@@ -1,5 +1,87 @@
 # TEAM-02 Requirement Factory
 
+## Team 02 Rolling Requirement Discovery Correction - 2026-05-26
+
+Root `AGENTS.md` was read first. Team 02 stayed docs-only, wrote only inside requirement-queue docs plus this outbox, and did not touch app source/tests, Prisma/schema, route registries, shared UI, package manifests, or generated artifacts.
+
+### Work Item
+
+Reconcile the next requirement queue after Team 00 routed the three current non-overlapping lanes:
+
+- `CF-W2-DOV-01`
+- `CF-W2-SPL-01B`
+- `CF-W1-RH-01A`
+
+Then identify the next direct investor/trader-value item without duplicating those active or queued packets.
+
+### Files Inspected
+
+- `AGENTS.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/refinement-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/requirements-backlog.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-MD-02A-additive-companion-evidence-schema-packet-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-SQLAB-02B-signal-outcome-journal-durable-learning-memory-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-STRAT-02B-strategy-definition-durable-revision-history-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-TSC-02-active-signal-health-rule-evidence-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-TSC-03-today-review-supporting-trust-evidence-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-TSC-02-architecture-review.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W1-TSC-03-architecture-review.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/00-control/active-work-board.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/12-ready-queue/ready-for-implementation.md`
+
+### Files Changed
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-MD-02A-additive-companion-evidence-schema-packet-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/requirements-backlog.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/refinement-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-02-requirement-factory.md`
+
+### Queue Correction Result
+
+- Removed `CF-W1-RH-01A` from fresh Team 02 discovery because Team 00 already promoted it into the active Ready family.
+- Removed stale near-front reliance on parent `CF-W1-TSC-02` and `CF-W1-TSC-03` as if they were the next fresh pulls from current `dev`; their honest executable children were already prepared or consumed in earlier stacked work.
+- Kept `CF-W2-DOV-01` and `CF-W2-SPL-01B` out of fresh discovery because they are already routed.
+
+### Requirement Refined
+
+Refined:
+
+- `CF-W1-MD-02A - Additive Companion Evidence Schema Packet`
+
+Refinement outcome:
+
+- explicitly positions `MD-02A` as the next post-DOV / SPL / RH direct-value packet;
+- keeps it proposal-only with an explicit schema/storage consent gate;
+- names the downstream trust surfaces still blocked behind this upstream durable-evidence decision.
+
+### Next Recommended Team 00 Action
+
+1. Keep DOV / SPL / RH on their current gates; do not send them back through Team 02.
+2. If Team 00 wants the next direct-value requirement after those lanes, open `CF-W1-MD-02A` as the next approval-gated Team 03 / Team 04 packet.
+3. If Team 00 does not want to open schema/storage scope yet, keep `CF-W1-MD-02A`, `CF-W1-SQLAB-02B`, and `CF-W1-STRAT-02B` parked explicitly as proposal-only and do not pretend there is a fresher non-consent queue head.
+
+### Architecture-Ready / Proposal-Ready Result
+
+- Proposal-ready next item: `CF-W1-MD-02A`
+- Proposal-ready follow-ons: `CF-W1-SQLAB-02B`, `CF-W1-STRAT-02B`
+- No fresh non-consent architecture candidate now sits ahead of those consent-gated items after Team 00 already routed `CF-W1-RH-01A`.
+
+### Tests Run / Skipped
+
+- Tests run: none
+- Tests skipped: all
+- Reason: docs-only requirement discovery and queue correction pass
+
+### Constraints / Blockers
+
+- No app code changed.
+- No builds, tests, UI smoke, or local data checks were run.
+- Primary blocker is explicit consent for schema/storage/generated scope if Team 00 wants to advance `CF-W1-MD-02A`, `CF-W1-SQLAB-02B`, or `CF-W1-STRAT-02B`.
+
 ## Team 02 Research Hub Next-Candidate Refinement Pass - 2026-05-26
 
 Root `AGENTS.md` was read first. Team 02 stayed docs-only, wrote only inside the allowed `10-requirements/**` folder plus this outbox, and did not touch application source/tests, Team 03 architecture docs, Team 04 QA docs, the Ready queue, Prisma/schema, route registries, package manifests, shared UI, or generated artifacts.

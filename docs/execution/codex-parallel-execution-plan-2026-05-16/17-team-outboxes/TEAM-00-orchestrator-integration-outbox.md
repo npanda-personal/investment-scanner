@@ -1,5 +1,39 @@
 # TEAM-00 Orchestrator / Integration Outbox
 
+## Latest Runtime Checkpoint - Ready Implementation Started, Rework Routed
+
+Date: 2026-05-26
+
+Status:
+
+- Branch: `dev`.
+- Main workspace status before this checkpoint: active execution docs only.
+- Open decisions: 2, affecting only `CF-W1-MD-02B` and `CF-W1-DQ-02-RS1`.
+- Product Owner action required: yes only for those affected workstreams; no for DOV/SPL/RH routine gates.
+- Push performed: no.
+
+Gate movement:
+
+- Team 08 `CF-W2-DOV-01` implementation was reviewed by Team 04 and rejected for fallback truthfulness / missing section-local source-failure surfacing; Team 08 rework is active as `019e6398-0233-7a23-9e06-5894d19d30e9`.
+- Team 06 `CF-W2-SPL-01B` implementation passed QA, but Team 10 rejected code review for stale current-DQ fallback and private Signal Generation type import; Team 06 rework is active as `019e63a0-d57d-7133-a31c-c990968cbaea`.
+- Team 08 `CF-W1-RH-01A` implementation completed and Team 04 QA Verification is active as `019e639b-4277-7191-b579-f89023b629b0`.
+- Team 03 prepared `CF-W1-MD-02A` as proposal-only and opened `DECISION-20260526-md-02b-schema-generated-consent`; no Prisma/schema/generated/source work is authorized.
+
+Teams ready to pick up new tasks:
+
+- Team 08: active on `CF-W2-DOV-01` QA-rejection rework.
+- Team 06: active on `CF-W2-SPL-01B` code-review rejection rework.
+- Team 04: active on `CF-W1-RH-01A` QA and queued for DOV/SPL QA reruns.
+- Team 10: ready for any QA-accepted RH/DOV/SPL handoff.
+- Team 03: ready for Architect Signoff after Team 10 acceptance.
+- Team 02: ready for rolling direct investor/trader-value requirement discovery when an agent slot is free.
+
+Next action:
+
+- Consume active agent outputs, close completed agents, then route QA/review/signoff gates. If a newly Ready implementation slice appears and has no true consent blocker, start it in an isolated worktree.
+
+---
+
 ## Latest Runtime Checkpoint - DOV And SPL Ready Promotions
 
 Date: 2026-05-26

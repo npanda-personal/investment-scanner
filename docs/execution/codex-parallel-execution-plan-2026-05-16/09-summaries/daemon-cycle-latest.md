@@ -1,21 +1,26 @@
 # Daemon Cycle Latest
 
-Date: 2026-05-25
+Date: 2026-05-26
 
 ## Current Cycle
 
 - Cycle id: `DAEMON-20260517`
-- Rolling iteration count: 26
-- Current mode: Team 00 coordinating Market Data Pipeline redesign and Ops dashboard rollout.
+- Rolling iteration count: 27
+- Current mode: Team 00 coordinating Ready implementation gates for Daily Overview, Signal Position Ledger, and Research Hub.
 - Daemon continuing: yes.
 - Main branch: `dev`.
 - Resume prompt path: `09-summaries/daemon-resume-prompt.md`.
 - Resume prompt updated: yes.
-- Product Owner action required: no.
-- Decision inbox count: 0.
+- Product Owner action required: yes only for affected decision workstreams.
+- Decision inbox count: 2.
 
 ## Completed Since Prior Checkpoint
 
+- Team 00 promoted and launched three independent Ready implementation lanes: `CF-W2-DOV-01`, `CF-W2-SPL-01B`, and `CF-W1-RH-01A`.
+- Team 08 completed initial `CF-W2-DOV-01` implementation; Team 04 rejected QA for placeholder/fallback truthfulness gaps. Team 08 rework is active.
+- Team 06 completed initial `CF-W2-SPL-01B` implementation; Team 04 accepted QA, but Team 10 rejected Code Review for stale current-DQ fallback and private Signal Generation type imports. Team 06 rework is active.
+- Team 08 completed initial `CF-W1-RH-01A` implementation; Team 04 QA Verification is active.
+- Team 03 refreshed `CF-W1-MD-02A` as a proposal-only packet and opened `DECISION-20260526-md-02b-schema-generated-consent`.
 - `CF-W3-MDPIPE-01A-MDF-OFFICIAL-EOD` accepted through QA, review, Architect Signoff, delegated PO acceptance, and committed on `dev` as `b0c1ab7 feat: add official eod bulk market data sync`.
 - `CF-W3-MDPIPE-01B1-DURABLE-PIPELINE-LEDGER-FOUNDATION` implemented and committed on `dev` as `e537f9e feat: add durable pipeline ledger foundation`.
 - `CF-W3-MDPIPE-01B2-PIPELINE-STATUS-API` implemented and committed on `dev` as `10719fa feat: add read-only pipeline status api`.
@@ -44,14 +49,19 @@ Validation:
 
 ## Queue Pressure
 
-- Ready queue depth: 0 available unassigned application-code items; B6 compact indicator is the next Ready-promotion candidate.
-- Refinement queue depth: active; next items are compact progress indicators, page-control migration, and ledgered Data Quality stage.
-- Integration queue depth: command API scoped commit complete; prior ledger/status/dashboard commits are complete.
-- Open decisions: 0.
-- Product Owner action required: no.
+- Ready queue depth: 0 available unassigned application-code items; active Ready work is already assigned to Team 08 / Team 06 / Team 08.
+- Refinement queue depth: active; next proposal-first items are `CF-W1-MD-02A`, `CF-W1-SQLAB-02B`, `CF-W1-STRAT-02B`, `CF-W1-L3-DQ-01A`, and `CF-W1-UX-01`.
+- Integration queue depth: active handoffs/review evidence exist in the three worktrees; no accepted app-code commit is ready yet.
+- Open decisions: 2.
+- Product Owner action required: only for `CF-W1-MD-02B` and `CF-W1-DQ-02-RS1`.
 
 ## Current Blockers
 
+- `CF-W2-DOV-01` is blocked from Code Review until Team 08 rework and Team 04 QA rerun accept.
+- `CF-W2-SPL-01B` is blocked from Architect Signoff until Team 06 rework, Team 04 QA rerun, and Team 10 re-review accept.
+- `CF-W1-RH-01A` is blocked from Code Review until Team 04 QA accepts.
+- `CF-W1-MD-02B` is blocked by the new schema/generated consent decision.
+- `CF-W1-DQ-02-RS1` remains blocked by the currentness-summary parity decision.
 - Manual trigger support is still limited to one Data Quality batch command. Market Data provider ingestion, scheduler fanout, and downstream fanout remain disabled/forbidden.
 - Existing feature-page bulk controls remain until dashboard command coverage is sufficient; remove/migrate them in a phased slice so ad hoc refresh capability is not stranded.
 - Compact feature-page progress strips require per-feature file reservations before implementation.
@@ -61,24 +71,24 @@ Validation:
 
 | Team | State | Current assignment | Next relaunch condition |
 | --- | --- | --- | --- |
-| Team 00 | coordinating | Promote the next bounded pipeline slice | Continue rolling scheduler unless a true blocker appears. |
-| Team 02 | ready | Rolling Product Owner / requirements discovery focused on investor/trader value | Relaunch when the pipeline queue thins. |
-| Team 03 | ready | Architect Signoff done for B4; next architecture prep is `CF-W3-MDPIPE-01C` | Start after B4 commit or if Team 00 asks for stage prep. |
-| Team 04 | ready | QA for B6 compact indicator, then command-control migration | Start after Team 08 B6 handoff. |
-| Team 05 | standby | Data Quality scheduled stage prep | Wait for command/status/stage contracts. |
-| Team 06 | standby | Strategy/Signal downstream stage prep | Wait for DQ stage and fanout contracts. |
-| Team 07 | standby | Today Review compact progress indicator later | Wait for feature-page indicator reservation. |
-| Team 08 | ready | `CF-W3-MDPIPE-01B6` compact Data Quality progress indicator | Start after B4 commit. |
+| Team 00 | coordinating | Consume active agent outputs and route QA/review/signoff gates | Continue rolling scheduler unless a true blocker appears. |
+| Team 02 | ready | Rolling Product Owner / requirements discovery focused on investor/trader value | Relaunch when an agent slot opens and no review/signoff gate is waiting. |
+| Team 03 | ready | Architect Signoff after Team 10 acceptance | Start after RH/DOV/SPL Code Review acceptance. |
+| Team 04 | active | `CF-W1-RH-01A` QA; queued DOV/SPL QA reruns | Start each rerun after developer rework handoff. |
+| Team 05 | blocked/standby | `CF-W1-MD-02B` blocked by consent; DQ-RS1 blocked by decision | Wait for Product Owner decision or a separate no-schema Ready packet. |
+| Team 06 | active | `CF-W2-SPL-01B` review-reject rework | Route to Team 04 after handoff. |
+| Team 07 | standby | No current Ready item | Wait for next promoted Today Review / Portfolio item. |
+| Team 08 | active | `CF-W2-DOV-01` rework; `CF-W1-RH-01A` already in QA | Route DOV to Team 04 after handoff. |
 | Team 09 | standby | Platform/auth only if command API needs protected-user semantics | Wait for Team 03 architecture finding. |
-| Team 10 | ready | Review B6 after QA acceptance | Start after Team 04 accepts.
+| Team 10 | ready | Review RH/DOV/SPL after QA acceptance | Start after Team 04 accepts.
 
 ## Next Assignments
 
-1. Team 00: promote `CF-W3-MDPIPE-01B6` compact Data Quality progress indicator if gates remain clean.
-2. Team 08: implement `CF-W3-MDPIPE-01B6`.
-3. Team 04: verify B6 after Team 08 handoff.
-4. Team 10 and Team 03: review/signoff B6 after QA acceptance.
-5. Team 03 and Team 05: prepare `CF-W3-MDPIPE-01C` ledgered Data Quality scheduled stage after command/status contracts stabilize.
+1. Team 00: consume Team 08 DOV rework output and route Team 04 QA rerun.
+2. Team 00: consume Team 06 SPL rework output and route Team 04 QA rerun.
+3. Team 00: consume Team 04 RH QA output and route Team 10 review if accepted.
+4. Team 03: sign off only after Team 10 accepts a handoff.
+5. Team 02: resume rolling direct-value requirements when a slot opens and no immediate review/signoff gate is waiting.
 
 ## Stop State
 

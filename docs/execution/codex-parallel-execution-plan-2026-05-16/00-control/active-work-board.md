@@ -34,6 +34,46 @@ No historical active work items have been migrated as active.
 - Rejected / Rework
 - Deferred
 
+## Latest Team 00 Routing Update - Implementation Gates In Flight
+
+Date: 2026-05-26
+
+User direction:
+
+- Start implementation once a bounded slice is Ready.
+- Continue rolling Team 00 coordination without waiting for Product Owner approval unless a true consent blocker appears.
+
+Gate status:
+
+- `CF-W2-DOV-01` is in Team 08 implementation rework after Team 04 QA rejected placeholder/fallback truthfulness gaps.
+- `CF-W2-SPL-01B` is in Team 06 code-review rework after Team 10 rejected stale current-DQ fallback and private Signal Generation type import.
+- `CF-W1-RH-01A` is in Team 04 QA Verification after Team 08 implementation.
+- `CF-W1-MD-02A` remains proposal-only. Team 03 opened `DECISION-20260526-md-02b-schema-generated-consent`; no schema/generated/source implementation is authorized until resolved.
+- Open decisions: 2, affecting only `CF-W1-MD-02B` and `CF-W1-DQ-02-RS1`.
+
+Active spawned agents:
+
+- Team 08 `019e6398-0233-7a23-9e06-5894d19d30e9`: `CF-W2-DOV-01` QA-rejection rework in `C:\work\repo\investment-scanner-worktrees\team08-CF-W2-DOV-01`.
+- Team 04 `019e639b-4277-7191-b579-f89023b629b0`: `CF-W1-RH-01A` QA Verification in `C:\work\repo\investment-scanner-worktrees\team08-CF-W1-RH-01A`.
+- Team 06 `019e63a0-d57d-7133-a31c-c990968cbaea`: `CF-W2-SPL-01B` code-review rejection rework in `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-SPL-01B`.
+
+Next gates:
+
+- Team 04 QA re-run for `CF-W2-DOV-01` after Team 08 rework handoff.
+- Team 04 QA re-run for `CF-W2-SPL-01B` after Team 06 rework handoff.
+- Team 10 Code Review for `CF-W1-RH-01A` if Team 04 accepts QA.
+- Team 03 Architect Signoff follows only after Team 10 acceptance.
+- Team 02 may continue rolling direct investor/trader-value requirement discovery when an agent slot is available.
+
+Teams ready to pick up new tasks:
+
+- Team 08: active on `CF-W2-DOV-01` rework.
+- Team 06: active on `CF-W2-SPL-01B` rework.
+- Team 04: active on `CF-W1-RH-01A` QA; ready for DOV/SPL QA reruns after handoffs.
+- Team 10: ready for `CF-W1-RH-01A`, `CF-W2-DOV-01`, or `CF-W2-SPL-01B` after QA acceptance.
+- Team 03: ready for Architect Signoff after Team 10 acceptance.
+- Team 02: ready for rolling requirements discovery when the current gate pressure frees a slot.
+
 ## Latest Team 00 Routing Update - Daily Overview And Signal Position Ledger Ready
 
 Date: 2026-05-26

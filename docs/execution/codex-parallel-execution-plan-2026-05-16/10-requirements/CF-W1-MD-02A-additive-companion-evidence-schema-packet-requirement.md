@@ -1,16 +1,24 @@
 # CF-W1-MD-02A - Additive Companion Evidence Schema Packet Requirement
 
-Date: 2026-05-18
+Date: 2026-05-26
 
 ## Status
 
-New bounded child requirement. Docs-only architecture and QA-prep candidate. Not Ready for Implementation.
+Refined bounded child requirement. Proposal-only architecture and QA-prep candidate. This is the next direct-value post-`CF-W2-DOV-01` / `CF-W2-SPL-01B` / `CF-W1-RH-01A` packet only if Team 00 deliberately opens a consent-gated schema/storage lane. Not Ready for Implementation.
 
 This child converts the accepted `CF-W1-MD-02` ADR direction into the next approval-gated packet: an additive Prisma/schema proposal for companion durable market-data readiness evidence. No Prisma edits, migrations, generated types, repository/service changes, Data Quality handoff changes, or tests are approved in this requirement.
 
 ## Product Value
 
 Market-data trust remains the highest upstream investor/trader-value dependency. Until the storage model is narrowed into an explicit additive schema packet, downstream claims about durable freshness, missing-candle basis, duplicate/invalid-row evidence, and source provenance stay limited to derived/read-path behavior.
+
+That gap still sits above later signal-quality, calibration, and review-surface follow-through work. Team 00 already routed the three bounded non-consent lanes now in motion:
+
+- `CF-W2-DOV-01` Daily Overview
+- `CF-W2-SPL-01B` Signal Position Ledger active-row foundation
+- `CF-W1-RH-01A` Research Hub evidence-date wiring
+
+After those lanes, the strongest unassigned direct-value gap is still upstream durable market-data evidence. Without it, Daily Overview trust framing, Signal Position Ledger current-price provenance, Research Hub evidence-date trust, and later Today Review / Calibration / Signal Quality follow-through must keep leaning on read-path or request-local evidence instead of durable stored proof.
 
 `CF-W1-MD-02A` is the smallest next slice that can move the market-data evidence program forward without opening application-code work.
 
@@ -43,6 +51,14 @@ Docs-only packet preparation for the first child after the ADR draft:
 - document which later packets remain blocked behind this child;
 - prepare the item for Team 03 architecture packet tightening and Team 04 ADR QA review.
 
+## Why Now After DOV / SPL / RH
+
+This child is still proposal-only, but it is now the cleanest next requirement-factory recommendation because:
+
+- `CF-W2-DOV-01`, `CF-W2-SPL-01B`, and `CF-W1-RH-01A` already occupy the active non-consent implementation lanes;
+- previously queued Today Review parent items are no longer honest fresh queue heads because their executable children were already prepared or consumed in earlier stacked work;
+- the next remaining direct-value move that does not duplicate those active lanes is to decide whether Team 00 wants to open the upstream storage consent gate at all.
+
 ## Non-Goals
 
 - No direct edit to `backend/prisma/schema.prisma`.
@@ -74,6 +90,7 @@ For this docs-only child requirement:
 - The child states that the first packet must be additive and must not destructively rewrite existing `PriceTick` or `LatestPrice` semantics.
 - The child states that implementation remains blocked until a later explicit schema/migration approval is granted.
 - The child clearly names the blocked follow-on packets so Team 00 does not route repository/service or DQE work prematurely.
+- The child explicitly names the downstream trust surfaces that stay blocked behind this consent gate: Daily Overview trust framing, Signal Position Ledger durable price/readiness provenance, Research Hub durable evidence-date trust, and later Today Review / Calibration / Signal Quality consumer adoption.
 
 ## Likely Owner Team
 
@@ -140,4 +157,6 @@ This child does not overlap Team 06 implementation files and does not touch Team
 
 ## Next Gate
 
-Team 00 should route `CF-W1-MD-02A` to Team 03 for architecture packet prep and Team 04 for ADR QA checklist review. Keep `CF-W1-MD-02` as the parent only, with `CF-W1-MD-02B/C/D` blocked behind the child and behind explicit schema/migration approval.
+If Team 00 wants the next direct-value requirement after the active DOV / SPL / RH lanes, route `CF-W1-MD-02A` to Team 03 for approval-gated architecture packet prep and Team 04 for ADR QA checklist review.
+
+Keep `CF-W1-MD-02` as the parent only, with `CF-W1-MD-02B/C/D` blocked behind this child and behind explicit schema/migration approval.

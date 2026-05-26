@@ -4,6 +4,40 @@ Date: 2026-05-25
 
 Owner: Team 00 - Master Orchestrator / Integration
 
+## Latest Active Snapshot - Implementation Rework And QA Gates
+
+Date: 2026-05-26
+
+Current active agents:
+
+| Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Team 08 - UX / Research / Copilot | `019e6398-0233-7a23-9e06-5894d19d30e9` | `gpt-5.3-codex`, high | rework | `CF-W2-DOV-01` in `C:\work\repo\investment-scanner-worktrees\team08-CF-W2-DOV-01` | active |
+| 2 | Team 04 - QA Factory | `019e639b-4277-7191-b579-f89023b629b0` | inherited, active | QA verification | `CF-W1-RH-01A` in `C:\work\repo\investment-scanner-worktrees\team08-CF-W1-RH-01A` | active |
+| 3 | Team 06 - Strategy / Signal / Risk | `019e63a0-d57d-7133-a31c-c990968cbaea` | `gpt-5.3-codex`, high | review-reject rework | `CF-W2-SPL-01B` in `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-SPL-01B` | active |
+| 4 | Open slot | none | pending | QA rerun | Team 04 `CF-W2-DOV-01` after Team 08 rework handoff | queued |
+| 5 | Open slot | none | pending | QA rerun / Code Review | Team 04 `CF-W2-SPL-01B` after Team 06 rework; Team 10 after QA ACCEPT | queued |
+| 6 | Open slot | none | pending | Requirements / Architecture | Team 02 rolling discovery or Team 03 signoff after Team 10 ACCEPT | queued |
+
+Current routing:
+
+- `CF-W2-DOV-01` remains inside the approved frontend-only Daily Overview dashboard file set. Rework must remove fallback-as-truth behavior and surface source failures section-locally.
+- `CF-W2-SPL-01B` remains inside the approved backend-only Signal Position Ledger module/test file set. Rework must remove stale current-DQ fallback and private Signal Generation type imports.
+- `CF-W1-RH-01A` is under QA Verification; if QA accepts, route to Team 10 Code Review.
+- `CF-W1-MD-02A` is proposal-only and blocked from schema/generated/source implementation by `DECISION-20260526-md-02b-schema-generated-consent`.
+- Open decisions remain scoped to `CF-W1-MD-02B` and `CF-W1-DQ-02-RS1`; unrelated DOV/SPL/RH gates continue.
+
+Teams ready to pick up new tasks:
+
+- Team 08: active on `CF-W2-DOV-01` rework.
+- Team 06: active on `CF-W2-SPL-01B` rework.
+- Team 04: active on `CF-W1-RH-01A` QA; queued for DOV/SPL QA reruns.
+- Team 10: ready for the next QA-accepted RH/DOV/SPL handoff.
+- Team 03: ready for Architect Signoff after Team 10 acceptance.
+- Team 02: ready for rolling direct-value requirement discovery when a slot opens.
+
+---
+
 ## Latest Active Snapshot - Pause Checkpoint After Current Open Items
 
 Date: 2026-05-25

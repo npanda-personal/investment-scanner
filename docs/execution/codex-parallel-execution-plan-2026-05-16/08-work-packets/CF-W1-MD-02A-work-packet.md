@@ -1,6 +1,6 @@
 # CF-W1-MD-02A Work Packet
 
-Date: 2026-05-18
+Date: 2026-05-26
 
 ## Work Item
 
@@ -8,9 +8,9 @@ Date: 2026-05-18
 
 ## State
 
-Proposal packet ready. Not Ready for Implementation.
+Proposal-only packet refreshed. Not Ready for Implementation.
 
-This packet exists only to tighten the future schema boundary and later packet split. It does not authorize any application writer, Prisma change, migration, generated artifact change, repository/service change, DQE handoff implementation, test run, or UI work.
+This packet exists only to tighten the future schema boundary, implementation split, and consent boundary. It does not authorize any application writer, Prisma change, migration, generated artifact change, repository/service change, DQE handoff implementation, test run, or UI work.
 
 ## Owner / Lane / Module
 
@@ -50,8 +50,10 @@ The packet must leave behind:
 - the minimum natural key for future companion evidence storage;
 - the minimum durable evidence field set;
 - additive migration posture with no destructive `PriceTick` / `LatestPrice` rewrite;
+- explicit confirmation that existing run-level `sourceFingerprint` and changed-instrument evidence are optional linkage only, not a substitute for the companion evidence row;
 - exact blockers for schema, migrations, generated artifacts, Market Data implementation, DQE handoff, and downstream adoption;
-- the exact split between `MD-02A`, `MD-02B`, `MD-02C`, and `MD-02D`.
+- the exact split between `MD-02A`, `MD-02B`, `MD-02C`, and `MD-02D`;
+- the separate Product Owner consent requirement tracked in `99-decision-inbox/DECISION-20260526-md-02b-schema-generated-consent.md`.
 
 ## Exact Split
 
@@ -75,6 +77,7 @@ Review focus:
 - natural-key completeness;
 - durable evidence completeness;
 - durable-versus-derived claim boundary;
+- run-level evidence is not mistaken for per-candle durable evidence;
 - clear rejection of implementation work in this pass;
 - exact `02B/C/D` separation.
 
@@ -96,5 +99,6 @@ Stop and return to Team 00 / Architect if any request asks `MD-02A` to do one of
 ## Next Gate
 
 1. Team 04 ADR/schema-proposal QA review for `CF-W1-MD-02A`.
-2. Team 00 decision on whether to open `CF-W1-MD-02B` as the explicit first implementation packet with schema/migration/generated approval.
-3. Keep `CF-W1-MD-02A` out of any Ready-for-implementation routing.
+2. Product Owner decision on `DECISION-20260526-md-02b-schema-generated-consent`.
+3. If that decision is approved, Team 00 may open `CF-W1-MD-02B` as the explicit first implementation packet with schema, migration, and generated approval.
+4. Keep `CF-W1-MD-02A` out of any Ready-for-implementation routing.

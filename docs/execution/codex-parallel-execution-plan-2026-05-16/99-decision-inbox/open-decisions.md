@@ -1,10 +1,10 @@
 # Open Decisions
 
-Date: 2026-05-18
+Date: 2026-05-26
 
 ## Current Open Decisions
 
-Open decisions: 1.
+Open decisions: 2.
 
 Product Owner action required for the affected workstream only.
 
@@ -12,6 +12,7 @@ Daemon should continue unrelated autonomous work.
 
 | Decision ID | Summary | Affected Workstream | Decision Packet | Current Routing |
 | --- | --- | --- | --- | --- |
+| DECISION-20260526-md-02b-schema-generated-consent | Decide whether Team 00 may open the first additive Market Data companion evidence implementation lane with Prisma schema, migration, generated client/types, and Market Data writer reservations. | `CF-W1-MD-02B` only | `DECISION-20260526-md-02b-schema-generated-consent.md` | Keep `CF-W1-MD-02A` proposal-only; Team 04 may review the packet, but no schema/generated/source work may start until resolved. |
 | DECISION-20260525-dq-rs1-currentness-summary-parity | Choose whether to reduce `CF-W1-DQ-02-RS1` to bounded row/detail currentness only or preserve full summary/helper parity and create an upstream bulk/durable evidence slice first. | `CF-W1-DQ-02-RS1` only | `DECISION-20260525-dq-rs1-currentness-summary-parity.md` | Stop Team 05 RS1 rework and do not rerun QA on the current packet until resolved. |
 
 ## Resolved This Cycle
@@ -37,9 +38,12 @@ Daemon should continue unrelated autonomous work.
 
 ## Current Routing Result
 
-No current workstream is blocked by a human Product Owner decision.
+Current direct-value workstreams blocked by a human Product Owner decision:
 
-Items moved out of Decision Inbox blocker state but still not Ready:
+- `CF-W1-MD-02B`
+- `CF-W1-DQ-02-RS1`
+
+Items moved out of earlier Decision Inbox blocker state but still not Ready:
 
 - `CF-W1-AUTH-01`
 - `CF-W1-SUB-01`

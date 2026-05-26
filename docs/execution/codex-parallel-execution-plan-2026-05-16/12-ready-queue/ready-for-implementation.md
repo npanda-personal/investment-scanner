@@ -6,6 +6,13 @@ Date: 2026-05-18
 
 No available application-code item is currently waiting unassigned in Ready. The newly promoted items below are assigned immediately to their owning teams and should run in separate worktrees.
 
+2026-05-26 gate update:
+
+- `CF-W2-DOV-01` remains assigned to Team 08 and is in QA-rejection rework; it is not ready for Code Review until Team 04 rerun accepts.
+- `CF-W2-SPL-01B` remains assigned to Team 06 and is in Code Review rejection rework; it is not ready for Architect Signoff until Team 04 rerun and Team 10 re-review accept.
+- `CF-W1-RH-01A` remains assigned to Team 08 and is currently in Team 04 QA Verification.
+- `CF-W1-MD-02A` is proposal-only and not Ready for Implementation because `DECISION-20260526-md-02b-schema-generated-consent` is open.
+
 2026-05-26 Team 00 Ready promotion - `CF-W1-RH-01A`:
 
 - `CF-W1-RH-01A` is promoted and assigned to Team 08 as a separate Research Hub worktree from `CF-W2-DOV-01`.
