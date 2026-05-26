@@ -20,17 +20,20 @@ Gate movement:
 - Team 04 completed executable QA plans for both `CF-W2-DOV-01` and `CF-W2-SPL-01B`.
 - Team 00 promoted `CF-W2-DOV-01` to Team 08 as a frontend-only Daily Overview dashboard child.
 - Team 00 promoted `CF-W2-SPL-01B` to Team 06 as a backend-only Signal Position Ledger active-row read-model child.
+- Team 00 promoted `CF-W1-RH-01A` to Team 08 as a separate Research Hub evidence-date wiring child.
 
 Parallelism:
 
-- `CF-W2-DOV-01` and `CF-W2-SPL-01B` can run in parallel because their write scopes do not overlap.
+- `CF-W2-DOV-01`, `CF-W2-SPL-01B`, and `CF-W1-RH-01A` can run in parallel because their write scopes do not overlap.
 - `CF-W2-DOV-01` reserves `frontend/src/app/HomePage.tsx`, the new `frontend/src/features/daily-overview-dashboard/**` feature, and `frontend/tests/ui/daily-overview-dashboard.spec.ts`.
 - `CF-W2-SPL-01B` reserves only the new backend `signal-position-ledger` module files and backend module tests.
+- `CF-W1-RH-01A` reserves only the five Research Hub files listed in its Ready promotion.
 
 Teams ready to pick up new tasks:
 
 - Team 08: implement `CF-W2-DOV-01` in `C:\work\repo\investment-scanner-worktrees\team08-CF-W2-DOV-01`.
 - Team 06: implement `CF-W2-SPL-01B` in `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-SPL-01B`.
+- Team 08: implement `CF-W1-RH-01A` in `C:\work\repo\investment-scanner-worktrees\team08-CF-W1-RH-01A`.
 - Team 04: QA Verification after either developer handoff.
 - Team 10: Code Review after QA acceptance.
 - Team 03: `CF-W1-RH-01A` architecture now, then Architect Signoff after Team 10 acceptance.

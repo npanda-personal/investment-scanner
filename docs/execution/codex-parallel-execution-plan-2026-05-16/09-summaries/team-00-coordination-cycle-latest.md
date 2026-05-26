@@ -17,21 +17,25 @@ Gate movement:
 
 - `CF-W2-DOV-01` has requirement, UX plan, architecture review, contract, work packet, QA plan, and exact Team 08 file reservations.
 - `CF-W2-SPL-01B` has requirement, architecture review, contract, work packet, QA plan, and exact Team 06 file reservations.
-- Team 00 promoted both items to Ready.
-- The two items are independent and can run in parallel:
+- `CF-W1-RH-01A` has requirement refinement, architecture review, contract, work packet, QA plan, and exact Research Hub file reservations.
+- Team 00 promoted all three items to Ready.
+- The three items are independent and can run in parallel:
   - `DOV-01`: frontend-only dashboard over existing read APIs.
   - `SPL-01B`: backend-only active-row read-model foundation.
+  - `RH-01A`: Research Hub evidence-date wiring.
 - Team 02 rolling requirement discovery and Team 03 `CF-W1-RH-01A` architecture remain active.
 
 Implementation assignments:
 
 - Team 08: `CF-W2-DOV-01`, branch `codex/team08-ux-research/CF-W2-DOV-01`, worktree `C:\work\repo\investment-scanner-worktrees\team08-CF-W2-DOV-01`.
 - Team 06: `CF-W2-SPL-01B`, branch `codex/team06-strategy-signal/CF-W2-SPL-01B`, worktree `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-SPL-01B`.
+- Team 08: `CF-W1-RH-01A`, branch `codex/team08-research/CF-W1-RH-01A`, worktree `C:\work\repo\investment-scanner-worktrees\team08-CF-W1-RH-01A`.
 
 Teams ready to pick up new tasks:
 
 - Team 08: implement `CF-W2-DOV-01` after docs checkpoint/worktree setup.
 - Team 06: implement `CF-W2-SPL-01B` after docs checkpoint/worktree setup.
+- Team 08: implement `CF-W1-RH-01A` in a separate Research Hub worktree after docs checkpoint/worktree setup.
 - Team 04: QA Verification after first developer handoff.
 - Team 10: Code Review after QA acceptance.
 - Team 03: continue `CF-W1-RH-01A` architecture; later signoff gates.

@@ -6,6 +6,46 @@ Date: 2026-05-18
 
 No available application-code item is currently waiting unassigned in Ready. The newly promoted items below are assigned immediately to their owning teams and should run in separate worktrees.
 
+2026-05-26 Team 00 Ready promotion - `CF-W1-RH-01A`:
+
+- `CF-W1-RH-01A` is promoted and assigned to Team 08 as a separate Research Hub worktree from `CF-W2-DOV-01`.
+- Current gate state: Ready for Implementation after Team 02 requirement refinement, Team 03 architecture/contract/work packet, Team 04 QA plan, exact file reservations, and affected-decision check.
+- Purpose: wire truthful per-dimension `evidenceDate` values into Research Hub actionability tiles without widening the API shape or fabricating unavailable timestamps.
+- Branch: `codex/team08-research/CF-W1-RH-01A`.
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team08-CF-W1-RH-01A`.
+- Required base: Team 00 docs checkpoint commit containing `13-implementation-evidence/CF-W1-RH-01A-ready-promotion.md`.
+- Gate evidence:
+  - Requirement: `10-requirements/CF-W1-RH-01A-research-hub-actionability-evidence-date-wiring-requirement.md`
+  - Architecture review: `03-architecture/CF-W1-RH-01A-architecture-review.md`
+  - Contract: `06-contracts/CF-W1-RH-01A-research-hub-evidence-date-contract.md`
+  - Work packet: `08-work-packets/CF-W1-RH-01A-work-packet.md`
+  - QA plan: `04-qa/CF-W1-RH-01A-qa-plan.md`
+  - Ready promotion: `13-implementation-evidence/CF-W1-RH-01A-ready-promotion.md`
+  - Open decisions: one unrelated DQ-RS1 decision only.
+- Allowed implementation files:
+  - `backend/src/modules/research-hub/research-hub.service.ts`
+  - `backend/src/modules/research-hub/research-hub.md`
+  - `backend/tests/modules/research-hub/research-hub.service.test.ts`
+  - `frontend/src/features/research-hub/components/ResearchOverviewPage.tsx`
+  - `frontend/tests/ui/research-hub.spec.ts`
+- Allowed reporting docs:
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-08-CF-W1-RH-01A-implementation-outbox.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W1-RH-01A-developer-handoff.md`
+- Forbidden scope:
+  - Research Hub types/controller/router/index, frontend API/hook/index, route registries, shared UI/components, shared backend utilities, upstream module source/tests, schema/migrations/generated/package files, provider/live/startup/backfill, DOV files, and SPL files
+- Required validation:
+
+```powershell
+cd backend
+npm.cmd run build
+npm.cmd test -- research-hub --runInBand
+cd frontend
+npm.cmd run build
+npm.cmd run test:ui -- research-hub.spec.ts --workers=1
+```
+
+Stop and return to Team 00 if implementation requires files outside the allowed five-file writer set, route registry edits, shared UI, type/API expansion, upstream module edits, calibration basis work, schema/generated/package/provider scope, or advice/target/R:R wording.
+
 2026-05-26 Team 00 Ready promotion - `CF-W2-DOV-01`:
 
 - `CF-W2-DOV-01` is promoted and assigned to Team 08.

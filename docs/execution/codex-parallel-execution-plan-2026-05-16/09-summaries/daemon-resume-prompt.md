@@ -16,6 +16,9 @@ Latest live checkpoint:
 - `CF-W2-SPL-01B` branch/worktree: `codex/team06-strategy-signal/CF-W2-SPL-01B`, `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-SPL-01B`.
 - `CF-W2-SPL-01B` allowed scope: new `backend/src/modules/signal-position-ledger/**` and `backend/tests/modules/signal-position-ledger/**`.
 - Team 04 is preparing `CF-W1-RH-01A` QA planning after Team 03 architecture; RH is not Ready until QA and Team 00 promotion.
+- `CF-W1-RH-01A` is now Ready for a separate Research Hub evidence-date implementation once the Team 00 docs checkpoint containing `13-implementation-evidence/CF-W1-RH-01A-ready-promotion.md` exists.
+- `CF-W1-RH-01A` branch/worktree: `codex/team08-research/CF-W1-RH-01A`, `C:\work\repo\investment-scanner-worktrees\team08-CF-W1-RH-01A`.
+- `CF-W1-RH-01A` allowed scope: `backend/src/modules/research-hub/research-hub.service.ts`, `backend/src/modules/research-hub/research-hub.md`, `backend/tests/modules/research-hub/research-hub.service.test.ts`, `frontend/src/features/research-hub/components/ResearchOverviewPage.tsx`, and `frontend/tests/ui/research-hub.spec.ts`.
 - Team 02 requirement lane refined `CF-W1-RH-01A` and updated priority queues; DOV/SPL are routed work, not fresh discovery.
 - Active implementation agents at checkpoint:
   - Team 06 `019e6383-810a-70c2-822a-7604ecc086a9`: `CF-W2-SPL-01B`.

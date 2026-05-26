@@ -47,7 +47,8 @@ Gate status:
 
 - `CF-W2-DOV-01` is promoted to Ready as a frontend-only Team 08 child.
 - `CF-W2-SPL-01B` is promoted to Ready as a backend-only Team 06 child.
-- `CF-W2-DOV-01` and `CF-W2-SPL-01B` are independent and may run in parallel.
+- `CF-W1-RH-01A` is promoted to Ready as a separate Research Hub evidence-date child.
+- `CF-W2-DOV-01`, `CF-W2-SPL-01B`, and `CF-W1-RH-01A` are independent and may run in parallel in separate worktrees.
 - `CF-W2-DOV-01` must keep `Calibration Evidence-Through`, `Signal Position Follow-Through`, and `Measured Outcome Follow-Through` as explicit `Coming soon` placeholders.
 - `CF-W2-SPL-01B` is only a backend read-model foundation; it is not a surfaced open/closed positions page.
 - Open decisions: one unrelated `CF-W1-DQ-02-RS1` currentness-summary parity decision; it blocks only DQ-RS1.
@@ -56,6 +57,7 @@ Implementation routing:
 
 - Team 08 owns `CF-W2-DOV-01` in branch `codex/team08-ux-research/CF-W2-DOV-01`, worktree `C:\work\repo\investment-scanner-worktrees\team08-CF-W2-DOV-01`.
 - Team 06 owns `CF-W2-SPL-01B` in branch `codex/team06-strategy-signal/CF-W2-SPL-01B`, worktree `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-SPL-01B`.
+- Team 08 owns `CF-W1-RH-01A` in branch `codex/team08-research/CF-W1-RH-01A`, worktree `C:\work\repo\investment-scanner-worktrees\team08-CF-W1-RH-01A`.
 - Team 04 owns QA Verification after each developer handoff.
 - Team 10 owns Code Review after Team 04 acceptance.
 - Team 03 owns Architect Signoff after Team 10 acceptance and continues `CF-W1-RH-01A` architecture prep in parallel.
@@ -65,6 +67,7 @@ Teams ready to pick up new tasks:
 
 - Team 08: implement `CF-W2-DOV-01` after docs checkpoint/worktree setup.
 - Team 06: implement `CF-W2-SPL-01B` after docs checkpoint/worktree setup.
+- Team 08: implement `CF-W1-RH-01A` in a separate Research Hub worktree after docs checkpoint/worktree setup.
 - Team 04: QA Verification for whichever implementation handoff lands first.
 - Team 10: Code Review after QA acceptance.
 - Team 03: active on `CF-W1-RH-01A` architecture and later signoff gates.
