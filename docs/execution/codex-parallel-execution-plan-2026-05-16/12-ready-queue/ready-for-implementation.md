@@ -6,6 +6,24 @@ Date: 2026-05-18
 
 No available application-code item is currently waiting unassigned in Ready. The newly promoted items below are assigned immediately to their owning teams and should run in separate worktrees.
 
+2026-05-26 Team 00 Ready promotion - `CF-W2-DOV-02`:
+
+- `CF-W2-DOV-02` is promoted and assigned to Team 08 as a bounded Daily Overview calibration evidence-through summary child.
+- Branch: `codex/team08-ux-research/CF-W2-DOV-02`.
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team08-CF-W2-DOV-02`.
+- Required base: `50bccc8 feat: add daily overview dashboard`, built from accepted `1be7d1a` plus replayed accepted DOV-01 commit `a371e2f`.
+- Dependency validation evidence: `09-summaries/CF-W2-DOV-02-dependency-integration-base-evidence.md`.
+- Ready promotion evidence: `13-implementation-evidence/CF-W2-DOV-02-ready-promotion.md`.
+- Allowed implementation files:
+  - `frontend/src/features/daily-overview-dashboard/types.ts`
+  - `frontend/src/features/daily-overview-dashboard/api/dailyOverviewDashboardApi.ts`
+  - `frontend/src/features/daily-overview-dashboard/hooks/useDailyOverviewDashboard.ts`
+  - `frontend/src/features/daily-overview-dashboard/components/DailyOverviewDashboardPage.tsx`
+  - `frontend/src/features/daily-overview-dashboard/components/CalibrationEvidenceSummaryPanel.tsx`
+  - `frontend/tests/ui/daily-overview-dashboard.spec.ts`
+- Forbidden: `HomePage`, route registries, navigation metadata, shared UI/hooks, Signal Calibration source/tests, backend source/tests, schema/migrations/generated/package files, provider/live/startup/backfill/scheduler files, and advice/target/R:R/Trade Plan-first wording.
+- Required validation: frontend build, focused Daily Overview UI smoke against a dedicated worktree server, and language guard.
+
 2026-05-26 Team 00 gate update:
 
 - `CF-W2-SPL-02` is accepted under standing delegation after Team 04 QA rerun, Team 10 rereview, and Team 03 Architect Signoff. It is locally committed on branch `codex/team06-strategy-signal/CF-W2-SPL-02` as `31115f0 feat: add signal position ledger surface`; no push is authorized.

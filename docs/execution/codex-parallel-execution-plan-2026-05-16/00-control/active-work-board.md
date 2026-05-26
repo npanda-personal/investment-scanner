@@ -68,12 +68,13 @@ Priority closure status:
   - No push.
 - Daily Overview:
   - `CF-W2-DOV-01` accepted and locally committed as `a371e2f feat: add daily overview dashboard`.
-  - `CF-W2-DOV-02` remains queued for dependency integration-base preparation because accepted DOV-01 and CAL-02A commits are on separate branches and dry-merge conflicts exist in Signal Calibration files.
+  - `CF-W2-DOV-02` dependency integration base is verified at `50bccc8 feat: add daily overview dashboard`.
+  - `CF-W2-DOV-02` is promoted to Team 08 on branch `codex/team08-ux-research/CF-W2-DOV-02` / worktree `C:\work\repo\investment-scanner-worktrees\team08-CF-W2-DOV-02`.
+  - Team 08 implementation agent: `019e649d-550f-7b31-b6fa-40109ce27eff`.
 
 Teams ready to pick up new tasks:
 
-- Team 00: prepare the `CF-W2-DOV-02` dependency integration base.
-- Team 08: Daily Overview follow-up only after Team 00 creates the integration base and promotes a bounded Ready slice.
+- Team 08: implement `CF-W2-DOV-02`.
 - Team 04: QA after the next Daily Overview handoff.
 - Team 10: review after QA acceptance.
 - Team 03: Architect Signoff after review acceptance, not rolling architecture prep.

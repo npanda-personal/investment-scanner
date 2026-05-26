@@ -23,12 +23,12 @@ Completed in the recent window:
 
 In progress:
 
-- Team 00 local coordination only: prepare `CF-W2-DOV-02` dependency integration base.
+- Team 08 `019e649d-550f-7b31-b6fa-40109ce27eff`: `CF-W2-DOV-02` implementation in `C:\work\repo\investment-scanner-worktrees\team08-CF-W2-DOV-02`.
 
 Pending:
 
 - Daily Overview dependency integration base.
-- Daily Overview follow-up implementation only after Team 00 promotes a bounded Ready slice.
+- Daily Overview follow-up implementation by Team 08.
 - QA, review, Architect Signoff, delegated PO acceptance, and commit for that follow-up slice.
 
 Teams ready to pick up new tasks:

@@ -6,6 +6,76 @@ Team: TEAM-08 - UX / Research / Copilot
 
 Prompt file: `docs/execution/codex-parallel-execution-plan-2026-05-16/15-automation-prompts/AUTO-08-ux-research-copilot.md`
 
+## Latest Assignment Override - 2026-05-26 DOV-02
+
+Team 00 promotes `CF-W2-DOV-02` as a bounded Daily Overview follow-up implementation.
+
+Work item:
+
+- `CF-W2-DOV-02` - Daily Overview calibration evidence-through summary.
+
+Branch / worktree:
+
+- Branch: `codex/team08-ux-research/CF-W2-DOV-02`
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team08-CF-W2-DOV-02`
+- Required base: `50bccc8 feat: add daily overview dashboard`
+
+Read latest active docs from the main workspace:
+
+- `C:\work\repo\investment-scanner\AGENTS.md`
+- `C:\work\repo\investment-scanner\docs\execution\codex-parallel-execution-plan-2026-05-16\10-requirements\CF-W2-DOV-02-daily-overview-calibration-evidence-through-summary-requirement.md`
+- `C:\work\repo\investment-scanner\docs\execution\codex-parallel-execution-plan-2026-05-16\03-architecture\CF-W2-DOV-02-architecture-review.md`
+- `C:\work\repo\investment-scanner\docs\execution\codex-parallel-execution-plan-2026-05-16\06-contracts\CF-W2-DOV-02-daily-overview-calibration-evidence-summary-contract.md`
+- `C:\work\repo\investment-scanner\docs\execution\codex-parallel-execution-plan-2026-05-16\08-work-packets\CF-W2-DOV-02-work-packet.md`
+- `C:\work\repo\investment-scanner\docs\execution\codex-parallel-execution-plan-2026-05-16\04-qa\CF-W2-DOV-02-qa-plan.md`
+- `C:\work\repo\investment-scanner\docs\execution\codex-parallel-execution-plan-2026-05-16\09-summaries\CF-W2-DOV-02-dependency-integration-base-evidence.md`
+- `C:\work\repo\investment-scanner\docs\execution\codex-parallel-execution-plan-2026-05-16\13-implementation-evidence\CF-W2-DOV-02-ready-promotion.md`
+
+Allowed implementation files:
+
+- `frontend/src/features/daily-overview-dashboard/types.ts`
+- `frontend/src/features/daily-overview-dashboard/api/dailyOverviewDashboardApi.ts`
+- `frontend/src/features/daily-overview-dashboard/hooks/useDailyOverviewDashboard.ts`
+- `frontend/src/features/daily-overview-dashboard/components/DailyOverviewDashboardPage.tsx`
+- `frontend/src/features/daily-overview-dashboard/components/CalibrationEvidenceSummaryPanel.tsx`
+- `frontend/tests/ui/daily-overview-dashboard.spec.ts`
+
+Allowed reporting docs:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-08-CF-W2-DOV-02-outbox.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W2-DOV-02-developer-handoff.md`
+
+Required behavior:
+
+- Replace the Daily Overview `Calibration Evidence-Through Summary` placeholder with a truthful compact summary.
+- Keep the section below primary Daily Overview candidate-review content.
+- Use only calibration-owned scoped page-summary/evidence-basis truth from the accepted CAL-02A base.
+- Show explicit scope, horizon, latest measurable evidence date when available, waiting-for-maturity wording when horizon-limited, and unavailable/failure wording when missing.
+- Do not use `/signals/calibration/health`, first-row proxy logic, row `generatedAt`, first warning/blocker rows, or visible-row counts as evidence-through truth.
+- Preserve research-support language and avoid target, R:R, Trade Plan-first, broker/execution, advice, or guarantee wording.
+
+Forbidden files:
+
+- `frontend/src/app/HomePage.tsx`
+- `frontend/src/app/routes.tsx`
+- `frontend/src/app/navigationMetadata.tsx`
+- `frontend/src/shared/**`
+- `frontend/src/contexts/**`
+- `frontend/src/features/signal-calibration-engine/**`
+- `frontend/tests/ui/signal-calibration-engine.spec.ts`
+- all `backend/src/**`
+- all `backend/tests/**`
+- Prisma/schema/migrations/generated files
+- package manifests and lockfiles
+- provider/live/startup/backfill/scheduler/worker/queue files
+- route registries
+
+Expected handoff:
+
+- Update `17-team-outboxes/TEAM-08-CF-W2-DOV-02-outbox.md`.
+- Create `18-integration-queue/CF-W2-DOV-02-developer-handoff.md`.
+- Include changed files, inspected files, validation commands, skipped checks, risks, and next gate: Team 04 QA Verification.
+
 ## Latest Assignment Override - 2026-05-26 UX-01B
 
 Team 00 promotes `CF-W1-UX-01B` as a bounded Stock Research Workbench trust-evidence implementation item.

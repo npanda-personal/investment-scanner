@@ -27,7 +27,7 @@ Current active / queued agents:
 | Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | Team 00 - Orchestrator | local | n/a | dependency-base integration sequencing | `CF-W2-DOV-02` DOV-01 + CAL-02A integration base | queued |
-| 2 | Team 08 - UX / Research | pending | `gpt-5.3-codex` | implementation | Daily Overview follow-up after Team 00 promotes a bounded Ready slice | queued |
+| 2 | Team 08 - UX / Research | `019e649d-550f-7b31-b6fa-40109ce27eff` | `gpt-5.3-codex`, high | implementation | `CF-W2-DOV-02` in `C:\work\repo\investment-scanner-worktrees\team08-CF-W2-DOV-02` | active |
 | 3 | Team 04 - QA Factory | pending | `gpt-5.4`, high | QA Verification | next Daily Overview handoff | queued |
 | 4 | Team 10 - Review / Release | pending | `gpt-5.4`, high | Code Review | next QA-accepted Daily Overview handoff | queued |
 | 5 | Team 03 - Architecture Factory | pending | `gpt-5.4`, high | Architect Signoff | next review-accepted Daily Overview handoff | queued |
@@ -40,6 +40,12 @@ Teams ready to pick up new tasks:
 - Team 04: QA after Daily Overview handoff.
 - Team 10: review after QA acceptance.
 - Team 03: Architect Signoff after review acceptance.
+
+Update:
+
+- DOV-02 dependency integration base verified at `50bccc8`.
+- Team 08 implementation worktree created at `C:\work\repo\investment-scanner-worktrees\team08-CF-W2-DOV-02`.
+- Team 08 implementation launched as `019e649d-550f-7b31-b6fa-40109ce27eff`.
 
 ## Latest Active Snapshot - UX-01B Signoff, STRAT-05 Architecture, Rolling PO
 
