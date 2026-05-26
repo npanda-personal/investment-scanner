@@ -1,9 +1,9 @@
 # TEAM-10 Review / Release Outbox
 
-Date: 2026-05-25
+Date: 2026-05-26
 
-- Work item: `CF-W3-MDPIPE-01B5`
+- Work item: `CF-W2-SPL-02`
 - Verdict: `ACCEPT`
-- Evidence: `docs/execution/codex-parallel-execution-plan-2026-05-16/13-implementation-evidence/CF-W3-MDPIPE-01B5-code-review.md`
-- Summary: Confirmed reserved-scope frontend diff only, verified `/data-quality` no longer owns manual bulk evaluation controls, verified compact read-only strip remains, and confirmed focused UI coverage still proves Pipeline Ops is the only manual `DATA_QUALITY_EVALUATE_SCOPE` surface.
-- Next gate: Architect signoff -> Product Owner acceptance
+- Evidence: `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W2-SPL-02-code-review.md`
+- Summary: Confirmed the stale-scope summary defect is fixed, confirmed QA rerun evidence now explicitly covers active loading and active error states, and found no forbidden scope widening beyond the bounded SPL-02 slice.
+- Next gate: Team 03 Architect Signoff

@@ -34,6 +34,37 @@ No historical active work items have been migrated as active.
 - Rejected / Rework
 - Deferred
 
+## Latest Team 00 Routing Update - SPL-02 To Architect Signoff, DOV-02 Queued
+
+Date: 2026-05-26
+
+Current state:
+
+- `CF-W2-SPL-02` Team 10 rereview returned `ACCEPT`.
+- Team 10 rereview evidence is recorded at `18-integration-queue/CF-W2-SPL-02-code-review.md`.
+- `CF-W2-SPL-02` is now in Team 03 Architect Signoff.
+- Team 04 remains active on `CF-W1-UX-01B` QA Verification.
+- Team 02 completed its rolling investor/trader-value requirement pass and created `CF-W2-DOV-02` plus `CF-W2-SPL-03`.
+- `CF-W2-DOV-02` is queued for Team 03 architecture readiness as a non-consent Daily Overview follow-up.
+- `CF-W2-SPL-03` remains requirement/proposal-only and is not Ready because closed-history lifecycle proof likely needs storage/lifecycle architecture.
+- Open decisions remain 2 and block only `CF-W1-MD-02B` and `CF-W1-DQ-02-RS1`.
+
+SPL-02 next gates:
+
+- Team 03: Architect Signoff now.
+- Team 00: delegated PO acceptance after Architect Signoff accepts.
+- Team 00: scoped local commit from the Team 06 worktree only after all gates pass.
+
+Teams ready to pick up new tasks:
+
+- Team 03: `CF-W2-SPL-02` Architect Signoff now.
+- Team 03: `CF-W2-DOV-02` architecture readiness in parallel if agent capacity permits and file reservations stay isolated.
+- Team 04: active on `CF-W1-UX-01B` QA Verification.
+- Team 10: ready for `CF-W1-UX-01B` review after Team 04 accepts.
+- Team 08: ready for UX-01B rework only if Team 04 rejects; otherwise wait for the next user-facing Ready slice.
+- Team 06: ready for SPL-02 rework only if Architect rejects; otherwise wait for next Team 06 Ready item.
+- Team 02: ready for another rolling requirement pass after the current architecture/signoff pressure clears.
+
 ## Latest Team 00 Routing Update - SPL-02 QA, UX-01B Ready
 
 Date: 2026-05-26

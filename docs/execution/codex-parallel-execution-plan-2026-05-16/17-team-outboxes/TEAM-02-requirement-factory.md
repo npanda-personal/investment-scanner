@@ -1,5 +1,118 @@
 # TEAM-02 Requirement Factory
 
+## Team 02 Rolling Requirement Discovery Refresh - 2026-05-26
+
+Root `AGENTS.md` was read first. Team 02 stayed docs-only, used the active execution plan folder, and did not touch application source, tests, Prisma, generated files, package manifests, route registries, shared UI, or Team 00 runtime-control docs.
+
+### Work Item
+
+Refresh the live next/top requirement ordering while `CF-W2-SPL-02` and `CF-W1-UX-01B` continue through parallel gates, preserve those active statuses, and refill the thin investor/trader-value backlog with at most two new high-value candidate drafts.
+
+### Files Inspected
+
+- `AGENTS.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/refinement-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/requirements-backlog.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W2-SPL-02-signal-position-ledger-active-surface-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W2-DOV-01-daily-overview-interactive-market-dashboard-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W2-CAL-02-signal-calibration-evidence-freshness-and-scope-basis-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-TSC-02-active-signal-health-rule-evidence-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-TSC-03-today-review-supporting-trust-evidence-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W2-CAL-02-architecture-review.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/00-control/active-work-board.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/12-ready-queue/README.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/99-decision-inbox/open-decisions.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/16-team-inboxes/TEAM-02-current-assignment.md`
+
+### Files Changed
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/requirements-backlog.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W2-DOV-02-daily-overview-calibration-evidence-through-summary-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W2-SPL-03-signal-position-ledger-closed-history-proof-foundation-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-02-requirement-factory.md`
+
+### Queue Refresh Result
+
+Preserved active statuses intact:
+
+- `CF-W2-SPL-02` remains the active Team 06 QA-rerun lane after review-reject rework.
+- `CF-W1-UX-01B` remains the active Team 08 implementation lane.
+
+Removed stale requirement-lane wording that still treated:
+
+- active `CF-W1-UX-01B` as a fresh next Team 03 candidate; and
+- the backlog front as if only `CF-W2-SPL-02` were active.
+
+Accepted/committed exclusions kept intact:
+
+- `CF-W2-DOV-01` - `a371e2f`
+- `CF-W2-SPL-01B` - `ca31d79`
+- `CF-W1-RH-01A` - `30460aa`
+- `CF-W2-CAL-02A` - `1be7d1a`
+
+### New Requirements Created
+
+1. `CF-W2-DOV-02 - Daily Overview Calibration Evidence-Through Summary`
+   - Type: bounded non-consent follow-up
+   - Why: highest current Daily Overview trust gap after accepted `CF-W2-CAL-02A`; replaces a known placeholder with truthful calibration evidence-through summary.
+   - Next gate: Team 03 architecture next.
+
+2. `CF-W2-SPL-03 - Signal Position Ledger Closed-History Proof Foundation`
+   - Type: proposal-only consent-gated follow-up
+   - Why: highest remaining ledger trust gap after active positions surface; formalizes close-history proof as proof-first, not UI-first.
+   - Next gate: Team 00 consent opening first, then Team 03 architecture later.
+
+### Updated Priority Read
+
+Highest-value proposal stack:
+
+1. `CF-W1-MD-02A`
+2. `CF-W1-SQLAB-02B`
+3. `CF-W1-STRAT-02B`
+4. `CF-W2-SPL-03`
+
+Highest-value non-consent architecture-next stack:
+
+1. `CF-W2-DOV-02`
+2. `CF-W1-L3-DQ-01A`
+
+### Blockers / Dependencies
+
+- `CF-W2-SPL-02` and `CF-W1-UX-01B` stay active and must not be reopened from Team 02.
+- `CF-W1-MD-02A` remains blocked by schema/storage consent.
+- `CF-W1-SQLAB-02B` remains blocked by storage consent.
+- `CF-W1-STRAT-02B` remains blocked by schema/generated/repository consent.
+- `CF-W2-SPL-03` remains blocked by close-lifecycle/schema-storage consent.
+- `CF-W2-DOV-02` depends on accepted `CF-W2-CAL-02A` truth being available on the chosen implementation base.
+
+### Recommended Next Architecture Assignment
+
+Recommend Team 03 prepares architecture next for:
+
+- `CF-W2-DOV-02 - Daily Overview Calibration Evidence-Through Summary`
+
+Reason:
+
+- direct investor/trader value on an already accepted top-level workflow;
+- bounded non-consent follow-on;
+- uses an accepted upstream calibration truth dependency instead of inventing a new score;
+- does not interfere with the active UX-01B or SPL-02 execution lanes.
+
+### Notes
+
+- No item was moved to Ready.
+- `requirements-backlog.md` is the live backlog file in this execution folder; no `backlog.md` file exists there.
+
+### Tests Run / Skipped
+
+- Tests run: none
+- Tests skipped: all
+- Reason: docs-only requirement discovery and queue refresh pass
+
 ## Team 02 Queue Reconciliation And Next Architecture Recommendation - 2026-05-26
 
 Root `AGENTS.md` was read first. Team 02 stayed docs-only and edited only the allowed Team 02 queue files plus one new requirement draft under `10-requirements/`.

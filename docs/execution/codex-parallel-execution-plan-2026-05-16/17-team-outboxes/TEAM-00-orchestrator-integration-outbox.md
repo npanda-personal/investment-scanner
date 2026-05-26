@@ -1,5 +1,40 @@
 # TEAM-00 Orchestrator / Integration Outbox
 
+## Latest Runtime Checkpoint - SPL-02 To Architect Signoff
+
+Date: 2026-05-26
+
+Status:
+
+- Branch: `dev`.
+- Main workspace status before this checkpoint: active execution docs only.
+- Open decisions: 2, affecting only `CF-W1-MD-02B` and `CF-W1-DQ-02-RS1`.
+- Product Owner action required: yes only for those affected workstreams; no for SPL-02, UX-01B, or DOV-02 routine gates.
+- Push performed: no.
+
+Gate movement:
+
+- Team 10 rereview accepted `CF-W2-SPL-02` after Team 06 rework and Team 04 QA rerun.
+- Team 00 recorded the Team 10 acceptance evidence at `18-integration-queue/CF-W2-SPL-02-code-review.md`.
+- Team 03 Architect Signoff is now the next gate for `CF-W2-SPL-02`.
+- Team 04 UX-01B QA Verification remains active as `019e645d-3a98-7cd3-9365-40a2867efd27`.
+- Team 02 completed rolling requirement discovery and added `CF-W2-DOV-02` plus `CF-W2-SPL-03`.
+- `CF-W2-DOV-02` is queued for docs-only Team 03 architecture readiness.
+- `CF-W2-SPL-03` remains proposal-only and not Ready.
+
+Teams ready to pick up new tasks:
+
+- Team 03: SPL-02 Architect Signoff now.
+- Team 03: DOV-02 architecture readiness if capacity permits.
+- Team 04: UX-01B QA Verification active.
+- Team 10: UX-01B Code Review after Team 04 accepts.
+- Team 08: UX-01B rework only if Team 04 rejects.
+- Team 06: SPL-02 rework only if Team 03 rejects.
+
+Next action:
+
+- Spawn Team 03 for SPL-02 Architect Signoff, then spawn a separate isolated Team 03 architecture worker for DOV-02 if capacity remains. Do not push.
+
 ## Latest Runtime Checkpoint - SPL-02 QA Routed, UX-01B Ready
 
 Date: 2026-05-26

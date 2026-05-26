@@ -6,6 +6,109 @@ Team: TEAM-03 - Architecture Factory
 
 Prompt file: `docs/execution/codex-parallel-execution-plan-2026-05-16/15-automation-prompts/AUTO-03-architecture-factory.md`
 
+## Latest Assignment Override - 2026-05-26 SPL-02 Architect Signoff
+
+Priority: highest. Signoff gates take precedence over rolling architecture work.
+
+Perform Architect Signoff for `CF-W2-SPL-02` Signal Position Ledger active positions surface after Team 10 accepted rereview.
+
+Do not implement application code. Do not edit the Team 06 implementation files. Inspect the Team 06 worktree and evidence only, then write the signoff decision.
+
+Worktree to inspect:
+
+- `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-SPL-02`
+
+Required checks:
+
+- Confirm accepted base `ca31d79 feat: add signal position ledger read model` remains an ancestor.
+- Confirm Team 06 implementation and post-review rework stayed inside the approved SPL-02 contract and file reservations.
+- Confirm route/navigation additions match the approved active-surface contract.
+- Confirm `Closed History` remains placeholder-only with no API/data/count/detail claims.
+- Confirm no forbidden schema, generated, package, provider/live, startup/backfill, scheduler, shared UI/context, or broad cross-feature changes were introduced.
+- Confirm Team 04 QA rerun and Team 10 rereview evidence are sufficient for architecture acceptance.
+- Confirm product-language constraints remain satisfied: no advice, no targets, no reward/risk framing, no broker/execution wording.
+
+Allowed writes:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W2-SPL-02-architecture-signoff.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-03-CF-W2-SPL-02-architect-signoff-outbox.md`
+
+Forbidden writes:
+
+- application source or tests
+- Prisma schema or migrations
+- backend or frontend route registries
+- shared backend utilities
+- shared UI
+- package manifests
+- generated files
+- provider/live/startup/backfill/scheduler files
+- Team 06 implementation files
+- unrelated active execution docs
+
+Required output:
+
+- Architect verdict: `ACCEPT`, `REJECT`, or `ACCEPT WITH LIMITATIONS`.
+- Exact evidence reviewed.
+- Any scope or architecture risks.
+- Next gate recommendation: delegated PO acceptance if accepted, or Team 06 rework if rejected.
+
+## Queued Parallel Architecture Assignment - 2026-05-26 DOV-02 Calibration Evidence Summary
+
+This is queued behind signoff priority, but may run in a separate isolated Team 03 agent if Team 00 has open agent capacity and file reservations remain isolated.
+
+## Latest Assignment Override - 2026-05-26 DOV-02 Calibration Evidence Summary
+
+Prepare docs-only architecture readiness for `CF-W2-DOV-02` Daily Overview calibration evidence-through summary.
+
+This follows Team 02's rolling investor/trader-value requirement discovery. Do not implement application code. Do not move the item to Ready. Determine whether the first child can stay additive and bounded to the Daily Overview frontend surface using accepted calibration-owned public outputs.
+
+Goal:
+
+- Define the smallest bounded Daily Overview child that replaces the current calibration placeholder with a truthful compact summary.
+- Reuse accepted `CF-W2-CAL-02A` evidence-basis truth if available on the implementation base.
+- Keep the section below primary Daily Overview candidate-review content.
+- Do not recompute calibration evidence in Daily Overview.
+- Preserve research-support language and avoid target/reward/risk/Trade Plan-first framing.
+- Stop and report a consent blocker only if honest implementation requires schema/storage, route registry, shared UI, package/generated, provider/live, startup/backfill, or broader cross-module source edits.
+
+Allowed writes:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W2-DOV-02-architecture-review.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W2-DOV-02-daily-overview-calibration-evidence-summary-contract.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W2-DOV-02-work-packet.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/next-contracts-to-prepare.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-03-CF-W2-DOV-02-architecture-outbox.md`
+
+Read-only inputs:
+
+- `AGENTS.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W2-DOV-02-daily-overview-calibration-evidence-through-summary-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W2-DOV-01-daily-overview-interactive-market-dashboard-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/13-implementation-evidence/CF-W2-CAL-02A-implementation-evidence.md`
+- `frontend/src/app/HomePage.tsx`
+- `frontend/src/features/daily-overview-dashboard/**`
+- `frontend/src/features/signal-calibration-engine/**`
+
+Forbidden writes:
+
+- application source or tests
+- Prisma schema or migrations
+- backend or frontend route registries
+- shared backend utilities
+- shared UI
+- package manifests
+- generated files
+- provider/live/startup/backfill files
+- Signal Calibration, Signal Quality, Today Review, Signal Position Ledger, Market Data, DQ, Backtesting, Pipeline Ops, or other module source/tests
+
+Required output:
+
+- Architecture recommendation: `Ready candidate after QA`, `split required`, or `consent blocker`.
+- Exact allowed/forbidden file reservation if a bounded additive child is viable.
+- QA handoff notes for scope/horizon labels, evidence-through basis, unavailable/waiting states, no first-row proxy, no module-health fallback, and placeholder truthfulness.
+- Stop condition if schema/storage, route widening, shared UI, or broader cross-module implementation is required.
+
 ## Latest Assignment Override - 2026-05-25 CAL-02 Calibration Evidence Basis
 
 Prepare docs-only architecture readiness for `CF-W2-CAL-02` Signal Calibration evidence freshness and scope basis.

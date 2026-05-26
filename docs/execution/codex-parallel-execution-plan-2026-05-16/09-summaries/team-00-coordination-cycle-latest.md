@@ -2,6 +2,44 @@
 
 Date: 2026-05-26
 
+## Latest Runtime Checkpoint - SPL-02 Accepted By Review
+
+Date: 2026-05-26
+
+Current status:
+
+- Branch: `dev`.
+- Open decisions: 2, scoped only to `CF-W1-MD-02B` and `CF-W1-DQ-02-RS1`.
+- Product Owner action required: yes only for those affected workstreams.
+- Push performed: no.
+
+Completed in the recent window:
+
+- Team 06 completed `CF-W2-SPL-02` implementation and code-review rework.
+- Team 04 accepted `CF-W2-SPL-02` QA rerun.
+- Team 10 accepted `CF-W2-SPL-02` rereview.
+- Team 08 completed `CF-W1-UX-01B` implementation and handed it to Team 04.
+- Team 02 completed rolling investor/trader-value requirement discovery and added `CF-W2-DOV-02` plus `CF-W2-SPL-03`.
+
+Active / queued:
+
+- Team 04 `019e645d-3a98-7cd3-9365-40a2867efd27`: active on UX-01B QA Verification.
+- Team 03: queued for SPL-02 Architect Signoff.
+- Team 03: queued for DOV-02 architecture readiness.
+- Team 10: queued for UX-01B review after QA acceptance.
+
+Teams ready to pick up new tasks:
+
+- Team 03: SPL-02 Architect Signoff now.
+- Team 03: DOV-02 architecture readiness in parallel if capacity permits.
+- Team 04: UX-01B QA Verification active.
+- Team 10: UX-01B review after QA acceptance.
+- Team 02: rolling requirement discovery after current gates clear.
+
+Next action:
+
+- Record docs checkpoint, then launch Team 03 signoff and DOV-02 architecture workers if capacity remains.
+
 ## Latest Runtime Checkpoint - SPL-02 QA Active, UX-01B Ready
 
 Date: 2026-05-26
