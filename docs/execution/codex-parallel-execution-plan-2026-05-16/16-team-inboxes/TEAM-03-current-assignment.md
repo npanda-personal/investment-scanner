@@ -6,6 +6,84 @@ Team: TEAM-03 - Architecture Factory
 
 Prompt file: `docs/execution/codex-parallel-execution-plan-2026-05-16/15-automation-prompts/AUTO-03-architecture-factory.md`
 
+## Current Pause - 2026-05-26
+
+Product Owner paused rolling architecture work.
+
+Do not continue `CF-W2-STRAT-05` or other rolling architecture prep until Team 00 reopens it. Current factory focus is end-to-end closure for Daily Overview and Signal Position Ledger only.
+
+Signoff gates may still run when Team 00 assigns them for the priority closure path.
+
+## Latest Assignment Override - 2026-05-26 UX-01B Architect Signoff
+
+Priority: highest. Signoff gates take precedence over rolling architecture work.
+
+Perform Architect Signoff for `CF-W1-UX-01B` after Team 08 rework, Team 04 QA rerun `ACCEPT`, and Team 10 rereview `ACCEPT`.
+
+Worktree to inspect:
+
+- `C:\work\repo\investment-scanner-worktrees\team08-CF-W1-UX-01B`
+
+Required checks:
+
+- Confirm base commit `246d5a3 feat: add workbench trust framing` is included.
+- Confirm implementation stayed inside UX-01B reservations.
+- Confirm `trust_evidence` is additive and no existing response fields were removed.
+- Confirm missing backend `trust_evidence` fails closed and does not synthesize `trust_evidence` from legacy `trust`.
+- Confirm backend-provided scope verification, evidence basis, reasons, and LIMITED/BLOCKED widget states remain truthful.
+- Confirm no route/navigation/shared UI/context/upstream module/schema/generated/package/provider/startup/scheduler widening.
+- Confirm Team 04 QA rerun and Team 10 rereview evidence are sufficient.
+- Confirm product language remains research-support only.
+
+Allowed writes:
+
+- `C:\work\repo\investment-scanner-worktrees\team08-CF-W1-UX-01B\docs\execution\codex-parallel-execution-plan-2026-05-16\18-integration-queue\CF-W1-UX-01B-architecture-signoff.md`
+- `C:\work\repo\investment-scanner-worktrees\team08-CF-W1-UX-01B\docs\execution\codex-parallel-execution-plan-2026-05-16\17-team-outboxes\TEAM-03-CF-W1-UX-01B-architect-signoff-outbox.md`
+
+Forbidden writes:
+
+- application source/tests
+- Prisma/schema/migrations
+- route registries
+- shared UI or shared backend utilities
+- package/generated/provider/live/startup/backfill/scheduler files
+- unrelated active execution docs
+
+## Parallel Assignment Override - 2026-05-26 STRAT-05 Architecture Prep
+
+Prepare docs-only architecture readiness for `CF-W2-STRAT-05` - Strategy Library proof summary and evidence caveats.
+
+Context:
+
+- Team 02 created `CF-W2-STRAT-05` as the next bounded non-consent candidate.
+- Use the existing `/strategies` route and current proof registry/ranking/detail surfaces.
+- Focus is proof summary and evidence caveats, not new scoring, storage, routes, schema, or shared UI.
+
+Allowed writes:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W2-STRAT-05-architecture-review.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W2-STRAT-05-strategy-library-proof-summary-and-evidence-caveats-contract.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/08-work-packets/CF-W2-STRAT-05-work-packet.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/next-contracts-to-prepare.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-03-CF-W2-STRAT-05-architecture-outbox.md`
+
+Forbidden writes:
+
+- application source/tests
+- Prisma/schema/migrations
+- backend/frontend route registries
+- shared backend utilities or shared UI
+- package manifests/generated files
+- provider/live/startup/backfill/scheduler files
+- broad Strategy/Signal/Today Review/Calibration implementation
+
+Required output:
+
+- Architecture recommendation: `Ready candidate after QA`, `split required`, or `consent blocker`.
+- Exact allowed/forbidden file reservation if a bounded child is viable.
+- QA handoff notes for proof summary truthfulness, evidence caveats, stale/missing measured evidence, no invented confidence, no targets/R:R/direct advice, and existing-route behavior.
+- Stop conditions for Team 00.
+
 ## Latest Assignment Override - 2026-05-26 DOV-02 Dependency Base Correction
 
 Prepare an architecture/integration recommendation for `CF-W2-DOV-02` dependency-base correction.

@@ -34,6 +34,76 @@ No historical active work items have been migrated as active.
 - Rejected / Rework
 - Deferred
 
+## Latest Team 00 Routing Update - Narrowed Focus / UX-01B Closed
+
+Date: 2026-05-26
+
+Product Owner direction:
+
+- Stop rolling PO and rolling architecture work for now.
+- Complete the two priority items end to end first:
+  - Daily Overview dashboard.
+  - Signal Position Ledger.
+
+Closure completed:
+
+- `CF-W1-UX-01B` completed QA rerun, Code Review rereview, Architect Signoff, delegated PO acceptance, and scoped local branch commit.
+- Commit: `8dbc183 feat: add workbench trust evidence contract`.
+- Branch: `codex/team08-ux-research/CF-W1-UX-01B`.
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team08-CF-W1-UX-01B`.
+- Push: not performed.
+
+Paused / not active:
+
+- Rolling Team 02 requirements agent `019e6489-1bb6-7d21-87ae-f8e4bf992921` was stopped.
+- Rolling Team 03 `CF-W2-STRAT-05` architecture agent `019e6489-06da-7f42-9da0-97f8c6d325a0` was stopped.
+- `CF-W2-STRAT-05` remains backlog/proposal evidence only, not Ready and not active.
+- No new rolling PO/architecture work should start until the two priority items are closed or the Product Owner redirects.
+
+Priority closure status:
+
+- Signal Position Ledger:
+  - `CF-W2-SPL-01B` accepted and locally committed as `ca31d79 feat: add signal position ledger read model`.
+  - `CF-W2-SPL-02` accepted and locally committed as `31115f0 feat: add signal position ledger surface`.
+  - No push.
+- Daily Overview:
+  - `CF-W2-DOV-01` accepted and locally committed as `a371e2f feat: add daily overview dashboard`.
+  - `CF-W2-DOV-02` remains queued for dependency integration-base preparation because accepted DOV-01 and CAL-02A commits are on separate branches and dry-merge conflicts exist in Signal Calibration files.
+
+Teams ready to pick up new tasks:
+
+- Team 00: prepare the `CF-W2-DOV-02` dependency integration base.
+- Team 08: Daily Overview follow-up only after Team 00 creates the integration base and promotes a bounded Ready slice.
+- Team 04: QA after the next Daily Overview handoff.
+- Team 10: review after QA acceptance.
+- Team 03: Architect Signoff after review acceptance, not rolling architecture prep.
+
+## Latest Team 00 Routing Update - UX-01B Signoff And STRAT-05 Architecture
+
+Date: 2026-05-26
+
+Current state:
+
+- `CF-W2-SPL-02` remains accepted and locally committed on branch `codex/team06-strategy-signal/CF-W2-SPL-02` as `31115f0 feat: add signal position ledger surface`; no push.
+- Team 04 QA rerun accepted `CF-W1-UX-01B`.
+- Team 10 rereview accepted `CF-W1-UX-01B`; Architect Signoff can proceed.
+- Team 00 closed the completed Team 02 agent `019e647e-0d7c-7711-a2df-c4c2a566dcdc`.
+- Team 02's latest pass added `CF-W2-STRAT-05` as the next bounded non-consent architecture candidate and kept `CF-W1-MD-02A`, `CF-W1-SQLAB-02B`, `CF-W2-SPL-03`, and `CF-W1-STRAT-02B` proposal-only.
+- Team 00 launched Team 03 Architect Signoff for `CF-W1-UX-01B` as `019e6488-f28c-70d2-ac7a-a82f7fc0952d`.
+- Team 00 launched Team 03 architecture prep for `CF-W2-STRAT-05` as `019e6489-06da-7f42-9da0-97f8c6d325a0`.
+- Team 00 relaunched rolling Team 02 requirements discovery as `019e6489-1bb6-7d21-87ae-f8e4bf992921`.
+- `CF-W2-DOV-02` remains queued for Team 00 dependency integration-base preparation; it is not Ready.
+- Open decisions remain 2 and block only `CF-W1-MD-02B` and `CF-W1-DQ-02-RS1`.
+
+Teams ready to pick up new tasks:
+
+- Team 03: active on `CF-W1-UX-01B` Architect Signoff.
+- Team 03: active on `CF-W2-STRAT-05` architecture prep.
+- Team 02: active on rolling investor/trader-value requirements.
+- Team 04: ready for `CF-W2-STRAT-05` QA planning if Team 03 returns `Ready candidate after QA`.
+- Team 00: ready to prepare `CF-W2-DOV-02` integration base after current signoff/routing checkpoint.
+- Team 06: ready for the next Team 06 Ready item after Team 00 promotion; none is unassigned right now.
+
 ## Latest Team 00 Routing Update - SPL-02 To Architect Signoff, DOV-02 Queued
 
 Date: 2026-05-26

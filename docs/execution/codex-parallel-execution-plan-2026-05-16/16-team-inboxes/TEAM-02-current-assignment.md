@@ -4,6 +4,39 @@ Date: 2026-05-18
 
 Team: TEAM-02 - Requirement Factory
 
+## Current Pause - 2026-05-26
+
+Product Owner paused rolling PO/requirements work.
+
+Do not continue rolling discovery until Team 00 reopens it. Current factory focus is end-to-end closure for Daily Overview and Signal Position Ledger only.
+
+## Latest Assignment Override - 2026-05-26 Rolling Direct-Value Discovery
+
+Before creating or changing requirements, read root `AGENTS.md` and preserve the Product Owner direction: direct investor/trader value first, no Trade Plan/R:R/target-price framing, no financial-advice wording, and no app-code implementation from Team 02.
+
+Assignment:
+
+1. Continue rolling investor/trader-value requirements discovery and backlog hygiene.
+2. Keep `CF-W1-UX-01B` out of fresh routing because it is active in review/signoff.
+3. Keep `CF-W2-DOV-02` out of fresh routing because it is already in dependency-base/integration sequencing.
+4. Keep `CF-W2-STRAT-05` out of duplicate creation because it has been routed to Team 03 architecture.
+5. Keep durable/schema proposal items proposal-only unless Team 00 opens consent: `CF-W1-MD-02A`, `CF-W1-SQLAB-02B`, `CF-W2-SPL-03`, and `CF-W1-STRAT-02B`.
+6. Add or refine at most one or two high-value requirements if current audits/source evidence support them.
+7. Do not move any item to Ready; Team 00 owns Ready promotion.
+
+Allowed writes:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/**`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-02-requirement-factory.md`
+
+Forbidden writes:
+
+- application source/tests
+- architecture/contracts/work-packets/QA docs
+- Prisma/schema/migrations/generated/package files
+- route registries/shared utilities/shared UI
+- docs outside the active execution folder
+
 ## Latest Assignment Override - 2026-05-25 Research Evidence-Date Follow-Up
 
 Before creating or changing requirements, read root `AGENTS.md` and preserve the Product Owner direction: direct investor/trader value first, no Trade Plan/R:R/target-price framing, no financial-advice wording, and no app-code implementation from Team 02.

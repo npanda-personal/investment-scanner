@@ -1,5 +1,76 @@
 # TEAM-00 Orchestrator / Integration Outbox
 
+## Latest Runtime Checkpoint - Priority Closure Only
+
+Date: 2026-05-26
+
+Status:
+
+- Branch: `dev`.
+- Open decisions: 2, affecting only `CF-W1-MD-02B` and `CF-W1-DQ-02-RS1`.
+- Product Owner action required: no for Daily Overview or Signal Position Ledger closure.
+- Push performed: no.
+
+Completed:
+
+- `CF-W2-SPL-02` closed and locally committed on branch `codex/team06-strategy-signal/CF-W2-SPL-02` as `31115f0 feat: add signal position ledger surface`.
+- `CF-W1-UX-01B` closed and locally committed on branch `codex/team08-ux-research/CF-W1-UX-01B` as `8dbc183 feat: add workbench trust evidence contract`.
+- Rolling Team 02 and rolling Team 03 STRAT-05 agents were stopped per Product Owner direction.
+
+Active focus:
+
+- Complete the two priority items only:
+  - Signal Position Ledger: committed through `SPL-02`; no further active slice unless the Product Owner asks for closed-history follow-up.
+  - Daily Overview: prepare `CF-W2-DOV-02` integration base, then route only bounded follow-up implementation if Ready.
+
+Teams ready to pick up new tasks:
+
+- Team 00: prepare DOV-02 dependency integration base.
+- Team 08: Daily Overview follow-up after Ready promotion.
+- Team 04: QA after handoff.
+- Team 10: review after QA acceptance.
+- Team 03: Architect Signoff after review acceptance.
+
+Next action:
+
+- Build the DOV-02 dependency integration base from accepted DOV-01 and CAL-02A branches. Do not push.
+
+## Latest Runtime Checkpoint - UX-01B Signoff And STRAT-05 Architecture Active
+
+Date: 2026-05-26
+
+Status:
+
+- Branch: `dev`.
+- Main workspace status before this checkpoint: active execution docs only.
+- Open decisions: 2, affecting only `CF-W1-MD-02B` and `CF-W1-DQ-02-RS1`.
+- Product Owner action required: yes only for those affected workstreams; no for UX-01B, STRAT-05, SPL-02, or DOV-02 routine gates.
+- Push performed: no.
+
+Gate movement:
+
+- Team 04 QA rerun accepted `CF-W1-UX-01B`.
+- Team 10 rereview accepted `CF-W1-UX-01B`.
+- Team 00 routed `CF-W1-UX-01B` to Team 03 Architect Signoff as `019e6488-f28c-70d2-ac7a-a82f7fc0952d`.
+- Team 02 completed rolling requirement discovery and Team 00 closed `019e647e-0d7c-7711-a2df-c4c2a566dcdc`.
+- Team 02 created `CF-W2-STRAT-05` as the next bounded non-consent candidate and kept durable/storage items proposal-only.
+- Team 00 routed `CF-W2-STRAT-05` to Team 03 architecture prep as `019e6489-06da-7f42-9da0-97f8c6d325a0`.
+- Team 00 relaunched rolling Team 02 requirements discovery as `019e6489-1bb6-7d21-87ae-f8e4bf992921`.
+- `CF-W2-DOV-02` remains queued for Team 00 integration-base preparation, not implementation.
+
+Teams ready to pick up new tasks:
+
+- Team 03: active on UX-01B Architect Signoff.
+- Team 03: active on STRAT-05 architecture prep.
+- Team 02: active on rolling investor/trader-value requirement discovery.
+- Team 04: ready for STRAT-05 QA planning if Team 03 returns architecture-ready.
+- Team 00: ready for UX-01B delegated PO packet and scoped branch commit if Architect Signoff accepts.
+- Team 00: ready for DOV-02 dependency integration-base preparation.
+
+Next action:
+
+- Monitor Team 03 UX-01B Architect Signoff first, then either route delegated PO acceptance/commit or bounded rework. Continue STRAT-05 architecture and rolling requirements in parallel. Do not push.
+
 ## Latest Runtime Checkpoint - SPL-02 To Architect Signoff
 
 Date: 2026-05-26

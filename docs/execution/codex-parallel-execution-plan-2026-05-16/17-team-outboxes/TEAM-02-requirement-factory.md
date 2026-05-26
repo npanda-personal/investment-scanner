@@ -1,5 +1,119 @@
 # TEAM-02 Requirement Factory
 
+## Team 02 Rolling Investor/Trader Priority Hygiene Refresh - 2026-05-26
+
+Root `AGENTS.md` was read first. Team 02 stayed docs-only, used only the active execution folder, and did not touch application source, tests, Prisma, generated files, package manifests, route registries, shared UI, or Team 00 control docs.
+
+### Work Item
+
+Refresh the requirement front so it stays aligned with the latest Product Owner direction while `CF-W1-UX-01B` remains active and `CF-W2-DOV-02` sits inside dependency-base correction.
+
+The specific goal for this pass was:
+
+- remove stale "next candidate" language that still pointed at active or already-routed work;
+- identify 1-3 next high-value candidates that are independent from active `CF-W1-UX-01B` and `CF-W2-DOV-02`;
+- add one bounded docs-only investor/trader-value requirement only if the repo already had a real owned surface for it; and
+- keep admin/settings/notification work behind market/signal/strategy/research value.
+
+### Files Inspected
+
+- `AGENTS.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/requirements-backlog.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/refinement-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/12-ready-queue/ready-for-implementation.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/12-ready-queue/blocked-by-upstream-dependency.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/99-decision-inbox/open-decisions.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/00-control/active-work-board.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/09-summaries/team-00-coordination-cycle-latest.md`
+- `backend/src/modules/strategy-framework/strategy-framework.md`
+- `frontend/src/features/strategy-framework/routes.tsx`
+- `frontend/src/features/strategy-framework/components/StrategyFrameworkPage.tsx`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-MD-02A-additive-companion-evidence-schema-packet-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W1-SQLAB-02B-signal-outcome-journal-durable-learning-memory-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W2-SPL-03-signal-position-ledger-closed-history-proof-foundation-requirement.md`
+
+### Files Changed
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W2-STRAT-05-strategy-library-proof-summary-and-evidence-caveats-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/top-10-ready-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/requirements-backlog.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/refinement-queue.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-02-requirement-factory.md`
+
+### New Requirement Created
+
+Created:
+
+- `CF-W2-STRAT-05 - Strategy Library Proof Summary And Evidence Caveats`
+
+Why this was the honest bounded draft:
+
+- the repo already has a real `/strategies` route and a substantial `strategy-framework` feature/module;
+- current source already exposes proof registry, ratings, readiness, and backtest links;
+- the remaining gap is investor-facing proof visibility, not an invented new workflow;
+- it is independent from active `CF-W1-UX-01B` and Team 03's current `CF-W2-DOV-02` correction lane;
+- it avoids target-price, Trade Plan, broker, and advice framing.
+
+### Refreshed Next 3 High-Value Candidates
+
+1. `CF-W1-MD-02A`
+   - State: proposal-only
+   - Why: strongest remaining upstream market-data provenance gap.
+   - Gate: Team 00 consent opening for schema/storage path.
+
+2. `CF-W1-SQLAB-02B`
+   - State: proposal-only
+   - Why: strongest durable measured-outcome memory gap after accepted calibration and review-loop work.
+   - Gate: Team 00 consent opening for storage path.
+
+3. `CF-W2-STRAT-05`
+   - State: new bounded draft
+   - Why: strongest current non-consent investor-facing gap on an already-existing strategy review route.
+   - Gate: Team 03 architecture next.
+
+### Proposal-Only But Still High Value
+
+- `CF-W2-SPL-03` remains high-value and truthful, but it is explicitly proposal-only because closed-history proof still needs later close-lifecycle/schema-storage consent.
+- `CF-W1-STRAT-02B` remains valuable, but it stays behind `CF-W2-SPL-03` and `CF-W2-STRAT-05` in this pass because it is still durable-history infrastructure rather than near-surface investor-facing evidence.
+
+### Queue Hygiene Result
+
+- Removed stale queue language that still treated active `CF-W1-UX-01B` as a fresh refinement front.
+- Removed stale queue language that still treated routed `CF-W2-DOV-02` dependency-base correction as a fresh Team 02 candidate.
+- Removed stale discovery language that omitted already accepted `CF-W1-MD-05` from the fresh-exclusion stack.
+- Marked accepted `CF-W2-SPL-02` as excluded from fresh discovery.
+- Kept admin/settings/notifications behind market/signal/strategy/research value.
+
+### Blockers / Dependencies
+
+- `CF-W1-UX-01B` remains active and must stay out of fresh Team 02 routing.
+- `CF-W2-DOV-02` remains in Team 03 dependency-base correction and must stay out of fresh Team 02 routing.
+- `CF-W1-MD-02A` remains blocked by schema/storage consent.
+- `CF-W1-SQLAB-02B` remains blocked by storage consent.
+- `CF-W2-SPL-03` remains blocked by close-lifecycle/schema-storage consent.
+- `CF-W1-STRAT-02B` remains blocked by schema/generated/repository consent.
+
+### Recommended Next Architecture Candidate
+
+Recommend Team 03 takes:
+
+- `CF-W2-STRAT-05 - Strategy Library Proof Summary And Evidence Caveats`
+
+Reason:
+
+- highest honest non-consent investor/trader-value gap left after excluding active `UX-01B` and routed `DOV-02`;
+- existing route and module ownership already exist;
+- bounded to strategy-evidence surfacing rather than new persistence or cross-module scoring.
+
+### Tests Run / Skipped
+
+- Tests run: none
+- Tests skipped: all
+- Reason: docs-only requirement discovery and priority hygiene pass
+
 ## Team 02 Rolling Requirement Discovery Refresh - 2026-05-26
 
 Root `AGENTS.md` was read first. Team 02 stayed docs-only, used the active execution plan folder, and did not touch application source, tests, Prisma, generated files, package manifests, route registries, shared UI, or Team 00 runtime-control docs.

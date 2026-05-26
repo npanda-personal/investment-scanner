@@ -2,6 +2,85 @@
 
 Date: 2026-05-26
 
+## Latest Runtime Checkpoint - Priority Closure Only
+
+Date: 2026-05-26
+
+Current status:
+
+- Branch: `dev`.
+- Open decisions: 2, scoped only to `CF-W1-MD-02B` and `CF-W1-DQ-02-RS1`.
+- Product Owner action required: no for Daily Overview or Signal Position Ledger closure.
+- Push performed: no.
+
+Completed in the recent window:
+
+- `CF-W2-SPL-02` completed QA, review, Architect Signoff, delegated PO acceptance, and local branch commit `31115f0 feat: add signal position ledger surface`.
+- `CF-W1-UX-01B` completed QA rerun, Code Review rereview, Architect Signoff, delegated PO acceptance, and local branch commit `8dbc183 feat: add workbench trust evidence contract`.
+- `CF-W2-DOV-02` completed architecture and QA planning, then moved to dependency-base/integration sequencing because DOV-01 and CAL-02A accepted branches conflict in Signal Calibration files.
+- Team 02 rolling requirements was stopped after Product Owner direction.
+- Team 03 rolling `CF-W2-STRAT-05` architecture prep was stopped after Product Owner direction.
+
+In progress:
+
+- Team 00 local coordination only: prepare `CF-W2-DOV-02` dependency integration base.
+
+Pending:
+
+- Daily Overview dependency integration base.
+- Daily Overview follow-up implementation only after Team 00 promotes a bounded Ready slice.
+- QA, review, Architect Signoff, delegated PO acceptance, and commit for that follow-up slice.
+
+Teams ready to pick up new tasks:
+
+- Team 00: DOV-02 dependency integration base.
+- Team 08: Daily Overview follow-up after Ready promotion.
+- Team 04: QA after handoff.
+- Team 10: review after QA acceptance.
+- Team 03: Architect Signoff after review acceptance.
+
+## Latest Runtime Checkpoint - UX-01B Signoff And STRAT-05 Architecture Active
+
+Date: 2026-05-26
+
+Current status:
+
+- Branch: `dev`.
+- Open decisions: 2, scoped only to `CF-W1-MD-02B` and `CF-W1-DQ-02-RS1`.
+- Product Owner action required: yes only for those affected workstreams.
+- Push performed: no.
+
+Completed in the recent window:
+
+- `CF-W2-SPL-02` completed QA, review, Architect Signoff, delegated PO acceptance, and local branch commit `31115f0 feat: add signal position ledger surface`.
+- `CF-W2-DOV-02` completed architecture and QA planning, then moved to dependency-base/integration sequencing after DOV-01/CAL-02A branch conflict analysis.
+- `CF-W1-UX-01B` completed Team 08 rework after Team 10 rejection.
+- Team 04 QA rerun accepted `CF-W1-UX-01B`.
+- Team 10 rereview accepted `CF-W1-UX-01B`.
+- Team 02 rolling requirements completed, added `CF-W2-STRAT-05`, and left durable/storage items proposal-only.
+
+In progress:
+
+- Team 03 `019e6488-f28c-70d2-ac7a-a82f7fc0952d`: `CF-W1-UX-01B` Architect Signoff.
+- Team 03 `019e6489-06da-7f42-9da0-97f8c6d325a0`: `CF-W2-STRAT-05` architecture prep.
+- Team 02 `019e6489-1bb6-7d21-87ae-f8e4bf992921`: rolling investor/trader-value requirement discovery.
+
+Pending:
+
+- Team 00 delegated PO packet and scoped branch commit for `CF-W1-UX-01B` if Architect Signoff accepts.
+- Team 04 QA planning for `CF-W2-STRAT-05` if Team 03 returns architecture-ready.
+- Team 00 DOV-02 dependency integration-base preparation.
+- Consent-gated proposals remain blocked from source implementation: `CF-W1-MD-02A`, `CF-W1-SQLAB-02B`, `CF-W2-SPL-03`, and `CF-W1-STRAT-02B`.
+
+Teams ready to pick up new tasks:
+
+- Team 03: active on UX-01B Architect Signoff.
+- Team 03: active on STRAT-05 architecture prep.
+- Team 02: active on rolling requirements.
+- Team 04: ready for STRAT-05 QA planning after architecture.
+- Team 00: ready for UX-01B PO packet/commit if signoff accepts.
+- Team 00: ready for DOV-02 integration-base preparation.
+
 ## Latest Runtime Checkpoint - SPL-02 Accepted By Review
 
 Date: 2026-05-26
