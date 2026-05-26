@@ -24,7 +24,7 @@ Current active / queued agents:
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | Team 04 - QA Factory | `019e6479-4c86-7fa2-a260-5b7a44fd9476` | `gpt-5.4`, high | QA rerun | `CF-W1-UX-01B` in `C:\work\repo\investment-scanner-worktrees\team08-CF-W1-UX-01B` | active |
 | 2 | Team 03 - Architecture Factory | `019e647a-e5f9-7251-a2e1-154d821de566` | `gpt-5.4`, high | dependency-base correction | `CF-W2-DOV-02` DOV-01 + CAL-02A integration base | active |
-| 3 | Team 00 - Orchestrator | local | n/a | parked accepted commit | `CF-W2-SPL-02` commit `31115f0` | complete |
+| 3 | Team 02 - Product Owner / Requirement Factory | `019e647e-0d7c-7711-a2df-c4c2a566dcdc` | `gpt-5.4`, medium | rolling requirements | investor/trader-value backlog refresh | active |
 | 4 | Team 08 - UX / Research / Copilot | none | pending | rework | `CF-W1-UX-01B` only if Team 04 rerun rejects | queued |
 | 5 | Team 10 - Review / Release | pending | `gpt-5.4`, high | rereview | `CF-W1-UX-01B` after Team 04 ACCEPT | queued |
 | 6 | Team 03 - Architecture Factory | pending | `gpt-5.4`, high | Architect Signoff | `CF-W1-UX-01B` after Team 10 ACCEPT | queued |
@@ -33,9 +33,10 @@ Teams ready to pick up new tasks:
 
 - Team 04: active on UX-01B QA rerun as `019e6479-4c86-7fa2-a260-5b7a44fd9476`.
 - Team 03: active on DOV-02 dependency-base correction architecture as `019e647a-e5f9-7251-a2e1-154d821de566`.
+- Team 02: active on rolling investor/trader-value requirement discovery as `019e647e-0d7c-7711-a2df-c4c2a566dcdc`.
 - Team 10: queued for UX-01B rereview after QA acceptance.
 - Team 03: queued for UX-01B Architect Signoff after Team 10 acceptance.
-- Team 02: ready for another rolling requirement pass after commit/routing pressure clears.
+- Team 02: active on rolling requirement discovery.
 
 ## Latest Active Snapshot - SPL-02 QA Rerun And UX-01B Implementation
 

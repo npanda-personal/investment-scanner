@@ -52,6 +52,7 @@ Current state:
 - `CF-W2-DOV-02` Team 03 architecture returned `split required`; Team 04 QA planning completed.
 - Team 00 dependency-base verification found `a371e2f` and `1be7d1a` on separate branches with Signal Calibration dry-merge conflicts. DOV-02 now needs architecture/integration base correction before implementation.
 - `CF-W2-SPL-03` remains requirement/proposal-only and is not Ready because closed-history lifecycle proof likely needs storage/lifecycle architecture.
+- Team 02 rolling investor/trader-value requirement discovery is active as `019e647e-0d7c-7711-a2df-c4c2a566dcdc`.
 - Open decisions remain 2 and block only `CF-W1-MD-02B` and `CF-W1-DQ-02-RS1`.
 
 SPL-02 next gates:
@@ -65,7 +66,7 @@ Teams ready to pick up new tasks:
 - Team 10: queued for `CF-W1-UX-01B` rereview after QA acceptance.
 - Team 03: ready for DOV-02 dependency-base correction architecture.
 - Team 06: SPL-02 complete/parked; ready for next Team 06 Ready item.
-- Team 02: ready for another rolling requirement pass after the current architecture/signoff pressure clears.
+- Team 02: active on rolling investor/trader-value requirement discovery.
 
 ## Latest Team 00 Routing Update - SPL-02 QA, UX-01B Ready
 

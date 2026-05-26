@@ -21,6 +21,7 @@ Gate movement:
 - `CF-W2-SPL-02` scoped local commit completed on Team 06 branch as `31115f0 feat: add signal position ledger surface`.
 - Team 10 rejected `CF-W1-UX-01B`; Team 08 bounded rework completed.
 - Team 04 UX-01B QA rerun is active as `019e6479-4c86-7fa2-a260-5b7a44fd9476`.
+- Team 02 rolling investor/trader-value requirement discovery is active as `019e647e-0d7c-7711-a2df-c4c2a566dcdc`.
 - Team 03 completed `CF-W2-DOV-02` architecture with `split required`.
 - Team 04 completed DOV-02 QA planning with `QA-PLAN READY AFTER DEPENDENCY-BASE VERIFICATION`.
 - Team 00 dependency-base verification found DOV-01 and CAL-02A on separate branches with Signal Calibration dry-merge conflicts.
@@ -32,6 +33,7 @@ Teams ready to pick up new tasks:
 
 - Team 04: UX-01B QA rerun active.
 - Team 03: DOV-02 dependency-base correction architecture active as `019e647a-e5f9-7251-a2e1-154d821de566`.
+- Team 02: rolling requirement discovery active as `019e647e-0d7c-7711-a2df-c4c2a566dcdc`.
 - Team 10: ready for UX-01B rereview after QA acceptance.
 - Team 06: SPL-02 complete/parked; ready for next Team 06 Ready item.
 
