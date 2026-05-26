@@ -174,8 +174,9 @@ New narrowed child after Team 03 source audit:
 
 Recommended path now:
 
-1. implement `CF-W2-SPL-01B` first as an active-only read model using existing persisted/public evidence only;
-2. defer closed history to a later durable lifecycle/storage child after Team 00 intentionally opens that path.
+1. `CF-W2-SPL-01B` is the accepted backend-only active read-model foundation using existing persisted/public evidence only;
+2. `CF-W2-SPL-02` is the next honest surfaced child for mounted API/frontend exposure of active positions, with a placeholder-only `Closed History` tab if Team 00 approves that UX shape;
+3. defer real closed history to a later durable lifecycle/storage child after Team 00 intentionally opens that path.
 
 Why the split is required:
 
@@ -230,8 +231,14 @@ Until Team 03 and Team 00 explicitly approve a bounded implementation packet, th
 
 ## Next Gate
 
-Team 03 should take `CF-W2-SPL-01B` as the next module-level architecture candidate after the active Today Review writer family clears and Team 00 confirms sequencing.
+Next surfaced follow-up:
 
-Team 04 should keep QA at scaffold-only status until Team 03 finishes the `CF-W2-SPL-01B` architecture/contract/work-packet packet.
+- Team 08 UX plan for `CF-W2-SPL-02`
+- Team 03 architecture packet for mounted API/frontend route/nav exposure of `CF-W2-SPL-02`
+- Team 04 QA plan for active-surface plus closed-placeholder behavior only
+
+Later follow-up:
+
+- a separate durable close-proof child if Team 00 intentionally opens closed-history truth
 
 Team 00 must not move this parent requirement to Ready from the requirement lane.

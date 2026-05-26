@@ -1,5 +1,117 @@
 # TEAM-02 Requirement Factory
 
+## Team 02 Signal Position Ledger Surface Follow-Up - 2026-05-26
+
+Root `AGENTS.md` was read first. Team 02 stayed docs-only and updated only requirement-lane artifacts plus this outbox.
+
+### Work Item
+
+Define the next honest Signal Position Ledger child after accepted `CF-W2-SPL-01B` so the module can surface active positions for investors/traders without overstating closed-history proof.
+
+### Files Inspected
+
+- `AGENTS.md`
+- `backend/src/api/routes.ts`
+- `frontend/src/app/routes.tsx`
+- `frontend/src/app/navigationMetadata.tsx`
+- `frontend/src/app/HomePage.tsx`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W2-SPL-01-signal-position-ledger-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W2-SPL-01A-signal-position-ledger-first-slice-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W2-SPL-01B-signal-position-ledger-active-positions-read-model-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/06-contracts/CF-W2-SPL-01B-active-position-read-model-contract.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W2-SPL-01B-architecture-review.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/04-qa/CF-W2-SPL-01B-qa-plan.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/13-implementation-evidence/CF-W2-SPL-01B-ready-promotion.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- local git evidence: `ca31d79 feat: add signal position ledger read model`
+
+### Files Changed
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W2-SPL-01-signal-position-ledger-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/CF-W2-SPL-02-signal-position-ledger-active-surface-requirement.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/10-requirements/next-top-10-candidates.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-02-requirement-factory.md`
+
+### Recommendation
+
+Create the next user-visible SPL child as:
+
+- `CF-W2-SPL-02 - Signal Position Ledger Active Positions Surface`
+
+Recommended first surfaced shape:
+
+- `Active Positions` tab backed by accepted `CF-W2-SPL-01B`
+- `Closed History` tab as placeholder-only
+- no closed-history endpoint, rows, counts, or mock data
+
+Why this is the better bounded follow-up:
+
+- the active backend read model is already accepted and locally committed;
+- the user-visible page and route must be opened anyway, so a placeholder closed tab sets truthful expectation with little additional scope;
+- real closed-history proof still remains deferred.
+
+### Exact Separation Of Scope
+
+Backed now by accepted `CF-W2-SPL-01B`:
+
+- active rows only
+- entry date/timestamp
+- entry price
+- reason summary
+- stock/company identity
+- current return to latest trusted price date
+- limited compatibility states and trust labels
+
+Deferred until durable lifecycle/close proof exists:
+
+- close date
+- close price
+- close reason
+- closed return
+- truthful closed-history rows
+- any reusable closed lifecycle API
+
+### Shared-File And Dependency Result
+
+This next child is not module-local only. Before implementation, Team 00 and Team 03 must control:
+
+- backend route registry: `backend/src/api/routes.ts`
+- frontend route registry: `frontend/src/app/routes.tsx`
+- frontend navigation metadata: `frontend/src/app/navigationMetadata.tsx`
+
+Possible additional discoverability file only if Team 00 widens the pass:
+
+- `frontend/src/app/HomePage.tsx`
+
+Other dependencies:
+
+- accepted `CF-W2-SPL-01B` commit `ca31d79` must be present on the working base
+- Team 08 UX pass should define the final page behavior before meaningful UI implementation
+- Team 04 QA should plan only the active-surface plus closed-placeholder slice
+
+### Verdict
+
+`Architecture-needed`
+
+Not Ready:
+
+- shared-file route/API/UI exposure still needs architecture and reservation control
+
+Not consent-blocked:
+
+- this child does not require schema/storage/package/generated-file consent if it stays active-surface plus closed-placeholder only
+
+Real consent-sensitive follow-on later:
+
+- any true closed-history delivery that needs durable lifecycle or close-proof storage
+
+### Next Recommended Gate
+
+1. Team 08 UX plan for the surfaced Signal Position Ledger page.
+2. Team 03 architecture packet for mounted backend route plus frontend route/navigation reservations.
+3. Team 04 QA plan for active positions and closed placeholder only.
+4. Team 00 sequencing after `ca31d79` is available on the implementation base.
+
 ## Team 02 DOV Investor-First Requirement Correction - 2026-05-26
 
 Root `AGENTS.md` was read first. Team 02 stayed docs-only and updated only requirement-lane artifacts plus this outbox.

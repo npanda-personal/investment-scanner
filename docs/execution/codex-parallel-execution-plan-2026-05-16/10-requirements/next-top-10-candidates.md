@@ -29,6 +29,7 @@ Status: Team 02 refreshed this queue after reconciling the live runtime queue wi
 
 - `CF-W2-CAL-02` remains important, but its bounded child `CF-W2-CAL-02A` is already routed and therefore stays out of the unassigned stack.
 - `CF-W2-DOV-01`, `CF-W2-SPL-01B`, and `CF-W1-RH-01A` have already moved past Team 02 fresh discovery and should stay with Team 00 / Team 03 / Team 04 / owning implementation teams for the current gate flow. `CF-W2-DOV-01` specifically remains high priority, but it is blocked from implementation until the investor/trader-first Team 08 UX and Team 03 architecture refreshes replace the superseded admin-style framing.
+- `CF-W2-SPL-02` is now the honest post-`CF-W2-SPL-01B` follow-up for a user-visible Signal Position Ledger page, but it is architecture-needed shared-file work rather than a fresh queue-head candidate. Keep it behind the current DOV gate work and route it only after Team 00 sequences the accepted `ca31d79` backend read-model dependency plus backend/frontend route and navigation reservations.
 - `CF-W1-MD-02A`, `CF-W1-SQLAB-02B`, and `CF-W1-STRAT-02B` remain valuable, but all three are honest consent-gated proposals rather than Ready-adjacent slices.
 - Parent `CF-W1-TSC-02` and `CF-W1-TSC-03` docs remain useful historical context, but they are not the next fresh Team 02 queue heads from current `dev`.
 - `CF-W2-SPL-01A` remains a split-history requirement, not the next intake target.
