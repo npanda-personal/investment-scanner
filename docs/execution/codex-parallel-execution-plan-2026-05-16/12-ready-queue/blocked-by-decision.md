@@ -4,14 +4,15 @@ Date: 2026-05-18
 
 ## Decision Inbox State
 
-One active implementation item is currently blocked by an open Product Owner decision.
+Two workstreams are currently blocked by open Product Owner decisions.
 
-`99-decision-inbox/open-decisions.md` reports one open decision for `CF-W1-DQ-02-RS1`. The previously open policy items were resolved on 2026-05-18 and remain refinement/Ready-promotion candidates only.
+`99-decision-inbox/open-decisions.md` reports two open decisions: `CF-W1-MD-02B` and `CF-W1-DQ-02-RS1`. The previously open policy items were resolved on 2026-05-18 and remain refinement/Ready-promotion candidates only.
 
 ## Currently Blocked By Open Decision
 
 | ID | Decision | Blocker | Routing |
 | --- | --- | --- | --- |
+| CF-W1-MD-02B | `99-decision-inbox/DECISION-20260526-md-02b-schema-generated-consent.md` | Market Data durable companion evidence work would require Prisma schema, migration, generated client/types, and Market Data writer reservations. | Keep `CF-W1-MD-02A` proposal-only; no schema/generated/source implementation until resolved. |
 | CF-W1-DQ-02-RS1 | `99-decision-inbox/DECISION-20260525-dq-rs1-currentness-summary-parity.md` | Team 10 and Team 03 found no bounded DQE-only path that satisfies both bounded summary behavior and reconstructed summary/helper parity. | Stop current Team 05 RS1 rework. Decide whether to reduce scope or open upstream bulk/durable evidence work first. |
 
 ## Resolved This Cycle, Still Not Ready
@@ -44,3 +45,4 @@ These items are not blocked by Product Owner decisions, but they remain out of R
 - `CF-W1-UX-02`
 - `CF-W1-UX-05`
 - `CF-W1-MD-01`
+- `CF-W2-SPL-02`

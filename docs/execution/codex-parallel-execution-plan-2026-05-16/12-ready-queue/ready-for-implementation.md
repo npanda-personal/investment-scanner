@@ -6,6 +6,78 @@ Date: 2026-05-18
 
 No available application-code item is currently waiting unassigned in Ready. The newly promoted items below are assigned immediately to their owning teams and should run in separate worktrees.
 
+2026-05-26 Team 00 Ready promotion - `CF-W2-SPL-02`:
+
+- `CF-W2-SPL-02` is promoted and assigned to Team 06 as the next Signal Position Ledger child after accepted backend foundation `CF-W2-SPL-01B`.
+- Purpose: expose the accepted active-row read model through a mounted backend route and a dedicated user-facing Signal Position Ledger page, with `Closed History` placeholder-only.
+- Branch: `codex/team06-strategy-signal/CF-W2-SPL-02`.
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-SPL-02`.
+- Required base: keep `ca31d79 feat: add signal position ledger read model` as an ancestor and include current `dev` active execution docs before implementation starts.
+- Gate evidence:
+  - Requirement: `10-requirements/CF-W2-SPL-02-signal-position-ledger-active-surface-requirement.md`
+  - UX plan: `05-ux/CF-W2-SPL-02-signal-position-ledger-active-surface-ux-plan.md`
+  - Architecture review: `03-architecture/CF-W2-SPL-02-architecture-review.md`
+  - Contract: `06-contracts/CF-W2-SPL-02-active-surface-contract.md`
+  - Work packet: `08-work-packets/CF-W2-SPL-02-work-packet.md`
+  - QA plan: `04-qa/CF-W2-SPL-02-qa-plan.md`
+  - Ready promotion: `13-implementation-evidence/CF-W2-SPL-02-ready-promotion.md`
+- Team 00 shared-file reservation for this pass:
+  - `backend/src/api/routes.ts`
+  - `frontend/src/app/routes.tsx`
+  - `frontend/src/app/navigationMetadata.tsx`
+- Allowed implementation files:
+  - `backend/src/api/routes.ts`
+  - `backend/src/modules/signal-position-ledger/signal-position-ledger.service.ts`
+  - `backend/src/modules/signal-position-ledger/signal-position-ledger.md`
+  - `backend/tests/modules/signal-position-ledger/signal-position-ledger.service.test.ts`
+  - `backend/tests/modules/signal-position-ledger/signal-position-ledger.routes.test.ts`
+  - optional only if route-registry assertions are added: `backend/tests/api/routes.test.ts`
+  - `frontend/src/features/signal-position-ledger/types.ts`
+  - `frontend/src/features/signal-position-ledger/api/signalPositionLedgerApi.ts`
+  - `frontend/src/features/signal-position-ledger/hooks/useSignalPositionLedgerActiveRows.ts`
+  - `frontend/src/features/signal-position-ledger/components/SignalPositionLedgerPage.tsx`
+  - `frontend/src/features/signal-position-ledger/components/ActivePositionsTable.tsx`
+  - `frontend/src/features/signal-position-ledger/components/SignalPositionSummaryStrip.tsx`
+  - `frontend/src/features/signal-position-ledger/components/ClosedHistoryPlaceholder.tsx`
+  - `frontend/src/features/signal-position-ledger/routes.tsx`
+  - `frontend/src/features/signal-position-ledger/index.ts`
+  - `frontend/src/app/routes.tsx`
+  - `frontend/src/app/navigationMetadata.tsx`
+  - `frontend/tests/ui/signal-position-ledger.spec.ts`
+- Allowed reporting docs:
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-06-CF-W2-SPL-02-outbox.md`
+  - `docs/execution/codex-parallel-execution-plan-2026-05-16/18-integration-queue/CF-W2-SPL-02-developer-handoff.md`
+- Forbidden scope:
+  - closed-history API, rows, counts, mocks, close date, close price, close reason, closed return, durable lifecycle storage, row-detail routes
+  - Prisma schema, migrations, generated files, package manifests, lockfiles, shared backend utilities, shared frontend components, shared test helpers unless Team 04 later reserves them
+  - `frontend/src/app/HomePage.tsx`
+  - Today Review, Trade Plan, Portfolio, Backtesting, Market Data, Data Quality, provider/live/startup/backfill/scheduler/worker/queue files
+  - broker execution, portfolio accounting, realized P/L, target-price, reward/risk, `R:R`, direct buy/sell wording, guarantee wording, or financial-advice framing
+- Required validation:
+
+```powershell
+cd backend
+npm.cmd test -- signal-position-ledger.service.test.ts signal-position-ledger.routes.test.ts --runInBand
+npm.cmd run build
+cd frontend
+npm.cmd run build
+npm.cmd run test:ui -- signal-position-ledger.spec.ts --workers=1
+```
+
+- Required language guard:
+
+```powershell
+rg -n -i '\b(active trade|active trades|open trade|open trades|closed trade|closed trades|buy|sell|target|profit target|price target|reward/risk|risk:reward|R:R|broker|execution|realized P/L|realized profit|financial advice|must buy|must sell)\b' backend/src/api/routes.ts backend/src/modules/signal-position-ledger backend/tests/modules/signal-position-ledger frontend/src/app/routes.tsx frontend/src/app/navigationMetadata.tsx frontend/src/features/signal-position-ledger frontend/tests/ui/signal-position-ledger.spec.ts
+```
+
+Stop and return to Team 00 if implementation requires any forbidden file, closed-history proof/API, backend aggregates, filters/search, schema/package/generated/provider/startup/scheduler/shared UI scope, or product-language drift.
+
+2026-05-26 acceptance update - `CF-W2-DOV-01`:
+
+- `CF-W2-DOV-01` refreshed Daily Overview dashboard is accepted through QA rerun, Code Review rerun, Architect Signoff, delegated PO acceptance, staged-scope verification, and local Team 08 branch commit `a371e2f feat: add daily overview dashboard`.
+- The DOV branch remains parked for later integration sequencing and has not been pushed.
+- Current Ready status: complete/committed on branch; no Team 08 DOV implementation work remains active.
+
 2026-05-26 refreshed Ready promotion - `CF-W2-DOV-01`:
 
 - `CF-W2-DOV-01` is re-promoted as frontend-only Team 08 rework after Product Owner correction, Team 02 requirement refresh, Team 08 UX refresh, Team 03 architecture refresh, and Team 04 QA refresh.

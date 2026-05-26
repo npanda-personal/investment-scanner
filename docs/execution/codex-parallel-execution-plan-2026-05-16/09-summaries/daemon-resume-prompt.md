@@ -8,15 +8,20 @@ Latest live checkpoint:
 
 - Branch: `dev`.
 - Open decisions: 2, scoped only to `CF-W1-MD-02B` and `CF-W1-DQ-02-RS1`.
-- Product Owner action required: yes only for those affected workstreams; no for active DOV/SPL/RH routine gates.
-- `CF-W2-DOV-01` refreshed Ready promotion is recorded after Product Owner feedback, Team 02 requirement refresh, Team 08 UX refresh, Team 03 architecture refresh, and Team 04 QA refresh. Team 08 may now rework the existing DOV worktree within the refreshed frontend-only boundary.
+- Product Owner action required: yes only for those affected workstreams; no for active SPL/RH routine gates.
+- `CF-W2-DOV-01` refreshed Daily Overview dashboard is accepted through QA rerun, Code Review rerun, Architect Signoff, delegated PO acceptance, staged-scope verification, and locally committed on the Team 08 branch as `a371e2f feat: add daily overview dashboard`.
 - `CF-W2-DOV-01` branch/worktree: `codex/team08-ux-research/CF-W2-DOV-01`, `C:\work\repo\investment-scanner-worktrees\team08-CF-W2-DOV-01`.
-- `CF-W2-DOV-01` allowed scope: `frontend/src/app/HomePage.tsx`, new `frontend/src/features/daily-overview-dashboard/**`, and `frontend/tests/ui/daily-overview-dashboard.spec.ts`.
-- `CF-W2-DOV-01` current gate: refreshed Ready for Team 08 implementation/rework. After handoff, route to Team 04 QA Verification.
-- `CF-W2-SPL-01B` is Ready and assigned to Team 06 as a backend-only active-row read-model child.
+- `CF-W2-DOV-01` current gate: accepted and parked for later integration sequencing.
+- `CF-W2-SPL-01B` is accepted as a backend-only active-row read-model foundation.
 - `CF-W2-SPL-01B` branch/worktree: `codex/team06-strategy-signal/CF-W2-SPL-01B`, `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-SPL-01B`.
-- `CF-W2-SPL-01B` allowed scope: new `backend/src/modules/signal-position-ledger/**` and `backend/tests/modules/signal-position-ledger/**`.
 - `CF-W2-SPL-01B` current gate: accepted through QA rerun, Code Review rerun, Architect Signoff, delegated PO acceptance, and locally committed on the Team 06 branch as `ca31d79 feat: add signal position ledger read model`.
+- `CF-W2-SPL-02` is promoted as the next Signal Position Ledger user-facing surface.
+- `CF-W2-SPL-02` branch/worktree: `codex/team06-strategy-signal/CF-W2-SPL-02`, `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-SPL-02`.
+- `CF-W2-SPL-02` required base: keep `ca31d79` as an ancestor and include current `dev` active execution docs before implementation starts.
+- `CF-W2-SPL-02` Team 00 shared-file reservation: `backend/src/api/routes.ts`, `frontend/src/app/routes.tsx`, and `frontend/src/app/navigationMetadata.tsx`.
+- `CF-W2-SPL-02` allowed scope: accepted SPL service/doc/tests, backend route mount, feature-local `frontend/src/features/signal-position-ledger/**`, frontend route/nav files, and `frontend/tests/ui/signal-position-ledger.spec.ts`.
+- `CF-W2-SPL-02` forbidden scope: closed-history API/data, schema/migrations/generated/package/shared UI, `HomePage`, Today Review, Trade Plan, Portfolio, Backtesting, Market Data, DQ, providers/live/startup/scheduler, targets, reward/risk, broker/execution, and advice language.
+- `CF-W2-SPL-02` current gate: Ready for Team 06 implementation. After handoff, route to Team 04 QA Verification.
 - `CF-W1-RH-01A` is accepted and locally committed on the Team 08 branch as `30460aa feat: add research hub evidence dates`.
 - `CF-W1-RH-01A` branch/worktree: `codex/team08-research/CF-W1-RH-01A`, `C:\work\repo\investment-scanner-worktrees\team08-CF-W1-RH-01A`.
 - `CF-W1-RH-01A` allowed scope: `backend/src/modules/research-hub/research-hub.service.ts`, `backend/src/modules/research-hub/research-hub.md`, `backend/tests/modules/research-hub/research-hub.service.test.ts`, `frontend/src/features/research-hub/components/ResearchOverviewPage.tsx`, and `frontend/tests/ui/research-hub.spec.ts`.
@@ -24,14 +29,14 @@ Latest live checkpoint:
 - `CF-W1-MD-02A` current gate: proposal-only; Team 03 opened `DECISION-20260526-md-02b-schema-generated-consent`; no Prisma/schema/generated/source implementation may start until resolved.
 - Team 02 requirement lane refined `CF-W1-RH-01A` and updated priority queues; DOV/SPL are routed work, not fresh discovery.
 - Active implementation agents at checkpoint:
-  - Team 08 `019e63b3-3be9-7470-ba5f-b3fc1d1ce261`: `CF-W2-DOV-01` paused UX reframe analysis after Product Owner feedback.
-  - Team 04 `019e63b5-d35a-72a0-8a4d-770ce1986dc4`: `CF-W1-RH-01A` QA rerun.
+  - none recorded in this file before SPL-02 worker launch.
 - Next gates:
-  1. launch Team 08 DOV refreshed frontend-only rework in the existing DOV worktree;
-  2. route Team 04 DOV QA Verification after Team 08 handoff;
-  3. keep SPL parked as accepted branch commit `ca31d79` until a later integration pass;
-  4. keep RH parked as accepted branch commit `30460aa` until integration sequencing is opened;
-  5. keep Team 02 rolling on the next direct investor/trader-value requirement when a slot is free.
+  1. create/update the SPL-02 worktree;
+  2. spawn Team 06 SPL-02 implementation;
+  3. route Team 04 SPL-02 QA Verification after Team 06 handoff;
+  4. route Team 10 Code Review and Team 03 Architect Signoff after QA acceptance;
+  5. keep RH parked as accepted branch commit `30460aa` until integration sequencing is opened;
+  6. keep Team 02 rolling on the next direct investor/trader-value requirement when a slot is free.
 
 This file exists and was updated after Team 00 accepted `CF-W3-MDPIPE-01B4-PIPELINE-COMMAND-API` for the Market Data pipeline redesign.
 

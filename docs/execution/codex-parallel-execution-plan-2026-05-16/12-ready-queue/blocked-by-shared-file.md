@@ -16,6 +16,18 @@ Date: 2026-05-18
 | CF-W1-L3-AUTH-EVENT-DIRECT-OWNER | `backend/prisma/schema.prisma` if direct alert event ownership is selected later | Direct `AlertEvent.userId` remains a future schema/migration decision; the accepted `CF-W1-L3-AUTH-02` slice used parent rule ownership and is no longer blocked here. |
 | CF-W1-MD-STARTUP | `backend/src/server.ts`, `.env.example`, scheduler/backfill | Startup/provider-heavy behavior remains excluded. |
 
+## Active Team 00 Shared-File Reservation - 2026-05-26
+
+`CF-W2-SPL-02` is not blocked by shared files because Team 00 reserves the required shared route/navigation files for one Team 06 writer:
+
+- `backend/src/api/routes.ts`
+- `frontend/src/app/routes.tsx`
+- `frontend/src/app/navigationMetadata.tsx`
+
+No other team may edit these files until SPL-02 is handed off, rejected, or Team 00 releases the reservation.
+
+If SPL-02 needs shared UI, shared backend utilities, schema, package/generated files, Home Page, closed-history files, or additional route/nav redesign, stop and return to Team 00.
+
 ## Team 00 Routing Note - 2026-05-18
 
 Current near-ready inspection targets are expected to avoid shared/high-risk files:

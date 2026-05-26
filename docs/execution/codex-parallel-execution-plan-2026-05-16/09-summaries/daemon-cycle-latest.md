@@ -5,8 +5,8 @@ Date: 2026-05-26
 ## Current Cycle
 
 - Cycle id: `DAEMON-20260517`
-- Rolling iteration count: 27
-- Current mode: Team 00 coordinating refreshed Daily Overview architecture; SPL/RH accepted branch commits are parked.
+- Rolling iteration count: 28
+- Current mode: Team 00 coordinating SPL-02 implementation after DOV acceptance.
 - Daemon continuing: yes.
 - Main branch: `dev`.
 - Resume prompt path: `09-summaries/daemon-resume-prompt.md`.
@@ -16,13 +16,17 @@ Date: 2026-05-26
 
 Latest routing update:
 
-- `CF-W2-DOV-01` refreshed Ready promotion is recorded after Team 02/08/03/04 refresh gates.
-- Next active implementation lane is Team 08 DOV frontend-only rework in `C:\work\repo\investment-scanner-worktrees\team08-CF-W2-DOV-01`.
-- `CF-W2-SPL-01B` remains parked as accepted branch commit `ca31d79`.
+- `CF-W2-DOV-01` refreshed Daily Overview dashboard is accepted and locally committed on the Team 08 branch as `a371e2f feat: add daily overview dashboard`.
+- `CF-W2-SPL-01B` remains parked as accepted backend foundation branch commit `ca31d79`.
+- `CF-W2-SPL-02` is promoted as the next active implementation lane in `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-SPL-02`.
+- Team 00 reserved `backend/src/api/routes.ts`, `frontend/src/app/routes.tsx`, and `frontend/src/app/navigationMetadata.tsx` for one Team 06 writer.
 - `CF-W1-RH-01A` remains parked as accepted branch commit `30460aa`.
 
 ## Completed Since Prior Checkpoint
 
+- Team 08 completed refreshed `CF-W2-DOV-01`; Team 04 QA rerun accepted, Team 10 re-review accepted, Team 03 Architect Signoff accepted, Team 00 delegated PO acceptance completed, and the Team 08 branch has local commit `a371e2f feat: add daily overview dashboard`.
+- Team 02, Team 08, Team 03, and Team 04 completed `CF-W2-SPL-02` requirement, UX, architecture, work-packet, and QA-plan prep.
+- Team 00 promoted `CF-W2-SPL-02` to Team 06 with exact route/navigation/shared-file reservations.
 - Team 00 promoted and launched three independent Ready implementation lanes: `CF-W2-DOV-01`, `CF-W2-SPL-01B`, and `CF-W1-RH-01A`.
 - Team 08 completed initial `CF-W2-DOV-01` implementation; Team 04 rejected QA for placeholder/fallback truthfulness gaps. Team 08 rework is active.
 - Team 06 completed initial `CF-W2-SPL-01B` implementation; Team 04 accepted QA, but Team 10 rejected Code Review for stale current-DQ fallback and private Signal Generation type imports. Team 06 rework is active.
@@ -58,7 +62,7 @@ Validation:
 
 ## Queue Pressure
 
-- Ready queue depth: 0 available unassigned application-code items; DOV requires refreshed architecture/QA before a new Ready promotion.
+- Ready queue depth: 1 active assigned implementation item: `CF-W2-SPL-02` assigned to Team 06. No unassigned Ready item is waiting.
 - Refinement queue depth: active; next proposal-first items are `CF-W1-MD-02A`, `CF-W1-SQLAB-02B`, `CF-W1-STRAT-02B`, `CF-W1-L3-DQ-01A`, and `CF-W1-UX-01`.
 - Integration queue depth: active handoffs/review evidence exist in the three worktrees; no accepted app-code commit is ready yet.
 - Open decisions: 2.
@@ -66,7 +70,8 @@ Validation:
 
 ## Current Blockers
 
-- `CF-W2-DOV-01` is blocked from implementation until Team 03 architecture/source-map refresh and Team 04 QA refresh consume the new investor/trader requirement/UX.
+- `CF-W2-DOV-01` is no longer blocked; it is accepted and locally committed on its Team 08 branch as `a371e2f`.
+- `CF-W2-SPL-02` has no current Product Owner blocker, but must stop if implementation needs closed-history proof/API, schema/package/generated/provider/startup/shared UI scope, or product-language drift.
 - `CF-W2-SPL-01B` is no longer blocked; it is accepted and locally committed on its Team 06 branch as `ca31d79`.
 - `CF-W1-RH-01A` is no longer blocked; it is accepted and locally committed on its Team 08 branch as `30460aa`.
 - `CF-W1-MD-02B` is blocked by the new schema/generated consent decision.
@@ -82,21 +87,22 @@ Validation:
 | --- | --- | --- | --- |
 | Team 00 | coordinating | Consume active agent outputs and route QA/review/signoff gates | Continue rolling scheduler unless a true blocker appears. |
 | Team 02 | ready | Rolling Product Owner / requirements discovery focused on investor/trader value | Relaunch when an agent slot opens and no review/signoff gate is waiting. |
-| Team 03 | ready | `CF-W2-DOV-01` architecture/source-map refresh | Start now from refreshed requirement and UX. |
-| Team 04 | ready | DOV QA refresh after architecture | Start after Team 03 refresh. |
+| Team 03 | ready | SPL-02 Architect Signoff after Team 10 acceptance, or rolling architecture prep | Start after Team 10 acceptance or when Team 00 assigns the next design item. |
+| Team 04 | ready | SPL-02 QA after Team 06 handoff | Start after Team 06 developer handoff. |
 | Team 05 | blocked/standby | `CF-W1-MD-02B` blocked by consent; DQ-RS1 blocked by decision | Wait for Product Owner decision or a separate no-schema Ready packet. |
-| Team 06 | committed | `CF-W2-SPL-01B` accepted branch commit `ca31d79` | Wait for a later integration pass. |
+| Team 06 | ready/assigned | `CF-W2-SPL-02` implementation | Start in `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-SPL-02`. |
 | Team 07 | standby | No current Ready item | Wait for next promoted Today Review / Portfolio item. |
-| Team 08 | active | `CF-W2-DOV-01` UX reframe after Product Owner feedback; `CF-W1-RH-01A` already in QA | Route DOV back through product/UX/architecture/QA before implementation resumes. |
+| Team 08 | standby | DOV accepted and parked; `CF-W1-RH-01A` accepted and parked | Available for UX feedback or next user-facing item. |
 | Team 09 | standby | Platform/auth only if command API needs protected-user semantics | Wait for Team 03 architecture finding. |
-| Team 10 | ready | Review RH/DOV/SPL after QA acceptance | Start after Team 04 accepts.
+| Team 10 | ready | SPL-02 Code Review after QA acceptance | Start after Team 04 accepts. |
 
 ## Next Assignments
 
-1. Team 00: consume Team 08 DOV UX reframe and route DOV back to requirement/UX/architecture/QA before implementation resumes.
-2. Team 00: consume Team 04 RH QA output and route Team 10 review if accepted.
-3. Team 03: sign off only after Team 10 accepts a handoff.
-4. Team 02: resume rolling direct-value requirements when a slot opens and no immediate review/signoff gate is waiting.
+1. Team 00: create/update the SPL-02 worktree, then spawn Team 06 implementation.
+2. Team 04: QA Verification after Team 06 handoff.
+3. Team 10: Code Review after QA acceptance.
+4. Team 03: Architect Signoff after Team 10 acceptance.
+5. Team 02: resume rolling direct-value requirements when a slot opens and no immediate review/signoff gate is waiting.
 
 ## Stop State
 

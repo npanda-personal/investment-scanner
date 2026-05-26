@@ -34,6 +34,45 @@ No historical active work items have been migrated as active.
 - Rejected / Rework
 - Deferred
 
+## Latest Team 00 Routing Update - SPL-02 Promoted After DOV Acceptance
+
+Date: 2026-05-26
+
+Current state:
+
+- `CF-W2-DOV-01` refreshed Daily Overview dashboard is accepted and locally committed on the Team 08 branch as `a371e2f feat: add daily overview dashboard`.
+- `CF-W2-DOV-01` is parked for later integration sequencing; no active Team 08 DOV implementation work remains.
+- `CF-W2-SPL-01B` remains accepted and locally committed on the Team 06 branch as `ca31d79 feat: add signal position ledger read model`.
+- `CF-W2-SPL-02` is now promoted to Team 06 as the user-facing Signal Position Ledger active positions surface.
+- Open decisions remain 2 and block only `CF-W1-MD-02B` and `CF-W1-DQ-02-RS1`.
+
+SPL-02 implementation routing:
+
+- Team: Team 06 - Strategy / Signals / Risk.
+- Branch: `codex/team06-strategy-signal/CF-W2-SPL-02`.
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-SPL-02`.
+- Required base: `ca31d79` must remain an ancestor; current `dev` active execution docs should be merged into the worktree before implementation.
+- Shared files reserved by Team 00 for one Team 06 writer: `backend/src/api/routes.ts`, `frontend/src/app/routes.tsx`, and `frontend/src/app/navigationMetadata.tsx`.
+- Scope: mount the accepted active endpoint, add `/signal-position-ledger`, add the navigation item, render `Active Positions`, and keep `Closed History` placeholder-only.
+- Forbidden: closed-history API/data, schema/migrations/generated/package/shared UI, `HomePage`, Today Review, Trade Plan, Portfolio, Backtesting, providers/live/startup/scheduler, targets, reward/risk, broker/execution, and advice language.
+
+Next gates:
+
+- Team 06: implement `CF-W2-SPL-02`.
+- Team 04: QA Verification after Team 06 handoff.
+- Team 10: Code Review after Team 04 acceptance.
+- Team 03: Architect Signoff after Team 10 acceptance.
+- Team 00: delegated PO acceptance and scoped local commit if all gates pass.
+
+Teams ready to pick up new tasks:
+
+- Team 06: `CF-W2-SPL-02` implementation now.
+- Team 04: SPL-02 QA after Team 06 handoff.
+- Team 10: SPL-02 Code Review after QA acceptance.
+- Team 03: SPL-02 Architect Signoff after Code Review acceptance, or rolling architecture if no signoff is waiting.
+- Team 02: rolling investor/trader-value requirements discovery.
+- Team 08: standby for UX feedback or next user-facing item; DOV is currently complete and parked.
+
 ## Latest Team 00 Routing Update - DOV Reframe, SPL Parked, RH Accepted
 
 Date: 2026-05-26

@@ -1,5 +1,49 @@
 # TEAM-00 Orchestrator / Integration Outbox
 
+## Latest Runtime Checkpoint - SPL-02 Promoted
+
+Date: 2026-05-26
+
+Status:
+
+- Branch: `dev`.
+- Main workspace status before this checkpoint: clean.
+- Open decisions: 2, affecting only `CF-W1-MD-02B` and `CF-W1-DQ-02-RS1`.
+- Product Owner action required: yes only for those affected workstreams; no for SPL-02.
+- Push performed: no.
+
+Accepted since prior checkpoint:
+
+- `CF-W2-DOV-01` refreshed Daily Overview dashboard completed QA rerun, Code Review rerun, Architect Signoff, delegated PO acceptance, staged-scope verification, and local Team 08 branch commit `a371e2f feat: add daily overview dashboard`.
+- `CF-W2-DOV-01` is parked for later integration sequencing.
+
+Gate movement:
+
+- Team 00 consumed SPL-02 requirement, UX, architecture, work packet, and QA plan.
+- Team 00 promoted `CF-W2-SPL-02` to Team 06 implementation.
+- Team 00 reserved shared files for one Team 06 writer: `backend/src/api/routes.ts`, `frontend/src/app/routes.tsx`, and `frontend/src/app/navigationMetadata.tsx`.
+
+Implementation assignment:
+
+- Team: Team 06 - Strategy / Signals / Risk.
+- Branch: `codex/team06-strategy-signal/CF-W2-SPL-02`.
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-SPL-02`.
+- Required base: keep `ca31d79 feat: add signal position ledger read model` as an ancestor and include current `dev` active docs before implementation starts.
+- Scope: mount `/api/v1/signals/position-ledger/active`, add `/signal-position-ledger`, add navigation, default to `Active Positions`, and keep `Closed History` placeholder-only.
+
+Teams ready to pick up new tasks:
+
+- Team 06: SPL-02 implementation now.
+- Team 04: SPL-02 QA Verification after Team 06 handoff.
+- Team 10: SPL-02 Code Review after QA acceptance.
+- Team 03: SPL-02 Architect Signoff after Code Review acceptance, or rolling architecture prep if no signoff is waiting.
+- Team 02: rolling investor/trader-value requirements discovery.
+- Team 08: standby for UX feedback or next user-facing item; DOV is complete and parked.
+
+Next action:
+
+- Create/update the SPL-02 worktree, then spawn Team 06 worker. Do not push.
+
 ## Latest Runtime Checkpoint - DOV Refreshed Ready
 
 Date: 2026-05-26

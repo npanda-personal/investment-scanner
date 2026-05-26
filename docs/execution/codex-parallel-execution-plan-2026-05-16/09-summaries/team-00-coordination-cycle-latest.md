@@ -2,6 +2,56 @@
 
 Date: 2026-05-26
 
+## Latest Runtime Checkpoint - DOV Accepted And SPL-02 Promoted
+
+Date: 2026-05-26
+
+Current status:
+
+- Branch: `dev`.
+- Main workspace status before this checkpoint: clean.
+- Open decisions: 2, scoped only to `CF-W1-MD-02B` and `CF-W1-DQ-02-RS1`.
+- Product Owner action required: yes only for those affected workstreams; no for SPL-02.
+- Push performed: no.
+
+Completed:
+
+- `CF-W2-DOV-01` refreshed Daily Overview dashboard is accepted through QA rerun, Code Review rerun, Architect Signoff, delegated PO acceptance, staged-scope verification, and local Team 08 branch commit `a371e2f feat: add daily overview dashboard`.
+- `CF-W2-DOV-01` is parked for later integration sequencing.
+- `CF-W2-SPL-01B` remains accepted and locally committed as `ca31d79 feat: add signal position ledger read model`.
+- `CF-W1-RH-01A` remains accepted and locally committed as `30460aa feat: add research hub evidence dates`.
+
+Ready promotion:
+
+- `CF-W2-SPL-02` is promoted to Team 06 for implementation.
+- Branch: `codex/team06-strategy-signal/CF-W2-SPL-02`.
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team06-CF-W2-SPL-02`.
+- Required base: keep accepted `ca31d79` as an ancestor and include current `dev` active execution docs.
+- Team 00 reserves `backend/src/api/routes.ts`, `frontend/src/app/routes.tsx`, and `frontend/src/app/navigationMetadata.tsx` for one Team 06 writer.
+
+Implementation scope:
+
+- Mount the accepted active endpoint at `/api/v1/signals/position-ledger/active`.
+- Add `/signal-position-ledger` and first-class navigation label `Signal Position Ledger`.
+- Render `Active Positions` as the default truth-bearing tab.
+- Render `Closed History` as placeholder-only with no API call, no rows, no counts, no mocks, and no inferred close evidence.
+- Keep research-support language and avoid targets, reward/risk, broker/execution, direct advice, or Trade Plan-first framing.
+
+Teams ready to pick up new tasks:
+
+- Team 06: SPL-02 implementation now.
+- Team 04: SPL-02 QA Verification after Team 06 handoff.
+- Team 10: SPL-02 Code Review after QA acceptance.
+- Team 03: SPL-02 Architect Signoff after Code Review acceptance, or rolling architecture prep if no signoff is waiting.
+- Team 02: rolling investor/trader-value requirements discovery.
+- Team 08: standby for UX feedback or next user-facing item.
+
+Next action:
+
+- Create/update the SPL-02 worktree, spawn Team 06 worker, and do not push.
+
+---
+
 ## Latest Runtime Checkpoint - DOV And SPL Ready Promotions
 
 Date: 2026-05-26
