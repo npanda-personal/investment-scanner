@@ -4,7 +4,90 @@ Date: 2026-05-26
 
 Owner: Team 08 - UX / Research / Copilot
 
-Status: Docs-only UX plan ready for Team 00 / Team 03 / Team 04. Not implementation approval. Architecture mapping is still required before the requirement can move toward Ready.
+Status: Superseded / reframe required after Product Owner feedback. Not implementation approval.
+
+## Superseding Product Owner Feedback - 2026-05-26
+
+The prior UX plan is too close to a developer/admin monitoring dashboard. The Daily Overview must feel like an investor/trader daily briefing and opportunity workspace.
+
+Do not make these prior sections prominent first-viewport sections:
+
+- `Data Trust and Pipeline Health`
+- `Signal and Evidence Health`
+- `Drilldown Strip`
+
+They may exist only as compact secondary caveats or supporting navigation. The first viewport must focus on market opportunity, market movement, and review candidates.
+
+The revised section direction is:
+
+1. `Market Pulse`
+   - current market regime, breadth, sector tone, notable caution signal
+
+2. `Market Movers`
+   - gainers and losers if the current database/API can prove latest movement
+   - otherwise `Coming soon - Market Movers`
+
+3. `High-Priority Review Candidates`
+   - bullish review candidates
+   - bearish / exit-risk candidates
+   - source-ranked, not dashboard-invented
+
+4. `Watch And Blocked`
+   - watch-only, limited-evidence, blocked, invalidated, or missing-DQ setups with reason summaries
+
+5. `Institutional Flow`
+   - FII/DII activity only if a reliable local source exists
+   - otherwise `Coming soon - FII/DII Activity`
+
+6. `Evidence Caveats`
+   - compact warnings: stale data, DQ blockers, pipeline failures, missing calibration/outcome evidence
+   - route to Data Quality / Pipeline Ops for details
+
+7. `Focused Drilldowns`
+   - secondary navigation to Today Review, Research, Market Context, Signals, Calibration, Data Quality, Smart Money, Backtests, Pipeline Ops
+
+Preferred wording:
+
+- `high-priority review candidate`
+- `bullish review`
+- `bearish / exit-risk review`
+- `market movers`
+- `watch only`
+- `blocked`
+- `limited evidence`
+- `reason summary`
+
+Avoid:
+
+- `high conviction trade`
+- `best trade`
+- `buy`
+- `sell`
+- `target`
+- `R:R`
+- `pipeline health` as a main dashboard promise
+- module-health phrasing in first viewport
+
+Downstream Team 08 must prepare a replacement UX plan before implementation resumes.
+
+### Source Availability Update - 2026-05-26
+
+Current source inspection confirms the replacement UX must use this truth map:
+
+- `Market Movers`: placeholder-only for market-wide gainers/losers in slice 1. Existing watchlist daily-change sorting can support a future user-watchlist movers subsection, but not market-wide movers.
+- `Institutional Flow`: placeholder-only for FII/DII in slice 1. Smart Money can be described only as price/volume behavior, not FII/DII flow.
+- `High-Priority Review Candidates`: ready for slice 1 from Today Review candidate groups, with Research Hub priorities as supporting context.
+- `Bearish / Exit-Risk Review`: ready for slice 1 from Today Review `shortReview` / `exitRiskReview`, with Research Hub exit candidates as supporting context.
+- `Watch And Blocked`: ready for slice 1 from Today Review watch/blocked/unproven/insufficient-data groups plus reason summaries.
+- `Market Pulse`: limited/lower-page from Market Context and Research Hub because Market Context is region-scoped, not fully asset-type-specific.
+
+The first viewport should therefore be:
+
+1. scope and daily reviewability statement,
+2. bullish / bearish / exit-risk candidate lanes,
+3. watch/blocked reason summary,
+4. clear placeholders for Market Movers and FII/DII if shown,
+5. compact evidence caveats only after the user-facing market/candidate sections.
 
 ## Scope and guardrails
 

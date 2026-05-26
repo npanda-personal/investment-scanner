@@ -4,7 +4,63 @@ Date: 2026-05-26
 
 Owner: Team 02 - Product / Requirement Factory
 
-Status: New requirement draft. Not Ready for Implementation. Team 03 architecture prep required first.
+Status: Paused / Product reframe required. The earlier dashboard implementation direction is not acceptance-ready.
+
+## Superseding Product Owner Direction - 2026-05-26
+
+The Daily Overview must read as an investor/trader daily dashboard, not an admin/developer monitoring dashboard.
+
+This direction supersedes lower sections in this document wherever they conflict.
+
+The first viewport should answer:
+
+- What is happening in the market today?
+- Which areas of the market are moving?
+- Which stocks deserve review attention now?
+- Which bullish, bearish, exit-risk, watch-only, or blocked candidates are credible enough to inspect?
+- What important market or institutional-flow evidence is missing?
+
+Preferred investor/trader-oriented sections:
+
+1. `Market Pulse`
+   - broad regime, breadth, sector leadership, notable caution signals
+   - source: Market Context / Research Hub confirmation where truthful
+
+2. `Market Movers`
+   - gainers and losers for the active scope
+   - ship only if current Market Data / Signal / Research APIs can prove latest price-change rows without provider/live calls
+   - otherwise keep as `Coming soon - Market Movers`
+
+3. `High-Conviction Review Candidates`
+   - bullish review candidates and bearish/exit-risk candidates using Today Review / Research Hub source ordering
+   - use research-support wording such as `high-priority review candidate`, not `best trade`, `buy`, or `sell`
+
+4. `Watchlist And Blocked Setups`
+   - watch-only, limited-evidence, blocked, and invalidated candidates with reasons
+   - helps the user avoid over-reading weak data
+
+5. `Institutional Flow`
+   - FII/DII activity if a reliable local source exists
+   - if no current source exists, render only `Coming soon - FII/DII Activity` with no invented values
+
+6. `Evidence And Data Caveats`
+   - concise warnings only, not an operations dashboard
+   - link to Data Quality and Pipeline Ops for details
+
+Do not make sections like `Data Trust and Pipeline Health`, `Signal and Evidence Health`, or `Drilldown Strip` prominent first-viewport product sections. Those may become secondary caveats or navigation aids, but the page must not feel like a backend module health console.
+
+### Source Availability Update - 2026-05-26
+
+Team 00 source audit found:
+
+- Market-wide gainers/losers: no truthful public market-wide movers API/hook exists on the current base. Closest current truth is user-owned watchlist sorting by `dailyChangeDesc` / `dailyChangeAsc`, which must not be labeled as market gainers/losers. Slice 1 should use `Coming soon - Market Movers`.
+- FII/DII activity: no route, DTO, hook, or provider exists. Smart Money is a price/volume proxy and must not be labeled as FII/DII. Slice 1 should use `Coming soon - FII/DII Activity`.
+- Bullish review candidates: Today Review `groups.longReview` is the primary source; Research Hub `researchPriorities.tradeCandidates` can be supporting context.
+- Bearish / exit-risk review candidates: Today Review `groups.shortReview` and `groups.exitRiskReview` are primary; Research Hub exit candidates and bearish counts are supporting context only.
+- Watch-only / blocked candidates: Today Review `watchOnly`, `blocked`, `insufficientData`, `unproven`, `scanFunnel`, and explainability are ready for slice 1.
+- Market overview / regime / sector leadership: Market Context and Research Hub provide truth, but this should be lower-page / limited because Market Context is region-scoped and not fully asset-type-specific.
+
+Slice 1 should therefore center on Today Review plus Research Overview plus review-readiness, with Market Context lower on the page and Market Movers/FII-DII as explicit placeholders.
 
 Primary route affected:
 
@@ -74,14 +130,14 @@ When the user opens the app, they should immediately know:
 
 Order matters. The page should surface user value and truth in this sequence:
 
-1. Global scope + freshness + trust header
-2. Daily market pulse and reviewability status
-3. Review candidate and research-priority summary
-4. Market environment and confirmation layers
-5. Signal/evidence health summary
-6. Data trust and pipeline health
-7. Drilldown shortcuts
-8. Clearly tagged `Coming soon` placeholders for valuable but not yet truthful summary areas
+1. Current market pulse and scope
+2. Market movers, if truthful now; otherwise a clear placeholder
+3. High-priority bullish and bearish/exit-risk review candidates
+4. Watch-only and blocked setups with reasons
+5. Institutional flow, if truthful now; otherwise a clear FII/DII placeholder
+6. Evidence and data caveats in a compact secondary area
+7. Drilldowns as supporting navigation, not the product centerpiece
+8. Clearly tagged `Coming soon` placeholders for valuable but not yet truthful investor/trader summaries
 
 ## Required Dashboard Sections
 
@@ -147,7 +203,7 @@ Use Market Context plus Smart Money plus Research Hub confirmation summaries to 
 
 This section should help the user decide whether the day is broadly supportive, mixed, or cautionary without giving advice language.
 
-### 5. Signal And Evidence Health
+### 5. Signal And Evidence Caveats
 
 Use existing Raw Signals, Calibration, and Strategy/Research proof summaries where public truth already exists to show:
 
@@ -158,9 +214,9 @@ Use existing Raw Signals, Calibration, and Strategy/Research proof summaries whe
 - strategy-proof proven / unproven summary
 - missing backtest or blocked-by-market-gate counts where available
 
-This section should stay evidence-oriented. It must not collapse raw signals, calibrated evidence, and strategy proof into one invented confidence number.
+This section should stay compact and user-facing. It must not become a developer-facing module-health panel, and it must not collapse raw signals, calibrated evidence, and strategy proof into one invented confidence number.
 
-### 6. Data Trust And Pipeline Health
+### 6. Evidence And Data Caveats
 
 Use Data Quality, Market Data readiness context, and Pipeline Ops to show:
 
@@ -170,9 +226,9 @@ Use Data Quality, Market Data readiness context, and Pipeline Ops to show:
 - stage warnings / failed stage count / blocked stage count where available
 - direct link to Pipeline Ops and Data Quality details
 
-This section must make trust and freshness problems visible before the user misreads downstream candidate counts.
+This section must make trust and freshness problems visible before the user misreads downstream candidate counts, but it belongs below the investor/trader decision sections. It must not dominate the dashboard as an admin monitoring view.
 
-### 7. Drilldown Strip
+### 7. Supporting Drilldowns
 
 Provide fast routes into:
 
@@ -193,6 +249,14 @@ Each route should carry a small amount of truthful context, such as a count, sta
 Use clearly tagged `Coming soon` sections only where the user would reasonably expect the information but the current source does not yet provide a stable truthful dashboard summary.
 
 Recommended placeholders:
+
+0. `Coming soon - FII/DII Activity`
+   - depends on a reliable local institutional-flow source
+   - do not scrape, call live providers, or invent FII/DII values in this dashboard slice
+
+0. `Coming soon - Market Movers`
+   - only if current source inspection proves there is no truthful latest gainer/loser read model
+   - should eventually show scoped latest gainers/losers from stored market data, not live provider calls
 
 1. `Coming soon - Signal Position Follow-Through`
    - depends on `CF-W2-SPL-01B` plus the later durable closed-history/lifecycle child

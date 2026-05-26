@@ -9,6 +9,7 @@ No available application-code item is currently waiting unassigned in Ready. The
 2026-05-26 gate update:
 
 - `CF-W2-DOV-01` remains assigned to Team 08 and is in QA-rejection rework; it is not ready for Code Review until Team 04 rerun accepts.
+- `CF-W2-DOV-01` is now paused from implementation acceptance after Product Owner feedback that the dashboard reads like an admin/developer monitoring dashboard. It must return to requirement/UX/architecture/QA refresh before implementation resumes.
 - `CF-W2-SPL-01B` remains assigned to Team 06 and is in Code Review rejection rework; it is not ready for Architect Signoff until Team 04 rerun and Team 10 re-review accept.
 - `CF-W1-RH-01A` remains assigned to Team 08 and is currently in Team 04 QA Verification.
 - `CF-W1-MD-02A` is proposal-only and not Ready for Implementation because `DECISION-20260526-md-02b-schema-generated-consent` is open.

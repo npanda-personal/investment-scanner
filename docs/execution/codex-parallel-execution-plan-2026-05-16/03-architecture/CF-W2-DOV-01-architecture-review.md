@@ -6,9 +6,27 @@ Owner: Team 03 Architecture Factory
 
 ## Status
 
-Architecture-prepared.
+Superseded / architecture refresh required after Product Owner feedback.
 
 This is a docs-only Team 03 source-map pass. It does not self-promote the item to Ready.
+
+## Superseding Product Owner Feedback - 2026-05-26
+
+The current architecture packet mapped the page around Daily Pulse, Review Candidate Summary, Market Environment, Signal/Evidence Health, Data Trust/Pipeline Health, and Drilldown Strip.
+
+That shape is no longer acceptable as the first implementation target because Product Owner feedback says the page reads like an admin/developer monitoring dashboard.
+
+Architecture must be refreshed around an investor/trader daily workflow:
+
+- `Market Pulse`
+- `Market Movers` / gainers-losers, if current stored data can prove it
+- `High-Priority Review Candidates` split into bullish and bearish/exit-risk review
+- `Watch And Blocked`
+- `Institutional Flow` / FII-DII as placeholder unless a reliable local source exists
+- compact `Evidence Caveats`, not a dominant pipeline-health surface
+- focused drilldowns as secondary support
+
+No implementation should proceed from this architecture packet until Team 03 updates the source map and Team 04 updates QA expectations for the revised product direction.
 
 ## Verdict
 

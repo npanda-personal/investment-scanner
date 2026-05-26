@@ -38,6 +38,14 @@ No historical active work items have been migrated as active.
 
 Date: 2026-05-26
 
+Update after Product Owner dashboard feedback:
+
+- `CF-W2-DOV-01` is paused as currently framed. Product Owner feedback says the Daily Overview reads like an admin/developer monitoring dashboard, not an investor/trader daily overview.
+- Team 08 current DOV rework was interrupted and redirected to docs/UX analysis only.
+- Admin/developer-oriented sections such as Data Trust and Pipeline Health, Signal and Evidence Health, and Drilldown Strip must be removed, renamed, or moved out of the Daily Overview first-viewport workflow.
+- DOV must return to product/UX framing before further implementation, QA acceptance, Code Review, Architect Signoff, or PO acceptance.
+- SPL and RH are unrelated and continue through their gates.
+
 User direction:
 
 - Start implementation once a bounded slice is Ready.
@@ -46,6 +54,7 @@ User direction:
 Gate status:
 
 - `CF-W2-DOV-01` is in Team 08 implementation rework after Team 04 QA rejected placeholder/fallback truthfulness gaps.
+- `CF-W2-DOV-01` is now paused from acceptance after Product Owner UX feedback; Team 08 is preparing a user-oriented reframe.
 - `CF-W2-SPL-01B` is in Team 06 code-review rework after Team 10 rejected stale current-DQ fallback and private Signal Generation type import.
 - `CF-W1-RH-01A` is in Team 04 QA Verification after Team 08 implementation.
 - `CF-W1-MD-02A` remains proposal-only. Team 03 opened `DECISION-20260526-md-02b-schema-generated-consent`; no schema/generated/source implementation is authorized until resolved.

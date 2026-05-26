@@ -4,6 +4,13 @@
 
 Date: 2026-05-26
 
+Product Owner correction:
+
+- `CF-W2-DOV-01` is paused as currently framed because the Daily Overview feels like an admin/developer monitoring dashboard instead of an investor/trader daily dashboard.
+- Team 08 DOV rework agent was interrupted and redirected to docs/UX reframe only.
+- Do not advance DOV to QA acceptance, Code Review, Architect Signoff, delegated PO acceptance, or commit until the UX is reframed around investor/trader daily workflow.
+- SPL and RH continue because they are independent.
+
 Status:
 
 - Branch: `dev`.
@@ -15,6 +22,7 @@ Status:
 Gate movement:
 
 - Team 08 `CF-W2-DOV-01` implementation was reviewed by Team 04 and rejected for fallback truthfulness / missing section-local source-failure surfacing; Team 08 rework is active as `019e6398-0233-7a23-9e06-5894d19d30e9`.
+- Team 10 later rejected `CF-W2-DOV-01` for source-truth issues, and Product Owner feedback superseded the current design before acceptance. DOV is now paused for UX reframe.
 - Team 06 `CF-W2-SPL-01B` implementation passed QA, but Team 10 rejected code review for stale current-DQ fallback and private Signal Generation type import; Team 06 rework is active as `019e63a0-d57d-7133-a31c-c990968cbaea`.
 - Team 08 `CF-W1-RH-01A` implementation completed and Team 04 QA Verification is active as `019e639b-4277-7191-b579-f89023b629b0`.
 - Team 03 prepared `CF-W1-MD-02A` as proposal-only and opened `DECISION-20260526-md-02b-schema-generated-consent`; no Prisma/schema/generated/source work is authorized.

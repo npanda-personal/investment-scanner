@@ -6,7 +6,7 @@ Date: 2026-05-26
 
 - Cycle id: `DAEMON-20260517`
 - Rolling iteration count: 27
-- Current mode: Team 00 coordinating Ready implementation gates for Daily Overview, Signal Position Ledger, and Research Hub.
+- Current mode: Team 00 coordinating Ready implementation gates; Daily Overview is paused for Product Owner UX reframe.
 - Daemon continuing: yes.
 - Main branch: `dev`.
 - Resume prompt path: `09-summaries/daemon-resume-prompt.md`.
@@ -21,6 +21,8 @@ Date: 2026-05-26
 - Team 06 completed initial `CF-W2-SPL-01B` implementation; Team 04 accepted QA, but Team 10 rejected Code Review for stale current-DQ fallback and private Signal Generation type imports. Team 06 rework is active.
 - Team 08 completed initial `CF-W1-RH-01A` implementation; Team 04 QA Verification is active.
 - Team 03 refreshed `CF-W1-MD-02A` as a proposal-only packet and opened `DECISION-20260526-md-02b-schema-generated-consent`.
+- Team 10 accepted `CF-W2-SPL-01B` after rework, Team 03 Architect Signoff accepted, Team 00 delegated PO acceptance completed, and the Team 06 branch has local commit `ca31d79 feat: add signal position ledger read model`.
+- Product Owner rejected the current `CF-W2-DOV-01` direction as too admin/developer-oriented. DOV was interrupted and returned to UX/product reframe.
 - `CF-W3-MDPIPE-01A-MDF-OFFICIAL-EOD` accepted through QA, review, Architect Signoff, delegated PO acceptance, and committed on `dev` as `b0c1ab7 feat: add official eod bulk market data sync`.
 - `CF-W3-MDPIPE-01B1-DURABLE-PIPELINE-LEDGER-FOUNDATION` implemented and committed on `dev` as `e537f9e feat: add durable pipeline ledger foundation`.
 - `CF-W3-MDPIPE-01B2-PIPELINE-STATUS-API` implemented and committed on `dev` as `10719fa feat: add read-only pipeline status api`.
@@ -57,8 +59,8 @@ Validation:
 
 ## Current Blockers
 
-- `CF-W2-DOV-01` is blocked from Code Review until Team 08 rework and Team 04 QA rerun accept.
-- `CF-W2-SPL-01B` is blocked from Architect Signoff until Team 06 rework, Team 04 QA rerun, and Team 10 re-review accept.
+- `CF-W2-DOV-01` is blocked from any acceptance/commit until it is reframed around investor/trader daily workflow instead of admin/pipeline health.
+- `CF-W2-SPL-01B` is no longer blocked; it is accepted and locally committed on its Team 06 branch.
 - `CF-W1-RH-01A` is blocked from Code Review until Team 04 QA accepts.
 - `CF-W1-MD-02B` is blocked by the new schema/generated consent decision.
 - `CF-W1-DQ-02-RS1` remains blocked by the currentness-summary parity decision.
@@ -73,22 +75,21 @@ Validation:
 | --- | --- | --- | --- |
 | Team 00 | coordinating | Consume active agent outputs and route QA/review/signoff gates | Continue rolling scheduler unless a true blocker appears. |
 | Team 02 | ready | Rolling Product Owner / requirements discovery focused on investor/trader value | Relaunch when an agent slot opens and no review/signoff gate is waiting. |
-| Team 03 | ready | Architect Signoff after Team 10 acceptance | Start after RH/DOV/SPL Code Review acceptance. |
-| Team 04 | active | `CF-W1-RH-01A` QA; queued DOV/SPL QA reruns | Start each rerun after developer rework handoff. |
+| Team 03 | ready | Architect Signoff after Team 10 acceptance | Start after RH Code Review acceptance or after DOV is reframed and re-reviewed. |
+| Team 04 | active | `CF-W1-RH-01A` QA rerun | Start DOV QA only after the UX reframe and new implementation pass. |
 | Team 05 | blocked/standby | `CF-W1-MD-02B` blocked by consent; DQ-RS1 blocked by decision | Wait for Product Owner decision or a separate no-schema Ready packet. |
-| Team 06 | active | `CF-W2-SPL-01B` review-reject rework | Route to Team 04 after handoff. |
+| Team 06 | committed | `CF-W2-SPL-01B` accepted branch commit `ca31d79` | Wait for a later integration pass. |
 | Team 07 | standby | No current Ready item | Wait for next promoted Today Review / Portfolio item. |
-| Team 08 | active | `CF-W2-DOV-01` rework; `CF-W1-RH-01A` already in QA | Route DOV to Team 04 after handoff. |
+| Team 08 | active | `CF-W2-DOV-01` UX reframe after Product Owner feedback; `CF-W1-RH-01A` already in QA | Route DOV back through product/UX/architecture/QA before implementation resumes. |
 | Team 09 | standby | Platform/auth only if command API needs protected-user semantics | Wait for Team 03 architecture finding. |
 | Team 10 | ready | Review RH/DOV/SPL after QA acceptance | Start after Team 04 accepts.
 
 ## Next Assignments
 
-1. Team 00: consume Team 08 DOV rework output and route Team 04 QA rerun.
-2. Team 00: consume Team 06 SPL rework output and route Team 04 QA rerun.
-3. Team 00: consume Team 04 RH QA output and route Team 10 review if accepted.
-4. Team 03: sign off only after Team 10 accepts a handoff.
-5. Team 02: resume rolling direct-value requirements when a slot opens and no immediate review/signoff gate is waiting.
+1. Team 00: consume Team 08 DOV UX reframe and route DOV back to requirement/UX/architecture/QA before implementation resumes.
+2. Team 00: consume Team 04 RH QA output and route Team 10 review if accepted.
+3. Team 03: sign off only after Team 10 accepts a handoff.
+4. Team 02: resume rolling direct-value requirements when a slot opens and no immediate review/signoff gate is waiting.
 
 ## Stop State
 
