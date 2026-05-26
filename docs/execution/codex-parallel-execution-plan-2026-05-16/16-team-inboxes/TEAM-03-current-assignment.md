@@ -6,6 +6,52 @@ Team: TEAM-03 - Architecture Factory
 
 Prompt file: `docs/execution/codex-parallel-execution-plan-2026-05-16/15-automation-prompts/AUTO-03-architecture-factory.md`
 
+## Latest Assignment Override - 2026-05-26 DOV-02 Dependency Base Correction
+
+Prepare an architecture/integration recommendation for `CF-W2-DOV-02` dependency-base correction.
+
+Context:
+
+- Team 03 DOV-02 architecture returned `split required`.
+- Team 04 DOV-02 QA planning returned `QA-PLAN READY AFTER DEPENDENCY-BASE VERIFICATION`.
+- Team 00 verified accepted dependency commits are on separate branches:
+  - `a371e2f feat: add daily overview dashboard` on `codex/team08-ux-research/CF-W2-DOV-01`
+  - `1be7d1a feat: add calibration evidence basis` on `codex/team06-strategy-signal/CF-W2-CAL-02A`
+- Neither commit is ancestor of the other.
+- Non-mutating merge check reports conflicts in Signal Calibration files.
+- Evidence: `09-summaries/CF-W2-DOV-02-dependency-base-verification.md`.
+
+Do not implement application code. Do not resolve merge conflicts. Do not create a worktree unless Team 00 explicitly asks later.
+
+Goal:
+
+- Decide the safest dependency-base strategy for a future DOV-02 implementation handoff.
+- Identify whether the base should be built by stacking CAL-02A onto DOV-01, stacking DOV-01 onto CAL-02A, or waiting for a release integration branch.
+- Identify exact files and semantic checks required to resolve the Signal Calibration conflicts without changing accepted CAL-02A behavior.
+- State whether this is routine architecture/integration work or a true consent blocker.
+
+Allowed writes:
+
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/03-architecture/CF-W2-DOV-02-dependency-base-correction-architecture.md`
+- `docs/execution/codex-parallel-execution-plan-2026-05-16/17-team-outboxes/TEAM-03-CF-W2-DOV-02-dependency-base-outbox.md`
+
+Forbidden writes:
+
+- application source or tests
+- merge conflict resolutions
+- route registries
+- shared UI
+- schema/migrations/generated/package files
+- provider/live/startup/backfill/scheduler files
+- broad Daily Overview or Signal Calibration implementation
+
+Required output:
+
+- Recommendation: `routine integration base`, `wait for integration sequencing`, or `consent blocker`.
+- Exact dependency-base branch/worktree recommendation if routine.
+- Exact validation gates needed before DOV-02 can be promoted.
+- Stop conditions for Team 00.
+
 ## Latest Assignment Override - 2026-05-26 SPL-02 Architect Signoff
 
 Priority: highest. Signoff gates take precedence over rolling architecture work.

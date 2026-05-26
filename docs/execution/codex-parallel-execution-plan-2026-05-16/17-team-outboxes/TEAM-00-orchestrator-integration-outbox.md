@@ -19,23 +19,25 @@ Gate movement:
 - Team 03 Architect Signoff accepted `CF-W2-SPL-02`.
 - Team 00 created delegated PO acceptance packet `09-summaries/CF-W2-SPL-02-po-acceptance-packet.md`.
 - `CF-W2-SPL-02` scoped local commit completed on Team 06 branch as `31115f0 feat: add signal position ledger surface`.
-- Team 10 rejected `CF-W1-UX-01B`; Team 08 bounded rework is active as `019e6470-2027-7141-affc-9eac83ee17e0`.
-- Team 03 completed `CF-W2-DOV-02` architecture with `split required`; Team 04 QA planning is active as `019e6472-cca9-7d40-85dd-fd0aa17e14f1`.
+- Team 10 rejected `CF-W1-UX-01B`; Team 08 bounded rework completed.
+- Team 04 UX-01B QA rerun is active as `019e6479-4c86-7fa2-a260-5b7a44fd9476`.
+- Team 03 completed `CF-W2-DOV-02` architecture with `split required`.
+- Team 04 completed DOV-02 QA planning with `QA-PLAN READY AFTER DEPENDENCY-BASE VERIFICATION`.
+- Team 00 dependency-base verification found DOV-01 and CAL-02A on separate branches with Signal Calibration dry-merge conflicts.
 - Team 04 UX-01B QA Verification returned `ACCEPT`; Team 00 closed `019e645d-3a98-7cd3-9365-40a2867efd27`.
 - Team 02 completed rolling requirement discovery and added `CF-W2-DOV-02` plus `CF-W2-SPL-03`.
 - `CF-W2-SPL-03` remains proposal-only and not Ready.
 
 Teams ready to pick up new tasks:
 
-- Team 08: UX-01B bounded rework active.
-- Team 04: DOV-02 QA planning active.
-- Team 04: ready for UX-01B QA rerun after Team 08 handoff.
+- Team 04: UX-01B QA rerun active.
+- Team 03: DOV-02 dependency-base correction architecture active as `019e647a-e5f9-7251-a2e1-154d821de566`.
 - Team 10: ready for UX-01B rereview after QA acceptance.
 - Team 06: SPL-02 complete/parked; ready for next Team 06 Ready item.
 
 Next action:
 
-- Monitor Team 08 UX-01B rework and Team 04 DOV-02 QA planning. Do not push.
+- Monitor Team 04 UX-01B QA rerun and route Team 10 rereview if accepted. Do not push.
 
 ## Latest Runtime Checkpoint - SPL-02 QA Routed, UX-01B Ready
 

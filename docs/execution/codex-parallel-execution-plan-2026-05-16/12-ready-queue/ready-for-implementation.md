@@ -10,7 +10,7 @@ No available application-code item is currently waiting unassigned in Ready. The
 
 - `CF-W2-SPL-02` is accepted under standing delegation after Team 04 QA rerun, Team 10 rereview, and Team 03 Architect Signoff. It is locally committed on branch `codex/team06-strategy-signal/CF-W2-SPL-02` as `31115f0 feat: add signal position ledger surface`; no push is authorized.
 - `CF-W1-UX-01B` was rejected by Team 10 Code Review for synthetic frontend `trust_evidence` fallback. It is returned to Team 08 for bounded frontend-only rework, then Team 04 QA rerun and Team 10 rereview.
-- `CF-W2-DOV-02` is not Ready. Team 03 returned `split required`; Team 04 QA planning and Team 00 dependency-base verification are next.
+- `CF-W2-DOV-02` is not Ready. Team 03 returned `split required`; Team 04 QA planning is complete. Team 00 dependency-base verification found `a371e2f` and `1be7d1a` on separate branches with Signal Calibration dry-merge conflicts, so an integration-base correction plan is required before implementation promotion.
 
 2026-05-26 Team 00 Ready promotion - `CF-W1-UX-01B`:
 

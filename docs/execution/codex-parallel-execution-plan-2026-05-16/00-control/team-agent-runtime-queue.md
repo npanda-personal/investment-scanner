@@ -4,34 +4,35 @@ Date: 2026-05-25
 
 Owner: Team 00 - Master Orchestrator / Integration
 
-## Latest Active Snapshot - SPL-02 Accepted, UX-01B Rework Active, DOV-02 QA Planning Queued
+## Latest Active Snapshot - SPL-02 Committed, UX-01B QA Rerun Active, DOV-02 Integration Base Queued
 
 Date: 2026-05-26
 
 Update:
 
 - Team 03 Architect Signoff accepted `CF-W2-SPL-02`; Team 00 created delegated PO acceptance and is verifying scoped local commit.
-- Team 03 architecture completed `CF-W2-DOV-02` with `split required`, not a consent blocker; Team 04 QA planning is queued.
-- Team 10 rejected `CF-W1-UX-01B` for synthetic frontend `trust_evidence` fallback; Team 08 bounded rework is active.
+- Team 03 architecture completed `CF-W2-DOV-02` with `split required`, not a consent blocker; Team 04 QA planning completed.
+- Team 00 dependency-base verification found DOV-01 and CAL-02A on separate branches with Signal Calibration dry-merge conflicts.
+- Team 10 rejected `CF-W1-UX-01B` for synthetic frontend `trust_evidence` fallback.
+- Team 08 completed bounded UX-01B rework and Team 04 QA rerun is active.
 - Team 00 committed accepted `CF-W2-SPL-02` on branch `codex/team06-strategy-signal/CF-W2-SPL-02` as `31115f0 feat: add signal position ledger surface`.
-- Team 04 DOV-02 QA planning is active as `019e6472-cca9-7d40-85dd-fd0aa17e14f1`.
+- Team 04 DOV-02 QA planning completed; DOV-02 dependency-base correction architecture is queued.
 
 Current active / queued agents:
 
 | Slot | Team | Agent | Model / Reasoning | Mode | Work Item | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | Team 08 - UX / Research / Copilot | `019e6470-2027-7141-affc-9eac83ee17e0` | `gpt-5.4`, high | Code Review rejection rework | `CF-W1-UX-01B` in `C:\work\repo\investment-scanner-worktrees\team08-CF-W1-UX-01B` | active |
-| 2 | Team 04 - QA Factory | `019e6472-cca9-7d40-85dd-fd0aa17e14f1` | `gpt-5.4`, high | QA planning | `CF-W2-DOV-02` Daily Overview calibration evidence summary | active |
+| 1 | Team 04 - QA Factory | `019e6479-4c86-7fa2-a260-5b7a44fd9476` | `gpt-5.4`, high | QA rerun | `CF-W1-UX-01B` in `C:\work\repo\investment-scanner-worktrees\team08-CF-W1-UX-01B` | active |
+| 2 | Team 03 - Architecture Factory | `019e647a-e5f9-7251-a2e1-154d821de566` | `gpt-5.4`, high | dependency-base correction | `CF-W2-DOV-02` DOV-01 + CAL-02A integration base | active |
 | 3 | Team 00 - Orchestrator | local | n/a | parked accepted commit | `CF-W2-SPL-02` commit `31115f0` | complete |
-| 4 | Team 04 - QA Factory | pending | `gpt-5.4`, high | QA rerun | `CF-W1-UX-01B` after Team 08 rework handoff | queued |
+| 4 | Team 08 - UX / Research / Copilot | none | pending | rework | `CF-W1-UX-01B` only if Team 04 rerun rejects | queued |
 | 5 | Team 10 - Review / Release | pending | `gpt-5.4`, high | rereview | `CF-W1-UX-01B` after Team 04 ACCEPT | queued |
 | 6 | Team 03 - Architecture Factory | pending | `gpt-5.4`, high | Architect Signoff | `CF-W1-UX-01B` after Team 10 ACCEPT | queued |
 
 Teams ready to pick up new tasks:
 
-- Team 08: active on UX-01B bounded rework.
-- Team 04: active on DOV-02 QA planning as `019e6472-cca9-7d40-85dd-fd0aa17e14f1`.
-- Team 04: queued for UX-01B QA rerun after Team 08 handoff.
+- Team 04: active on UX-01B QA rerun as `019e6479-4c86-7fa2-a260-5b7a44fd9476`.
+- Team 03: active on DOV-02 dependency-base correction architecture as `019e647a-e5f9-7251-a2e1-154d821de566`.
 - Team 10: queued for UX-01B rereview after QA acceptance.
 - Team 03: queued for UX-01B Architect Signoff after Team 10 acceptance.
 - Team 02: ready for another rolling requirement pass after commit/routing pressure clears.

@@ -46,9 +46,11 @@ Current state:
 - `CF-W2-SPL-02` is accepted under standing delegation and locally committed on branch `codex/team06-strategy-signal/CF-W2-SPL-02` as `31115f0 feat: add signal position ledger surface`.
 - Team 04 accepted `CF-W1-UX-01B` QA Verification.
 - Team 10 rejected `CF-W1-UX-01B` for synthetic frontend `trust_evidence` fallback.
-- `CF-W1-UX-01B` is back in bounded Team 08 rework as `019e6470-2027-7141-affc-9eac83ee17e0`.
+- Team 08 completed bounded `CF-W1-UX-01B` rework.
+- `CF-W1-UX-01B` is in Team 04 QA rerun as `019e6479-4c86-7fa2-a260-5b7a44fd9476`.
 - Team 02 completed its rolling investor/trader-value requirement pass and created `CF-W2-DOV-02` plus `CF-W2-SPL-03`.
-- `CF-W2-DOV-02` Team 03 architecture returned `split required`; Team 04 QA planning is active as `019e6472-cca9-7d40-85dd-fd0aa17e14f1`.
+- `CF-W2-DOV-02` Team 03 architecture returned `split required`; Team 04 QA planning completed.
+- Team 00 dependency-base verification found `a371e2f` and `1be7d1a` on separate branches with Signal Calibration dry-merge conflicts. DOV-02 now needs architecture/integration base correction before implementation.
 - `CF-W2-SPL-03` remains requirement/proposal-only and is not Ready because closed-history lifecycle proof likely needs storage/lifecycle architecture.
 - Open decisions remain 2 and block only `CF-W1-MD-02B` and `CF-W1-DQ-02-RS1`.
 
@@ -58,10 +60,10 @@ SPL-02 next gates:
 
 Teams ready to pick up new tasks:
 
-- Team 04: `CF-W2-DOV-02` QA planning active.
-- Team 08: active on `CF-W1-UX-01B` bounded rework.
-- Team 04: queued for `CF-W1-UX-01B` QA rerun after Team 08 handoff.
+- Team 03: active on `CF-W2-DOV-02` dependency-base correction architecture as `019e647a-e5f9-7251-a2e1-154d821de566`.
+- Team 04: active on `CF-W1-UX-01B` QA rerun.
 - Team 10: queued for `CF-W1-UX-01B` rereview after QA acceptance.
+- Team 03: ready for DOV-02 dependency-base correction architecture.
 - Team 06: SPL-02 complete/parked; ready for next Team 06 Ready item.
 - Team 02: ready for another rolling requirement pass after the current architecture/signoff pressure clears.
 
