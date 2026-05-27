@@ -78,8 +78,8 @@ export const TradePlanDashboard: React.FC = () => {
   const [funnel, setFunnel] = useState<TradePlanFunnelDiagnostics | null>(null);
   const [funnelLoading, setFunnelLoading] = useState(false);
   const [tab, setTab] = useState(0);
-  const [paperReadyOnly, setPaperReadyOnly] = useState(false);
-  const [paperReadinessStatus, setPaperReadinessStatus] = useState('');
+  const [paperReadyOnly, setPaperReadyOnly] = useState(true);
+  const [paperReadinessStatus, setPaperReadinessStatus] = useState('READY_FOR_PAPER_REVIEW');
   const [backtestTimeframe, setBacktestTimeframe] = useState('');
   const [generateTimeframe, setGenerateTimeframe] = useState('3Y');
   const [strategyRating, setStrategyRating] = useState('');
@@ -231,7 +231,7 @@ export const TradePlanDashboard: React.FC = () => {
   return (
     <Box className="page-container page-container--workspace">
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h5">Trade Plans</Typography>
+        <Typography variant="h5">Legacy Trade Plan Evidence</Typography>
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ xs: 'stretch', sm: 'center' }}>
           <FormControl size="small" sx={{ minWidth: 190 }}>
             <InputLabel>Backtest Proof</InputLabel>
@@ -246,6 +246,9 @@ export const TradePlanDashboard: React.FC = () => {
       </Box>
 
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+      <Alert severity="warning" sx={{ mb: 2 }}>
+        This legacy page shows generated review evidence only. Rows are not trade instructions or active trade candidates; use Today Review and Signal Position Ledger for the current trusted signal workflow.
+      </Alert>
       {batchProgress && (
         <Alert severity="info" sx={{ mb: 2 }}>
           <Stack spacing={1}>
@@ -330,7 +333,7 @@ export const TradePlanDashboard: React.FC = () => {
       <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} justifyContent="flex-end" sx={{ mb: 2 }}>
         <FormControlLabel
           control={<Switch checked={paperReadyOnly} onChange={(event) => { setPaperReadyOnly(event.target.checked); setPage(0); }} />}
-          label="Paper-ready only"
+          label="Review-candidate only"
         />
         <FormControl size="small" sx={{ minWidth: 190 }}>
           <InputLabel>Readiness</InputLabel>
@@ -367,7 +370,7 @@ export const TradePlanDashboard: React.FC = () => {
 
       <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
         <Tabs value={tab} onChange={(_e, v) => setTab(v)}>
-          <Tab label="Latest Plans" />
+          <Tab label="Legacy Evidence Rows" />
         </Tabs>
       </Box>
 
@@ -391,7 +394,7 @@ export const TradePlanDashboard: React.FC = () => {
                 setSortDirection(newSortDir);
                 setPage(0);
               }}
-              emptyMessage={`No trade plans found for ${scope.region}/${scope.assetType}. Run Generate Plans after Strategy Decision has review candidates, or loosen the readiness/proof filters.`}
+              emptyMessage={`No legacy review evidence rows found for ${scope.region}/${scope.assetType}.`}
             />
          </Box>
       )}

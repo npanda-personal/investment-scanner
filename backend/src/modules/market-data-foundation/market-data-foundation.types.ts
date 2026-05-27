@@ -205,6 +205,36 @@ export interface ScheduledRegionSyncSummary {
   officialEodBulk?: OfficialEodBulkSyncEvidence | null;
 }
 
+export type MarketMoverRange = '1D' | '1W' | '1M' | '3M' | '6M' | '1Y';
+
+export interface MarketMoverRow {
+  instrumentId: string;
+  symbol: string;
+  companyName: string;
+  sector: string | null;
+  latestDate: string;
+  latestClose: number;
+  baseDate: string;
+  baseClose: number;
+  returnPercent: number;
+}
+
+export interface MarketMoverRangeSummary {
+  range: MarketMoverRange;
+  gainers: MarketMoverRow[];
+  losers: MarketMoverRow[];
+  warnings: string[];
+}
+
+export interface MarketMoversSummary {
+  scope: {
+    region: string;
+    assetType: string;
+  };
+  generatedAt: string;
+  ranges: MarketMoverRangeSummary[];
+}
+
 export interface OfficialEodBulkSyncEvidence {
   enabled: boolean;
   attempted: boolean;

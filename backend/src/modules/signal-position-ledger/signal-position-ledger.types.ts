@@ -4,6 +4,7 @@ export type SignalPositionTriggerType = 'bullish_entry_trigger' | 'bearish_trigg
 export type SignalPositionReturnStatus = 'CURRENT' | 'STALE' | 'UNAVAILABLE';
 export type SignalPositionHealthState = 'EXIT_TRIGGERED' | 'RISK_WARNING' | null;
 export type SignalPositionLifecycleEvidenceStatus = 'EXIT_COMPATIBILITY_ONLY' | 'UNAVAILABLE';
+export type SignalPositionCalibrationEvidenceStatus = 'AVAILABLE' | 'UNAVAILABLE';
 export type SignalPositionTrustEvidenceStatus =
   | 'SOURCE_PROVEN'
   | 'SOURCE_PROVEN_PRICE_STALE'
@@ -109,6 +110,9 @@ export interface SignalPositionLedgerActiveRow {
   entryReasonSummary: string;
   strategyId: string | null;
   strategyVersion: string | null;
+  strategyDecision: string | null;
+  strategyReadinessLabel: string | null;
+  strategyRatingGrade: string | null;
   entryRuleId: string | null;
   latestTrustedPriceDate: string | null;
   latestTrustedPrice: number | null;
@@ -118,6 +122,8 @@ export interface SignalPositionLedgerActiveRow {
   healthState: SignalPositionHealthState;
   lifecycleEvidenceStatus: SignalPositionLifecycleEvidenceStatus;
   trustEvidenceStatus: SignalPositionTrustEvidenceStatus;
+  calibrationEvidenceStatus: SignalPositionCalibrationEvidenceStatus;
+  displayWarnings: string[];
 }
 
 export interface SignalPositionLedgerActiveListResponse {

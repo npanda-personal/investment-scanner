@@ -29,7 +29,7 @@ const SignalPositionLedgerPage: React.FC = () => {
     <Box sx={{ p: 3, maxWidth: 1500, mx: 'auto' }}>
       <PageHeader
         title="Signal Position Ledger"
-        subtitle={`System-picked signal-position evidence for the current market scope. Scope: ${scopeLabel}.`}
+        subtitle={`Rule-triggered entry candidate evidence for the current market scope. Scope: ${scopeLabel}.`}
         primaryAction={<Button variant="contained" onClick={() => void refreshLedger()} disabled={refreshingLedger}>Refresh ledger data</Button>}
         secondaryActions={<Button variant="outlined" onClick={reload} disabled={loading}>Reload snapshot</Button>}
       />
@@ -38,7 +38,7 @@ const SignalPositionLedgerPage: React.FC = () => {
         <Stack spacing={1}>
           <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" gap={1}>
             <Typography variant="body2" color="text.secondary">
-              Ledger pipeline: {data.refresh.status} · processed {data.refresh.processedCount.toLocaleString()} / {data.refresh.totalCount.toLocaleString()} source signals · materialized {data.refresh.materializedRowCount.toLocaleString()} rows.
+              Ledger pipeline: {data.refresh.status} - processed {data.refresh.processedCount.toLocaleString()} / {data.refresh.totalCount.toLocaleString()} source signals - materialized {data.refresh.materializedRowCount.toLocaleString()} entry candidates.
             </Typography>
             <Typography variant="body2" color="text.secondary">
               Updated {data.refresh.updatedAt ? new Date(data.refresh.updatedAt).toLocaleString() : 'not yet'}
@@ -55,7 +55,7 @@ const SignalPositionLedgerPage: React.FC = () => {
 
       {error && (
         <Alert severity="error" sx={{ mb: 2 }} action={<Button color="inherit" size="small" onClick={reload}>Retry</Button>}>
-          Active signal-position data could not be loaded for {scopeLabel}.
+          Entry trigger candidate data could not be loaded for {scopeLabel}.
         </Alert>
       )}
 
@@ -73,7 +73,7 @@ const SignalPositionLedgerPage: React.FC = () => {
           scrollButtons="auto"
           sx={{ px: 1, minHeight: 44, '& .MuiTab-root': { minHeight: 44, fontSize: 13, textTransform: 'none' } }}
         >
-          <Tab value="active" label="Active Positions" />
+          <Tab value="active" label="Entry Trigger Candidates" />
           <Tab value="history" label="Closed History" />
         </Tabs>
       </Paper>

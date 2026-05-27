@@ -76,10 +76,9 @@ export const TradePlanTable: React.FC<TradePlanTableProps> = ({
     },
     { id: 'strategyRating', label: 'Strategy Rating', sortable: true, render: (p) => <Chip size="small" label={p.strategyRating || 'UNPROVEN'} variant="outlined" /> },
     { id: 'backtestTimeframe', label: 'Proof Timeframe', render: (p) => p.backtestTimeframe || '-' },
-    { id: 'entryZone', label: 'Entry Zone', render: (p) => p.entryZone ? `${fmtMoney(p, p.entryZone.preferredEntryMin)} - ${fmtMoney(p, p.entryZone.preferredEntryMax)}` : '-' },
-    { id: 'stopLoss', label: 'Stop Loss', render: (p) => p.stopLoss ? fmtMoney(p, p.stopLoss.price) : '-' },
-    { id: 'target', label: 'Target', render: (p) => p.target ? `${fmtMoney(p, p.target.price)}${p.target.method === 'REWARD_RISK_MULTIPLE' ? ' (Default 2R target)' : ''}` : '-' },
-    { id: 'rewardRiskRatio', label: 'R/R', render: (p) => <strong>{p.rewardRiskRatio.toFixed(2)}</strong> },
+    { id: 'latestPrice', label: 'Latest Price', render: (p) => fmtMoney(p, p.latestPrice ?? p.marketDataSnapshot?.latestPrice) },
+    { id: 'decision', label: 'Decision Evidence', render: (p) => <Typography variant="body2">{p.strategyDecisionSnapshot?.decision || p.planStatus}</Typography> },
+    { id: 'reason', label: 'Reason', render: (p) => <Typography variant="body2" noWrap sx={{ maxWidth: 240 }}>{p.strategyDecisionSnapshot?.reasons?.[0] || p.paperReadinessReasons?.[0] || p.warnings?.[0] || '-'}</Typography> },
     { id: 'actions', label: 'Actions', align: 'right', render: (p) => <Button size="small" component={Link} to={`/trade-plans/${p.instrumentId}`}>View</Button> },
   ];
 

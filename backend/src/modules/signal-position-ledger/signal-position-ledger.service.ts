@@ -107,6 +107,7 @@ export class SignalPositionLedgerService {
   private toActiveRow(candidate: SignalPositionLedgerActiveCandidate, snapshots: SignalPositionLedgerRowSnapshots): SignalPositionLedgerActiveRow {
     const { signal, triggerContract } = candidate;
     const { latestPrice, quality, exitDecision } = snapshots;
+    const primaryStrategy = signal.strategyMatches?.[0] ?? null;
 
     const returnProjection = this.currentReturnProjection(triggerContract.trigger_price as number, latestPrice, quality);
     const healthState = this.healthStateForDecision(exitDecision?.decision);
@@ -124,6 +125,9 @@ export class SignalPositionLedgerService {
       entryReasonSummary: triggerContract.reason_summary,
       strategyId: triggerContract.strategy_id || null,
       strategyVersion: triggerContract.strategy_version || null,
+      strategyDecision: primaryStrategy?.decision ?? null,
+      strategyReadinessLabel: primaryStrategy?.readinessLabel ?? null,
+      strategyRatingGrade: primaryStrategy?.ratingGrade ?? null,
       entryRuleId: triggerContract.entry_rule_id || null,
       latestTrustedPriceDate: latestPrice?.date || null,
       latestTrustedPrice: latestPrice?.adjustedClose ?? latestPrice?.close ?? null,
@@ -133,22 +137,40 @@ export class SignalPositionLedgerService {
       healthState,
       lifecycleEvidenceStatus: healthState ? 'EXIT_COMPATIBILITY_ONLY' : 'UNAVAILABLE',
       trustEvidenceStatus: returnProjection.trustEvidenceStatus,
+      calibrationEvidenceStatus: primaryStrategy?.readinessLabel || primaryStrategy?.ratingGrade ? 'AVAILABLE' : 'UNAVAILABLE',
+      displayWarnings: this.displayWarnings(primaryStrategy, quality, returnProjection.currentReturnStatus),
     };
   }
 
   private isTrustedReadSignal(signal: SignalResultDto): boolean {
     const quality = signal.dataQualityEligibility;
+    const primaryStrategy = signal.strategyMatches?.[0] ?? null;
+    const hasNoiseBlocker = (signal.blockedStrategies || []).some((item) => (item.noiseFiltersTriggered || []).length > 0);
     return signal.auditStatus === 'CURRENT'
+      && signal.direction === 'BULLISH'
       && quality?.filterApplied === true
       && quality.eligible === true
-      && quality.signalReadinessStatus === 'READY';
+      && quality.signalReadinessStatus === 'READY'
+      && primaryStrategy?.decision === 'ENTRY_CANDIDATE'
+      && primaryStrategy.direction === 'BULLISH'
+      && !hasNoiseBlocker;
   }
 
   private isEligibleActiveTrigger(trigger: SignalPositionTriggerContractReadModel): boolean {
-    if (trigger.trigger_type !== 'bullish_entry_trigger' && trigger.trigger_type !== 'bearish_trigger') return false;
+    if (trigger.trigger_type !== 'bullish_entry_trigger') return false;
     if (trigger.trigger_price_evidence?.status !== 'SOURCE_PROVEN') return false;
     if (typeof trigger.trigger_price !== 'number' || !Number.isFinite(trigger.trigger_price)) return false;
     if (!trigger.trigger_timestamp) return false;
+    if (!trigger.strategy_id || !trigger.strategy_version || !trigger.entry_rule_id) return false;
+    return true;
+  }
+
+  private isPublishableActiveCandidate(row: SignalPositionLedgerActiveRow): boolean {
+    if (row.triggerType !== 'bullish_entry_trigger') return false;
+    if (row.strategyDecision !== 'ENTRY_CANDIDATE') return false;
+    if (row.currentDataQualityStatus !== 'READY') return false;
+    if (row.currentReturnStatus !== 'CURRENT') return false;
+    if (row.healthState === 'EXIT_TRIGGERED' || row.healthState === 'RISK_WARNING') return false;
     return true;
   }
 
@@ -207,6 +229,23 @@ export class SignalPositionLedgerService {
     if (decision === 'EXIT_CANDIDATE') return 'EXIT_TRIGGERED';
     if (decision === 'REDUCE_RISK') return 'RISK_WARNING';
     return null;
+  }
+
+  private displayWarnings(
+    primaryStrategy: NonNullable<SignalResultDto['strategyMatches']>[number] | null,
+    quality: SignalPositionDataQualitySnapshot | null,
+    currentReturnStatus: SignalPositionLedgerActiveRow['currentReturnStatus'],
+  ): string[] {
+    const warnings: string[] = [];
+    if (!primaryStrategy?.ratingGrade || !primaryStrategy?.readinessLabel) {
+      warnings.push('Forward-validation evidence is unavailable.');
+    }
+    if (!quality || quality.signalReadinessStatus !== 'READY') {
+      warnings.push('Current data-quality readiness is not READY.');
+    }
+    if (currentReturnStatus === 'STALE') warnings.push('Latest price is stale; raw price move is hidden.');
+    if (currentReturnStatus === 'UNAVAILABLE') warnings.push('Latest price is unavailable; raw price move is hidden.');
+    return warnings;
   }
 
   private async loadRowSnapshots(
@@ -313,6 +352,10 @@ export class SignalPositionLedgerService {
         const snapshots = await this.loadRowSnapshots(candidates, query);
         for (const candidate of candidates) {
           const row = this.toActiveRow(candidate, snapshots.get(candidate.signal.instrument_id) ?? this.emptySnapshots());
+          if (!this.isPublishableActiveCandidate(row)) {
+            state.skippedCount += 1;
+            continue;
+          }
           state.rows.set(this.rowKey(row), row);
           state.succeededCount += 1;
         }

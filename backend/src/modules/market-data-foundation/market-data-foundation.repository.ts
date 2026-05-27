@@ -15,6 +15,7 @@ import type {
   MarketDataRepairType,
   MarketDataRepairRunStatus,
   MarketDataRepairStateStatus,
+  MarketMoverRow,
   ProviderValidationQueue,
   ScheduledRegionSyncSummary,
   TrustedReviewUniversePriceRow,
@@ -633,6 +634,77 @@ export class MarketDataFoundationRepository {
     `);
 
     return rows[0]?.timestamp ?? null;
+  }
+
+  async marketMoversForRange(
+    lookbackDays: number,
+    options: Pick<PaginationOptions, 'region' | 'assetType'> & { limit?: number } = {},
+  ): Promise<MarketMoverRow[]> {
+    const rowLimit = Math.max(1, Math.min(options.limit ?? 25, 100));
+    const rows = await this.prisma.$queryRaw<Array<{
+      instrumentId: string;
+      symbol: string;
+      companyName: string;
+      sector: string | null;
+      latestDate: Date;
+      latestClose: Prisma.Decimal | number | string;
+      baseDate: Date;
+      baseClose: Prisma.Decimal | number | string;
+      returnPercent: Prisma.Decimal | number | string;
+    }>>(Prisma.sql`
+      SELECT
+        stocks.id AS "instrumentId",
+        stocks.symbol,
+        stocks.name AS "companyName",
+        stocks.sector,
+        latest_prices.timestamp AS "latestDate",
+        latest_prices.price AS "latestClose",
+        base_prices.timestamp AS "baseDate",
+        base_prices.price AS "baseClose",
+        ((latest_prices.price - base_prices.price) / base_prices.price) AS "returnPercent"
+      FROM stocks
+      INNER JOIN LATERAL (
+        SELECT
+          price_ticks.timestamp,
+          COALESCE(price_ticks."adjustedClose", price_ticks.close) AS price
+        FROM price_ticks
+        WHERE price_ticks.symbol = stocks.symbol
+          AND UPPER(COALESCE(price_ticks."dataStatus", 'COMPLETE')) <> 'ERROR'
+          AND COALESCE(price_ticks."adjustedClose", price_ticks.close) > 0
+        ORDER BY price_ticks.timestamp DESC
+        LIMIT 1
+      ) latest_prices ON TRUE
+      INNER JOIN LATERAL (
+        SELECT
+          price_ticks.timestamp,
+          COALESCE(price_ticks."adjustedClose", price_ticks.close) AS price
+        FROM price_ticks
+        WHERE price_ticks.symbol = stocks.symbol
+          AND price_ticks.timestamp <= latest_prices.timestamp - (${lookbackDays}::int * INTERVAL '1 day')
+          AND UPPER(COALESCE(price_ticks."dataStatus", 'COMPLETE')) <> 'ERROR'
+          AND COALESCE(price_ticks."adjustedClose", price_ticks.close) > 0
+        ORDER BY price_ticks.timestamp DESC
+        LIMIT 1
+      ) base_prices ON TRUE
+      WHERE ${this.scopedStockSqlWhere(options)}
+        AND stocks."isActive" = TRUE
+        AND stocks."isDelisted" = FALSE
+        AND base_prices.price > 0
+      ORDER BY ABS((latest_prices.price - base_prices.price) / base_prices.price) DESC
+      LIMIT ${rowLimit * 8}
+    `);
+
+    return rows.map((row) => ({
+      instrumentId: row.instrumentId,
+      symbol: row.symbol,
+      companyName: row.companyName,
+      sector: row.sector,
+      latestDate: row.latestDate.toISOString(),
+      latestClose: this.toNumber(row.latestClose),
+      baseDate: row.baseDate.toISOString(),
+      baseClose: this.toNumber(row.baseClose),
+      returnPercent: Number(this.toNumber(row.returnPercent).toFixed(6)),
+    }));
   }
 
   listStocksForUniverseHealth(options: Pick<PaginationOptions, 'region' | 'assetType'> = {}) {
@@ -2239,6 +2311,13 @@ export class MarketDataFoundationRepository {
     const segmentWhere = this.segmentWhere(options.instrumentSegment);
     if (segmentWhere) filters.push(segmentWhere);
     return filters.length > 0 ? { AND: filters } : {};
+  }
+
+  private toNumber(value: Prisma.Decimal | number | string | null | undefined): number {
+    if (value === null || value === undefined) return 0;
+    if (typeof value === 'number') return value;
+    if (typeof value === 'string') return Number(value);
+    return value.toNumber();
   }
 
   private safeStockSortBy(sortBy?: string): string {

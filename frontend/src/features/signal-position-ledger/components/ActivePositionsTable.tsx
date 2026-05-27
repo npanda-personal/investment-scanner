@@ -1,5 +1,17 @@
-import React, { useMemo } from 'react';
-import { Chip, Stack, Tooltip, Typography } from '@mui/material';
+import React, { useMemo, useState } from 'react';
+import {
+  Box,
+  Button,
+  Chip,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Divider,
+  Stack,
+  Tooltip,
+  Typography,
+} from '@mui/material';
 import { DataTable, StatusBadge, type DataTableColumn } from '@/shared/components';
 import type { SignalPositionLedgerActiveListResponse, SignalPositionLedgerActiveRow } from '../types';
 
@@ -34,7 +46,7 @@ function formatPrice(value: number | null): string {
   return numberFormatter.format(value);
 }
 
-function formatReturn(row: SignalPositionLedgerActiveRow): string {
+function formatMove(row: SignalPositionLedgerActiveRow): string {
   if (row.currentReturnStatus !== 'CURRENT' || row.currentReturnPercent === null) {
     return labelize(row.currentReturnStatus);
   }
@@ -43,9 +55,9 @@ function formatReturn(row: SignalPositionLedgerActiveRow): string {
 }
 
 function healthLabel(row: SignalPositionLedgerActiveRow): string {
-  if (row.healthState === 'EXIT_TRIGGERED') return 'Exit-trigger compatibility';
+  if (row.healthState === 'EXIT_TRIGGERED') return 'Exit review';
   if (row.healthState === 'RISK_WARNING') return 'Risk warning';
-  return 'No compatibility state';
+  return 'No exit evidence';
 }
 
 type ActivePositionsTableProps = {
@@ -69,106 +81,68 @@ export const ActivePositionsTable: React.FC<ActivePositionsTableProps> = ({
   onPageChange,
   onPageSizeChange,
 }) => {
+  const [selectedRow, setSelectedRow] = useState<SignalPositionLedgerActiveRow | null>(null);
   const columns = useMemo<DataTableColumn<SignalPositionLedgerActiveRow>[]>(() => [
     {
       id: 'company',
-      label: 'Company',
+      label: 'Stock',
       render: (row) => (
-        <Stack spacing={0.25} sx={{ minWidth: 160 }}>
-          <Typography variant="body2" fontWeight={700} noWrap>{row.companyName || row.symbol}</Typography>
-          <Typography color="text.secondary" variant="caption" noWrap>{row.symbol}</Typography>
-        </Stack>
-      ),
-    },
-    {
-      id: 'scope',
-      label: 'Scope',
-      render: (row) => (
-        <Stack spacing={0.25}>
-          <Typography variant="body2">{row.region || 'Unavailable'}</Typography>
-          <Typography color="text.secondary" variant="caption">{row.assetType || 'Unavailable'}</Typography>
+        <Stack spacing={0.25} sx={{ minWidth: 150, maxWidth: 190 }}>
+          <Tooltip title={row.companyName || row.symbol} arrow>
+            <Typography variant="body2" fontWeight={800} noWrap>{row.symbol}</Typography>
+          </Tooltip>
+          <Typography color="text.secondary" variant="caption" noWrap>{row.companyName || 'Company unavailable'}</Typography>
         </Stack>
       ),
     },
     {
       id: 'entry',
-      label: 'Entry trigger',
+      label: 'Trigger',
       render: (row) => (
-        <Stack spacing={0.25}>
-          <Typography variant="body2">{formatDate(row.entryTriggerTimestamp)}</Typography>
-          <Typography color="text.secondary" variant="caption">{formatPrice(row.entryTriggerPrice)}</Typography>
+        <Stack spacing={0.25} sx={{ minWidth: 120 }}>
+          <Typography variant="body2" fontWeight={700} noWrap>{formatDate(row.entryTriggerTimestamp)}</Typography>
+          <Typography color="text.secondary" variant="caption" noWrap>@ {formatPrice(row.entryTriggerPrice)}</Typography>
         </Stack>
       ),
     },
     {
-      id: 'reason',
-      label: 'Reason summary',
-      render: (row) => (
-        <Tooltip title={row.entryReasonSummary} arrow>
-          <Typography
-            variant="body2"
-            tabIndex={0}
-            sx={{
-              maxWidth: 260,
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {row.entryReasonSummary}
-          </Typography>
-        </Tooltip>
-      ),
-    },
-    {
-      id: 'priceBasis',
-      label: 'Latest price basis',
-      render: (row) => (
-        <Stack spacing={0.25}>
-          <Typography variant="body2">{formatPrice(row.latestTrustedPrice)}</Typography>
-          <Typography color="text.secondary" variant="caption">{formatDate(row.latestTrustedPriceDate)}</Typography>
-        </Stack>
-      ),
-    },
-    {
-      id: 'return',
-      label: 'Return from entry',
+      id: 'move',
+      label: 'Raw move',
       align: 'right',
       render: (row) => (
         <Chip
           size="small"
           variant={row.currentReturnStatus === 'CURRENT' ? 'filled' : 'outlined'}
-          color={row.currentReturnStatus === 'CURRENT' ? 'primary' : 'default'}
-          label={formatReturn(row)}
+          color={row.currentReturnStatus === 'CURRENT' && (row.currentReturnPercent ?? 0) >= 0 ? 'success' : 'default'}
+          label={formatMove(row)}
         />
       ),
     },
     {
-      id: 'state',
-      label: 'Current state',
-      render: (row) => <StatusBadge label={healthLabel(row)} />,
-    },
-    {
-      id: 'trust',
-      label: 'Trust',
+      id: 'quality',
+      label: 'Evidence',
       render: (row) => (
-        <Stack spacing={0.5} alignItems="flex-start">
+        <Stack direction="row" spacing={0.5} sx={{ minWidth: 210 }}>
           <StatusBadge label={row.currentDataQualityStatus || 'DQ unavailable'} />
-          <StatusBadge label={labelize(row.trustEvidenceStatus)} />
-          <Typography color="text.secondary" variant="caption">
-            {row.lifecycleEvidenceStatus === 'UNAVAILABLE' ? 'Lifecycle proof deferred' : labelize(row.lifecycleEvidenceStatus)}
-          </Typography>
+          <StatusBadge label={row.strategyRatingGrade ? `Grade ${row.strategyRatingGrade}` : 'Grade N/A'} />
         </Stack>
       ),
     },
     {
+      id: 'state',
+      label: 'Lifecycle',
+      render: (row) => <StatusBadge label={healthLabel(row)} />,
+    },
+    {
       id: 'strategy',
-      label: 'Strategy',
+      label: 'Rule',
       render: (row) => (
-        <Stack spacing={0.25} sx={{ minWidth: 150 }}>
-          <Typography variant="body2" noWrap>{row.strategyId || 'Unavailable'}</Typography>
+        <Stack spacing={0.25} sx={{ minWidth: 170, maxWidth: 210 }}>
+          <Tooltip title={row.strategyId || 'Strategy unavailable'} arrow>
+            <Typography variant="body2" noWrap>{row.strategyId || 'Unavailable'}</Typography>
+          </Tooltip>
           <Typography color="text.secondary" variant="caption" noWrap>
-            Version {row.strategyVersion || 'Unavailable'}
+            {row.entryRuleId || 'Entry rule unavailable'}
           </Typography>
         </Stack>
       ),
@@ -176,18 +150,97 @@ export const ActivePositionsTable: React.FC<ActivePositionsTableProps> = ({
   ], []);
 
   return (
-    <DataTable
-      columns={columns}
-      rows={data.items}
-      getRowId={(row) => row.signalId || `${row.instrumentId}-${row.entryTriggerTimestamp}`}
-      loading={loading}
-      error={error ? `Active signal-position data could not be loaded for ${scopeLabel}. ${error}` : null}
-      emptyMessage={`No active signal positions are available for ${scopeLabel}.`}
-      page={page}
-      pageSize={pageSize}
-      totalCount={data.totalCount}
-      onPageChange={onPageChange}
-      onPageSizeChange={onPageSizeChange}
-    />
+    <>
+      <DataTable
+        columns={columns}
+        rows={data.items}
+        getRowId={(row) => row.signalId || `${row.instrumentId}-${row.entryTriggerTimestamp}`}
+        loading={loading}
+        error={error ? `Entry trigger candidate data could not be loaded for ${scopeLabel}. ${error}` : null}
+        emptyMessage={`No entry trigger candidates are available for ${scopeLabel}.`}
+        page={page}
+        pageSize={pageSize}
+        totalCount={data.totalCount}
+        onPageChange={onPageChange}
+        onPageSizeChange={onPageSizeChange}
+        onRowClick={setSelectedRow}
+      />
+
+      <Dialog open={Boolean(selectedRow)} onClose={() => setSelectedRow(null)} maxWidth="md" fullWidth>
+        {selectedRow && (
+          <>
+            <DialogTitle>
+              <Stack spacing={0.5}>
+                <Typography variant="h6">{selectedRow.symbol} entry trigger evidence</Typography>
+                <Typography variant="body2" color="text.secondary">{selectedRow.companyName || 'Company unavailable'}</Typography>
+              </Stack>
+            </DialogTitle>
+            <DialogContent dividers>
+              <Stack spacing={2}>
+                <Stack direction="row" gap={1} flexWrap="wrap" useFlexGap>
+                  <Chip label={`Trigger ${formatDate(selectedRow.entryTriggerTimestamp)}`} variant="outlined" />
+                  <Chip label={`Price ${formatPrice(selectedRow.entryTriggerPrice)}`} variant="outlined" />
+                  <Chip label={`Raw move ${formatMove(selectedRow)}`} variant="outlined" />
+                  <Chip label={`DQ ${selectedRow.currentDataQualityStatus || 'Unavailable'}`} variant="outlined" />
+                  <Chip label={`Lifecycle ${healthLabel(selectedRow)}`} variant="outlined" />
+                </Stack>
+
+                <Box>
+                  <Typography variant="subtitle2" fontWeight={800}>Reason</Typography>
+                  <Typography color="text.secondary">{selectedRow.entryReasonSummary}</Typography>
+                </Box>
+
+                <Divider />
+
+                <Stack direction={{ xs: 'column', md: 'row' }} gap={2}>
+                  <DetailBlock label="Strategy" value={`${selectedRow.strategyId || 'Unavailable'} v${selectedRow.strategyVersion || 'N/A'}`} />
+                  <DetailBlock label="Decision" value={labelize(selectedRow.strategyDecision)} />
+                  <DetailBlock label="Entry Rule" value={selectedRow.entryRuleId || 'Unavailable'} />
+                </Stack>
+                <Stack direction={{ xs: 'column', md: 'row' }} gap={2}>
+                  <DetailBlock label="Readiness" value={labelize(selectedRow.strategyReadinessLabel)} />
+                  <DetailBlock label="Rating Grade" value={selectedRow.strategyRatingGrade || 'Unavailable'} />
+                  <DetailBlock label="Forward Validation" value={labelize(selectedRow.calibrationEvidenceStatus)} />
+                </Stack>
+                <Stack direction={{ xs: 'column', md: 'row' }} gap={2}>
+                  <DetailBlock label="Latest Trusted Price" value={`${formatPrice(selectedRow.latestTrustedPrice)} on ${formatDate(selectedRow.latestTrustedPriceDate)}`} />
+                  <DetailBlock label="Trust Evidence" value={labelize(selectedRow.trustEvidenceStatus)} />
+                  <DetailBlock label="Lifecycle Evidence" value={labelize(selectedRow.lifecycleEvidenceStatus)} />
+                </Stack>
+
+                {(selectedRow.displayWarnings || []).length > 0 && (
+                  <AlertList warnings={selectedRow.displayWarnings || []} />
+                )}
+              </Stack>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setSelectedRow(null)}>Close</Button>
+            </DialogActions>
+          </>
+        )}
+      </Dialog>
+    </>
   );
 };
+
+function DetailBlock({ label, value }: { label: string; value: string }) {
+  return (
+    <Box sx={{ minWidth: 0, flex: 1 }}>
+      <Typography variant="caption" color="text.secondary">{label}</Typography>
+      <Typography variant="body2" fontWeight={700}>{value}</Typography>
+    </Box>
+  );
+}
+
+function AlertList({ warnings }: { warnings: string[] }) {
+  return (
+    <Box>
+      <Typography variant="subtitle2" fontWeight={800}>Warnings</Typography>
+      <Stack spacing={0.5} sx={{ mt: 0.5 }}>
+        {warnings.map((warning) => (
+          <Typography key={warning} variant="body2" color="text.secondary">- {warning}</Typography>
+        ))}
+      </Stack>
+    </Box>
+  );
+}

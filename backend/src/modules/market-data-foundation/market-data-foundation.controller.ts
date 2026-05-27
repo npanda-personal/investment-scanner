@@ -402,6 +402,21 @@ export class MarketDataFoundationController {
     }
   };
 
+  marketMovers = async (req: Request, res: Response) => {
+    try {
+      const { region, assetType } = this.getMarketFilter(req);
+      return res.json(await this.service.marketMovers({
+        region,
+        assetType,
+        limit: this.numberParam(req, 'limit'),
+        range: typeof req.query.range === 'string' ? req.query.range : undefined,
+      }));
+    } catch (error) {
+      console.error('Market movers error:', error);
+      return res.status(500).json({ error: 'Market movers summary failed' });
+    }
+  };
+
   trustedReviewUniverseInstruments = async (req: Request, res: Response) => {
     try {
       const { region, assetType } = this.getMarketFilter(req);

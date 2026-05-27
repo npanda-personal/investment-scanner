@@ -88,8 +88,8 @@ describe('ResearchHubService', () => {
       expect(db.pipelineRun.findFirst).toHaveBeenCalledWith(expect.objectContaining({
         where: expect.objectContaining({
           pipelineKey: 'research-hub-overview',
-          region: 'IN',
-          assetType: 'STOCK',
+          scopeRegion: 'IN',
+          scopeAssetType: 'STOCK',
         }),
       }));
       expect(strategyService.marketGate).not.toHaveBeenCalled();

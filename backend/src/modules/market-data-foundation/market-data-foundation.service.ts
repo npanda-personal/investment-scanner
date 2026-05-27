@@ -46,6 +46,9 @@ import type {
   ReviewReadinessNextAction,
   ReviewReadinessSummary,
   MarketDataSyncSkipReason,
+  MarketMoverRange,
+  MarketMoverRangeSummary,
+  MarketMoversSummary,
   InstrumentUniverseReadiness,
   TrustedReviewUniverseHealth,
   TrustedReviewUniverseInstrument,
@@ -94,6 +97,14 @@ import {
 } from './market-data-foundation.exchange-eod-adapter';
 
 const TRUSTED_REVIEW_SCAN_ORDERING = 'recentVolumeDesc_priceHistoryCompleteness_latestFreshness_symbol';
+const MARKET_MOVER_LOOKBACK_DAYS: Record<MarketMoverRange, number> = {
+  '1D': 1,
+  '1W': 7,
+  '1M': 30,
+  '3M': 90,
+  '6M': 180,
+  '1Y': 365,
+};
 
 type TrustedReviewUniverseOptions = Pick<PaginationOptions, 'region' | 'assetType'> & { now?: Date };
 type UniverseComputationSnapshot = {
@@ -525,6 +536,50 @@ export class MarketDataFoundationService {
       region: options.region || 'GLOBAL',
       assetType: options.assetType || 'ALL',
     };
+  }
+
+  async marketMovers(options: Pick<PaginationOptions, 'region' | 'assetType'> & { limit?: number; range?: string } = {}): Promise<MarketMoversSummary> {
+    const scope = {
+      region: options.region?.trim().toUpperCase() || 'IN',
+      assetType: options.assetType?.trim().toUpperCase() || 'STOCK',
+    };
+    const limit = Math.max(1, Math.min(options.limit ?? 5, 20));
+    const requestedRange = this.marketMoverRange(options.range);
+    const requestedRanges = requestedRange
+      ? [requestedRange]
+      : (Object.keys(MARKET_MOVER_LOOKBACK_DAYS) as MarketMoverRange[]);
+    const ranges = await Promise.all(
+      requestedRanges.map(async (range): Promise<MarketMoverRangeSummary> => {
+        const rows = await this.repository.marketMoversForRange(MARKET_MOVER_LOOKBACK_DAYS[range], { ...scope, limit });
+        const ordered = rows.filter((row) => Number.isFinite(row.returnPercent));
+        const gainers = ordered
+          .filter((row) => row.returnPercent > 0)
+          .sort((left, right) => right.returnPercent - left.returnPercent)
+          .slice(0, limit);
+        const losers = ordered
+          .filter((row) => row.returnPercent < 0)
+          .sort((left, right) => left.returnPercent - right.returnPercent)
+          .slice(0, limit);
+        const warnings = rows.length === 0
+          ? [`No priced stocks have enough ${range} history for movers in ${scope.region}/${scope.assetType}.`]
+          : [];
+        return { range, gainers, losers, warnings };
+      }),
+    );
+
+    return {
+      scope,
+      generatedAt: new Date().toISOString(),
+      ranges,
+    };
+  }
+
+  private marketMoverRange(value: unknown): MarketMoverRange | null {
+    if (typeof value !== 'string') return null;
+    const normalized = value.trim().toUpperCase();
+    return Object.prototype.hasOwnProperty.call(MARKET_MOVER_LOOKBACK_DAYS, normalized)
+      ? normalized as MarketMoverRange
+      : null;
   }
 
   async stockMissingDataDiagnostics(options: Pick<PaginationOptions, 'region' | 'assetType'> & { sampleLimit?: number } = {}): Promise<StockMissingDataDiagnostics> {

@@ -183,8 +183,8 @@ export class ResearchHubService {
     const row = await (this.db as any).pipelineRun.findFirst({
       where: {
         pipelineKey: RESEARCH_OVERVIEW_PIPELINE_KEY,
-        region,
-        assetType,
+        scopeRegion: region,
+        scopeAssetType: assetType,
         status: { in: ['COMPLETED', 'PARTIAL'] },
         metadata: {
           path: ['version'],
@@ -204,8 +204,8 @@ export class ResearchHubService {
       where: { idempotencyKey },
       create: {
         pipelineKey: RESEARCH_OVERVIEW_PIPELINE_KEY,
-        region,
-        assetType,
+        scopeRegion: region,
+        scopeAssetType: assetType,
         timeframe: '1d',
         triggerType: 'scheduled',
         status: overview.dataGaps.length > 0 ? 'PARTIAL' : 'COMPLETED',

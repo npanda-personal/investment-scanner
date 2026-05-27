@@ -1,10 +1,5 @@
 import type { MarketScope } from '@/contexts/MarketScopeContext';
-import type { DataQualityReviewReadinessSummary, DataQualitySummary } from '@/features/data-quality-engine/types';
 import type { MarketContextSummary } from '@/features/market-context-intelligence/types';
-import type { PipelineStatusSnapshot } from '@/features/pipeline-ops/types';
-import type { ResearchOverview } from '@/features/research-hub/api/researchHubApi';
-import type { CalibrationPageSummary } from '@/features/signal-calibration-engine/types';
-import type { SignalGenerationRunAudit } from '@/features/signal-generation-engine/types';
 import type { TodayReviewCandidate, TodayReviewResponse } from '@/features/today-trade-review/types';
 
 export interface DashboardSectionState<T> {
@@ -16,16 +11,11 @@ export interface DashboardSectionState<T> {
 
 export interface DailyOverviewCriticalSections {
   todayReview: DashboardSectionState<TodayReviewResponse>;
-  researchOverview: DashboardSectionState<ResearchOverview>;
-  reviewReadiness: DashboardSectionState<DataQualityReviewReadinessSummary>;
+  marketMovers: DashboardSectionState<MarketMoversSummary>;
 }
 
 export interface DailyOverviewDeferredSections {
   marketContext: DashboardSectionState<MarketContextSummary>;
-  dataQualitySummary: DashboardSectionState<DataQualitySummary>;
-  latestSignalRun: DashboardSectionState<SignalGenerationRunAudit>;
-  pipelineStatus: DashboardSectionState<PipelineStatusSnapshot>;
-  calibrationSummary: DashboardSectionState<CalibrationPageSummary>;
 }
 
 export type CalibrationEvidenceSummaryDisplayState = 'USABLE' | 'LIMITED' | 'UNAVAILABLE' | 'WAITING';
@@ -39,8 +29,7 @@ export interface DailyOverviewDashboardState {
   refreshing: boolean;
   latestDashboardFetchedAt: string | null;
   latestSourceTimestamp: string | null;
-  calibrationHorizon: string;
-  setCalibrationHorizon: (horizon: string) => Promise<void>;
+  loadMarketMoversRange: (range: MarketMoverRange) => Promise<void>;
 }
 
 export type DailyPulseState = 'REVIEW_SUPPORTED' | 'REVIEW_LIMITED' | 'REVIEW_BLOCKED' | 'MIXED_EVIDENCE' | 'UNAVAILABLE';
@@ -64,6 +53,36 @@ export interface DashboardDrilldownRoute {
   label: string;
   to: string;
   context: string | null;
+}
+
+export type MarketMoverRange = '1D' | '1W' | '1M' | '3M' | '6M' | '1Y';
+
+export interface MarketMoverRow {
+  instrumentId: string;
+  symbol: string;
+  companyName: string;
+  sector: string | null;
+  latestDate: string;
+  latestClose: number;
+  baseDate: string;
+  baseClose: number;
+  returnPercent: number;
+}
+
+export interface MarketMoverRangeSummary {
+  range: MarketMoverRange;
+  gainers: MarketMoverRow[];
+  losers: MarketMoverRow[];
+  warnings: string[];
+}
+
+export interface MarketMoversSummary {
+  scope: {
+    region: string;
+    assetType: string;
+  };
+  generatedAt: string;
+  ranges: MarketMoverRangeSummary[];
 }
 
 export type TodayReviewCandidateGroupSet = {

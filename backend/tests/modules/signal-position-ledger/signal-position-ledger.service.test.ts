@@ -32,6 +32,19 @@ const trustedSignal = {
   generationRunId: 'run-1',
   source: 'signal-generation-engine',
   data_status: 'COMPLETE' as const,
+  strategyMatches: [{
+    strategyCode: 'BREAKOUT_CONFIRMATION',
+    strategyVersion: '1.0.0',
+    decision: 'ENTRY_CANDIDATE' as const,
+    direction: 'BULLISH' as const,
+    score: 82,
+    confidence: 'HIGH' as const,
+    reasons: ['Breakout confirmation triggered.'],
+    entryRulesPassed: ['ENTRY_BREAKOUT'],
+    timeframe: 'DAILY',
+    readinessLabel: 'READY' as const,
+    ratingGrade: 'A' as const,
+  }],
 };
 
 const sourceProvenTrigger = {
@@ -103,11 +116,7 @@ describe('SignalPositionLedgerService', () => {
         liquidityStatus: 'LIQUID',
         lastEvaluatedAt: new Date().toISOString(),
       }),
-      latestExitDecisionByInstrumentId: jest.fn().mockResolvedValue({
-        strategy: 'DEFENSIVE_EXIT',
-        decision: 'EXIT_CANDIDATE',
-        generatedAt: new Date().toISOString(),
-      }),
+      latestExitDecisionByInstrumentId: jest.fn().mockResolvedValue(null),
     };
     const signalService = {
       enrichSignals: jest.fn().mockResolvedValue([{ ...trustedSignal, triggerContract: sourceProvenTrigger }]),
@@ -125,13 +134,15 @@ describe('SignalPositionLedgerService', () => {
       triggerType: 'bullish_entry_trigger',
       currentReturnPercent: 10,
       currentReturnStatus: 'CURRENT',
-      healthState: 'EXIT_TRIGGERED',
-      lifecycleEvidenceStatus: 'EXIT_COMPATIBILITY_ONLY',
+      healthState: null,
+      lifecycleEvidenceStatus: 'UNAVAILABLE',
       trustEvidenceStatus: 'SOURCE_PROVEN',
+      strategyDecision: 'ENTRY_CANDIDATE',
+      calibrationEvidenceStatus: 'AVAILABLE',
     });
   });
 
-  it('keeps lifecycle evidence unavailable by default and downgrades stale/missing return basis', async () => {
+  it('excludes stale price rows from entry trigger candidates', async () => {
     const staleSignal = { ...trustedSignal, id: 'signal-2', instrument_id: 'stock-2', symbol: 'XYZ', company_name: 'XYZ Co' };
     const repository = {
       listLatestSignals: jest.fn().mockResolvedValue({
@@ -176,16 +187,11 @@ describe('SignalPositionLedgerService', () => {
     await service.refreshActiveRows(query, { force: true, wait: true });
     const result = await service.listActiveRows(query);
 
-    expect(result.items[0]).toMatchObject({
-      currentReturnPercent: null,
-      currentReturnStatus: 'STALE',
-      healthState: null,
-      lifecycleEvidenceStatus: 'UNAVAILABLE',
-      trustEvidenceStatus: 'SOURCE_PROVEN_PRICE_STALE',
-    });
+    expect(result.totalCount).toBe(0);
+    expect(result.items).toHaveLength(0);
   });
 
-  it('keeps current data quality unavailable when latest persisted DQ is missing', async () => {
+  it('excludes rows when current data-quality evidence is missing', async () => {
     const repository = {
       listLatestSignals: jest.fn().mockResolvedValue({
         items: [trustedSignal],
@@ -214,15 +220,11 @@ describe('SignalPositionLedgerService', () => {
     await service.refreshActiveRows(query, { force: true, wait: true });
     const result = await service.listActiveRows(query);
 
-    expect(result.items[0]).toMatchObject({
-      currentDataQualityStatus: null,
-      currentReturnPercent: null,
-      currentReturnStatus: 'UNAVAILABLE',
-      trustEvidenceStatus: 'SOURCE_PROVEN_DQ_UNAVAILABLE',
-    });
+    expect(result.totalCount).toBe(0);
+    expect(result.items).toHaveLength(0);
   });
 
-  it('maps REDUCE_RISK decisions to risk warning state', async () => {
+  it('excludes risk warning rows from the entry candidate list', async () => {
     const repository = {
       listLatestSignals: jest.fn().mockResolvedValue({
         items: [trustedSignal],
@@ -260,10 +262,8 @@ describe('SignalPositionLedgerService', () => {
     await service.refreshActiveRows(query, { force: true, wait: true });
     const result = await service.listActiveRows(query);
 
-    expect(result.items[0]).toMatchObject({
-      healthState: 'RISK_WARNING',
-      lifecycleEvidenceStatus: 'EXIT_COMPATIBILITY_ONLY',
-    });
+    expect(result.totalCount).toBe(0);
+    expect(result.items).toHaveLength(0);
   });
 
   it('ignores unsupported decision values in lifecycle health mapping', async () => {
@@ -471,7 +471,7 @@ describe('SignalPositionLedgerService', () => {
           { ...signalB, triggerContract: { ...sourceProvenTrigger, signal_id: 'signal-b', instrument_id: 'stock-b', symbol: 'BBB', trigger_type: 'risk_warning' } },
         ])
         .mockResolvedValueOnce([
-          { ...signalD, triggerContract: { ...sourceProvenTrigger, signal_id: 'signal-d', instrument_id: 'stock-d', symbol: 'DDD', trigger_type: 'bearish_trigger' } },
+          { ...signalD, triggerContract: { ...sourceProvenTrigger, signal_id: 'signal-d', instrument_id: 'stock-d', symbol: 'DDD' } },
         ]),
     };
     const service = new SignalPositionLedgerService(repository as any, signalService as any);
@@ -484,7 +484,7 @@ describe('SignalPositionLedgerService', () => {
     expect(result.items).toHaveLength(1);
     expect(result.items[0]).toMatchObject({
       symbol: 'DDD',
-      triggerType: 'bearish_trigger',
+      triggerType: 'bullish_entry_trigger',
     });
     expect(result.nextOffset).toBe(null);
     expect(result.hasMore).toBe(false);

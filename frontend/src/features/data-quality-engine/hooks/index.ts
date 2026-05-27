@@ -16,18 +16,21 @@ export function useDataQualityEngine(filters: DataQualityFilters = {}) {
     setLoading(true);
     setError(null);
     try {
-      const [nextSummary, nextReviewReadiness, nextItems] = await Promise.all([
-        fetchDataQualitySummary({ region: scope.region, assetType: scope.assetType }),
-        fetchDataQualityReviewReadiness({ region: scope.region, assetType: scope.assetType }).catch(() => null),
-        fetchDataQualityEvaluations({ ...filters, region: scope.region, assetType: scope.assetType }),
-      ]);
-      setSummary(nextSummary);
-      setReviewReadiness(nextReviewReadiness);
+      const scopedFilters = { ...filters, region: scope.region, assetType: scope.assetType };
+      const nextItems = await fetchDataQualityEvaluations(scopedFilters);
       setItems(nextItems.items);
       setTotal(nextItems.pagination.total);
+      setLoading(false);
+
+      void Promise.allSettled([
+        fetchDataQualitySummary({ region: scope.region, assetType: scope.assetType }),
+        fetchDataQualityReviewReadiness({ region: scope.region, assetType: scope.assetType }),
+      ]).then(([summaryResult, reviewResult]) => {
+        if (summaryResult.status === 'fulfilled') setSummary(summaryResult.value);
+        if (reviewResult.status === 'fulfilled') setReviewReadiness(reviewResult.value);
+      });
     } catch (err: any) {
       setError(err.response?.data?.error || err.message || 'Failed to load data quality');
-    } finally {
       setLoading(false);
     }
   }, [filters.search, filters.status, filters.readinessStatus, filters.liquidityStatus, filters.sector, filters.country, filters.eligibleForSignals, filters.eligibleForBacktesting, filters.minCoverageScore, filters.minReadinessScore, filters.limit, filters.offset, filters.sortBy, filters.sortOrder, scope.region, scope.assetType]);

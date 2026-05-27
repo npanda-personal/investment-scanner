@@ -29,22 +29,22 @@ export const SignalPositionSummaryStrip: React.FC<SignalPositionSummaryStripProp
     return (
       <Paper variant="outlined" sx={{ p: 1.5, mb: 2 }}>
         <Typography color="text.secondary" variant="body2">
-          Loading active position summary for {scopeLabel}.
+          Loading entry trigger summary for {scopeLabel}.
         </Typography>
       </Paper>
     );
   }
 
-  const exitCompatibility = data.items.filter((item) => item.healthState === 'EXIT_TRIGGERED').length;
-  const riskWarning = data.items.filter((item) => item.healthState === 'RISK_WARNING').length;
-  const limitedReturnBasis = data.items.filter((item) => item.currentReturnStatus === 'STALE' || item.currentReturnStatus === 'UNAVAILABLE').length;
+  const validatedEvidence = data.items.filter((item) => item.currentDataQualityStatus === 'READY' && item.trustEvidenceStatus === 'SOURCE_PROVEN').length;
+  const forwardValidated = data.items.filter((item) => item.calibrationEvidenceStatus === 'AVAILABLE').length;
+  const hiddenDetails = data.items.filter((item) => (item.displayWarnings || []).length > 0).length;
 
   return (
     <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', xl: 'repeat(4, 1fr)' }, gap: 1.5, mb: 2 }}>
-      <SummaryTile label="Active positions" value={data.totalCount} helper={`${scopeLabel} total`} />
-      <SummaryTile label="Exit-trigger compatibility" value={exitCompatibility} helper="This page" />
-      <SummaryTile label="Risk warning" value={riskWarning} helper="This page" />
-      <SummaryTile label="Return basis limited" value={limitedReturnBasis} helper="This page" />
+      <SummaryTile label="Entry trigger candidates" value={data.totalCount} helper={`${scopeLabel} total`} />
+      <SummaryTile label="DQ ready evidence" value={validatedEvidence} helper="Visible rows" />
+      <SummaryTile label="Forward-validation shown" value={forwardValidated} helper="Visible rows" />
+      <SummaryTile label="Rows with caveats" value={hiddenDetails} helper="Open details" />
     </Box>
   );
 };
