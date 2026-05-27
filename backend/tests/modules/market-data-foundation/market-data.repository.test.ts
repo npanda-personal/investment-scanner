@@ -130,6 +130,106 @@ describe('MarketDataFoundationRepository', () => {
     });
   });
 
+  it('stores multi-symbol official EOD rows in one bulk pass with per-symbol summaries', async () => {
+    const createMany = jest.fn().mockResolvedValue({ count: 1 });
+    const update = jest.fn().mockResolvedValue({});
+    const latestPriceUpsert = jest.fn().mockResolvedValue({});
+    const prisma = {
+      priceTick: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            symbol: 'TCS',
+            timestamp: new Date('2026-05-18T00:00:00.000Z'),
+            open: 200,
+            high: 210,
+            low: 190,
+            close: 205,
+            adjustedClose: null,
+            volume: BigInt(1000),
+            source: 'yahoo',
+          },
+        ]),
+      },
+      latestPrice: {
+        upsert: latestPriceUpsert,
+      },
+      $transaction: jest.fn(async (callback: any): Promise<any> => callback({
+        priceTick: { createMany, update },
+        latestPrice: { upsert: latestPriceUpsert },
+      })),
+    } as any;
+    const repository = new MarketDataFoundationRepository(prisma as any);
+
+    const summary = await repository.storeHistoricalBulk([
+      {
+        symbol: 'RELIANCE',
+        date: new Date('2026-05-18T00:00:00.000Z'),
+        open: 100,
+        high: 110,
+        low: 95,
+        close: 108,
+        volume: 1000,
+        source: 'NSE_SECURITY_BHAVDATA',
+      },
+      {
+        symbol: 'TCS',
+        date: new Date('2026-05-18T12:30:00.000Z'),
+        open: 200,
+        high: 220,
+        low: 195,
+        close: 218,
+        volume: 2000,
+        source: 'NSE_SECURITY_BHAVDATA',
+      },
+    ], () => ({ region: 'US', exchange: 'NASDAQ' }), new Map([
+      ['RELIANCE', { region: 'IN', exchange: 'NSE' }],
+      ['TCS', { region: 'IN', exchange: 'NSE' }],
+    ]));
+
+    expect(prisma.priceTick.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        symbol: { in: ['RELIANCE', 'TCS'] },
+      }),
+    }));
+    expect(createMany).toHaveBeenCalledTimes(1);
+    expect(createMany.mock.calls[0][0].data).toEqual([
+      expect.objectContaining({
+        symbol: 'RELIANCE',
+        region: 'IN',
+        exchange: 'NSE',
+        timestamp: new Date('2026-05-18T00:00:00.000Z'),
+        source: 'NSE_SECURITY_BHAVDATA',
+      }),
+    ]);
+    expect(update).toHaveBeenCalledTimes(1);
+    expect(update.mock.calls[0][0].where.symbol_timestamp).toEqual({
+      symbol: 'TCS',
+      timestamp: new Date('2026-05-18T00:00:00.000Z'),
+    });
+    expect(update.mock.calls[0][0].data).toEqual(expect.objectContaining({
+      region: 'IN',
+      exchange: 'NSE',
+      source: 'NSE_SECURITY_BHAVDATA',
+    }));
+    expect(latestPriceUpsert).toHaveBeenCalledTimes(2);
+    expect(summary).toMatchObject({
+      rowsReceived: 2,
+      rowsInserted: 1,
+      rowsUpdated: 1,
+      rowsNoOp: 0,
+    });
+    expect(summary.summaryBySymbol.get('RELIANCE')).toMatchObject({
+      rowsReceived: 1,
+      rowsInserted: 1,
+      rowsUpdated: 0,
+    });
+    expect(summary.summaryBySymbol.get('TCS')).toMatchObject({
+      rowsReceived: 1,
+      rowsInserted: 0,
+      rowsUpdated: 1,
+    });
+  });
+
   it('updates source provenance when a fallback source confirms an existing candle', async () => {
     const createMany = jest.fn().mockResolvedValue({ count: 0 });
     const update = jest.fn().mockResolvedValue({});

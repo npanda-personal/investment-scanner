@@ -4829,7 +4829,7 @@ describe('MarketDataFoundationService syncV1', () => {
     });
   });
 
-  it('uses one official NSE EOD bulk file for incremental latest price backfill before provider fallback', async () => {
+  it('uses one official NSE EOD bulk file for the full incremental latest price queue before provider fallback', async () => {
     const previousFlag = process.env.MARKET_DATA_NSE_OFFICIAL_EOD_BULK_ENABLED;
     const previousFetch = global.fetch;
     process.env.MARKET_DATA_NSE_OFFICIAL_EOD_BULK_ENABLED = 'true';
@@ -4841,6 +4841,7 @@ describe('MarketDataFoundationService syncV1', () => {
     const csvText = [
       'SYMBOL,SERIES,DATE1,OPEN_PRICE,HIGH_PRICE,LOW_PRICE,CLOSE_PRICE,TTL_TRD_QNTY',
       `RELIANCE,EQ,${day}-${month}-${year},100,110,95,108,1000`,
+      `TCS,EQ,${day}-${month}-${year},200,220,195,218,2000`,
     ].join('\n');
     const payload = Buffer.from(csvText);
     global.fetch = jest.fn().mockResolvedValue({
@@ -4868,11 +4869,27 @@ describe('MarketDataFoundationService syncV1', () => {
             country: 'India',
             currency: 'INR',
           },
+          {
+            id: 'tcs-id',
+            symbol: 'TCS',
+            providerSymbol: 'TCS.NS',
+            sourceSymbol: 'TCS',
+            displaySymbol: 'TCS',
+            exchange: 'NSE',
+            providerSupportStatus: 'SUPPORTED',
+            isActive: true,
+            isDelisted: false,
+            sector: 'Technology',
+            industry: 'IT Services',
+            country: 'India',
+            currency: 'INR',
+          },
         ])
         .mockResolvedValueOnce([]),
       priceReadinessStatsForSymbols: jest.fn()
         .mockResolvedValueOnce(new Map([
           ['RELIANCE', { priceHistoryBars: 4000, firstPriceDate: '2010-01-01', latestPriceDate: staleLatest, latestVolume: 100, latestAdjustedClose: 100, latestClose: 100 }],
+          ['TCS', { priceHistoryBars: 4000, firstPriceDate: '2010-01-01', latestPriceDate: staleLatest, latestVolume: 200, latestAdjustedClose: 200, latestClose: 200 }],
         ]))
         .mockResolvedValueOnce(new Map()),
       updateStockLoadTimestampBySymbol: jest.fn().mockResolvedValue({}),
@@ -4901,7 +4918,7 @@ describe('MarketDataFoundationService syncV1', () => {
       const result = await service.backfillPrices({
         region: 'IN',
         assetType: 'STOCK',
-        batchSize: 10,
+        batchSize: 1,
         policy: 'INCREMENTAL_LATEST_ONLY',
       });
 
@@ -4912,19 +4929,27 @@ describe('MarketDataFoundationService syncV1', () => {
           date: new Date(`${latestCompleted}T00:00:00.000Z`),
         }),
       ]);
+      expect(storeHistorical).toHaveBeenCalledWith([
+        expect.objectContaining({
+          symbol: 'TCS',
+          source: 'NSE_SECURITY_BHAVDATA',
+          date: new Date(`${latestCompleted}T00:00:00.000Z`),
+        }),
+      ]);
       expect(repository.updateStockLoadTimestampBySymbol).toHaveBeenCalledWith('RELIANCE');
+      expect(repository.updateStockLoadTimestampBySymbol).toHaveBeenCalledWith('TCS');
       expect(ingestSymbol).not.toHaveBeenCalled();
       expect(result).toMatchObject({
-        processedCount: 1,
-        updated: 1,
-        priceRowsUpdated: 1,
-        processedStockIds: ['reliance-id'],
+        processedCount: 2,
+        updated: 2,
+        priceRowsUpdated: 2,
+        processedStockIds: ['reliance-id', 'tcs-id'],
         remainingCandidates: 0,
         hasMore: false,
         officialEodBulk: {
           attempted: true,
           sourceName: 'NSE_SECURITY_BHAVDATA',
-          matchedInstruments: 1,
+          matchedInstruments: 2,
         },
       });
     } finally {

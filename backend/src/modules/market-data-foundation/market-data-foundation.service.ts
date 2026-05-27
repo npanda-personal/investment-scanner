@@ -467,6 +467,15 @@ type OfficialNseEodBulkSyncResult = {
   summaryByTaskId: Map<string, SyncSummary>;
 };
 
+type HistoricalBulkStoreResult = SyncSummary & {
+  summaryBySymbol: Map<string, SyncSummary>;
+};
+
+type PriceRegionInfo = {
+  region: string;
+  exchange?: string | null;
+};
+
 type MarketDataPipelineRecorder = {
   recordMarketDataStageSnapshot(input: {
     region: string;
@@ -2702,6 +2711,7 @@ export class MarketDataFoundationService {
       policy: request.policy,
       scope,
       targetTradingDate: latestCompletedDate,
+      candidates,
       page,
       summary,
     });
@@ -3650,6 +3660,49 @@ export class MarketDataFoundationService {
     }
   }
 
+  async storeHistoricalBulk(
+    prices: HistoricalPrice[],
+    regionInfoBySymbol: Map<string, PriceRegionInfo> = new Map()
+  ): Promise<HistoricalBulkStoreResult> {
+    const repository = this.repository as any;
+    if (typeof repository.storeHistoricalBulk === 'function') {
+      return repository.storeHistoricalBulk(
+        prices,
+        this.marketDataProvider.inferRegion.bind(this.marketDataProvider),
+        regionInfoBySymbol
+      );
+    }
+
+    const summaryBySymbol = new Map<string, SyncSummary>();
+    let aggregate: SyncSummary = {
+      rowsReceived: 0,
+      rowsInserted: 0,
+      rowsUpdated: 0,
+      rowsSkipped: 0,
+      rowsNoOp: 0,
+      warningCount: 0,
+      warnings: [],
+    };
+    const bySymbol = new Map<string, HistoricalPrice[]>();
+    for (const price of prices) {
+      bySymbol.set(price.symbol, [...(bySymbol.get(price.symbol) || []), price]);
+    }
+    for (const [symbol, symbolPrices] of bySymbol.entries()) {
+      const symbolSummary = await this.storeHistorical(symbolPrices);
+      summaryBySymbol.set(symbol, symbolSummary);
+      aggregate = {
+        rowsReceived: aggregate.rowsReceived + (symbolSummary.rowsReceived || 0),
+        rowsInserted: aggregate.rowsInserted + (symbolSummary.rowsInserted || 0),
+        rowsUpdated: aggregate.rowsUpdated + (symbolSummary.rowsUpdated || 0),
+        rowsSkipped: aggregate.rowsSkipped + (symbolSummary.rowsSkipped || 0),
+        rowsNoOp: (aggregate.rowsNoOp || 0) + (symbolSummary.rowsNoOp || 0),
+        warningCount: aggregate.warningCount + (symbolSummary.warningCount || 0),
+        warnings: [...(aggregate.warnings || []), ...(symbolSummary.warnings || [])].slice(0, 10),
+      };
+    }
+    return { ...aggregate, summaryBySymbol };
+  }
+
   async latestStoredCandleInfo(region: string, assetType = 'STOCK', now = new Date()) {
     const tradingDate = tradingDateForRegion(region, now);
     const [latestTradingDate, syncState] = await Promise.all([
@@ -3734,9 +3787,18 @@ export class MarketDataFoundationService {
       : gate.providerEndDate ?? now;
     const batchSize = Math.max(1, Math.min(options.batchSize ?? 25, 250));
 
-    const tasks = gate.shouldSkip
-      ? await this.listStaleCatalogSyncTasks({ region, assetType }, targetTradingDate, batchSize)
+    const repositoryAny = this.repository as any;
+    const canListStaleTasks = typeof repositoryAny.listStaleActiveStockSyncTasks === 'function';
+    const officialBulkEnabled = this.officialNseEodBulkEnabled();
+    const staleTasksForOfficial = officialBulkEnabled && canListStaleTasks
+      ? await this.listStaleCatalogSyncTasks({ region, assetType }, targetTradingDate, undefined)
+      : [];
+    const providerTasks = gate.shouldSkip
+      ? (staleTasksForOfficial.length > 0
+        ? staleTasksForOfficial.slice(0, batchSize)
+        : await this.listStaleCatalogSyncTasks({ region, assetType }, targetTradingDate, batchSize))
       : await this.repository.listActiveStockSyncTasks({ region, assetType }, batchSize);
+    const officialTasks = staleTasksForOfficial.length > 0 ? staleTasksForOfficial : providerTasks;
     const summary: ScheduledRegionSyncSummary = {
       region,
       assetType,
@@ -3765,7 +3827,7 @@ export class MarketDataFoundationService {
       region,
       assetType,
       targetTradingDate,
-      tasks,
+      tasks: officialTasks,
     });
     summary.officialEodBulk = officialBulk.evidence;
     for (const taskId of officialBulk.matchedTaskIds) {
@@ -3789,7 +3851,7 @@ export class MarketDataFoundationService {
       summary.warnings.push(`Official NSE EOD bulk fallback: ${officialBulk.evidence.fallbackReason}`);
     }
 
-    for (const task of tasks) {
+    for (const task of providerTasks) {
       if (officialBulk.matchedTaskIds.has(task.id)) continue;
       try {
         await this.throttleIngestion(250);
@@ -3938,6 +4000,8 @@ export class MarketDataFoundationService {
         }
       }
 
+      const matchedRows: Array<{ task: StockSyncTask; price: HistoricalPrice }> = [];
+      const regionInfoBySymbol = new Map<string, PriceRegionInfo>();
       for (const task of input.tasks) {
         if (!this.canUseOfficialNseEodForTask(task)) continue;
 
@@ -3951,22 +4015,42 @@ export class MarketDataFoundationService {
         }
         if (!matched) continue;
 
-        try {
-          const taskSummary = await this.storeHistorical([{
+        matchedRows.push({
+          task,
+          price: {
             ...matched,
             symbol: task.symbol,
             date: this.startOfUtcDay(matched.date),
-          }]);
-          result.matchedTaskIds.add(task.id);
-          result.summaryByTaskId.set(task.id, taskSummary);
-          evidence.matchedInstruments += 1;
-          evidence.rowsInserted += taskSummary.rowsInserted || 0;
-          evidence.rowsUpdated += taskSummary.rowsUpdated || 0;
-          evidence.rowsNoOp += taskSummary.rowsNoOp || 0;
-          await this.repository.updateStockLoadTimestampBySymbol(task.symbol).catch(() => null);
+          },
+        });
+        regionInfoBySymbol.set(task.symbol, this.taskPriceRegionInfo(input.region, task));
+      }
+
+      if (matchedRows.length > 0) {
+        try {
+          const bulkSummary = await this.storeHistoricalBulk(
+            matchedRows.map((row) => row.price),
+            regionInfoBySymbol
+          );
+          const matchedSymbols: string[] = [];
+          for (const row of matchedRows) {
+            const taskSummary = bulkSummary.summaryBySymbol.get(row.task.symbol);
+            if (!taskSummary) {
+              evidence.warnings.push(`${row.task.symbol}: official EOD row matched but no storage summary was returned.`);
+              continue;
+            }
+            result.matchedTaskIds.add(row.task.id);
+            result.summaryByTaskId.set(row.task.id, taskSummary);
+            evidence.matchedInstruments += 1;
+            evidence.rowsInserted += taskSummary.rowsInserted || 0;
+            evidence.rowsUpdated += taskSummary.rowsUpdated || 0;
+            evidence.rowsNoOp += taskSummary.rowsNoOp || 0;
+            matchedSymbols.push(row.task.symbol);
+          }
+          await this.updateStockLoadTimestampsForSymbols(matchedSymbols);
         } catch (error) {
           const message = error instanceof Error ? error.message : 'unknown storage error';
-          evidence.warnings.push(`${task.symbol}: official EOD row matched but store failed (${message}).`);
+          evidence.warnings.push(`Official EOD bulk store failed for ${matchedRows.length} matched rows (${message}).`);
         }
       }
 
@@ -3983,6 +4067,34 @@ export class MarketDataFoundationService {
     }
 
     return result;
+  }
+
+  private taskPriceRegionInfo(defaultRegion: string, task: StockSyncTask): PriceRegionInfo {
+    const exchange = this.trimmedUpper(task.exchange);
+    if (defaultRegion === 'IN' && (this.isNseLikeExchange(exchange || '') || this.hasExplicitExchangeSuffix(task.providerSymbol, '.NS') || this.hasExplicitExchangeSuffix(task.symbol, '.NS'))) {
+      return { region: 'IN', exchange: 'NSE' };
+    }
+    if (defaultRegion === 'IN' && (exchange === 'BSE' || this.hasExplicitExchangeSuffix(task.providerSymbol, '.BO') || this.hasExplicitExchangeSuffix(task.symbol, '.BO'))) {
+      return { region: 'IN', exchange: 'BSE' };
+    }
+    return { region: defaultRegion, exchange: exchange || null };
+  }
+
+  private async updateStockLoadTimestampsForSymbols(symbols: string[]): Promise<void> {
+    const uniqueSymbols = [...new Set(symbols.filter(Boolean))];
+    if (uniqueSymbols.length === 0) return;
+    const repository = this.repository as any;
+    if (typeof repository.updateStockLoadTimestampBySymbols === 'function') {
+      try {
+        await repository.updateStockLoadTimestampBySymbols(uniqueSymbols);
+        return;
+      } catch {
+        // Fall through to per-symbol compatibility path for older repository doubles.
+      }
+    }
+    await Promise.all(uniqueSymbols.map((symbol) =>
+      this.repository.updateStockLoadTimestampBySymbol(symbol).catch(() => null)
+    ));
   }
 
   private officialNseEodBulkEnabled(): boolean {
@@ -4669,6 +4781,8 @@ export class MarketDataFoundationService {
         }
       }
 
+      await this.applyOfficialEodBulkForCatalogRun(run);
+
       while (run.batchesExecuted < run.maxBatches) {
         if (run.cancelRequested) {
           run.status = 'CANCELED';
@@ -4740,8 +4854,8 @@ export class MarketDataFoundationService {
         }
       }
 
-      run.status = 'PARTIAL';
       run.hasMore = run.processedCount < run.totalCount;
+      run.status = run.hasMore || run.failedCount > 0 ? 'PARTIAL' : 'COMPLETED';
       run.message = run.hasMore
         ? 'Catalog sync reached the maximum batch limit. More eligible rows remain.'
         : 'Catalog sync completed within the maximum batch limit.';
@@ -4758,6 +4872,58 @@ export class MarketDataFoundationService {
       await this.persistCatalogSyncRunState(run, 'FAILED', new Date()).catch(() => null);
       this.completeCatalogSyncRun(run);
     }
+  }
+
+  private async applyOfficialEodBulkForCatalogRun(run: CatalogSyncRunRecord): Promise<void> {
+    if (run.force || run.fullReload) return;
+    if (!this.officialNseEodBulkEnabled()) return;
+    const tasks = await this.listStaleCatalogSyncTasks(
+      { region: run.region, assetType: run.assetType },
+      run.targetTradingDate,
+      undefined,
+      Array.from(run.processedTaskIds)
+    );
+    if (tasks.length === 0) return;
+
+    run.currentBatchNumber = run.batchesExecuted + 1;
+    run.message = `Processing official NSE EOD bulk file for ${tasks.length} stale instruments.`;
+    this.touchCatalogSyncRun(run);
+
+    const officialBulk = await this.tryOfficialNseEodBulkLatestCandle({
+      region: run.region,
+      assetType: run.assetType,
+      targetTradingDate: run.targetTradingDate,
+      tasks,
+    });
+    for (const warning of officialBulk.evidence.warnings || []) {
+      this.addCatalogSyncWarning(run, warning);
+    }
+    if (officialBulk.evidence.fallbackReason && !['OFFICIAL_EOD_DISABLED', 'OFFICIAL_EOD_NO_TASKS'].includes(officialBulk.evidence.fallbackReason)) {
+      this.addCatalogSyncWarning(run, `Official NSE EOD bulk fallback: ${officialBulk.evidence.fallbackReason}`);
+    }
+    if (officialBulk.matchedTaskIds.size === 0) return;
+
+    const byId = new Map(tasks.map((task) => [task.id, task]));
+    const results: Array<{ task: StockSyncTask; success: boolean; summary?: SyncSummary; message: string }> = [];
+    for (const taskId of officialBulk.matchedTaskIds) {
+      const task = byId.get(taskId);
+      const summary = officialBulk.summaryByTaskId.get(taskId);
+      if (!task || !summary) continue;
+      run.processedTaskIds.add(task.id);
+      results.push({
+        task,
+        success: true,
+        summary,
+        message: `Official NSE EOD bulk sync completed: ${summary.rowsInserted} inserted, ${summary.rowsUpdated} updated, ${summary.rowsNoOp || 0} no-op`,
+      });
+    }
+    if (results.length === 0) return;
+
+    run.batchesExecuted += 1;
+    this.applyCatalogSyncBatchResults(run, results);
+    run.hasMore = run.processedCount < run.totalCount;
+    run.percentComplete = this.catalogSyncPercent(run);
+    this.touchCatalogSyncRun(run);
   }
 
   private async processCatalogSyncBatch(run: CatalogSyncRunRecord, tasks: StockSyncTask[]) {
@@ -4924,7 +5090,7 @@ export class MarketDataFoundationService {
   private async listStaleCatalogSyncTasks(
     options: Pick<PaginationOptions, 'region' | 'assetType'>,
     targetTradingDate: string,
-    batchSize: number,
+    batchSize?: number,
     excludeIds: string[] = []
   ): Promise<StockSyncTask[]> {
     const repository = this.repository as any;
@@ -8484,12 +8650,14 @@ export class MarketDataFoundationService {
     policy: MarketDataRepairRequest['policy'];
     scope: { region: string; assetType: string };
     targetTradingDate: string;
+    candidates: PriceBackfillCandidate[];
     page: PriceBackfillCandidate[];
     summary: MarketDataRepairSummary;
   }): Promise<PriceBackfillCandidate[]> {
     if (input.policy !== 'INCREMENTAL_LATEST_ONLY' || input.page.length === 0) return input.page;
 
-    const tasks = input.page.map((candidate) => this.priceBackfillCandidateTask(candidate));
+    const officialCandidates = input.candidates.length > 0 ? input.candidates : input.page;
+    const tasks = officialCandidates.map((candidate) => this.priceBackfillCandidateTask(candidate));
     const officialBulk = await this.tryOfficialNseEodBulkLatestCandle({
       region: input.scope.region,
       assetType: input.scope.assetType,
@@ -8509,7 +8677,7 @@ export class MarketDataFoundationService {
 
     if (officialBulk.matchedTaskIds.size === 0) return input.page;
 
-    const byId = new Map(input.page.map((candidate) => [String(candidate.stock.id), candidate]));
+    const byId = new Map(officialCandidates.map((candidate) => [String(candidate.stock.id), candidate]));
     for (const taskId of officialBulk.matchedTaskIds) {
       const candidate = byId.get(taskId);
       const taskSummary = officialBulk.summaryByTaskId.get(taskId);

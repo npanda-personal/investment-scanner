@@ -444,7 +444,7 @@ Scheduler decision states:
 
 ### Scheduled Sync Behavior
 
-Scheduled sync is incremental only. It processes a bounded batch of active instruments for the configured region and asset type, using a recent lookback rather than the 15-year manual backfill path.
+Scheduled sync is incremental only. For `IN/STOCK`, latest completed daily candles are date-first: the service attempts the official NSE EOD bulk file for the full stale latest-candle queue before it starts the bounded per-symbol provider fallback. This keeps the normal daily update path tied to one exchange file instead of one historical-provider request per stock. Non-IN/STOCK scopes and unmatched instruments still use the bounded provider loop with a recent lookback rather than the 15-year manual backfill path.
 
 For scheduled `IN/STOCK` runs, the service first attempts one official NSE security bhavdata CSV for the latest completed trading date, parses it once, and matches only tasks that are safely NSE-identified. Official matching is allowed when the task exchange is NSE-like or symbol identity explicitly proves `.NS`; it is skipped for BSE/non-NSE exchange values, any `.BO` symbol evidence, and ambiguous tasks without explicit NSE evidence. Eligible tasks are matched by canonical/provider/source/display symbol aliases and stored under canonical local symbols with existing idempotent `PriceTick` semantics. Unmatched, skipped, disabled, or unavailable official-path rows fall back to the existing per-symbol provider loop. The scheduled summary stores official-path evidence (`sourceName`, `sourceUrl`, `sourceFingerprint`, row counts, matched count, stored counts, fallback reason).
 
@@ -465,7 +465,7 @@ Price backfill visibility:
 - startup price backfill remains owned by Market Data Foundation and continues to use the existing module-local run state;
 - startup price backfill uses `INCREMENTAL_LATEST_ONLY` policy with a default maximum of five batches, so server startup does not launch a broad historical/deep repair run when latest EOD is already current;
 - background/manual price-backfill runs carry their policy into every worker batch; the UI starts ordinary price maintenance as `INCREMENTAL_LATEST_ONLY`, `maxBatches=3`, and `workerConcurrency=1`;
-- latest-only `IN/STOCK` backfill attempts the official NSE EOD bulk file once per batch before falling back unmatched instruments to per-symbol provider calls;
+- latest-only `IN/STOCK` backfill attempts the official NSE EOD bulk file once for the full current stale queue before falling back unmatched instruments from the bounded batch to per-symbol provider calls;
 - historical/deep repair remains available through the module-owned repair/backfill path, but it is not allowed to block the 15-minute latest-candle scheduler;
 - each price-backfill run mirrors its current progress into the Pipeline Orchestration ledger as stage `MARKET_DATA`;
 - terminal price-backfill snapshots include the processed instrument ids so Pipeline Orchestration can start downstream Data Quality and the subsequent DB-only stages without another manual click;

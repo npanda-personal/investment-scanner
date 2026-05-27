@@ -30,6 +30,11 @@ const MARKET_MOVER_BASE_WINDOW_DAYS = 14;
 const MARKET_MOVER_MIN_PRICE = 10;
 const MARKET_MOVER_MIN_RECENT_TURNOVER = 1_000_000;
 
+type PriceRegionInfo = { region?: string | null; exchange?: string | null };
+type HistoricalBulkStoreSummary = SyncSummary & {
+  summaryBySymbol: Map<string, SyncSummary>;
+};
+
 export class MarketDataFoundationRepository {
   constructor(public readonly prisma: PrismaClient = defaultPrisma) {}
 
@@ -478,6 +483,15 @@ export class MarketDataFoundationRepository {
   updateStockLoadTimestampBySymbol(symbol: string, timestamp = new Date()) {
     return this.prisma.stock.update({
       where: { symbol },
+      data: { lastSuccessfulDataLoadTimestamp: timestamp },
+    });
+  }
+
+  updateStockLoadTimestampBySymbols(symbols: string[], timestamp = new Date()) {
+    const uniqueSymbols = [...new Set(symbols.map((symbol) => symbol.trim()).filter(Boolean))];
+    if (uniqueSymbols.length === 0) return Promise.resolve({ count: 0 });
+    return this.prisma.stock.updateMany({
+      where: { symbol: { in: uniqueSymbols } },
       data: { lastSuccessfulDataLoadTimestamp: timestamp },
     });
   }
@@ -1558,7 +1572,8 @@ export class MarketDataFoundationRepository {
 
   async storeHistorical(
     prices: HistoricalPrice[],
-    inferRegion: YahooFinanceIngestionService['inferRegion']
+    inferRegion: YahooFinanceIngestionService['inferRegion'],
+    regionInfoBySymbol: Map<string, PriceRegionInfo> = new Map()
   ): Promise<SyncSummary> {
     const rowsReceived = prices.length;
     const validation = partitionHistoricalPrices(prices);
@@ -1585,7 +1600,7 @@ export class MarketDataFoundationRepository {
 
     prices = prices.map((price) => ({ ...price, date: this.normalizeUtcDay(price.date) }));
 
-    const regionInfo = inferRegion(prices[0].symbol);
+    const regionInfo = regionInfoBySymbol.get(prices[0].symbol) ?? inferRegion(prices[0].symbol);
     const latest = prices.reduce((prev, current) =>
       prev.date > current.date ? prev : current
     );
@@ -1697,6 +1712,173 @@ export class MarketDataFoundationRepository {
       duplicateProviderRowsSkipped,
       warningCount: warnings.length,
       warnings: warnings.slice(0, 10),
+    };
+  }
+
+  async storeHistoricalBulk(
+    prices: HistoricalPrice[],
+    inferRegion: YahooFinanceIngestionService['inferRegion'],
+    regionInfoBySymbol: Map<string, PriceRegionInfo> = new Map()
+  ): Promise<HistoricalBulkStoreSummary> {
+    const rowsReceived = prices.length;
+    const receivedBySymbol = new Map<string, number>();
+    for (const price of prices) {
+      receivedBySymbol.set(price.symbol, (receivedBySymbol.get(price.symbol) || 0) + 1);
+    }
+
+    const validation = partitionHistoricalPrices(prices);
+    const duplicateProviderRowsSkipped = (validation as any).duplicateProviderRowsSkipped || 0;
+    const warningBySymbol = new Map<string, string[]>();
+    for (const invalid of validation.invalid) {
+      const symbol = (invalid.item as HistoricalPrice)?.symbol || 'UNKNOWN';
+      const warnings = invalid.errors.map((error) => `${symbol}: ${error}`);
+      warningBySymbol.set(symbol, [...(warningBySymbol.get(symbol) || []), ...warnings]);
+    }
+    if (validation.invalid.length > 0) {
+      console.warn(`Skipped ${validation.invalid.length} malformed historical price rows before bulk storage`);
+    }
+
+    const validPrices = validation.valid.map((price) => ({ ...price, date: this.normalizeUtcDay(price.date) }));
+    const summaryBySymbol = new Map<string, SyncSummary>();
+    const symbols = [...new Set([
+      ...Array.from(receivedBySymbol.keys()),
+      ...validPrices.map((price) => price.symbol),
+    ])];
+
+    if (validPrices.length === 0) {
+      const warnings = Array.from(warningBySymbol.values()).flat();
+      for (const symbol of symbols) {
+        const symbolWarnings = warningBySymbol.get(symbol) || [];
+        summaryBySymbol.set(symbol, {
+          rowsReceived: receivedBySymbol.get(symbol) || 0,
+          rowsInserted: 0,
+          rowsUpdated: 0,
+          rowsSkipped: symbolWarnings.length > 0 ? 1 : 0,
+          rowsNoOp: 0,
+          duplicateProviderRowsSkipped,
+          warningCount: symbolWarnings.length,
+          warnings: symbolWarnings.slice(0, 10),
+        });
+      }
+      return {
+        rowsReceived,
+        rowsInserted: 0,
+        rowsUpdated: 0,
+        rowsSkipped: validation.invalid.length,
+        rowsNoOp: 0,
+        duplicateProviderRowsSkipped,
+        warningCount: warnings.length,
+        warnings: warnings.slice(0, 10),
+        summaryBySymbol,
+      };
+    }
+
+    const validSymbols = [...new Set(validPrices.map((price) => price.symbol))];
+    const validDates = [...new Set(validPrices.map((price) => price.date.toISOString()))].map((date) => new Date(date));
+    const existingRows = await this.prisma.priceTick.findMany({
+      where: {
+        symbol: { in: validSymbols },
+        timestamp: { in: validDates },
+      },
+      select: { symbol: true, timestamp: true, open: true, high: true, low: true, close: true, adjustedClose: true, volume: true, source: true },
+    });
+    const existingByKey = new Map(existingRows.map((row) => [this.priceStorageKey(row.symbol, row.timestamp), row]));
+    const rowsToInsert = validPrices.filter((price) => !existingByKey.has(this.priceStorageKey(price.symbol, price.date)));
+    const rowsToUpdate = validPrices.filter((price) => {
+      const existing = existingByKey.get(this.priceStorageKey(price.symbol, price.date));
+      return existing ? !this.sameDailyCandle(existing, price) : false;
+    });
+    const rowsNoOp = validPrices.length - rowsToInsert.length - rowsToUpdate.length;
+    const latestBySymbol = this.latestHistoricalPriceBySymbol(validPrices);
+
+    console.log(`  Bulk storing ${validPrices.length} price ticks across ${validSymbols.length} symbols...`);
+
+    await this.prisma.$transaction(async (tx: any) => {
+      const batchSize = 1000;
+      for (let i = 0; i < rowsToInsert.length; i += batchSize) {
+        const batch = rowsToInsert.slice(i, i + batchSize);
+        await tx.priceTick.createMany({
+          data: batch.map((price) => this.priceTickCreateData(price, regionInfoBySymbol.get(price.symbol) ?? inferRegion(price.symbol))),
+          skipDuplicates: true,
+        });
+      }
+
+      for (let i = 0; i < rowsToUpdate.length; i += batchSize) {
+        const batch = rowsToUpdate.slice(i, i + batchSize);
+        await Promise.all(batch.map((price) => {
+          const regionInfo = regionInfoBySymbol.get(price.symbol) ?? inferRegion(price.symbol);
+          return tx.priceTick.update({
+            where: {
+              symbol_timestamp: {
+                symbol: price.symbol,
+                timestamp: price.date,
+              },
+            },
+            data: this.priceTickUpdateData(price, regionInfo),
+          });
+        }));
+      }
+
+      const latestEntries = Array.from(latestBySymbol.entries());
+      for (let i = 0; i < latestEntries.length; i += 500) {
+        const batch = latestEntries.slice(i, i + 500);
+        await Promise.all(batch.map(([symbol, latest]) => {
+          const regionInfo = regionInfoBySymbol.get(symbol) ?? inferRegion(symbol);
+          return tx.latestPrice.upsert({
+            where: { symbol },
+            update: {
+              region: regionInfo.region,
+              price: new Prisma.Decimal(latest.close),
+              timestamp: latest.date,
+              updatedAt: new Date(),
+            },
+            create: {
+              symbol,
+              region: regionInfo.region,
+              price: new Prisma.Decimal(latest.close),
+              timestamp: latest.date,
+              updatedAt: new Date(),
+            },
+          });
+        }));
+      }
+    }, {
+      maxWait: 30000,
+      timeout: 120000,
+    });
+
+    const insertedBySymbol = this.countPricesBySymbol(rowsToInsert);
+    const updatedBySymbol = this.countPricesBySymbol(rowsToUpdate);
+    const validBySymbol = this.countPricesBySymbol(validPrices);
+    for (const symbol of symbols) {
+      const symbolWarnings = warningBySymbol.get(symbol) || [];
+      const validCount = validBySymbol.get(symbol) || 0;
+      const inserted = insertedBySymbol.get(symbol) || 0;
+      const updated = updatedBySymbol.get(symbol) || 0;
+      summaryBySymbol.set(symbol, {
+        rowsReceived: receivedBySymbol.get(symbol) || validCount,
+        rowsInserted: inserted,
+        rowsUpdated: updated,
+        rowsSkipped: symbolWarnings.length > 0 ? 1 : 0,
+        rowsNoOp: Math.max(0, validCount - inserted - updated),
+        duplicateProviderRowsSkipped,
+        warningCount: symbolWarnings.length,
+        warnings: symbolWarnings.slice(0, 10),
+      });
+    }
+
+    const warnings = Array.from(warningBySymbol.values()).flat();
+    console.log(`  Successfully bulk stored ${validPrices.length} price ticks: ${rowsToInsert.length} inserted, ${rowsToUpdate.length} updated, ${rowsNoOp} no-op`);
+    return {
+      rowsReceived,
+      rowsInserted: rowsToInsert.length,
+      rowsUpdated: rowsToUpdate.length,
+      rowsSkipped: validation.invalid.length,
+      rowsNoOp,
+      duplicateProviderRowsSkipped,
+      warningCount: warnings.length,
+      warnings: warnings.slice(0, 10),
+      summaryBySymbol,
     };
   }
 
@@ -2069,6 +2251,63 @@ export class MarketDataFoundationRepository {
     if (value === null || value === undefined) return 'null';
     const numeric = Number(value);
     return Number.isFinite(numeric) ? numeric.toFixed(8).replace(/\.?0+$/, '') : String(value);
+  }
+
+  private priceStorageKey(symbol: string, timestamp: Date): string {
+    return `${symbol}|${timestamp.toISOString()}`;
+  }
+
+  private priceTickCreateData(price: HistoricalPrice, regionInfo: PriceRegionInfo) {
+    const source = price.source || 'yahoo';
+    return {
+      symbol: price.symbol,
+      region: regionInfo.region,
+      exchange: regionInfo.exchange ?? null,
+      timestamp: price.date,
+      open: new Prisma.Decimal(price.open),
+      high: new Prisma.Decimal(price.high),
+      low: new Prisma.Decimal(price.low),
+      close: new Prisma.Decimal(price.close),
+      adjustedClose: price.adjustedClose !== undefined && price.adjustedClose !== null ? new Prisma.Decimal(price.adjustedClose) : null,
+      volume: price.volume !== undefined && price.volume !== null ? BigInt(price.volume) : null,
+      source,
+      dataStatus: 'COMPLETE',
+    };
+  }
+
+  private priceTickUpdateData(price: HistoricalPrice, regionInfo: PriceRegionInfo) {
+    const source = price.source || 'yahoo';
+    return {
+      open: new Prisma.Decimal(price.open),
+      high: new Prisma.Decimal(price.high),
+      low: new Prisma.Decimal(price.low),
+      close: new Prisma.Decimal(price.close),
+      adjustedClose: price.adjustedClose !== undefined && price.adjustedClose !== null ? new Prisma.Decimal(price.adjustedClose) : null,
+      volume: price.volume !== undefined && price.volume !== null ? BigInt(price.volume) : null,
+      source,
+      region: regionInfo.region,
+      exchange: regionInfo.exchange ?? null,
+      dataStatus: 'COMPLETE',
+    };
+  }
+
+  private latestHistoricalPriceBySymbol(prices: HistoricalPrice[]): Map<string, HistoricalPrice> {
+    const latestBySymbol = new Map<string, HistoricalPrice>();
+    for (const price of prices) {
+      const current = latestBySymbol.get(price.symbol);
+      if (!current || current.date < price.date) {
+        latestBySymbol.set(price.symbol, price);
+      }
+    }
+    return latestBySymbol;
+  }
+
+  private countPricesBySymbol(prices: HistoricalPrice[]): Map<string, number> {
+    const counts = new Map<string, number>();
+    for (const price of prices) {
+      counts.set(price.symbol, (counts.get(price.symbol) || 0) + 1);
+    }
+    return counts;
   }
 
   private sameDailyCandle(existing: any, price: HistoricalPrice): boolean {
