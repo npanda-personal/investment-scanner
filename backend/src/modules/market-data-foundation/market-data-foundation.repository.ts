@@ -26,6 +26,10 @@ import { normalizeMarketRegion, resolveMarketRegionFilter } from '../../shared/u
 import { knownNseFnoStockUnderlyingSymbols } from './market-data-foundation.fno-underlyings';
 import { STANDARD_REVIEW_MIN_BARS, type UniversePriceStats } from './market-data-foundation.universe';
 
+const MARKET_MOVER_BASE_WINDOW_DAYS = 14;
+const MARKET_MOVER_MIN_PRICE = 10;
+const MARKET_MOVER_MIN_RECENT_TURNOVER = 1_000_000;
+
 export class MarketDataFoundationRepository {
   constructor(public readonly prisma: PrismaClient = defaultPrisma) {}
 
@@ -638,9 +642,12 @@ export class MarketDataFoundationRepository {
 
   async marketMoversForRange(
     lookbackDays: number,
-    options: Pick<PaginationOptions, 'region' | 'assetType'> & { limit?: number } = {},
+    options: Pick<PaginationOptions, 'region' | 'assetType'> & { limit?: number; minHistoryBars?: number; maxAbsReturn?: number; recentBars?: number } = {},
   ): Promise<MarketMoverRow[]> {
     const rowLimit = Math.max(1, Math.min(options.limit ?? 25, 100));
+    const minHistoryBars = Math.max(2, Math.min(options.minHistoryBars ?? 20, 260));
+    const maxAbsReturn = Math.max(0.1, Math.min(options.maxAbsReturn ?? 1000, 1000));
+    const recentBars = Math.max(2, Math.min(options.recentBars ?? 20, minHistoryBars));
     const rows = await this.prisma.$queryRaw<Array<{
       instrumentId: string;
       symbol: string;
@@ -651,47 +658,125 @@ export class MarketDataFoundationRepository {
       baseDate: Date;
       baseClose: Prisma.Decimal | number | string;
       returnPercent: Prisma.Decimal | number | string;
+      priceBasis: string;
+      latestSource: string | null;
+      baseSource: string | null;
+      actualLookbackDays: Prisma.Decimal | number | string;
+      historyBarsInWindow: number;
+      averageRecentTurnover: Prisma.Decimal | number | string | null;
     }>>(Prisma.sql`
+      WITH scoped_stocks AS (
+        SELECT stocks.*
+        FROM stocks
+        WHERE ${this.scopedStockSqlWhere(options)}
+          AND stocks."isActive" = TRUE
+          AND stocks."isDelisted" = FALSE
+          AND UPPER(COALESCE(stocks."providerSupportStatus", 'UNSUPPORTED')) = 'SUPPORTED'
+      ),
+      eligible AS (
+        SELECT
+          stocks.id AS "instrumentId",
+          stocks.symbol,
+          stocks.name AS "companyName",
+          stocks.sector,
+          latest_prices.timestamp AS "latestDate",
+          latest_prices.price AS "latestClose",
+          base_prices.timestamp AS "baseDate",
+          base_prices.price AS "baseClose",
+          ((latest_prices.price - base_prices.price) / base_prices.price) AS "returnPercent",
+          CASE WHEN latest_prices.has_adjusted THEN 'ADJUSTED_CLOSE' ELSE 'CLOSE_FALLBACK' END AS "priceBasis",
+          latest_prices.source AS "latestSource",
+          base_prices.source AS "baseSource",
+          EXTRACT(EPOCH FROM (latest_prices.timestamp - base_prices.timestamp)) / 86400.0 AS "actualLookbackDays",
+          recent_liquidity.recent_bars AS "historyBarsInWindow",
+          recent_liquidity.average_turnover AS "averageRecentTurnover"
+        FROM scoped_stocks stocks
+        CROSS JOIN LATERAL (
+          SELECT COALESCE(NULLIF(stocks."providerSymbol", ''), NULLIF(stocks.symbol, '')) AS price_symbol
+        ) price_identity
+        INNER JOIN LATERAL (
+          SELECT
+            price_ticks.timestamp,
+            COALESCE(price_ticks."adjustedClose", price_ticks.close) AS price,
+            price_ticks."adjustedClose" IS NOT NULL AS has_adjusted,
+            price_ticks.source
+          FROM price_ticks
+          WHERE price_ticks.symbol = price_identity.price_symbol
+            AND UPPER(COALESCE(price_ticks."dataStatus", 'COMPLETE')) = 'COMPLETE'
+            AND COALESCE(price_ticks."adjustedClose", price_ticks.close) >= ${MARKET_MOVER_MIN_PRICE}
+          ORDER BY price_ticks.timestamp DESC
+          LIMIT 1
+        ) latest_prices ON TRUE
+        INNER JOIN LATERAL (
+          SELECT
+            price_ticks.timestamp,
+            COALESCE(price_ticks."adjustedClose", price_ticks.close) AS price,
+            price_ticks."adjustedClose" IS NOT NULL AS has_adjusted,
+            price_ticks.source
+          FROM price_ticks
+          WHERE price_ticks.symbol = price_identity.price_symbol
+            AND price_ticks.timestamp <= latest_prices.timestamp - (${lookbackDays}::int * INTERVAL '1 day')
+            AND price_ticks.timestamp >= latest_prices.timestamp - ((${lookbackDays}::int + ${MARKET_MOVER_BASE_WINDOW_DAYS}::int) * INTERVAL '1 day')
+            AND UPPER(COALESCE(price_ticks."dataStatus", 'COMPLETE')) = 'COMPLETE'
+            AND COALESCE(price_ticks."adjustedClose", price_ticks.close) >= ${MARKET_MOVER_MIN_PRICE}
+          ORDER BY price_ticks.timestamp DESC
+          LIMIT 1
+        ) base_prices ON TRUE
+        INNER JOIN LATERAL (
+          SELECT
+            COUNT(*)::int AS recent_bars,
+            AVG(COALESCE(recent_rows.volume, 0)::numeric * recent_rows.price) AS average_turnover,
+            MIN(COALESCE(recent_rows.volume, 0)) AS min_volume
+          FROM (
+            SELECT
+              price_ticks.volume,
+              COALESCE(price_ticks."adjustedClose", price_ticks.close) AS price
+            FROM price_ticks
+            WHERE price_ticks.symbol = price_identity.price_symbol
+              AND price_ticks.timestamp <= latest_prices.timestamp
+              AND UPPER(COALESCE(price_ticks."dataStatus", 'COMPLETE')) = 'COMPLETE'
+              AND COALESCE(price_ticks."adjustedClose", price_ticks.close) >= ${MARKET_MOVER_MIN_PRICE}
+            ORDER BY price_ticks.timestamp DESC
+            LIMIT ${recentBars}
+          ) recent_rows
+        ) recent_liquidity ON TRUE
+        WHERE base_prices.price >= ${MARKET_MOVER_MIN_PRICE}
+          AND latest_prices.price >= ${MARKET_MOVER_MIN_PRICE}
+          AND price_identity.price_symbol IS NOT NULL
+          AND latest_prices.has_adjusted = base_prices.has_adjusted
+          AND recent_liquidity.recent_bars >= ${recentBars}
+          AND COALESCE(recent_liquidity.min_volume, 0) > 0
+          AND COALESCE(recent_liquidity.average_turnover, 0) >= ${MARKET_MOVER_MIN_RECENT_TURNOVER}
+      ),
+      ranked AS (
+        SELECT
+          eligible.*,
+          ROW_NUMBER() OVER (ORDER BY eligible."returnPercent" DESC) AS gainer_rank,
+          ROW_NUMBER() OVER (ORDER BY eligible."returnPercent" ASC) AS loser_rank
+        FROM eligible
+        WHERE ABS(eligible."returnPercent") <= ${maxAbsReturn}
+          AND eligible."returnPercent" > -0.95
+      )
       SELECT
-        stocks.id AS "instrumentId",
-        stocks.symbol,
-        stocks.name AS "companyName",
-        stocks.sector,
-        latest_prices.timestamp AS "latestDate",
-        latest_prices.price AS "latestClose",
-        base_prices.timestamp AS "baseDate",
-        base_prices.price AS "baseClose",
-        ((latest_prices.price - base_prices.price) / base_prices.price) AS "returnPercent"
-      FROM stocks
-      INNER JOIN LATERAL (
-        SELECT
-          price_ticks.timestamp,
-          COALESCE(price_ticks."adjustedClose", price_ticks.close) AS price
-        FROM price_ticks
-        WHERE price_ticks.symbol = stocks.symbol
-          AND UPPER(COALESCE(price_ticks."dataStatus", 'COMPLETE')) <> 'ERROR'
-          AND COALESCE(price_ticks."adjustedClose", price_ticks.close) > 0
-        ORDER BY price_ticks.timestamp DESC
-        LIMIT 1
-      ) latest_prices ON TRUE
-      INNER JOIN LATERAL (
-        SELECT
-          price_ticks.timestamp,
-          COALESCE(price_ticks."adjustedClose", price_ticks.close) AS price
-        FROM price_ticks
-        WHERE price_ticks.symbol = stocks.symbol
-          AND price_ticks.timestamp <= latest_prices.timestamp - (${lookbackDays}::int * INTERVAL '1 day')
-          AND UPPER(COALESCE(price_ticks."dataStatus", 'COMPLETE')) <> 'ERROR'
-          AND COALESCE(price_ticks."adjustedClose", price_ticks.close) > 0
-        ORDER BY price_ticks.timestamp DESC
-        LIMIT 1
-      ) base_prices ON TRUE
-      WHERE ${this.scopedStockSqlWhere(options)}
-        AND stocks."isActive" = TRUE
-        AND stocks."isDelisted" = FALSE
-        AND base_prices.price > 0
-      ORDER BY ABS((latest_prices.price - base_prices.price) / base_prices.price) DESC
-      LIMIT ${rowLimit * 8}
+        ranked."instrumentId",
+        ranked.symbol,
+        ranked."companyName",
+        ranked.sector,
+        ranked."latestDate",
+        ranked."latestClose",
+        ranked."baseDate",
+        ranked."baseClose",
+        ranked."returnPercent",
+        ranked."priceBasis",
+        ranked."latestSource",
+        ranked."baseSource",
+        ranked."actualLookbackDays",
+        ranked."historyBarsInWindow",
+        ranked."averageRecentTurnover"
+      FROM ranked
+      WHERE ranked.gainer_rank <= ${rowLimit}
+        OR ranked.loser_rank <= ${rowLimit}
+      ORDER BY ABS(ranked."returnPercent") DESC
     `);
 
     return rows.map((row) => ({
@@ -704,6 +789,12 @@ export class MarketDataFoundationRepository {
       baseDate: row.baseDate.toISOString(),
       baseClose: this.toNumber(row.baseClose),
       returnPercent: Number(this.toNumber(row.returnPercent).toFixed(6)),
+      priceBasis: row.priceBasis === 'ADJUSTED_CLOSE' ? 'ADJUSTED_CLOSE' : 'CLOSE_FALLBACK',
+      latestSource: row.latestSource,
+      baseSource: row.baseSource,
+      actualLookbackDays: Number(this.toNumber(row.actualLookbackDays).toFixed(1)),
+      historyBarsInWindow: Number(row.historyBarsInWindow || 0),
+      averageRecentTurnover: row.averageRecentTurnover == null ? null : Number(this.toNumber(row.averageRecentTurnover).toFixed(0)),
     }));
   }
 

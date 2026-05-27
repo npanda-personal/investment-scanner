@@ -105,6 +105,22 @@ const MARKET_MOVER_LOOKBACK_DAYS: Record<MarketMoverRange, number> = {
   '6M': 180,
   '1Y': 365,
 };
+const MARKET_MOVER_MIN_HISTORY_BARS: Record<MarketMoverRange, number> = {
+  '1D': 2,
+  '1W': 5,
+  '1M': 20,
+  '3M': 60,
+  '6M': 120,
+  '1Y': 240,
+};
+const MARKET_MOVER_MAX_ABS_RETURN: Record<MarketMoverRange, number> = {
+  '1D': 10,
+  '1W': 25,
+  '1M': 50,
+  '3M': 100,
+  '6M': 250,
+  '1Y': 1000,
+};
 
 type TrustedReviewUniverseOptions = Pick<PaginationOptions, 'region' | 'assetType'> & { now?: Date };
 type UniverseComputationSnapshot = {
@@ -550,7 +566,13 @@ export class MarketDataFoundationService {
       : (Object.keys(MARKET_MOVER_LOOKBACK_DAYS) as MarketMoverRange[]);
     const ranges = await Promise.all(
       requestedRanges.map(async (range): Promise<MarketMoverRangeSummary> => {
-        const rows = await this.repository.marketMoversForRange(MARKET_MOVER_LOOKBACK_DAYS[range], { ...scope, limit });
+        const rows = await this.repository.marketMoversForRange(MARKET_MOVER_LOOKBACK_DAYS[range], {
+          ...scope,
+          limit,
+          minHistoryBars: MARKET_MOVER_MIN_HISTORY_BARS[range],
+          maxAbsReturn: MARKET_MOVER_MAX_ABS_RETURN[range],
+          recentBars: Math.min(20, MARKET_MOVER_MIN_HISTORY_BARS[range]),
+        });
         const ordered = rows.filter((row) => Number.isFinite(row.returnPercent));
         const gainers = ordered
           .filter((row) => row.returnPercent > 0)
@@ -562,7 +584,7 @@ export class MarketDataFoundationService {
           .slice(0, limit);
         const warnings = rows.length === 0
           ? [`No priced stocks have enough ${range} history for movers in ${scope.region}/${scope.assetType}.`]
-          : [];
+          : ['Price movers use the provider-symbol price history and exclude unsupported instruments, insufficient liquidity/history, and mixed adjusted/close basis.'];
         return { range, gainers, losers, warnings };
       }),
     );

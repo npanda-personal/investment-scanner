@@ -217,6 +217,12 @@ export interface MarketMoverRow {
   baseDate: string;
   baseClose: number;
   returnPercent: number;
+  priceBasis?: 'ADJUSTED_CLOSE' | 'CLOSE_FALLBACK';
+  latestSource?: string | null;
+  baseSource?: string | null;
+  actualLookbackDays?: number;
+  historyBarsInWindow?: number;
+  averageRecentTurnover?: number | null;
 }
 
 export interface MarketMoverRangeSummary {

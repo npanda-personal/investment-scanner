@@ -21,6 +21,8 @@ export type DataTableColumn<T> = {
   label: string;
   align?: 'left' | 'right' | 'center';
   sortable?: boolean;
+  minWidth?: number;
+  maxWidth?: number;
   render: (row: T) => React.ReactNode;
 };
 
@@ -76,6 +78,10 @@ export function DataTable<T>({
             minWidth: 900,
             '& .MuiTableCell-root': {
               py: isCompact ? 1 : 1.35,
+              verticalAlign: 'middle',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
             },
             '& .MuiTableHead-root .MuiTableCell-root': {
               py: isCompact ? 1 : 1.25,
@@ -92,7 +98,7 @@ export function DataTable<T>({
           <TableHead>
             <TableRow>
               {columns.map((column) => (
-                <TableCell key={column.id} align={column.align}>
+                <TableCell key={column.id} align={column.align} sx={{ minWidth: column.minWidth, maxWidth: column.maxWidth ?? 260 }}>
                   {column.sortable && onSortChange ? (
                     <TableSortLabel
                       active={sortBy === column.id}
@@ -140,7 +146,24 @@ export function DataTable<T>({
                 }}
               >
                 {columns.map((column) => (
-                  <TableCell key={column.id} align={column.align}>{column.render(row)}</TableCell>
+                  <TableCell key={column.id} align={column.align} sx={{ minWidth: column.minWidth, maxWidth: column.maxWidth ?? 260 }}>
+                    <Box
+                      sx={{
+                        minWidth: 0,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        '& .MuiTypography-root': {
+                          minWidth: 0,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        },
+                      }}
+                    >
+                      {column.render(row)}
+                    </Box>
+                  </TableCell>
                 ))}
               </TableRow>
             ))}

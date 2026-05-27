@@ -86,23 +86,25 @@ export const ActivePositionsTable: React.FC<ActivePositionsTableProps> = ({
     {
       id: 'company',
       label: 'Stock',
+      minWidth: 190,
+      maxWidth: 260,
       render: (row) => (
-        <Stack spacing={0.25} sx={{ minWidth: 150, maxWidth: 190 }}>
-          <Tooltip title={row.companyName || row.symbol} arrow>
-            <Typography variant="body2" fontWeight={800} noWrap>{row.symbol}</Typography>
-          </Tooltip>
-          <Typography color="text.secondary" variant="caption" noWrap>{row.companyName || 'Company unavailable'}</Typography>
-        </Stack>
+        <Tooltip title={`${row.symbol} - ${row.companyName || 'Company unavailable'}`} arrow>
+          <Typography variant="body2" fontWeight={800} noWrap>
+            {row.symbol} - {row.companyName || 'Company unavailable'}
+          </Typography>
+        </Tooltip>
       ),
     },
     {
       id: 'entry',
       label: 'Trigger',
+      minWidth: 145,
+      maxWidth: 170,
       render: (row) => (
-        <Stack spacing={0.25} sx={{ minWidth: 120 }}>
-          <Typography variant="body2" fontWeight={700} noWrap>{formatDate(row.entryTriggerTimestamp)}</Typography>
-          <Typography color="text.secondary" variant="caption" noWrap>@ {formatPrice(row.entryTriggerPrice)}</Typography>
-        </Stack>
+        <Typography variant="body2" fontWeight={700} noWrap>
+          {formatDate(row.entryTriggerTimestamp)} @ {formatPrice(row.entryTriggerPrice)}
+        </Typography>
       ),
     },
     {
@@ -121,8 +123,10 @@ export const ActivePositionsTable: React.FC<ActivePositionsTableProps> = ({
     {
       id: 'quality',
       label: 'Evidence',
+      minWidth: 210,
+      maxWidth: 240,
       render: (row) => (
-        <Stack direction="row" spacing={0.5} sx={{ minWidth: 210 }}>
+        <Stack direction="row" spacing={0.5} sx={{ minWidth: 0, overflow: 'hidden' }}>
           <StatusBadge label={row.currentDataQualityStatus || 'DQ unavailable'} />
           <StatusBadge label={row.strategyRatingGrade ? `Grade ${row.strategyRatingGrade}` : 'Grade N/A'} />
         </Stack>
@@ -136,15 +140,14 @@ export const ActivePositionsTable: React.FC<ActivePositionsTableProps> = ({
     {
       id: 'strategy',
       label: 'Rule',
+      minWidth: 220,
+      maxWidth: 300,
       render: (row) => (
-        <Stack spacing={0.25} sx={{ minWidth: 170, maxWidth: 210 }}>
-          <Tooltip title={row.strategyId || 'Strategy unavailable'} arrow>
-            <Typography variant="body2" noWrap>{row.strategyId || 'Unavailable'}</Typography>
-          </Tooltip>
-          <Typography color="text.secondary" variant="caption" noWrap>
-            {row.entryRuleId || 'Entry rule unavailable'}
+        <Tooltip title={`${row.strategyId || 'Unavailable'} - ${row.entryRuleId || 'Entry rule unavailable'}`} arrow>
+          <Typography variant="body2" noWrap>
+            {row.strategyId || 'Unavailable'} - {row.entryRuleId || 'Entry rule unavailable'}
           </Typography>
-        </Stack>
+        </Tooltip>
       ),
     },
   ], []);

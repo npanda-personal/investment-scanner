@@ -35,7 +35,7 @@ import {
 } from '@mui/material';
 import type { ReactNode } from 'react';
 import { useEffect, useMemo, useState } from 'react';
-import { Link as RouterLink } from 'react-router-dom';
+import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { PageHeader } from '@/shared/components/PageHeader';
 import { useTodayReview } from '../hooks/useTodayReview';
 import type {
@@ -431,6 +431,7 @@ function downloadTodayReviewCsv(rows: TodayReviewCandidate[], tabLabel: string) 
 }
 
 function CandidateTable({ candidates }: { candidates: TodayReviewCandidate[] }) {
+  const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [gradeFilter, setGradeFilter] = useState('ALL');
   const [readinessFilter, setReadinessFilter] = useState('ALL');
@@ -485,6 +486,7 @@ function CandidateTable({ candidates }: { candidates: TodayReviewCandidate[] }) 
             to={`/today-review/candidates/${candidate.id}`}
             fontWeight={700}
             title={`${candidate.symbol} - ${candidate.companyName || 'Company unavailable'}`}
+            onClick={(event) => event.stopPropagation()}
             sx={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
           >
             {candidate.symbol}
@@ -820,7 +822,12 @@ function CandidateTable({ candidates }: { candidates: TodayReviewCandidate[] }) 
                 </TableCell>
               </TableRow>
             ) : pagedCandidates.map((candidate) => (
-              <TableRow key={candidate.id} hover>
+              <TableRow
+                key={candidate.id}
+                hover
+                onClick={() => navigate(`/today-review/candidates/${candidate.id}`)}
+                sx={{ cursor: 'pointer' }}
+              >
                 {columns.map((column) => (
                   <TableCell key={column.id} align={column.align}>{column.render(candidate)}</TableCell>
                 ))}

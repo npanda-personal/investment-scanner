@@ -82,10 +82,20 @@ export function DailyOverviewDashboardPage() {
 
   const moverSummary = marketMovers?.ranges.find((item) => item.range === moverRange) ?? null;
   const activeCandidateGroup = candidateSummaries[candidateGroup];
-  const hotStocks = useMemo(() => [
-    ...todayReviewGroups.bullishReview,
-    ...todayReviewGroups.bearishReview,
-  ].sort((left, right) => right.confidenceScore - left.confidenceScore).slice(0, 8), [todayReviewGroups]);
+  const hotStocks = useMemo(() => {
+    const candidateByInstrumentId = new Map(
+      [...todayReviewGroups.bullishReview, ...todayReviewGroups.bearishReview]
+        .map((item) => [item.instrumentId, item] as const),
+    );
+    return [...(moverSummary?.gainers ?? []), ...(moverSummary?.losers ?? [])]
+      .map((mover) => ({
+        mover,
+        candidate: candidateByInstrumentId.get(mover.instrumentId) ?? null,
+      }))
+      .filter((item) => item.candidate)
+      .sort((left, right) => Math.abs(right.mover.returnPercent) - Math.abs(left.mover.returnPercent))
+      .slice(0, 6);
+  }, [moverSummary?.gainers, moverSummary?.losers, todayReviewGroups.bearishReview, todayReviewGroups.bullishReview]);
 
   return (
     <Box className="page-container page-container--workspace">
@@ -135,7 +145,7 @@ export function DailyOverviewDashboardPage() {
             <Paper variant="outlined" sx={{ p: 2, height: '100%' }}>
               <Stack spacing={1.5}>
                 <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', md: 'center' }} gap={1}>
-                  <Typography variant="h6">Gainers And Losers</Typography>
+                  <Typography variant="h6">Market Price Movers</Typography>
                   <ToggleButtonGroup
                     value={moverRange}
                     exclusive
@@ -160,10 +170,10 @@ export function DailyOverviewDashboardPage() {
                 )}
                 <Grid container spacing={2}>
                   <Grid item xs={12} md={6}>
-                    <MoverList title={`Top ${moverRange} Gainers`} icon={<TrendingUpIcon color="success" />} rows={moverSummary?.gainers ?? []} tone="success.main" />
+                    <MoverList title={`Top ${moverRange} Price Gainers`} icon={<TrendingUpIcon color="success" />} rows={moverSummary?.gainers ?? []} tone="success.main" />
                   </Grid>
                   <Grid item xs={12} md={6}>
-                    <MoverList title={`Top ${moverRange} Losers`} icon={<TrendingDownIcon color="error" />} rows={moverSummary?.losers ?? []} tone="error.main" />
+                    <MoverList title={`Top ${moverRange} Price Losers`} icon={<TrendingDownIcon color="error" />} rows={moverSummary?.losers ?? []} tone="error.main" />
                   </Grid>
                 </Grid>
               </Stack>
@@ -232,10 +242,11 @@ export function DailyOverviewDashboardPage() {
                     {activeCandidateGroup.rows.slice(0, 8).map((row, index) => (
                       <Box key={row.id}>
                         <ListItem sx={{ py: 0.75, gap: 1.25 }}>
-                          <Box sx={{ minWidth: 90 }}>
-                            <Typography variant="body2" fontWeight={800} noWrap>{row.symbol}</Typography>
-                            <Typography variant="caption" color="text.secondary" noWrap>{row.subLabel}</Typography>
-                          </Box>
+                          <Tooltip title={`${row.symbol} - ${row.subLabel}`} arrow>
+                            <Typography variant="body2" fontWeight={800} noWrap sx={{ minWidth: 150, maxWidth: 220 }}>
+                              {row.symbol} - {row.subLabel}
+                            </Typography>
+                          </Tooltip>
                           <Tooltip title={row.reasonSummary} arrow>
                             <Typography variant="body2" color="text.secondary" noWrap sx={{ flex: 1 }}>
                               {row.reasonSummary}
@@ -254,22 +265,25 @@ export function DailyOverviewDashboardPage() {
           <Grid item xs={12} lg={5}>
             <Paper variant="outlined" sx={{ p: 2, height: '100%' }}>
               <Stack spacing={1.5}>
-                <Typography variant="h6">Hot Stocks</Typography>
+                <Typography variant="h6">Mover-Backed Signal Candidates</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Stocks where market movement overlaps with a current signal candidate.
+                </Typography>
                 {dashboard.critical.todayReview.loading && <LinearProgress />}
                 {!dashboard.critical.todayReview.loading && hotStocks.length === 0 && (
-                  <Alert severity="info">No high-confidence bullish or bearish candidates are available yet.</Alert>
+                  <Alert severity="info">No mover and signal-candidate overlap is available for {moverRange}.</Alert>
                 )}
                 <Grid container spacing={1}>
                   {hotStocks.map((item) => (
-                    <Grid key={item.id} item xs={12} sm={6}>
+                    <Grid key={`${item.mover.instrumentId}-${item.candidate?.id}`} item xs={12} sm={6}>
                       <Paper variant="outlined" sx={{ p: 1.25, height: '100%' }}>
                         <Stack spacing={0.5}>
                           <Stack direction="row" justifyContent="space-between" gap={1}>
-                            <Typography variant="body2" fontWeight={800} noWrap>{item.symbol}</Typography>
-                            <Chip size="small" label={item.direction} color={item.direction === 'LONG' ? 'success' : 'error'} variant="outlined" />
+                            <Typography variant="body2" fontWeight={800} noWrap>{item.mover.symbol}</Typography>
+                            <Chip size="small" label={formatPercent(item.mover.returnPercent)} color={item.mover.returnPercent >= 0 ? 'success' : 'error'} variant="outlined" />
                           </Stack>
-                          <Typography variant="caption" color="text.secondary" noWrap>{item.companyName || item.strategyCode}</Typography>
-                          <Typography variant="body2" fontWeight={700}>{item.grade} · {Math.round(item.confidenceScore)}</Typography>
+                          <Typography variant="caption" color="text.secondary" noWrap>{item.mover.companyName}</Typography>
+                          <Typography variant="body2" fontWeight={700}>{item.candidate?.grade} - {Math.round(item.candidate?.confidenceScore ?? 0)} - {item.candidate?.direction}</Typography>
                         </Stack>
                       </Paper>
                     </Grid>
@@ -314,10 +328,11 @@ function MoverList({ title, icon, rows, tone }: { title: string; icon: ReactNode
           {rows.map((row, index) => (
             <Box key={`${title}-${row.instrumentId}`}>
               <ListItem sx={{ py: 0.75, gap: 1.25 }}>
-                <Box sx={{ minWidth: 88 }}>
-                  <Typography variant="body2" fontWeight={800} noWrap>{row.symbol}</Typography>
-                  <Typography variant="caption" color="text.secondary" noWrap>{row.sector || 'Sector N/A'}</Typography>
-                </Box>
+                <Tooltip title={`${row.symbol} - ${row.sector || 'Sector N/A'}`} arrow>
+                  <Typography variant="body2" fontWeight={800} noWrap sx={{ minWidth: 130, maxWidth: 180 }}>
+                    {row.symbol} - {row.sector || 'Sector N/A'}
+                  </Typography>
+                </Tooltip>
                 <Typography variant="body2" color="text.secondary" noWrap sx={{ flex: 1 }}>
                   {row.companyName}
                 </Typography>
@@ -347,7 +362,7 @@ function SectorList({ title, rows }: { title: string; rows: Array<{ sector: stri
               <ListItem sx={{ py: 0.75, gap: 1.25 }}>
                 <Typography variant="body2" fontWeight={800} noWrap sx={{ flex: 1 }}>{row.sector}</Typography>
                 <Typography variant="caption" color="text.secondary" noWrap>
-                  1M {formatPercent(row.return1M)} · 3M {formatPercent(row.return3M)} · 6M {formatPercent(row.return6M)}
+                  1M {formatPercent(row.return1M)} - 3M {formatPercent(row.return3M)} - 6M {formatPercent(row.return6M)}
                 </Typography>
                 <Chip size="small" label={row.relativeStrengthScore} variant="outlined" />
               </ListItem>
@@ -367,7 +382,7 @@ function mapTodayReviewRows(rows: TodayReviewCandidateGroupSet[CandidateGroupKey
       id: item.id,
       symbol: item.symbol,
       reasonSummary: item.reasonSummary,
-      subLabel: `${item.grade} · ${Math.round(item.confidenceScore)} · ${item.strategyCode}`,
+      subLabel: `${item.grade} - ${Math.round(item.confidenceScore)} - ${item.strategyCode}`,
       targetRoute: '/today-review',
     }));
 }
