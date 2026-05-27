@@ -1683,11 +1683,15 @@ describe('MarketDataFoundationRepository', () => {
       limit: 5,
       minHistoryBars: 20,
       recentBars: 20,
+      latestDateStart: new Date('2026-05-27T00:00:00.000Z'),
+      latestDateEnd: new Date('2026-05-28T00:00:00.000Z'),
     });
 
     const queryArg = prisma.$queryRaw.mock.calls[0][0];
     const queryText = String((queryArg as any).sql || (queryArg as any).text || JSON.stringify(queryArg));
     expect(queryText).toContain('source_family');
     expect(queryText).toContain('latest_prices.source_family = base_prices.source_family');
+    expect(queryText).toContain('latest_prices.timestamp >=');
+    expect(queryText).toContain('latest_prices.timestamp <');
   });
 });

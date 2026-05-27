@@ -697,12 +697,15 @@ export class MarketDataFoundationRepository {
 
   async marketMoversForRange(
     lookbackDays: number,
-    options: Pick<PaginationOptions, 'region' | 'assetType'> & { limit?: number; minHistoryBars?: number; maxAbsReturn?: number; recentBars?: number } = {},
+    options: Pick<PaginationOptions, 'region' | 'assetType'> & { limit?: number; minHistoryBars?: number; maxAbsReturn?: number; recentBars?: number; latestDateStart?: Date | null; latestDateEnd?: Date | null } = {},
   ): Promise<MarketMoverRow[]> {
     const rowLimit = Math.max(1, Math.min(options.limit ?? 25, 100));
     const minHistoryBars = Math.max(2, Math.min(options.minHistoryBars ?? 20, 260));
     const maxAbsReturn = Math.max(0.1, Math.min(options.maxAbsReturn ?? 1000, 1000));
     const recentBars = Math.max(2, Math.min(options.recentBars ?? 20, minHistoryBars));
+    const latestFreshnessFilter = options.latestDateStart && options.latestDateEnd
+      ? Prisma.sql`AND latest_prices.timestamp >= ${options.latestDateStart} AND latest_prices.timestamp < ${options.latestDateEnd}`
+      : Prisma.sql``;
     const rows = await this.prisma.$queryRaw<Array<{
       instrumentId: string;
       symbol: string;
@@ -817,6 +820,7 @@ export class MarketDataFoundationRepository {
         WHERE base_prices.price >= ${MARKET_MOVER_MIN_PRICE}
           AND latest_prices.price >= ${MARKET_MOVER_MIN_PRICE}
           AND price_identity.price_symbol IS NOT NULL
+          ${latestFreshnessFilter}
           AND latest_prices.has_adjusted = base_prices.has_adjusted
           AND latest_prices.source_family = base_prices.source_family
           AND recent_liquidity.recent_bars >= ${recentBars}

@@ -576,6 +576,11 @@ export class MarketDataFoundationService {
     const requestedRanges = requestedRange
       ? [requestedRange]
       : (Object.keys(MARKET_MOVER_LOOKBACK_DAYS) as MarketMoverRange[]);
+    const latestDataTimestamp = await this.repository.latestDataTimestamp(scope).catch(() => null);
+    const latestDateStart = latestDataTimestamp ? new Date(latestDataTimestamp) : null;
+    latestDateStart?.setUTCHours(0, 0, 0, 0);
+    const latestDateEnd = latestDateStart ? new Date(latestDateStart) : null;
+    latestDateEnd?.setUTCDate(latestDateEnd.getUTCDate() + 1);
     const ranges = await Promise.all(
       requestedRanges.map(async (range): Promise<MarketMoverRangeSummary> => {
         const rows = await this.repository.marketMoversForRange(MARKET_MOVER_LOOKBACK_DAYS[range], {
@@ -584,6 +589,8 @@ export class MarketDataFoundationService {
           minHistoryBars: MARKET_MOVER_MIN_HISTORY_BARS[range],
           maxAbsReturn: MARKET_MOVER_MAX_ABS_RETURN[range],
           recentBars: Math.min(20, MARKET_MOVER_MIN_HISTORY_BARS[range]),
+          latestDateStart,
+          latestDateEnd,
         });
         const ordered = rows.filter((row) => Number.isFinite(row.returnPercent));
         const gainers = ordered
@@ -596,7 +603,7 @@ export class MarketDataFoundationService {
           .slice(0, limit);
         const warnings = rows.length === 0
           ? [`No priced stocks have enough ${range} history for movers in ${scope.region}/${scope.assetType}.`]
-          : ['Price movers use the provider-symbol price history and exclude unsupported instruments, insufficient liquidity/history, and mixed adjusted/close basis.'];
+          : ['Price movers use the latest scoped candle date available in the database and exclude unsupported instruments, stale latest candles, insufficient liquidity/history, mixed sources, and mixed adjusted/close basis.'];
         return { range, gainers, losers, warnings };
       }),
     );

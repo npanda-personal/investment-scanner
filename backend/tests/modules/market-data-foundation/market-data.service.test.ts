@@ -87,6 +87,23 @@ describe('MarketDataFoundationService syncV1', () => {
     });
   });
 
+  it('anchors market movers to the latest scoped candle so stale instruments are excluded', async () => {
+    const marketMoversForRange = jest.fn().mockResolvedValue([]);
+    const service = new MarketDataFoundationService({
+      latestDataTimestamp: jest.fn().mockResolvedValue(new Date('2026-05-27T00:00:00.000Z')),
+      marketMoversForRange,
+    } as any, {} as any);
+
+    await service.marketMovers({ region: 'IN', assetType: 'STOCK', range: '1D', limit: 5 });
+
+    expect(marketMoversForRange).toHaveBeenCalledWith(1, expect.objectContaining({
+      region: 'IN',
+      assetType: 'STOCK',
+      latestDateStart: new Date('2026-05-27T00:00:00.000Z'),
+      latestDateEnd: new Date('2026-05-28T00:00:00.000Z'),
+    }));
+  });
+
   it('keeps price fallback-blocked rows out of universe-health automatic backfill counts', async () => {
     const repository = {
       listStocksForUniverseHealth: jest.fn().mockResolvedValue([

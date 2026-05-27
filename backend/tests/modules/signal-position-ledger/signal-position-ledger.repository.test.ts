@@ -117,5 +117,32 @@ describe('SignalPositionLedgerRepository', () => {
       decision: 'EXIT_CANDIDATE',
     });
   });
+
+  it('ignores stale materialized snapshots from older ledger versions', async () => {
+    const repository = new SignalPositionLedgerRepository({
+      pipelineRun: {
+        findFirst: jest.fn().mockResolvedValue({
+          idempotencyKey: 'signal-position-ledger:old-run',
+          status: 'COMPLETED',
+          totalCount: 100,
+          processedCount: 100,
+          succeededCount: 0,
+          failedCount: 0,
+          skippedCount: 100,
+          warnings: [],
+          errors: [],
+          startedAt: new Date('2026-05-26T00:00:00.000Z'),
+          completedAt: new Date('2026-05-26T00:01:00.000Z'),
+          updatedAt: new Date('2026-05-26T00:01:00.000Z'),
+          metadata: {
+            version: 'signal-position-ledger-materialized-v1',
+            rows: [],
+          },
+        }),
+      },
+    } as any);
+
+    await expect(repository.loadLatestMaterializedSnapshot({ region: 'IN', assetType: 'STOCK' })).resolves.toBeNull();
+  });
 });
 

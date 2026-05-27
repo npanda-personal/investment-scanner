@@ -55,7 +55,7 @@ export class SignalPositionLedgerService {
   async listActiveRows(query: SignalPositionLedgerActiveQuery): Promise<SignalPositionLedgerActiveListResponse> {
     let state = this.refreshStates.get(this.scopeKey(query));
     const snapshot = state ? null : await this.loadMaterializedSnapshot(query);
-    if (!state && this.shouldRefreshEmptySnapshot(snapshot)) {
+    if (!state && this.shouldRefreshSnapshot(snapshot)) {
       state = this.ensureRefreshStarted(query, false);
     }
     const refresh = state ? this.toRefreshProgress(state) : snapshot?.refresh ?? this.toRefreshProgress(null);
@@ -474,8 +474,8 @@ export class SignalPositionLedgerService {
     return repositoryWithCache.loadLatestMaterializedSnapshot(query);
   }
 
-  private shouldRefreshEmptySnapshot(snapshot: SignalPositionLedgerMaterializedSnapshot | null): boolean {
-    if (!snapshot) return false;
+  private shouldRefreshSnapshot(snapshot: SignalPositionLedgerMaterializedSnapshot | null): boolean {
+    if (!snapshot) return true;
     if (snapshot.rows.length > 0) return false;
     if (snapshot.refresh.status === 'RUNNING') return false;
     if ((snapshot.refresh.processedCount || 0) === 0) return false;

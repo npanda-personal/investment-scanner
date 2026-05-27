@@ -36,6 +36,7 @@ type MaterializedRefreshSaveInput = Pick<SignalPositionLedgerActiveQuery, 'regio
 
 const LEDGER_PIPELINE_KEY = 'signal-position-ledger';
 const LEDGER_TIMEFRAME = '1d';
+const LEDGER_MATERIALIZED_VERSION = 'signal-position-ledger-materialized-v2';
 
 export class SignalPositionLedgerRepository {
   constructor(private readonly db = prisma) {}
@@ -186,6 +187,7 @@ export class SignalPositionLedgerRepository {
     if (!row) return null;
 
     const metadata = this.objectOrNull(row.metadata);
+    if (metadata?.version !== LEDGER_MATERIALIZED_VERSION) return null;
     const rows = Array.isArray(metadata?.rows)
       ? metadata.rows.filter(this.isActiveRow)
       : [];
@@ -198,7 +200,7 @@ export class SignalPositionLedgerRepository {
   async saveMaterializedSnapshot(input: MaterializedRefreshSaveInput): Promise<void> {
     const idempotencyKey = `${LEDGER_PIPELINE_KEY}:${input.runId}`;
     const metadata = {
-      version: 'signal-position-ledger-materialized-v1',
+      version: LEDGER_MATERIALIZED_VERSION,
       rows: input.rows,
     } as any;
     await this.db.pipelineRun.upsert({
