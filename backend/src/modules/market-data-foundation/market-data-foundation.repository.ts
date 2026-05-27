@@ -759,7 +759,14 @@ export class MarketDataFoundationRepository {
             price_ticks.timestamp,
             COALESCE(price_ticks."adjustedClose", price_ticks.close) AS price,
             price_ticks."adjustedClose" IS NOT NULL AS has_adjusted,
-            price_ticks.source
+            price_ticks.source,
+            CASE
+              WHEN LOWER(COALESCE(price_ticks.source, 'unknown')) = 'yahoo' THEN 'yahoo'
+              WHEN LOWER(COALESCE(price_ticks.source, 'unknown')) = 'angel_one' THEN 'angel_one'
+              WHEN UPPER(COALESCE(price_ticks.source, 'unknown')) LIKE 'NSE_%BHAV%' THEN 'nse_official'
+              WHEN UPPER(COALESCE(price_ticks.source, 'unknown')) LIKE 'NSE_%UDIFF%' THEN 'nse_official'
+              ELSE LOWER(COALESCE(price_ticks.source, 'unknown'))
+            END AS source_family
           FROM price_ticks
           WHERE price_ticks.symbol = price_identity.price_symbol
             AND UPPER(COALESCE(price_ticks."dataStatus", 'COMPLETE')) = 'COMPLETE'
@@ -772,7 +779,14 @@ export class MarketDataFoundationRepository {
             price_ticks.timestamp,
             COALESCE(price_ticks."adjustedClose", price_ticks.close) AS price,
             price_ticks."adjustedClose" IS NOT NULL AS has_adjusted,
-            price_ticks.source
+            price_ticks.source,
+            CASE
+              WHEN LOWER(COALESCE(price_ticks.source, 'unknown')) = 'yahoo' THEN 'yahoo'
+              WHEN LOWER(COALESCE(price_ticks.source, 'unknown')) = 'angel_one' THEN 'angel_one'
+              WHEN UPPER(COALESCE(price_ticks.source, 'unknown')) LIKE 'NSE_%BHAV%' THEN 'nse_official'
+              WHEN UPPER(COALESCE(price_ticks.source, 'unknown')) LIKE 'NSE_%UDIFF%' THEN 'nse_official'
+              ELSE LOWER(COALESCE(price_ticks.source, 'unknown'))
+            END AS source_family
           FROM price_ticks
           WHERE price_ticks.symbol = price_identity.price_symbol
             AND price_ticks.timestamp <= latest_prices.timestamp - (${lookbackDays}::int * INTERVAL '1 day')
@@ -804,6 +818,7 @@ export class MarketDataFoundationRepository {
           AND latest_prices.price >= ${MARKET_MOVER_MIN_PRICE}
           AND price_identity.price_symbol IS NOT NULL
           AND latest_prices.has_adjusted = base_prices.has_adjusted
+          AND latest_prices.source_family = base_prices.source_family
           AND recent_liquidity.recent_bars >= ${recentBars}
           AND COALESCE(recent_liquidity.min_volume, 0) > 0
           AND COALESCE(recent_liquidity.average_turnover, 0) >= ${MARKET_MOVER_MIN_RECENT_TURNOVER}

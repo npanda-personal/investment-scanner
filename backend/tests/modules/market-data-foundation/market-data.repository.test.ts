@@ -1670,4 +1670,24 @@ describe('MarketDataFoundationRepository', () => {
       }),
     }));
   });
+
+  it('keeps market mover returns on a consistent price source family', async () => {
+    const prisma = {
+      $queryRaw: jest.fn().mockResolvedValue([]),
+    };
+    const repository = new MarketDataFoundationRepository(prisma as any);
+
+    await repository.marketMoversForRange(30, {
+      region: 'IN',
+      assetType: 'STOCK',
+      limit: 5,
+      minHistoryBars: 20,
+      recentBars: 20,
+    });
+
+    const queryArg = prisma.$queryRaw.mock.calls[0][0];
+    const queryText = String((queryArg as any).sql || (queryArg as any).text || JSON.stringify(queryArg));
+    expect(queryText).toContain('source_family');
+    expect(queryText).toContain('latest_prices.source_family = base_prices.source_family');
+  });
 });

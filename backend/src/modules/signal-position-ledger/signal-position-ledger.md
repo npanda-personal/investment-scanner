@@ -26,12 +26,12 @@ Rows are included only when current source evidence proves:
 - `trigger_price_evidence.status = SOURCE_PROVEN`;
 - numeric trigger price and trigger timestamp are present;
 - trigger type is `bullish_entry_trigger`;
-- Strategy Framework match is `ENTRY_CANDIDATE`;
+- Strategy Framework match is `ENTRY_CANDIDATE` or source-proven `WATCH`;
 - current Data Quality readiness is `READY`;
 - latest price evidence is current enough to compute a raw price move;
 - no current exit/risk decision is present.
 
-Risk-only, bearish, watch-only, DQ-blocked, stale-price, exit-triggered, and incomplete trigger evidence rows are excluded from the primary entry-candidate list.
+Risk-only, bearish, DQ-blocked, stale-price, exit-triggered, and incomplete trigger evidence rows are excluded from the primary entry-candidate list. `WATCH` rows are shown only when the trigger price/timestamp are source-proven and current DQ/price evidence is usable; the row remains a review candidate, not an executed trade.
 
 Entry candidates are ordered by newest `entryTriggerTimestamp` before pagination. Rows with the same timestamp fall back to symbol and then instrument id ordering for stable results.
 

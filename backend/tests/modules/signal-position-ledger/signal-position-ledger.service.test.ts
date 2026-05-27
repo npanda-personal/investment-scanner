@@ -94,9 +94,14 @@ const sourceProvenTrigger = {
 
 describe('SignalPositionLedgerService', () => {
   it('keeps only source-proven entry rows and computes current return when trust basis is usable', async () => {
+    const persistedSignal = {
+      ...trustedSignal,
+      strategyMatches: undefined,
+      blockedStrategies: undefined,
+    };
     const repository = {
       listLatestSignals: jest.fn().mockResolvedValue({
-        items: [trustedSignal],
+        items: [persistedSignal],
         totalCount: 1,
         limit: 100,
         offset: 0,
@@ -128,6 +133,7 @@ describe('SignalPositionLedgerService', () => {
     const result = await service.listActiveRows(query);
 
     expect(result.totalCount).toBe(1);
+    expect(signalService.enrichSignals).toHaveBeenCalledWith([persistedSignal], { includeStrategyMatches: true });
     expect(result.items).toHaveLength(1);
     expect(result.items[0]).toMatchObject({
       symbol: 'ABC',
@@ -222,6 +228,75 @@ describe('SignalPositionLedgerService', () => {
 
     expect(result.totalCount).toBe(0);
     expect(result.items).toHaveLength(0);
+  });
+
+  it('keeps source-proven WATCH rows as active review candidates', async () => {
+    const watchSignal = {
+      ...trustedSignal,
+      id: 'signal-watch',
+      instrument_id: 'stock-watch',
+      symbol: 'WATCHME',
+      company_name: 'Watch Me Co',
+    };
+    const watchTrigger = {
+      ...sourceProvenTrigger,
+      signal_id: 'signal-watch',
+      instrument_id: 'stock-watch',
+      symbol: 'WATCHME',
+      trigger_price: 88,
+      entry_rule_id: 'PRICE_ABOVE_SMA50',
+    };
+    const repository = {
+      listLatestSignals: jest.fn().mockResolvedValue({
+        items: [{ ...watchSignal, strategyMatches: undefined }],
+        totalCount: 1,
+        limit: 100,
+        offset: 0,
+        nextOffset: null,
+        hasMore: false,
+      }),
+      latestPriceByInstrumentId: jest.fn().mockResolvedValue({
+        date: new Date().toISOString(),
+        close: 92,
+        adjustedClose: 92,
+        dataStatus: 'COMPLETE',
+        source: 'database',
+      }),
+      latestDataQualityByInstrumentId: jest.fn().mockResolvedValue({
+        signalReadinessStatus: 'READY',
+        coverageStatus: 'GOOD',
+        liquidityStatus: 'LIQUID',
+        lastEvaluatedAt: new Date().toISOString(),
+      }),
+      latestExitDecisionByInstrumentId: jest.fn().mockResolvedValue(null),
+    };
+    const signalService = {
+      enrichSignals: jest.fn().mockResolvedValue([{
+        ...watchSignal,
+        strategyMatches: [{
+          ...trustedSignal.strategyMatches![0],
+          decision: 'WATCH' as const,
+          direction: 'BULLISH' as const,
+          readinessLabel: 'NOT_AUTOMATION_READY' as const,
+          ratingGrade: 'WEAK' as const,
+        }],
+        triggerContract: watchTrigger,
+      }]),
+    };
+    const service = new SignalPositionLedgerService(repository as any, signalService as any);
+
+    const query = { region: 'IN', assetType: 'STOCK', limit: 25, offset: 0 };
+    await service.refreshActiveRows(query, { force: true, wait: true });
+    const result = await service.listActiveRows(query);
+
+    expect(result.totalCount).toBe(1);
+    expect(result.items[0]).toMatchObject({
+      symbol: 'WATCHME',
+      strategyDecision: 'WATCH',
+      entryRuleId: 'PRICE_ABOVE_SMA50',
+      currentDataQualityStatus: 'READY',
+      currentReturnStatus: 'CURRENT',
+    });
   });
 
   it('excludes risk warning rows from the entry candidate list', async () => {

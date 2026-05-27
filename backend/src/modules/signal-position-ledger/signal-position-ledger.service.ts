@@ -6,6 +6,7 @@ import type {
   SignalPositionLedgerActiveListResponse,
   SignalPositionLedgerActiveQuery,
   SignalPositionLedgerActiveRow,
+  SignalPositionLedgerMaterializedSnapshot,
   SignalPositionLedgerRowSnapshots,
   SignalPositionLedgerRefreshProgress,
   SignalPositionLedgerRefreshStatus,
@@ -52,8 +53,11 @@ export class SignalPositionLedgerService {
   ) {}
 
   async listActiveRows(query: SignalPositionLedgerActiveQuery): Promise<SignalPositionLedgerActiveListResponse> {
-    const state = this.refreshStates.get(this.scopeKey(query));
+    let state = this.refreshStates.get(this.scopeKey(query));
     const snapshot = state ? null : await this.loadMaterializedSnapshot(query);
+    if (!state && this.shouldRefreshEmptySnapshot(snapshot)) {
+      state = this.ensureRefreshStarted(query, false);
+    }
     const refresh = state ? this.toRefreshProgress(state) : snapshot?.refresh ?? this.toRefreshProgress(null);
     const orderedRows = this.orderActiveRows(state ? [...state.rows.values()] : snapshot?.rows ?? []);
     const totalCount = orderedRows.length;
@@ -142,16 +146,24 @@ export class SignalPositionLedgerService {
     };
   }
 
-  private isTrustedReadSignal(signal: SignalResultDto): boolean {
+  private isTrustedSourceSignal(signal: SignalResultDto): boolean {
     const quality = signal.dataQualityEligibility;
-    const primaryStrategy = signal.strategyMatches?.[0] ?? null;
     const hasNoiseBlocker = (signal.blockedStrategies || []).some((item) => (item.noiseFiltersTriggered || []).length > 0);
     return signal.auditStatus === 'CURRENT'
       && signal.direction === 'BULLISH'
       && quality?.filterApplied === true
       && quality.eligible === true
       && quality.signalReadinessStatus === 'READY'
-      && primaryStrategy?.decision === 'ENTRY_CANDIDATE'
+      && !hasNoiseBlocker;
+  }
+
+  private isTrustedEnrichedSignal(signal: SignalResultDto): boolean {
+    const primaryStrategy = signal.strategyMatches?.[0] ?? null;
+    const hasNoiseBlocker = (signal.blockedStrategies || []).some((item) => (item.noiseFiltersTriggered || []).length > 0);
+    const activeReviewDecision = primaryStrategy?.decision === 'ENTRY_CANDIDATE'
+      || primaryStrategy?.decision === 'WATCH';
+    return this.isTrustedSourceSignal(signal)
+      && activeReviewDecision
       && primaryStrategy.direction === 'BULLISH'
       && !hasNoiseBlocker;
   }
@@ -167,7 +179,7 @@ export class SignalPositionLedgerService {
 
   private isPublishableActiveCandidate(row: SignalPositionLedgerActiveRow): boolean {
     if (row.triggerType !== 'bullish_entry_trigger') return false;
-    if (row.strategyDecision !== 'ENTRY_CANDIDATE') return false;
+    if (row.strategyDecision !== 'ENTRY_CANDIDATE' && row.strategyDecision !== 'WATCH') return false;
     if (row.currentDataQualityStatus !== 'READY') return false;
     if (row.currentReturnStatus !== 'CURRENT') return false;
     if (row.healthState === 'EXIT_TRIGGERED' || row.healthState === 'RISK_WARNING') return false;
@@ -330,13 +342,17 @@ export class SignalPositionLedgerService {
         state.totalCount = Math.max(state.totalCount, page.totalCount, page.offset + page.items.length);
         state.processedCount += page.items.length;
 
-        const trusted = page.items.filter((signal) => this.isTrustedReadSignal(signal));
+        const trusted = page.items.filter((signal) => this.isTrustedSourceSignal(signal));
         state.skippedCount += page.items.length - trusted.length;
         const enriched = trusted.length > 0
           ? await this.signalService.enrichSignals(trusted, { includeStrategyMatches: true })
           : [];
         const candidates: SignalPositionLedgerActiveCandidate[] = [];
         for (const signal of enriched) {
+          if (!this.isTrustedEnrichedSignal(signal)) {
+            state.skippedCount += 1;
+            continue;
+          }
           const trigger = signal.triggerContract as SignalPositionTriggerContractReadModel | undefined;
           if (!trigger) {
             state.skippedCount += 1;
@@ -456,6 +472,16 @@ export class SignalPositionLedgerService {
     };
     if (typeof repositoryWithCache.loadLatestMaterializedSnapshot !== 'function') return null;
     return repositoryWithCache.loadLatestMaterializedSnapshot(query);
+  }
+
+  private shouldRefreshEmptySnapshot(snapshot: SignalPositionLedgerMaterializedSnapshot | null): boolean {
+    if (!snapshot) return false;
+    if (snapshot.rows.length > 0) return false;
+    if (snapshot.refresh.status === 'RUNNING') return false;
+    if ((snapshot.refresh.processedCount || 0) === 0) return false;
+    const updatedAt = Date.parse(snapshot.refresh.updatedAt || '');
+    if (!Number.isFinite(updatedAt)) return true;
+    return Date.now() - updatedAt > REFRESH_STALE_MS;
   }
 
   private async persistRefreshState(state: LedgerRefreshState): Promise<void> {
