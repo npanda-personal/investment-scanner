@@ -32,6 +32,46 @@ const resetCatalogSyncRuns = () => {
   (MarketDataFoundationService as any).activeCatalogSyncRuns?.clear();
 };
 
+const buildStoredZip = (fileName: string, text: string): Buffer => {
+  const name = Buffer.from(fileName, 'utf8');
+  const data = Buffer.from(text, 'utf8');
+  const local = Buffer.alloc(30);
+  local.writeUInt32LE(0x04034b50, 0);
+  local.writeUInt16LE(20, 4);
+  local.writeUInt16LE(0, 6);
+  local.writeUInt16LE(0, 8);
+  local.writeUInt32LE(0, 14);
+  local.writeUInt32LE(data.length, 18);
+  local.writeUInt32LE(data.length, 22);
+  local.writeUInt16LE(name.length, 26);
+  local.writeUInt16LE(0, 28);
+
+  const central = Buffer.alloc(46);
+  central.writeUInt32LE(0x02014b50, 0);
+  central.writeUInt16LE(20, 4);
+  central.writeUInt16LE(20, 6);
+  central.writeUInt16LE(0, 8);
+  central.writeUInt16LE(0, 10);
+  central.writeUInt32LE(0, 16);
+  central.writeUInt32LE(data.length, 20);
+  central.writeUInt32LE(data.length, 24);
+  central.writeUInt16LE(name.length, 28);
+  central.writeUInt16LE(0, 30);
+  central.writeUInt16LE(0, 32);
+  central.writeUInt32LE(0, 42);
+
+  const centralOffset = local.length + name.length + data.length;
+  const centralSize = central.length + name.length;
+  const eocd = Buffer.alloc(22);
+  eocd.writeUInt32LE(0x06054b50, 0);
+  eocd.writeUInt16LE(1, 8);
+  eocd.writeUInt16LE(1, 10);
+  eocd.writeUInt32LE(centralSize, 12);
+  eocd.writeUInt32LE(centralOffset, 16);
+
+  return Buffer.concat([local, name, data, central, name, eocd]);
+};
+
 describe('MarketDataFoundationService syncV1', () => {
   it('returns health metadata', async () => {
     const service = new MarketDataFoundationService({
@@ -1947,6 +1987,100 @@ describe('MarketDataFoundationService syncV1', () => {
           sourceName: 'NSE_SECURITY_BHAVDATA',
           matchedInstruments: 1,
           fallbackReason: 'OFFICIAL_EOD_PARTIAL_MATCH:1_UNMATCHED',
+        },
+      });
+    } finally {
+      if (previousFlag === undefined) delete process.env.MARKET_DATA_NSE_OFFICIAL_EOD_BULK_ENABLED;
+      else process.env.MARKET_DATA_NSE_OFFICIAL_EOD_BULK_ENABLED = previousFlag;
+      global.fetch = previousFetch;
+    }
+  });
+
+  it('uses NSE UDiFF zip as the first official EOD source when available', async () => {
+    const previousFlag = process.env.MARKET_DATA_NSE_OFFICIAL_EOD_BULK_ENABLED;
+    const previousFetch = global.fetch;
+    process.env.MARKET_DATA_NSE_OFFICIAL_EOD_BULK_ENABLED = 'true';
+    const csvText = [
+      'TckrSymb,SctySrs,TradDt,OpnPric,HghPric,LwPric,ClsPric,TtlTradgVol',
+      'RELIANCE,EQ,2026-05-18,100,110,95,108,1000',
+    ].join('\n');
+    const payload = buildStoredZip('BhavCopy_NSE_CM_0_0_0_20260518_F_0000.csv', csvText);
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: { get: (name: string) => (name.toLowerCase() === 'content-length' ? String(payload.length) : null) },
+      arrayBuffer: async () => payload.buffer.slice(payload.byteOffset, payload.byteOffset + payload.byteLength),
+    }) as any;
+
+    const repository = {
+      countStaleActiveStockSyncTasks: jest.fn().mockResolvedValue(1),
+      listStaleActiveStockSyncTasks: jest.fn().mockResolvedValue([{
+        id: 'stock-1',
+        symbol: 'RELIANCE',
+        providerSymbol: 'RELIANCE.NS',
+        sourceSymbol: 'RELIANCE',
+        displaySymbol: 'RELIANCE',
+        exchange: 'NSE',
+        lastSuccessfulDataLoadTimestamp: new Date('2026-05-19T00:00:00.000Z'),
+        latestStoredTimestamp: new Date('2026-05-17T00:00:00.000Z'),
+      }]),
+      listActiveStockSyncTasks: jest.fn(),
+      upsertSyncState: jest.fn().mockResolvedValue({}),
+      latestStoredTradingDateForRegion: jest.fn().mockResolvedValue('2026-05-18'),
+      getSyncState: jest.fn().mockResolvedValue({
+        status: 'SYNCED',
+        lastCheckedAt: new Date('2026-05-18T12:00:00.000Z').toISOString(),
+      }),
+      updateStockLoadTimestampBySymbol: jest.fn().mockResolvedValue({}),
+    };
+    const service = new MarketDataFoundationService(repository as any, {} as any);
+    const storeHistorical = jest.spyOn(service, 'storeHistorical').mockResolvedValue({
+      rowsReceived: 1,
+      rowsInserted: 1,
+      rowsUpdated: 0,
+      rowsSkipped: 0,
+      rowsNoOp: 0,
+      warningCount: 0,
+      warnings: [],
+    });
+    const ingestSymbol = jest.spyOn(service, 'ingestSymbol').mockResolvedValue({
+      rowsReceived: 0,
+      rowsInserted: 0,
+      rowsUpdated: 0,
+      rowsSkipped: 0,
+      rowsNoOp: 0,
+      warningCount: 0,
+      warnings: [],
+    });
+
+    try {
+      const summary = await service.syncScheduledRegion('IN', {
+        assetType: 'STOCK',
+        batchSize: 1,
+        now: new Date('2026-05-18T12:00:00.000Z'),
+      });
+
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+      expect(global.fetch).toHaveBeenCalledWith(
+        'https://nsearchives.nseindia.com/content/cm/BhavCopy_NSE_CM_0_0_0_20260518_F_0000.csv.zip',
+        expect.any(Object)
+      );
+      expect(storeHistorical).toHaveBeenCalledWith([
+        expect.objectContaining({
+          symbol: 'RELIANCE',
+          source: 'NSE_UDIFF_CM_BHAVCOPY',
+          date: new Date('2026-05-18T00:00:00.000Z'),
+        }),
+      ]);
+      expect(ingestSymbol).not.toHaveBeenCalled();
+      expect(summary).toMatchObject({
+        instrumentsProcessed: 1,
+        officialEodBulk: {
+          attempted: true,
+          sourceName: 'NSE_UDIFF_CM_BHAVCOPY',
+          sourceFileName: 'BhavCopy_NSE_CM_0_0_0_20260518_F_0000.csv.zip',
+          matchedInstruments: 1,
+          fallbackReason: null,
         },
       });
     } finally {

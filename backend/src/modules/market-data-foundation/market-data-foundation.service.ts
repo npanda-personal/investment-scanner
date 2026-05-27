@@ -2,6 +2,7 @@ import fs from 'fs/promises';
 import { createHash } from 'crypto';
 import net from 'net';
 import path from 'path';
+import { inflateRawSync } from 'zlib';
 import { MarketDataFoundationRepository } from './market-data-foundation.repository';
 import { YahooFinanceIngestionService } from './market-data-foundation.provider';
 import { AngelOneMarketDataProvider } from './market-data-foundation.angel-one-provider';
@@ -92,7 +93,9 @@ import {
   UNIVERSE_STATES,
 } from './market-data-foundation.universe';
 import {
+  buildNseOfficialArchiveUrls,
   buildNseSecurityBhavdataArchiveUrl,
+  type NseArchiveUrl,
   parseIndianExchangeEodCsv,
 } from './market-data-foundation.exchange-eod-adapter';
 
@@ -3971,25 +3974,18 @@ export class MarketDataFoundationService {
       return result;
     }
 
-    const archive = buildNseSecurityBhavdataArchiveUrl(tradingDate);
     evidence.attempted = true;
-    evidence.sourceName = archive.sourceName;
-    evidence.sourceUrl = archive.url;
-    evidence.sourceFileName = archive.fileName;
 
     try {
-      const csvText = await this.downloadOfficialExchangeText(archive.url);
-      const parsed = parseIndianExchangeEodCsv(csvText, {
-        source: archive.sourceName,
-        sourceUrl: archive.url,
-        exchange: 'NSE',
-        includeSeries: ['EQ', 'BE'],
-        tradingDate,
-      });
+      const officialSource = await this.loadFirstAvailableNseOfficialEodCsv(tradingDate);
+      const { archive, parsed } = officialSource;
+      evidence.sourceName = archive.sourceName;
+      evidence.sourceUrl = archive.url;
+      evidence.sourceFileName = archive.fileName;
       evidence.sourceFingerprint = parsed.sourceFingerprint;
       evidence.rowsRead = parsed.rowsRead;
       evidence.rowsParsed = parsed.rowsParsed;
-      evidence.warnings = parsed.warnings.slice(0, 10);
+      evidence.warnings = [...officialSource.warnings, ...parsed.warnings].slice(0, 10);
 
       const priceByAlias = new Map<string, HistoricalPrice>();
       for (const price of parsed.prices) {
@@ -4063,10 +4059,38 @@ export class MarketDataFoundationService {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'download or parse failed';
       evidence.fallbackReason = 'OFFICIAL_EOD_UNAVAILABLE';
-      evidence.warnings = [`${archive.sourceName} ${archive.fileName}: ${message}`];
+      evidence.warnings = [message];
     }
 
     return result;
+  }
+
+  private async loadFirstAvailableNseOfficialEodCsv(tradingDate: Date): Promise<{
+    archive: NseArchiveUrl;
+    parsed: ReturnType<typeof parseIndianExchangeEodCsv>;
+    warnings: string[];
+  }> {
+    const warnings: string[] = [];
+    for (const archive of buildNseOfficialArchiveUrls(tradingDate)) {
+      try {
+        const csvText = await this.downloadOfficialExchangeText(archive.url);
+        const parsed = parseIndianExchangeEodCsv(csvText, {
+          source: archive.sourceName,
+          sourceUrl: archive.url,
+          exchange: 'NSE',
+          includeSeries: ['EQ', 'BE'],
+          tradingDate,
+        });
+        if (parsed.rowsParsed > 0) {
+          return { archive, parsed, warnings };
+        }
+        warnings.push(`${archive.sourceName} ${archive.fileName}: parsed zero usable rows.`);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'download or parse failed';
+        warnings.push(`${archive.sourceName} ${archive.fileName}: ${message}`);
+      }
+    }
+    throw new Error(warnings.length > 0 ? warnings.join(' | ') : 'No official NSE EOD source was available.');
   }
 
   private taskPriceRegionInfo(defaultRegion: string, task: StockSyncTask): PriceRegionInfo {
@@ -4420,7 +4444,7 @@ export class MarketDataFoundationService {
       const response = await fetch(url, {
         signal: controller.signal,
         headers: {
-          accept: 'text/csv, text/plain, */*',
+          accept: 'text/csv, text/plain, application/zip, application/octet-stream, */*',
           'accept-language': 'en-US,en;q=0.9',
           'user-agent': 'investment-scanner-market-data-foundation/1.0',
         },
@@ -4430,6 +4454,9 @@ export class MarketDataFoundationService {
       if (contentLength && Number(contentLength) > maxBytes) throw new Error('download exceeds configured max size');
       const buffer = Buffer.from(await response.arrayBuffer());
       if (buffer.length > maxBytes) throw new Error('download exceeds configured max size');
+      if (url.toLowerCase().endsWith('.zip') || this.isZipBuffer(buffer)) {
+        return this.extractFirstCsvFromZip(buffer, url, maxBytes);
+      }
       return buffer.toString('utf8');
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') throw new Error('download timed out');
@@ -4437,6 +4464,78 @@ export class MarketDataFoundationService {
     } finally {
       clearTimeout(timeout);
     }
+  }
+
+  private isZipBuffer(buffer: Buffer): boolean {
+    return buffer.length >= 4 && buffer.readUInt32LE(0) === 0x04034b50;
+  }
+
+  private extractFirstCsvFromZip(buffer: Buffer, sourceUrl: string, maxBytes: number): string {
+    const eocdOffset = this.findZipEndOfCentralDirectory(buffer);
+    if (eocdOffset < 0) throw new Error('zip end-of-central-directory was not found');
+    const totalEntries = buffer.readUInt16LE(eocdOffset + 10);
+    let cursor = buffer.readUInt32LE(eocdOffset + 16);
+
+    for (let index = 0; index < totalEntries; index += 1) {
+      if (cursor + 46 > buffer.length || buffer.readUInt32LE(cursor) !== 0x02014b50) {
+        throw new Error('zip central directory is malformed');
+      }
+      const compressionMethod = buffer.readUInt16LE(cursor + 10);
+      const compressedSize = buffer.readUInt32LE(cursor + 20);
+      const uncompressedSize = buffer.readUInt32LE(cursor + 24);
+      const fileNameLength = buffer.readUInt16LE(cursor + 28);
+      const extraLength = buffer.readUInt16LE(cursor + 30);
+      const commentLength = buffer.readUInt16LE(cursor + 32);
+      const localHeaderOffset = buffer.readUInt32LE(cursor + 42);
+      const fileName = buffer.subarray(cursor + 46, cursor + 46 + fileNameLength).toString('utf8');
+
+      if (fileName.toLowerCase().endsWith('.csv') && !fileName.endsWith('/')) {
+        if (uncompressedSize > maxBytes) throw new Error(`${fileName} exceeds configured max size`);
+        const csvBuffer = this.extractZipEntry(buffer, {
+          fileName,
+          compressionMethod,
+          compressedSize,
+          localHeaderOffset,
+          sourceUrl,
+        });
+        if (csvBuffer.length > maxBytes) throw new Error(`${fileName} exceeds configured max size`);
+        return csvBuffer.toString('utf8');
+      }
+
+      cursor += 46 + fileNameLength + extraLength + commentLength;
+    }
+
+    throw new Error(`no CSV entry found in zip ${sourceUrl}`);
+  }
+
+  private extractZipEntry(buffer: Buffer, entry: {
+    fileName: string;
+    compressionMethod: number;
+    compressedSize: number;
+    localHeaderOffset: number;
+    sourceUrl: string;
+  }): Buffer {
+    const localOffset = entry.localHeaderOffset;
+    if (localOffset + 30 > buffer.length || buffer.readUInt32LE(localOffset) !== 0x04034b50) {
+      throw new Error(`zip local header is malformed for ${entry.fileName}`);
+    }
+    const fileNameLength = buffer.readUInt16LE(localOffset + 26);
+    const extraLength = buffer.readUInt16LE(localOffset + 28);
+    const dataStart = localOffset + 30 + fileNameLength + extraLength;
+    const dataEnd = dataStart + entry.compressedSize;
+    if (dataEnd > buffer.length) throw new Error(`zip entry exceeds archive bounds for ${entry.fileName}`);
+    const compressed = buffer.subarray(dataStart, dataEnd);
+    if (entry.compressionMethod === 0) return compressed;
+    if (entry.compressionMethod === 8) return inflateRawSync(compressed);
+    throw new Error(`unsupported zip compression ${entry.compressionMethod} for ${entry.fileName} from ${entry.sourceUrl}`);
+  }
+
+  private findZipEndOfCentralDirectory(buffer: Buffer): number {
+    const minOffset = Math.max(0, buffer.length - 65_557);
+    for (let offset = buffer.length - 22; offset >= minOffset; offset -= 1) {
+      if (buffer.readUInt32LE(offset) === 0x06054b50) return offset;
+    }
+    return -1;
   }
 
   private mergeHistoricalPriceRows(prices: HistoricalPrice[]): HistoricalPrice[] {
