@@ -201,7 +201,7 @@ const fallbackCatalogSources: CatalogSourceInfo[] = [
 const buildCandleStatusMessage = (status?: MarketDataSchedulerRegionStatus) => {
   if (!status) return '';
   if (status.candleSyncStatus === 'CURRENT') {
-    return ` Latest completed candle ${status.latestCompletedTradingDate} is synced. Latest stored candle: ${status.latestStoredTradingDate}.`;
+    return ` Latest completed candle ${status.latestCompletedTradingDate}; latest stored candle observed: ${status.latestStoredTradingDate}.`;
   }
   if (status.candleSyncStatus === 'MISSING_LATEST_COMPLETED') {
     return ` Latest completed candle ${status.latestCompletedTradingDate} is missing. Latest stored candle: ${status.latestStoredTradingDate || 'none'}.`;
@@ -235,7 +235,11 @@ const formatCatalogSyncSummary = (run: MarketDataCatalogSyncRunResponse) => {
   const scope = `${run.region}/${run.assetType}`;
   const processed = formatCount(run.processedCount);
   const total = run.totalCount !== undefined ? formatCount(run.totalCount) : 'unknown';
-  return `Catalog sync ${run.status} for ${scope}: processed ${processed} of ${total}, succeeded ${formatCount(run.succeededCount)}, failed ${formatCount(run.failedCount)}, skipped ${formatCount(run.skippedCount)}, no-op ${formatCount(run.noOpCount)}.`;
+  const incomplete = run.status === 'PARTIAL' || run.hasMore || countValue(run.processedCount) < countValue(run.totalCount);
+  const coverageNote = incomplete
+    ? ' Universe coverage is incomplete; more eligible instruments remain.'
+    : '';
+  return `Catalog sync ${run.status} for ${scope}: processed ${processed} of ${total}, succeeded ${formatCount(run.succeededCount)}, failed ${formatCount(run.failedCount)}, skipped ${formatCount(run.skippedCount)}, no-op ${formatCount(run.noOpCount)}.${coverageNote}`;
 };
 
 const MarketDataFoundationPage: React.FC = () => {
