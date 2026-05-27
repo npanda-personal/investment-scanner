@@ -6,6 +6,7 @@ import { ResearchHubService } from '../research-hub';
 import { SignalGenerationEngineService } from '../signal-generation-engine';
 import { SignalCalibrationEngineService } from '../signal-calibration-engine';
 import { SignalQualityLabService } from '../signal-quality-lab';
+import { SignalPositionLedgerService } from '../signal-position-ledger';
 import { SmartMoneyIntelligenceService } from '../smart-money-intelligence';
 import { StrategyDecisionEngineService } from '../strategy-decision-engine';
 import { TodayTradeReviewService } from '../today-trade-review';
@@ -50,6 +51,7 @@ const LEDGER_VERSION = 'pipeline-ledger-v1';
 const ACTIVE_STATUSES = new Set(['PENDING', 'RUNNING']);
 const TERMINAL_STATUSES = new Set(['COMPLETED', 'PARTIAL', 'FAILED', 'SKIPPED', 'BLOCKED']);
 const DEFAULT_LEASE_MS = 600_000;
+const DEFAULT_ACTIVE_STALE_MS = DEFAULT_LEASE_MS * 2;
 const PROCESS_LOCAL_ID = `${process.pid}-${Math.random().toString(16).slice(2, 10)}`;
 const DQ_SCHEDULED_STAGE_VERSION = 'scheduled-dq-v1';
 const RAW_SIGNALS_SCHEDULED_STAGE_VERSION = 'scheduled-raw-signals-v1';
@@ -61,6 +63,7 @@ const SIGNAL_QUALITY_SCHEDULED_STAGE_VERSION = 'scheduled-signal-quality-v2';
 const STRATEGY_DECISION_SCHEDULED_STAGE_VERSION = 'scheduled-strategy-decision-v2';
 const RESEARCH_PROJECTION_SCHEDULED_STAGE_VERSION = 'scheduled-research-projection-v2';
 const TODAY_REVIEW_SCHEDULED_STAGE_VERSION = 'scheduled-today-review-v2';
+const SIGNAL_POSITION_LEDGER_SCHEDULED_STAGE_VERSION = 'scheduled-signal-position-ledger-v1';
 
 type ScheduledAdapterResult = {
   totalCount: number;
@@ -104,9 +107,10 @@ const PIPELINE_COMMAND_POLICIES: PipelineCommandPolicy[] = [
   commandPolicy('BACKTEST_PROOF_REFRESH', 'BACKTEST_PROOF', 10, 'Backtests', 'Backtest proof refresh', 'FORBIDDEN', 'Backtesting proof execution is out of scope for this first command slice.'),
   commandPolicy('RESEARCH_PROJECTION_REFRESH', 'RESEARCH_PROJECTION', 11, 'Research', 'Research projection refresh', 'FORBIDDEN', 'Manual command remains forbidden; scheduler-only research projection automation is active.'),
   commandPolicy('TODAY_REVIEW_PUBLISH', 'TODAY_REVIEW', 12, 'Today Review', 'Today review publish', 'FORBIDDEN', 'Manual command remains forbidden; scheduler-only publication is active with compatibility generation disabled.'),
-  commandPolicy('PIPELINE_RUN_ALL', 'PIPELINE', 13, 'Pipeline', 'Run all stages', 'FORBIDDEN', 'Broad pipeline fanout is out of scope.'),
-  commandPolicy('PIPELINE_DRAIN_ALL_BATCHES', 'PIPELINE', 13, 'Pipeline', 'Drain all batches', 'FORBIDDEN', 'First slice allows one batch per request only.'),
-  commandPolicy('PIPELINE_CANCEL_ACTIVE', 'PIPELINE', 13, 'Pipeline', 'Cancel active run', 'FORBIDDEN', 'No background worker cancellation contract exists for this slice.'),
+  commandPolicy('SIGNAL_POSITION_LEDGER_REFRESH', 'SIGNAL_POSITION_LEDGER', 13, 'Signal Position Ledger', 'Materialized ledger refresh', 'DEFERRED', 'Manual command remains module-owned; scheduler-only materialization is active.'),
+  commandPolicy('PIPELINE_RUN_ALL', 'PIPELINE', 14, 'Pipeline', 'Run all stages', 'FORBIDDEN', 'Broad pipeline fanout is out of scope.'),
+  commandPolicy('PIPELINE_DRAIN_ALL_BATCHES', 'PIPELINE', 14, 'Pipeline', 'Drain all batches', 'FORBIDDEN', 'First slice allows one batch per request only.'),
+  commandPolicy('PIPELINE_CANCEL_ACTIVE', 'PIPELINE', 14, 'Pipeline', 'Cancel active run', 'FORBIDDEN', 'No background worker cancellation contract exists for this slice.'),
 ];
 
 const PIPELINE_COMMAND_POLICY_MAP = new Map(PIPELINE_COMMAND_POLICIES.map((policy) => [policy.commandKey, policy]));
@@ -133,7 +137,8 @@ export class PipelineOrchestrationService {
     private readonly signalQualityService = new SignalQualityLabService(),
     private readonly strategyDecisionService = new StrategyDecisionEngineService(),
     private readonly researchHubService = new ResearchHubService(),
-    private readonly todayReviewService = new TodayTradeReviewService()
+    private readonly todayReviewService = new TodayTradeReviewService(),
+    private readonly signalPositionLedgerService = new SignalPositionLedgerService()
   ) {}
 
   createRun(input: PipelineRunCreateInput): Promise<PipelineRunRecord> {
@@ -190,9 +195,9 @@ export class PipelineOrchestrationService {
         pipelineKey: query.pipelineKey,
       },
       generatedAt: now.toISOString(),
-      activeRun: activeRun ? this.toRunStatus(activeRun) : null,
+      activeRun: activeRun && !this.isStaleActiveRun(activeRun, now) ? this.toRunStatus(activeRun) : null,
       lastRun: lastRun ? this.toRunStatus(lastRun) : null,
-      stages: this.groupStages(stages),
+      stages: this.groupStages(stages, now),
     };
   }
 
@@ -998,30 +1003,80 @@ export class PipelineOrchestrationService {
     });
 
     try {
-      const adapterResult = await this.signalGenerationService.run({
-        instrumentIds: changedInstrumentIds,
-        region: normalizedScope.region,
-        assetType: normalizedScope.assetType,
-        batchSize: normalizedBatchSize,
-        offset: 0,
-        requestedByUserId: 'system',
-        useDataQualityFilter: true,
-        missingQualityBehavior: 'SKIP',
-        skipUnusable: true,
-        includeLimited: false,
-        providerThrottleMs: 0,
-        researchContextMode: 'LIGHTWEIGHT',
-      });
+      const warnings: string[] = [];
+      const errors: string[] = [];
+      let generatedCount = 0;
+      let updatedCount = 0;
+      let noOpCount = 0;
+      let failedCount = 0;
+      let skippedCount = 0;
+      let adapterProcessedCount = 0;
+      let excludedByDataQuality = 0;
+      let missingQualityEvaluationCount = 0;
+      for (let offset = 0; offset < changedInstrumentIds.length; offset += normalizedBatchSize) {
+        const chunk = changedInstrumentIds.slice(offset, offset + normalizedBatchSize);
+        const adapterResult = await this.signalGenerationService.run({
+          instrumentIds: chunk,
+          region: normalizedScope.region,
+          assetType: normalizedScope.assetType,
+          batchSize: normalizedBatchSize,
+          offset: 0,
+          requestedByUserId: 'system',
+          useDataQualityFilter: true,
+          missingQualityBehavior: 'SKIP',
+          skipUnusable: true,
+          includeLimited: false,
+          providerThrottleMs: 0,
+          researchContextMode: 'LIGHTWEIGHT',
+        });
+        generatedCount += adapterResult.generatedCount ?? adapterResult.generated ?? 0;
+        updatedCount += adapterResult.updatedCount ?? 0;
+        noOpCount += adapterResult.noOpCount ?? 0;
+        failedCount += adapterResult.failedCount ?? adapterResult.errors.length;
+        skippedCount += adapterResult.skippedCount ?? adapterResult.skipped ?? 0;
+        adapterProcessedCount += adapterResult.processedCount ?? chunk.length;
+        excludedByDataQuality += adapterResult.dataQuality?.excludedByDataQuality ?? 0;
+        missingQualityEvaluationCount += adapterResult.dataQuality?.missingQualityEvaluationCount ?? 0;
+        warnings.push(...adapterResult.warnings);
+        errors.push(...adapterResult.errors);
+
+        const nextOffset = offset + chunk.length;
+        await this.recordStageProgress({
+          idempotencyKey: stageIdempotencyKey,
+          status: 'RUNNING',
+          totalCount: changedInstrumentIds.length,
+          processedCount: Math.min(changedInstrumentIds.length, adapterProcessedCount),
+          succeededCount: generatedCount + updatedCount + noOpCount,
+          partialCount: 0,
+          failedCount,
+          skippedCount,
+          unchangedCount: noOpCount,
+          nextOffset: nextOffset < changedInstrumentIds.length ? nextOffset : null,
+          hasMore: nextOffset < changedInstrumentIds.length,
+          metadata: {
+            sourceStage: 'DATA_QUALITY',
+            upstreamStageRunId: request.upstreamStageRunId ?? null,
+            dataThroughDate: request.dataThroughDate,
+            sourceFingerprint: request.sourceFingerprint,
+            changedInstrumentCount: changedInstrumentIds.length,
+            changedInstrumentFingerprint,
+            rawSignalsStageVersion: RAW_SIGNALS_SCHEDULED_STAGE_VERSION,
+            schedulerRunStartedAt: request.schedulerRunStartedAt,
+            adapter: 'SignalGenerationEngineService.run',
+            adapterProcessedCount,
+            generatedCount,
+            updatedCount,
+            noOpCount,
+            excludedByDataQuality,
+            missingQualityEvaluationCount,
+          },
+          now: new Date(),
+        });
+      }
       const completedAt = new Date();
       const durationMs = Math.max(0, completedAt.getTime() - startedAt.getTime());
-      const generatedCount = adapterResult.generatedCount ?? adapterResult.generated ?? 0;
-      const updatedCount = adapterResult.updatedCount ?? 0;
-      const noOpCount = adapterResult.noOpCount ?? 0;
       const succeededCount = generatedCount + updatedCount + noOpCount;
-      const failedCount = adapterResult.failedCount ?? adapterResult.errors.length;
-      const skippedCount = adapterResult.skippedCount ?? adapterResult.skipped ?? 0;
-      const adapterProcessedCount = adapterResult.processedCount ?? changedInstrumentIds.length;
-      const totalCount = adapterResult.totalCount ?? changedInstrumentIds.length;
+      const totalCount = changedInstrumentIds.length;
       const completedCount = Math.min(totalCount, Math.max(adapterProcessedCount, succeededCount + failedCount + skippedCount));
       const status = this.mapScheduledRawSignalsStatus({
         totalCount,
@@ -1054,8 +1109,8 @@ export class PipelineOrchestrationService {
         generatedCount,
         updatedCount,
         noOpCount,
-        excludedByDataQuality: adapterResult.dataQuality?.excludedByDataQuality ?? 0,
-        missingQualityEvaluationCount: adapterResult.dataQuality?.missingQualityEvaluationCount ?? 0,
+        excludedByDataQuality,
+        missingQualityEvaluationCount,
       };
 
       const completedStage = await this.completeStage({
@@ -1071,8 +1126,8 @@ export class PipelineOrchestrationService {
         nextOffset: null,
         hasMore: false,
         outputFingerprint,
-        warnings: adapterResult.warnings,
-        errors: adapterResult.errors,
+        warnings,
+        errors,
         completedAt,
         durationMs,
         metadata,
@@ -1088,8 +1143,8 @@ export class PipelineOrchestrationService {
         failedCount,
         skippedCount,
         unchangedCount: noOpCount,
-        warnings: adapterResult.warnings,
-        errors: adapterResult.errors,
+        warnings,
+        errors,
         completedAt,
         durationMs,
         metadata,
@@ -1351,22 +1406,79 @@ export class PipelineOrchestrationService {
     });
 
     try {
-      const adapterResult = await this.signalCalibrationService.run({
-        instrumentIds: changedInstrumentIds,
-        region: normalizedScope.region,
-        assetType: normalizedScope.assetType,
-        batchSize: normalizedBatchSize,
-        offset: 0,
-      });
+      const warnings: string[] = [];
+      const errors: string[] = [];
+      let succeededCount = 0;
+      let failedCount = 0;
+      let unchangedCount = 0;
+      let adapterProcessedCount = 0;
+      let adapterSkippedCount = 0;
+      let outOfScopeSkipped = 0;
+      let calibratedCount = 0;
+      let passthroughCount = 0;
+      let selectedHorizon: string | null = null;
+      let evidenceStatus: string | null = null;
+      let readinessStatus: string | null = null;
+      for (let offset = 0; offset < changedInstrumentIds.length; offset += normalizedBatchSize) {
+        const chunk = changedInstrumentIds.slice(offset, offset + normalizedBatchSize);
+        const adapterResult = await this.signalCalibrationService.run({
+          instrumentIds: chunk,
+          region: normalizedScope.region,
+          assetType: normalizedScope.assetType,
+          batchSize: normalizedBatchSize,
+          offset: 0,
+        });
+        succeededCount += adapterResult.generated ?? adapterResult.results.length;
+        failedCount += adapterResult.failedCount ?? adapterResult.errors.length;
+        unchangedCount += adapterResult.passthroughCount ?? 0;
+        adapterProcessedCount += adapterResult.processedCount ?? chunk.length;
+        adapterSkippedCount += adapterResult.skippedCount ?? adapterResult.skipped ?? 0;
+        outOfScopeSkipped += adapterResult.outOfScopeSkipped ?? 0;
+        calibratedCount += adapterResult.calibratedCount ?? 0;
+        passthroughCount += adapterResult.passthroughCount ?? 0;
+        selectedHorizon = selectedHorizon || adapterResult.selectedHorizon || null;
+        evidenceStatus = evidenceStatus || adapterResult.calibrationEvidence?.evidenceStatus || null;
+        readinessStatus = readinessStatus || adapterResult.calibrationReadiness?.status || null;
+        warnings.push(...adapterResult.warnings);
+        errors.push(...adapterResult.errors);
+
+        const nextOffset = offset + chunk.length;
+        const runningSkippedCount = adapterSkippedCount + outOfScopeSkipped;
+        await this.recordStageProgress({
+          idempotencyKey: stageIdempotencyKey,
+          status: 'RUNNING',
+          totalCount: changedInstrumentIds.length,
+          processedCount: Math.min(changedInstrumentIds.length, adapterProcessedCount),
+          succeededCount,
+          partialCount: 0,
+          failedCount,
+          skippedCount: runningSkippedCount,
+          unchangedCount,
+          nextOffset: nextOffset < changedInstrumentIds.length ? nextOffset : null,
+          hasMore: nextOffset < changedInstrumentIds.length,
+          metadata: {
+            sourceStage: 'RAW_SIGNALS',
+            upstreamStageRunId: request.upstreamStageRunId ?? null,
+            dataThroughDate: request.dataThroughDate,
+            sourceFingerprint: request.sourceFingerprint,
+            changedInstrumentCount: changedInstrumentIds.length,
+            changedInstrumentFingerprint,
+            signalCalibrationStageVersion: SIGNAL_CALIBRATION_SCHEDULED_STAGE_VERSION,
+            schedulerRunStartedAt: request.schedulerRunStartedAt,
+            adapter: 'SignalCalibrationEngineService.run',
+            adapterProcessedCount,
+            calibratedCount,
+            passthroughCount,
+            selectedHorizon,
+            evidenceStatus,
+            readinessStatus,
+          },
+          now: new Date(),
+        });
+      }
       const completedAt = new Date();
       const durationMs = Math.max(0, completedAt.getTime() - startedAt.getTime());
-      const succeededCount = adapterResult.generated ?? adapterResult.results.length;
-      const failedCount = adapterResult.failedCount ?? adapterResult.errors.length;
-      const unchangedCount = adapterResult.passthroughCount ?? 0;
-      const adapterProcessedCount = adapterResult.processedCount ?? changedInstrumentIds.length;
-      const totalCount = adapterResult.totalCount ?? changedInstrumentIds.length;
-      const adapterSkippedCount = adapterResult.skippedCount ?? adapterResult.skipped ?? 0;
-      const outOfScopeSkipped = adapterResult.outOfScopeSkipped ?? 0;
+      const totalCount = changedInstrumentIds.length;
       const missingInputSkipped = Math.max(0, totalCount - adapterProcessedCount - adapterSkippedCount);
       const skippedCount = adapterSkippedCount + outOfScopeSkipped + missingInputSkipped;
       const completedCount = Math.min(totalCount, Math.max(adapterProcessedCount, succeededCount + failedCount + skippedCount));
@@ -1400,11 +1512,11 @@ export class PipelineOrchestrationService {
         adapterProcessedCount,
         completedCount,
         missingInputSkipped,
-        calibratedCount: adapterResult.calibratedCount ?? 0,
-        passthroughCount: adapterResult.passthroughCount ?? 0,
-        selectedHorizon: adapterResult.selectedHorizon ?? null,
-        evidenceStatus: adapterResult.calibrationEvidence?.evidenceStatus ?? null,
-        readinessStatus: adapterResult.calibrationReadiness?.status ?? null,
+        calibratedCount,
+        passthroughCount,
+        selectedHorizon,
+        evidenceStatus,
+        readinessStatus,
       };
 
       const completedStage = await this.completeStage({
@@ -1420,8 +1532,8 @@ export class PipelineOrchestrationService {
         nextOffset: null,
         hasMore: false,
         outputFingerprint,
-        warnings: adapterResult.warnings,
-        errors: adapterResult.errors,
+        warnings,
+        errors,
         completedAt,
         durationMs,
         metadata,
@@ -1437,8 +1549,8 @@ export class PipelineOrchestrationService {
         failedCount,
         skippedCount,
         unchangedCount,
-        warnings: adapterResult.warnings,
-        errors: adapterResult.errors,
+        warnings,
+        errors,
         completedAt,
         durationMs,
         metadata,
@@ -1887,7 +1999,7 @@ export class PipelineOrchestrationService {
       sourceStage: 'STRATEGY_DECISION',
       adapter: 'ResearchHubService.overview',
     }, async ({ normalizedScope }) => {
-      const result = await this.researchHubService.overview({
+      const result = await this.researchHubService.refreshOverview({
         region: normalizedScope.region,
         assetType: normalizedScope.assetType,
       });
@@ -1922,7 +2034,7 @@ export class PipelineOrchestrationService {
   }
 
   async runScheduledTodayReviewStage(request: ScheduledPipelineStageRequest, now = new Date()): Promise<ScheduledPipelineStageResponse> {
-    return this.runScheduledPipelineStage(request, {
+    const response = await this.runScheduledPipelineStage(request, {
       stageKey: 'TODAY_REVIEW',
       stageOrder: 12,
       stageSlug: 'scheduled-today-review',
@@ -1956,6 +2068,49 @@ export class PipelineOrchestrationService {
         },
       };
     }, now);
+
+    if (response.status === 'COMPLETED' || response.status === 'PARTIAL') {
+      response.downstream = await this.runScheduledSignalPositionLedgerStage({
+        ...request,
+        sourceFingerprint: response.outputFingerprint || request.sourceFingerprint,
+        upstreamStageRunId: response.stageRunId,
+      }).catch((error) => this.logScheduledDownstreamFailure('Signal Position Ledger', response.stageKey, request, error));
+    }
+    return response;
+  }
+
+  async runScheduledSignalPositionLedgerStage(request: ScheduledPipelineStageRequest, now = new Date()): Promise<ScheduledPipelineStageResponse> {
+    return this.runScheduledPipelineStage(request, {
+      stageKey: 'SIGNAL_POSITION_LEDGER',
+      stageOrder: 13,
+      stageSlug: 'scheduled-signal-position-ledger',
+      stageVersion: SIGNAL_POSITION_LEDGER_SCHEDULED_STAGE_VERSION,
+      sourceStage: 'TODAY_REVIEW',
+      adapter: 'SignalPositionLedgerService.refreshActiveRows',
+    }, async ({ normalizedScope }) => {
+      const progress = await this.signalPositionLedgerService.refreshActiveRows({
+        region: normalizedScope.region,
+        assetType: normalizedScope.assetType,
+        limit: 25,
+        offset: 0,
+      }, { force: true, wait: true });
+      return {
+        totalCount: progress.totalCount,
+        processedCount: progress.processedCount,
+        succeededCount: progress.succeededCount,
+        failedCount: progress.failedCount,
+        skippedCount: progress.skippedCount,
+        unchangedCount: 0,
+        warnings: progress.warnings,
+        errors: progress.errors,
+        metadata: {
+          runId: progress.runId,
+          materializedRowCount: progress.materializedRowCount,
+          status: progress.status,
+          updatedAt: progress.updatedAt,
+        },
+      };
+    }, now);
   }
 
   async recordMarketDataStageSnapshot(
@@ -1986,7 +2141,8 @@ export class PipelineOrchestrationService {
     const warnings = this.toStringArray(request.warnings);
     const errors = this.toStringArray(request.errors);
     const changedInstrumentIds = this.normalizeInstrumentIds(request.changedInstrumentIds);
-    const changedInstrumentCount = changedInstrumentIds.length > 0 ? changedInstrumentIds.length : request.processedCount;
+    const downstreamInstrumentIds = this.normalizeInstrumentIds(request.downstreamInstrumentIds?.length ? request.downstreamInstrumentIds : request.changedInstrumentIds);
+    const changedInstrumentCount = changedInstrumentIds.length;
     const startedAt = this.parseOptionalDate(request.startedAt) || now;
     const completedAt = this.parseOptionalDate(request.completedAt) || (terminal ? now : null);
     const succeededCount = request.succeededCount ?? Math.max(0, request.processedCount - request.failedCount - request.skippedCount);
@@ -1995,6 +2151,7 @@ export class PipelineOrchestrationService {
       operation: request.operation,
       sourceRunId: runId,
       sourceModule: 'market-data-foundation',
+      downstreamInstrumentCount: downstreamInstrumentIds.length,
       ...(request.metadata || {}),
     };
 
@@ -2120,8 +2277,8 @@ export class PipelineOrchestrationService {
       normalizedScope,
       completedStage,
       outputFingerprint,
-      changedInstrumentIds,
-      normalizedBatchSize: this.normalizeScheduledBatchSize(request.batchSize ?? 25, changedInstrumentIds.length),
+      changedInstrumentIds: downstreamInstrumentIds,
+      normalizedBatchSize: this.normalizeScheduledBatchSize(request.batchSize ?? 25, downstreamInstrumentIds.length),
     });
     return completedStage;
   }
@@ -2176,7 +2333,7 @@ export class PipelineOrchestrationService {
     return value.trim().replace(/\s+/g, '-').toLowerCase();
   }
 
-  private groupStages(stages: PipelineStageRunRecord[]) {
+  private groupStages(stages: PipelineStageRunRecord[], now = new Date()) {
     const groups = new Map<string, {
       stageKey: string;
       stageOrder: number;
@@ -2191,11 +2348,33 @@ export class PipelineOrchestrationService {
         lastStage: null,
       };
       current.stageOrder = Math.min(current.stageOrder, stage.stageOrder);
-      if (!current.activeStage && ACTIVE_STATUSES.has(stage.status)) current.activeStage = this.toStageStatus(stage);
+      if (!current.activeStage && ACTIVE_STATUSES.has(stage.status) && !this.isStaleActiveStage(stage, now)) current.activeStage = this.toStageStatus(stage);
       if (!current.lastStage && TERMINAL_STATUSES.has(stage.status)) current.lastStage = this.toStageStatus(stage);
       groups.set(stage.stageKey, current);
     }
     return [...groups.values()].sort((a, b) => a.stageOrder - b.stageOrder || a.stageKey.localeCompare(b.stageKey));
+  }
+
+  private isStaleActiveRun(run: PipelineRunRecord, now: Date): boolean {
+    if (!ACTIVE_STATUSES.has(run.status)) return false;
+    const updatedAt = Date.parse(run.updatedAt || run.startedAt);
+    if (!Number.isFinite(updatedAt)) return true;
+    return now.getTime() - updatedAt > this.activeStaleMs();
+  }
+
+  private isStaleActiveStage(stage: PipelineStageRunRecord, now: Date): boolean {
+    if (!ACTIVE_STATUSES.has(stage.status)) return false;
+    const leaseExpiresAt = stage.leaseExpiresAt ? Date.parse(stage.leaseExpiresAt) : NaN;
+    if (Number.isFinite(leaseExpiresAt)) return leaseExpiresAt < now.getTime();
+    const updatedAt = Date.parse(stage.updatedAt || stage.startedAt || stage.createdAt);
+    if (!Number.isFinite(updatedAt)) return true;
+    return now.getTime() - updatedAt > this.activeStaleMs();
+  }
+
+  private activeStaleMs(): number {
+    const configured = Number(process.env.PIPELINE_ACTIVE_STALE_MS);
+    if (Number.isFinite(configured) && configured >= 60_000) return Math.floor(configured);
+    return DEFAULT_ACTIVE_STALE_MS;
   }
 
   private toRunStatus(run: PipelineRunRecord): PipelineStatusRunDto {
@@ -2255,6 +2434,7 @@ export class PipelineOrchestrationService {
       durationMs: stage.durationMs,
       warnings: stage.warnings,
       errors: stage.errors,
+      metadata: stage.metadata,
       updatedAt: stage.updatedAt,
     };
   }

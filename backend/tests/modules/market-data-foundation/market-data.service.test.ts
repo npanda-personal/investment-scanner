@@ -1688,8 +1688,9 @@ describe('MarketDataFoundationService syncV1', () => {
       rowsUpdated: 0,
       dataThroughDate: '2026-05-05',
       changedInstrumentIds: [],
+      downstreamInstrumentIds: ['stock-1'],
       changedInstrumentCount: 0,
-      dqStageEligible: false,
+      dqStageEligible: true,
     });
     expect(summary.sourceFingerprint).toEqual(expect.any(String));
     expect(service.ingestSymbol).toHaveBeenCalledWith(
@@ -1768,6 +1769,7 @@ describe('MarketDataFoundationService syncV1', () => {
 
       expect(summary).toMatchObject({
         changedInstrumentIds: ['stock-1'],
+        downstreamInstrumentIds: ['stock-1', 'stock-2'],
         changedInstrumentCount: 1,
         dqStageEligible: true,
       });

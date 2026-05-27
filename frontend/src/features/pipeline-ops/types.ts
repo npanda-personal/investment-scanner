@@ -54,6 +54,7 @@ export interface PipelineStatusStage {
   durationMs: number | null;
   warnings: string[];
   errors: string[];
+  metadata: Record<string, unknown> | null;
   updatedAt: string;
 }
 
@@ -100,6 +101,7 @@ export type PipelineCommandKey =
   | 'BACKTEST_PROOF_REFRESH'
   | 'RESEARCH_PROJECTION_REFRESH'
   | 'TODAY_REVIEW_PUBLISH'
+  | 'SIGNAL_POSITION_LEDGER_REFRESH'
   | 'PIPELINE_RUN_ALL'
   | 'PIPELINE_DRAIN_ALL_BATCHES'
   | 'PIPELINE_CANCEL_ACTIVE';

@@ -3,10 +3,8 @@ import { SignalPositionLedgerRepository } from '../../../src/modules/signal-posi
 
 describe('SignalPositionLedgerRepository', () => {
   it('lists latest scoped signal rows with pagination metadata', async () => {
-    const findMany = jest
-      .fn()
-      .mockResolvedValueOnce([{ instrumentId: 'stock-1' }, { instrumentId: 'stock-2' }])
-      .mockResolvedValueOnce([{
+    const findMany = jest.fn().mockResolvedValueOnce([
+      {
         id: 'signal-1',
         instrumentId: 'stock-1',
         symbol: 'ABC',
@@ -30,12 +28,39 @@ describe('SignalPositionLedgerRepository', () => {
         generationRunId: 'run-1',
         source: 'signal-generation-engine',
         dataStatus: 'COMPLETE',
-      }]);
+      },
+      {
+        id: 'signal-2',
+        instrumentId: 'stock-2',
+        symbol: 'XYZ',
+        companyName: 'XYZ Co',
+        sector: 'Tech',
+        country: 'IN',
+        score: 70,
+        direction: 'BULLISH',
+        confidence: 'MEDIUM',
+        triggeredSignals: [],
+        negativeSignals: [],
+        explanation: 'Bullish.',
+        generatedAt: new Date('2026-05-26T00:00:00.000Z'),
+        generatedDate: new Date('2026-05-26T00:00:00.000Z'),
+        modelVersion: 'signal-engine-v1',
+        rulesetVersion: 'signal-engine-v1',
+        sourceDataDate: new Date('2026-05-26T00:00:00.000Z'),
+        sourcePriceDate: new Date('2026-05-26T00:00:00.000Z'),
+        scoringInputSummary: {},
+        dataQualityEligibilitySnapshot: { filterApplied: true, eligible: true, signalReadinessStatus: 'READY' },
+        generationRunId: 'run-1',
+        source: 'signal-generation-engine',
+        dataStatus: 'COMPLETE',
+      },
+    ]);
     const repository = new SignalPositionLedgerRepository({ signalResult: { findMany } } as any);
 
     const page = await repository.listLatestSignals({ region: 'IN', assetType: 'STOCK', limit: 1, offset: 0 });
 
-    expect(findMany).toHaveBeenCalledTimes(2);
+    expect(findMany).toHaveBeenCalledTimes(1);
+    expect(findMany).toHaveBeenCalledWith(expect.objectContaining({ take: 2, skip: 0 }));
     expect(page.totalCount).toBe(2);
     expect(page.hasMore).toBe(true);
     expect(page.nextOffset).toBe(1);

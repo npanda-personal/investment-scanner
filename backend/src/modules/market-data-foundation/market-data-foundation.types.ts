@@ -183,6 +183,7 @@ export interface ScheduledRegionSyncSummary {
   dataThroughDate?: string | null;
   sourceFingerprint?: string | null;
   changedInstrumentIds?: string[];
+  downstreamInstrumentIds?: string[];
   changedInstrumentCount?: number;
   dqStageEligible?: boolean;
   instrumentsProcessed: number;

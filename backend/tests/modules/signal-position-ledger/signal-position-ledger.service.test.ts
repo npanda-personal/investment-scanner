@@ -114,7 +114,9 @@ describe('SignalPositionLedgerService', () => {
     };
     const service = new SignalPositionLedgerService(repository as any, signalService as any);
 
-    const result = await service.listActiveRows({ region: 'IN', assetType: 'STOCK', limit: 25, offset: 0 });
+    const query = { region: 'IN', assetType: 'STOCK', limit: 25, offset: 0 };
+    await service.refreshActiveRows(query, { force: true, wait: true });
+    const result = await service.listActiveRows(query);
 
     expect(result.totalCount).toBe(1);
     expect(result.items).toHaveLength(1);
@@ -170,7 +172,9 @@ describe('SignalPositionLedgerService', () => {
     };
     const service = new SignalPositionLedgerService(repository as any, signalService as any);
 
-    const result = await service.listActiveRows({ region: 'IN', assetType: 'STOCK', limit: 25, offset: 0 });
+    const query = { region: 'IN', assetType: 'STOCK', limit: 25, offset: 0 };
+    await service.refreshActiveRows(query, { force: true, wait: true });
+    const result = await service.listActiveRows(query);
 
     expect(result.items[0]).toMatchObject({
       currentReturnPercent: null,
@@ -206,7 +210,9 @@ describe('SignalPositionLedgerService', () => {
     };
     const service = new SignalPositionLedgerService(repository as any, signalService as any);
 
-    const result = await service.listActiveRows({ region: 'IN', assetType: 'STOCK', limit: 25, offset: 0 });
+    const query = { region: 'IN', assetType: 'STOCK', limit: 25, offset: 0 };
+    await service.refreshActiveRows(query, { force: true, wait: true });
+    const result = await service.listActiveRows(query);
 
     expect(result.items[0]).toMatchObject({
       currentDataQualityStatus: null,
@@ -250,7 +256,9 @@ describe('SignalPositionLedgerService', () => {
     };
     const service = new SignalPositionLedgerService(repository as any, signalService as any);
 
-    const result = await service.listActiveRows({ region: 'IN', assetType: 'STOCK', limit: 25, offset: 0 });
+    const query = { region: 'IN', assetType: 'STOCK', limit: 25, offset: 0 };
+    await service.refreshActiveRows(query, { force: true, wait: true });
+    const result = await service.listActiveRows(query);
 
     expect(result.items[0]).toMatchObject({
       healthState: 'RISK_WARNING',
@@ -292,7 +300,9 @@ describe('SignalPositionLedgerService', () => {
     };
     const service = new SignalPositionLedgerService(repository as any, signalService as any);
 
-    const result = await service.listActiveRows({ region: 'IN', assetType: 'STOCK', limit: 25, offset: 0 });
+    const query = { region: 'IN', assetType: 'STOCK', limit: 25, offset: 0 };
+    await service.refreshActiveRows(query, { force: true, wait: true });
+    const result = await service.listActiveRows(query);
 
     expect(result.items[0]).toMatchObject({
       healthState: null,
@@ -325,7 +335,9 @@ describe('SignalPositionLedgerService', () => {
     };
     const service = new SignalPositionLedgerService(repository as any, signalService as any);
 
-    const result = await service.listActiveRows({ region: 'IN', assetType: 'STOCK', limit: 25, offset: 0 });
+    const query = { region: 'IN', assetType: 'STOCK', limit: 25, offset: 0 };
+    await service.refreshActiveRows(query, { force: true, wait: true });
+    const result = await service.listActiveRows(query);
 
     expect(result.totalCount).toBe(0);
     expect(result.items).toHaveLength(0);
@@ -398,7 +410,9 @@ describe('SignalPositionLedgerService', () => {
     };
     const service = new SignalPositionLedgerService(repository as any, signalService as any);
 
-    const result = await service.listActiveRows({ region: 'IN', assetType: 'STOCK', limit: 1, offset: 0 });
+    const query = { region: 'IN', assetType: 'STOCK', limit: 1, offset: 0 };
+    await service.refreshActiveRows(query, { force: true, wait: true });
+    const result = await service.listActiveRows(query);
 
     expect(result.totalCount).toBe(3);
     expect(result.items).toHaveLength(1);
@@ -462,7 +476,9 @@ describe('SignalPositionLedgerService', () => {
     };
     const service = new SignalPositionLedgerService(repository as any, signalService as any);
 
-    const result = await service.listActiveRows({ region: 'IN', assetType: 'STOCK', limit: 1, offset: 1 });
+    const query = { region: 'IN', assetType: 'STOCK', limit: 1, offset: 1 };
+    await service.refreshActiveRows(query, { force: true, wait: true });
+    const result = await service.listActiveRows(query);
 
     expect(result.totalCount).toBe(2);
     expect(result.items).toHaveLength(1);

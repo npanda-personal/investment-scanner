@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
-import { fetchSignalPositionLedgerActiveRows } from '../api/signalPositionLedgerApi';
+import { fetchSignalPositionLedgerActiveRows, refreshSignalPositionLedgerActiveRows } from '../api/signalPositionLedgerApi';
 import type { SignalPositionLedgerActiveListResponse } from '../types';
 
 const DEFAULT_LIMIT = 25;
@@ -16,6 +16,7 @@ type LoadRequest = {
   assetType: string;
   limit: number;
   offset: number;
+  silent?: boolean;
 };
 
 function emptyResponse(region: string, assetType: string, limit = DEFAULT_LIMIT, offset = 0): SignalPositionLedgerActiveListResponse {
@@ -27,6 +28,21 @@ function emptyResponse(region: string, assetType: string, limit = DEFAULT_LIMIT,
     nextOffset: null,
     hasMore: false,
     scope: { region, assetType },
+    refresh: {
+      runId: null,
+      status: 'IDLE',
+      totalCount: 0,
+      processedCount: 0,
+      succeededCount: 0,
+      failedCount: 0,
+      skippedCount: 0,
+      materializedRowCount: 0,
+      startedAt: null,
+      completedAt: null,
+      updatedAt: null,
+      warnings: [],
+      errors: [],
+    },
     warnings: [],
   };
 }
@@ -43,13 +59,16 @@ export function useSignalPositionLedgerActiveRows() {
   const [paging, setPaging] = useState<PagingState>(() => ({ scopeKey, limit: DEFAULT_LIMIT, offset: 0 }));
   const [data, setData] = useState<SignalPositionLedgerActiveListResponse>(() => emptyResponse(region, assetType));
   const [loading, setLoading] = useState(true);
+  const [refreshingLedger, setRefreshingLedger] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const latestRequestRef = useRef(0);
 
-  const load = useCallback(async ({ region: requestRegion, assetType: requestAssetType, limit, offset }: LoadRequest) => {
+  const load = useCallback(async ({ region: requestRegion, assetType: requestAssetType, limit, offset, silent = false }: LoadRequest) => {
     const requestId = ++latestRequestRef.current;
-    setLoading(true);
-    setError(null);
+    if (!silent) {
+      setLoading(true);
+      setError(null);
+    }
     try {
       const nextData = await fetchSignalPositionLedgerActiveRows({
         region: requestRegion,
@@ -62,10 +81,10 @@ export function useSignalPositionLedgerActiveRows() {
     } catch (caught) {
       if (requestId !== latestRequestRef.current) return;
       setError(toErrorMessage(caught));
-      setData(emptyResponse(requestRegion, requestAssetType, limit, offset));
+      if (!silent) setData(emptyResponse(requestRegion, requestAssetType, limit, offset));
     } finally {
       if (requestId !== latestRequestRef.current) return;
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, []);
 
@@ -106,9 +125,36 @@ export function useSignalPositionLedgerActiveRows() {
     void load({ region, assetType, limit: paging.limit, offset: paging.offset });
   }, [assetType, load, paging.limit, paging.offset, region]);
 
+  const refreshLedger = useCallback(async () => {
+    setRefreshingLedger(true);
+    setError(null);
+    try {
+      await refreshSignalPositionLedgerActiveRows({
+        region,
+        assetType,
+        limit: paging.limit,
+        offset: paging.offset,
+      });
+      await load({ region, assetType, limit: paging.limit, offset: paging.offset, silent: true });
+    } catch (caught) {
+      setError(toErrorMessage(caught));
+    } finally {
+      setRefreshingLedger(false);
+    }
+  }, [assetType, load, paging.limit, paging.offset, region]);
+
+  useEffect(() => {
+    if (scopedData.refresh.status !== 'RUNNING') return;
+    const interval = window.setInterval(() => {
+      void load({ region, assetType, limit: paging.limit, offset: paging.offset, silent: true });
+    }, 2000);
+    return () => window.clearInterval(interval);
+  }, [assetType, load, paging.limit, paging.offset, region, scopedData.refresh.status]);
+
   return {
     data: scopedData,
     loading: loading || !isCurrentScopeData,
+    refreshingLedger,
     error: isCurrentScopeData ? error : null,
     scope,
     page: Math.floor(paging.offset / paging.limit),
@@ -116,5 +162,6 @@ export function useSignalPositionLedgerActiveRows() {
     setPage,
     setPageSize,
     reload,
+    refreshLedger,
   };
 }

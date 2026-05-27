@@ -18,6 +18,24 @@ export interface SignalPositionLedgerActiveQuery {
   offset: number;
 }
 
+export type SignalPositionLedgerRefreshStatus = 'IDLE' | 'RUNNING' | 'COMPLETED' | 'FAILED';
+
+export interface SignalPositionLedgerRefreshProgress {
+  runId: string | null;
+  status: SignalPositionLedgerRefreshStatus;
+  totalCount: number;
+  processedCount: number;
+  succeededCount: number;
+  failedCount: number;
+  skippedCount: number;
+  materializedRowCount: number;
+  startedAt: string | null;
+  completedAt: string | null;
+  updatedAt: string | null;
+  warnings: string[];
+  errors: string[];
+}
+
 export interface SignalPositionLedgerSignalPage {
   items: SignalResultDto[];
   totalCount: number;
@@ -72,6 +90,12 @@ export interface SignalPositionExitDecisionSnapshot {
   generatedAt: string;
 }
 
+export interface SignalPositionLedgerRowSnapshots {
+  latestPrice: SignalPositionLatestPriceSnapshot | null;
+  quality: SignalPositionDataQualitySnapshot | null;
+  exitDecision: SignalPositionExitDecisionSnapshot | null;
+}
+
 export interface SignalPositionLedgerActiveRow {
   signalId: string | null;
   instrumentId: string;
@@ -107,6 +131,12 @@ export interface SignalPositionLedgerActiveListResponse {
     region: string;
     assetType: string;
   };
+  refresh: SignalPositionLedgerRefreshProgress;
   warnings: string[];
+}
+
+export interface SignalPositionLedgerMaterializedSnapshot {
+  rows: SignalPositionLedgerActiveRow[];
+  refresh: SignalPositionLedgerRefreshProgress;
 }
 

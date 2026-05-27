@@ -9,6 +9,7 @@ export class ResearchHubController {
       const data = await this.service.overview({
         region: typeof req.query.region === 'string' ? req.query.region : undefined,
         assetType: typeof req.query.assetType === 'string' ? req.query.assetType : undefined,
+        live: req.query.live === 'true',
       });
       return res.json(data);
     } catch (error) {

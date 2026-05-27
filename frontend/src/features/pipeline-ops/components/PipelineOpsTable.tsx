@@ -54,6 +54,7 @@ const OPERATION_CATALOG: OperationDefinition[] = [
   { stageKey: 'BACKTEST_PROOF', stageOrder: 10, moduleName: 'Backtests', operationName: 'Backtest proof refresh', sourcePath: '/backtests' },
   { stageKey: 'RESEARCH_PROJECTION', stageOrder: 11, moduleName: 'Research', operationName: 'Research command projection', sourcePath: '/research' },
   { stageKey: 'TODAY_REVIEW', stageOrder: 12, moduleName: 'Today Review', operationName: 'Daily candidate publication', sourcePath: '/today-review' },
+  { stageKey: 'SIGNAL_POSITION_LEDGER', stageOrder: 13, moduleName: 'Signal Position Ledger', operationName: 'Open/closed position materialization', sourcePath: '/signals/position-ledger' },
 ];
 
 type PipelineOpsRow = OperationDefinition & PipelineStatusStageGroup;
@@ -236,6 +237,11 @@ function ProgressCell({ stage }: { stage: PipelineStatusStage | null }) {
         <Typography variant="caption" color="text.secondary">{stage && stage.totalCount > 0 ? `${percent}%` : 'N/A'}</Typography>
       </Stack>
       <LinearProgress variant="determinate" value={percent} sx={{ height: 7, borderRadius: 1 }} />
+      {stage?.hasMore && (
+        <Typography variant="caption" color="warning.main">
+          More batches pending from offset {stage.nextOffset ?? 'unknown'}
+        </Typography>
+      )}
     </Stack>
   );
 }
@@ -251,15 +257,48 @@ function RowDetails({ stage }: { stage: PipelineStatusStage | null }) {
   return (
     <Box sx={{ px: 2, py: 1.5 }}>
       <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} useFlexGap flexWrap="wrap">
+        <DetailBlock label="Execution Scope" value={executionScopeLabel(stage)} />
         <DetailBlock label="Cache" value={`${stage.cacheStatus}${stage.cacheKey ? ` | ${stage.cacheKey}` : ''}`} />
         <DetailBlock label="Input" value={stage.inputFingerprint || 'N/A'} />
         <DetailBlock label="Output" value={stage.outputFingerprint || 'N/A'} />
+        <DetailBlock label="Batch Cursor" value={`batch ${stage.batchSize ?? 'N/A'} | next ${stage.nextOffset ?? 'done'} | hasMore ${stage.hasMore ? 'yes' : 'no'}`} />
         <DetailBlock label="Lease" value={stage.leaseExpiresAt ? `${stage.leaseOwner || 'worker'} until ${formatDateTime(stage.leaseExpiresAt)}` : 'N/A'} />
         <DetailBlock label="Warnings" value={stage.warnings.length ? stage.warnings.join(' | ') : 'None'} />
         <DetailBlock label="Errors" value={stage.errors.length ? stage.errors.join(' | ') : 'None'} />
+        <DetailBlock label="Metadata" value={stage.metadata ? compactMetadata(stage.metadata) : 'N/A'} />
       </Stack>
     </Box>
   );
+}
+
+function executionScopeLabel(stage: PipelineStatusStage) {
+  const metadata = stage.metadata || {};
+  const changedCount = Number(metadata.changedInstrumentCount ?? stage.changedInstrumentCount ?? 0);
+  const adapterProcessed = Number(metadata.adapterProcessedCount ?? stage.processedCount ?? 0);
+  const scope = changedCount > 0 ? 'incremental changed/downstream set' : 'module snapshot';
+  return `${scope} | input ${changedCount || stage.totalCount || 0} | processed ${adapterProcessed}`;
+}
+
+function compactMetadata(metadata: Record<string, unknown>) {
+  const keys = [
+    'sourceStage',
+    'adapter',
+    'adapterProcessedCount',
+    'completedCount',
+    'changedInstrumentCount',
+    'downstreamInstrumentCount',
+    'generatedCount',
+    'updatedCount',
+    'noOpCount',
+    'calibratedCount',
+    'passthroughCount',
+    'evidenceStatus',
+    'readinessStatus',
+  ];
+  return keys
+    .filter((key) => metadata[key] !== undefined && metadata[key] !== null)
+    .map((key) => `${key}: ${String(metadata[key])}`)
+    .join(' | ') || 'No compact metadata';
 }
 
 function DetailBlock({ label, value }: { label: string; value: string }) {

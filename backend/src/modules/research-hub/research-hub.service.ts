@@ -3,6 +3,7 @@ import { MarketContextIntelligenceService } from '../market-context-intelligence
 import { SignalGenerationEngineService } from '../signal-generation-engine';
 import { SmartMoneyIntelligenceService } from '../smart-money-intelligence';
 import { StrategyFrameworkService } from '../strategy-framework';
+import prisma from '../../db/prisma';
 import type { StrategyDecisionDto, StrategyQuery } from '../strategy-decision-engine';
 import type { 
   ResearchOverview, 
@@ -19,16 +20,39 @@ import type {
   ActionabilityStatus
 } from './research-hub.types';
 
+const RESEARCH_OVERVIEW_PIPELINE_KEY = 'research-hub-overview';
+const RESEARCH_OVERVIEW_CACHE_VERSION = 'research-overview-v1';
+
 export class ResearchHubService {
   constructor(
     private readonly strategyService = new StrategyDecisionEngineService(),
     private readonly contextService = new MarketContextIntelligenceService(),
     private readonly signalService = new SignalGenerationEngineService(),
     private readonly smartMoneyService = new SmartMoneyIntelligenceService(),
-    private readonly strategyFrameworkService = new StrategyFrameworkService()
+    private readonly strategyFrameworkService = new StrategyFrameworkService(),
+    private readonly db = prisma
   ) {}
 
-  async overview(query: { region?: string; assetType?: string } = {}): Promise<ResearchOverview> {
+  async overview(query: { region?: string; assetType?: string; live?: boolean } = {}): Promise<ResearchOverview> {
+    const region = query.region || 'IN';
+    const assetType = query.assetType || 'STOCK';
+    if (!query.live) {
+      const cached = await this.loadCachedOverview(region, assetType);
+      if (cached) return cached;
+      return this.emptyOverview(['Research overview snapshot is not ready yet. Run the backend pipeline to materialize this dashboard.']);
+    }
+    return this.buildOverview({ region, assetType });
+  }
+
+  async refreshOverview(query: { region?: string; assetType?: string } = {}): Promise<ResearchOverview> {
+    const region = query.region || 'IN';
+    const assetType = query.assetType || 'STOCK';
+    const overview = await this.buildOverview({ region, assetType });
+    await this.saveCachedOverview(region, assetType, overview);
+    return overview;
+  }
+
+  private async buildOverview(query: { region?: string; assetType?: string } = {}): Promise<ResearchOverview> {
     const dataGaps: string[] = [];
     const region = query.region || 'IN';
     const assetType = query.assetType || 'STOCK';
@@ -148,6 +172,127 @@ export class ResearchHubService {
       strategyProofSummary,
       confirmationSummary,
       whatChanged,
+      nextActions,
+      generatedAt: new Date().toISOString(),
+      dataGaps,
+    };
+  }
+
+  private async loadCachedOverview(region: string, assetType: string): Promise<ResearchOverview | null> {
+    if (typeof (this.db as any).pipelineRun?.findFirst !== 'function') return null;
+    const row = await (this.db as any).pipelineRun.findFirst({
+      where: {
+        pipelineKey: RESEARCH_OVERVIEW_PIPELINE_KEY,
+        region,
+        assetType,
+        status: { in: ['COMPLETED', 'PARTIAL'] },
+        metadata: {
+          path: ['version'],
+          equals: RESEARCH_OVERVIEW_CACHE_VERSION,
+        },
+      },
+      orderBy: { updatedAt: 'desc' },
+    });
+    const overview = (row?.metadata as any)?.overview;
+    return overview && typeof overview === 'object' ? overview as ResearchOverview : null;
+  }
+
+  private async saveCachedOverview(region: string, assetType: string, overview: ResearchOverview): Promise<void> {
+    if (typeof (this.db as any).pipelineRun?.upsert !== 'function') return;
+    const idempotencyKey = [RESEARCH_OVERVIEW_CACHE_VERSION, region, assetType].join(':');
+    await (this.db as any).pipelineRun.upsert({
+      where: { idempotencyKey },
+      create: {
+        pipelineKey: RESEARCH_OVERVIEW_PIPELINE_KEY,
+        region,
+        assetType,
+        timeframe: '1d',
+        triggerType: 'scheduled',
+        status: overview.dataGaps.length > 0 ? 'PARTIAL' : 'COMPLETED',
+        totalCount: 1,
+        processedCount: 1,
+        succeededCount: 1,
+        partialCount: overview.dataGaps.length > 0 ? 1 : 0,
+        failedCount: 0,
+        skippedCount: 0,
+        unchangedCount: 0,
+        warnings: overview.dataGaps as any,
+        errors: [] as any,
+        idempotencyKey,
+        startedAt: new Date(overview.generatedAt),
+        completedAt: new Date(overview.generatedAt),
+        metadata: { version: RESEARCH_OVERVIEW_CACHE_VERSION, overview } as any,
+      },
+      update: {
+        status: overview.dataGaps.length > 0 ? 'PARTIAL' : 'COMPLETED',
+        totalCount: 1,
+        processedCount: 1,
+        succeededCount: 1,
+        partialCount: overview.dataGaps.length > 0 ? 1 : 0,
+        failedCount: 0,
+        skippedCount: 0,
+        unchangedCount: 0,
+        warnings: overview.dataGaps as any,
+        errors: [] as any,
+        completedAt: new Date(overview.generatedAt),
+        metadata: { version: RESEARCH_OVERVIEW_CACHE_VERSION, overview } as any,
+      },
+    });
+  }
+
+  private emptyOverview(dataGaps: string[]): ResearchOverview {
+    const marketReadiness: MarketReadiness = {
+      marketGate: 'UNKNOWN',
+      marketCondition: 'UNKNOWN',
+      headline: 'Research overview is waiting for the backend pipeline snapshot.',
+      allowedActions: [],
+      reasons: [],
+      blockers: dataGaps,
+      dataStatus: 'MISSING',
+    };
+    const priorities: ResearchPriorities = {
+      tradeCandidates: [],
+      watchCandidates: [],
+      avoidCandidates: [],
+      exitCandidates: [],
+    };
+    const confirmationSummary: ConfirmationSummary = {
+      signalSummary: {
+        topBullishCount: 0,
+        topBearishCount: 0,
+        reliabilityAvailable: false,
+        notes: ['Signal evidence is unavailable until the research overview pipeline materializes a snapshot.'],
+      },
+      smartMoneySummary: {
+        accumulationCount: 0,
+        distributionCount: 0,
+        topConfirmations: [],
+        topContradictions: [],
+      },
+      marketContextSummary: {
+        leadingSectors: [],
+        weakSectors: [],
+        breadthStatus: 'Breadth unavailable',
+        notes: [],
+      },
+    };
+    const nextActions: NextAction[] = [{
+      label: 'Run Backend Pipeline',
+      priority: 'HIGH',
+      targetRoute: '/pipeline-ops',
+    }];
+    return {
+      actionability: this.buildActionability(marketReadiness, priorities, this.buildStrategyProofSummary([], marketReadiness), confirmationSummary, dataGaps, nextActions),
+      marketReadiness,
+      researchPriorities: priorities,
+      strategyProofSummary: this.buildStrategyProofSummary([], marketReadiness),
+      confirmationSummary,
+      whatChanged: {
+        newTradeCandidates: [],
+        downgradedCandidates: [],
+        marketGateChange: null,
+        warnings: dataGaps,
+      },
       nextActions,
       generatedAt: new Date().toISOString(),
       dataGaps,

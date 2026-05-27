@@ -65,33 +65,33 @@ export function useDailyOverviewDashboard(): DailyOverviewDashboardState & { ref
 
     const scopeParams = { region: scope.region, assetType: scope.assetType };
 
-    const [todayReviewResult, researchResult, readinessResult] = await Promise.allSettled([
-      fetchDailyOverviewTodayReview(scopeParams),
-      fetchDailyOverviewResearchOverview(scopeParams),
-      fetchDailyOverviewReviewReadiness(scopeParams),
-    ]);
-
-    if (requestRef.current !== requestId) return;
-
-    const dashboardFetchedAt = new Date().toISOString();
-    setTodayReview((current) => {
-      if (todayReviewResult.status === 'fulfilled') {
-        return { data: todayReviewResult.value, loading: false, error: null, dashboardFetchedAt };
-      }
-      return { ...current, loading: false, error: toErrorMessage(todayReviewResult.reason, 'Failed to load Today Review summary.') };
-    });
-    setResearchOverview((current) => {
-      if (researchResult.status === 'fulfilled') {
-        return { data: researchResult.value, loading: false, error: null, dashboardFetchedAt };
-      }
-      return { ...current, loading: false, error: toErrorMessage(researchResult.reason, 'Failed to load Research overview summary.') };
-    });
-    setReviewReadiness((current) => {
-      if (readinessResult.status === 'fulfilled') {
-        return { data: readinessResult.value, loading: false, error: null, dashboardFetchedAt };
-      }
-      return { ...current, loading: false, error: toErrorMessage(readinessResult.reason, 'Failed to load review-readiness summary.') };
-    });
+    void fetchDailyOverviewTodayReview(scopeParams)
+      .then((value) => {
+        if (requestRef.current !== requestId) return;
+        setTodayReview({ data: value, loading: false, error: null, dashboardFetchedAt: new Date().toISOString() });
+      })
+      .catch((error) => {
+        if (requestRef.current !== requestId) return;
+        setTodayReview((current) => ({ ...current, loading: false, error: toErrorMessage(error, 'Failed to load Today Review summary.') }));
+      });
+    void fetchDailyOverviewResearchOverview(scopeParams)
+      .then((value) => {
+        if (requestRef.current !== requestId) return;
+        setResearchOverview({ data: value, loading: false, error: null, dashboardFetchedAt: new Date().toISOString() });
+      })
+      .catch((error) => {
+        if (requestRef.current !== requestId) return;
+        setResearchOverview((current) => ({ ...current, loading: false, error: toErrorMessage(error, 'Failed to load Research overview summary.') }));
+      });
+    void fetchDailyOverviewReviewReadiness(scopeParams)
+      .then((value) => {
+        if (requestRef.current !== requestId) return;
+        setReviewReadiness({ data: value, loading: false, error: null, dashboardFetchedAt: new Date().toISOString() });
+      })
+      .catch((error) => {
+        if (requestRef.current !== requestId) return;
+        setReviewReadiness((current) => ({ ...current, loading: false, error: toErrorMessage(error, 'Failed to load review-readiness summary.') }));
+      });
     setCriticalLoading(false);
 
     setMarketContext((current) => ({ ...current, loading: true, error: null }));

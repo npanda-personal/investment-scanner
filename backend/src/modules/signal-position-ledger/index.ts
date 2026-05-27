@@ -11,6 +11,8 @@ export type {
   SignalPositionLedgerActiveQuery,
   SignalPositionLedgerActiveRow,
   SignalPositionLedgerActiveListResponse,
+  SignalPositionLedgerRefreshProgress,
+  SignalPositionLedgerRefreshStatus,
   SignalPositionTriggerType,
   SignalPositionReturnStatus,
   SignalPositionHealthState,

@@ -421,7 +421,10 @@ Environment defaults:
 | `MARKET_DATA_SCHEDULER_FINALIZATION_GRACE_MINUTES` | `15` | Grace period after close before final confirmation can be trusted. |
 | `MARKET_DATA_SCHEDULER_SKIP_WEEKENDS` | `true` | Skips non-trading weekends by default. |
 | `MARKET_DATA_NSE_OFFICIAL_EOD_BULK_ENABLED` | `true` in non-test, `false` in test | Enables one-file official NSE latest completed EOD bulk attempt for scheduled `IN/STOCK` sync before per-symbol provider fallback. |
-| `MARKET_DATA_STARTUP_PRICE_BACKFILL_MAX_BATCHES` | `5` | Bounds startup latest-only price backfill so server boot does not queue a multi-hour historical drain. |
+| `MARKET_DATA_SCHEDULER_RUN_ON_STARTUP` | `false` | Keeps server boot from starting ingestion before the operator asks for it or the interval fires. |
+| `MARKET_DATA_STARTUP_PRICE_BACKFILL_ENABLED` | `false` | Startup price backfill is disabled by default because it can launch provider work during ordinary server validation. |
+| `MARKET_DATA_ALLOW_STARTUP_PROVIDER_LOADS` | `false` | Required second opt-in before startup price backfill may call a provider. |
+| `MARKET_DATA_STARTUP_PRICE_BACKFILL_MAX_BATCHES` | `5` | Bounds startup latest-only price backfill when both startup backfill and startup provider loads are explicitly enabled. |
 | `MARKET_DATA_MANUAL_SYNC_COOLDOWN_MINUTES` | `15` | Cooldown for manual catalog/instrument freshness checks before another provider fetch is eligible. |
 
 ### Session Model

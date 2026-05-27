@@ -245,6 +245,97 @@ describe('PipelineOrchestrationService', () => {
     });
   });
 
+  it('hides stale active run and stage rows from status snapshots', async () => {
+    const staleRun = {
+      id: 'run-stale',
+      pipelineKey: 'market-intelligence',
+      region: 'IN',
+      assetType: 'STOCK',
+      timeframe: '1d',
+      triggerType: 'scheduled',
+      status: 'RUNNING',
+      idempotencyKey: 'run-stale-key',
+      dataThroughDate: null,
+      sourceFingerprint: null,
+      changedInstrumentCount: 0,
+      totalCount: 100,
+      processedCount: 20,
+      succeededCount: 20,
+      partialCount: 0,
+      failedCount: 0,
+      skippedCount: 0,
+      unchangedCount: 0,
+      warnings: [],
+      errors: [],
+      metadata: null,
+      startedAt: '2026-05-25T01:00:00.000Z',
+      completedAt: null,
+      durationMs: null,
+      createdAt: '2026-05-25T01:00:00.000Z',
+      updatedAt: '2026-05-25T01:00:00.000Z',
+    };
+    const repository = {
+      findActiveRun: jest.fn().mockResolvedValue(staleRun),
+      findLastRun: jest.fn().mockResolvedValue(null),
+      latestStages: jest.fn().mockResolvedValue([{
+        id: 'stage-stale',
+        pipelineRunId: 'run-stale',
+        stageKey: 'MARKET_DATA',
+        stageOrder: 1,
+        status: 'RUNNING',
+        idempotencyKey: 'stage-stale-key',
+        region: 'IN',
+        assetType: 'STOCK',
+        timeframe: '1d',
+        dataThroughDate: null,
+        inputFingerprint: null,
+        outputFingerprint: null,
+        changedInstrumentCount: 0,
+        batchSize: 25,
+        offset: 0,
+        nextOffset: 20,
+        hasMore: true,
+        totalCount: 100,
+        processedCount: 20,
+        succeededCount: 20,
+        partialCount: 0,
+        failedCount: 0,
+        skippedCount: 0,
+        unchangedCount: 0,
+        attemptCount: 1,
+        cacheKey: null,
+        cacheStatus: 'BYPASS',
+        cacheExpiresAt: null,
+        leaseOwner: 'dead-worker',
+        leaseExpiresAt: '2026-05-25T01:10:00.000Z',
+        startedAt: '2026-05-25T01:00:00.000Z',
+        completedAt: null,
+        durationMs: null,
+        warnings: [],
+        errors: [],
+        metadata: null,
+        createdAt: '2026-05-25T01:00:00.000Z',
+        updatedAt: '2026-05-25T01:00:00.000Z',
+      }]),
+    };
+    const service = new PipelineOrchestrationService(repository as any);
+
+    const snapshot = await service.status({
+      region: 'IN',
+      assetType: 'STOCK',
+      timeframe: '1d',
+      pipelineKey: 'market-intelligence',
+      limit: 25,
+    }, new Date('2026-05-25T01:30:00.000Z'));
+
+    expect(snapshot.activeRun).toBeNull();
+    expect(snapshot.stages[0]).toMatchObject({
+      stageKey: 'MARKET_DATA',
+      activeStage: null,
+      lastStage: null,
+    });
+  });
+
   it('returns a command catalog with only DATA_QUALITY_EVALUATE_SCOPE enabled', () => {
     const service = new PipelineOrchestrationService({} as any, {} as any);
     const catalog = service.commandCatalog({
@@ -1020,7 +1111,15 @@ describe('PipelineOrchestrationService', () => {
       stageKey: 'SIGNAL_CALIBRATION',
       stageOrder: 4,
     }));
-    expect(repository.recordStageProgress).toHaveBeenCalledTimes(3);
+    expect(repository.recordStageProgress.mock.calls.length).toBeGreaterThanOrEqual(3);
+    expect(repository.recordStageProgress.mock.calls.map(([input]) => input)).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        status: 'RUNNING',
+        totalCount: 2,
+        processedCount: 2,
+        succeededCount: 2,
+      }),
+    ]));
     expect(repository.completeStage).toHaveBeenCalledWith(expect.objectContaining({
       status: 'COMPLETED',
       processedCount: 2,

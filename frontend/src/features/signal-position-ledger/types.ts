@@ -19,6 +19,24 @@ export interface SignalPositionLedgerActiveQuery extends SignalPositionLedgerSco
   offset: number;
 }
 
+export type SignalPositionLedgerRefreshStatus = 'IDLE' | 'RUNNING' | 'COMPLETED' | 'FAILED';
+
+export interface SignalPositionLedgerRefreshProgress {
+  runId: string | null;
+  status: SignalPositionLedgerRefreshStatus;
+  totalCount: number;
+  processedCount: number;
+  succeededCount: number;
+  failedCount: number;
+  skippedCount: number;
+  materializedRowCount: number;
+  startedAt: string | null;
+  completedAt: string | null;
+  updatedAt: string | null;
+  warnings: string[];
+  errors: string[];
+}
+
 export interface SignalPositionLedgerActiveRow {
   signalId: string | null;
   instrumentId: string;
@@ -51,5 +69,6 @@ export interface SignalPositionLedgerActiveListResponse {
   nextOffset: number | null;
   hasMore: boolean;
   scope: SignalPositionLedgerScope;
+  refresh: SignalPositionLedgerRefreshProgress;
   warnings: string[];
 }

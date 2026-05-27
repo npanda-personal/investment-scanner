@@ -5,6 +5,7 @@ export function createSignalPositionLedgerRouter(controller = new SignalPosition
   const router = Router();
   router.get('/signals/position-ledger/health', controller.health);
   router.get('/signals/position-ledger/active', controller.activeRows);
+  router.post('/signals/position-ledger/active/refresh', controller.refreshActiveRows);
   return router;
 }
 

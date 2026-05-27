@@ -6,6 +6,9 @@ import type {
   SignalPositionLedgerActiveListResponse,
   SignalPositionLedgerActiveQuery,
   SignalPositionLedgerActiveRow,
+  SignalPositionLedgerRowSnapshots,
+  SignalPositionLedgerRefreshProgress,
+  SignalPositionLedgerRefreshStatus,
   SignalPositionLatestPriceSnapshot,
   SignalPositionTriggerContractReadModel,
 } from './signal-position-ledger.types';
@@ -13,20 +16,48 @@ import { SignalPositionLedgerRepository } from './signal-position-ledger.reposit
 
 const SOURCE_PAGE_LIMIT = 100;
 const PRICE_STALE_DAYS = 5;
+const REFRESH_STALE_MS = 15 * 60 * 1000;
+
+type LedgerRefreshState = {
+  scopeKey: string;
+  region: string;
+  assetType: string;
+  runId: string;
+  status: SignalPositionLedgerRefreshStatus;
+  rows: Map<string, SignalPositionLedgerActiveRow>;
+  totalCount: number;
+  processedCount: number;
+  succeededCount: number;
+  failedCount: number;
+  skippedCount: number;
+  startedAt: string;
+  completedAt: string | null;
+  updatedAt: string;
+  warnings: string[];
+  errors: string[];
+  promise: Promise<void> | null;
+};
+
+type RefreshOptions = {
+  force?: boolean;
+  wait?: boolean;
+};
 
 export class SignalPositionLedgerService {
+  private readonly refreshStates = new Map<string, LedgerRefreshState>();
+
   constructor(
     private readonly repository = new SignalPositionLedgerRepository(),
     private readonly signalService = new SignalGenerationEngineService(),
   ) {}
 
   async listActiveRows(query: SignalPositionLedgerActiveQuery): Promise<SignalPositionLedgerActiveListResponse> {
-    const warnings: string[] = [];
-    const candidates = await this.collectActiveCandidates(query, warnings);
-    const orderedCandidates = this.orderActiveCandidates(candidates);
-    const totalCount = orderedCandidates.length;
-    const selected = orderedCandidates.slice(query.offset, query.offset + query.limit);
-    const items = await Promise.all(selected.map((candidate) => this.toActiveRow(candidate, query)));
+    const state = this.refreshStates.get(this.scopeKey(query));
+    const snapshot = state ? null : await this.loadMaterializedSnapshot(query);
+    const refresh = state ? this.toRefreshProgress(state) : snapshot?.refresh ?? this.toRefreshProgress(null);
+    const orderedRows = this.orderActiveRows(state ? [...state.rows.values()] : snapshot?.rows ?? []);
+    const totalCount = orderedRows.length;
+    const items = orderedRows.slice(query.offset, query.offset + query.limit);
 
     const nextOffset = query.offset + items.length;
     return {
@@ -40,8 +71,15 @@ export class SignalPositionLedgerService {
         region: query.region,
         assetType: query.assetType,
       },
-      warnings,
+      refresh,
+      warnings: this.activeWarnings(state, snapshot?.refresh ?? null),
     };
+  }
+
+  async refreshActiveRows(query: SignalPositionLedgerActiveQuery, options: RefreshOptions = {}): Promise<SignalPositionLedgerRefreshProgress> {
+    const state = this.ensureRefreshStarted(query, options.force === true);
+    if (options.wait && state.promise) await state.promise;
+    return this.toRefreshProgress(state);
   }
 
   async health() {
@@ -52,65 +90,23 @@ export class SignalPositionLedgerService {
     };
   }
 
-  private async collectActiveCandidates(query: SignalPositionLedgerActiveQuery, warnings: string[]): Promise<SignalPositionLedgerActiveCandidate[]> {
-    const candidates: SignalPositionLedgerActiveCandidate[] = [];
-    let sourceOffset = 0;
-    let hasMore = true;
-    let totalSignals = 0;
-
-    while (hasMore) {
-      const page = await this.repository.listLatestSignals({
-        region: query.region,
-        assetType: query.assetType,
-        limit: SOURCE_PAGE_LIMIT,
-        offset: sourceOffset,
-      });
-      totalSignals = page.totalCount;
-      const trusted = page.items.filter((signal) => this.isTrustedReadSignal(signal));
-      const enriched = trusted.length > 0
-        ? await this.signalService.enrichSignals(trusted, { includeStrategyMatches: true })
-        : [];
-
-      for (const signal of enriched) {
-        const trigger = signal.triggerContract;
-        if (!trigger) continue;
-        if (!this.isEligibleActiveTrigger(trigger)) continue;
-        candidates.push({ signal, triggerContract: trigger });
-      }
-
-      hasMore = page.hasMore;
-      sourceOffset = page.nextOffset ?? (sourceOffset + page.items.length);
-      if (page.items.length === 0) break;
-    }
-
-    if (totalSignals > 0 && candidates.length === 0) {
-      warnings.push('No active rows satisfied source-proven entry trigger evidence in the selected scope.');
-    }
-
-    return candidates;
-  }
-
-  private orderActiveCandidates(candidates: SignalPositionLedgerActiveCandidate[]): SignalPositionLedgerActiveCandidate[] {
-    return [...candidates].sort((left, right) => {
-      const rightTime = Date.parse(right.triggerContract.trigger_timestamp || '');
-      const leftTime = Date.parse(left.triggerContract.trigger_timestamp || '');
+  private orderActiveRows(rows: SignalPositionLedgerActiveRow[]): SignalPositionLedgerActiveRow[] {
+    return [...rows].sort((left, right) => {
+      const rightTime = Date.parse(right.entryTriggerTimestamp || '');
+      const leftTime = Date.parse(left.entryTriggerTimestamp || '');
       const timeDelta = (Number.isFinite(rightTime) ? rightTime : 0) - (Number.isFinite(leftTime) ? leftTime : 0);
       if (timeDelta !== 0) return timeDelta;
 
-      const symbolDelta = left.signal.symbol.localeCompare(right.signal.symbol);
+      const symbolDelta = left.symbol.localeCompare(right.symbol);
       if (symbolDelta !== 0) return symbolDelta;
 
-      return left.signal.instrument_id.localeCompare(right.signal.instrument_id);
+      return left.instrumentId.localeCompare(right.instrumentId);
     });
   }
 
-  private async toActiveRow(candidate: SignalPositionLedgerActiveCandidate, scope: Pick<SignalPositionLedgerActiveQuery, 'region' | 'assetType'>): Promise<SignalPositionLedgerActiveRow> {
+  private toActiveRow(candidate: SignalPositionLedgerActiveCandidate, snapshots: SignalPositionLedgerRowSnapshots): SignalPositionLedgerActiveRow {
     const { signal, triggerContract } = candidate;
-    const [latestPrice, quality, exitDecision] = await Promise.all([
-      this.repository.latestPriceByInstrumentId(signal.instrument_id, scope),
-      this.repository.latestDataQualityByInstrumentId(signal.instrument_id),
-      this.repository.latestExitDecisionByInstrumentId(signal.instrument_id),
-    ]);
+    const { latestPrice, quality, exitDecision } = snapshots;
 
     const returnProjection = this.currentReturnProjection(triggerContract.trigger_price as number, latestPrice, quality);
     const healthState = this.healthStateForDecision(exitDecision?.decision);
@@ -211,6 +207,250 @@ export class SignalPositionLedgerService {
     if (decision === 'EXIT_CANDIDATE') return 'EXIT_TRIGGERED';
     if (decision === 'REDUCE_RISK') return 'RISK_WARNING';
     return null;
+  }
+
+  private async loadRowSnapshots(
+    candidates: SignalPositionLedgerActiveCandidate[],
+    scope: Pick<SignalPositionLedgerActiveQuery, 'region' | 'assetType'>,
+  ): Promise<Map<string, SignalPositionLedgerRowSnapshots>> {
+    const instrumentIds = candidates.map((candidate) => candidate.signal.instrument_id);
+    const repositoryWithBatch = this.repository as SignalPositionLedgerRepository & {
+      latestSnapshotsByInstrumentIds?: (
+        instrumentIds: string[],
+        scope: Pick<SignalPositionLedgerActiveQuery, 'region' | 'assetType'>,
+      ) => Promise<Map<string, SignalPositionLedgerRowSnapshots>>;
+    };
+    if (typeof repositoryWithBatch.latestSnapshotsByInstrumentIds === 'function') {
+      return repositoryWithBatch.latestSnapshotsByInstrumentIds(instrumentIds, scope);
+    }
+
+    const snapshots = new Map<string, SignalPositionLedgerRowSnapshots>();
+    await Promise.all(candidates.map(async (candidate) => {
+      const [latestPrice, quality, exitDecision] = await Promise.all([
+        this.repository.latestPriceByInstrumentId(candidate.signal.instrument_id, scope),
+        this.repository.latestDataQualityByInstrumentId(candidate.signal.instrument_id),
+        this.repository.latestExitDecisionByInstrumentId(candidate.signal.instrument_id),
+      ]);
+      snapshots.set(candidate.signal.instrument_id, { latestPrice, quality, exitDecision });
+    }));
+    return snapshots;
+  }
+
+  private emptySnapshots(): SignalPositionLedgerRowSnapshots {
+    return {
+      latestPrice: null,
+      quality: null,
+      exitDecision: null,
+    };
+  }
+
+  private ensureRefreshStarted(query: SignalPositionLedgerActiveQuery, force: boolean): LedgerRefreshState {
+    const scopeKey = this.scopeKey(query);
+    const existing = this.refreshStates.get(scopeKey);
+    if (existing?.status === 'RUNNING') return existing;
+    if (!force && existing && !this.isRefreshStale(existing)) return existing;
+
+    const now = new Date().toISOString();
+    const state: LedgerRefreshState = {
+      scopeKey,
+      region: query.region,
+      assetType: query.assetType,
+      runId: `signal-position-ledger-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      status: 'RUNNING',
+      rows: new Map(),
+      totalCount: 0,
+      processedCount: 0,
+      succeededCount: 0,
+      failedCount: 0,
+      skippedCount: 0,
+      startedAt: now,
+      completedAt: null,
+      updatedAt: now,
+      warnings: [],
+      errors: [],
+      promise: null,
+    };
+    state.promise = this.runIncrementalRefresh(state, { ...query, offset: 0 });
+    this.refreshStates.set(scopeKey, state);
+    void this.persistRefreshState(state);
+    return state;
+  }
+
+  private async runIncrementalRefresh(state: LedgerRefreshState, query: SignalPositionLedgerActiveQuery): Promise<void> {
+    let sourceOffset = 0;
+    let hasMore = true;
+    try {
+      while (hasMore && state.status === 'RUNNING') {
+        const page = await this.repository.listLatestSignals({
+          region: query.region,
+          assetType: query.assetType,
+          limit: SOURCE_PAGE_LIMIT,
+          offset: sourceOffset,
+        });
+
+        state.totalCount = Math.max(state.totalCount, page.totalCount, page.offset + page.items.length);
+        state.processedCount += page.items.length;
+
+        const trusted = page.items.filter((signal) => this.isTrustedReadSignal(signal));
+        state.skippedCount += page.items.length - trusted.length;
+        const enriched = trusted.length > 0
+          ? await this.signalService.enrichSignals(trusted, { includeStrategyMatches: true })
+          : [];
+        const candidates: SignalPositionLedgerActiveCandidate[] = [];
+        for (const signal of enriched) {
+          const trigger = signal.triggerContract as SignalPositionTriggerContractReadModel | undefined;
+          if (!trigger) {
+            state.skippedCount += 1;
+            continue;
+          }
+          if (!this.isEligibleActiveTrigger(trigger)) {
+            state.skippedCount += 1;
+            continue;
+          }
+          candidates.push({ signal, triggerContract: trigger });
+        }
+
+        const snapshots = await this.loadRowSnapshots(candidates, query);
+        for (const candidate of candidates) {
+          const row = this.toActiveRow(candidate, snapshots.get(candidate.signal.instrument_id) ?? this.emptySnapshots());
+          state.rows.set(this.rowKey(row), row);
+          state.succeededCount += 1;
+        }
+
+        hasMore = page.hasMore;
+        sourceOffset = page.nextOffset ?? (sourceOffset + page.items.length);
+        state.updatedAt = new Date().toISOString();
+        await this.persistRefreshState(state);
+        if (page.items.length === 0) break;
+      }
+      if (state.totalCount < state.processedCount) state.totalCount = state.processedCount;
+      state.status = 'COMPLETED';
+      state.completedAt = new Date().toISOString();
+      state.updatedAt = state.completedAt;
+      if (state.processedCount > 0 && state.rows.size === 0) {
+        state.warnings.push('No active rows satisfied source-proven entry trigger evidence in the selected scope.');
+      }
+      await this.persistRefreshState(state);
+    } catch (error) {
+      state.status = 'FAILED';
+      state.failedCount += 1;
+      state.completedAt = new Date().toISOString();
+      state.updatedAt = state.completedAt;
+      state.errors.push(error instanceof Error ? error.message : 'Signal position ledger refresh failed.');
+      await this.persistRefreshState(state).catch(() => undefined);
+    }
+  }
+
+  private toRefreshProgress(state: LedgerRefreshState | null | undefined): SignalPositionLedgerRefreshProgress {
+    if (!state) {
+      return {
+        runId: null,
+        status: 'IDLE',
+        totalCount: 0,
+        processedCount: 0,
+        succeededCount: 0,
+        failedCount: 0,
+        skippedCount: 0,
+        materializedRowCount: 0,
+        startedAt: null,
+        completedAt: null,
+        updatedAt: null,
+        warnings: [],
+        errors: [],
+      };
+    }
+
+    return {
+      runId: state.runId,
+      status: state.status,
+      totalCount: state.totalCount,
+      processedCount: state.processedCount,
+      succeededCount: state.succeededCount,
+      failedCount: state.failedCount,
+      skippedCount: state.skippedCount,
+      materializedRowCount: state.rows.size,
+      startedAt: state.startedAt,
+      completedAt: state.completedAt,
+      updatedAt: state.updatedAt,
+      warnings: state.warnings,
+      errors: state.errors,
+    };
+  }
+
+  private activeWarnings(state: LedgerRefreshState | undefined, persisted: SignalPositionLedgerRefreshProgress | null): string[] {
+    const warnings = [...(state?.warnings ?? persisted?.warnings ?? [])];
+    if (state?.status === 'RUNNING') {
+      warnings.push(`Signal Position Ledger refresh is running; ${state.rows.size} materialized rows are currently available.`);
+    }
+    if (!state && !persisted) {
+      warnings.push('No Signal Position Ledger pipeline snapshot is available yet. Start a ledger refresh or wait for the automated pipeline.');
+    }
+    return warnings;
+  }
+
+  private isRefreshStale(state: LedgerRefreshState): boolean {
+    if (state.status === 'RUNNING') return false;
+    const updatedAt = Date.parse(state.updatedAt);
+    if (!Number.isFinite(updatedAt)) return true;
+    return Date.now() - updatedAt > REFRESH_STALE_MS;
+  }
+
+  private scopeKey(query: Pick<SignalPositionLedgerActiveQuery, 'region' | 'assetType'>): string {
+    return `${query.region.trim().toUpperCase()}:${query.assetType.trim().toUpperCase()}`;
+  }
+
+  private rowKey(row: SignalPositionLedgerActiveRow): string {
+    return row.signalId || `${row.instrumentId}:${row.entryTriggerTimestamp}:${row.triggerType}`;
+  }
+
+  private async loadMaterializedSnapshot(
+    query: Pick<SignalPositionLedgerActiveQuery, 'region' | 'assetType'>,
+  ) {
+    const repositoryWithCache = this.repository as SignalPositionLedgerRepository & {
+      loadLatestMaterializedSnapshot?: (
+        query: Pick<SignalPositionLedgerActiveQuery, 'region' | 'assetType'>,
+      ) => Promise<{ rows: SignalPositionLedgerActiveRow[]; refresh: SignalPositionLedgerRefreshProgress } | null>;
+    };
+    if (typeof repositoryWithCache.loadLatestMaterializedSnapshot !== 'function') return null;
+    return repositoryWithCache.loadLatestMaterializedSnapshot(query);
+  }
+
+  private async persistRefreshState(state: LedgerRefreshState): Promise<void> {
+    const repositoryWithCache = this.repository as SignalPositionLedgerRepository & {
+      saveMaterializedSnapshot?: (input: {
+        region: string;
+        assetType: string;
+        runId: string;
+        status: SignalPositionLedgerRefreshStatus;
+        rows: SignalPositionLedgerActiveRow[];
+        totalCount: number;
+        processedCount: number;
+        succeededCount: number;
+        failedCount: number;
+        skippedCount: number;
+        startedAt: Date;
+        completedAt?: Date | null;
+        warnings: string[];
+        errors: string[];
+      }) => Promise<void>;
+    };
+    if (typeof repositoryWithCache.saveMaterializedSnapshot !== 'function') return;
+    await repositoryWithCache.saveMaterializedSnapshot({
+      region: state.region,
+      assetType: state.assetType,
+      runId: state.runId,
+      status: state.status,
+      rows: [...state.rows.values()],
+      totalCount: state.totalCount,
+      processedCount: state.processedCount,
+      succeededCount: state.succeededCount,
+      failedCount: state.failedCount,
+      skippedCount: state.skippedCount,
+      startedAt: new Date(state.startedAt),
+      completedAt: state.completedAt ? new Date(state.completedAt) : null,
+      warnings: state.warnings,
+      errors: state.errors,
+    });
   }
 }
 

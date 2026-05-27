@@ -76,6 +76,33 @@ describe('StrategyDecisionEngineService', () => {
     });
   });
 
+  describe('latestForInstrument', () => {
+    it('is read-only and does not evaluate or persist missing decisions during page reads', async () => {
+      const repository = {
+        latestForInstrument: jest.fn().mockResolvedValue(null),
+        create: jest.fn(),
+      };
+      const svc = new StrategyDecisionEngineService(
+        repository as any,
+        {} as any,
+        mockContext as any,
+        mockSignal as any,
+        mockCalibration as any,
+        mockQuality as any,
+        mockSmartMoney as any,
+        {} as any,
+        {} as any
+      );
+      const evaluateSpy = jest.spyOn(svc, 'evaluateInstrumentStrategy');
+
+      await expect(svc.latestForInstrument('stock-1', 'TREND_MOMENTUM', 'IN')).resolves.toBeNull();
+
+      expect(repository.latestForInstrument).toHaveBeenCalledWith('stock-1', 'TREND_MOMENTUM');
+      expect(evaluateSpy).not.toHaveBeenCalled();
+      expect(repository.create).not.toHaveBeenCalled();
+    });
+  });
+
   describe('evaluateTrendMomentum', () => {
     it('returns TRADE_CANDIDATE when all rules align', () => {
       const ctx = {

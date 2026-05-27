@@ -1,7 +1,27 @@
 /// <reference types="@types/jest" />
-import { MarketDataFoundationScheduler } from '../../../src/modules/market-data-foundation';
+import {
+  MarketDataFoundationScheduler,
+  readMarketDataSchedulerConfig,
+  startMarketDataStartupPriceBackfill,
+} from '../../../src/modules/market-data-foundation';
 
 describe('MarketDataFoundationScheduler', () => {
+  it('keeps scheduler startup and provider backfill disabled unless explicitly opted in', async () => {
+    expect(readMarketDataSchedulerConfig({ ANGEL_ONE_ENABLE_MARKET_DATA: 'true' } as any).runOnStartup).toBe(false);
+
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      await expect(startMarketDataStartupPriceBackfill({
+        NODE_ENV: 'development',
+        ANGEL_ONE_ENABLE_MARKET_DATA: 'true',
+        MARKET_DATA_STARTUP_PRICE_BACKFILL_ENABLED: 'true',
+      } as any)).resolves.toBeNull();
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('startup price backfill skipped'));
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
   it('skips regions when session decision says sync is not useful and latest completed candle is already stored', async () => {
     const service = {
       activePriceBackfillRun: jest.fn().mockReturnValue(null),
@@ -252,7 +272,7 @@ describe('MarketDataFoundationScheduler', () => {
     });
   });
 
-  it('triggers scheduled data quality stage only for normal scheduled runs with non-empty changed set', async () => {
+  it('triggers scheduled data quality stage only for normal scheduled runs with a downstream set', async () => {
     const service = {
       activePriceBackfillRun: jest.fn().mockReturnValue(null),
       latestStoredCandleInfo: jest.fn().mockResolvedValue({
@@ -268,6 +288,7 @@ describe('MarketDataFoundationScheduler', () => {
         dataThroughDate: '2026-05-05',
         sourceFingerprint: 'scheduled-region:abc123',
         changedInstrumentIds: ['stock-1'],
+        downstreamInstrumentIds: ['stock-1', 'stock-2'],
         changedInstrumentCount: 1,
         dqStageEligible: true,
         rowsInserted: 1,
@@ -298,7 +319,7 @@ describe('MarketDataFoundationScheduler', () => {
       region: 'IN',
       assetType: 'STOCK',
       triggerType: 'scheduled',
-      changedInstrumentIds: ['stock-1'],
+      changedInstrumentIds: ['stock-1', 'stock-2'],
       dataThroughDate: '2026-05-05',
       sourceFingerprint: 'scheduled-region:abc123',
     }));

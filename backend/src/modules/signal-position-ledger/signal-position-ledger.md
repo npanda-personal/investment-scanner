@@ -8,10 +8,14 @@ This module currently exposes:
 
 - module-local `GET /signals/position-ledger/health`
 - module-local `GET /signals/position-ledger/active`
+- module-local `POST /signals/position-ledger/active/refresh`
 - mounted `GET /api/v1/signals/position-ledger/health`
 - mounted `GET /api/v1/signals/position-ledger/active`
+- mounted `POST /api/v1/signals/position-ledger/active/refresh`
 
 The mounted active endpoint preserves the accepted active-list DTO: `items`, `totalCount`, `limit`, `offset`, `nextOffset`, `hasMore`, `scope`, and `warnings`.
+
+Active-list reads are materialized snapshot reads. They do not recompute current prices, DQ evidence, and exit/risk lifecycle details during page render. The refresh endpoint and scheduled `SIGNAL_POSITION_LEDGER` pipeline stage build the snapshot incrementally and persist progress so the UI can render already-materialized rows while a refresh is still running.
 
 ## Active Row Truth Rules
 

@@ -3672,6 +3672,7 @@ export class MarketDataFoundationService {
       rowsSkipped: 0,
       rowsNoOp: 0,
       changedInstrumentIds: [],
+      downstreamInstrumentIds: [],
       changedInstrumentCount: 0,
       dqStageEligible: false,
       warningCount: 0,
@@ -3679,6 +3680,7 @@ export class MarketDataFoundationService {
       errors: [],
     };
     const changedInstrumentIds = new Set<string>();
+    const downstreamInstrumentIds = new Set<string>();
 
     await this.repository.upsertSyncState({ region, assetType, tradingDate, status: 'PENDING', summary, lastCheckedAt: now });
 
@@ -3692,6 +3694,7 @@ export class MarketDataFoundationService {
     for (const taskId of officialBulk.matchedTaskIds) {
       const taskSummary = officialBulk.summaryByTaskId.get(taskId);
       if (!taskSummary) continue;
+      downstreamInstrumentIds.add(taskId);
       if ((taskSummary.rowsInserted || 0) > 0 || (taskSummary.rowsUpdated || 0) > 0) {
         changedInstrumentIds.add(taskId);
       }
@@ -3719,6 +3722,7 @@ export class MarketDataFoundationService {
           assetType,
           skipFreshnessGate: true,
         });
+        downstreamInstrumentIds.add(task.id);
         summary.instrumentsProcessed += 1;
         summary.rowsReceived += result.rowsReceived;
         summary.rowsInserted += result.rowsInserted;
@@ -3735,9 +3739,11 @@ export class MarketDataFoundationService {
       }
     }
     const sortedChangedInstrumentIds = [...changedInstrumentIds].sort((a, b) => a.localeCompare(b));
+    const sortedDownstreamInstrumentIds = [...downstreamInstrumentIds].sort((a, b) => a.localeCompare(b));
     summary.changedInstrumentIds = sortedChangedInstrumentIds;
+    summary.downstreamInstrumentIds = sortedDownstreamInstrumentIds;
     summary.changedInstrumentCount = sortedChangedInstrumentIds.length;
-    summary.dqStageEligible = sortedChangedInstrumentIds.length > 0;
+    summary.dqStageEligible = sortedDownstreamInstrumentIds.length > 0;
     summary.sourceFingerprint = summary.officialEodBulk?.sourceFingerprint
       || this.scheduledRegionSourceFingerprint({
         region,
@@ -3746,6 +3752,7 @@ export class MarketDataFoundationService {
         rowsInserted: summary.rowsInserted,
         rowsUpdated: summary.rowsUpdated,
         changedInstrumentIds: sortedChangedInstrumentIds,
+        downstreamInstrumentIds: sortedDownstreamInstrumentIds,
       });
 
     const latestTradingDate = await this.repository.latestStoredTradingDateForRegion(region, assetType);
@@ -9657,8 +9664,10 @@ export class MarketDataFoundationService {
         rowsInserted: 0,
         rowsUpdated: 0,
         changedInstrumentIds: [],
+        downstreamInstrumentIds: [],
       }),
       changedInstrumentIds: [],
+      downstreamInstrumentIds: [],
       changedInstrumentCount: 0,
       dqStageEligible: false,
       instrumentsProcessed: 0,
@@ -9687,6 +9696,7 @@ export class MarketDataFoundationService {
     rowsInserted: number;
     rowsUpdated: number;
     changedInstrumentIds: string[];
+    downstreamInstrumentIds?: string[];
   }): string {
     const payload = [
       input.region,
@@ -9695,6 +9705,7 @@ export class MarketDataFoundationService {
       String(input.rowsInserted),
       String(input.rowsUpdated),
       input.changedInstrumentIds.join(','),
+      (input.downstreamInstrumentIds || []).join(','),
     ].join('|');
     return `scheduled-region:${createHash('sha256').update(payload).digest('hex').slice(0, 16)}`;
   }

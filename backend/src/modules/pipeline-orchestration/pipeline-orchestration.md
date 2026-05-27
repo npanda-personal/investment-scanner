@@ -58,6 +58,8 @@ This lets a user leave Market Data, Data Quality, Signal, Backtesting, Research,
 
 Terminal stage progress is outcome-based. For `COMPLETED`, `PARTIAL`, `FAILED`, `SKIPPED`, `BLOCKED`, or `CANCELED` rows, skipped and failed rows are counted as completed outcomes for progress display and ledger `processedCount` where the adapter reports them separately. This prevents a finished partial stage from appearing stuck below 100% when the remaining rows were intentionally skipped or blocked by missing upstream evidence.
 
+Scheduled `RAW_SIGNALS` and `SIGNAL_CALIBRATION` stages process explicit downstream instrument sets in bounded chunks and persist progress after each chunk. A terminal scheduled stage means the configured changed/downstream set was processed, not that a full-market manual sweep was performed. Pipeline Ops surfaces this execution scope and cursor metadata so users can distinguish incremental pipeline work from feature-owned full-scope manual actions.
+
 ## Read-Only Status API
 
 `GET /api/v1/pipeline/status`

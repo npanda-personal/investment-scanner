@@ -249,6 +249,7 @@ export type PipelineStatusStageDto = Pick<
   | 'durationMs'
   | 'warnings'
   | 'errors'
+  | 'metadata'
   | 'updatedAt'
 >;
 
@@ -287,6 +288,7 @@ export type PipelineCommandKey =
   | 'BACKTEST_PROOF_REFRESH'
   | 'RESEARCH_PROJECTION_REFRESH'
   | 'TODAY_REVIEW_PUBLISH'
+  | 'SIGNAL_POSITION_LEDGER_REFRESH'
   | 'PIPELINE_RUN_ALL'
   | 'PIPELINE_DRAIN_ALL_BATCHES'
   | 'PIPELINE_CANCEL_ACTIVE';
@@ -642,6 +644,7 @@ export interface MarketDataStageSnapshotRequest {
   skippedCount: number;
   unchangedCount?: number;
   changedInstrumentIds?: string[];
+  downstreamInstrumentIds?: string[];
   batchSize?: number | null;
   nextOffset?: number | null;
   hasMore: boolean;

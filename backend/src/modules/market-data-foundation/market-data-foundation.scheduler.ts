@@ -143,7 +143,7 @@ export class MarketDataFoundationScheduler {
               triggerType: 'scheduled',
               dataThroughDate: summary.dataThroughDate || summary.tradingDate,
               sourceFingerprint: summary.sourceFingerprint || 'scheduled-source:missing',
-              changedInstrumentIds: summary.changedInstrumentIds || [],
+              changedInstrumentIds: summary.downstreamInstrumentIds?.length ? summary.downstreamInstrumentIds : summary.changedInstrumentIds || [],
               batchSize: Math.max(1, Math.min(this.config.batchSize, 100)),
               schedulerRunStartedAt: now.toISOString(),
             });
@@ -271,7 +271,8 @@ export class MarketDataFoundationScheduler {
   ) {
     if (triggerType !== 'scheduled') return false;
     if (!summary.dqStageEligible) return false;
-    if (!summary.changedInstrumentIds || summary.changedInstrumentIds.length === 0) return false;
+    const downstreamIds = summary.downstreamInstrumentIds?.length ? summary.downstreamInstrumentIds : summary.changedInstrumentIds || [];
+    if (downstreamIds.length === 0) return false;
     if (!summary.sourceFingerprint || !summary.dataThroughDate) return false;
     return true;
   }
@@ -299,7 +300,7 @@ export function readMarketDataSchedulerConfig(env = process.env): MarketDataSche
     postCloseSyncWindowMinutes: parseNumber(env.MARKET_DATA_SCHEDULER_POST_CLOSE_WINDOW_MINUTES, 120),
     finalizationGraceMinutes: parseNumber(env.MARKET_DATA_SCHEDULER_FINALIZATION_GRACE_MINUTES, 15),
     skipWeekends: parseBoolean(env.MARKET_DATA_SCHEDULER_SKIP_WEEKENDS, true),
-    runOnStartup: parseBoolean(env.MARKET_DATA_SCHEDULER_RUN_ON_STARTUP, true),
+    runOnStartup: parseBoolean(env.MARKET_DATA_SCHEDULER_RUN_ON_STARTUP, false),
   };
 }
 
@@ -324,7 +325,12 @@ export async function startMarketDataStartupLoads(env = process.env) {
 export async function startMarketDataStartupPriceBackfill(env = process.env) {
   if (env.NODE_ENV === 'test') return null;
   const angelEnabled = parseBoolean(env.ANGEL_ONE_ENABLE_MARKET_DATA, false);
-  const startupEnabled = parseBoolean(env.MARKET_DATA_STARTUP_PRICE_BACKFILL_ENABLED, angelEnabled);
+  const startupEnabled = parseBoolean(env.MARKET_DATA_STARTUP_PRICE_BACKFILL_ENABLED, false);
+  const providerStartupAllowed = parseBoolean(env.MARKET_DATA_ALLOW_STARTUP_PROVIDER_LOADS, false);
+  if (startupEnabled && angelEnabled && !providerStartupAllowed) {
+    console.warn('[MarketDataStartupBackfill] startup price backfill skipped because provider startup loads are not explicitly allowed');
+    return null;
+  }
   if (!startupEnabled || !angelEnabled) return null;
 
   const service = new MarketDataFoundationService();

@@ -13,6 +13,14 @@ export class SignalPositionLedgerController {
     }
   };
 
+  refreshActiveRows = async (req: Request, res: Response) => {
+    try {
+      return res.json(await this.service.refreshActiveRows(parseSignalPositionLedgerActiveQuery({ ...req.query, ...req.body }), { force: true }));
+    } catch (error) {
+      return this.error(res, error, 'Failed to refresh signal position ledger active rows', 400);
+    }
+  };
+
   health = async (_req: Request, res: Response) => {
     try {
       return res.json(await this.service.health());

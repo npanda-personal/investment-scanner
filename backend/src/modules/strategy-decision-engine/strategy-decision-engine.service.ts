@@ -312,16 +312,8 @@ export class StrategyDecisionEngineService {
   }
 
   async latestForInstrument(instrumentId: string, strategy?: string, region?: string): Promise<StrategyDecisionDto | null> {
-    const latest = await this.repository.latestForInstrument(instrumentId, strategy);
-    if (latest) return latest;
-    
-    // If not found, run evaluate for this single instrument
-    const gate = await this.marketGate(region);
-    const result = await this.evaluateInstrumentStrategy(instrumentId, (strategy as any) || 'TREND_MOMENTUM', gate);
-    if (result) {
-      return this.repository.create(result);
-    }
-    return null;
+    void region;
+    return this.repository.latestForInstrument(instrumentId, strategy);
   }
 
   private async evaluateInstrumentStrategies(

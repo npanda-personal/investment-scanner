@@ -35,7 +35,9 @@ Raw bullish signals are confirmation context only. They are not promoted into `t
 
 ### `GET /api/v1/research/overview`
 
-Returns a consolidated decision-oriented response.
+Returns the latest materialized Research Hub overview snapshot for the requested scope. The page-read path is snapshot-first and must not fan out to Strategy Decision, Signal Generation, Smart Money, or Strategy Framework calculations during render. If no snapshot exists yet, the endpoint returns a fast "pipeline not ready" response with `dataGaps` pointing the user to Pipeline Ops.
+
+The scheduled `RESEARCH_PROJECTION` stage refreshes and persists this snapshot. `live=true` is reserved for explicit diagnostics and tests; normal UI reads should not use it.
 
 **Response Structure**:
 

@@ -52,6 +52,52 @@ describe('ResearchHubService', () => {
   });
 
   describe('overview', () => {
+    it('uses materialized overview snapshots by default instead of live fan-out on page reads', async () => {
+      const cachedOverview = {
+        actionability: { overallStatus: 'INSUFFICIENT_DATA', canReviewActionableSetups: false, headline: 'Cached', researchSupportOnly: true, dimensions: {}, nextBestAction: null, blockers: [] },
+        marketReadiness: { marketGate: 'UNKNOWN', marketCondition: 'UNKNOWN', headline: 'Cached snapshot', allowedActions: [], reasons: [], blockers: [], dataStatus: 'MISSING' },
+        researchPriorities: { tradeCandidates: [], watchCandidates: [], avoidCandidates: [], exitCandidates: [] },
+        strategyProofSummary: { strategiesProducingCandidates: [], provenCandidateCount: 0, unprovenCandidateCount: 0, blockedByMarketGateCount: 0, missingBacktestCount: 0, notes: [] },
+        confirmationSummary: {
+          signalSummary: { topBullishCount: 0, topBearishCount: 0, reliabilityAvailable: false, notes: [] },
+          smartMoneySummary: { accumulationCount: 0, distributionCount: 0, topConfirmations: [], topContradictions: [] },
+          marketContextSummary: { leadingSectors: [], weakSectors: [], breadthStatus: 'Breadth unavailable', notes: [] },
+        },
+        whatChanged: { newTradeCandidates: [], downgradedCandidates: [], marketGateChange: null, warnings: [] },
+        nextActions: [],
+        generatedAt: '2026-05-27T00:00:00.000Z',
+        dataGaps: [],
+      } as any;
+      const db = {
+        pipelineRun: {
+          findFirst: jest.fn().mockResolvedValue({ metadata: { version: 'research-overview-v1', overview: cachedOverview } }),
+        },
+      };
+      const cachedService = new ResearchHubService(
+        strategyService,
+        contextService,
+        signalService,
+        smartMoneyService,
+        strategyFrameworkService,
+        db as any
+      );
+
+      const result = await cachedService.overview();
+
+      expect(result).toBe(cachedOverview);
+      expect(db.pipelineRun.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+        where: expect.objectContaining({
+          pipelineKey: 'research-hub-overview',
+          region: 'IN',
+          assetType: 'STOCK',
+        }),
+      }));
+      expect(strategyService.marketGate).not.toHaveBeenCalled();
+      expect(strategyService.candidates).not.toHaveBeenCalled();
+      expect(signalService.funnelDiagnostics).not.toHaveBeenCalled();
+      expect(smartMoneyService.top).not.toHaveBeenCalled();
+    });
+
     it('should aggregate data and return a decision-oriented response', async () => {
       // Setup mock returns
       strategyService.marketGate.mockResolvedValue({ 
@@ -122,7 +168,7 @@ describe('ResearchHubService', () => {
         total: 1
       } as any);
 
-      const result = await service.overview();
+      const result = await service.overview({ live: true });
 
       // Assertions
       expect(contextService.latestPersistedSummary).toHaveBeenCalledWith('IN');
@@ -169,7 +215,7 @@ describe('ResearchHubService', () => {
       smartMoneyService.top.mockResolvedValue([] as any);
       strategyFrameworkService.performance.mockResolvedValue([]);
 
-      const result = await service.overview();
+      const result = await service.overview({ live: true });
 
       expect(result.marketReadiness.marketGate).toBe('UNKNOWN');
       expect(result.dataGaps).toContain('Market gate status unavailable');
@@ -188,7 +234,7 @@ describe('ResearchHubService', () => {
       smartMoneyService.top.mockResolvedValue({ results: [], total: 0 } as any);
       strategyFrameworkService.performance.mockResolvedValue([]);
 
-      const result = await service.overview();
+      const result = await service.overview({ live: true });
 
       expect(result.confirmationSummary.signalSummary.topBullishCount).toBe(1);
       expect(result.researchPriorities.tradeCandidates).toHaveLength(0);
@@ -206,7 +252,7 @@ describe('ResearchHubService', () => {
       smartMoneyService.top.mockResolvedValue({ results: [], total: 0 } as any);
       strategyFrameworkService.performance.mockResolvedValue([]);
 
-      const result = await service.overview();
+      const result = await service.overview({ live: true });
 
       expect(result.researchPriorities.tradeCandidates).toHaveLength(0);
       expect(result.researchPriorities.watchCandidates[0].proofWarnings).toContain('No backtest summary available for this strategy/timeframe/region.');
@@ -224,7 +270,7 @@ describe('ResearchHubService', () => {
       smartMoneyService.top.mockResolvedValue({ results: [], total: 0 } as any);
       strategyFrameworkService.performance.mockResolvedValue([{ timeframe: '3Y', cagr: 0.1, maxDrawdown: -0.1, sharpe: 1, winRate: 0.6, profitFactor: 1.5, tradeCount: 30, ratingGrade: 'GOOD', generatedAt: new Date().toISOString() }] as any);
 
-      const result = await service.overview();
+      const result = await service.overview({ live: true });
 
       expect(result.researchPriorities.tradeCandidates).toHaveLength(0);
       expect(result.researchPriorities.watchCandidates.length + result.researchPriorities.avoidCandidates.length).toBeGreaterThan(0);
@@ -241,7 +287,7 @@ describe('ResearchHubService', () => {
       smartMoneyService.top.mockResolvedValue({ results: [], total: 0 } as any);
       strategyFrameworkService.performance.mockResolvedValue([{ timeframe: '3Y', cagr: 0.1, maxDrawdown: -0.1, sharpe: 1, winRate: 0.6, profitFactor: 1.5, tradeCount: 30, ratingGrade: 'GOOD', generatedAt: new Date().toISOString() }] as any);
 
-      const result = await service.overview();
+      const result = await service.overview({ live: true });
 
       expect(result.marketReadiness.headline).toContain('No new long review candidates');
       expect(result.researchPriorities.tradeCandidates).toHaveLength(0);
@@ -262,7 +308,7 @@ describe('ResearchHubService', () => {
       smartMoneyService.top.mockResolvedValue({ results: [], total: 0 } as any);
       strategyFrameworkService.performance.mockResolvedValue([{ timeframe: '3Y', cagr: 0.1, maxDrawdown: -0.1, sharpe: 1, winRate: 0.6, profitFactor: 1.5, tradeCount: 30, ratingGrade: 'GOOD', generatedAt: new Date().toISOString() }] as any);
 
-      const result = await service.overview();
+      const result = await service.overview({ live: true });
 
       expect(JSON.stringify(result)).not.toContain('LIVE_TRADING_ELIGIBLE_FUTURE');
       expect(result.researchPriorities.tradeCandidates[0].readinessLabel).toBe('RESEARCH_ONLY');
@@ -279,7 +325,7 @@ describe('ResearchHubService', () => {
       smartMoneyService.top.mockResolvedValue({ results: [], total: 0 } as any);
       strategyFrameworkService.performance.mockResolvedValue([{ timeframe: '3Y', cagr: 0.1, maxDrawdown: -0.1, sharpe: 1, winRate: 0.6, profitFactor: 1.5, tradeCount: 30, ratingGrade: 'GOOD', generatedAt: new Date().toISOString() }] as any);
 
-      const result = await service.overview();
+      const result = await service.overview({ live: true });
 
       expect(result.actionability.dimensions.marketEnvironment.status).toBe('READY');
       expect(result.actionability.dimensions.signalEvidence.status).toBe('LIMITED');

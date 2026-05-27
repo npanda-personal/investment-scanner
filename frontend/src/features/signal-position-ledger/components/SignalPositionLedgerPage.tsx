@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Alert, Box, Button, Paper, Tab, Tabs } from '@mui/material';
+import { Alert, Box, Button, LinearProgress, Paper, Stack, Tab, Tabs, Typography } from '@mui/material';
 import { PageHeader } from '@/shared/components';
 import { useSignalPositionLedgerActiveRows } from '../hooks/useSignalPositionLedgerActiveRows';
 import { ActivePositionsTable } from './ActivePositionsTable';
@@ -20,6 +20,8 @@ const SignalPositionLedgerPage: React.FC = () => {
     setPage,
     setPageSize,
     reload,
+    refreshLedger,
+    refreshingLedger,
   } = useSignalPositionLedgerActiveRows();
   const scopeLabel = `${scope.region} / ${scope.assetType}`;
 
@@ -28,8 +30,28 @@ const SignalPositionLedgerPage: React.FC = () => {
       <PageHeader
         title="Signal Position Ledger"
         subtitle={`System-picked signal-position evidence for the current market scope. Scope: ${scopeLabel}.`}
-        primaryAction={<Button variant="outlined" onClick={reload} disabled={loading}>Refresh</Button>}
+        primaryAction={<Button variant="contained" onClick={() => void refreshLedger()} disabled={refreshingLedger}>Refresh ledger data</Button>}
+        secondaryActions={<Button variant="outlined" onClick={reload} disabled={loading}>Reload snapshot</Button>}
       />
+
+      <Paper variant="outlined" sx={{ p: 1.5, mb: 2 }}>
+        <Stack spacing={1}>
+          <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" gap={1}>
+            <Typography variant="body2" color="text.secondary">
+              Ledger pipeline: {data.refresh.status} · processed {data.refresh.processedCount.toLocaleString()} / {data.refresh.totalCount.toLocaleString()} source signals · materialized {data.refresh.materializedRowCount.toLocaleString()} rows.
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Updated {data.refresh.updatedAt ? new Date(data.refresh.updatedAt).toLocaleString() : 'not yet'}
+            </Typography>
+          </Stack>
+          {data.refresh.status === 'RUNNING' && (
+            <LinearProgress
+              variant={data.refresh.totalCount > 0 ? 'determinate' : 'indeterminate'}
+              value={data.refresh.totalCount > 0 ? Math.min(100, (data.refresh.processedCount / data.refresh.totalCount) * 100) : undefined}
+            />
+          )}
+        </Stack>
+      </Paper>
 
       {error && (
         <Alert severity="error" sx={{ mb: 2 }} action={<Button color="inherit" size="small" onClick={reload}>Retry</Button>}>

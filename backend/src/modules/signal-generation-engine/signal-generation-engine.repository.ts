@@ -158,6 +158,9 @@ export class SignalGenerationEngineRepository {
   }
 
   async latestSignals(query: SignalQuery): Promise<{ signals: SignalResultDto[], total: number }> {
+    const fastPage = await this.latestSignalsFromLatestGeneratedDate(query);
+    if (fastPage) return fastPage;
+
     const finalResults = await this.latestFilteredSignals(query);
     const total = finalResults.length;
     const offset = query.offset || 0;
@@ -170,6 +173,9 @@ export class SignalGenerationEngineRepository {
   }
 
   async directionCounts(query: SignalQuery): Promise<Record<'BULLISH' | 'NEUTRAL' | 'BEARISH', number>> {
+    const fastCounts = await this.directionCountsFromLatestGeneratedDate(query);
+    if (fastCounts) return fastCounts;
+
     const signals = await this.latestFilteredSignals({
       ...query,
       direction: undefined,
@@ -182,12 +188,18 @@ export class SignalGenerationEngineRepository {
   }
 
   async latestSignalUniverse(query: SignalQuery): Promise<SignalResultDto[]> {
+    const fastPage = await this.latestSignalsFromLatestGeneratedDate(query);
+    if (fastPage) return fastPage.signals;
+
     const results = await this.latestFilteredSignals(query);
     const offset = query.offset || 0;
     return results.slice(offset, offset + query.limit);
   }
 
   async latestSignalUniverseCount(query: Omit<SignalQuery, 'limit'>): Promise<number> {
+    const fastCount = await this.latestSignalUniverseCountFromLatestGeneratedDate(query);
+    if (fastCount !== null) return fastCount;
+
     return (await this.latestFilteredSignals({ ...(query as SignalQuery), limit: Number.MAX_SAFE_INTEGER })).length;
   }
 
@@ -293,6 +305,121 @@ export class SignalGenerationEngineRepository {
         .filter((result) => !query.signalType || this.hasSignal(result, query.signalType)),
       query
     );
+  }
+
+  private async latestSignalsFromLatestGeneratedDate(query: SignalQuery): Promise<{ signals: SignalResultDto[]; total: number } | null> {
+    if (!this.canUseLatestGeneratedDateFastPath(query)) return null;
+    if (typeof this.db.signalResult.findFirst !== 'function' || typeof this.db.signalResult.count !== 'function') return null;
+
+    const generatedDate = await this.latestGeneratedDateFor(query);
+    if (!generatedDate) return null;
+
+    const limit = query.limit || 25;
+    const offset = Math.max(0, query.offset || 0);
+    const where = {
+      ...this.buildWhere(query as SignalQuery & SignalFunnelDiagnosticsQuery),
+      generatedDate,
+    };
+    const [rows, total] = await Promise.all([
+      this.db.signalResult.findMany({
+        where,
+        orderBy: this.orderByForLatestSignals(query),
+        take: Math.min(500, Math.max(limit + 1, limit * 4 + 1)),
+        skip: offset,
+      }),
+      this.db.signalResult.count({ where }),
+    ]);
+    const signals = rows.map((item) => this.toDto(item)).filter((result) => this.isTrustedReadSignal(result)).slice(0, limit);
+    return { signals, total };
+  }
+
+  private async latestSignalUniverseCountFromLatestGeneratedDate(query: Omit<SignalQuery, 'limit'>): Promise<number | null> {
+    if (!this.canUseLatestGeneratedDateFastPath(query as SignalQuery)) return null;
+    if (typeof this.db.signalResult.findFirst !== 'function' || typeof this.db.signalResult.count !== 'function') return null;
+    const generatedDate = await this.latestGeneratedDateFor(query as SignalQuery);
+    if (!generatedDate) return null;
+    return this.db.signalResult.count({
+      where: {
+        ...this.buildWhere(query as SignalQuery & SignalFunnelDiagnosticsQuery),
+        generatedDate,
+      },
+    });
+  }
+
+  private async directionCountsFromLatestGeneratedDate(query: SignalQuery): Promise<Record<'BULLISH' | 'NEUTRAL' | 'BEARISH', number> | null> {
+    if (!this.canUseLatestGeneratedDateFastPath({ ...query, direction: undefined })) return null;
+    if (typeof this.db.signalResult.findFirst !== 'function' || typeof this.db.signalResult.groupBy !== 'function') return null;
+    const generatedDate = await this.latestGeneratedDateFor({ ...query, direction: undefined });
+    if (!generatedDate) return null;
+    const rows = await this.db.signalResult.groupBy({
+      by: ['direction'],
+      where: {
+        ...this.buildWhere({
+          ...query,
+          direction: undefined,
+          confidence: undefined,
+          minScore: undefined,
+        } as SignalQuery & SignalFunnelDiagnosticsQuery),
+        generatedDate,
+      },
+      _count: { _all: true },
+    });
+    return rows.reduce<Record<'BULLISH' | 'NEUTRAL' | 'BEARISH', number>>((acc, item: any) => {
+      if (item.direction === 'BULLISH' || item.direction === 'NEUTRAL' || item.direction === 'BEARISH') {
+        const direction = item.direction as 'BULLISH' | 'NEUTRAL' | 'BEARISH';
+        acc[direction] = Number(item._count?._all || 0);
+      }
+      return acc;
+    }, { BULLISH: 0, NEUTRAL: 0, BEARISH: 0 });
+  }
+
+  private async latestGeneratedDateFor(query: SignalQuery): Promise<Date | null> {
+    const where = {
+      ...this.buildWhere({
+        ...query,
+        direction: undefined,
+        confidence: undefined,
+        minScore: undefined,
+        signalType: undefined,
+      } as SignalQuery & SignalFunnelDiagnosticsQuery),
+      generatedDate: { not: null },
+    };
+    const latest = await this.db.signalResult.findFirst({
+      where,
+      orderBy: [{ generatedDate: 'desc' }, { generatedAt: 'desc' }],
+      select: { generatedDate: true },
+    });
+    return latest?.generatedDate ?? null;
+  }
+
+  private canUseLatestGeneratedDateFastPath(query: SignalQuery): boolean {
+    return !query.signalType
+      && !query.hasStrategyMatch
+      && !query.hasBlockedStrategies
+      && !query.frameworkBackedDecisionAvailable
+      && !query.includeStrategyMatches
+      && !query.onlyStrategyEligible
+      && !query.excludeNoiseFiltered
+      && !query.strategyCode;
+  }
+
+  private orderByForLatestSignals(query: Pick<SignalQuery, 'sortBy' | 'sortDirection'>): Prisma.SignalResultOrderByWithRelationInput[] {
+    const direction: Prisma.SortOrder = query.sortDirection === 'asc' ? 'asc' : 'desc';
+    switch (this.normalizeSortBy(query.sortBy)) {
+      case 'symbol':
+        return [{ symbol: direction }, { instrumentId: 'asc' }];
+      case 'companyName':
+        return [{ companyName: direction }, { instrumentId: 'asc' }];
+      case 'generatedAt':
+        return [{ generatedAt: direction }, { instrumentId: 'asc' }];
+      case 'direction':
+        return [{ direction }, { score: 'desc' }, { instrumentId: 'asc' }];
+      case 'confidence':
+        return [{ confidence: direction }, { score: 'desc' }, { instrumentId: 'asc' }];
+      case 'score':
+      default:
+        return [{ score: direction }, { generatedAt: 'desc' }, { instrumentId: 'asc' }];
+    }
   }
 
   private sortSignals(results: SignalResultDto[], query: Pick<SignalQuery, 'sortBy' | 'sortDirection'>): SignalResultDto[] {
