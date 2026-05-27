@@ -220,12 +220,14 @@ Current Market Data bridge:
 - startup/manual price backfill writes a `MARKET_DATA` stage snapshot while its module-owned backfill run is active;
 - the bridge records progress, counts, warnings, errors, and terminal status using the existing pipeline ledger;
 - terminal `COMPLETED` or `PARTIAL` price-backfill snapshots with changed instrument ids start scheduled Data Quality for that explicit changed set, then the normal DB-only downstream chain can continue;
-- it does not enable Market Data manual commands from Pipeline Ops;
+- Pipeline Ops exposes `Run Daily Pipeline`, which runs Market Data first and then starts the downstream scheduled chain for the resulting changed/downstream instrument set;
+- if a server shutdown leaves Market Data in `PENDING`, the next startup/manual run retries from Market Data first instead of jumping to downstream stages;
+- if Market Data is already current but downstream did not finish, startup/manual catch-up can relaunch the downstream chain for the last terminal Market Data summary;
 - it does not change provider calls, scheduler decisions, or Pipeline Ops command permissions.
 
 Performance guard:
 
-- the 15-minute latest-candle scheduler no longer waits for long background price-backfill runs before checking missing/current EOD state;
+- the latest-candle scheduler wakes daily by default and also runs startup catch-up when the server comes online;
 - startup price backfill is incremental-latest-only, so historical/deep backfill can continue as explicit maintenance without making the primary automated pipeline appear stuck for hours.
 
-`MARKET_DATA_INCREMENTAL_EOD_LOAD`, `MARKET_DATA_PRICE_BACKFILL`, and `MARKET_DATA_CATALOG_SYNC` remain command-policy `FORBIDDEN` until separate command contracts approve safe manual execution from Pipeline Ops.
+`MARKET_DATA_INCREMENTAL_EOD_LOAD`, `MARKET_DATA_PRICE_BACKFILL`, and `MARKET_DATA_CATALOG_SYNC` remain command-policy `FORBIDDEN`; Pipeline Ops uses the safer `PIPELINE_RUN_ALL` command so Market Data and dependent DB-only stages execute in the approved order.

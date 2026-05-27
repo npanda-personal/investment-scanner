@@ -321,7 +321,7 @@ export interface PipelineCommandCatalogItem {
   runModes: PipelineCommandRunMode[];
   defaultBatchSize: number;
   maxBatchSize: number;
-  providerAccess: 'NONE' | 'FORBIDDEN';
+  providerAccess: 'NONE' | 'FORBIDDEN' | 'APPROVED';
   schedulerAccess: 'NONE' | 'FORBIDDEN';
   downstreamFanout: 'NONE' | 'FORBIDDEN';
 }

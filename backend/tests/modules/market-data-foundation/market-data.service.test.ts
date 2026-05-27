@@ -1752,6 +1752,50 @@ describe('MarketDataFoundationService syncV1', () => {
     }));
   });
 
+  it('retries scheduled market data when prior sync state is pending from an interrupted run', async () => {
+    const repository = {
+      listActiveStockSyncTasks: jest.fn().mockResolvedValue([{ id: 'stock-1', symbol: 'RETRY.NS', lastSuccessfulDataLoadTimestamp: null }]),
+      upsertSyncState: jest.fn().mockResolvedValue({}),
+      latestStoredTradingDateForRegion: jest.fn().mockResolvedValue('2026-05-04'),
+      getSyncState: jest.fn().mockResolvedValue({
+        status: 'PENDING',
+        lastCheckedAt: new Date('2026-05-05T02:59:00.000Z').toISOString(),
+      }),
+    };
+    const service = new MarketDataFoundationService(repository as any, {} as any);
+    jest.spyOn(service, 'ingestSymbol').mockResolvedValue({
+      rowsReceived: 1,
+      rowsInserted: 0,
+      rowsUpdated: 0,
+      rowsSkipped: 0,
+      rowsNoOp: 1,
+      warningCount: 0,
+      warnings: [],
+    });
+
+    const summary = await service.syncScheduledRegion('IN', {
+      assetType: 'STOCK',
+      now: new Date('2026-05-05T03:00:00.000Z'),
+    });
+
+    expect(repository.listActiveStockSyncTasks).toHaveBeenCalled();
+    expect(service.ingestSymbol).toHaveBeenCalledWith(
+      'RETRY.NS',
+      undefined,
+      expect.any(Date),
+      false,
+      expect.objectContaining({
+        region: 'IN',
+        assetType: 'STOCK',
+        skipFreshnessGate: true,
+      })
+    );
+    expect(summary).toMatchObject({
+      instrumentsProcessed: 1,
+      rowsNoOp: 1,
+    });
+  });
+
   it('adds changed-set evidence only for instruments with inserted or updated rows', async () => {
     const previousFlag = process.env.MARKET_DATA_NSE_OFFICIAL_EOD_BULK_ENABLED;
     process.env.MARKET_DATA_NSE_OFFICIAL_EOD_BULK_ENABLED = 'false';

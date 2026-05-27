@@ -6,8 +6,15 @@ import {
 } from '../../../src/modules/market-data-foundation';
 
 describe('MarketDataFoundationScheduler', () => {
-  it('keeps scheduler startup and provider backfill disabled unless explicitly opted in', async () => {
-    expect(readMarketDataSchedulerConfig({ ANGEL_ONE_ENABLE_MARKET_DATA: 'true' } as any).runOnStartup).toBe(false);
+  it('defaults to daily startup catch-up while keeping provider backfill disabled unless explicitly opted in', async () => {
+    expect(readMarketDataSchedulerConfig({ ANGEL_ONE_ENABLE_MARKET_DATA: 'true' } as any)).toMatchObject({
+      intervalMinutes: 1440,
+      runOnStartup: true,
+    });
+    expect(readMarketDataSchedulerConfig({
+      ANGEL_ONE_ENABLE_MARKET_DATA: 'true',
+      MARKET_DATA_SCHEDULER_INTERVAL_MINUTES: '15',
+    } as any).intervalMinutes).toBe(1440);
 
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
     try {
@@ -82,6 +89,42 @@ describe('MarketDataFoundationScheduler', () => {
     });
 
     const result = await scheduler.runOnce(new Date('2026-05-05T03:00:00.000Z'));
+
+    expect(result[0]).toMatchObject({ region: 'IN', skipped: false });
+    expect(service.syncScheduledRegion).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries market data first when the prior sync state is still pending', async () => {
+    const service = {
+      activePriceBackfillRun: jest.fn().mockReturnValue(null),
+      latestStoredCandleInfo: jest.fn().mockResolvedValue({
+        latestTradingDate: '2026-05-04',
+        finalConfirmed: false,
+        syncState: { status: 'PENDING', lastSummary: null },
+        tradingDate: '2026-05-05',
+      }),
+      syncScheduledRegion: jest.fn().mockResolvedValue({
+        region: 'IN',
+        assetType: 'STOCK',
+        tradingDate: '2026-05-05',
+        rowsInserted: 0,
+        rowsUpdated: 0,
+        rowsNoOp: 1,
+      }),
+    };
+    const scheduler = new MarketDataFoundationScheduler(service as any, {
+      enabled: true,
+      intervalMinutes: 1440,
+      regions: ['IN'],
+      assetType: 'STOCK',
+      batchSize: 25,
+      syncDuringMarketHours: false,
+      postCloseSyncWindowMinutes: 120,
+      finalizationGraceMinutes: 15,
+      skipWeekends: true,
+    });
+
+    const result = await scheduler.runOnce(new Date('2026-05-05T03:00:00.000Z'), { triggerType: 'startup' });
 
     expect(result[0]).toMatchObject({ region: 'IN', skipped: false });
     expect(service.syncScheduledRegion).toHaveBeenCalledTimes(1);
@@ -272,7 +315,7 @@ describe('MarketDataFoundationScheduler', () => {
     });
   });
 
-  it('triggers scheduled data quality stage only for normal scheduled runs with a downstream set', async () => {
+  it('triggers scheduled data quality stage for scheduled and startup catch-up runs with a downstream set', async () => {
     const service = {
       activePriceBackfillRun: jest.fn().mockReturnValue(null),
       latestStoredCandleInfo: jest.fn().mockResolvedValue({
@@ -314,7 +357,7 @@ describe('MarketDataFoundationScheduler', () => {
     const scheduledResult = await scheduler.runOnce(new Date('2026-05-05T10:30:00.000Z'));
     await scheduler.runOnce(new Date('2026-05-05T10:31:00.000Z'), { triggerType: 'startup' });
 
-    expect(pipelineOrchestration.runScheduledDataQualityStage).toHaveBeenCalledTimes(1);
+    expect(pipelineOrchestration.runScheduledDataQualityStage).toHaveBeenCalledTimes(2);
     expect(pipelineOrchestration.runScheduledDataQualityStage).toHaveBeenCalledWith(expect.objectContaining({
       region: 'IN',
       assetType: 'STOCK',

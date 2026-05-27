@@ -336,7 +336,7 @@ describe('PipelineOrchestrationService', () => {
     });
   });
 
-  it('returns a command catalog with only DATA_QUALITY_EVALUATE_SCOPE enabled', () => {
+  it('returns a command catalog with data quality and daily pipeline commands enabled', () => {
     const service = new PipelineOrchestrationService({} as any, {} as any);
     const catalog = service.commandCatalog({
       region: 'IN',
@@ -346,10 +346,10 @@ describe('PipelineOrchestrationService', () => {
     }, new Date('2026-05-25T02:00:00.000Z'));
 
     const enabled = catalog.commands.filter((item) => item.availability === 'ENABLED');
-    expect(enabled.map((item) => item.commandKey)).toEqual(['DATA_QUALITY_EVALUATE_SCOPE']);
+    expect(enabled.map((item) => item.commandKey)).toEqual(['DATA_QUALITY_EVALUATE_SCOPE', 'PIPELINE_RUN_ALL']);
     expect(catalog.commands.find((item) => item.commandKey === 'PIPELINE_RUN_ALL')).toMatchObject({
-      availability: 'FORBIDDEN',
-      disabledReason: expect.any(String),
+      availability: 'ENABLED',
+      stageKey: 'MARKET_DATA',
     });
     expect(catalog.generatedAt).toBe('2026-05-25T02:00:00.000Z');
   });
@@ -367,7 +367,7 @@ describe('PipelineOrchestrationService', () => {
     const service = new PipelineOrchestrationService(repository as any, { evaluate: jest.fn() } as any);
 
     await expect(service.executeCommand({
-      commandKey: 'PIPELINE_RUN_ALL',
+      commandKey: 'MARKET_DATA_PRICE_BACKFILL',
       region: 'IN',
       assetType: 'STOCK',
       timeframe: '1d',
@@ -384,6 +384,132 @@ describe('PipelineOrchestrationService', () => {
 
     expect(repository.upsertRun).not.toHaveBeenCalled();
     expect(repository.upsertStage).not.toHaveBeenCalled();
+  });
+
+  it('executes the daily pipeline command by syncing market data and recording a downstream-eligible snapshot', async () => {
+    const repository = {
+      findActiveRun: jest.fn().mockResolvedValue(null),
+    };
+    const marketDataService = {
+      syncScheduledRegion: jest.fn().mockResolvedValue({
+        region: 'IN',
+        assetType: 'STOCK',
+        tradingDate: '2026-05-25',
+        dataThroughDate: '2026-05-25',
+        sourceFingerprint: 'scheduled-region:abc123',
+        instrumentsProcessed: 2,
+        rowsReceived: 2,
+        rowsInserted: 1,
+        rowsUpdated: 0,
+        rowsSkipped: 0,
+        rowsNoOp: 1,
+        changedInstrumentIds: ['stock-1'],
+        downstreamInstrumentIds: ['stock-1', 'stock-2'],
+        changedInstrumentCount: 1,
+        dqStageEligible: true,
+        warningCount: 0,
+        warnings: [],
+        errors: [],
+      }),
+    };
+    const service = new PipelineOrchestrationService(
+      repository as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      marketDataService as any
+    );
+    const completedStage = {
+      id: 'stage-market-data',
+      pipelineRunId: 'run-market-data',
+      stageKey: 'MARKET_DATA',
+      stageOrder: 1,
+      status: 'COMPLETED',
+      idempotencyKey: 'stage-key',
+      region: 'IN',
+      assetType: 'STOCK',
+      timeframe: '1d',
+      dataThroughDate: '2026-05-25T00:00:00.000Z',
+      inputFingerprint: 'market-data:INCREMENTAL_EOD_LOAD:manual-daily-pipeline',
+      outputFingerprint: 'market-data-output',
+      changedInstrumentCount: 1,
+      batchSize: 100,
+      offset: 0,
+      nextOffset: null,
+      hasMore: false,
+      totalCount: 2,
+      processedCount: 2,
+      succeededCount: 2,
+      partialCount: 0,
+      failedCount: 0,
+      skippedCount: 0,
+      unchangedCount: 1,
+      attemptCount: 1,
+      cacheKey: null,
+      cacheStatus: 'BYPASS',
+      cacheExpiresAt: null,
+      leaseOwner: null,
+      leaseExpiresAt: null,
+      startedAt: '2026-05-25T03:00:00.000Z',
+      completedAt: '2026-05-25T03:00:02.000Z',
+      durationMs: 2000,
+      warnings: [],
+      errors: [],
+      metadata: null,
+      createdAt: '2026-05-25T03:00:00.000Z',
+      updatedAt: '2026-05-25T03:00:02.000Z',
+    };
+    const recordSnapshot = jest.spyOn(service, 'recordMarketDataStageSnapshot')
+      .mockResolvedValueOnce({ ...completedStage, status: 'RUNNING', completedAt: null } as any)
+      .mockResolvedValueOnce(completedStage as any);
+
+    const result = await service.executeCommand({
+      commandKey: 'PIPELINE_RUN_ALL',
+      region: 'IN',
+      assetType: 'STOCK',
+      timeframe: '1d',
+      pipelineKey: 'market-intelligence',
+      runMode: 'single_batch',
+      batchSize: 100,
+      offset: 0,
+      idempotencyKey: 'manual-daily-1',
+      force: false,
+    }, { requestedByUserId: 'local-manual-operator' }, new Date('2026-05-25T03:00:00.000Z'));
+
+    expect(marketDataService.syncScheduledRegion).toHaveBeenCalledWith('IN', expect.objectContaining({
+      assetType: 'STOCK',
+      batchSize: 100,
+      syncDuringMarketHours: false,
+      skipWeekends: true,
+    }));
+    expect(recordSnapshot).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      operation: 'INCREMENTAL_EOD_LOAD',
+      status: 'RUNNING',
+      triggerType: 'manual',
+    }));
+    expect(recordSnapshot).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      operation: 'INCREMENTAL_EOD_LOAD',
+      status: 'COMPLETED',
+      changedInstrumentIds: ['stock-1'],
+      downstreamInstrumentIds: ['stock-1', 'stock-2'],
+    }));
+    expect(result).toMatchObject({
+      commandKey: 'PIPELINE_RUN_ALL',
+      stageKey: 'MARKET_DATA',
+      status: 'COMPLETED',
+      counts: {
+        totalCount: 2,
+        processedCount: 2,
+      },
+    });
   });
 
   it('rejects enabled command without idempotencyKey', async () => {

@@ -1,5 +1,6 @@
 import { Alert, Box, Button, FormControlLabel, Stack, Switch } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import { PageHeader } from '@/shared/components';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
 import { usePipelineStatus } from '../hooks/usePipelineStatus';
@@ -18,6 +19,8 @@ export default function PipelineOpsPage() {
   const [commandError, setCommandError] = useState<string | null>(null);
   const [commandPendingKey, setCommandPendingKey] = useState<PipelineCommandKey | null>(null);
   const { data, loading, refreshing, error, refresh } = usePipelineStatus(scope.region, scope.assetType);
+  const dailyPipelineCommand = catalog?.commands.find((command) => command.commandKey === 'PIPELINE_RUN_ALL') || null;
+  const dailyPipelineEnabled = dailyPipelineCommand?.availability === 'ENABLED';
 
   const loadCatalog = useCallback(async () => {
     setCatalogLoading(true);
@@ -52,7 +55,7 @@ export default function PipelineOpsPage() {
         timeframe: '1d',
         pipelineKey: 'market-intelligence',
         runMode: 'single_batch',
-        batchSize: 25,
+        batchSize: commandKey === 'PIPELINE_RUN_ALL' ? 100 : 25,
         offset: 0,
         idempotencyKey: crypto.randomUUID(),
         force: false,
@@ -73,9 +76,19 @@ export default function PipelineOpsPage() {
         title="Bulk Pipeline Dashboard"
         subtitle="Monitoring and OPS for backend data load, processing stages, progress, and approved manual triggers."
         primaryAction={
-          <Button variant="contained" startIcon={<RefreshIcon />} onClick={() => void refresh()} disabled={loading || refreshing}>
-            {refreshing ? 'Refreshing' : 'Refresh'}
-          </Button>
+          <Stack direction="row" spacing={1}>
+            <Button
+              variant="contained"
+              startIcon={<PlayArrowIcon />}
+              onClick={() => void handleTriggerCommand('PIPELINE_RUN_ALL')}
+              disabled={!dailyPipelineEnabled || commandPendingKey !== null}
+            >
+              {commandPendingKey === 'PIPELINE_RUN_ALL' ? 'Running Pipeline' : 'Run Daily Pipeline'}
+            </Button>
+            <Button variant="outlined" startIcon={<RefreshIcon />} onClick={() => void refresh()} disabled={loading || refreshing}>
+              {refreshing ? 'Refreshing' : 'Refresh'}
+            </Button>
+          </Stack>
         }
         secondaryActions={
           <FormControlLabel

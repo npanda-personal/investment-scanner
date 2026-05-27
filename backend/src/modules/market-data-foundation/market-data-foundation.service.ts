@@ -9898,6 +9898,15 @@ export class MarketDataFoundationService {
       };
     }
 
+    if (syncState?.status === 'PENDING') {
+      return {
+        shouldSkip: false,
+        reason: 'RECENTLY_SYNCED',
+        message: 'Previous market-data sync did not complete; retrying from Market Data.',
+        providerEndDate: completedCatchUpEndDate,
+      };
+    }
+
     if (syncState?.lastCheckedAt && syncState.status !== 'FAILED' && !latestCompletedCandleMissing) {
       const lastCheckedAt = new Date(syncState.lastCheckedAt);
       const nextEligibleAt = this.addMinutes(lastCheckedAt, input.cooldownMinutes);

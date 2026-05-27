@@ -84,7 +84,9 @@ export function PipelineOpsTable({
     const stageMap = new Map((snapshot?.stages || []).map((stage) => [stage.stageKey, stage]));
     const commandMap = new Map<string, PipelineCommandCatalogItem>();
     for (const command of catalog?.commands || []) {
-      if (!commandMap.has(command.stageKey)) commandMap.set(command.stageKey, command);
+      const current = commandMap.get(command.stageKey);
+      if (!current || command.availability === 'ENABLED') commandMap.set(command.stageKey, command);
+      if (command.commandKey === 'PIPELINE_RUN_ALL') commandMap.set('MARKET_DATA', command);
       if (command.commandKey === 'DATA_QUALITY_EVALUATE_SCOPE') commandMap.set(command.stageKey, command);
     }
     const catalogRows = OPERATION_CATALOG.map((operation) => ({

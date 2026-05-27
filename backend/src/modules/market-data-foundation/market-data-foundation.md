@@ -406,14 +406,14 @@ Legacy compatibility endpoints are still supported.
 
 ## Market-Aware 1D Scheduler
 
-The scheduler is intentionally disabled by default and is designed for daily candles, not live trading. Manual full sync remains available through existing ingestion routes.
+The scheduler is designed for daily candles, not live trading. It wakes once per day by default and performs startup catch-up when the server comes online, so a laptop that was switched off overnight can still detect missing latest-completed EOD data without waiting for a 15-minute polling loop. Manual full-pipeline execution is available from Pipeline Ops.
 
 Environment defaults:
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `MARKET_DATA_SCHEDULER_ENABLED` | `false` | Enables background scheduled ingestion. |
-| `MARKET_DATA_SCHEDULER_INTERVAL_MINUTES` | `15` | Scheduler wake-up interval. |
+| `MARKET_DATA_SCHEDULER_INTERVAL_MINUTES` | `1440` | Daily scheduler wake-up interval. Values below `1440` are clamped to daily so stale local env values cannot re-enable 15-minute polling. Startup catch-up covers laptop/server downtime. |
 | `MARKET_DATA_SCHEDULER_REGIONS` | `IN` | Explicit comma-separated regions. `GLOBAL` is not expanded automatically. |
 | `MARKET_DATA_SCHEDULER_ASSET_TYPE` | `STOCK` | Current scheduled asset scope. |
 | `MARKET_DATA_SCHEDULER_BATCH_SIZE` | `25` | Max instruments processed per scheduled run. |
@@ -422,7 +422,7 @@ Environment defaults:
 | `MARKET_DATA_SCHEDULER_FINALIZATION_GRACE_MINUTES` | `15` | Grace period after close before final confirmation can be trusted. |
 | `MARKET_DATA_SCHEDULER_SKIP_WEEKENDS` | `true` | Skips non-trading weekends by default. |
 | `MARKET_DATA_NSE_OFFICIAL_EOD_BULK_ENABLED` | `true` in non-test, `false` in test | Enables one-file official NSE latest completed EOD bulk attempt for scheduled `IN/STOCK` sync before per-symbol provider fallback. |
-| `MARKET_DATA_SCHEDULER_RUN_ON_STARTUP` | `false` | Keeps server boot from starting ingestion before the operator asks for it or the interval fires. |
+| `MARKET_DATA_SCHEDULER_RUN_ON_STARTUP` | `true` | Runs a smart catch-up check when the server starts; it syncs only when latest-completed EOD data is missing or the session policy says a daily candle is useful. |
 | `MARKET_DATA_STARTUP_PRICE_BACKFILL_ENABLED` | `false` | Startup price backfill is disabled by default because it can launch provider work during ordinary server validation. |
 | `MARKET_DATA_ALLOW_STARTUP_PROVIDER_LOADS` | `false` | Required second opt-in before startup price backfill may call a provider. |
 | `MARKET_DATA_STARTUP_PRICE_BACKFILL_MAX_BATCHES` | `5` | Bounds startup latest-only price backfill when both startup backfill and startup provider loads are explicitly enabled. |
