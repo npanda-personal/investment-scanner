@@ -137,8 +137,27 @@ export class MarketDataFoundationRepository {
     return this.prisma.stock.findFirst({ where: { ...this.stockWhere(options), id } });
   }
 
-  findStockBySymbol(symbol: string) {
-    return this.prisma.stock.findUnique({ where: { symbol } });
+  async findStockBySymbol(symbol: string) {
+    const normalized = symbol.trim().toUpperCase();
+    const baseSymbol = normalized.replace(/\.(NS|BO)$/i, '');
+    const exact = await this.prisma.stock.findUnique({ where: { symbol: normalized } }).catch(() => null);
+    if (exact) return exact;
+
+    return this.prisma.stock.findFirst({
+      where: {
+        OR: [
+          { symbol: baseSymbol },
+          { providerSymbol: normalized },
+          { sourceSymbol: baseSymbol },
+          { displaySymbol: baseSymbol },
+        ],
+      },
+      orderBy: [
+        { isActive: 'desc' },
+        { isDelisted: 'asc' },
+        { updatedAt: 'desc' },
+      ],
+    });
   }
 
   findStockBySymbolAndExchange(symbol: string, exchange: string) {
@@ -480,18 +499,40 @@ export class MarketDataFoundationRepository {
     });
   }
 
-  updateStockLoadTimestampBySymbol(symbol: string, timestamp = new Date()) {
-    return this.prisma.stock.update({
-      where: { symbol },
+  async updateStockLoadTimestampBySymbol(symbol: string, timestamp = new Date()) {
+    const normalized = symbol.trim().toUpperCase();
+    const baseSymbol = normalized.replace(/\.(NS|BO)$/i, '');
+    const result = await this.prisma.stock.updateMany({
+      where: {
+        OR: [
+          { symbol: normalized },
+          { symbol: baseSymbol },
+          { providerSymbol: normalized },
+        ],
+      },
       data: { lastSuccessfulDataLoadTimestamp: timestamp },
     });
+    if (result.count === 0) {
+      return this.prisma.stock.update({
+        where: { symbol: normalized },
+        data: { lastSuccessfulDataLoadTimestamp: timestamp },
+      });
+    }
+    return result;
   }
 
   updateStockLoadTimestampBySymbols(symbols: string[], timestamp = new Date()) {
-    const uniqueSymbols = [...new Set(symbols.map((symbol) => symbol.trim()).filter(Boolean))];
+    const uniqueSymbols = [...new Set(symbols.map((symbol) => symbol.trim().toUpperCase()).filter(Boolean))];
     if (uniqueSymbols.length === 0) return Promise.resolve({ count: 0 });
+    const baseSymbols = uniqueSymbols.map((symbol) => symbol.replace(/\.(NS|BO)$/i, ''));
     return this.prisma.stock.updateMany({
-      where: { symbol: { in: uniqueSymbols } },
+      where: {
+        OR: [
+          { symbol: { in: uniqueSymbols } },
+          { symbol: { in: baseSymbols } },
+          { providerSymbol: { in: uniqueSymbols } },
+        ],
+      },
       data: { lastSuccessfulDataLoadTimestamp: timestamp },
     });
   }
@@ -706,7 +747,12 @@ export class MarketDataFoundationRepository {
           recent_liquidity.average_turnover AS "averageRecentTurnover"
         FROM scoped_stocks stocks
         CROSS JOIN LATERAL (
-          SELECT COALESCE(NULLIF(stocks."providerSymbol", ''), NULLIF(stocks.symbol, '')) AS price_symbol
+          SELECT regexp_replace(
+            COALESCE(NULLIF(stocks."sourceSymbol", ''), NULLIF(stocks.symbol, ''), NULLIF(stocks."providerSymbol", '')),
+            '\\.(NS|BO)$',
+            '',
+            'i'
+          ) AS price_symbol
         ) price_identity
         INNER JOIN LATERAL (
           SELECT

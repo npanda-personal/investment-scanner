@@ -856,7 +856,7 @@ export class MarketDataFoundationService {
           recordSupportedPriceBackfillNeed();
         }
         if (providerStatus === 'SUPPORTED') {
-          const historyDiagnostics = this.requiredHistoryDiagnostics(stock, validationWindow, statsBySymbol.get(stock.symbol));
+          const historyDiagnostics = this.requiredHistoryDiagnostics(stock, validationWindow, this.priceStatsForStock(statsBySymbol, stock));
           if (!historyDiagnostics.requiredHistoryComplete) {
             hasRequiredHistoryCoverage = false;
             counts.historyCoverageIncomplete = (counts.historyCoverageIncomplete || 0) + 1;
@@ -1247,7 +1247,7 @@ export class MarketDataFoundationService {
     for (const stock of stocks) {
       const readiness = readinessBySymbol.get(stock.symbol);
       if (!readiness) continue;
-      const stats = statsBySymbol.get(stock.symbol) || null;
+      const stats = this.priceStatsForStock(statsBySymbol, stock) || null;
       const isInactiveOrDelisted = stock.isActive === false || stock.isDelisted === true;
       if (isInactiveOrDelisted) {
         excludedCounts.inactiveOrDelisted += 1;
@@ -1466,7 +1466,7 @@ export class MarketDataFoundationService {
         recordPriceBackfillNeed();
       }
       if (isProviderSupported) {
-        const historyDiagnostics = this.requiredHistoryDiagnostics(stock, validationWindow, statsBySymbol.get(stock.symbol));
+        const historyDiagnostics = this.requiredHistoryDiagnostics(stock, validationWindow, this.priceStatsForStock(statsBySymbol, stock));
         if (!historyDiagnostics.requiredHistoryComplete) {
           historyCoverageIncomplete += 1;
           if (readiness?.priceReadiness === 'READY') {
@@ -1984,7 +1984,7 @@ export class MarketDataFoundationService {
 
     for (const stock of stocks) {
       summary.processedCount += 1;
-      const storedStats = priceStatsBySymbol.get(stock.symbol);
+      const storedStats = this.priceStatsForStock(priceStatsBySymbol, stock);
       const historyDiagnostics = this.requiredHistoryDiagnostics(stock, validationWindow, storedStats);
       summary.requiredHistoryStartDate = summary.requiredHistoryStartDate || historyDiagnostics.requiredHistoryStartDate;
       if (historyDiagnostics.listingDate) summary.listingDate = summary.listingDate || historyDiagnostics.listingDate;
@@ -2930,6 +2930,26 @@ export class MarketDataFoundationService {
     return symbol;
   }
 
+  private internalStorageSymbol(symbol: string, options: { region?: string; assetType?: string; exchange?: string | null } = {}): string {
+    const normalized = symbol.trim().toUpperCase();
+    const region = options.region?.trim().toUpperCase();
+    const assetType = options.assetType?.trim().toUpperCase() || 'STOCK';
+    const exchange = options.exchange?.trim().toUpperCase();
+    if (region === 'IN' && assetType === 'STOCK' && (exchange === 'NSE' || normalized.endsWith('.NS'))) {
+      return this.baseSymbolFromProviderSymbol(normalized);
+    }
+    return normalized;
+  }
+
+  private yahooHistoricalProviderSymbol(symbol: string, options: { region?: string; assetType?: string; exchange?: string | null } = {}): string {
+    const normalized = symbol.trim().toUpperCase();
+    if (!normalized || normalized.startsWith('^') || /\.(NS|BO)$/i.test(normalized)) return normalized;
+    const region = options.region?.trim().toUpperCase();
+    const assetType = options.assetType?.trim().toUpperCase() || 'STOCK';
+    if (region !== 'IN' || assetType !== 'STOCK') return normalized;
+    return this.providerSymbolForExchange(normalized, options.exchange || 'NSE');
+  }
+
   normalizeCatalogSymbol(row: { symbol?: string | null; sourceSymbol?: string | null; providerSymbol?: string | null; displaySymbol?: string | null; exchange?: string | null }, source?: string) {
     const rawSymbol = (row.sourceSymbol || row.providerSymbol || row.symbol || '').trim().toUpperCase();
     const exchange = row.exchange?.trim().toUpperCase() || (source?.startsWith('BSE') ? 'BSE' : source?.startsWith('NSE') ? 'NSE' : undefined);
@@ -3648,7 +3668,7 @@ export class MarketDataFoundationService {
         console.warn(`${symbol}: Angel One historical fetch failed; falling back to Yahoo because ANGEL_ONE_FAIL_CLOSED=false.`);
       }
     }
-    return this.marketDataProvider.fetchHistorical(symbol, startDate, endDate);
+    return this.marketDataProvider.fetchHistorical(this.yahooHistoricalProviderSymbol(symbol, options), startDate, endDate);
   }
 
   async storeHistorical(prices: HistoricalPrice[]): Promise<SyncSummary> {
@@ -3898,6 +3918,12 @@ export class MarketDataFoundationService {
       });
 
     const latestTradingDate = await this.repository.latestStoredTradingDateForRegion(region, assetType);
+    const remainingStaleCount = await this.countStaleCatalogSyncTasks({ region, assetType }, targetTradingDate).catch(() => 0);
+    if (remainingStaleCount > 0) {
+      (summary as any).remainingStaleCount = remainingStaleCount;
+      summary.warningCount += 1;
+      summary.warnings.push(`${remainingStaleCount} instruments still need latest completed candle ${targetTradingDate}.`);
+    }
     const decisionAfterRun = shouldRunMarketDataSync(region, now, {
       latestTradingDate,
       finalConfirmed: false,
@@ -3912,7 +3938,7 @@ export class MarketDataFoundationService {
       && summary.rowsUpdated === 0
       && summary.rowsNoOp > 0
       && (decisionAfterRun.reasonCode === 'POST_CLOSE_FINALIZATION_WINDOW' || decisionAfterRun.reasonCode === 'MARKET_CLOSED_NO_SYNC');
-    const status = summary.errors.length > 0
+    const status = summary.errors.length > 0 || remainingStaleCount > 0
       ? 'FAILED'
       : canConfirmFinal
         ? 'FINAL_CONFIRMED'
@@ -4180,7 +4206,8 @@ export class MarketDataFoundationService {
     const stock = await this.repository.findStockBySymbol(symbol);
     const region = options.region || stock?.region || this.marketDataProvider.inferRegion(symbol).region || 'GLOBAL';
     const assetType = options.assetType || stock?.assetType || 'STOCK';
-    const providerSymbol = stock?.providerSymbol || symbol;
+    const storageSymbol = stock?.symbol || this.internalStorageSymbol(symbol, { region, assetType, exchange: stock?.exchange });
+    const providerSymbol = stock?.providerSymbol || this.yahooHistoricalProviderSymbol(symbol, { region, assetType, exchange: stock?.exchange });
     const now = endDate || new Date();
     let providerEndDate = now;
     const tradingDate = tradingDateForRegion(region, now) || now.toISOString().slice(0, 10);
@@ -4190,7 +4217,7 @@ export class MarketDataFoundationService {
         region,
         assetType,
         scopeType: 'INSTRUMENT',
-        scopeKey: symbol,
+        scopeKey: storageSymbol,
         tradingDate,
         now,
         force: false,
@@ -4203,7 +4230,7 @@ export class MarketDataFoundationService {
           region,
           assetType,
           scopeType: 'INSTRUMENT',
-          scopeKey: symbol,
+          scopeKey: storageSymbol,
           tradingDate,
           timeframe: '1D',
           status: gate.reason === 'FINAL_CANDLE_CONFIRMED' ? 'FINAL_CONFIRMED' : 'SYNCED',
@@ -4247,7 +4274,7 @@ export class MarketDataFoundationService {
     });
     const exchangeFallback = await this.fetchIndianExchangeEodFallbackIfNeeded({
       stock,
-      symbol,
+      symbol: storageSymbol,
       providerSymbol,
       region,
       assetType,
@@ -4275,7 +4302,7 @@ export class MarketDataFoundationService {
         region,
         assetType,
         scopeType: 'INSTRUMENT',
-        scopeKey: symbol,
+        scopeKey: storageSymbol,
         tradingDate,
         timeframe: '1D',
         status: 'FAILED',
@@ -4284,12 +4311,12 @@ export class MarketDataFoundationService {
         lastProviderFetchAt: now,
       });
       if (!options.preserveProviderSupportOnZeroRows && stock && typeof (this.repository as any).updateProviderSupportStatus === 'function') {
-        await this.repository.updateProviderSupportStatus(symbol, 'UNSUPPORTED', 'Provider returned zero usable historical price rows.').catch(() => null);
+        await this.repository.updateProviderSupportStatus(storageSymbol, 'UNSUPPORTED', 'Provider returned zero usable historical price rows.').catch(() => null);
       }
       return emptySummary;
     }
 
-    const pricesForStorage = prices.map((price) => ({ ...price, symbol }));
+    const pricesForStorage = prices.map((price) => ({ ...price, symbol: storageSymbol }));
     const syncSummary = await this.storeHistorical(pricesForStorage);
     if (exchangeFallback.attempted) {
       syncSummary.warnings = [
@@ -4298,15 +4325,15 @@ export class MarketDataFoundationService {
       ].slice(0, 10);
       syncSummary.warningCount = (syncSummary.warningCount || 0) + exchangeFallback.warnings.length;
     }
-    await this.repository.updateStockLoadTimestampBySymbol(symbol);
+    await this.repository.updateStockLoadTimestampBySymbol(storageSymbol);
     if (typeof (this.repository as any).updateProviderSupportStatus === 'function') {
-      await this.repository.updateProviderSupportStatus(symbol, 'SUPPORTED', null).catch(() => null);
+      await this.repository.updateProviderSupportStatus(storageSymbol, 'SUPPORTED', null).catch(() => null);
     }
     await this.repository.upsertSyncState({
       region,
       assetType,
       scopeType: 'INSTRUMENT',
-      scopeKey: symbol,
+      scopeKey: storageSymbol,
       tradingDate,
       timeframe: '1D',
       status: 'SYNCED',
@@ -4315,7 +4342,7 @@ export class MarketDataFoundationService {
       lastProviderFetchAt: now,
     });
 
-    console.log(`  Successfully ingested ${prices.length} price ticks for ${symbol}`);
+    console.log(`  Successfully ingested ${prices.length} price ticks for ${storageSymbol}`);
     return syncSummary;
   }
 
@@ -5929,12 +5956,18 @@ export class MarketDataFoundationService {
   ): Promise<{ readinessBySymbol: Map<string, InstrumentUniverseReadiness>; statsBySymbol: Map<string, any> }> {
     if (stocks.length === 0) return { readinessBySymbol: new Map(), statsBySymbol: new Map() };
     const expectedLatestTradingDate = latestCompletedTradingDateForRegion(options.region || 'IN');
+    const identitySymbols = [...new Set(stocks.flatMap((stock) => [
+      stock.symbol,
+      stock.providerSymbol,
+      stock.sourceSymbol,
+      stock.displaySymbol,
+    ]).filter((value): value is string => typeof value === 'string' && value.trim().length > 0))];
     const statsBySymbol = typeof (this.repository as any).priceReadinessStatsForSymbols === 'function'
-      ? await this.repository.priceReadinessStatsForSymbols(stocks.map((stock) => stock.symbol))
+      ? await this.repository.priceReadinessStatsForSymbols(identitySymbols)
       : new Map<string, never>();
     await this.repairProviderSupportFromStoredPrices(stocks, statsBySymbol as Map<string, any>);
     const readinessBySymbol = new Map(stocks.map((stock) => {
-      const priceStats = statsBySymbol.get(stock.symbol);
+      const priceStats = this.priceStatsForStock(statsBySymbol as Map<string, any>, stock);
       const readiness = classifyInstrumentUniverseReadiness({
         isActive: stock.isActive,
         isDelisted: stock.isDelisted,
@@ -5982,7 +6015,7 @@ export class MarketDataFoundationService {
     for (const stock of stocks) {
       const readiness = readinessBySymbol.get(stock.symbol);
       if (!readiness) continue;
-      const historyDiagnostics = this.requiredHistoryDiagnostics(stock, validationWindow, statsBySymbol.get(stock.symbol));
+      const historyDiagnostics = this.requiredHistoryDiagnostics(stock, validationWindow, this.priceStatsForStock(statsBySymbol, stock));
       const repairStates = this.repairStateLookup(repairStatesByStockId.get(stock.id));
       const sourceFallbackReason = this.sourceFallbackReasonForBaseline(repairStates.priceBackfill);
       const requiredHistoryStatus = this.requiredHistoryStatusForBaseline(historyDiagnostics, sourceFallbackReason);
@@ -6105,8 +6138,8 @@ export class MarketDataFoundationService {
     if (sourceFallbackReason === 'YAHOO_ZERO_ROWS') return 'FALLBACK_REQUIRED_AFTER_YAHOO_ZERO_ROWS';
     if (providerFallbackState === 'FALLBACK_ATTEMPTED_STILL_INCOMPLETE') return 'FALLBACK_ATTEMPTED_STILL_INCOMPLETE';
     if (listingDateStatus === 'MISSING_USED_15_YEAR_TARGET') return 'LISTING_DATE_MISSING_REQUIRED_15Y';
-    if (requiredHistoryStatus !== 'COMPLETE') return 'REQUIRED_HISTORY_INCOMPLETE';
     if (this.needsCatalogIdentityRepair(stock)) return 'CATALOG_IDENTITY_REPAIR_REQUIRED';
+    if (requiredHistoryStatus !== 'COMPLETE') return 'REQUIRED_HISTORY_INCOMPLETE';
     if (readiness.priceReadiness !== 'READY' || !historyDiagnostics.requiredHistoryComplete) return 'REQUIRED_HISTORY_INCOMPLETE';
     return 'REVIEW_READY';
   }
@@ -6738,10 +6771,6 @@ export class MarketDataFoundationService {
         add('PROVIDER_SYMBOL_SUFFIX_MISMATCH', 'Provider symbol suffix does not match exchange', stock, `Expected provider symbol suffix ${expectedSuffix}.`, { expected: `*${expectedSuffix}`, value: providerSymbol });
       }
 
-      if (expectedSuffix && canonicalSymbol && !canonicalSymbol.endsWith(expectedSuffix)) {
-        add('STOCK_SYMBOL_SUFFIX_MISMATCH', 'Canonical symbol suffix does not match exchange', stock, `Expected canonical symbol to end with ${expectedSuffix}.`, { expected: `*${expectedSuffix}`, value: canonicalSymbol });
-      }
-
       if (providerSymbol && sourceSymbol && this.baseSymbolFromProviderSymbol(providerSymbol) !== this.baseSymbolFromProviderSymbol(sourceSymbol)) {
         add('SOURCE_PROVIDER_BASE_MISMATCH', 'Source/provider symbol bases differ', stock, 'Provider symbol base should match the source symbol base.', { expected: sourceSymbol, value: providerSymbol });
       }
@@ -6994,6 +7023,19 @@ export class MarketDataFoundationService {
   private priceBarsForSymbol(priceStatsBySymbol: Map<string, any>, symbol: unknown): number {
     if (typeof symbol !== 'string' || !symbol.trim()) return 0;
     return Number(priceStatsBySymbol.get(symbol)?.priceHistoryBars || 0);
+  }
+
+  private priceStatsForStock(priceStatsBySymbol: Map<string, any>, stock: any): any | null {
+    const candidates = [stock?.symbol, stock?.sourceSymbol, stock?.providerSymbol, stock?.displaySymbol]
+      .filter((value): value is string => typeof value === 'string' && value.trim().length > 0);
+    for (const value of candidates) {
+      const direct = priceStatsBySymbol.get(value);
+      if (direct) return direct;
+      const base = this.baseSymbolFromProviderSymbol(value);
+      const baseStats = priceStatsBySymbol.get(base);
+      if (baseStats) return baseStats;
+    }
+    return null;
   }
 
   private expectedProviderSuffixForStock(stock: any): '.NS' | '.BO' | null {
@@ -7386,7 +7428,7 @@ export class MarketDataFoundationService {
     const symbols = stocks
       .filter((stock) => normalizeProviderStatus(stock.providerSupportStatus) === 'UNKNOWN')
       .filter((stock) => {
-        const stats = statsBySymbol.get(stock.symbol);
+        const stats = this.priceStatsForStock(statsBySymbol, stock);
         return Boolean(stats?.latestPriceDate && Number(stats.priceHistoryBars || 0) > 0);
       })
       .map((stock) => stock.symbol);
@@ -8719,7 +8761,7 @@ export class MarketDataFoundationService {
         if (blockedStockIds.has(stock.id)) return [];
         const readiness = readinessBySymbol.get(stock.symbol);
         if (!readiness) return [];
-        const historyDiagnostics = this.requiredHistoryDiagnostics(stock, validationWindow, statsBySymbol.get(stock.symbol));
+        const historyDiagnostics = this.requiredHistoryDiagnostics(stock, validationWindow, this.priceStatsForStock(statsBySymbol, stock));
         if (readiness.priceReadiness === 'READY' && historyDiagnostics.requiredHistoryComplete) return [];
         return [{ stock, readiness, historyDiagnostics }];
       })
@@ -9417,7 +9459,7 @@ export class MarketDataFoundationService {
     const isEquityCash = segment === 'CASH' || assetType === 'STOCK';
 
     return {
-      symbol,
+      symbol: normalized.sourceSymbol,
       name: stock.name || normalized.displaySymbol,
       region: 'IN',
       exchange: inferredExchange || (symbol.endsWith('.BO') ? 'BSE' : 'NSE'),
@@ -9469,7 +9511,7 @@ export class MarketDataFoundationService {
     const isCashEquity = isEtf || !series || ['EQ', 'BE', 'BZ', 'SM', 'ST'].includes(series);
     if (!isCashEquity) return null;
     return {
-      symbol: normalized.providerSymbol,
+      symbol: normalized.sourceSymbol,
       sourceSymbol: normalized.sourceSymbol,
       providerSymbol: normalized.providerSymbol,
       displaySymbol: normalized.displaySymbol,
@@ -9519,7 +9561,7 @@ export class MarketDataFoundationService {
       };
     }
     return {
-      symbol: this.providerSymbolForExchange(sourceSymbol, 'NSE'),
+      symbol: sourceSymbol,
       sourceSymbol,
       providerSymbol: this.providerSymbolForExchange(sourceSymbol, 'NSE'),
       displaySymbol: sourceSymbol,
