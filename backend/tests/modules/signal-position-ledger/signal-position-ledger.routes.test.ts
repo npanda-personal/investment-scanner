@@ -8,16 +8,18 @@ const routePaths = (router: any) =>
     .map((layer: any) => `${Object.keys(layer.route.methods)[0].toUpperCase()} ${layer.route.path}`);
 
 describe('signal position ledger routes', () => {
-  it('registers health, active, and refresh endpoints', () => {
+  it('registers health, active, closed, and refresh endpoints', () => {
     const router = createSignalPositionLedgerRouter({
       health: jest.fn(),
       activeRows: jest.fn(),
+      closedRows: jest.fn(),
       refreshActiveRows: jest.fn(),
     } as any);
 
     expect(routePaths(router)).toEqual([
       'GET /signals/position-ledger/health',
       'GET /signals/position-ledger/active',
+      'GET /signals/position-ledger/closed',
       'POST /signals/position-ledger/active/refresh',
     ]);
   });

@@ -13,6 +13,14 @@ export class SignalPositionLedgerController {
     }
   };
 
+  closedRows = async (req: Request, res: Response) => {
+    try {
+      return res.json(await this.service.listClosedRows(parseSignalPositionLedgerActiveQuery(req.query)));
+    } catch (error) {
+      return this.error(res, error, 'Failed to load signal position ledger closed rows', 400);
+    }
+  };
+
   refreshActiveRows = async (req: Request, res: Response) => {
     try {
       return res.json(await this.service.refreshActiveRows(parseSignalPositionLedgerActiveQuery({ ...req.query, ...req.body }), { force: true }));

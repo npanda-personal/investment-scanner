@@ -65,6 +65,7 @@ type ActivePositionsTableProps = {
   loading: boolean;
   error: string | null;
   scopeLabel: string;
+  variant?: 'active' | 'closed';
   page: number;
   pageSize: number;
   onPageChange: (page: number) => void;
@@ -76,13 +77,15 @@ export const ActivePositionsTable: React.FC<ActivePositionsTableProps> = ({
   loading,
   error,
   scopeLabel,
+  variant = 'active',
   page,
   pageSize,
   onPageChange,
   onPageSizeChange,
 }) => {
   const [selectedRow, setSelectedRow] = useState<SignalPositionLedgerActiveRow | null>(null);
-  const columns = useMemo<DataTableColumn<SignalPositionLedgerActiveRow>[]>(() => [
+  const columns = useMemo<DataTableColumn<SignalPositionLedgerActiveRow>[]>(() => {
+    const baseColumns: DataTableColumn<SignalPositionLedgerActiveRow>[] = [
     {
       id: 'company',
       label: 'Stock',
@@ -107,9 +110,20 @@ export const ActivePositionsTable: React.FC<ActivePositionsTableProps> = ({
         </Typography>
       ),
     },
+    ...(variant === 'closed' ? [{
+      id: 'exit',
+      label: 'Exit',
+      minWidth: 145,
+      maxWidth: 170,
+      render: (row: SignalPositionLedgerActiveRow) => (
+        <Typography variant="body2" fontWeight={700} noWrap>
+          {formatDate(row.exitTriggerTimestamp || null)} @ {formatPrice(row.exitTriggerPrice ?? null)}
+        </Typography>
+      ),
+    } satisfies DataTableColumn<SignalPositionLedgerActiveRow>] : []),
     {
       id: 'move',
-      label: 'Raw move',
+      label: variant === 'closed' ? 'Final return' : 'Return till date',
       align: 'right',
       render: (row) => (
         <Chip
@@ -135,7 +149,7 @@ export const ActivePositionsTable: React.FC<ActivePositionsTableProps> = ({
     {
       id: 'state',
       label: 'Lifecycle',
-      render: (row) => <StatusBadge label={healthLabel(row)} />,
+      render: (row) => <StatusBadge label={variant === 'closed' ? 'Closed' : healthLabel(row)} />,
     },
     {
       id: 'strategy',
@@ -150,7 +164,9 @@ export const ActivePositionsTable: React.FC<ActivePositionsTableProps> = ({
         </Tooltip>
       ),
     },
-  ], []);
+    ];
+    return baseColumns;
+  }, [variant]);
 
   return (
     <>
@@ -159,8 +175,8 @@ export const ActivePositionsTable: React.FC<ActivePositionsTableProps> = ({
         rows={data.items}
         getRowId={(row) => row.signalId || `${row.instrumentId}-${row.entryTriggerTimestamp}`}
         loading={loading}
-        error={error ? `Entry trigger candidate data could not be loaded for ${scopeLabel}. ${error}` : null}
-        emptyMessage={`No entry trigger candidates are available for ${scopeLabel}.`}
+        error={error ? `${variant === 'closed' ? 'Closed history' : 'Entry trigger candidate'} data could not be loaded for ${scopeLabel}. ${error}` : null}
+        emptyMessage={variant === 'closed' ? `No closed entry-trigger history is available for ${scopeLabel}.` : `No active entry trigger candidates are available for ${scopeLabel}.`}
         page={page}
         pageSize={pageSize}
         totalCount={data.totalCount}
@@ -174,7 +190,7 @@ export const ActivePositionsTable: React.FC<ActivePositionsTableProps> = ({
           <>
             <DialogTitle>
               <Stack spacing={0.5}>
-                <Typography variant="h6">{selectedRow.symbol} entry trigger evidence</Typography>
+                <Typography variant="h6">{selectedRow.symbol} {variant === 'closed' ? 'closed history' : 'entry trigger evidence'}</Typography>
                 <Typography variant="body2" color="text.secondary">{selectedRow.companyName || 'Company unavailable'}</Typography>
               </Stack>
             </DialogTitle>
@@ -192,6 +208,13 @@ export const ActivePositionsTable: React.FC<ActivePositionsTableProps> = ({
                   <Typography variant="subtitle2" fontWeight={800}>Reason</Typography>
                   <Typography color="text.secondary">{selectedRow.entryReasonSummary}</Typography>
                 </Box>
+
+                {variant === 'closed' && (
+                  <Box>
+                    <Typography variant="subtitle2" fontWeight={800}>Exit Reason</Typography>
+                    <Typography color="text.secondary">{selectedRow.exitReasonSummary || 'Exit reason unavailable.'}</Typography>
+                  </Box>
+                )}
 
                 <Divider />
 

@@ -1,7 +1,8 @@
 export type SignalPositionTriggerType = 'bullish_entry_trigger' | 'bearish_trigger';
 export type SignalPositionReturnStatus = 'CURRENT' | 'STALE' | 'UNAVAILABLE';
+export type SignalPositionLedgerStatus = 'ACTIVE' | 'CLOSED';
 export type SignalPositionHealthState = 'EXIT_TRIGGERED' | 'RISK_WARNING' | null;
-export type SignalPositionLifecycleEvidenceStatus = 'EXIT_COMPATIBILITY_ONLY' | 'UNAVAILABLE';
+export type SignalPositionLifecycleEvidenceStatus = 'ACTIVE_ENTRY' | 'EXIT_TRIGGERED' | 'UNAVAILABLE';
 export type SignalPositionCalibrationEvidenceStatus = 'AVAILABLE' | 'UNAVAILABLE';
 export type SignalPositionTrustEvidenceStatus =
   | 'SOURCE_PROVEN'
@@ -39,6 +40,8 @@ export interface SignalPositionLedgerRefreshProgress {
 }
 
 export interface SignalPositionLedgerActiveRow {
+  ledgerKey: string;
+  status: SignalPositionLedgerStatus;
   signalId: string | null;
   instrumentId: string;
   symbol: string;
@@ -65,6 +68,13 @@ export interface SignalPositionLedgerActiveRow {
   trustEvidenceStatus: SignalPositionTrustEvidenceStatus;
   calibrationEvidenceStatus: SignalPositionCalibrationEvidenceStatus;
   displayWarnings: string[];
+  exitSignalId?: string | null;
+  exitTriggerTimestamp?: string | null;
+  exitTriggerPrice?: number | null;
+  exitReasonSummary?: string | null;
+  exitRuleId?: string | null;
+  exitDecision?: string | null;
+  closedAt?: string | null;
 }
 
 export interface SignalPositionLedgerActiveListResponse {

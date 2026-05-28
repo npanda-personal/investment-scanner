@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { Alert, Box, Button, LinearProgress, Paper, Stack, Tab, Tabs, Typography } from '@mui/material';
 import { PageHeader } from '@/shared/components';
 import { useSignalPositionLedgerActiveRows } from '../hooks/useSignalPositionLedgerActiveRows';
+import { useSignalPositionLedgerClosedRows } from '../hooks/useSignalPositionLedgerClosedRows';
 import { ActivePositionsTable } from './ActivePositionsTable';
-import { ClosedHistoryPlaceholder } from './ClosedHistoryPlaceholder';
 import { SignalPositionSummaryStrip } from './SignalPositionSummaryStrip';
 
 type LedgerTab = 'active' | 'history';
@@ -23,6 +23,7 @@ const SignalPositionLedgerPage: React.FC = () => {
     refreshLedger,
     refreshingLedger,
   } = useSignalPositionLedgerActiveRows();
+  const closed = useSignalPositionLedgerClosedRows();
   const scopeLabel = `${scope.region} / ${scope.assetType}`;
 
   return (
@@ -38,7 +39,7 @@ const SignalPositionLedgerPage: React.FC = () => {
         <Stack spacing={1}>
           <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" gap={1}>
             <Typography variant="body2" color="text.secondary">
-              Ledger pipeline: {data.refresh.status} - processed {data.refresh.processedCount.toLocaleString()} / {data.refresh.totalCount.toLocaleString()} source signals - materialized {data.refresh.materializedRowCount.toLocaleString()} entry candidates.
+              Ledger pipeline: {data.refresh.status} - processed {data.refresh.processedCount.toLocaleString()} / {data.refresh.totalCount.toLocaleString()} source signals - active {data.totalCount.toLocaleString()} - closed {closed.data.totalCount.toLocaleString()}.
             </Typography>
             <Typography variant="body2" color="text.secondary">
               Updated {data.refresh.updatedAt ? new Date(data.refresh.updatedAt).toLocaleString() : 'not yet'}
@@ -93,7 +94,17 @@ const SignalPositionLedgerPage: React.FC = () => {
           />
         </>
       ) : (
-        <ClosedHistoryPlaceholder />
+        <ActivePositionsTable
+          data={closed.data}
+          loading={closed.loading}
+          error={closed.error}
+          scopeLabel={scopeLabel}
+          variant="closed"
+          page={closed.page}
+          pageSize={closed.pageSize}
+          onPageChange={closed.setPage}
+          onPageSizeChange={closed.setPageSize}
+        />
       )}
     </Box>
   );

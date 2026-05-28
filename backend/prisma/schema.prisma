@@ -88,6 +88,7 @@ model Stock {
   strategyDecisions             StrategyDecisionResult[]
   marketDataRepairAttempts      MarketDataRepairAttempt[]
   marketDataRepairStates        MarketDataRepairState[]
+  signalPositionLedgerEntries   SignalPositionLedgerEntry[]
 
   @@index([region, assetType, symbol], map: "stocks_region_assetType_symbol_idx")
   @@index([region, assetType, providerSupportStatus, isActive, isDelisted], map: "stocks_region_assetType_providerSupport_active_delisted_idx")
@@ -1060,6 +1061,55 @@ model PipelineRun {
   @@index([scopeRegion, scopeAssetType, startedAt])
   @@index([status, startedAt])
   @@map("pipeline_runs")
+}
+
+model SignalPositionLedgerEntry {
+  id                        String   @id @default(cuid())
+  ledgerKey                 String   @unique
+  scopeRegion               String
+  scopeAssetType            String
+  instrumentId              String
+  stock                     Stock    @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+  stockKey                  String   @default("")
+  activeSlot                String?
+  symbol                    String
+  companyName               String?
+  status                    String   @default("ACTIVE")
+  entrySignalId             String?
+  entryTriggerType          String   @default("bullish_entry_trigger")
+  entryTriggerTimestamp     DateTime
+  entryTriggerPrice         Float
+  entryReasonSummary        String
+  strategyId                String?
+  strategyVersion           String?
+  strategyDecision          String?
+  strategyReadinessLabel    String?
+  strategyRatingGrade       String?
+  entryRuleId               String?
+  latestTrustedPriceDate    DateTime?
+  latestTrustedPrice        Float?
+  currentReturnPercent      Float?
+  currentReturnStatus       String   @default("UNAVAILABLE")
+  currentDataQualityStatus  String?
+  trustEvidenceStatus       String   @default("SOURCE_PROVEN_PRICE_UNAVAILABLE")
+  calibrationEvidenceStatus String   @default("UNAVAILABLE")
+  displayWarnings           Json     @default("[]")
+  exitSignalId              String?
+  exitTriggerTimestamp      DateTime?
+  exitTriggerPrice          Float?
+  exitReasonSummary         String?
+  exitRuleId                String?
+  exitDecision              String?
+  closedAt                  DateTime?
+  lastEvaluatedAt           DateTime?
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+
+  @@index([scopeRegion, scopeAssetType, status, entryTriggerTimestamp], map: "spl_entries_scope_status_entry_idx")
+  @@index([scopeRegion, scopeAssetType, status, exitTriggerTimestamp], map: "spl_entries_scope_status_exit_idx")
+  @@index([instrumentId, status], map: "spl_entries_instrument_status_idx")
+  @@unique([scopeRegion, scopeAssetType, activeSlot], map: "spl_entries_one_active_stock_key")
+  @@map("signal_position_ledger_entries")
 }
 
 model PipelineStageRun {

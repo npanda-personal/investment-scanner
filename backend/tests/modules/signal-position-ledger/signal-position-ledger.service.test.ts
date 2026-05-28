@@ -92,6 +92,37 @@ const sourceProvenTrigger = {
   incomplete_reasons: [],
 };
 
+const activeLedgerRow = (overrides: Partial<any> = {}) => ({
+  ledgerKey: overrides.ledgerKey || `IN:STOCK:${overrides.instrumentId || 'stock-1'}:bullish_entry_trigger:2026-05-20T00:00:00.000Z`,
+  status: 'ACTIVE' as const,
+  signalId: overrides.signalId || 'signal-existing',
+  instrumentId: overrides.instrumentId || 'stock-1',
+  symbol: overrides.symbol || 'ABC',
+  companyName: overrides.companyName || 'ABC Co',
+  region: 'IN',
+  assetType: 'STOCK',
+  triggerType: 'bullish_entry_trigger' as const,
+  entryTriggerTimestamp: overrides.entryTriggerTimestamp || '2026-05-20T00:00:00.000Z',
+  entryTriggerPrice: overrides.entryTriggerPrice ?? 100,
+  entryReasonSummary: overrides.entryReasonSummary || 'Original entry trigger.',
+  strategyId: 'BREAKOUT_CONFIRMATION',
+  strategyVersion: '1.0.0',
+  strategyDecision: 'ENTRY_CANDIDATE',
+  strategyReadinessLabel: 'READY',
+  strategyRatingGrade: 'A',
+  entryRuleId: 'ENTRY_BREAKOUT',
+  latestTrustedPriceDate: null,
+  latestTrustedPrice: null,
+  currentReturnPercent: null,
+  currentReturnStatus: 'UNAVAILABLE' as const,
+  currentDataQualityStatus: 'READY',
+  healthState: null,
+  lifecycleEvidenceStatus: 'ACTIVE_ENTRY' as const,
+  trustEvidenceStatus: 'SOURCE_PROVEN_PRICE_UNAVAILABLE' as const,
+  calibrationEvidenceStatus: 'AVAILABLE' as const,
+  displayWarnings: [],
+});
+
 describe('SignalPositionLedgerService', () => {
   it('keeps only source-proven entry rows and computes current return when trust basis is usable', async () => {
     const persistedSignal = {
@@ -141,14 +172,127 @@ describe('SignalPositionLedgerService', () => {
       currentReturnPercent: 10,
       currentReturnStatus: 'CURRENT',
       healthState: null,
-      lifecycleEvidenceStatus: 'UNAVAILABLE',
+      lifecycleEvidenceStatus: 'ACTIVE_ENTRY',
       trustEvidenceStatus: 'SOURCE_PROVEN',
       strategyDecision: 'ENTRY_CANDIDATE',
       calibrationEvidenceStatus: 'AVAILABLE',
     });
   });
 
-  it('excludes stale price rows from entry trigger candidates', async () => {
+  it('does not drop existing active entries when the latest scan contains fewer current candidates', async () => {
+    const existingA = activeLedgerRow({ instrumentId: 'stock-a', symbol: 'AAA' });
+    const existingB = activeLedgerRow({ instrumentId: 'stock-b', symbol: 'BBB', ledgerKey: 'IN:STOCK:stock-b:bullish_entry_trigger:2026-05-20T00:00:00.000Z' });
+    const signalA = { ...trustedSignal, id: 'signal-a-new', instrument_id: 'stock-a', symbol: 'AAA', company_name: 'AAA Co' };
+    const repository = {
+      listAllLedgerRows: jest.fn()
+        .mockResolvedValueOnce([existingA, existingB])
+        .mockResolvedValueOnce([]),
+      listLatestSignals: jest.fn().mockResolvedValue({
+        items: [signalA],
+        totalCount: 1,
+        limit: 100,
+        offset: 0,
+        nextOffset: null,
+        hasMore: false,
+      }),
+      latestSnapshotsByInstrumentIds: jest.fn().mockResolvedValue(new Map([
+        ['stock-a', {
+          latestPrice: { date: new Date().toISOString(), close: 105, adjustedClose: 105, dataStatus: 'COMPLETE', source: 'database' },
+          quality: { signalReadinessStatus: 'READY', coverageStatus: 'GOOD', liquidityStatus: 'LIQUID', lastEvaluatedAt: new Date().toISOString() },
+          exitDecision: null,
+        }],
+        ['stock-b', {
+          latestPrice: { date: new Date().toISOString(), close: 110, adjustedClose: 110, dataStatus: 'COMPLETE', source: 'database' },
+          quality: { signalReadinessStatus: 'READY', coverageStatus: 'GOOD', liquidityStatus: 'LIQUID', lastEvaluatedAt: new Date().toISOString() },
+          exitDecision: null,
+        }],
+      ])),
+      upsertActiveLedgerRow: jest.fn(),
+      closeLedgerRow: jest.fn(),
+    };
+    const signalService = {
+      enrichSignals: jest.fn().mockResolvedValue([{
+        ...signalA,
+        triggerContract: {
+          ...sourceProvenTrigger,
+          signal_id: 'signal-a-new',
+          instrument_id: 'stock-a',
+          symbol: 'AAA',
+          trigger_timestamp: '2026-05-26T00:00:00.000Z',
+        },
+      }]),
+    };
+    const service = new SignalPositionLedgerService(repository as any, signalService as any);
+    const query = { region: 'IN', assetType: 'STOCK', limit: 25, offset: 0 };
+
+    await service.refreshActiveRows(query, { force: true, wait: true });
+    const result = await service.listActiveRows(query);
+
+    expect(result.totalCount).toBe(2);
+    expect(result.items.map((row) => row.symbol).sort()).toEqual(['AAA', 'BBB']);
+    expect(result.items.find((row) => row.symbol === 'AAA')?.entryTriggerTimestamp).toBe('2026-05-20T00:00:00.000Z');
+    expect(repository.closeLedgerRow).not.toHaveBeenCalled();
+  });
+
+  it('closes an existing active entry only when an exit trigger is present', async () => {
+    const existing = activeLedgerRow({ instrumentId: 'stock-1', symbol: 'ABC' });
+    const repository = {
+      listAllLedgerRows: jest.fn()
+        .mockResolvedValueOnce([existing])
+        .mockResolvedValueOnce([]),
+      listLatestSignals: jest.fn().mockResolvedValue({
+        items: [],
+        totalCount: 0,
+        limit: 100,
+        offset: 0,
+        nextOffset: null,
+        hasMore: false,
+      }),
+      latestSnapshotsByInstrumentIds: jest.fn().mockResolvedValue(new Map([
+        ['stock-1', {
+          latestPrice: { date: '2026-05-27T00:00:00.000Z', close: 112, adjustedClose: 112, dataStatus: 'COMPLETE', source: 'database' },
+          quality: { signalReadinessStatus: 'READY', coverageStatus: 'GOOD', liquidityStatus: 'LIQUID', lastEvaluatedAt: '2026-05-27T00:00:00.000Z' },
+          exitDecision: {
+            strategy: 'DEFENSIVE_EXIT',
+            decision: 'EXIT_CANDIDATE',
+            generatedAt: '2026-05-27T00:00:00.000Z',
+            reasons: ['Price closed below SMA50.'],
+            exitRulesTriggered: ['PRICE_BELOW_SMA50'],
+          },
+        }],
+      ])),
+      priceAtOrBeforeInstrumentId: jest.fn().mockResolvedValue({
+        date: '2026-05-27T00:00:00.000Z',
+        close: 112,
+        adjustedClose: 112,
+        dataStatus: 'COMPLETE',
+        source: 'database',
+      }),
+      upsertActiveLedgerRow: jest.fn(),
+      closeLedgerRow: jest.fn(),
+    };
+    const signalService = { enrichSignals: jest.fn() };
+    const service = new SignalPositionLedgerService(repository as any, signalService as any);
+    const query = { region: 'IN', assetType: 'STOCK', limit: 25, offset: 0 };
+
+    await service.refreshActiveRows(query, { force: true, wait: true });
+    const active = await service.listActiveRows(query);
+    const closed = await service.listClosedRows(query);
+
+    expect(active.totalCount).toBe(0);
+    expect(closed.totalCount).toBe(1);
+    expect(closed.items[0]).toMatchObject({
+      status: 'CLOSED',
+      symbol: 'ABC',
+      exitTriggerTimestamp: '2026-05-27T00:00:00.000Z',
+      exitTriggerPrice: 112,
+      exitReasonSummary: 'Price closed below SMA50.',
+      exitRuleId: 'PRICE_BELOW_SMA50',
+    });
+    expect(repository.closeLedgerRow).toHaveBeenCalledWith(expect.objectContaining({ status: 'CLOSED' }));
+  });
+
+  it('keeps active entry trigger rows visible when current price is stale', async () => {
     const staleSignal = { ...trustedSignal, id: 'signal-2', instrument_id: 'stock-2', symbol: 'XYZ', company_name: 'XYZ Co' };
     const repository = {
       listLatestSignals: jest.fn().mockResolvedValue({
@@ -193,8 +337,12 @@ describe('SignalPositionLedgerService', () => {
     await service.refreshActiveRows(query, { force: true, wait: true });
     const result = await service.listActiveRows(query);
 
-    expect(result.totalCount).toBe(0);
-    expect(result.items).toHaveLength(0);
+    expect(result.totalCount).toBe(1);
+    expect(result.items[0]).toMatchObject({
+      symbol: 'XYZ',
+      currentReturnStatus: 'STALE',
+      lifecycleEvidenceStatus: 'ACTIVE_ENTRY',
+    });
   });
 
   it('excludes rows when current data-quality evidence is missing', async () => {
@@ -230,7 +378,7 @@ describe('SignalPositionLedgerService', () => {
     expect(result.items).toHaveLength(0);
   });
 
-  it('keeps source-proven WATCH rows as active review candidates', async () => {
+  it('excludes WATCH rows because only entry triggers open active lifecycle rows', async () => {
     const watchSignal = {
       ...trustedSignal,
       id: 'signal-watch',
@@ -289,17 +437,11 @@ describe('SignalPositionLedgerService', () => {
     await service.refreshActiveRows(query, { force: true, wait: true });
     const result = await service.listActiveRows(query);
 
-    expect(result.totalCount).toBe(1);
-    expect(result.items[0]).toMatchObject({
-      symbol: 'WATCHME',
-      strategyDecision: 'WATCH',
-      entryRuleId: 'PRICE_ABOVE_SMA50',
-      currentDataQualityStatus: 'READY',
-      currentReturnStatus: 'CURRENT',
-    });
+    expect(result.totalCount).toBe(0);
+    expect(result.items).toHaveLength(0);
   });
 
-  it('excludes risk warning rows from the entry candidate list', async () => {
+  it('keeps active entry rows on risk warning because only exit triggers close them', async () => {
     const repository = {
       listLatestSignals: jest.fn().mockResolvedValue({
         items: [trustedSignal],
@@ -337,8 +479,12 @@ describe('SignalPositionLedgerService', () => {
     await service.refreshActiveRows(query, { force: true, wait: true });
     const result = await service.listActiveRows(query);
 
-    expect(result.totalCount).toBe(0);
-    expect(result.items).toHaveLength(0);
+    expect(result.totalCount).toBe(1);
+    expect(result.items[0]).toMatchObject({
+      symbol: 'ABC',
+      healthState: 'RISK_WARNING',
+      status: 'ACTIVE',
+    });
   });
 
   it('ignores unsupported decision values in lifecycle health mapping', async () => {
@@ -381,7 +527,7 @@ describe('SignalPositionLedgerService', () => {
 
     expect(result.items[0]).toMatchObject({
       healthState: null,
-      lifecycleEvidenceStatus: 'UNAVAILABLE',
+      lifecycleEvidenceStatus: 'ACTIVE_ENTRY',
     });
   });
 
@@ -421,7 +567,7 @@ describe('SignalPositionLedgerService', () => {
     ]));
   });
 
-  it('orders active rows by newest entry trigger timestamp before pagination', async () => {
+  it('orders active rows by first entry trigger timestamp before pagination', async () => {
     const oldSignal = { ...trustedSignal, id: 'signal-old', instrument_id: 'stock-old', symbol: 'OLD', company_name: 'Old Co' };
     const newSignal = { ...trustedSignal, id: 'signal-new', instrument_id: 'stock-new', symbol: 'NEW', company_name: 'New Co' };
     const midSignal = { ...trustedSignal, id: 'signal-mid', instrument_id: 'stock-mid', symbol: 'MID', company_name: 'Mid Co' };
@@ -492,8 +638,8 @@ describe('SignalPositionLedgerService', () => {
     expect(result.totalCount).toBe(3);
     expect(result.items).toHaveLength(1);
     expect(result.items[0]).toMatchObject({
-      symbol: 'NEW',
-      entryTriggerTimestamp: '2026-05-26T00:00:00.000Z',
+      symbol: 'OLD',
+      entryTriggerTimestamp: '2026-05-24T00:00:00.000Z',
     });
     expect(result.nextOffset).toBe(1);
     expect(result.hasMore).toBe(true);

@@ -14,6 +14,13 @@ export async function fetchSignalPositionLedgerActiveRows(
   return response.data;
 }
 
+export async function fetchSignalPositionLedgerClosedRows(
+  query: SignalPositionLedgerActiveQuery,
+): Promise<SignalPositionLedgerActiveListResponse> {
+  const response = await axios.get<SignalPositionLedgerActiveListResponse>(`${API_BASE}/closed`, { params: query });
+  return response.data;
+}
+
 export async function refreshSignalPositionLedgerActiveRows(
   query: SignalPositionLedgerActiveQuery,
 ): Promise<SignalPositionLedgerRefreshProgress> {

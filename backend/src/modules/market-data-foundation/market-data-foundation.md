@@ -323,17 +323,17 @@ The first implementation downloads/parses the configured source per import reque
 
 ### Symbol Conventions And Backfill
 
-Current stored `Stock.symbol` is treated as the canonical application key and is not rewritten by catalog backfill. Most existing NSE rows already use the Yahoo-compatible provider convention, for example `ABB.NS`. New fields clarify the different symbol roles:
+Current stored `Stock.symbol` is the canonical application key. For Indian NSE rows it should be the exchange/base symbol without the Yahoo `.NS` provider suffix, for example `ABB`. Provider-specific suffixes stay in provider fields and request payloads, not in the canonical symbol. New fields clarify the different symbol roles:
 
-- `symbol`: existing application/storage key. Price ticks remain keyed by this value.
+- `symbol`: application/storage key. NSE rows use the base symbol; price ticks remain keyed by this canonical value.
 - `sourceSymbol`: exchange/security-master base symbol, for example `ABB`.
 - `providerSymbol`: Yahoo-compatible symbol used for provider fetches, for example `ABB.NS` or `ABC.BO`.
-- `displaySymbol`: user-facing short symbol, currently the base symbol for NSE/BSE equities.
+- `displaySymbol`: user-facing short symbol, normally the same base symbol for NSE/BSE equities.
 
 Normalization helpers follow these rules:
 
 - NSE base `ABB` becomes `sourceSymbol=ABB`, `providerSymbol=ABB.NS`.
-- Existing `ABB.NS` becomes `sourceSymbol=ABB`, `providerSymbol=ABB.NS`.
+- Legacy stored `ABB.NS` is normalized to canonical `symbol=ABB`, `sourceSymbol=ABB`, `providerSymbol=ABB.NS`.
 - BSE base `ABC` becomes `sourceSymbol=ABC`, `providerSymbol=ABC.BO`.
 - Index provider symbols such as `^NSEI` are preserved.
 - Invalid legacy provider suffixes on obvious NSE/BSE rows are corrected during DTO mapping and backfill; for example `RELIANCE.NL` on an NSE row becomes `providerSymbol=RELIANCE.NS`, while the UI displays the base symbol `RELIANCE`.

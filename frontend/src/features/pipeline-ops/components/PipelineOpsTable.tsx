@@ -54,7 +54,7 @@ const OPERATION_CATALOG: OperationDefinition[] = [
   { stageKey: 'BACKTEST_PROOF', stageOrder: 10, moduleName: 'Backtests', operationName: 'Backtest proof refresh', sourcePath: '/backtests' },
   { stageKey: 'RESEARCH_PROJECTION', stageOrder: 11, moduleName: 'Research', operationName: 'Research command projection', sourcePath: '/research' },
   { stageKey: 'TODAY_REVIEW', stageOrder: 12, moduleName: 'Today Review', operationName: 'Daily candidate publication', sourcePath: '/today-review' },
-  { stageKey: 'SIGNAL_POSITION_LEDGER', stageOrder: 13, moduleName: 'Signal Position Ledger', operationName: 'Open/closed position materialization', sourcePath: '/signals/position-ledger' },
+  { stageKey: 'SIGNAL_POSITION_LEDGER', stageOrder: 13, moduleName: 'Signal Position Ledger', operationName: 'Entry/exit trigger lifecycle refresh', sourcePath: '/signals/position-ledger' },
 ];
 
 type PipelineOpsRow = OperationDefinition & PipelineStatusStageGroup;

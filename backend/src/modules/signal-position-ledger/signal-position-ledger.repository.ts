@@ -34,12 +34,154 @@ type MaterializedRefreshSaveInput = Pick<SignalPositionLedgerActiveQuery, 'regio
   errors: string[];
 };
 
+type LedgerRowsQuery = Pick<SignalPositionLedgerActiveQuery, 'region' | 'assetType'> & {
+  status: 'ACTIVE' | 'CLOSED';
+  limit: number;
+  offset: number;
+};
+
 const LEDGER_PIPELINE_KEY = 'signal-position-ledger';
 const LEDGER_TIMEFRAME = '1d';
 const LEDGER_MATERIALIZED_VERSION = 'signal-position-ledger-materialized-v2';
 
 export class SignalPositionLedgerRepository {
   constructor(private readonly db = prisma) {}
+
+  async listLedgerRows(query: LedgerRowsQuery): Promise<{ items: SignalPositionLedgerActiveRow[]; totalCount: number; hasMore: boolean; nextOffset: number | null }> {
+    const delegate = (this.db as any).signalPositionLedgerEntry;
+    if (!delegate || typeof delegate.findMany !== 'function') {
+      return { items: [], totalCount: 0, hasMore: false, nextOffset: null };
+    }
+
+    const where = {
+      scopeRegion: query.region,
+      scopeAssetType: query.assetType,
+      status: query.status,
+    };
+    if (query.status === 'ACTIVE') {
+      const rows = await delegate.findMany({
+        where,
+        orderBy: [{ entryTriggerTimestamp: 'asc' }, { createdAt: 'asc' }],
+      });
+      const deduped = this.dedupeActiveRows(rows.map((row: any) => this.toLedgerRow(row)));
+      const items = deduped.slice(query.offset, query.offset + query.limit);
+      const nextOffset = query.offset + items.length;
+      return {
+        items,
+        totalCount: deduped.length,
+        hasMore: nextOffset < deduped.length,
+        nextOffset: nextOffset < deduped.length ? nextOffset : null,
+      };
+    }
+    const [totalCount, rows] = await Promise.all([
+      typeof delegate.count === 'function' ? delegate.count({ where }) : Promise.resolve(0),
+      delegate.findMany({
+        where,
+        orderBy: query.status === 'CLOSED'
+          ? [{ exitTriggerTimestamp: 'desc' }, { updatedAt: 'desc' }]
+          : [{ entryTriggerTimestamp: 'asc' }, { createdAt: 'asc' }],
+        take: query.limit,
+        skip: query.offset,
+      }),
+    ]);
+    const nextOffset = query.offset + rows.length;
+    return {
+      items: rows.map((row: any) => this.toLedgerRow(row)),
+      totalCount,
+      hasMore: nextOffset < totalCount,
+      nextOffset: nextOffset < totalCount ? nextOffset : null,
+    };
+  }
+
+  async listAllLedgerRows(scope: Pick<SignalPositionLedgerActiveQuery, 'region' | 'assetType'>, status: 'ACTIVE' | 'CLOSED'): Promise<SignalPositionLedgerActiveRow[]> {
+    const delegate = (this.db as any).signalPositionLedgerEntry;
+    if (!delegate || typeof delegate.findMany !== 'function') return [];
+    const rows = await delegate.findMany({
+      where: {
+        scopeRegion: scope.region,
+        scopeAssetType: scope.assetType,
+        status,
+      },
+      orderBy: status === 'CLOSED'
+        ? [{ exitTriggerTimestamp: 'desc' }, { updatedAt: 'desc' }]
+        : [{ entryTriggerTimestamp: 'asc' }, { createdAt: 'asc' }],
+    });
+    const mapped = rows.map((row: any) => this.toLedgerRow(row));
+    return status === 'ACTIVE' ? this.dedupeActiveRows(mapped) : mapped;
+  }
+
+  private dedupeActiveRows(rows: SignalPositionLedgerActiveRow[]): SignalPositionLedgerActiveRow[] {
+    const byStock = new Map<string, SignalPositionLedgerActiveRow>();
+    for (const row of rows) {
+      const key = this.stockKey(row.symbol);
+      const existing = byStock.get(key);
+      if (!existing || Date.parse(row.entryTriggerTimestamp) < Date.parse(existing.entryTriggerTimestamp)) byStock.set(key, row);
+    }
+    return [...byStock.values()];
+  }
+
+  async listLegacyMaterializedRows(scope: Pick<SignalPositionLedgerActiveQuery, 'region' | 'assetType'>): Promise<SignalPositionLedgerActiveRow[]> {
+    const rows = await this.db.pipelineRun.findMany({
+      where: {
+        pipelineKey: LEDGER_PIPELINE_KEY,
+        scopeRegion: scope.region,
+        scopeAssetType: scope.assetType,
+        timeframe: LEDGER_TIMEFRAME,
+      },
+      orderBy: [{ startedAt: 'desc' }, { updatedAt: 'desc' }],
+      take: 20,
+      select: { metadata: true },
+    });
+    const byInstrument = new Map<string, SignalPositionLedgerActiveRow>();
+    for (const run of rows) {
+      const metadata = this.objectOrNull(run.metadata);
+      const materializedRows = Array.isArray(metadata?.rows) ? metadata.rows : [];
+      for (const value of materializedRows) {
+        if (!this.isActiveRow(value)) continue;
+        const row = this.normalizeLegacyRow(value, scope);
+        const key = this.stockKey(row.symbol);
+        const existing = byInstrument.get(key);
+        if (!existing || Date.parse(row.entryTriggerTimestamp) < Date.parse(existing.entryTriggerTimestamp)) {
+          byInstrument.set(key, row);
+        }
+      }
+    }
+    return [...byInstrument.values()];
+  }
+
+  async findActiveLedgerRowByInstrument(scope: Pick<SignalPositionLedgerActiveQuery, 'region' | 'assetType'>, instrumentId: string): Promise<SignalPositionLedgerActiveRow | null> {
+    const delegate = (this.db as any).signalPositionLedgerEntry;
+    if (!delegate || typeof delegate.findFirst !== 'function') return null;
+    const row = await delegate.findFirst({
+      where: {
+        scopeRegion: scope.region,
+        scopeAssetType: scope.assetType,
+        instrumentId,
+        status: 'ACTIVE',
+      },
+      orderBy: [{ entryTriggerTimestamp: 'asc' }, { createdAt: 'asc' }],
+    });
+    return row ? this.toLedgerRow(row) : null;
+  }
+
+  async upsertActiveLedgerRow(row: SignalPositionLedgerActiveRow): Promise<void> {
+    const delegate = (this.db as any).signalPositionLedgerEntry;
+    if (!delegate || typeof delegate.upsert !== 'function') return;
+    await delegate.upsert({
+      where: { ledgerKey: row.ledgerKey },
+      create: this.toLedgerWrite(row),
+      update: this.toLedgerUpdate(row, false),
+    });
+  }
+
+  async closeLedgerRow(row: SignalPositionLedgerActiveRow): Promise<void> {
+    const delegate = (this.db as any).signalPositionLedgerEntry;
+    if (!delegate || typeof delegate.update !== 'function') return;
+    await delegate.update({
+      where: { ledgerKey: row.ledgerKey },
+      data: this.toLedgerUpdate(row, true),
+    });
+  }
 
   async listLatestSignals(query: SignalListQuery): Promise<SignalPositionLedgerSignalPage> {
     const where = this.signalScopeWhere(query.region, query.assetType);
@@ -129,6 +271,8 @@ export class SignalPositionLedgerRepository {
           strategy: true,
           decision: true,
           generatedAt: true,
+          reasons: true,
+          exitRulesTriggered: true,
         },
       }),
     ]);
@@ -166,6 +310,8 @@ export class SignalPositionLedgerRepository {
         strategy: exitDecision.strategy,
         decision: exitDecision.decision,
         generatedAt: exitDecision.generatedAt.toISOString(),
+        reasons: Array.isArray(exitDecision.reasons) ? exitDecision.reasons.map(String) : [],
+        exitRulesTriggered: Array.isArray(exitDecision.exitRulesTriggered) ? exitDecision.exitRulesTriggered.map(String) : [],
       };
     }
 
@@ -307,6 +453,8 @@ export class SignalPositionLedgerRepository {
         strategy: true,
         decision: true,
         generatedAt: true,
+        reasons: true,
+        exitRulesTriggered: true,
       },
     });
     if (!latest) return null;
@@ -315,6 +463,43 @@ export class SignalPositionLedgerRepository {
       strategy: latest.strategy,
       decision: latest.decision,
       generatedAt: latest.generatedAt.toISOString(),
+      reasons: Array.isArray(latest.reasons) ? latest.reasons.map(String) : [],
+      exitRulesTriggered: Array.isArray(latest.exitRulesTriggered) ? latest.exitRulesTriggered.map(String) : [],
+    };
+  }
+
+  async priceAtOrBeforeInstrumentId(instrumentId: string, date: Date, scope: Pick<SignalPositionLedgerActiveQuery, 'region' | 'assetType'>): Promise<SignalPositionLatestPriceSnapshot | null> {
+    const stock = await this.db.stock.findFirst({
+      where: {
+        id: instrumentId,
+        ...this.stockScopeWhere(scope.region, scope.assetType),
+      },
+      select: { symbol: true },
+    });
+    if (!stock) return null;
+
+    const latest = await this.db.priceTick.findFirst({
+      where: {
+        symbol: stock.symbol,
+        timestamp: { lte: date },
+      },
+      orderBy: { timestamp: 'desc' },
+      select: {
+        timestamp: true,
+        close: true,
+        adjustedClose: true,
+        dataStatus: true,
+        source: true,
+      },
+    });
+    if (!latest) return null;
+
+    return {
+      date: latest.timestamp.toISOString(),
+      close: Number(latest.close),
+      adjustedClose: latest.adjustedClose !== null ? Number(latest.adjustedClose) : Number(latest.close),
+      dataStatus: latest.dataStatus || 'MISSING',
+      source: latest.source || null,
     };
   }
 
@@ -421,6 +606,151 @@ export class SignalPositionLedgerRepository {
       && typeof row.entryTriggerTimestamp === 'string'
       && typeof row.entryTriggerPrice === 'number'
       && typeof row.entryReasonSummary === 'string';
+  }
+
+  private normalizeLegacyRow(value: any, scope: Pick<SignalPositionLedgerActiveQuery, 'region' | 'assetType'>): SignalPositionLedgerActiveRow {
+    const region = value.region || scope.region;
+    const assetType = value.assetType || scope.assetType;
+    const entryTriggerTimestamp = value.entryTriggerTimestamp;
+    const ledgerKey = value.ledgerKey || [
+      String(region).trim().toUpperCase(),
+      String(assetType).trim().toUpperCase(),
+      value.instrumentId,
+      'bullish_entry_trigger',
+      new Date(entryTriggerTimestamp).toISOString(),
+    ].join(':');
+    return {
+      ...value,
+      ledgerKey,
+      status: value.status === 'CLOSED' ? 'CLOSED' : 'ACTIVE',
+      region,
+      assetType,
+      lifecycleEvidenceStatus: value.lifecycleEvidenceStatus || 'ACTIVE_ENTRY',
+      exitSignalId: value.exitSignalId ?? null,
+      exitTriggerTimestamp: value.exitTriggerTimestamp ?? null,
+      exitTriggerPrice: value.exitTriggerPrice ?? null,
+      exitReasonSummary: value.exitReasonSummary ?? null,
+      exitRuleId: value.exitRuleId ?? null,
+      exitDecision: value.exitDecision ?? null,
+      closedAt: value.closedAt ?? null,
+    };
+  }
+
+  private toLedgerRow(row: any): SignalPositionLedgerActiveRow {
+    return {
+      ledgerKey: row.ledgerKey,
+      status: row.status === 'CLOSED' ? 'CLOSED' : 'ACTIVE',
+      signalId: row.entrySignalId ?? null,
+      instrumentId: row.instrumentId,
+      symbol: row.symbol,
+      companyName: row.companyName ?? null,
+      region: row.scopeRegion,
+      assetType: row.scopeAssetType,
+      triggerType: row.entryTriggerType || 'bullish_entry_trigger',
+      entryTriggerTimestamp: row.entryTriggerTimestamp?.toISOString?.() ?? String(row.entryTriggerTimestamp),
+      entryTriggerPrice: Number(row.entryTriggerPrice),
+      entryReasonSummary: row.entryReasonSummary,
+      strategyId: row.strategyId ?? null,
+      strategyVersion: row.strategyVersion ?? null,
+      strategyDecision: row.strategyDecision ?? null,
+      strategyReadinessLabel: row.strategyReadinessLabel ?? null,
+      strategyRatingGrade: row.strategyRatingGrade ?? null,
+      entryRuleId: row.entryRuleId ?? null,
+      latestTrustedPriceDate: row.latestTrustedPriceDate?.toISOString?.() ?? null,
+      latestTrustedPrice: row.latestTrustedPrice === null || row.latestTrustedPrice === undefined ? null : Number(row.latestTrustedPrice),
+      currentReturnPercent: row.currentReturnPercent === null || row.currentReturnPercent === undefined ? null : Number(row.currentReturnPercent),
+      currentReturnStatus: row.currentReturnStatus || 'UNAVAILABLE',
+      currentDataQualityStatus: row.currentDataQualityStatus ?? null,
+      healthState: row.status === 'CLOSED' ? 'EXIT_TRIGGERED' : null,
+      lifecycleEvidenceStatus: row.status === 'CLOSED' ? 'EXIT_TRIGGERED' : 'ACTIVE_ENTRY',
+      trustEvidenceStatus: row.trustEvidenceStatus || 'SOURCE_PROVEN_PRICE_UNAVAILABLE',
+      calibrationEvidenceStatus: row.calibrationEvidenceStatus || 'UNAVAILABLE',
+      displayWarnings: Array.isArray(row.displayWarnings) ? row.displayWarnings.map(String) : [],
+      exitSignalId: row.exitSignalId ?? null,
+      exitTriggerTimestamp: row.exitTriggerTimestamp?.toISOString?.() ?? null,
+      exitTriggerPrice: row.exitTriggerPrice === null || row.exitTriggerPrice === undefined ? null : Number(row.exitTriggerPrice),
+      exitReasonSummary: row.exitReasonSummary ?? null,
+      exitRuleId: row.exitRuleId ?? null,
+      exitDecision: row.exitDecision ?? null,
+      closedAt: row.closedAt?.toISOString?.() ?? null,
+    };
+  }
+
+  private toLedgerWrite(row: SignalPositionLedgerActiveRow) {
+    return {
+      ledgerKey: row.ledgerKey,
+      scopeRegion: row.region || 'IN',
+      scopeAssetType: row.assetType || 'STOCK',
+      instrumentId: row.instrumentId,
+      symbol: row.symbol,
+      companyName: row.companyName,
+      stockKey: this.stockKey(row.symbol),
+      activeSlot: row.status === 'ACTIVE' ? this.stockKey(row.symbol) : null,
+      status: row.status,
+      entrySignalId: row.signalId,
+      entryTriggerType: row.triggerType,
+      entryTriggerTimestamp: new Date(row.entryTriggerTimestamp),
+      entryTriggerPrice: row.entryTriggerPrice,
+      entryReasonSummary: row.entryReasonSummary,
+      strategyId: row.strategyId,
+      strategyVersion: row.strategyVersion,
+      strategyDecision: row.strategyDecision,
+      strategyReadinessLabel: row.strategyReadinessLabel,
+      strategyRatingGrade: row.strategyRatingGrade,
+      entryRuleId: row.entryRuleId,
+      latestTrustedPriceDate: row.latestTrustedPriceDate ? new Date(row.latestTrustedPriceDate) : null,
+      latestTrustedPrice: row.latestTrustedPrice,
+      currentReturnPercent: row.currentReturnPercent,
+      currentReturnStatus: row.currentReturnStatus,
+      currentDataQualityStatus: row.currentDataQualityStatus,
+      trustEvidenceStatus: row.trustEvidenceStatus,
+      calibrationEvidenceStatus: row.calibrationEvidenceStatus,
+      displayWarnings: row.displayWarnings || [],
+      exitSignalId: row.exitSignalId ?? null,
+      exitTriggerTimestamp: row.exitTriggerTimestamp ? new Date(row.exitTriggerTimestamp) : null,
+      exitTriggerPrice: row.exitTriggerPrice ?? null,
+      exitReasonSummary: row.exitReasonSummary ?? null,
+      exitRuleId: row.exitRuleId ?? null,
+      exitDecision: row.exitDecision ?? null,
+      closedAt: row.closedAt ? new Date(row.closedAt) : null,
+      lastEvaluatedAt: new Date(),
+    };
+  }
+
+  private toLedgerUpdate(row: SignalPositionLedgerActiveRow, includeExit: boolean) {
+    const data: Record<string, unknown> = {
+      symbol: row.symbol,
+      companyName: row.companyName,
+      stockKey: this.stockKey(row.symbol),
+      activeSlot: row.status === 'ACTIVE' ? this.stockKey(row.symbol) : null,
+      latestTrustedPriceDate: row.latestTrustedPriceDate ? new Date(row.latestTrustedPriceDate) : null,
+      latestTrustedPrice: row.latestTrustedPrice,
+      currentReturnPercent: row.currentReturnPercent,
+      currentReturnStatus: row.currentReturnStatus,
+      currentDataQualityStatus: row.currentDataQualityStatus,
+      trustEvidenceStatus: row.trustEvidenceStatus,
+      calibrationEvidenceStatus: row.calibrationEvidenceStatus,
+      displayWarnings: row.displayWarnings || [],
+      lastEvaluatedAt: new Date(),
+    };
+    if (includeExit) {
+      Object.assign(data, {
+        status: 'CLOSED',
+        activeSlot: null,
+        exitSignalId: row.exitSignalId ?? null,
+        exitTriggerTimestamp: row.exitTriggerTimestamp ? new Date(row.exitTriggerTimestamp) : null,
+        exitTriggerPrice: row.exitTriggerPrice ?? null,
+        exitReasonSummary: row.exitReasonSummary ?? null,
+        exitRuleId: row.exitRuleId ?? null,
+        exitDecision: row.exitDecision ?? null,
+        closedAt: row.closedAt ? new Date(row.closedAt) : new Date(),
+      });
+    }
+    return data;
+  }
+
+  private stockKey(symbol: string): string {
+    return String(symbol || '').trim().replace(/\.(NS|BO)$/i, '').toUpperCase();
   }
 }
 

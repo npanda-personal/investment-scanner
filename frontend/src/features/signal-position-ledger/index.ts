@@ -1,6 +1,7 @@
 export { signalPositionLedgerRoutes } from './routes';
-export { fetchSignalPositionLedgerActiveRows, refreshSignalPositionLedgerActiveRows } from './api/signalPositionLedgerApi';
+export { fetchSignalPositionLedgerActiveRows, fetchSignalPositionLedgerClosedRows, refreshSignalPositionLedgerActiveRows } from './api/signalPositionLedgerApi';
 export { useSignalPositionLedgerActiveRows } from './hooks/useSignalPositionLedgerActiveRows';
+export { useSignalPositionLedgerClosedRows } from './hooks/useSignalPositionLedgerClosedRows';
 export type {
   SignalPositionHealthState,
   SignalPositionLedgerActiveListResponse,
