@@ -194,11 +194,14 @@ export interface SignalBlockedStrategySummary {
   strategyCode: string;
   strategyName?: string;
   strategyVersion: string;
+  timeframe?: string | null;
+  category?: string | null;
   blockers: string[];
   warnings: string[];
   dataGaps: string[];
   noiseFiltersTriggered: string[];
   reason: string;
+  triggerPriceEvidence?: SignalTriggerPriceEvidence | null;
 }
 
 export interface PaginatedSignalResponse {

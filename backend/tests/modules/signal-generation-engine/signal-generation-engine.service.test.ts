@@ -1071,10 +1071,10 @@ describe('SignalGenerationEngineService', () => {
         total: 1,
       }),
     };
-    const prices = Array.from({ length: 260 }, (_, index) => price(index, 200 - index * 0.2, 1000));
+    const prices = breakoutMatchPrices();
     const marketDataService = {
       getInstrumentsByIds: jest.fn().mockResolvedValue([{ id: 'stock-1', symbol: 'ABC', country: 'India', asset_type: 'STOCK', currency: 'INR' }]),
-      getLatestPricesBySymbols: jest.fn().mockResolvedValue([{ symbol: 'ABC', adjusted_close: 200, date: '2026-04-28T00:00:00.000Z' }]),
+      getLatestPricesBySymbols: jest.fn().mockResolvedValue([{ symbol: 'ABC', adjusted_close: 121, date: prices[0].date }]),
       listPricesByInstrumentId: jest.fn().mockResolvedValue({ prices }),
     };
     const frameworkService = {
@@ -1082,17 +1082,59 @@ describe('SignalGenerationEngineService', () => {
     };
     const service = new SignalGenerationEngineService(repository as any, marketDataService as any, {} as any, {} as any, new StrategyFrameworkRegistry(), frameworkService as any);
 
-    const result = await service.topSignals({ limit: 5, includeStrategyMatches: true, strategyCode: 'TREND_MOMENTUM' });
+    const result = await service.topSignals({ limit: 5, includeStrategyMatches: true, strategyCode: 'BREAKOUT_CONFIRMATION' });
 
     expect(result.signals[0].strategyMatches?.[0]).toMatchObject({
-      strategyCode: 'TREND_MOMENTUM',
+      strategyCode: 'BREAKOUT_CONFIRMATION',
       strategyName: expect.any(String),
-      strategyVersion: '1.0.0',
+      strategyVersion: '1.1.0',
       ratingGrade: 'GOOD',
       readinessLabel: 'PAPER_TEST_CANDIDATE',
     });
     expect(result.signals[0].strategyMatches?.[0].entryRulesPassed.length).toBeGreaterThan(0);
-    expect(frameworkService.performance).toHaveBeenCalledWith('TREND_MOMENTUM', { region: 'IN', assetType: 'STOCK' });
+    expect(frameworkService.performance).toHaveBeenCalledWith('BREAKOUT_CONFIRMATION', { region: 'IN', assetType: 'STOCK' });
+  });
+
+  it('does not promote strategy matches when signal Data Quality eligibility is incomplete', async () => {
+    const prices = breakoutMatchPrices();
+    const service = new SignalGenerationEngineService({} as any, {
+      getInstrumentsByIds: jest.fn().mockResolvedValue([{ id: 'stock-1', symbol: 'ABC', region: 'IN', asset_type: 'STOCK', currency: 'INR' }]),
+      getLatestPricesBySymbols: jest.fn().mockResolvedValue([{ symbol: 'ABC', adjusted_close: 121, date: prices[0].date }]),
+      listPricesByInstrumentId: jest.fn().mockResolvedValue({ prices }),
+    } as any, {} as any, {} as any, new StrategyFrameworkRegistry(), { performance: jest.fn().mockResolvedValue([]) } as any);
+
+    const [result] = await service.enrichSignals([{
+      instrument_id: 'stock-1',
+      symbol: 'ABC',
+      company_name: 'ABC Co',
+      sector: 'Technology',
+      country: 'IN',
+      currentPrice: null,
+      previousClose: null,
+      dailyChange: null,
+      dailyChangePercent: null,
+      currency: null,
+      priceTimestamp: null,
+      score: 85,
+      direction: 'BULLISH',
+      confidence: 'HIGH',
+      triggered_signals: [{ code: 'PRICE_ABOVE_SMA50', label: 'price is above SMA50', category: 'TECHNICAL' }],
+      negative_signals: [],
+      explanation: 'Bullish because price is above SMA50.',
+      generated_at: '2026-04-28T00:00:00.000Z',
+      source: 'signal-generation-engine',
+      data_status: 'COMPLETE',
+      auditStatus: 'CURRENT',
+      dataQualityEligibility: { filterApplied: true, eligible: true, coverageStatus: 'GOOD', liquidityStatus: 'LIQUID' },
+    } as any], { includeStrategyMatches: true, strategyCode: 'BREAKOUT_CONFIRMATION' });
+
+    expect(result.strategyMatches).toHaveLength(0);
+    expect(result.blockedStrategies?.[0]).toMatchObject({
+      strategyCode: 'BREAKOUT_CONFIRMATION',
+      noiseFiltersTriggered: expect.arrayContaining(['DATA_QUALITY_MISSING']),
+    });
+    expect(result.triggerContract?.trigger_price).toBeNull();
+    expect(result.triggerContract?.trigger_price_evidence.status).toBe('UNAVAILABLE');
   });
 
   it('returns blocked strategies with data gaps instead of failing matching', async () => {
@@ -1187,16 +1229,29 @@ describe('SignalGenerationEngineService', () => {
         total: 2,
       }),
     };
-    const prices = Array.from({ length: 260 }, (_, index) => price(index, 200 - index * 0.2, 1000));
+    const prices = breakoutMatchPrices();
     const marketDataService = {
       getInstrumentsByIds: jest.fn().mockResolvedValue([{ id: 'match', symbol: 'MATCH', region: 'IN' }, { id: 'blocked', symbol: 'BLOCK', region: 'IN' }]),
-      getLatestPricesBySymbols: jest.fn().mockResolvedValue([{ symbol: 'MATCH', adjusted_close: 200 }, { symbol: 'BLOCK', adjusted_close: 200 }]),
+      getLatestPricesBySymbols: jest.fn().mockResolvedValue([{ symbol: 'MATCH', adjusted_close: 121 }, { symbol: 'BLOCK', adjusted_close: 200 }]),
       listPricesByInstrumentId: jest.fn((instrumentId) => Promise.resolve({ prices: instrumentId === 'match' ? prices : [] })),
     };
     const service = new SignalGenerationEngineService(repository as any, marketDataService as any, {} as any);
 
-    const result = await service.topSignals({ limit: 10, onlyStrategyEligible: true, strategyCode: 'TREND_MOMENTUM' });
+    const result = await service.topSignals({ limit: 10, onlyStrategyEligible: true, strategyCode: 'BREAKOUT_CONFIRMATION' });
 
     expect(result.signals.map((signal) => signal.instrument_id)).toEqual(['match']);
   });
 });
+
+function breakoutMatchPrices() {
+  return Array.from({ length: 260 }, (_unused, index) => {
+    const close = index === 0
+      ? 121
+      : index < 11
+        ? 110 + index * 0.2
+        : index < 21
+          ? 103 + (index - 11) * 0.9
+          : 106;
+    return price(index, close, index === 0 ? 4000 : 1000);
+  });
+}

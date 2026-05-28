@@ -97,9 +97,10 @@ export class BacktestingStrategyLabService {
         error: null,
       }, userId);
       if (this.isRegisteredConfig(config!) && run.metrics) {
+        const frameworkStrategy = this.strategyRegistry.get(config!.strategyCode!);
         const summary = await this.strategyFrameworkService.persistBacktestPerformance({
           strategyCode: config!.strategyCode!,
-          strategyVersion: config!.strategyVersion,
+          strategyVersion: frameworkStrategy?.version ?? config!.strategyVersion,
           timeframe: config!.timeframe!,
           region: config!.region || 'IN',
           assetType: config!.assetType || 'STOCK',
@@ -111,7 +112,7 @@ export class BacktestingStrategyLabService {
         });
         run = await this.repository.updateRunMetrics(run.id, {
           ...run.metrics,
-          frameworkStrategyName: this.strategyRegistry.get(config!.strategyCode!)?.name ?? config!.strategyCode!,
+          frameworkStrategyName: frameworkStrategy?.name ?? config!.strategyCode!,
           frameworkRating: {
             ratingScore: summary.ratingScore,
             ratingGrade: summary.ratingGrade,
@@ -193,8 +194,12 @@ export class BacktestingStrategyLabService {
         if (position) position.highestClose = Math.max(position.highestClose, bar.close);
         const exit = position ? this.exitDecision(config, history.bars, barIndex, position) : null;
         if (position && exit?.exit) {
-          const registeredExit = this.evaluateRegisteredStrategy(config, history.bars, barIndex, true);
-          const exitReasons = registeredExit?.reasons || [];
+          const registeredExit = this.evaluateRegisteredStrategy(config, history.bars, barIndex, true, position);
+          const exitReasons = registeredExit ? this.uniqueStrings([
+            ...registeredExit.exitRulesTriggered,
+            ...registeredExit.invalidationRulesTriggered,
+            ...registeredExit.reasons,
+          ]) : [];
           const trade = this.closePosition(config, position, bar, exit.reason, exitReasons);
           cash += this.exitCash(config, position.quantity, trade.exitPrice);
           trades.push(trade);
@@ -271,7 +276,10 @@ export class BacktestingStrategyLabService {
 
   private entryDecision(config: BacktestStrategyConfig, bars: HistoricalBar[], index: number): { enter: boolean; reasons: string[] } {
     const registered = this.evaluateRegisteredStrategy(config, bars, index);
-    if (registered) return { enter: registered.eligibleForBacktest && registered.eligibleForSignalGeneration, reasons: registered.reasons };
+    if (registered) return {
+      enter: registered.decision === 'ENTRY_CANDIDATE' && registered.eligibleForBacktest && registered.eligibleForSignalGeneration,
+      reasons: this.uniqueStrings([...registered.entryRulesPassed, ...registered.reasons]),
+    };
     const signal = this.signalProxy(bars, index);
     if (config.entryRule.type === 'SIGNAL_SCORE_ABOVE') return { enter: signal.score > Number(config.entryRule.threshold), reasons: [`Signal score ${signal.score}`] };
     if (config.entryRule.type === 'SIGNAL_DIRECTION_BULLISH') return { enter: signal.direction === 'BULLISH', reasons: [`Signal direction ${signal.direction}`] };
@@ -290,7 +298,7 @@ export class BacktestingStrategyLabService {
     if (typeof config.takeProfitPercent === 'number' && close >= position.entryPrice * (1 + config.takeProfitPercent)) return { exit: true, reason: EXIT_REASONS.TAKE_PROFIT };
     if (typeof config.maxHoldingDays === 'number' && index - position.entryBarIndex >= config.maxHoldingDays) return { exit: true, reason: EXIT_REASONS.MAX_HOLDING_PERIOD };
     if (config.strategyCode) {
-      const registered = this.evaluateRegisteredStrategy(config, bars, index, true);
+      const registered = this.evaluateRegisteredStrategy(config, bars, index, true, position);
       if (registered && ['EXIT_CANDIDATE', 'REDUCE_RISK', 'AVOID'].includes(registered.decision)) return { exit: true, reason: EXIT_REASONS.STRATEGY_EXIT };
     }
     const signal = this.signalProxy(bars, index);
@@ -365,16 +373,16 @@ export class BacktestingStrategyLabService {
     };
   }
 
-  private evaluateRegisteredStrategy(config: BacktestStrategyConfig, bars: HistoricalBar[], index: number, exit = false) {
+  private evaluateRegisteredStrategy(config: BacktestStrategyConfig, bars: HistoricalBar[], index: number, exit = false, position?: Position) {
     if (!this.isRegisteredConfig(config)) return null;
     const strategy = this.strategyRegistry.get(config.strategyCode!);
     if (!strategy) return null;
-    const context = this.strategyContextFromBars(bars, index, config);
+    const context = this.strategyContextFromBars(bars, index, config, position);
     const evaluator = new StrategyFrameworkEvaluator(strategy);
     return exit ? evaluator.evaluateExit(context) : evaluator.evaluateEntry(context);
   }
 
-  private strategyContextFromBars(bars: HistoricalBar[], index: number, config: BacktestStrategyConfig) {
+  private strategyContextFromBars(bars: HistoricalBar[], index: number, config: BacktestStrategyConfig, position?: Position) {
     const window = bars.slice(0, index + 1);
     const latestFirst = [...window].reverse();
     const closes = latestFirst.map((bar) => bar.close);
@@ -419,14 +427,18 @@ export class BacktestingStrategyLabService {
         signalReadinessStatus: closes.length >= 200 ? 'READY' : closes.length >= 50 ? 'LIMITED' : 'NOT_READY',
         coverageStatus: closes.length >= 252 ? 'GOOD' : closes.length >= 50 ? 'PARTIAL' : 'UNUSABLE',
         liquidityStatus: averageVolume20 === null ? 'UNKNOWN' : averageVolume20 > 0 ? 'LIQUID' : 'ILLIQUID',
-        eligibleForSignals: closes.length >= 50,
+        eligibleForSignals: closes.length >= 200,
         eligibleForBacktesting: closes.length >= 252,
       },
-      marketGate: 'UNKNOWN',
-      marketRegime: null,
+      marketGate: 'OPEN',
+      marketRegime: 'NEUTRAL',
       region: config.region || 'IN',
       assetType: config.assetType || 'STOCK',
       backtestDate: latest?.date ?? null,
+      holding: position ? {
+        quantity: position.quantity,
+        unrealizedPnLPercent: position.entryPrice > 0 ? ((latest?.close ?? position.entryPrice) - position.entryPrice) / position.entryPrice : null,
+      } : null,
     };
   }
 
@@ -452,12 +464,20 @@ export class BacktestingStrategyLabService {
         fixedAmountPerTrade: config.fixedAmountPerTrade,
       });
     }
-    return {
+    const normalized = {
       ...config,
       mode: config.strategyCode ? 'REGISTERED_STRATEGY' : config.mode || 'CUSTOM_RULES',
       region: config.region || config.universe.region || 'IN',
       assetType: config.assetType || config.universe.assetType || 'STOCK',
     };
+    if (this.isRegisteredConfig(normalized)) {
+      const strategy = this.strategyRegistry.get(normalized.strategyCode!);
+      return {
+        ...normalized,
+        strategyVersion: strategy?.version ?? normalized.strategyVersion,
+      };
+    }
+    return normalized;
   }
 
   private isRegisteredConfig(config: BacktestStrategyConfig) {

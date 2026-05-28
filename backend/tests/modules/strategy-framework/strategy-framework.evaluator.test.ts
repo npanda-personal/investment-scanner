@@ -52,6 +52,179 @@ describe('Strategy Framework evaluator', () => {
     expect(result.decision).toBe('INSUFFICIENT_DATA');
   });
 
+  it('hard-blocks active entry strategies when data quality is missing', () => {
+    const activeEntries = registry.active().filter((strategy) => strategy.category === 'ENTRY');
+
+    for (const strategy of activeEntries) {
+      const result = new StrategyFrameworkEvaluator(strategy).evaluateEntry({
+        instrumentId: 'stock-1',
+        symbol: 'TEST',
+        latestPrice: 120,
+        previousClose: 118,
+        sma50: 100,
+        sma200: 80,
+        rsi: 50,
+        high52Week: 119,
+        averageVolume20: 1000,
+        bars: latestFirstBreakoutBars(3000),
+        rawSignal: { score: 82, direction: 'BULLISH' } as any,
+        marketGate: 'OPEN',
+        sectorLeadership: 'LEADING',
+        sectorRelativeStrengthScore: 72,
+        smartMoneyStatus: 'ACCUMULATION',
+        smartMoneyScore: 78,
+      });
+
+      expect(result.decision).not.toBe('ENTRY_CANDIDATE');
+      expect(result.eligibleForSignalGeneration).toBe(false);
+      expect(result.noiseFiltersTriggered).toContain('DATA_QUALITY_MISSING');
+    }
+  });
+
+  it('hard-blocks active entry strategies when data quality evidence is incomplete', () => {
+    const result = new StrategyFrameworkEvaluator(registry.get('TREND_MOMENTUM')!).evaluateEntry({
+      instrumentId: 'stock-1',
+      symbol: 'TEST',
+      latestPrice: 120,
+      sma50: 100,
+      sma200: 80,
+      rawSignal: { score: 82, direction: 'BULLISH' } as any,
+      dataQuality: { coverageStatus: 'GOOD', liquidityStatus: 'LIQUID' },
+      marketGate: 'OPEN',
+      sectorLeadership: 'LEADING',
+      sectorRelativeStrengthScore: 72,
+      smartMoneyStatus: 'ACCUMULATION',
+    });
+
+    expect(result.decision).not.toBe('ENTRY_CANDIDATE');
+    expect(result.eligibleForSignalGeneration).toBe(false);
+    expect(result.noiseFiltersTriggered).toContain('DATA_QUALITY_MISSING');
+  });
+
+  it('keeps gate and filter strategies neutral and ineligible for entry promotion', () => {
+    for (const code of ['RISK_OFF_AVOIDANCE', 'LOW_QUALITY_DATA_REJECTION']) {
+      const result = new StrategyFrameworkEvaluator(registry.get(code)!).evaluateEntry({
+        instrumentId: 'stock-1',
+        symbol: 'TEST',
+        latestPrice: 120,
+        marketGate: 'OPEN',
+        marketRegime: 'NEUTRAL',
+        dataQuality: { signalReadinessStatus: 'READY', coverageStatus: 'GOOD', liquidityStatus: 'LIQUID', eligibleForSignals: true },
+      });
+
+      expect(result.decision).not.toBe('ENTRY_CANDIDATE');
+      expect(result.direction).toBe('NEUTRAL');
+      expect(result.eligibleForSignalGeneration).toBe(false);
+      expect(result.eligibleForBacktest).toBe(false);
+    }
+  });
+
+  it('uses latest-first bar volume for breakout confirmation', () => {
+    const result = new StrategyFrameworkEvaluator(registry.get('BREAKOUT_CONFIRMATION')!).evaluateEntry({
+      instrumentId: 'stock-1',
+      symbol: 'TEST',
+      latestPrice: 121,
+      sma50: 110,
+      high52Week: 120,
+      averageVolume20: 1000,
+      bars: latestFirstBreakoutBars(2500, 100),
+      rawSignal: { score: 82, direction: 'BULLISH' } as any,
+      dataQuality: { signalReadinessStatus: 'READY', coverageStatus: 'GOOD', liquidityStatus: 'LIQUID', eligibleForSignals: true },
+      marketGate: 'OPEN',
+    });
+
+    expect(result.entryRulesPassed).toContain('VOLUME_BREAKOUT');
+    expect(result.decision).toBe('ENTRY_CANDIDATE');
+  });
+
+  it('keeps active entry minScore thresholds reachable with complete evidence fixtures', () => {
+    const fixtures: Record<string, any> = {
+      TREND_MOMENTUM: {
+        latestPrice: 120,
+        sma50: 100,
+        sma200: 80,
+        rawSignal: { score: 82, direction: 'BULLISH' },
+        dataQuality: { signalReadinessStatus: 'READY', coverageStatus: 'GOOD', liquidityStatus: 'LIQUID', eligibleForSignals: true },
+        marketGate: 'OPEN',
+        sectorLeadership: 'LEADING',
+        sectorRelativeStrengthScore: 72,
+        smartMoneyStatus: 'ACCUMULATION',
+      },
+      PULLBACK_IN_UPTREND: {
+        latestPrice: 103,
+        previousClose: 99,
+        sma50: 100,
+        sma200: 80,
+        rsi: 45,
+        dataQuality: { signalReadinessStatus: 'READY', coverageStatus: 'GOOD', liquidityStatus: 'LIQUID', eligibleForSignals: true },
+        marketGate: 'OPEN',
+      },
+      BREAKOUT_CONFIRMATION: {
+        latestPrice: 121,
+        sma50: 110,
+        high52Week: 120,
+        averageVolume20: 1000,
+        bars: latestFirstBreakoutBars(2500),
+        rawSignal: { score: 82, direction: 'BULLISH' },
+        dataQuality: { signalReadinessStatus: 'READY', coverageStatus: 'GOOD', liquidityStatus: 'LIQUID', eligibleForSignals: true },
+        marketGate: 'OPEN',
+      },
+      SMART_MONEY_ACCUMULATION: {
+        latestPrice: 120,
+        sma50: 100,
+        averageVolume20: 1000,
+        smartMoneyStatus: 'ACCUMULATION',
+        smartMoneyScore: 78,
+        dataQuality: { signalReadinessStatus: 'READY', coverageStatus: 'GOOD', liquidityStatus: 'LIQUID', eligibleForSignals: true },
+        marketGate: 'OPEN',
+      },
+      SECTOR_LEADER_MOMENTUM: {
+        latestPrice: 120,
+        sma50: 100,
+        sma200: 80,
+        rawSignal: { score: 82, direction: 'BULLISH' },
+        sectorLeadership: 'LEADING',
+        sectorRelativeStrengthScore: 72,
+        dataQuality: { signalReadinessStatus: 'READY', coverageStatus: 'GOOD', liquidityStatus: 'LIQUID', eligibleForSignals: true },
+        marketGate: 'OPEN',
+      },
+    };
+
+    for (const strategy of registry.active().filter((item) => item.category === 'ENTRY')) {
+      const result = new StrategyFrameworkEvaluator(strategy).evaluateEntry({
+        instrumentId: 'stock-1',
+        symbol: 'TEST',
+        ...fixtures[strategy.code],
+      });
+
+      expect(result.score).toBeGreaterThanOrEqual(Number(strategy.parameters.minScore));
+      expect(result.decision).toBe('ENTRY_CANDIDATE');
+    }
+  });
+
+  it('emits common long exit and invalidation rule evidence', () => {
+    const result = new StrategyFrameworkEvaluator(registry.get('TREND_MOMENTUM')!).evaluateExit({
+      instrumentId: 'stock-1',
+      symbol: 'TEST',
+      latestPrice: 94,
+      previousClose: 95,
+      sma50: 100,
+      sma200: 90,
+      rawSignal: { score: 35, direction: 'BEARISH' } as any,
+      dataQuality: { signalReadinessStatus: 'NOT_READY', coverageStatus: 'UNUSABLE', liquidityStatus: 'LIQUID', eligibleForSignals: false },
+      marketGate: 'CLOSED',
+      marketRegime: 'RISK_OFF',
+      sectorLeadership: 'LAGGING',
+      sectorRelativeStrengthScore: 30,
+      smartMoneyStatus: 'DISTRIBUTION',
+      holding: { quantity: 1, unrealizedPnLPercent: -0.05 },
+    });
+
+    expect(result.decision).toBe('EXIT_CANDIDATE');
+    expect(result.exitRulesTriggered).toEqual(expect.arrayContaining(['DQ_FAIL_EXIT', 'MARKET_RISK_OFF_EXIT', 'STRUCTURAL_BREAK_EXIT', 'RELATIVE_STRENGTH_DECAY_EXIT', 'DISTRIBUTION_WARNING_EXIT', 'SIGNAL_DECAY_EXIT']));
+    expect(result.invalidationRulesTriggered).toEqual(expect.arrayContaining(['DQ_EVIDENCE_INVALIDATED', 'MARKET_GATE_INVALIDATED', 'SUPPORT_INVALIDATED']));
+  });
+
   it('rates insufficient samples as unproven', () => {
     const rating = StrategyFrameworkEvaluator.rate({
       strategyCode: 'TREND_MOMENTUM',
@@ -182,7 +355,7 @@ describe('Strategy Framework evaluator', () => {
       sma50: 100,
       sma200: 80,
       rawSignal: { score: 82, direction: 'BULLISH' } as any,
-      dataQuality: { signalReadinessStatus: 'READY', coverageStatus: 'GOOD', liquidityStatus: 'LIQUID' },
+      dataQuality: { signalReadinessStatus: 'READY', coverageStatus: 'GOOD', liquidityStatus: 'LIQUID', eligibleForSignals: true },
       marketGate: 'OPEN',
       sectorLeadership: 'LEADING',
       smartMoneyStatus: 'ACCUMULATION',
@@ -190,7 +363,7 @@ describe('Strategy Framework evaluator', () => {
     const filter = new StrategyFrameworkEvaluator(registry.get('LOW_QUALITY_DATA_REJECTION')!).evaluateEntry({
       instrumentId: 'stock-1',
       symbol: 'TEST',
-      dataQuality: { signalReadinessStatus: 'READY', coverageStatus: 'GOOD', liquidityStatus: 'LIQUID' },
+      dataQuality: { signalReadinessStatus: 'READY', coverageStatus: 'GOOD', liquidityStatus: 'LIQUID', eligibleForSignals: true },
     });
     const draft = new StrategyFrameworkEvaluator(registry.get('QUALITY_TREND')!).evaluateEntry({
       instrumentId: 'stock-1',
@@ -198,7 +371,7 @@ describe('Strategy Framework evaluator', () => {
       latestPrice: 120,
       sma50: 100,
       sma200: 80,
-      dataQuality: { signalReadinessStatus: 'READY', coverageStatus: 'GOOD', liquidityStatus: 'LIQUID' },
+      dataQuality: { signalReadinessStatus: 'READY', coverageStatus: 'GOOD', liquidityStatus: 'LIQUID', eligibleForSignals: true },
     });
 
     expect(entry.eligibleForBacktest).toBe(true);
@@ -206,3 +379,13 @@ describe('Strategy Framework evaluator', () => {
     expect(draft.eligibleForBacktest).toBe(false);
   });
 });
+
+function latestFirstBreakoutBars(latestVolume: number, oldestVolume = 1000) {
+  const latestDate = new Date('2026-05-28T00:00:00.000Z');
+  const bars = Array.from({ length: 30 }, (_unused, index) => ({
+    date: new Date(latestDate.getTime() - index * 86400000).toISOString().slice(0, 10),
+    close: index === 0 ? 121 : index < 11 ? 110 + index * 0.2 : 96 + index * 0.45,
+    volume: index === 0 ? latestVolume : index === 29 ? oldestVolume : 900,
+  }));
+  return bars;
+}

@@ -186,6 +186,7 @@ export class StrategyFrameworkRepository {
       parameters: row.parameters || {},
       entryRules: Array.isArray(row.entryRules) ? row.entryRules : [],
       exitRules: Array.isArray(row.exitRules) ? row.exitRules : [],
+      invalidationRules: [],
       noiseFilters: Array.isArray(row.noiseFilters) ? row.noiseFilters : [],
       riskRules: Array.isArray(row.riskRules) ? row.riskRules : [],
       requiredInputs: Array.isArray(row.requiredInputs) ? row.requiredInputs : [],

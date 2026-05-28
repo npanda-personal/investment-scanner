@@ -98,7 +98,7 @@ const createService = (overrides: any = {}) => {
     ...overrides.strategyFrameworkService,
   };
   return {
-    service: new BacktestingStrategyLabService(repository as any, marketDataService as any, watchlistService as any, { assertAllowed: jest.fn(), recordUsage: jest.fn() } as any, dataQualityService as any, new StrategyFrameworkRegistry(), strategyFrameworkService as any),
+    service: new BacktestingStrategyLabService(repository as any, marketDataService as any, watchlistService as any, { assertAllowed: jest.fn(), recordUsage: jest.fn() } as any, dataQualityService as any, overrides.strategyRegistry || new StrategyFrameworkRegistry(), strategyFrameworkService as any),
     repository,
     dataQualityService,
     strategyFrameworkService,
@@ -280,6 +280,45 @@ describe('BacktestingStrategyLabService', () => {
     expect(maxHoldRun.trades.some((trade) => trade.exitReason === 'MAX_HOLDING_PERIOD')).toBe(true);
   });
 
+  it('does not enter registered strategy backtests on WATCH decisions', () => {
+    const registry = new StrategyFrameworkRegistry();
+    const watchOnlyTrend = {
+      ...registry.get('TREND_MOMENTUM')!,
+      parameters: { ...registry.get('TREND_MOMENTUM')!.parameters, minScore: 101 },
+    };
+    const { service } = createService({
+      strategyRegistry: {
+        get: jest.fn((code: string) => code === 'TREND_MOMENTUM' ? watchOnlyTrend : registry.get(code)),
+      },
+    });
+    const bars = makeRegisteredTrendBars();
+    const registeredConfig: BacktestStrategyConfig = {
+      ...config,
+      mode: 'REGISTERED_STRATEGY',
+      strategyCode: 'TREND_MOMENTUM',
+      strategyVersion: '1.0.0',
+      entryRule: { type: 'SMA50_ABOVE_SMA200' },
+      exitRule: { type: 'PRICE_BELOW_SMA50' },
+    };
+
+    expect(service.shouldEnter(registeredConfig, bars, bars.length - 1)).toBe(false);
+  });
+
+  it('uses the latest bar volume for registered breakout backtest entries', () => {
+    const { service } = createService();
+    const bars = makeRegisteredBreakoutBars();
+    const registeredConfig: BacktestStrategyConfig = {
+      ...config,
+      mode: 'REGISTERED_STRATEGY',
+      strategyCode: 'BREAKOUT_CONFIRMATION',
+      strategyVersion: '1.0.0',
+      entryRule: { type: 'SIGNAL_DIRECTION_BULLISH' },
+      exitRule: { type: 'PRICE_BELOW_SMA50' },
+    };
+
+    expect(service.shouldEnter(registeredConfig, bars, bars.length - 1)).toBe(true);
+  });
+
   it('counts end-of-test exits and returns benchmark gaps without failing', async () => {
     const { service } = createService({
       marketDataService: {
@@ -447,9 +486,16 @@ describe('BacktestingStrategyLabService', () => {
     expect(run.status).toBe('COMPLETED');
     expect(strategyFrameworkService.persistBacktestPerformance).toHaveBeenCalledWith(expect.objectContaining({
       strategyCode: 'TREND_MOMENTUM',
+      strategyVersion: '1.1.0',
       timeframe: '1Y',
       universeKey: 'SYMBOLS:AAA,BBB',
     }));
+    expect(repository.createRun).toHaveBeenCalledWith(expect.objectContaining({
+      config: expect.objectContaining({
+        strategyCode: 'TREND_MOMENTUM',
+        strategyVersion: '1.1.0',
+      }),
+    }), 'default-user');
     expect(repository.updateRunMetrics).toHaveBeenCalled();
   });
 
@@ -503,3 +549,25 @@ describe('BacktestingStrategyLabService', () => {
     expect(run.metrics?.dataCoverage?.insufficientHistoryCount).toBeGreaterThan(0);
   });
 });
+
+function makeRegisteredTrendBars() {
+  return Array.from({ length: 260 }, (_unused, index) => ({
+    date: new Date(2025, 0, index + 1).toISOString(),
+    close: index < 60 ? 80 + index * 0.4 : 100 + index * 0.05,
+    volume: 1000,
+  }));
+}
+
+function makeRegisteredBreakoutBars() {
+  const bars = Array.from({ length: 260 }, (_unused, index) => ({
+    date: new Date(2025, 0, index + 1).toISOString(),
+    close: index < 220 ? 70 + index * 0.08 : 88 + (index - 220) * 0.25,
+    volume: 1000,
+  }));
+  bars[bars.length - 1] = {
+    ...bars[bars.length - 1],
+    close: Math.max(...bars.slice(0, -1).map((bar) => bar.close)) + 2,
+    volume: 3000,
+  };
+  return bars;
+}

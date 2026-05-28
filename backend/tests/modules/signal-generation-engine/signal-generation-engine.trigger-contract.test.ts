@@ -128,7 +128,7 @@ describe('signal generation trigger contract projection', () => {
 
     expect(trigger).toMatchObject({
       strategy_id: 'BREAKOUT_CONFIRMATION',
-      strategy_version: '1.0.0',
+      strategy_version: '1.1.0',
       trigger_price: 220,
       trigger_timestamp: prices[0].date,
       timeframe: 'DAILY_SWING',
@@ -139,7 +139,7 @@ describe('signal generation trigger contract projection', () => {
         source_field: 'strategyContext.prices[0].adjusted_close',
         source_timestamp: prices[0].date,
         strategy_id: 'BREAKOUT_CONFIRMATION',
-        strategy_version: '1.0.0',
+        strategy_version: '1.1.0',
         timeframe: 'DAILY_SWING',
         compatibility_only: true,
       },
@@ -167,7 +167,7 @@ describe('signal generation trigger contract projection', () => {
       source_field: null,
       source_timestamp: null,
       strategy_id: 'BREAKOUT_CONFIRMATION',
-      strategy_version: '1.0.0',
+      strategy_version: '1.1.0',
       timeframe: 'DAILY_SWING',
       compatibility_only: true,
     });
@@ -184,7 +184,7 @@ describe('signal generation trigger contract projection', () => {
 
     expect(trigger).toMatchObject({
       strategy_id: 'LOW_QUALITY_DATA_REJECTION',
-      strategy_version: '1.0.0',
+      strategy_version: '1.1.0',
       trigger_price: null,
       trigger_timestamp: null,
       entry_rule_id: null,
@@ -195,7 +195,7 @@ describe('signal generation trigger contract projection', () => {
         source_field: null,
         source_timestamp: null,
         strategy_id: 'LOW_QUALITY_DATA_REJECTION',
-        strategy_version: '1.0.0',
+        strategy_version: '1.1.0',
         timeframe: 'DAILY',
         compatibility_only: true,
       },

@@ -101,7 +101,11 @@ When a strategy-aware enrichment pass evaluates an ENTRY strategy against a loca
 
 If any of those inputs is missing or mismatched, `triggerPriceEvidence.status` remains `UNAVAILABLE` with a reason. This prevents downstream consumers from confusing reference prices, entry zones, Trade Plan geometry, target prices, or R:R-derived values with a source-proven rule-trigger price.
 
-`blockedStrategies[]` includes `strategyCode`, `strategyName`, `strategyVersion`, `blockers`, `warnings`, `dataGaps`, `noiseFiltersTriggered`, and a compact `reason`.
+Strategy matching passes latest-first price bars into Strategy Framework so registered strategies that require bar evidence, such as breakout base/volume checks, can use the same local source rows as the trigger-price evidence path.
+
+Strategy matching passes the signal row's `dataQualityEligibility` into Strategy Framework. It does not infer Data Quality readiness from market-data row completeness. If DQ eligibility is missing, incomplete, limited, not ready, or ineligible, Strategy Framework returns a blocked strategy rather than a source-proven entry match.
+
+`blockedStrategies[]` includes `strategyCode`, `strategyName`, `strategyVersion`, `timeframe`, `category`, `blockers`, `warnings`, `dataGaps`, `noiseFiltersTriggered`, a compact `reason`, and unavailable `triggerPriceEvidence` when an explicit strategy was evaluated but cannot produce a source-proven entry trigger. This preserves explicit strategy metadata for support/filter strategies without counting them as entry matches.
 
 ## Trigger Contract Projection
 
@@ -113,6 +117,7 @@ When strategy-aware enrichment attaches source-proven trigger-price evidence, `t
 
 Known limitations:
 - `trigger_price` is available only as compatibility evidence during strategy-aware enrichment when the local source price row and Strategy Framework rule evidence prove it. It is not persisted as durable trigger audit evidence.
+- Explicitly evaluated support/filter strategies can populate `strategy_id`, `strategy_version`, and `timeframe` in the trigger contract with `UNAVAILABLE` trigger-price evidence, but they cannot populate entry trigger price, timestamp, or entry rule ids.
 - lifecycle status, exit/invalidation rule IDs, persistence `created_at`, and persistence `updated_at` remain unavailable unless future persistence work records them.
 - Legacy rows without current audit or Data Quality snapshots are marked `LEGACY_INCOMPLETE`.
 - Persisted trigger snapshots, normalized trigger tables, route changes, shared type changes, frontend changes, and downstream consumer adoption are separate future decisions.

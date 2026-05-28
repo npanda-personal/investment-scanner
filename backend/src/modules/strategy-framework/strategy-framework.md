@@ -173,6 +173,32 @@ Active: `TREND_MOMENTUM`, `PULLBACK_IN_UPTREND`, `BREAKOUT_CONFIRMATION`, `SMART
 
 Draft: `QUALITY_TREND`, `MEAN_REVERSION_PULLBACK`.
 
+## Strategy Rule Hardening - 2026-05-29
+
+The strategy registry now treats rule declarations as the product contract for candidate eligibility, while the TypeScript evaluator remains the deterministic execution path. First-class `invalidationRules` are part of each strategy definition, and evaluator output includes `invalidationRulesTriggered` alongside entry and exit rule evidence.
+
+All built-in strategy definitions were version-bumped to `1.1.0` for this semantic hardening pass so persisted performance summaries keyed by strategy code and version cannot mix old and new evidence.
+
+Active long-entry strategies now fail closed when Data Quality evidence is missing, incomplete, not ready, unusable, ineligible for signals, or illiquid. `WATCH` is no longer eligible for signal generation or registered backtest proof; only active `ENTRY` strategies that reach `ENTRY_CANDIDATE` may be promoted.
+
+`GATE` and `FILTER` definitions such as `RISK_OFF_AVOIDANCE` and `LOW_QUALITY_DATA_REJECTION` remain neutral support rules. They cannot emit bullish entry candidates, cannot become registered backtest entries, and are not counted as matched entry proof.
+
+`COMMON_LONG_EXIT_RULES` and `COMMON_LONG_INVALIDATION_RULES` declare reusable exit/invalidation evidence for long-entry strategies. Current common evidence includes DQ failure, market risk-off, structural support break, relative-strength decay, distribution warnings, and signal decay. Exit evaluation produces rule IDs and invalidation IDs for downstream audit, but holding context is still required before a strategy-owned exit can be treated as more than review evidence.
+
+Strategy-specific hardening:
+
+- `BREAKOUT_CONFIRMATION` now requires base-duration evidence, volatility contraction before the breakout bar, resistance close, volume confirmation from the latest bar, bullish signal context, DQ, and bars. It no longer treats simple proximity to a 52-week high as sufficient breakout proof.
+- `PULLBACK_IN_UPTREND` now requires a reclaim/bounce style setup instead of accepting prices below SMA50 as a healthy pullback.
+- `SMART_MONEY_ACCUMULATION` now requires price-volume accumulation status, smart-money score, price confirmation, volume context, and DQ readiness. Price-volume-only smart-money evidence remains explicitly limited.
+- `SECTOR_LEADER_MOMENTUM` now behaves as a relative-strength continuation setup with price trend, sector leadership, sector relative strength, raw signal, and DQ inputs.
+
+Current supported region for built-in thresholds is `IN`. Other regions should not be advertised as calibrated until market-specific thresholds are approved.
+
+Non-goals for this hardening pass:
+
+- No Prisma schema, migration, generated type, route registry, shared utility, frontend, package, provider, startup/backfill, target-price, R:R, direct advice, or live-trading change.
+- No first-class short-entry family yet. Bearish/short review remains a future product and backtest semantics decision.
+
 ## Strategy Quality Audit - 2026-05-06
 
 | Strategy | Finding | Severity | Expected behavior | Fix |

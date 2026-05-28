@@ -19,10 +19,13 @@ describe('Strategy Framework service', () => {
       timeframe: '3Y',
       region: 'IN',
       assetType: 'STOCK',
+      takeProfitPercent: 0.2,
     });
 
     expect(config.strategyCode).toBe('TREND_MOMENTUM');
     expect(config.mode).toBe('REGISTERED_STRATEGY');
+    expect(config.excludeMissingQuality).toBe(true);
+    expect(config.takeProfitPercent).toBeUndefined();
   });
 
   it('rejects support rules as standalone registered backtests', () => {
@@ -127,4 +130,77 @@ describe('Strategy Framework service', () => {
     expect(blocked.status).toBe('BLOCKED');
     expect(blocked.missingEvidenceReason).toContain('support rules');
   });
+
+  it('does not count WATCH decisions as matched entry proof', async () => {
+    const watchService = new StrategyFrameworkService(
+      {} as any,
+      registry,
+      {
+        getInstrument: jest.fn(),
+        listInstruments: jest.fn().mockResolvedValue({ instruments: [{ id: 'stock-1', symbol: 'AAA', region: 'IN', asset_type: 'STOCK' }] }),
+        listPricesByInstrumentId: jest.fn().mockResolvedValue({ prices: servicePricesForWatchDecision() }),
+      } as any,
+      { latestForInstrument: jest.fn().mockResolvedValue({ score: 82, direction: 'BULLISH' }) } as any,
+      { latestForInstrument: jest.fn().mockResolvedValue(null) } as any,
+      { diagnostics: jest.fn().mockResolvedValue({ signalReadinessStatus: 'READY', coverageStatus: 'GOOD', liquidityStatus: 'LIQUID', eligibleForSignals: true }) } as any,
+      { summary: jest.fn().mockResolvedValue({ regime: { regime: 'RISK_ON' }, breadth: { percentAboveSma50: 0.7 }, topSectors: [], weakSectors: [] }) } as any,
+      { stock: jest.fn().mockResolvedValue(null) } as any,
+    );
+
+    const result = await watchService.evaluate({ strategyCode: 'TREND_MOMENTUM', symbol: 'AAA', region: 'IN', assetType: 'STOCK' });
+
+    expect(result.results[0].decision).toBe('WATCH');
+    expect(result.results[0].eligibleForSignalGeneration).toBe(false);
+    expect(result.matchedStrategies).toHaveLength(0);
+  });
+
+  it('passes latest-first bars into direct Strategy Framework evaluation', async () => {
+    const breakoutService = new StrategyFrameworkService(
+      {} as any,
+      registry,
+      {
+        getInstrument: jest.fn().mockResolvedValue({ id: 'stock-1', symbol: 'ABC', region: 'IN', asset_type: 'STOCK', sector: 'Technology' }),
+        listPricesByInstrumentId: jest.fn().mockResolvedValue({ prices: strategyServiceBreakoutPrices() }),
+      } as any,
+      { latestForInstrument: jest.fn().mockResolvedValue({ score: 85, direction: 'BULLISH' }) } as any,
+      { latestForInstrument: jest.fn().mockResolvedValue(null) } as any,
+      { diagnostics: jest.fn().mockResolvedValue({ signalReadinessStatus: 'READY', coverageStatus: 'GOOD', liquidityStatus: 'LIQUID', eligibleForSignals: true }) } as any,
+      { summary: jest.fn().mockResolvedValue({ regime: { regime: null }, breadth: { percentAboveSma50: 0.7 }, topSectors: [], weakSectors: [] }) } as any,
+      { stock: jest.fn().mockResolvedValue(null) } as any,
+    );
+
+    const result = await breakoutService.evaluate({ strategyCode: 'BREAKOUT_CONFIRMATION', instrumentId: 'stock-1', region: 'IN', assetType: 'STOCK' });
+
+    expect(result.results[0]).toMatchObject({
+      strategyCode: 'BREAKOUT_CONFIRMATION',
+      decision: 'ENTRY_CANDIDATE',
+    });
+    expect(result.results[0].entryRulesPassed).toEqual(expect.arrayContaining(['BASE_DURATION_CONFIRMED', 'VOLATILITY_CONTRACTION', 'RESISTANCE_CLOSE', 'VOLUME_BREAKOUT']));
+  });
 });
+
+function servicePricesForWatchDecision() {
+  const start = new Date('2026-05-28T00:00:00.000Z');
+  return Array.from({ length: 260 }, (_unused, index) => {
+    const date = new Date(start);
+    date.setDate(start.getDate() - index);
+    const close = index < 50 ? 100 : index < 200 ? 80 : 70;
+    return { date: date.toISOString(), close, adjusted_close: index === 0 ? 120 : close, volume: 1000 };
+  });
+}
+
+function strategyServiceBreakoutPrices() {
+  const latestDate = new Date('2026-04-28T00:00:00.000Z');
+  return Array.from({ length: 260 }, (_unused, index) => {
+    const date = new Date(latestDate);
+    date.setDate(latestDate.getDate() - index);
+    const close = index === 0
+      ? 121
+      : index < 11
+        ? 110 + index * 0.2
+        : index < 21
+          ? 103 + (index - 11) * 0.9
+          : 106;
+    return { date: date.toISOString(), close, adjusted_close: close, volume: index === 0 ? 4000 : 1000 };
+  });
+}

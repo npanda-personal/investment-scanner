@@ -675,7 +675,7 @@ export class SignalGenerationEngineService {
   private triggerContractFor(signal: SignalResultDto, instrument?: any): SignalTriggerContractDto {
     const unavailable = new Set<string>();
     const incompleteReasons: string[] = [];
-    const primaryStrategy = signal.strategyMatches?.[0] || null;
+    const primaryStrategy = signal.strategyMatches?.[0] || (signal.blockedStrategies?.length === 1 ? signal.blockedStrategies[0] : null);
     const assetClass = this.stringOrNull(instrument?.assetType ?? instrument?.asset_type);
     const region = this.stringOrNull(instrument?.region);
     const strategyId = primaryStrategy?.strategyCode ?? null;
@@ -799,7 +799,7 @@ export class SignalGenerationEngineService {
         const result = new StrategyFrameworkEvaluator(strategy).evaluateSignalCandidate(context);
         const rating = await this.latestStrategyPerformance(strategy.code, context.region || 'IN', context.assetType || 'STOCK', ratingCache);
         if (result.eligibleForSignalGeneration && result.blockers.length === 0) strategyMatches.push(this.summarizeMatch(result, strategy, rating, context));
-        else blockedStrategies.push(this.summarizeBlocked(result, strategy.name));
+        else blockedStrategies.push(this.summarizeBlocked(result, strategy, context));
       } catch (error: any) {
         blockedStrategies.push({
           strategyCode: strategy?.code || options.strategyCode || 'UNKNOWN',
@@ -838,6 +838,11 @@ export class SignalGenerationEngineService {
       latestPrice: signal.currentPrice ?? prices[0]?.adjusted_close ?? null,
       previousClose: signal.previousClose ?? prices[1]?.adjusted_close ?? null,
       prices,
+      bars: prices.map((price) => ({
+        date: price.date,
+        close: price.adjusted_close,
+        volume: price.volume,
+      })),
       sma50: this.sma(prices, 50),
       sma200: this.sma(prices, 200),
       rsi: this.rsi(prices, 14),
@@ -847,13 +852,13 @@ export class SignalGenerationEngineService {
       volatility: this.stddev(closes.slice(0, 63)),
       averageVolume20: this.average(prices.slice(1, 21).map((price) => price.volume).filter((value): value is number => typeof value === 'number')),
       rawSignal: signal,
-      dataQuality: {
-        signalReadinessStatus: signal.data_status === 'MISSING' ? 'NOT_READY' : signal.data_status === 'PARTIAL' ? 'LIMITED' : 'READY',
-        coverageStatus: signal.data_status === 'MISSING' ? 'UNUSABLE' : signal.data_status === 'PARTIAL' ? 'PARTIAL' : 'GOOD',
-        liquidityStatus: 'UNKNOWN',
-        eligibleForSignals: signal.data_status !== 'MISSING',
+      dataQuality: signal.dataQualityEligibility ? {
+        signalReadinessStatus: signal.dataQualityEligibility.signalReadinessStatus ?? null,
+        coverageStatus: signal.dataQualityEligibility.coverageStatus ?? null,
+        liquidityStatus: signal.dataQualityEligibility.liquidityStatus ?? null,
+        eligibleForSignals: signal.dataQualityEligibility.eligible === true,
         eligibleForBacktesting: prices.length >= 252,
-      },
+      } : null,
       marketGate: 'UNKNOWN',
     };
   }
@@ -931,17 +936,24 @@ export class SignalGenerationEngineService {
     return leftDate.toISOString().slice(0, 10) === rightDate.toISOString().slice(0, 10);
   }
 
-  private summarizeBlocked(result: StrategySignalOutput, strategyName: string): SignalBlockedStrategySummary {
+  private summarizeBlocked(
+    result: StrategySignalOutput,
+    strategy: { name?: string; timeframe?: string | null; category?: string | null },
+    context: StrategyContext
+  ): SignalBlockedStrategySummary {
     const reason = result.blockers[0] || result.noiseFiltersTriggered[0] || result.dataGaps[0] || result.warnings[0] || 'Strategy conditions were not met.';
     return {
       strategyCode: result.strategyCode,
-      strategyName,
+      strategyName: strategy.name,
       strategyVersion: result.strategyVersion,
+      timeframe: strategy.timeframe ?? null,
+      category: strategy.category ?? null,
       blockers: result.blockers,
       warnings: result.warnings,
       dataGaps: result.dataGaps,
       noiseFiltersTriggered: result.noiseFiltersTriggered,
       reason,
+      triggerPriceEvidence: this.triggerPriceEvidenceFor(result, strategy, context),
     };
   }
 

@@ -38,6 +38,7 @@ export interface StrategyDefinition {
   requiredInputs: string[];
   entryRules: StrategyRuleDeclaration[];
   exitRules: StrategyRuleDeclaration[];
+  invalidationRules: StrategyRuleDeclaration[];
   noiseFilters: StrategyRuleDeclaration[];
   riskRules: StrategyRuleDeclaration[];
   marketGateRules: StrategyRuleDeclaration[];
@@ -122,6 +123,7 @@ export interface StrategySignalOutput {
   dataGaps: string[];
   entryRulesPassed: string[];
   exitRulesTriggered: string[];
+  invalidationRulesTriggered: string[];
   noiseFiltersTriggered: string[];
   marketGateStatus: string | null;
   eligibleForSignalGeneration: boolean;

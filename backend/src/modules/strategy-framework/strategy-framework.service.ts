@@ -104,7 +104,7 @@ export class StrategyFrameworkService {
     const results = strategies.map((strategy) => new StrategyFrameworkEvaluator(strategy).evaluateSignalCandidate(context));
     return {
       results,
-      matchedStrategies: results.filter((result) => ['ENTRY_CANDIDATE', 'SIGNAL', 'WATCH', 'EXIT_CANDIDATE', 'REDUCE_RISK'].includes(result.decision) && result.blockers.length === 0),
+      matchedStrategies: results.filter((result) => ['ENTRY_CANDIDATE', 'EXIT_CANDIDATE', 'REDUCE_RISK'].includes(result.decision) && result.blockers.length === 0),
       blockedStrategies: results.filter((result) => result.blockers.length > 0 || result.decision === 'INSUFFICIENT_DATA' || result.decision === 'AVOID'),
       warnings: context.instrumentId ? [] : ['Instrument could not be resolved.'],
     };
@@ -177,7 +177,7 @@ export class StrategyFrameworkService {
     const strategy = this.requireStrategy(input.strategyCode);
     const base: Omit<StrategyPerformanceSummaryDto, 'ratingScore' | 'ratingGrade' | 'automationEligibility' | 'readinessLabel' | 'ratingReasons' | 'ratingWarnings' | 'ratingCapsApplied'> & { dataCoverageScore?: number; strategyStatus?: string } = {
       strategyCode: strategy.code,
-      strategyVersion: input.strategyVersion || strategy.version,
+      strategyVersion: strategy.version,
       timeframe: input.timeframe,
       region: input.region || 'IN',
       assetType: input.assetType || 'STOCK',
@@ -318,6 +318,11 @@ export class StrategyFrameworkService {
       latestPrice: latest?.adjusted_close ?? null,
       previousClose: prices[1]?.adjusted_close ?? null,
       prices,
+      bars: prices.map((price) => ({
+        date: price.date,
+        close: price.adjusted_close,
+        volume: price.volume,
+      })),
       sma50: this.sma(closes, 50),
       sma200: this.sma(closes, 200),
       rsi: this.rsi(closes, 14),
