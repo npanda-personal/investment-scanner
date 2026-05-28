@@ -1,15 +1,19 @@
 import React, { useState } from 'react';
+import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import { Alert, Box, Button, LinearProgress, Paper, Stack, Tab, Tabs, Typography } from '@mui/material';
 import { PageHeader } from '@/shared/components';
+import { fetchSignalPositionLedgerActiveRows, fetchSignalPositionLedgerClosedRows } from '../api/signalPositionLedgerApi';
 import { useSignalPositionLedgerActiveRows } from '../hooks/useSignalPositionLedgerActiveRows';
 import { useSignalPositionLedgerClosedRows } from '../hooks/useSignalPositionLedgerClosedRows';
 import { ActivePositionsTable } from './ActivePositionsTable';
-import { SignalPositionSummaryStrip } from './SignalPositionSummaryStrip';
+import type { SignalPositionLedgerActiveRow } from '../types';
 
 type LedgerTab = 'active' | 'history';
 
 const SignalPositionLedgerPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<LedgerTab>('active');
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
   const {
     data,
     loading,
@@ -17,14 +21,51 @@ const SignalPositionLedgerPage: React.FC = () => {
     scope,
     page,
     pageSize,
+    sortBy,
+    sortDirection,
     setPage,
     setPageSize,
+    setSort,
     reload,
     refreshLedger,
     refreshingLedger,
   } = useSignalPositionLedgerActiveRows();
   const closed = useSignalPositionLedgerClosedRows();
   const scopeLabel = `${scope.region} / ${scope.assetType}`;
+  const currentTabLoading = activeTab === 'active' ? loading : closed.loading;
+
+  const exportCurrentRows = async () => {
+    setExporting(true);
+    setExportError(null);
+    try {
+      const rows: SignalPositionLedgerActiveRow[] = [];
+      let offset = 0;
+      const limit = 100;
+      let hasMore = true;
+      const fetchRows = activeTab === 'active' ? fetchSignalPositionLedgerActiveRows : fetchSignalPositionLedgerClosedRows;
+      const currentSortBy = activeTab === 'active' ? sortBy : closed.sortBy;
+      const currentSortDirection = activeTab === 'active' ? sortDirection : closed.sortDirection;
+      while (hasMore) {
+        const pageResult = await fetchRows({
+          region: scope.region,
+          assetType: scope.assetType,
+          limit,
+          offset,
+          sortBy: currentSortBy,
+          sortDirection: currentSortDirection,
+        });
+        rows.push(...pageResult.items);
+        hasMore = pageResult.hasMore;
+        offset = pageResult.nextOffset ?? offset + pageResult.items.length;
+        if (pageResult.items.length === 0) break;
+      }
+      downloadLedgerCsv(rows, scopeLabel, activeTab);
+    } catch (caught) {
+      setExportError(caught instanceof Error ? caught.message : 'Signal Position Ledger export failed.');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   return (
     <Box sx={{ p: 3, maxWidth: 1500, mx: 'auto' }}>
@@ -32,19 +73,23 @@ const SignalPositionLedgerPage: React.FC = () => {
         title="Signal Position Ledger"
         subtitle={`Rule-triggered entry candidate evidence for the current market scope. Scope: ${scopeLabel}.`}
         primaryAction={<Button variant="contained" onClick={() => void refreshLedger()} disabled={refreshingLedger}>Refresh ledger data</Button>}
-        secondaryActions={<Button variant="outlined" onClick={reload} disabled={loading}>Reload snapshot</Button>}
+        secondaryActions={(
+          <Stack direction={{ xs: 'column', sm: 'row' }} gap={1}>
+            <Button variant="outlined" onClick={reload} disabled={loading}>Reload snapshot</Button>
+            <Button variant="outlined" startIcon={<FileDownloadIcon />} onClick={() => void exportCurrentRows()} disabled={exporting || currentTabLoading}>
+              {exporting ? 'Exporting' : 'Export CSV'}
+            </Button>
+          </Stack>
+        )}
       />
 
       <Paper variant="outlined" sx={{ p: 1.5, mb: 2 }}>
         <Stack spacing={1}>
-          <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" gap={1}>
-            <Typography variant="body2" color="text.secondary">
-              Ledger pipeline: {data.refresh.status} - processed {data.refresh.processedCount.toLocaleString()} / {data.refresh.totalCount.toLocaleString()} source signals - active {data.totalCount.toLocaleString()} - closed {closed.data.totalCount.toLocaleString()}.
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Updated {data.refresh.updatedAt ? new Date(data.refresh.updatedAt).toLocaleString() : 'not yet'}
-            </Typography>
-          </Stack>
+          <Typography variant="body2" color="text.secondary">
+            {data.refresh.status === 'RUNNING'
+              ? 'Updating signal ledger entries. Rows already processed remain available below.'
+              : `${data.totalCount.toLocaleString()} open entries and ${closed.data.totalCount.toLocaleString()} closed entries for ${scopeLabel}.`}
+          </Typography>
           {data.refresh.status === 'RUNNING' && (
             <LinearProgress
               variant={data.refresh.totalCount > 0 ? 'determinate' : 'indeterminate'}
@@ -66,6 +111,10 @@ const SignalPositionLedgerPage: React.FC = () => {
         </Alert>
       )}
 
+      {exportError && (
+        <Alert severity="error" sx={{ mb: 2 }}>{exportError}</Alert>
+      )}
+
       <Paper variant="outlined" sx={{ mb: 2 }}>
         <Tabs
           value={activeTab}
@@ -81,7 +130,6 @@ const SignalPositionLedgerPage: React.FC = () => {
 
       {activeTab === 'active' ? (
         <>
-          <SignalPositionSummaryStrip data={data} scopeLabel={scopeLabel} loading={loading} />
           <ActivePositionsTable
             data={data}
             loading={loading}
@@ -89,8 +137,11 @@ const SignalPositionLedgerPage: React.FC = () => {
             scopeLabel={scopeLabel}
             page={page}
             pageSize={pageSize}
+            sortBy={sortBy}
+            sortDirection={sortDirection}
             onPageChange={setPage}
             onPageSizeChange={setPageSize}
+            onSortChange={setSort}
           />
         </>
       ) : (
@@ -102,8 +153,11 @@ const SignalPositionLedgerPage: React.FC = () => {
           variant="closed"
           page={closed.page}
           pageSize={closed.pageSize}
+          sortBy={closed.sortBy}
+          sortDirection={closed.sortDirection}
           onPageChange={closed.setPage}
           onPageSizeChange={closed.setPageSize}
+          onSortChange={closed.setSort}
         />
       )}
     </Box>
@@ -111,3 +165,34 @@ const SignalPositionLedgerPage: React.FC = () => {
 };
 
 export default SignalPositionLedgerPage;
+
+function downloadLedgerCsv(rows: SignalPositionLedgerActiveRow[], scopeLabel: string, tab: LedgerTab) {
+  const header = ['Stock', 'Entry Price', 'Trigger Date', 'Trigger Reason'].map(csvCell).join(',');
+  const body = rows.map((row) => [
+    row.companyName ? `${row.symbol} - ${row.companyName}` : row.symbol,
+    formatExportNumber(row.entryTriggerPrice),
+    row.entryTriggerTimestamp,
+    row.entryReasonSummary,
+  ].map(csvCell).join(',')).join('\r\n');
+  const csv = `${header}\r\n${body}`;
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  const scopeSlug = scopeLabel.replace(/[^A-Z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase();
+  link.href = URL.createObjectURL(blob);
+  const tabSlug = tab === 'active' ? 'open-entries' : 'closed-history';
+  link.download = `signal-position-ledger-${tabSlug}-${scopeSlug}-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(link.href);
+}
+
+function csvCell(value: unknown): string {
+  const text = value === null || value === undefined ? '' : String(value);
+  const safeText = /^[=+\-@]/.test(text) ? `'${text}` : text;
+  return `"${safeText.replace(/"/g, '""')}"`;
+}
+
+function formatExportNumber(value: number): string {
+  return Number.isFinite(value) ? String(value) : '';
+}

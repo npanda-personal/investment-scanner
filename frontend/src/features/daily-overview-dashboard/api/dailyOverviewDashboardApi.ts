@@ -20,7 +20,7 @@ export async function fetchDailyOverviewMarketContext(params: DailyOverviewScope
 
 export async function fetchDailyOverviewMarketMovers(params: DailyOverviewScopeParams & { range?: MarketMoverRange }): Promise<MarketMoversSummary> {
   const response = await axios.get<MarketMoversSummary>('/api/v1/market-data/movers', {
-    params: { ...params, limit: 5 },
+    params: { ...params, limit: 20 },
   });
   return response.data;
 }

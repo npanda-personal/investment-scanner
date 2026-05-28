@@ -3,6 +3,8 @@ import type { SignalResultDto } from '../signal-generation-engine';
 export type SignalPositionTriggerType = 'bullish_entry_trigger' | 'bearish_trigger';
 export type SignalPositionReturnStatus = 'CURRENT' | 'STALE' | 'UNAVAILABLE';
 export type SignalPositionLedgerStatus = 'ACTIVE' | 'CLOSED';
+export type SignalPositionLedgerSortBy = 'entryTriggerTimestamp' | 'currentReturnPercent';
+export type SignalPositionLedgerSortDirection = 'asc' | 'desc';
 export type SignalPositionHealthState = 'EXIT_TRIGGERED' | 'RISK_WARNING' | null;
 export type SignalPositionLifecycleEvidenceStatus = 'ACTIVE_ENTRY' | 'EXIT_TRIGGERED' | 'UNAVAILABLE';
 export type SignalPositionCalibrationEvidenceStatus = 'AVAILABLE' | 'UNAVAILABLE';
@@ -18,6 +20,8 @@ export interface SignalPositionLedgerActiveQuery {
   assetType: string;
   limit: number;
   offset: number;
+  sortBy?: SignalPositionLedgerSortBy;
+  sortDirection?: SignalPositionLedgerSortDirection;
 }
 
 export type SignalPositionLedgerRefreshStatus = 'IDLE' | 'RUNNING' | 'COMPLETED' | 'FAILED';

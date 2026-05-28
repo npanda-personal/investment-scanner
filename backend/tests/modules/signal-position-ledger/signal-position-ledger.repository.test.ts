@@ -144,5 +144,72 @@ describe('SignalPositionLedgerRepository', () => {
 
     await expect(repository.loadLatestMaterializedSnapshot({ region: 'IN', assetType: 'STOCK' })).resolves.toBeNull();
   });
+
+  it('sorts active ledger rows before pagination with unavailable returns last', async () => {
+    const findMany = jest.fn().mockResolvedValue([
+      ledgerEntryRow({ ledgerKey: 'row-low', instrumentId: 'stock-low', symbol: 'LOW', entryTriggerTimestamp: '2026-05-24T00:00:00.000Z', currentReturnPercent: -2 }),
+      ledgerEntryRow({ ledgerKey: 'row-missing', instrumentId: 'stock-missing', symbol: 'MISS', entryTriggerTimestamp: '2026-05-25T00:00:00.000Z', currentReturnPercent: null, currentReturnStatus: 'UNAVAILABLE' }),
+      ledgerEntryRow({ ledgerKey: 'row-high', instrumentId: 'stock-high', symbol: 'HIGH', entryTriggerTimestamp: '2026-05-23T00:00:00.000Z', currentReturnPercent: 9 }),
+    ]);
+    const repository = new SignalPositionLedgerRepository({
+      signalPositionLedgerEntry: { findMany },
+    } as any);
+
+    const page = await repository.listLedgerRows({
+      region: 'IN',
+      assetType: 'STOCK',
+      status: 'ACTIVE',
+      limit: 2,
+      offset: 0,
+      sortBy: 'currentReturnPercent',
+      sortDirection: 'desc',
+    });
+
+    expect(page.items.map((row) => row.symbol)).toEqual(['HIGH', 'LOW']);
+    expect(page.totalCount).toBe(3);
+    expect(page.hasMore).toBe(true);
+    expect(page.nextOffset).toBe(2);
+  });
 });
+
+function ledgerEntryRow(overrides: Record<string, unknown>) {
+  return {
+    ledgerKey: 'row-1',
+    status: 'ACTIVE',
+    entrySignalId: 'signal-1',
+    instrumentId: 'stock-1',
+    symbol: 'ABC',
+    companyName: 'ABC Co',
+    scopeRegion: 'IN',
+    scopeAssetType: 'STOCK',
+    entryTriggerType: 'bullish_entry_trigger',
+    entryTriggerTimestamp: new Date('2026-05-26T00:00:00.000Z'),
+    entryTriggerPrice: 100,
+    entryReasonSummary: 'Entry trigger reason.',
+    strategyId: 'BREAKOUT',
+    strategyVersion: '1.0.0',
+    strategyDecision: 'ENTRY_CANDIDATE',
+    strategyReadinessLabel: 'READY',
+    strategyRatingGrade: 'A',
+    entryRuleId: 'ENTRY_RULE',
+    latestTrustedPriceDate: new Date('2026-05-27T00:00:00.000Z'),
+    latestTrustedPrice: 110,
+    currentReturnPercent: 10,
+    currentReturnStatus: 'CURRENT',
+    currentDataQualityStatus: 'READY',
+    trustEvidenceStatus: 'SOURCE_PROVEN',
+    calibrationEvidenceStatus: 'AVAILABLE',
+    displayWarnings: [],
+    exitSignalId: null,
+    exitTriggerTimestamp: null,
+    exitTriggerPrice: null,
+    exitReasonSummary: null,
+    exitRuleId: null,
+    exitDecision: null,
+    closedAt: null,
+    createdAt: new Date('2026-05-26T00:00:00.000Z'),
+    updatedAt: new Date('2026-05-26T00:00:00.000Z'),
+    ...overrides,
+  };
+}
 

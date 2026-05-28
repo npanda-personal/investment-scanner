@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
 import { fetchSignalPositionLedgerClosedRows } from '../api/signalPositionLedgerApi';
-import type { SignalPositionLedgerActiveListResponse } from '../types';
+import type { SignalPositionLedgerActiveListResponse, SignalPositionLedgerSortBy, SignalPositionLedgerSortDirection } from '../types';
 
 const DEFAULT_LIMIT = 25;
 
@@ -42,7 +42,13 @@ export function useSignalPositionLedgerClosedRows() {
   const { scope } = useMarketScope();
   const { region, assetType } = scope;
   const scopeKey = `${region}:${assetType}`;
-  const [paging, setPaging] = useState({ scopeKey, limit: DEFAULT_LIMIT, offset: 0 });
+  const [paging, setPaging] = useState<{ scopeKey: string; limit: number; offset: number; sortBy: SignalPositionLedgerSortBy; sortDirection: SignalPositionLedgerSortDirection }>({
+    scopeKey,
+    limit: DEFAULT_LIMIT,
+    offset: 0,
+    sortBy: 'entryTriggerTimestamp',
+    sortDirection: 'desc',
+  });
   const [data, setData] = useState<SignalPositionLedgerActiveListResponse>(() => emptyResponse(region, assetType));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -60,6 +66,8 @@ export function useSignalPositionLedgerClosedRows() {
         assetType,
         limit: paging.limit,
         offset: paging.offset,
+        sortBy: paging.sortBy,
+        sortDirection: paging.sortDirection,
       });
       if (requestId !== latestRequestRef.current) return;
       setData(nextData);
@@ -71,7 +79,7 @@ export function useSignalPositionLedgerClosedRows() {
       if (requestId !== latestRequestRef.current) return;
       if (!silent) setLoading(false);
     }
-  }, [assetType, paging.limit, paging.offset, region]);
+  }, [assetType, paging.limit, paging.offset, paging.sortBy, paging.sortDirection, region]);
 
   useEffect(() => {
     setPaging((current) => (current.scopeKey === scopeKey ? current : { ...current, scopeKey, offset: 0 }));
@@ -106,14 +114,26 @@ export function useSignalPositionLedgerClosedRows() {
     }));
   }, []);
 
+  const setSort = useCallback((sortBy: SignalPositionLedgerSortBy, sortDirection: SignalPositionLedgerSortDirection) => {
+    setPaging((current) => ({
+      ...current,
+      sortBy,
+      sortDirection,
+      offset: 0,
+    }));
+  }, []);
+
   return {
     data: scopedData,
     loading: loading || !isCurrentScopeData,
     error: isCurrentScopeData ? error : null,
     page: Math.floor(paging.offset / paging.limit),
     pageSize: paging.limit,
+    sortBy: paging.sortBy,
+    sortDirection: paging.sortDirection,
     setPage,
     setPageSize,
+    setSort,
     reload: () => void load(),
   };
 }

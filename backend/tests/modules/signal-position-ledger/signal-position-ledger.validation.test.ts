@@ -8,6 +8,8 @@ describe('signal position ledger validation', () => {
       assetType: 'STOCK',
       limit: 25,
       offset: 0,
+      sortBy: 'entryTriggerTimestamp',
+      sortDirection: 'desc',
     });
   });
 
@@ -17,11 +19,15 @@ describe('signal position ledger validation', () => {
       assetType: 'etf',
       limit: '999',
       offset: '-2',
+      sortBy: 'currentReturnPercent',
+      sortDirection: 'asc',
     })).toEqual({
       region: 'US',
       assetType: 'ETF',
       limit: 100,
       offset: 0,
+      sortBy: 'currentReturnPercent',
+      sortDirection: 'asc',
     });
   });
 });

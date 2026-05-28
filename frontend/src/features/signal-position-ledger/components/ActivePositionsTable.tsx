@@ -12,8 +12,8 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
-import { DataTable, StatusBadge, type DataTableColumn } from '@/shared/components';
-import type { SignalPositionLedgerActiveListResponse, SignalPositionLedgerActiveRow } from '../types';
+import { DataTable, StatusBadge, type DataTableColumn, type SortDirection } from '@/shared/components';
+import type { SignalPositionLedgerActiveListResponse, SignalPositionLedgerActiveRow, SignalPositionLedgerSortBy } from '../types';
 
 const dateFormatter = new Intl.DateTimeFormat(undefined, {
   year: 'numeric',
@@ -68,8 +68,11 @@ type ActivePositionsTableProps = {
   variant?: 'active' | 'closed';
   page: number;
   pageSize: number;
+  sortBy: SignalPositionLedgerSortBy;
+  sortDirection: SortDirection;
   onPageChange: (page: number) => void;
   onPageSizeChange: (pageSize: number) => void;
+  onSortChange: (sortBy: SignalPositionLedgerSortBy, sortDirection: SortDirection) => void;
 };
 
 export const ActivePositionsTable: React.FC<ActivePositionsTableProps> = ({
@@ -80,8 +83,11 @@ export const ActivePositionsTable: React.FC<ActivePositionsTableProps> = ({
   variant = 'active',
   page,
   pageSize,
+  sortBy,
+  sortDirection,
   onPageChange,
   onPageSizeChange,
+  onSortChange,
 }) => {
   const [selectedRow, setSelectedRow] = useState<SignalPositionLedgerActiveRow | null>(null);
   const columns = useMemo<DataTableColumn<SignalPositionLedgerActiveRow>[]>(() => {
@@ -100,8 +106,9 @@ export const ActivePositionsTable: React.FC<ActivePositionsTableProps> = ({
       ),
     },
     {
-      id: 'entry',
+      id: 'entryTriggerTimestamp',
       label: 'Trigger',
+      sortable: true,
       minWidth: 145,
       maxWidth: 170,
       render: (row) => (
@@ -122,9 +129,10 @@ export const ActivePositionsTable: React.FC<ActivePositionsTableProps> = ({
       ),
     } satisfies DataTableColumn<SignalPositionLedgerActiveRow>] : []),
     {
-      id: 'move',
+      id: 'currentReturnPercent',
       label: variant === 'closed' ? 'Final return' : 'Return till date',
       align: 'right',
+      sortable: true,
       render: (row) => (
         <Chip
           size="small"
@@ -180,8 +188,15 @@ export const ActivePositionsTable: React.FC<ActivePositionsTableProps> = ({
         page={page}
         pageSize={pageSize}
         totalCount={data.totalCount}
+        sortBy={sortBy}
+        sortDirection={sortDirection}
         onPageChange={onPageChange}
         onPageSizeChange={onPageSizeChange}
+        onSortChange={(nextSortBy, nextSortDirection) => {
+          if (nextSortBy === 'entryTriggerTimestamp' || nextSortBy === 'currentReturnPercent') {
+            onSortChange(nextSortBy, nextSortDirection);
+          }
+        }}
         onRowClick={setSelectedRow}
       />
 

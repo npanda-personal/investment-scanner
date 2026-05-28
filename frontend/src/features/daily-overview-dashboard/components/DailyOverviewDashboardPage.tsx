@@ -6,6 +6,10 @@ import {
   Box,
   Button,
   Chip,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Divider,
   Grid,
   LinearProgress,
@@ -14,6 +18,12 @@ import {
   Paper,
   Skeleton,
   Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
   ToggleButton,
   ToggleButtonGroup,
   Tooltip,
@@ -23,27 +33,19 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import { useDailyOverviewDashboard } from '../hooks/useDailyOverviewDashboard';
 import type {
-  CandidateGroupKey,
   CandidateGroupSummary,
   MarketMoverRange,
   MarketMoverRow,
   TodayReviewCandidateGroupSet,
 } from '../types';
 
-const candidateGroupOrder: CandidateGroupKey[] = ['bullishReview', 'bearishReview', 'exitRiskReview'];
-const candidateGroupLabels: Record<CandidateGroupKey, string> = {
-  bullishReview: 'Bullish candidates',
-  bearishReview: 'Bearish pressure',
-  exitRiskReview: 'Exit or risk review',
-};
-
 const moverRanges: MarketMoverRange[] = ['1D', '1W', '1M', '3M', '6M', '1Y'];
 const unavailableLabel = 'Unavailable';
 
 export function DailyOverviewDashboardPage() {
   const dashboard = useDailyOverviewDashboard();
-  const [candidateGroup, setCandidateGroup] = useState<CandidateGroupKey>('bullishReview');
   const [moverRange, setMoverRange] = useState<MarketMoverRange>('1D');
+  const [selectedCandidate, setSelectedCandidate] = useState<CandidateGroupSummary['rows'][number] | null>(null);
 
   const todayReview = dashboard.critical.todayReview.data;
   const marketMovers = dashboard.critical.marketMovers.data;
@@ -59,29 +61,13 @@ export function DailyOverviewDashboardPage() {
     unproven: todayReview?.groups.unproven ?? [],
   }), [todayReview]);
 
-  const candidateSummaries: Record<CandidateGroupKey, CandidateGroupSummary> = useMemo(() => ({
-    bullishReview: {
-      key: 'bullishReview',
-      label: candidateGroupLabels.bullishReview,
-      count: todayReviewGroups.bullishReview.length,
-      rows: mapTodayReviewRows(todayReviewGroups.bullishReview),
-    },
-    bearishReview: {
-      key: 'bearishReview',
-      label: candidateGroupLabels.bearishReview,
-      count: todayReviewGroups.bearishReview.length,
-      rows: mapTodayReviewRows(todayReviewGroups.bearishReview),
-    },
-    exitRiskReview: {
-      key: 'exitRiskReview',
-      label: candidateGroupLabels.exitRiskReview,
-      count: todayReviewGroups.exitRiskReview.length,
-      rows: mapTodayReviewRows(todayReviewGroups.exitRiskReview),
-    },
-  }), [todayReviewGroups]);
+  const topSignalCandidates = useMemo(() => mapTodayReviewRows([
+    ...todayReviewGroups.bullishReview,
+    ...todayReviewGroups.bearishReview,
+    ...todayReviewGroups.exitRiskReview,
+  ]).slice(0, 10), [todayReviewGroups]);
 
   const moverSummary = marketMovers?.ranges.find((item) => item.range === moverRange) ?? null;
-  const activeCandidateGroup = candidateSummaries[candidateGroup];
   const hotStocks = useMemo(() => {
     const candidateByInstrumentId = new Map(
       [...todayReviewGroups.bullishReview, ...todayReviewGroups.bearishReview]
@@ -217,46 +203,65 @@ export function DailyOverviewDashboardPage() {
               <Stack spacing={1.5}>
                 <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', md: 'center' }} gap={1}>
                   <Typography variant="h6">Top Signal Candidates</Typography>
-                  <ToggleButtonGroup
-                    value={candidateGroup}
-                    exclusive
-                    onChange={(_event, value: CandidateGroupKey | null) => {
-                      if (value) setCandidateGroup(value);
-                    }}
-                    size="small"
-                    sx={{ flexWrap: 'wrap', gap: 1 }}
-                  >
-                    {candidateGroupOrder.map((groupKey) => (
-                      <ToggleButton key={groupKey} value={groupKey}>
-                        {candidateGroupLabels[groupKey]} ({formatNumber(candidateSummaries[groupKey].count)})
-                      </ToggleButton>
-                    ))}
-                  </ToggleButtonGroup>
+                  <Typography variant="body2" color="text.secondary">Top 10 by Today Review rank</Typography>
                 </Stack>
                 {dashboard.critical.todayReview.loading && <LinearProgress />}
-                {!dashboard.critical.todayReview.loading && activeCandidateGroup.rows.length === 0 && (
-                  <Alert severity="info">No {activeCandidateGroup.label.toLowerCase()} are currently published for this scope.</Alert>
+                {!dashboard.critical.todayReview.loading && topSignalCandidates.length === 0 && (
+                  <Alert severity="info">No ranked signal candidates are currently published for this scope.</Alert>
                 )}
-                {!dashboard.critical.todayReview.loading && activeCandidateGroup.rows.length > 0 && (
-                  <List dense disablePadding sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
-                    {activeCandidateGroup.rows.slice(0, 8).map((row, index) => (
-                      <Box key={row.id}>
-                        <ListItem sx={{ py: 0.75, gap: 1.25 }}>
-                          <Tooltip title={`${row.symbol} - ${row.subLabel}`} arrow>
-                            <Typography variant="body2" fontWeight={800} noWrap sx={{ minWidth: 150, maxWidth: 220 }}>
-                              {row.symbol} - {row.subLabel}
-                            </Typography>
-                          </Tooltip>
-                          <Tooltip title={row.reasonSummary} arrow>
-                            <Typography variant="body2" color="text.secondary" noWrap sx={{ flex: 1 }}>
-                              {row.reasonSummary}
-                            </Typography>
-                          </Tooltip>
-                        </ListItem>
-                        {index < Math.min(activeCandidateGroup.rows.length, 8) - 1 && <Divider />}
-                      </Box>
-                    ))}
-                  </List>
+                {!dashboard.critical.todayReview.loading && topSignalCandidates.length > 0 && (
+                  <TableContainer sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, maxHeight: 430 }}>
+                    <Table stickyHeader size="small" sx={{
+                      minWidth: 820,
+                      '& .MuiTableCell-root': {
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      },
+                    }}>
+                      <TableHead>
+                        <TableRow>
+                          <TableCell sx={{ width: 64 }}>Rank</TableCell>
+                          <TableCell sx={{ minWidth: 150 }}>Stock</TableCell>
+                          <TableCell sx={{ minWidth: 120 }}>Type</TableCell>
+                          <TableCell sx={{ minWidth: 110 }}>Grade</TableCell>
+                          <TableCell sx={{ minWidth: 180 }}>Strategy</TableCell>
+                          <TableCell sx={{ minWidth: 280 }}>Trigger Reason</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {topSignalCandidates.map((row) => (
+                          <TableRow
+                            key={row.id}
+                            hover
+                            onClick={() => setSelectedCandidate(row)}
+                            sx={{ cursor: 'pointer' }}
+                          >
+                            <TableCell>#{row.rank}</TableCell>
+                            <TableCell>
+                              <Tooltip title={`${row.symbol} - ${row.companyName || 'Company unavailable'}`} arrow>
+                                <Typography variant="body2" fontWeight={800} noWrap>
+                                  {row.symbol} - {row.companyName || 'Company unavailable'}
+                                </Typography>
+                              </Tooltip>
+                            </TableCell>
+                            <TableCell>{labelize(row.direction || row.state)}</TableCell>
+                            <TableCell>{row.grade} / {Math.round(row.confidenceScore)}</TableCell>
+                            <TableCell>
+                              <Tooltip title={`${row.strategyCode} v${row.strategyVersion || 'N/A'}`} arrow>
+                                <Typography variant="body2" noWrap>{row.strategyCode} v{row.strategyVersion || 'N/A'}</Typography>
+                              </Tooltip>
+                            </TableCell>
+                            <TableCell>
+                              <Tooltip title={row.reasonSummary} arrow>
+                                <Typography variant="body2" color="text.secondary" noWrap>{row.reasonSummary}</Typography>
+                              </Tooltip>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
                 )}
               </Stack>
             </Paper>
@@ -310,7 +315,58 @@ export function DailyOverviewDashboardPage() {
           </Stack>
         </Paper>
       </Stack>
+      <CandidateDetailDialog candidate={selectedCandidate} onClose={() => setSelectedCandidate(null)} />
     </Box>
+  );
+}
+
+function CandidateDetailDialog({ candidate, onClose }: { candidate: CandidateGroupSummary['rows'][number] | null; onClose: () => void }) {
+  return (
+    <Dialog open={Boolean(candidate)} onClose={onClose} maxWidth="md" fullWidth>
+      {candidate && (
+        <>
+          <DialogTitle>
+            <Stack spacing={0.5}>
+              <Typography variant="h6">{candidate.symbol} rule-ranked candidate</Typography>
+              <Typography variant="body2" color="text.secondary">{candidate.companyName || 'Company unavailable'}</Typography>
+            </Stack>
+          </DialogTitle>
+          <DialogContent dividers>
+            <Stack spacing={2}>
+              <Stack direction="row" gap={1} flexWrap="wrap" useFlexGap>
+                <Chip label={`Rank #${candidate.rank}`} variant="outlined" />
+                <Chip label={`${candidate.grade} / ${Math.round(candidate.confidenceScore)}`} variant="outlined" />
+                <Chip label={labelize(candidate.direction || candidate.state)} variant="outlined" />
+                <Chip label={`Strategy ${candidate.strategyCode} v${candidate.strategyVersion || 'N/A'}`} variant="outlined" />
+                <Chip label={`DQ ${candidate.dataQualityStatus || 'Unavailable'}`} variant="outlined" />
+              </Stack>
+              <Box>
+                <Typography variant="subtitle2" fontWeight={800}>Trigger Reason</Typography>
+                <Typography color="text.secondary">{candidate.reasonSummary}</Typography>
+              </Box>
+              {candidate.watchReasons.length > 0 && (
+                <Box>
+                  <Typography variant="subtitle2" fontWeight={800}>Review Notes</Typography>
+                  <Typography color="text.secondary">{candidate.watchReasons.join(' ')}</Typography>
+                </Box>
+              )}
+              {candidate.blockers.length > 0 && (
+                <Box>
+                  <Typography variant="subtitle2" fontWeight={800}>Blockers</Typography>
+                  <Typography color="text.secondary">{candidate.blockers.join(' ')}</Typography>
+                </Box>
+              )}
+              <Typography variant="body2" color="text.secondary">
+                Source timestamp: {formatDateTime(candidate.sourceTimestamp)}
+              </Typography>
+            </Stack>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={onClose}>Close</Button>
+          </DialogActions>
+        </>
+      )}
+    </Dialog>
   );
 }
 
@@ -375,14 +431,30 @@ function SectorList({ title, rows }: { title: string; rows: Array<{ sector: stri
   );
 }
 
-function mapTodayReviewRows(rows: TodayReviewCandidateGroupSet[CandidateGroupKey]): CandidateGroupSummary['rows'] {
+function mapTodayReviewRows(rows: TodayReviewCandidateGroupSet[keyof TodayReviewCandidateGroupSet]): CandidateGroupSummary['rows'] {
   return [...rows]
-    .sort((left, right) => right.confidenceScore - left.confidenceScore)
+    .sort((left, right) => {
+      const rankDelta = (Number.isFinite(left.rank) ? left.rank : Number.MAX_SAFE_INTEGER) - (Number.isFinite(right.rank) ? right.rank : Number.MAX_SAFE_INTEGER);
+      if (rankDelta !== 0) return rankDelta;
+      return right.confidenceScore - left.confidenceScore;
+    })
     .map((item) => ({
       id: item.id,
+      rank: item.rank,
       symbol: item.symbol,
+      companyName: item.companyName,
+      direction: item.direction,
+      state: item.state,
+      setupType: item.setupType,
+      grade: item.grade,
+      confidenceScore: item.confidenceScore,
+      strategyCode: item.strategyCode,
+      strategyVersion: item.strategyVersion,
       reasonSummary: item.reasonSummary,
-      subLabel: `${item.grade} - ${Math.round(item.confidenceScore)} - ${item.strategyCode}`,
+      dataQualityStatus: typeof item.dataQualitySnapshot?.signalReadinessStatus === 'string' ? item.dataQualitySnapshot.signalReadinessStatus : null,
+      blockers: item.blockers || [],
+      watchReasons: item.watchReasons || [],
+      sourceTimestamp: item.updatedAt || item.createdAt || null,
       targetRoute: '/today-review',
     }));
 }
@@ -404,6 +476,15 @@ function formatNumber(value: number | null | undefined) {
 
 function formatStatus(value: string | null | undefined) {
   return value || unavailableLabel;
+}
+
+function labelize(value: string | null | undefined): string {
+  if (!value) return unavailableLabel;
+  return value
+    .toLowerCase()
+    .split('_')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
 }
 
 function formatPercent(value: number | null | undefined) {

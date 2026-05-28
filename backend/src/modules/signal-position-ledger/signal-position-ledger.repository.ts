@@ -38,6 +38,8 @@ type LedgerRowsQuery = Pick<SignalPositionLedgerActiveQuery, 'region' | 'assetTy
   status: 'ACTIVE' | 'CLOSED';
   limit: number;
   offset: number;
+  sortBy?: SignalPositionLedgerActiveQuery['sortBy'];
+  sortDirection?: SignalPositionLedgerActiveQuery['sortDirection'];
 };
 
 const LEDGER_PIPELINE_KEY = 'signal-position-ledger';
@@ -58,38 +60,24 @@ export class SignalPositionLedgerRepository {
       scopeAssetType: query.assetType,
       status: query.status,
     };
-    if (query.status === 'ACTIVE') {
-      const rows = await delegate.findMany({
-        where,
-        orderBy: [{ entryTriggerTimestamp: 'asc' }, { createdAt: 'asc' }],
-      });
-      const deduped = this.dedupeActiveRows(rows.map((row: any) => this.toLedgerRow(row)));
-      const items = deduped.slice(query.offset, query.offset + query.limit);
-      const nextOffset = query.offset + items.length;
-      return {
-        items,
-        totalCount: deduped.length,
-        hasMore: nextOffset < deduped.length,
-        nextOffset: nextOffset < deduped.length ? nextOffset : null,
-      };
-    }
+    const canCount = query.status === 'CLOSED' && typeof delegate.count === 'function';
     const [totalCount, rows] = await Promise.all([
-      typeof delegate.count === 'function' ? delegate.count({ where }) : Promise.resolve(0),
+      canCount ? delegate.count({ where }) : Promise.resolve(0),
       delegate.findMany({
         where,
-        orderBy: query.status === 'CLOSED'
-          ? [{ exitTriggerTimestamp: 'desc' }, { updatedAt: 'desc' }]
-          : [{ entryTriggerTimestamp: 'asc' }, { createdAt: 'asc' }],
-        take: query.limit,
-        skip: query.offset,
+        orderBy: [{ entryTriggerTimestamp: 'desc' }, { createdAt: 'desc' }],
       }),
     ]);
-    const nextOffset = query.offset + rows.length;
+    const mapped = rows.map((row: any) => this.toLedgerRow(row));
+    const sorted = this.sortLedgerRows(query.status === 'ACTIVE' ? this.dedupeActiveRows(mapped) : mapped, query);
+    const items = sorted.slice(query.offset, query.offset + query.limit);
+    const effectiveTotalCount = canCount ? totalCount : sorted.length;
+    const nextOffset = query.offset + items.length;
     return {
-      items: rows.map((row: any) => this.toLedgerRow(row)),
-      totalCount,
-      hasMore: nextOffset < totalCount,
-      nextOffset: nextOffset < totalCount ? nextOffset : null,
+      items,
+      totalCount: effectiveTotalCount,
+      hasMore: nextOffset < effectiveTotalCount,
+      nextOffset: nextOffset < effectiveTotalCount ? nextOffset : null,
     };
   }
 
@@ -118,6 +106,36 @@ export class SignalPositionLedgerRepository {
       if (!existing || Date.parse(row.entryTriggerTimestamp) < Date.parse(existing.entryTriggerTimestamp)) byStock.set(key, row);
     }
     return [...byStock.values()];
+  }
+
+  private sortLedgerRows(rows: SignalPositionLedgerActiveRow[], query: Pick<SignalPositionLedgerActiveQuery, 'sortBy' | 'sortDirection'>): SignalPositionLedgerActiveRow[] {
+    const sortBy = query.sortBy || 'entryTriggerTimestamp';
+    const direction = query.sortDirection || 'desc';
+    const factor = direction === 'asc' ? 1 : -1;
+    return [...rows].sort((left, right) => {
+      const leftValue = sortBy === 'currentReturnPercent'
+        ? this.sortableReturn(left)
+        : this.sortableDate(left.entryTriggerTimestamp);
+      const rightValue = sortBy === 'currentReturnPercent'
+        ? this.sortableReturn(right)
+        : this.sortableDate(right.entryTriggerTimestamp);
+      if (leftValue === null && rightValue === null) return left.symbol.localeCompare(right.symbol);
+      if (leftValue === null) return 1;
+      if (rightValue === null) return -1;
+      const delta = leftValue - rightValue;
+      if (delta !== 0) return delta * factor;
+      return left.symbol.localeCompare(right.symbol);
+    });
+  }
+
+  private sortableDate(value: string | null | undefined): number | null {
+    const timestamp = Date.parse(value || '');
+    return Number.isFinite(timestamp) ? timestamp : null;
+  }
+
+  private sortableReturn(row: SignalPositionLedgerActiveRow): number | null {
+    if (row.currentReturnStatus !== 'CURRENT') return null;
+    return typeof row.currentReturnPercent === 'number' && Number.isFinite(row.currentReturnPercent) ? row.currentReturnPercent : null;
   }
 
   async listLegacyMaterializedRows(scope: Pick<SignalPositionLedgerActiveQuery, 'region' | 'assetType'>): Promise<SignalPositionLedgerActiveRow[]> {

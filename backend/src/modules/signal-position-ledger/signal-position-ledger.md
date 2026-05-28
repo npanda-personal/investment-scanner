@@ -34,7 +34,20 @@ Rows are created only when source evidence proves:
 
 Only one active entry is allowed per stock per scope. The first active entry trigger owns the lifecycle. Later entry triggers for the same stock are ignored while an active row exists. Missing current candidates, stale price evidence, DQ drift, or risk-warning evidence must not remove an active row. Only an exit trigger can move an active row to closed history.
 
-Entry candidates are ordered by first `entryTriggerTimestamp` before pagination. Rows with the same timestamp fall back to symbol and then instrument id ordering for stable results.
+Entry candidates default to `entryTriggerTimestamp` descending before pagination. The active and closed endpoints also accept:
+
+- `sortBy=entryTriggerTimestamp`
+- `sortBy=currentReturnPercent`
+- `sortDirection=asc|desc`
+
+Rows with unavailable return evidence are sorted after rows with current return evidence. Stable ties fall back to symbol and then instrument id ordering.
+
+The frontend export is intentionally narrow and Excel-compatible CSV only. It exports the current ledger tab with:
+
+- Stock
+- Entry Price
+- Trigger Date
+- Trigger Reason
 
 ## Current Return Rules
 

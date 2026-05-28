@@ -567,7 +567,7 @@ describe('SignalPositionLedgerService', () => {
     ]));
   });
 
-  it('orders active rows by first entry trigger timestamp before pagination', async () => {
+  it('orders active rows by trigger timestamp before pagination', async () => {
     const oldSignal = { ...trustedSignal, id: 'signal-old', instrument_id: 'stock-old', symbol: 'OLD', company_name: 'Old Co' };
     const newSignal = { ...trustedSignal, id: 'signal-new', instrument_id: 'stock-new', symbol: 'NEW', company_name: 'New Co' };
     const midSignal = { ...trustedSignal, id: 'signal-mid', instrument_id: 'stock-mid', symbol: 'MID', company_name: 'Mid Co' };
@@ -631,15 +631,84 @@ describe('SignalPositionLedgerService', () => {
     };
     const service = new SignalPositionLedgerService(repository as any, signalService as any);
 
-    const query = { region: 'IN', assetType: 'STOCK', limit: 1, offset: 0 };
+    const query = { region: 'IN', assetType: 'STOCK', limit: 1, offset: 0, sortBy: 'entryTriggerTimestamp' as const, sortDirection: 'desc' as const };
     await service.refreshActiveRows(query, { force: true, wait: true });
     const result = await service.listActiveRows(query);
 
     expect(result.totalCount).toBe(3);
     expect(result.items).toHaveLength(1);
     expect(result.items[0]).toMatchObject({
-      symbol: 'OLD',
-      entryTriggerTimestamp: '2026-05-24T00:00:00.000Z',
+      symbol: 'NEW',
+      entryTriggerTimestamp: '2026-05-26T00:00:00.000Z',
+    });
+    expect(result.nextOffset).toBe(1);
+    expect(result.hasMore).toBe(true);
+  });
+
+  it('orders refreshed active rows by current return before pagination', async () => {
+    const lowSignal = { ...trustedSignal, id: 'signal-low', instrument_id: 'stock-low', symbol: 'LOW', company_name: 'Low Co' };
+    const highSignal = { ...trustedSignal, id: 'signal-high', instrument_id: 'stock-high', symbol: 'HIGH', company_name: 'High Co' };
+    const repository = {
+      listLatestSignals: jest.fn().mockResolvedValue({
+        items: [lowSignal, highSignal],
+        totalCount: 2,
+        limit: 100,
+        offset: 0,
+        nextOffset: null,
+        hasMore: false,
+      }),
+      latestPriceByInstrumentId: jest.fn().mockResolvedValue({
+        date: new Date().toISOString(),
+        close: 110,
+        adjustedClose: 110,
+        dataStatus: 'COMPLETE',
+        source: 'database',
+      }),
+      latestDataQualityByInstrumentId: jest.fn().mockResolvedValue({
+        signalReadinessStatus: 'READY',
+        coverageStatus: 'GOOD',
+        liquidityStatus: 'LIQUID',
+        lastEvaluatedAt: new Date().toISOString(),
+      }),
+      latestExitDecisionByInstrumentId: jest.fn().mockResolvedValue(null),
+    };
+    const signalService = {
+      enrichSignals: jest.fn().mockResolvedValue([
+        {
+          ...lowSignal,
+          triggerContract: {
+            ...sourceProvenTrigger,
+            signal_id: 'signal-low',
+            instrument_id: 'stock-low',
+            symbol: 'LOW',
+            trigger_price: 120,
+            trigger_timestamp: '2026-05-24T00:00:00.000Z',
+          },
+        },
+        {
+          ...highSignal,
+          triggerContract: {
+            ...sourceProvenTrigger,
+            signal_id: 'signal-high',
+            instrument_id: 'stock-high',
+            symbol: 'HIGH',
+            trigger_price: 80,
+            trigger_timestamp: '2026-05-23T00:00:00.000Z',
+          },
+        },
+      ]),
+    };
+    const service = new SignalPositionLedgerService(repository as any, signalService as any);
+
+    const query = { region: 'IN', assetType: 'STOCK', limit: 1, offset: 0, sortBy: 'currentReturnPercent' as const, sortDirection: 'desc' as const };
+    await service.refreshActiveRows(query, { force: true, wait: true });
+    const result = await service.listActiveRows(query);
+
+    expect(result.totalCount).toBe(2);
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]).toMatchObject({
+      symbol: 'HIGH',
+      currentReturnPercent: 37.5,
     });
     expect(result.nextOffset).toBe(1);
     expect(result.hasMore).toBe(true);

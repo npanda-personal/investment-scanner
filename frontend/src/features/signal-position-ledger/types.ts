@@ -1,6 +1,8 @@
 export type SignalPositionTriggerType = 'bullish_entry_trigger' | 'bearish_trigger';
 export type SignalPositionReturnStatus = 'CURRENT' | 'STALE' | 'UNAVAILABLE';
 export type SignalPositionLedgerStatus = 'ACTIVE' | 'CLOSED';
+export type SignalPositionLedgerSortBy = 'entryTriggerTimestamp' | 'currentReturnPercent';
+export type SignalPositionLedgerSortDirection = 'asc' | 'desc';
 export type SignalPositionHealthState = 'EXIT_TRIGGERED' | 'RISK_WARNING' | null;
 export type SignalPositionLifecycleEvidenceStatus = 'ACTIVE_ENTRY' | 'EXIT_TRIGGERED' | 'UNAVAILABLE';
 export type SignalPositionCalibrationEvidenceStatus = 'AVAILABLE' | 'UNAVAILABLE';
@@ -19,6 +21,8 @@ export interface SignalPositionLedgerScope {
 export interface SignalPositionLedgerActiveQuery extends SignalPositionLedgerScope {
   limit: number;
   offset: number;
+  sortBy?: SignalPositionLedgerSortBy;
+  sortDirection?: SignalPositionLedgerSortDirection;
 }
 
 export type SignalPositionLedgerRefreshStatus = 'IDLE' | 'RUNNING' | 'COMPLETED' | 'FAILED';

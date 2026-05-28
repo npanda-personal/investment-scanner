@@ -62,7 +62,7 @@ export class SignalPositionLedgerService {
     }
     const refresh = state ? this.toRefreshProgress(state) : snapshot?.refresh ?? this.toRefreshProgress(null);
     const persistedRows = persistedPage?.items ?? snapshot?.rows ?? [];
-    const orderedRows = state ? this.orderActiveRows([...state.rows.values()]) : this.orderActiveRows(persistedRows);
+    const orderedRows = state ? this.orderLedgerRows([...state.rows.values()], query) : this.orderLedgerRows(persistedRows, query);
     const totalCount = state ? orderedRows.length : persistedPage?.totalCount ?? orderedRows.length;
     const items = state ? orderedRows.slice(query.offset, query.offset + query.limit) : orderedRows;
 
@@ -87,7 +87,7 @@ export class SignalPositionLedgerService {
     const state = this.refreshStates.get(this.scopeKey(query));
     const persistedPage = state ? null : await this.loadLedgerPage(query, 'CLOSED');
     const refresh = state ? this.toRefreshProgress(state) : this.toRefreshProgress(null);
-    const orderedRows = state ? this.orderClosedRows([...state.closedRows.values()]) : this.orderClosedRows(persistedPage?.items ?? []);
+    const orderedRows = state ? this.orderLedgerRows([...state.closedRows.values()], query) : this.orderLedgerRows(persistedPage?.items ?? [], query);
     const totalCount = state ? orderedRows.length : persistedPage?.totalCount ?? orderedRows.length;
     const items = state ? orderedRows.slice(query.offset, query.offset + query.limit) : orderedRows;
     const nextOffset = query.offset + items.length;
@@ -121,28 +121,32 @@ export class SignalPositionLedgerService {
     };
   }
 
-  private orderActiveRows(rows: SignalPositionLedgerActiveRow[]): SignalPositionLedgerActiveRow[] {
+  private orderLedgerRows(rows: SignalPositionLedgerActiveRow[], query: Pick<SignalPositionLedgerActiveQuery, 'sortBy' | 'sortDirection'>): SignalPositionLedgerActiveRow[] {
+    const sortBy = query.sortBy || 'entryTriggerTimestamp';
+    const direction = query.sortDirection || 'desc';
+    const factor = direction === 'asc' ? 1 : -1;
     return [...rows].sort((left, right) => {
-      const rightTime = Date.parse(right.entryTriggerTimestamp || '');
-      const leftTime = Date.parse(left.entryTriggerTimestamp || '');
-      const timeDelta = (Number.isFinite(leftTime) ? leftTime : 0) - (Number.isFinite(rightTime) ? rightTime : 0);
-      if (timeDelta !== 0) return timeDelta;
-
+      const leftValue = sortBy === 'currentReturnPercent' ? this.sortableReturn(left) : this.sortableDate(left.entryTriggerTimestamp);
+      const rightValue = sortBy === 'currentReturnPercent' ? this.sortableReturn(right) : this.sortableDate(right.entryTriggerTimestamp);
+      if (leftValue === null && rightValue === null) return left.symbol.localeCompare(right.symbol);
+      if (leftValue === null) return 1;
+      if (rightValue === null) return -1;
+      const delta = leftValue - rightValue;
+      if (delta !== 0) return delta * factor;
       const symbolDelta = left.symbol.localeCompare(right.symbol);
       if (symbolDelta !== 0) return symbolDelta;
-
       return left.instrumentId.localeCompare(right.instrumentId);
     });
   }
 
-  private orderClosedRows(rows: SignalPositionLedgerActiveRow[]): SignalPositionLedgerActiveRow[] {
-    return [...rows].sort((left, right) => {
-      const rightTime = Date.parse(right.exitTriggerTimestamp || right.closedAt || '');
-      const leftTime = Date.parse(left.exitTriggerTimestamp || left.closedAt || '');
-      const timeDelta = (Number.isFinite(rightTime) ? rightTime : 0) - (Number.isFinite(leftTime) ? leftTime : 0);
-      if (timeDelta !== 0) return timeDelta;
-      return left.symbol.localeCompare(right.symbol);
-    });
+  private sortableDate(value: string | null | undefined): number | null {
+    const timestamp = Date.parse(value || '');
+    return Number.isFinite(timestamp) ? timestamp : null;
+  }
+
+  private sortableReturn(row: SignalPositionLedgerActiveRow): number | null {
+    if (row.currentReturnStatus !== 'CURRENT') return null;
+    return typeof row.currentReturnPercent === 'number' && Number.isFinite(row.currentReturnPercent) ? row.currentReturnPercent : null;
   }
 
   private toActiveRow(candidate: SignalPositionLedgerActiveCandidate, snapshots: SignalPositionLedgerRowSnapshots): SignalPositionLedgerActiveRow {

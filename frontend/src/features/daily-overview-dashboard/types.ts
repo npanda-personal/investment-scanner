@@ -42,9 +42,21 @@ export interface CandidateGroupSummary {
   count: number | null;
   rows: Array<{
     id: string;
+    rank: number;
     symbol: string;
+    companyName: string | null;
+    direction: string;
+    state: string;
+    setupType: string | null;
+    grade: string;
+    confidenceScore: number;
+    strategyCode: string;
+    strategyVersion: string | null;
     reasonSummary: string;
-    subLabel: string;
+    dataQualityStatus: string | null;
+    blockers: string[];
+    watchReasons: string[];
+    sourceTimestamp: string | null;
     targetRoute: string;
   }>;
 }

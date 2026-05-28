@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
+import { readFileSync } from 'node:fs';
 import { visitModule } from './support/moduleAssertions';
 
 const refresh = {
@@ -40,6 +41,36 @@ const activeRows = [
     latestTrustedPriceDate: '2026-05-27T00:00:00.000Z',
     latestTrustedPrice: 110.75,
     currentReturnPercent: 10.25,
+    currentReturnStatus: 'CURRENT',
+    currentDataQualityStatus: 'READY',
+    healthState: null,
+    lifecycleEvidenceStatus: 'ACTIVE_ENTRY',
+    trustEvidenceStatus: 'SOURCE_PROVEN',
+    calibrationEvidenceStatus: 'AVAILABLE',
+    displayWarnings: [],
+  },
+  {
+    ledgerKey: 'IN:STOCK:stock-alpha:bullish_entry_trigger:2026-05-25T09:15:00.000Z',
+    status: 'ACTIVE',
+    signalId: 'signal-alpha',
+    instrumentId: 'stock-alpha',
+    symbol: 'ALPHA',
+    companyName: 'Alpha Industries',
+    region: 'IN',
+    assetType: 'STOCK',
+    triggerType: 'bullish_entry_trigger',
+    entryTriggerTimestamp: '2026-05-25T09:15:00.000Z',
+    entryTriggerPrice: 80,
+    entryReasonSummary: 'Pullback recovery accepted by strategy evidence.',
+    strategyId: 'PULLBACK_RECOVERY',
+    strategyVersion: '1.0.0',
+    strategyDecision: 'ENTRY_CANDIDATE',
+    strategyReadinessLabel: 'READY',
+    strategyRatingGrade: 'B',
+    entryRuleId: 'ENTRY_PULLBACK',
+    latestTrustedPriceDate: '2026-05-27T00:00:00.000Z',
+    latestTrustedPrice: 76.8,
+    currentReturnPercent: -4,
     currentReturnStatus: 'CURRENT',
     currentDataQualityStatus: 'READY',
     healthState: null,
@@ -95,12 +126,24 @@ async function mockAuthenticatedUser(page: Page) {
   });
 }
 
-function ledgerResponse(items: unknown[], totalCount = items.length) {
+function sortedRows(url: string) {
+  const params = new URL(url).searchParams;
+  const sortBy = params.get('sortBy') || 'entryTriggerTimestamp';
+  const sortDirection = params.get('sortDirection') || 'desc';
+  const factor = sortDirection === 'asc' ? 1 : -1;
+  return [...activeRows].sort((left, right) => {
+    const leftValue = sortBy === 'currentReturnPercent' ? left.currentReturnPercent : Date.parse(left.entryTriggerTimestamp);
+    const rightValue = sortBy === 'currentReturnPercent' ? right.currentReturnPercent : Date.parse(right.entryTriggerTimestamp);
+    return (leftValue - rightValue) * factor;
+  });
+}
+
+function ledgerResponse(items: unknown[], totalCount = items.length, limit = 25, offset = 0) {
   return {
     items,
     totalCount,
-    limit: 25,
-    offset: 0,
+    limit,
+    offset,
     nextOffset: null,
     hasMore: false,
     scope: { region: 'IN', assetType: 'STOCK' },
@@ -112,9 +155,16 @@ function ledgerResponse(items: unknown[], totalCount = items.length) {
 test.describe('Signal Position Ledger UI', () => {
   test('shows persisted active entries and closed history', async ({ page }) => {
     await mockAuthenticatedUser(page);
+    let latestActiveRequest: URL | null = null;
 
     await page.route('**/api/v1/signals/position-ledger/active**', async (route: Route) => {
-      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ledgerResponse(activeRows, 28)) });
+      latestActiveRequest = new URL(route.request().url());
+      const params = latestActiveRequest.searchParams;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(ledgerResponse(sortedRows(route.request().url()), 28, Number(params.get('limit') || 25), Number(params.get('offset') || 0))),
+      });
     });
     await page.route('**/api/v1/signals/position-ledger/closed**', async (route: Route) => {
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ledgerResponse(closedRows, 1)) });
@@ -124,14 +174,44 @@ test.describe('Signal Position Ledger UI', () => {
 
     await expect(page.getByText('Rule-triggered entry candidate evidence for the current market scope. Scope: IN / STOCK.')).toBeVisible();
     await expect(page.getByRole('tab', { name: 'Entry Trigger Candidates' })).toHaveAttribute('aria-selected', 'true');
-    await expect(page.getByText('Entry trigger candidates', { exact: true })).toBeVisible();
-    await expect(page.getByText('IN / STOCK total')).toBeVisible();
+    await expect(page.getByText('28 open entries and 1 closed entries for IN / STOCK.')).toBeVisible();
+    await expect(page.getByText('Ledger pipeline')).toHaveCount(0);
     await expect(page.getByText('NEW - New Industries')).toBeVisible();
     await expect(page.getByText('+10.25%')).toBeVisible();
+    await expect.poll(() => latestActiveRequest?.searchParams.get('sortBy')).toBe('entryTriggerTimestamp');
+    await expect.poll(() => latestActiveRequest?.searchParams.get('sortDirection')).toBe('desc');
+
+    await page.getByRole('button', { name: 'Return till date' }).click();
+    await expect.poll(() => latestActiveRequest?.searchParams.get('sortBy')).toBe('currentReturnPercent');
+    await expect.poll(() => latestActiveRequest?.searchParams.get('sortDirection')).toBe('asc');
+    await expect(page.getByText('ALPHA - Alpha Industries')).toBeVisible();
+    await expect(page.locator('tbody tr').first()).toContainText('ALPHA - Alpha Industries');
+
+    const downloadPromise = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Export CSV' }).click();
+    const download = await downloadPromise;
+    const downloadPath = await download.path();
+    expect(downloadPath).toBeTruthy();
+    const csv = readFileSync(downloadPath!, 'utf8');
+    const [header] = csv.trim().split(/\r?\n/);
+    expect(header).toBe('"Stock","Entry Price","Trigger Date","Trigger Reason"');
+    for (const line of csv.trim().split(/\r?\n/)) {
+      expect(line.split(',')).toHaveLength(4);
+    }
+    expect(csv).toContain('"NEW - New Industries","100.45","2026-05-26T09:15:00.000Z","Breakout confirmation accepted with volume support."');
+    expect(csv).not.toContain('Return till date');
+    expect(csv).not.toContain('Strategy');
 
     await page.getByRole('tab', { name: 'Closed History' }).click();
     await expect(page.getByText('OLD - Old Industries')).toBeVisible();
     await expect(page.getByRole('columnheader', { name: 'Exit' })).toBeVisible();
+    const closedDownloadPromise = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Export CSV' }).click();
+    const closedDownload = await closedDownloadPromise;
+    const closedDownloadPath = await closedDownload.path();
+    expect(closedDownloadPath).toBeTruthy();
+    const closedCsv = readFileSync(closedDownloadPath!, 'utf8');
+    expect(closedCsv).toContain('"OLD - Old Industries","90","2026-05-20T09:15:00.000Z","Breakout confirmation accepted with volume support."');
     await page.getByText('OLD - Old Industries').click();
     await expect(page.getByText('Price closed below SMA50.')).toBeVisible();
   });
