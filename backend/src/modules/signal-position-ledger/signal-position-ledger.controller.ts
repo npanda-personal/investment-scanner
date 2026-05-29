@@ -21,6 +21,22 @@ export class SignalPositionLedgerController {
     }
   };
 
+  persistedActiveRows = async (req: Request, res: Response) => {
+    try {
+      return res.json(await this.service.listPersistedActiveRows(parseSignalPositionLedgerActiveQuery(req.query)));
+    } catch (error) {
+      return this.error(res, error, 'Failed to load persisted signal position ledger active rows', 400);
+    }
+  };
+
+  persistedClosedRows = async (req: Request, res: Response) => {
+    try {
+      return res.json(await this.service.listPersistedClosedRows(parseSignalPositionLedgerActiveQuery(req.query)));
+    } catch (error) {
+      return this.error(res, error, 'Failed to load persisted signal position ledger closed rows', 400);
+    }
+  };
+
   refreshActiveRows = async (req: Request, res: Response) => {
     try {
       return res.json(await this.service.refreshActiveRows(parseSignalPositionLedgerActiveQuery({ ...req.query, ...req.body }), { force: true }));

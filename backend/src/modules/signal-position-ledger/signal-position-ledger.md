@@ -9,15 +9,19 @@ This module currently exposes:
 - module-local `GET /signals/position-ledger/health`
 - module-local `GET /signals/position-ledger/active`
 - module-local `GET /signals/position-ledger/closed`
+- module-local `GET /signals/position-ledger/persisted/active`
+- module-local `GET /signals/position-ledger/persisted/closed`
 - module-local `POST /signals/position-ledger/active/refresh`
 - mounted `GET /api/v1/signals/position-ledger/health`
 - mounted `GET /api/v1/signals/position-ledger/active`
 - mounted `GET /api/v1/signals/position-ledger/closed`
+- mounted `GET /api/v1/signals/position-ledger/persisted/active`
+- mounted `GET /api/v1/signals/position-ledger/persisted/closed`
 - mounted `POST /api/v1/signals/position-ledger/active/refresh`
 
 The mounted active endpoint preserves the accepted active-list DTO: `items`, `totalCount`, `limit`, `offset`, `nextOffset`, `hasMore`, `scope`, `refresh`, and `warnings`.
 
-Active and closed reads are persisted lifecycle reads. They do not recompute current prices, DQ evidence, or exit/risk lifecycle details during page render. The refresh endpoint and scheduled `SIGNAL_POSITION_LEDGER` pipeline stage upsert active entries and close rows when exit triggers are detected.
+Persisted active and persisted closed reads are user-safe lifecycle reads. They read only saved `SignalPositionLedgerEntry` rows and do not start refresh, load legacy materialized snapshots, recompute current prices, recompute DQ evidence, evaluate exits, enrich signals, or write ledger rows during page render. The legacy active endpoint may still expose in-memory refresh progress for operator compatibility. The refresh endpoint and scheduled `SIGNAL_POSITION_LEDGER` pipeline stage upsert active entries and close rows when exit triggers are detected.
 
 ## Entry Candidate Truth Rules
 

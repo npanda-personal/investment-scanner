@@ -10,14 +10,14 @@ const API_BASE = '/api/v1/signals/position-ledger';
 export async function fetchSignalPositionLedgerActiveRows(
   query: SignalPositionLedgerActiveQuery,
 ): Promise<SignalPositionLedgerActiveListResponse> {
-  const response = await axios.get<SignalPositionLedgerActiveListResponse>(`${API_BASE}/active`, { params: query });
+  const response = await axios.get<SignalPositionLedgerActiveListResponse>(`${API_BASE}/persisted/active`, { params: query });
   return response.data;
 }
 
 export async function fetchSignalPositionLedgerClosedRows(
   query: SignalPositionLedgerActiveQuery,
 ): Promise<SignalPositionLedgerActiveListResponse> {
-  const response = await axios.get<SignalPositionLedgerActiveListResponse>(`${API_BASE}/closed`, { params: query });
+  const response = await axios.get<SignalPositionLedgerActiveListResponse>(`${API_BASE}/persisted/closed`, { params: query });
   return response.data;
 }
 

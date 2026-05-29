@@ -152,27 +152,79 @@ function ledgerResponse(items: unknown[], totalCount = items.length, limit = 25,
   };
 }
 
+async function routePersistedLedgerReads(
+  page: Page,
+  options: {
+    activeStatus?: number;
+    activeBody?: unknown;
+    closedStatus?: number;
+    closedBody?: unknown;
+    onActiveRequest?: (url: URL) => void;
+  } = {},
+) {
+  const forbiddenRequests: string[] = [];
+  const activeStatus = options.activeStatus ?? 200;
+  const closedStatus = options.closedStatus ?? 200;
+
+  await page.route('**/api/v1/signals/position-ledger/**', async (route: Route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    const method = request.method();
+
+    if (
+      (method === 'GET' && url.pathname === '/api/v1/signals/position-ledger/active')
+      || (method === 'GET' && url.pathname === '/api/v1/signals/position-ledger/closed')
+      || (method === 'POST' && url.pathname === '/api/v1/signals/position-ledger/active/refresh')
+    ) {
+      forbiddenRequests.push(`${method} ${url.pathname}`);
+      await route.fulfill({
+        status: 599,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: `Forbidden non-persisted ledger path: ${method} ${url.pathname}` }),
+      });
+      return;
+    }
+
+    if (method === 'GET' && url.pathname === '/api/v1/signals/position-ledger/persisted/active') {
+      options.onActiveRequest?.(url);
+      const params = url.searchParams;
+      const body = options.activeBody ?? ledgerResponse(
+        sortedRows(request.url()),
+        28,
+        Number(params.get('limit') || 25),
+        Number(params.get('offset') || 0),
+      );
+      await route.fulfill({ status: activeStatus, contentType: 'application/json', body: JSON.stringify(body) });
+      return;
+    }
+
+    if (method === 'GET' && url.pathname === '/api/v1/signals/position-ledger/persisted/closed') {
+      const body = options.closedBody ?? ledgerResponse(closedRows, 1);
+      await route.fulfill({ status: closedStatus, contentType: 'application/json', body: JSON.stringify(body) });
+      return;
+    }
+
+    await route.continue();
+  });
+
+  return forbiddenRequests;
+}
+
 test.describe('Signal Position Ledger UI', () => {
   test('shows persisted active entries and closed history', async ({ page }) => {
     await mockAuthenticatedUser(page);
     let latestActiveRequest: URL | null = null;
 
-    await page.route('**/api/v1/signals/position-ledger/active**', async (route: Route) => {
-      latestActiveRequest = new URL(route.request().url());
-      const params = latestActiveRequest.searchParams;
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify(ledgerResponse(sortedRows(route.request().url()), 28, Number(params.get('limit') || 25), Number(params.get('offset') || 0))),
-      });
-    });
-    await page.route('**/api/v1/signals/position-ledger/closed**', async (route: Route) => {
-      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ledgerResponse(closedRows, 1)) });
+    const forbiddenRequests = await routePersistedLedgerReads(page, {
+      onActiveRequest: (url) => {
+        latestActiveRequest = url;
+      },
     });
 
-    await visitModule(page, '/signal-position-ledger', 'Signal Position Ledger');
+    await visitModule(page, '/signal-position-ledger', 'Trigger Monitor');
 
-    await expect(page.getByText('Rule-triggered entry candidate evidence for the current market scope. Scope: IN / STOCK.')).toBeVisible();
+    expect(forbiddenRequests).toEqual([]);
+    await expect(page.getByText('Read-only rule-trigger lifecycle evidence for the current market scope. Scope: IN / STOCK.')).toBeVisible();
     await expect(page.getByRole('tab', { name: 'Entry Trigger Candidates' })).toHaveAttribute('aria-selected', 'true');
     await expect(page.getByText('28 open entries and 1 closed entries for IN / STOCK.')).toBeVisible();
     await expect(page.getByText('Ledger pipeline')).toHaveCount(0);
@@ -182,6 +234,7 @@ test.describe('Signal Position Ledger UI', () => {
     await expect.poll(() => latestActiveRequest?.searchParams.get('sortDirection')).toBe('desc');
 
     await page.getByRole('button', { name: 'Return till date' }).click();
+    expect(forbiddenRequests).toEqual([]);
     await expect.poll(() => latestActiveRequest?.searchParams.get('sortBy')).toBe('currentReturnPercent');
     await expect.poll(() => latestActiveRequest?.searchParams.get('sortDirection')).toBe('asc');
     await expect(page.getByText('ALPHA - Alpha Industries')).toBeVisible();
@@ -190,6 +243,7 @@ test.describe('Signal Position Ledger UI', () => {
     const downloadPromise = page.waitForEvent('download');
     await page.getByRole('button', { name: 'Export CSV' }).click();
     const download = await downloadPromise;
+    expect(forbiddenRequests).toEqual([]);
     const downloadPath = await download.path();
     expect(downloadPath).toBeTruthy();
     const csv = readFileSync(downloadPath!, 'utf8');
@@ -203,11 +257,13 @@ test.describe('Signal Position Ledger UI', () => {
     expect(csv).not.toContain('Strategy');
 
     await page.getByRole('tab', { name: 'Closed History' }).click();
+    expect(forbiddenRequests).toEqual([]);
     await expect(page.getByText('OLD - Old Industries')).toBeVisible();
     await expect(page.getByRole('columnheader', { name: 'Exit' })).toBeVisible();
     const closedDownloadPromise = page.waitForEvent('download');
     await page.getByRole('button', { name: 'Export CSV' }).click();
     const closedDownload = await closedDownloadPromise;
+    expect(forbiddenRequests).toEqual([]);
     const closedDownloadPath = await closedDownload.path();
     expect(closedDownloadPath).toBeTruthy();
     const closedCsv = readFileSync(closedDownloadPath!, 'utf8');
@@ -219,19 +275,15 @@ test.describe('Signal Position Ledger UI', () => {
   test('shows scoped active error state without fallback rows', async ({ page }) => {
     await mockAuthenticatedUser(page);
 
-    await page.route('**/api/v1/signals/position-ledger/active**', async (route: Route) => {
-      await route.fulfill({
-        status: 500,
-        contentType: 'application/json',
-        body: JSON.stringify({ error: 'Signal position ledger failed for scoped fetch.' }),
-      });
-    });
-    await page.route('**/api/v1/signals/position-ledger/closed**', async (route: Route) => {
-      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ledgerResponse([])) });
+    const forbiddenRequests = await routePersistedLedgerReads(page, {
+      activeStatus: 500,
+      activeBody: { error: 'Signal position ledger failed for scoped fetch.' },
+      closedBody: ledgerResponse([]),
     });
 
-    await visitModule(page, '/signal-position-ledger', 'Signal Position Ledger');
+    await visitModule(page, '/signal-position-ledger', 'Trigger Monitor');
 
+    expect(forbiddenRequests).toEqual([]);
     await expect(page.getByRole('alert')).toContainText('Entry trigger candidate data could not be loaded for IN / STOCK.');
     await expect(page.getByRole('button', { name: 'Retry' })).toBeVisible();
     await expect(page.getByText('NEW')).toHaveCount(0);

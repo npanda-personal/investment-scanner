@@ -709,6 +709,46 @@ Product Owner action required: no.
 
 ---
 
+# Runtime Checkpoint - CF-W3-MI-01C Persisted Ledger Read
+
+Date: 2026-05-29
+
+Team 00 implemented the second Market Intelligence backend/frontend slice in the fresh worktree:
+
+- Branch: `codex/team00-market-intelligence/CF-W3-MI-01C-persisted-ledger-read`.
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team00-CF-W3-MI-01C-persisted-ledger-read`.
+
+Implemented:
+
+- `GET /api/v1/signals/position-ledger/persisted/active`.
+- `GET /api/v1/signals/position-ledger/persisted/closed`.
+- Service read methods that only call saved ledger row reads.
+- Trigger Monitor frontend reads moved to the persisted-only paths.
+- Page header copy no longer exposes materialization/Admin wording.
+
+Validation:
+
+- TDD red run failed before production code on missing service methods and route registration.
+- Backend focused tests passed: 2 suites / 16 tests.
+- Backend build passed.
+- Frontend build passed.
+- Focused UI smoke passed: 2 tests.
+- `git diff --check` passed with normal CRLF warnings only.
+
+Review gates:
+
+- QA final review: accepted.
+- Architect final review: accepted.
+
+Next:
+
+- Commit this scoped slice locally.
+- Continue with index context and official breadth durable read models.
+
+Product Owner action required: no.
+
+---
+
 # Runtime Checkpoint - CF-W3-MI-01B Persisted Market Context Read
 
 Date: 2026-05-29

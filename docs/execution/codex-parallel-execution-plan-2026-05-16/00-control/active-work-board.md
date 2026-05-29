@@ -71,6 +71,36 @@ Next active item:
 - `CF-W3-MI-01C` persisted-only Signal Position Ledger / trigger monitor read path.
 - Keep FII/DII, derivatives, index constituent, official breadth, and market-map durable models queued as later slices.
 
+## Latest Team 00 Routing Update - Market Intelligence Persisted Ledger Slice
+
+Date: 2026-05-29
+
+Current slice:
+
+- `CF-W3-MI-01C` persisted Signal Position Ledger read is accepted for scoped local commit.
+- Branch: `codex/team00-market-intelligence/CF-W3-MI-01C-persisted-ledger-read`.
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team00-CF-W3-MI-01C-persisted-ledger-read`.
+
+Implemented:
+
+- `GET /api/v1/signals/position-ledger/persisted/active`.
+- `GET /api/v1/signals/position-ledger/persisted/closed`.
+- Trigger Monitor frontend uses the persisted read routes and does not call legacy materializing reads or refresh POST.
+
+Validation:
+
+- QA-owned TDD tests failed first for missing service methods and routes.
+- Backend focused tests passed, 2 suites / 16 tests.
+- Backend build passed.
+- Frontend build passed.
+- Focused UI smoke passed, 2 tests.
+- QA final review accepted.
+- Architect final review accepted.
+
+Next active item after commit:
+
+- `CF-W3-MI-01D` index context and official breadth durable read-model slice.
+
 ## Latest Team 00 Routing Update - Narrowed Focus / UX-01B Closed
 
 Date: 2026-05-26

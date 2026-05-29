@@ -107,6 +107,14 @@ export class SignalPositionLedgerService {
     };
   }
 
+  async listPersistedActiveRows(query: SignalPositionLedgerActiveQuery): Promise<SignalPositionLedgerActiveListResponse> {
+    return this.listPersistedRows(query, 'ACTIVE');
+  }
+
+  async listPersistedClosedRows(query: SignalPositionLedgerActiveQuery): Promise<SignalPositionLedgerActiveListResponse> {
+    return this.listPersistedRows(query, 'CLOSED');
+  }
+
   async refreshActiveRows(query: SignalPositionLedgerActiveQuery, options: RefreshOptions = {}): Promise<SignalPositionLedgerRefreshProgress> {
     const state = this.ensureRefreshStarted(query, options.force === true);
     if (options.wait && state.promise) await state.promise;
@@ -118,6 +126,32 @@ export class SignalPositionLedgerService {
       status: 'ok',
       module: 'signal-position-ledger',
       timestamp: new Date().toISOString(),
+    };
+  }
+
+  private async listPersistedRows(
+    query: SignalPositionLedgerActiveQuery,
+    status: 'ACTIVE' | 'CLOSED',
+  ): Promise<SignalPositionLedgerActiveListResponse> {
+    const persistedPage = await this.loadLedgerPage(query, status);
+    const items = persistedPage?.items ?? [];
+    const totalCount = persistedPage?.totalCount ?? items.length;
+    const nextOffset = persistedPage?.nextOffset ?? null;
+    return {
+      items,
+      totalCount,
+      limit: query.limit,
+      offset: query.offset,
+      nextOffset,
+      hasMore: persistedPage?.hasMore ?? false,
+      scope: {
+        region: query.region,
+        assetType: query.assetType,
+      },
+      refresh: this.toRefreshProgress(null),
+      warnings: status === 'ACTIVE' && totalCount === 0
+        ? ['No persisted Signal Position Ledger entries are available for this scope yet.']
+        : [],
     };
   }
 

@@ -13,6 +13,8 @@ describe('signal position ledger routes', () => {
       health: jest.fn(),
       activeRows: jest.fn(),
       closedRows: jest.fn(),
+      persistedActiveRows: jest.fn(),
+      persistedClosedRows: jest.fn(),
       refreshActiveRows: jest.fn(),
     } as any);
 
@@ -20,6 +22,8 @@ describe('signal position ledger routes', () => {
       'GET /signals/position-ledger/health',
       'GET /signals/position-ledger/active',
       'GET /signals/position-ledger/closed',
+      'GET /signals/position-ledger/persisted/active',
+      'GET /signals/position-ledger/persisted/closed',
       'POST /signals/position-ledger/active/refresh',
     ]);
   });

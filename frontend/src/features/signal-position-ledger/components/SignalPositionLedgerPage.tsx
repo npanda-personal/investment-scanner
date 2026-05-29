@@ -69,7 +69,7 @@ const SignalPositionLedgerPage: React.FC = () => {
     <Box sx={{ p: 3, maxWidth: 1500, mx: 'auto' }}>
       <PageHeader
         title="Trigger Monitor"
-        subtitle={`Read-only rule-trigger lifecycle evidence for the current market scope. Scope: ${scopeLabel}. Ledger materialization is an Admin / Data Ops workflow.`}
+        subtitle={`Read-only rule-trigger lifecycle evidence for the current market scope. Scope: ${scopeLabel}.`}
         secondaryActions={(
           <Stack direction={{ xs: 'column', sm: 'row' }} gap={1}>
             <Button variant="outlined" onClick={reload} disabled={loading}>Reload snapshot</Button>
