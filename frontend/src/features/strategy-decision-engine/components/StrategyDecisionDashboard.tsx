@@ -692,20 +692,20 @@ const StrategyDecisionDashboard: React.FC = () => {
 
                   {lookupResult.riskPlan && (
                     <Box sx={{ p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
-                      <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>Risk Plan</Typography>
+                      <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>Risk Review</Typography>
                       <Typography variant="body2" sx={{ mb: 1 }}>{lookupResult.riskPlan.rationale}</Typography>
                       <Grid container spacing={2}>
                         <Grid item xs={4}>
-                          <Typography variant="caption" color="textSecondary">Stop Loss</Typography>
+                          <Typography variant="caption" color="textSecondary">Review Evidence</Typography>
                           <Typography variant="body1" color="error" sx={{ fontWeight: 'medium' }}>{lookupResult.riskPlan.stopLoss}</Typography>
                         </Grid>
                         <Grid item xs={4}>
-                          <Typography variant="caption" color="textSecondary">Target Price</Typography>
-                          <Typography variant="body1" color="success.main" sx={{ fontWeight: 'medium' }}>{lookupResult.riskPlan.targetPrice}</Typography>
+                          <Typography variant="caption" color="textSecondary">Risk Review Level</Typography>
+                          <Typography variant="body1" sx={{ fontWeight: 'medium' }}>{lookupResult.riskPlan.riskReviewLevel || 'Review Required'}</Typography>
                         </Grid>
                         <Grid item xs={4}>
-                          <Typography variant="caption" color="textSecondary">Reward/Risk</Typography>
-                          <Typography variant="body1" sx={{ fontWeight: 'medium' }}>{lookupResult.riskPlan.rewardRiskRatio}</Typography>
+                          <Typography variant="caption" color="textSecondary">Rule Evidence</Typography>
+                          <Typography variant="body1" sx={{ fontWeight: 'medium' }}>Exit / Invalidation</Typography>
                         </Grid>
                       </Grid>
                       <Box sx={{ mt: 2 }}>

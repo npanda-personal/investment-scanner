@@ -175,6 +175,123 @@ test.describe('Strategy Decision Engine UI', () => {
     await expect(page.getByRole('option', { name: /Risk-Off Avoidance/ })).toHaveCount(0);
   });
 
+  test('stock lookup renders framework invalidation review without target or reward-risk labels', async ({ page }) => {
+    await page.route('**/api/v1/strategy/market-gate**', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          marketCondition: 'BAD',
+          marketGate: 'CLOSED',
+          allowedActions: ['MANAGE_EXISTING_POSITIONS_ONLY'],
+          marketScore: 20,
+          reasons: ['Market risk is elevated.'],
+          blockers: [],
+          dataStatus: 'COMPLETE',
+          updatedAt: new Date().toISOString(),
+        }),
+      });
+    });
+    await page.route('**/api/v1/strategy/exits**', async (route) => {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) });
+    });
+    await page.route('**/api/v1/strategy/model**', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          modelVersion: 'strategy-decision-v1',
+          strategies: [],
+          marketGateRules: { BAD: 'Closed' },
+          languageSafetyRules: ['Use research-support language.'],
+        }),
+      });
+    });
+    await page.route('**/api/v1/strategy/candidates**', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ total: 0, results: [] }),
+      });
+    });
+    await page.route('**/api/v1/instruments**', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          instruments: [{
+            id: 'stock-1',
+            symbol: 'ABC',
+            company_name: 'ABC Ltd',
+            region: 'IN',
+            assetType: 'STOCK',
+            asset_type: 'STOCK',
+            exchange: 'NSE',
+            country: 'IN',
+            sector: 'Technology',
+          }],
+          pagination: { total: 1, page: 1, pageSize: 20 },
+        }),
+      });
+    });
+    await page.route('**/api/v1/strategy/history/stock-1', async (route) => {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) });
+    });
+    await page.route('**/api/v1/strategy/stock-1', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          id: 'decision-1',
+          instrumentId: 'stock-1',
+          symbol: 'ABC',
+          country: 'IN',
+          exchange: 'NSE',
+          strategy: 'DEFENSIVE_EXIT',
+          decision: 'EXIT_CANDIDATE',
+          action: 'REVIEW_EXIT',
+          decisionScore: 76,
+          confidence: 'LOW',
+          marketCondition: 'BAD',
+          marketGate: 'CLOSED',
+          reasons: ['Distribution warning is active.'],
+          blockers: [],
+          warnings: [],
+          dataGaps: [],
+          modelVersion: 'strategy-decision-v1',
+          generatedAt: '2026-05-29T10:00:00.000Z',
+          strategyVersion: '1.2.0',
+          frameworkBacked: true,
+          frameworkDecision: 'EXIT_CANDIDATE',
+          frameworkAction: 'REVIEW_EXIT',
+          invalidationRulesTriggered: ['DISTRIBUTION_EXIT'],
+          riskPlan: {
+            stopLoss: 'Not applicable; framework invalidation evidence only.',
+            targetPrice: null,
+            rewardRiskRatio: null,
+            riskReviewLevel: 'HIGH',
+            rationale: 'Risk review uses Strategy Framework invalidation evidence. No projected outcome is produced.',
+            reasonSummary: 'Candidate review is based on rule evidence.',
+            invalidationRules: ['Strategy Framework invalidation rule triggered: DISTRIBUTION_EXIT.'],
+            exitRules: ['Distribution warning is active.'],
+          },
+        }),
+      });
+    });
+
+    await visitModule(page, '/strategy', 'Strategy Decision Engine');
+    await page.getByRole('tab', { name: 'Stock Lookup' }).click();
+    await page.getByRole('combobox', { name: 'Search Stock' }).fill('ABC');
+    await page.getByRole('option', { name: /ABC/ }).click();
+
+    await expect(page.getByRole('heading', { name: 'Risk Review' })).toBeVisible();
+    await expect(page.getByText('Risk Review Level')).toBeVisible();
+    await expect(page.getByText('HIGH')).toBeVisible();
+    await expect(page.getByText('Strategy Framework invalidation rule triggered: DISTRIBUTION_EXIT.')).toBeVisible();
+    await expect(page.getByText('Target Price')).toHaveCount(0);
+    await expect(page.getByText('Reward/Risk')).toHaveCount(0);
+  });
+
   test('start evaluation sends scoped bounded batch request without real decision run', async ({ page }) => {
     let evaluatePayload: any = null;
     await page.route('**/api/v1/strategy/evaluate', async (route) => {

@@ -254,6 +254,10 @@ describe('SignalGenerationEngineService', () => {
           source: 'signal-generation-engine',
           data_status: 'COMPLETE',
           marketGate: 'OPEN',
+          sectorLeadership: 'LEADING',
+          sectorRelativeStrengthScore: 72,
+          smartMoneyStatus: 'ACCUMULATION',
+          smartMoneyScore: 78,
           ...trustedReadEvidence,
         }],
         total: 1,
@@ -309,6 +313,10 @@ describe('SignalGenerationEngineService', () => {
             source: 'signal-generation-engine',
             data_status: 'COMPLETE',
             marketGate: 'OPEN',
+            sectorLeadership: 'LEADING',
+            sectorRelativeStrengthScore: 72,
+            smartMoneyStatus: 'ACCUMULATION',
+            smartMoneyScore: 78,
             ...trustedReadEvidence,
           },
           {
@@ -412,6 +420,10 @@ describe('SignalGenerationEngineService', () => {
             source: 'signal-generation-engine',
             data_status: 'COMPLETE',
             marketGate: 'OPEN',
+            sectorLeadership: 'LEADING',
+            sectorRelativeStrengthScore: 72,
+            smartMoneyStatus: 'ACCUMULATION',
+            smartMoneyScore: 78,
             ...trustedReadEvidence,
           },
           {
@@ -1077,21 +1089,32 @@ describe('SignalGenerationEngineService', () => {
     };
     const prices = breakoutMatchPrices();
     const marketDataService = {
-      getInstrumentsByIds: jest.fn().mockResolvedValue([{ id: 'stock-1', symbol: 'ABC', country: 'India', asset_type: 'STOCK', currency: 'INR' }]),
+      getInstrumentsByIds: jest.fn().mockResolvedValue([{ id: 'stock-1', symbol: 'ABC', country: 'India', asset_type: 'STOCK', currency: 'INR', sector: 'Technology' }]),
       getLatestPricesBySymbols: jest.fn().mockResolvedValue([{ symbol: 'ABC', adjusted_close: 121, date: prices[0].date }]),
       listPricesByInstrumentId: jest.fn().mockResolvedValue({ prices }),
     };
     const frameworkService = {
       performance: jest.fn().mockResolvedValue([{ ratingGrade: 'GOOD', readinessLabel: 'PAPER_TEST_CANDIDATE' }]),
     };
-    const service = new SignalGenerationEngineService(repository as any, marketDataService as any, {} as any, {} as any, new StrategyFrameworkRegistry(), frameworkService as any);
+    const marketContextService = {
+      latestPersistedSummary: jest.fn().mockResolvedValue({
+        regime: { regime: 'RISK_ON' },
+        breadth: { percentAboveSma50: 0.7 },
+        topSectors: [{ sector: 'Technology', leadershipStatus: 'LEADING', relativeStrengthScore: 72 }],
+        weakSectors: [],
+      }),
+    };
+    const smartMoneyService = {
+      latestPersistedStocks: jest.fn().mockResolvedValue([{ instrumentId: 'stock-1', status: 'ACCUMULATION', smartMoneyScore: 78 }]),
+    };
+    const service = new SignalGenerationEngineService(repository as any, marketDataService as any, {} as any, {} as any, new StrategyFrameworkRegistry(), frameworkService as any, marketContextService as any, smartMoneyService as any);
 
     const result = await service.topSignals({ limit: 5, includeStrategyMatches: true, strategyCode: 'BREAKOUT_CONFIRMATION' });
 
     expect(result.signals[0].strategyMatches?.[0]).toMatchObject({
       strategyCode: 'BREAKOUT_CONFIRMATION',
       strategyName: expect.any(String),
-      strategyVersion: '1.1.0',
+      strategyVersion: '1.2.0',
       ratingGrade: 'GOOD',
       readinessLabel: 'PAPER_TEST_CANDIDATE',
     });
@@ -1213,6 +1236,7 @@ describe('SignalGenerationEngineService', () => {
       source: 'signal-generation-engine',
       data_status: 'COMPLETE',
       marketGate: 'OPEN',
+      marketRegime: 'RISK_ON',
       sectorLeadership: 'LEADING',
       sectorRelativeStrengthScore: 75,
       smartMoneyStatus: 'ACCUMULATION',
@@ -1224,6 +1248,44 @@ describe('SignalGenerationEngineService', () => {
     expect(result.strategyMatches?.[0]?.entryRulesPassed).toEqual(expect.arrayContaining(['SECTOR_NOT_WEAK', 'SMART_MONEY_ACCUMULATION']));
   });
 
+  it('does not silently claim Strategy Framework matches when sector or smart-money context is missing', async () => {
+    const prices = breakoutMatchPrices();
+    const service = new SignalGenerationEngineService({} as any, {
+      getInstrumentsByIds: jest.fn().mockResolvedValue([{ id: 'stock-1', symbol: 'ABC', region: 'IN', asset_type: 'STOCK', currency: 'INR' }]),
+      getLatestPricesBySymbols: jest.fn().mockResolvedValue([{ symbol: 'ABC', adjusted_close: 121, date: prices[0].date }]),
+      listPricesByInstrumentId: jest.fn().mockResolvedValue({ prices }),
+    } as any, {} as any, {} as any, new StrategyFrameworkRegistry(), { performance: jest.fn().mockResolvedValue([]) } as any);
+
+    const [result] = await service.enrichSignals([{
+      instrument_id: 'stock-1',
+      symbol: 'ABC',
+      company_name: 'ABC Co',
+      sector: 'Technology',
+      country: 'IN',
+      currentPrice: null,
+      previousClose: null,
+      dailyChange: null,
+      dailyChangePercent: null,
+      currency: null,
+      priceTimestamp: null,
+      score: 85,
+      direction: 'BULLISH',
+      confidence: 'HIGH',
+      triggered_signals: [{ code: 'PRICE_ABOVE_SMA50', label: 'price is above SMA50', category: 'TECHNICAL' }],
+      negative_signals: [],
+      explanation: 'Bullish because price is above SMA50.',
+      generated_at: '2026-04-28T00:00:00.000Z',
+      source: 'signal-generation-engine',
+      data_status: 'COMPLETE',
+      marketGate: 'OPEN',
+      ...trustedReadEvidence,
+    } as any], { includeStrategyMatches: true, strategyCode: 'TREND_MOMENTUM' });
+
+    expect(result.strategyMatches ?? []).toHaveLength(0);
+    expect(result.blockedStrategies?.[0]).toMatchObject({ strategyCode: 'TREND_MOMENTUM' });
+    expect((result.blockedStrategies?.[0]?.dataGaps ?? []).join(' ')).toMatch(/sector/i);
+    expect((result.blockedStrategies?.[0]?.dataGaps ?? []).join(' ')).toMatch(/smart[- ]money/i);
+  });
 
   it('returns blocked strategies with data gaps instead of failing matching', async () => {
     const service = new SignalGenerationEngineService({} as any, {
@@ -1271,7 +1333,7 @@ describe('SignalGenerationEngineService', () => {
             instrument_id: 'match',
             symbol: 'MATCH',
             company_name: null,
-            sector: null,
+            sector: 'Technology',
             country: 'IN',
             currentPrice: null,
             previousClose: null,
@@ -1320,11 +1382,22 @@ describe('SignalGenerationEngineService', () => {
     };
     const prices = breakoutMatchPrices();
     const marketDataService = {
-      getInstrumentsByIds: jest.fn().mockResolvedValue([{ id: 'match', symbol: 'MATCH', region: 'IN' }, { id: 'blocked', symbol: 'BLOCK', region: 'IN' }]),
+      getInstrumentsByIds: jest.fn().mockResolvedValue([{ id: 'match', symbol: 'MATCH', region: 'IN', sector: 'Technology' }, { id: 'blocked', symbol: 'BLOCK', region: 'IN', sector: 'Technology' }]),
       getLatestPricesBySymbols: jest.fn().mockResolvedValue([{ symbol: 'MATCH', adjusted_close: 121 }, { symbol: 'BLOCK', adjusted_close: 200 }]),
       listPricesByInstrumentId: jest.fn((instrumentId) => Promise.resolve({ prices: instrumentId === 'match' ? prices : [] })),
     };
-    const service = new SignalGenerationEngineService(repository as any, marketDataService as any, {} as any);
+    const marketContextService = {
+      latestPersistedSummary: jest.fn().mockResolvedValue({
+        regime: { regime: 'RISK_ON' },
+        breadth: { percentAboveSma50: 0.7 },
+        topSectors: [{ sector: 'Technology', leadershipStatus: 'LEADING', relativeStrengthScore: 72 }],
+        weakSectors: [],
+      }),
+    };
+    const smartMoneyService = {
+      latestPersistedStocks: jest.fn().mockResolvedValue([{ instrumentId: 'match', status: 'ACCUMULATION', smartMoneyScore: 78 }]),
+    };
+    const service = new SignalGenerationEngineService(repository as any, marketDataService as any, {} as any, {} as any, new StrategyFrameworkRegistry(), { performance: jest.fn().mockResolvedValue([]) } as any, marketContextService as any, smartMoneyService as any);
 
     const result = await service.topSignals({ limit: 10, onlyStrategyEligible: true, strategyCode: 'BREAKOUT_CONFIRMATION' });
 

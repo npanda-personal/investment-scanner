@@ -295,6 +295,7 @@ export class StrategyDecisionEngineRepository {
       frameworkAction: record.frameworkAction || undefined,
       entryRulesPassed: Array.isArray(record.entryRulesPassed) ? record.entryRulesPassed : undefined,
       exitRulesTriggered: Array.isArray(record.exitRulesTriggered) ? record.exitRulesTriggered : undefined,
+      invalidationRulesTriggered: this.parseFrameworkInvalidationRules(record.riskPlan),
       noiseFiltersTriggered: Array.isArray(record.noiseFiltersTriggered) ? record.noiseFiltersTriggered : undefined,
       strategyRating: record.strategyRating || undefined,
       readinessLabel: record.readinessLabel || undefined,
@@ -341,5 +342,13 @@ export class StrategyDecisionEngineRepository {
     } catch {
       return undefined;
     }
+  }
+
+  private parseFrameworkInvalidationRules(riskPlan: any): string[] | undefined {
+    const rules = Array.isArray(riskPlan?.invalidationRules) ? riskPlan.invalidationRules : [];
+    const ids: string[] = rules
+      .map((rule: unknown) => String(rule || '').match(/Strategy Framework invalidation rule triggered:\s*([A-Z0-9_]+)/)?.[1])
+      .filter((rule: string | undefined): rule is string => Boolean(rule));
+    return ids.length > 0 ? [...new Set(ids)] : undefined;
   }
 }

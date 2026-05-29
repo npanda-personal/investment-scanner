@@ -2,7 +2,7 @@ import type { RegisteredBacktestInput, StrategyCategory, StrategyListQuery, Stra
 
 const TIMEFRAMES: StrategyTimeframe[] = ['1Y', '3Y', '5Y', '10Y', '15Y'];
 const STATUSES: StrategyStatus[] = ['DRAFT', 'ACTIVE', 'DISABLED', 'DEPRECATED'];
-const CATEGORIES: StrategyCategory[] = ['ENTRY', 'EXIT', 'FILTER', 'GATE'];
+const CATEGORIES: StrategyCategory[] = ['ENTRY', 'EXIT', 'FILTER', 'GATE', 'RISK', 'CALIBRATION', 'DIAGNOSTIC'];
 
 const first = (value: unknown) => Array.isArray(value) ? value[0] : value;
 const text = (value: unknown) => typeof first(value) === 'string' ? String(first(value)).trim() || undefined : undefined;

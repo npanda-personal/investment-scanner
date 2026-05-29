@@ -17,7 +17,7 @@ export interface MarketGateResponse {
   updatedAt: string;
 }
 
-export type StrategyName = 'TREND_MOMENTUM' | 'PULLBACK_IN_UPTREND' | 'DEFENSIVE_EXIT';
+export type StrategyName = string;
 
 export type StrategyDecision =
   | 'TRADE_CANDIDATE'
@@ -81,10 +81,13 @@ export interface StrategyDecisionDto {
   entryZone?: EntryZonePreview;
   riskPlan?: {
     stopLoss: string;
-    targetPrice: string;
-    rewardRiskRatio: number;
+    targetPrice: string | null;
+    rewardRiskRatio: number | null;
+    targetPriceCompatibilityNote?: string;
+    riskReviewLevel?: 'LOW' | 'MEDIUM' | 'HIGH';
     maxRiskNote?: string;
     rationale: string;
+    reasonSummary?: string;
     invalidationRules: string[];
     exitRules: string[];
   };
@@ -100,6 +103,7 @@ export interface StrategyDecisionDto {
   frameworkAction?: string;
   entryRulesPassed?: string[];
   exitRulesTriggered?: string[];
+  invalidationRulesTriggered?: string[];
   noiseFiltersTriggered?: string[];
   strategyRating?: {
     ratingScore: number;

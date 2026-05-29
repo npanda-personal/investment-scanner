@@ -76,7 +76,18 @@ const createService = (
   const strategyFrameworkService = {
     performance: jest.fn().mockResolvedValue([{ ratingGrade: 'GOOD', readinessLabel: 'PAPER_TEST_CANDIDATE' }]),
   };
-  return new SignalGenerationEngineService(repository as any, marketDataService as any, {} as any, {} as any, new StrategyFrameworkRegistry(), strategyFrameworkService as any);
+  const marketContextService = {
+    latestPersistedSummary: jest.fn().mockResolvedValue({
+      regime: { regime: 'RISK_ON' },
+      breadth: { percentAboveSma50: 0.7 },
+      topSectors: [{ sector: 'Technology', leadershipStatus: 'LEADING', relativeStrengthScore: 72 }],
+      weakSectors: [],
+    }),
+  };
+  const smartMoneyService = {
+    latestPersistedStocks: jest.fn().mockResolvedValue([{ instrumentId: 'stock-1', status: 'ACCUMULATION', smartMoneyScore: 78 }]),
+  };
+  return new SignalGenerationEngineService(repository as any, marketDataService as any, {} as any, {} as any, new StrategyFrameworkRegistry(), strategyFrameworkService as any, marketContextService as any, smartMoneyService as any);
 };
 
 describe('signal generation trigger contract projection', () => {
@@ -128,7 +139,7 @@ describe('signal generation trigger contract projection', () => {
 
     expect(trigger).toMatchObject({
       strategy_id: 'BREAKOUT_CONFIRMATION',
-      strategy_version: '1.1.0',
+      strategy_version: '1.2.0',
       trigger_price: 220,
       trigger_timestamp: prices[0].date,
       timeframe: 'DAILY_SWING',
@@ -139,7 +150,7 @@ describe('signal generation trigger contract projection', () => {
         source_field: 'strategyContext.prices[0].adjusted_close',
         source_timestamp: prices[0].date,
         strategy_id: 'BREAKOUT_CONFIRMATION',
-        strategy_version: '1.1.0',
+        strategy_version: '1.2.0',
         timeframe: 'DAILY_SWING',
         compatibility_only: true,
       },
@@ -167,7 +178,7 @@ describe('signal generation trigger contract projection', () => {
       source_field: null,
       source_timestamp: null,
       strategy_id: 'BREAKOUT_CONFIRMATION',
-      strategy_version: '1.1.0',
+      strategy_version: '1.2.0',
       timeframe: 'DAILY_SWING',
       compatibility_only: true,
     });
@@ -184,7 +195,7 @@ describe('signal generation trigger contract projection', () => {
 
     expect(trigger).toMatchObject({
       strategy_id: 'LOW_QUALITY_DATA_REJECTION',
-      strategy_version: '1.1.0',
+      strategy_version: '1.2.0',
       trigger_price: null,
       trigger_timestamp: null,
       entry_rule_id: null,
@@ -195,7 +206,7 @@ describe('signal generation trigger contract projection', () => {
         source_field: null,
         source_timestamp: null,
         strategy_id: 'LOW_QUALITY_DATA_REJECTION',
-        strategy_version: '1.1.0',
+        strategy_version: '1.2.0',
         timeframe: 'DAILY',
         compatibility_only: true,
       },

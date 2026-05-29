@@ -4,7 +4,7 @@ Date: 2026-05-29
 
 ## Current Open Decisions
 
-Open decisions: 3.
+Open decisions: 4.
 
 Product Owner action required for the affected workstream only.
 
@@ -13,6 +13,7 @@ Daemon should continue unrelated autonomous work.
 | Decision ID | Summary | Affected Workstream | Decision Packet | Current Routing |
 | --- | --- | --- | --- | --- |
 | DECISION-20260529-strategy-definition-invalidation-rules-persistence | Decide whether Team 00 may approve an additive Prisma/schema/generated-client slice so Strategy Definition `invalidationRules` persist and round-trip instead of being dropped. | `CF-W3-STRAT-05` persistence sub-slice only | `DECISION-20260529-strategy-definition-invalidation-rules-persistence.md` | Stop only the Strategy Definition persistence sub-slice. Continue no-schema Strategy Framework, Backtesting, and Signal Generation hardening. |
+| DECISION-20260529-strategy-definition-version-history | Decide whether Team 00 may approve a Prisma/schema/migration/generated-client slice so Strategy Definition history is keyed by `code + version` instead of overwriting by `code`. | `CF-W3-STRAT-05` persistence/history sub-slice only | `DECISION-20260529-strategy-definition-version-history.md` | Stop only the Strategy Definition version-history sub-slice. Continue no-schema proof filtering, Strategy Decision, Signal Generation, and frontend display hardening. |
 | DECISION-20260526-md-02b-schema-generated-consent | Decide whether Team 00 may open the first additive Market Data companion evidence implementation lane with Prisma schema, migration, generated client/types, and Market Data writer reservations. | `CF-W1-MD-02B` only | `DECISION-20260526-md-02b-schema-generated-consent.md` | Keep `CF-W1-MD-02A` proposal-only; Team 04 may review the packet, but no schema/generated/source work may start until resolved. |
 | DECISION-20260525-dq-rs1-currentness-summary-parity | Choose whether to reduce `CF-W1-DQ-02-RS1` to bounded row/detail currentness only or preserve full summary/helper parity and create an upstream bulk/durable evidence slice first. | `CF-W1-DQ-02-RS1` only | `DECISION-20260525-dq-rs1-currentness-summary-parity.md` | Stop Team 05 RS1 rework and do not rerun QA on the current packet until resolved. |
 
@@ -44,6 +45,7 @@ Current direct-value workstreams blocked by a human Product Owner decision:
 - `CF-W1-MD-02B`
 - `CF-W1-DQ-02-RS1`
 - `CF-W3-STRAT-05` Strategy Definition invalidation-rule persistence sub-slice
+- `CF-W3-STRAT-05` Strategy Definition version-history persistence sub-slice
 
 Items moved out of earlier Decision Inbox blocker state but still not Ready:
 

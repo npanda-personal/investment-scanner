@@ -5,6 +5,7 @@ export type StrategyRatingGrade = 'EXCELLENT' | 'GOOD' | 'AVERAGE' | 'WEAK' | 'U
 export type StrategyTimeframe = '1Y' | '3Y' | '5Y' | '10Y' | '15Y';
 export type StrategyProofStatus = 'PROVEN' | 'LIMITED' | 'UNPROVEN' | 'BLOCKED' | 'MISSING';
 export type StrategySampleSufficiency = 'SUFFICIENT' | 'LOW_SAMPLE' | 'INSUFFICIENT' | 'NOT_APPLICABLE';
+export type StrategyCategory = 'ENTRY' | 'EXIT' | 'FILTER' | 'GATE' | 'RISK' | 'CALIBRATION' | 'DIAGNOSTIC' | string;
 
 export interface StrategyRuleDeclaration {
   code: string;
@@ -55,7 +56,7 @@ export interface StrategyDefinition {
   code: string;
   name: string;
   description: string;
-  category: string;
+  category: StrategyCategory;
   style: string;
   timeframe: string;
   assetTypes: string[];
@@ -65,6 +66,7 @@ export interface StrategyDefinition {
   requiredInputs: string[];
   entryRules: StrategyRuleDeclaration[];
   exitRules: StrategyRuleDeclaration[];
+  invalidationRules?: StrategyRuleDeclaration[];
   noiseFilters: StrategyRuleDeclaration[];
   riskRules: StrategyRuleDeclaration[];
   marketGateRules: StrategyRuleDeclaration[];
@@ -144,6 +146,7 @@ export interface StrategyEvaluationResult {
   dataGaps: string[];
   entryRulesPassed: string[];
   exitRulesTriggered: string[];
+  invalidationRulesTriggered?: string[];
   noiseFiltersTriggered: string[];
   marketGateStatus: string | null;
 }

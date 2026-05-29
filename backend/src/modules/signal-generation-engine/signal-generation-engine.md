@@ -105,6 +105,8 @@ Strategy matching passes latest-first price bars into Strategy Framework so regi
 
 Strategy matching passes the signal row's `dataQualityEligibility` into Strategy Framework. It does not infer Data Quality readiness from market-data row completeness. If DQ eligibility is missing, incomplete, limited, not ready, or ineligible, Strategy Framework returns a blocked strategy rather than a source-proven entry match.
 
+When Strategy Framework matching is requested, Signal Generation uses persisted-only Market Context and Smart Money evidence when those module readers are available. It does not call on-demand Smart Money detail generation during signal list enrichment. Missing market, sector, or smart-money context remains visible as `blockedStrategies[].dataGaps` and must not be treated as healthy/supportive evidence.
+
 `blockedStrategies[]` includes `strategyCode`, `strategyName`, `strategyVersion`, `timeframe`, `category`, `blockers`, `warnings`, `dataGaps`, `noiseFiltersTriggered`, a compact `reason`, and unavailable `triggerPriceEvidence` when an explicit strategy was evaluated but cannot produce a source-proven entry trigger. This preserves explicit strategy metadata for support/filter strategies without counting them as entry matches.
 
 ## Trigger Contract Projection

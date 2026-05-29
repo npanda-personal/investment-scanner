@@ -48,7 +48,7 @@ export class StrategyFrameworkService {
       assetType: query.assetType,
     }).catch(() => []);
     const latestByCode = new Map<string, StrategyPerformanceSummaryDto>();
-    for (const row of performance) if (!latestByCode.has(row.strategyCode)) latestByCode.set(row.strategyCode, row);
+    for (const row of this.currentVersionSummaries(performance, configured)) if (!latestByCode.has(row.strategyCode)) latestByCode.set(row.strategyCode, row);
     return configured.map((strategy) => ({ ...strategy, latestPerformance: latestByCode.get(strategy.code) ?? null }));
   }
 
@@ -59,7 +59,9 @@ export class StrategyFrameworkService {
   }
 
   async performance(code: string, query: StrategyPerformanceQuery = {}) {
-    return this.repository.performance(code, query).catch(() => []);
+    const strategy = this.requireStrategy(code);
+    const rows = await this.repository.performance(strategy.code, query).catch(() => []);
+    return this.currentVersionSummaries(rows, [strategy]);
   }
 
   async proofRegistry(query: StrategyPerformanceQuery = {}): Promise<StrategyProofRegistryResponse> {
@@ -67,7 +69,7 @@ export class StrategyFrameworkService {
     const strategies = this.registry.list().filter((strategy) => this.matches(strategy, { region: scope.region, assetType: scope.assetType }));
     const summaries = await this.repository.latestPerformanceForStrategies(strategies.map((strategy) => strategy.code), scope).catch(() => []);
     const latestByCode = new Map<string, StrategyPerformanceSummaryDto>();
-    for (const summary of summaries) {
+    for (const summary of this.currentVersionSummaries(summaries, strategies)) {
       if (!latestByCode.has(summary.strategyCode)) latestByCode.set(summary.strategyCode, summary);
     }
     const rows = strategies.map((strategy) => this.proofRow(strategy, latestByCode.get(strategy.code) ?? null, scope));
@@ -86,7 +88,7 @@ export class StrategyFrameworkService {
   async proofDetail(code: string, query: StrategyPerformanceQuery = {}): Promise<StrategyProofRegistryRow> {
     const strategy = this.requireStrategy(code);
     const scope = this.proofScope(query);
-    const [summary] = await this.repository.performance(strategy.code, scope).catch(() => []);
+    const [summary] = await this.performance(strategy.code, scope).catch(() => []);
     return this.proofRow(strategy, summary ?? null, scope);
   }
 
@@ -304,8 +306,8 @@ export class StrategyFrameworkService {
       this.signalService.latestForInstrument(instrument.id).catch(() => null),
       this.calibrationService.latestForInstrument(instrument.id).catch(() => null),
       this.dataQualityService.diagnostics(instrument.id).catch(() => null),
-      this.contextService.summary({ region: request.region }).catch(() => null),
-      this.smartMoneyService.stock(instrument.id, '3M').catch(() => null),
+      this.latestPersistedMarketSummary(request.region),
+      this.latestPersistedSmartMoney(instrument.id),
     ]);
     const prices = this.toPricePoints(pricesResponse?.prices || []);
     const closes = prices.map((price) => price.adjusted_close);
@@ -365,6 +367,27 @@ export class StrategyFrameworkService {
     const strategy = this.registry.get(code);
     if (!strategy) throw new Error(`Strategy ${code} is not registered`);
     return strategy;
+  }
+
+  private currentVersionSummaries(rows: StrategyPerformanceSummaryDto[], strategies: StrategyDefinition[]): StrategyPerformanceSummaryDto[] {
+    const versionsByCode = new Map(strategies.map((strategy) => [strategy.code, strategy.version]));
+    return rows.filter((row) => versionsByCode.get(row.strategyCode) === row.strategyVersion);
+  }
+
+  private latestPersistedSmartMoney(instrumentId: string) {
+    const service = this.smartMoneyService as any;
+    if (typeof service.latestPersistedStock === 'function') {
+      return service.latestPersistedStock(instrumentId, '3M').catch(() => null);
+    }
+    return Promise.resolve(null);
+  }
+
+  private latestPersistedMarketSummary(region?: string) {
+    const service = this.contextService as any;
+    if (typeof service.latestPersistedSummary === 'function') {
+      return service.latestPersistedSummary(region).catch(() => null);
+    }
+    return Promise.resolve(null);
   }
 
   private requireStandaloneBacktestStrategy(code: string): StrategyDefinition {

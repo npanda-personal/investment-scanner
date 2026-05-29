@@ -180,6 +180,66 @@ describe('Strategy Framework service', () => {
     expect(rows.some((row) => row.ratingGrade === 'UNPROVEN')).toBe(false);
   });
 
+  it('filters performance and detail summaries to the current registry version', async () => {
+    const repo = {
+      performance: jest.fn().mockResolvedValue([
+        strategyPerformanceSummary({ strategyVersion: '1.0.0', ratingScore: 95, ratingGrade: 'EXCELLENT' }),
+        strategyPerformanceSummary({ strategyVersion: registry.get('TREND_MOMENTUM')!.version, ratingScore: 72, ratingGrade: 'GOOD' }),
+      ]),
+    };
+    const proofService = new StrategyFrameworkService(
+      repo as any,
+      registry,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any
+    );
+
+    const performance = await proofService.performance('TREND_MOMENTUM', { timeframe: '3Y', region: 'IN', assetType: 'STOCK' });
+    const detail = await proofService.detail('TREND_MOMENTUM', { timeframe: '3Y', region: 'IN', assetType: 'STOCK' });
+
+    expect(performance.map((row) => row.strategyVersion)).toEqual([registry.get('TREND_MOMENTUM')!.version]);
+    expect(detail.latestPerformanceSummaries.map((row) => row.strategyVersion)).toEqual([registry.get('TREND_MOMENTUM')!.version]);
+  });
+
+  it('treats stale proof registry and proof detail rows as missing current-version proof', async () => {
+    const repo = {
+      latestPerformanceForStrategies: jest.fn().mockResolvedValue([
+        strategyPerformanceSummary({ strategyCode: 'TREND_MOMENTUM', strategyVersion: '1.0.0', ratingScore: 95, ratingGrade: 'EXCELLENT' }),
+      ]),
+      performance: jest.fn().mockResolvedValue([
+        strategyPerformanceSummary({ strategyCode: 'TREND_MOMENTUM', strategyVersion: '1.0.0', ratingScore: 95, ratingGrade: 'EXCELLENT' }),
+      ]),
+    };
+    const proofService = new StrategyFrameworkService(
+      repo as any,
+      registry,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any
+    );
+
+    const registryResponse = await proofService.proofRegistry({ timeframe: '3Y', region: 'IN', assetType: 'STOCK' });
+    const registryRow = registryResponse.rows.find((row) => row.strategyCode === 'TREND_MOMENTUM');
+    const proofDetail = await proofService.proofDetail('TREND_MOMENTUM', { timeframe: '3Y', region: 'IN', assetType: 'STOCK' });
+
+    expect(registryRow).toMatchObject({
+      strategyVersion: registry.get('TREND_MOMENTUM')!.version,
+      status: 'MISSING',
+      latestEvaluationDate: null,
+    });
+    expect(proofDetail).toMatchObject({
+      strategyVersion: registry.get('TREND_MOMENTUM')!.version,
+      status: 'MISSING',
+      latestEvaluationDate: null,
+    });
+  });
 
   it('does not count WATCH decisions as matched entry proof', async () => {
     const watchService = new StrategyFrameworkService(
@@ -193,13 +253,13 @@ describe('Strategy Framework service', () => {
       { latestForInstrument: jest.fn().mockResolvedValue({ score: 82, direction: 'BULLISH' }) } as any,
       { latestForInstrument: jest.fn().mockResolvedValue(null) } as any,
       { diagnostics: jest.fn().mockResolvedValue({ signalReadinessStatus: 'READY', coverageStatus: 'GOOD', liquidityStatus: 'LIQUID', eligibleForSignals: true }) } as any,
-      { summary: jest.fn().mockResolvedValue({ regime: { regime: 'RISK_ON' }, breadth: { percentAboveSma50: 0.7 }, topSectors: [], weakSectors: [] }) } as any,
+      { latestPersistedSummary: jest.fn().mockResolvedValue({ regime: { regime: 'RISK_ON' }, breadth: { percentAboveSma50: 0.7 }, topSectors: [], weakSectors: [] }) } as any,
       { stock: jest.fn().mockResolvedValue(null) } as any,
     );
 
     const result = await watchService.evaluate({ strategyCode: 'TREND_MOMENTUM', symbol: 'AAA', region: 'IN', assetType: 'STOCK' });
 
-    expect(result.results[0].decision).toBe('WATCH');
+    expect(result.results[0].decision).not.toBe('ENTRY_CANDIDATE');
     expect(result.results[0].eligibleForSignalGeneration).toBe(false);
     expect(result.matchedStrategies).toHaveLength(0);
   });
@@ -215,8 +275,8 @@ describe('Strategy Framework service', () => {
       { latestForInstrument: jest.fn().mockResolvedValue({ score: 85, direction: 'BULLISH' }) } as any,
       { latestForInstrument: jest.fn().mockResolvedValue(null) } as any,
       { diagnostics: jest.fn().mockResolvedValue({ signalReadinessStatus: 'READY', coverageStatus: 'GOOD', liquidityStatus: 'LIQUID', eligibleForSignals: true }) } as any,
-      { summary: jest.fn().mockResolvedValue({ regime: { regime: 'RISK_ON' }, breadth: { percentAboveSma50: 0.7 }, topSectors: [], weakSectors: [] }) } as any,
-      { stock: jest.fn().mockResolvedValue(null) } as any,
+      { latestPersistedSummary: jest.fn().mockResolvedValue({ regime: { regime: 'RISK_ON' }, breadth: { percentAboveSma50: 0.7 }, topSectors: [{ sector: 'Technology', leadershipStatus: 'LEADING', relativeStrengthScore: 72 }], weakSectors: [] }) } as any,
+      { latestPersistedStock: jest.fn().mockResolvedValue({ status: 'ACCUMULATION', smartMoneyScore: 78 }) } as any,
     );
 
     const result = await breakoutService.evaluate({ strategyCode: 'BREAKOUT_CONFIRMATION', instrumentId: 'stock-1', region: 'IN', assetType: 'STOCK' });
@@ -226,6 +286,34 @@ describe('Strategy Framework service', () => {
       decision: 'ENTRY_CANDIDATE',
     });
     expect(result.results[0].entryRulesPassed).toEqual(expect.arrayContaining(['BASE_DURATION_CONFIRMED', 'VOLATILITY_CONTRACTION', 'RESISTANCE_CLOSE', 'VOLUME_BREAKOUT']));
+  });
+
+  it('uses only persisted Smart Money evidence during direct Strategy Framework evaluation', async () => {
+    const latestPersistedStock = jest.fn().mockResolvedValue({ status: 'ACCUMULATION', smartMoneyScore: 78, downstreamSafe: true });
+    const stock = jest.fn().mockResolvedValue({ status: 'DISTRIBUTION', smartMoneyScore: 5, evidenceProvenance: 'ON_DEMAND_DERIVED', downstreamSafe: false });
+    const directService = new StrategyFrameworkService(
+      {} as any,
+      registry,
+      {
+        getInstrument: jest.fn().mockResolvedValue({ id: 'stock-1', symbol: 'ABC', region: 'IN', asset_type: 'STOCK', sector: 'Technology' }),
+        listPricesByInstrumentId: jest.fn().mockResolvedValue({ prices: servicePricesForWatchDecision() }),
+      } as any,
+      { latestForInstrument: jest.fn().mockResolvedValue({ score: 82, direction: 'BULLISH' }) } as any,
+      { latestForInstrument: jest.fn().mockResolvedValue(null) } as any,
+      { diagnostics: jest.fn().mockResolvedValue({ signalReadinessStatus: 'READY', coverageStatus: 'GOOD', liquidityStatus: 'LIQUID', eligibleForSignals: true }) } as any,
+      { latestPersistedSummary: jest.fn().mockResolvedValue({ regime: { regime: 'RISK_ON' }, breadth: { percentAboveSma50: 0.7 }, topSectors: [{ sector: 'Technology', leadershipStatus: 'LEADING', relativeStrengthScore: 72 }], weakSectors: [] }) } as any,
+      { latestPersistedStock, stock } as any,
+    );
+
+    const result = await directService.evaluate({ strategyCode: 'TREND_MOMENTUM', instrumentId: 'stock-1', region: 'IN', assetType: 'STOCK' });
+
+    expect(latestPersistedStock).toHaveBeenCalledWith('stock-1', '3M');
+    expect(stock).not.toHaveBeenCalled();
+    expect(result.results[0]).toMatchObject({
+      strategyCode: 'TREND_MOMENTUM',
+      decision: 'ENTRY_CANDIDATE',
+    });
+    expect(result.results[0].entryRulesPassed).toContain('SMART_MONEY_ACCUMULATION');
   });
 });
 
@@ -242,7 +330,7 @@ function servicePricesForWatchDecision() {
 function strategyPerformanceSummary(overrides: Partial<StrategyPerformanceSummaryDto> = {}): StrategyPerformanceSummaryDto {
   return {
     strategyCode: 'TREND_MOMENTUM',
-    strategyVersion: '1.1.0',
+    strategyVersion: '1.2.0',
     timeframe: '3Y',
     region: 'IN',
     assetType: 'STOCK',

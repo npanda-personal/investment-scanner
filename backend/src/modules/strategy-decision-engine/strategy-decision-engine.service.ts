@@ -382,7 +382,7 @@ export class StrategyDecisionEngineService {
       options.calibrated !== undefined ? Promise.resolve(options.calibrated) : this.latestPersistedCalibration(instrumentId),
       options.quality !== undefined ? Promise.resolve(options.quality) : this.latestPersistedDataQuality(instrumentId),
       options.smartMoney !== undefined ? Promise.resolve(options.smartMoney) : this.latestPersistedSmartMoney(instrumentId),
-      options.marketSummary !== undefined ? Promise.resolve(options.marketSummary) : this.contextService.summary({ region: options.region }).catch(() => null),
+      options.marketSummary !== undefined ? Promise.resolve(options.marketSummary) : this.latestPersistedMarketSummary(options.region),
       options.portfolio ? Promise.resolve(options.portfolio) : options.portfolioId ? this.portfolioService.getPortfolioDetail(options.portfolioId).catch(() => null) : Promise.resolve(null),
     ]);
 
@@ -552,6 +552,7 @@ export class StrategyDecisionEngineService {
       frameworkAction: mapped.frameworkAction,
       entryRulesPassed: result.entryRulesPassed,
       exitRulesTriggered: result.exitRulesTriggered,
+      invalidationRulesTriggered: result.invalidationRulesTriggered,
       noiseFiltersTriggered: result.noiseFiltersTriggered,
       strategyRating: rating,
       readinessLabel: rating?.readinessLabel || null,
@@ -610,7 +611,7 @@ export class StrategyDecisionEngineService {
     if (typeof service.latestPersistedStock === 'function') {
       return service.latestPersistedStock(instrumentId, '3M').catch(() => null);
     }
-    return service.stock(instrumentId, '3M').catch(() => null);
+    return Promise.resolve(null);
   }
 
   private latestPersistedMarketSummary(region?: string) {
@@ -618,7 +619,7 @@ export class StrategyDecisionEngineService {
     if (typeof service.latestPersistedSummary === 'function') {
       return service.latestPersistedSummary(region).catch(() => null);
     }
-    return service.summary({ region }).catch(() => null);
+    return Promise.resolve(null);
   }
 
   private async loadEvaluationBatchContext(instrumentIds: string[], request: Pick<StrategyEvaluateRequest, 'region' | 'assetType'>): Promise<StrategyEvaluationBatchContext> {
@@ -979,19 +980,23 @@ export class StrategyDecisionEngineService {
     blockers: string[],
     warnings: string[],
     dataGaps: string[],
-    frameworkMetadata: Partial<Pick<StrategyDecisionDto, 'strategyVersion' | 'frameworkBacked' | 'frameworkDecision' | 'frameworkAction' | 'entryRulesPassed' | 'exitRulesTriggered' | 'noiseFiltersTriggered' | 'strategyRating' | 'readinessLabel'>> = {}
+    frameworkMetadata: Partial<Pick<StrategyDecisionDto, 'strategyVersion' | 'frameworkBacked' | 'frameworkDecision' | 'frameworkAction' | 'entryRulesPassed' | 'exitRulesTriggered' | 'invalidationRulesTriggered' | 'noiseFiltersTriggered' | 'strategyRating' | 'readinessLabel'>> = {}
   ): StrategyDecisionDto {
     const invalidationRules = [
       'Market gate closes (CLOSED status).',
       'Data quality becomes NOT_READY.'
     ];
     const exitRules = [];
+    const frameworkInvalidationRules = frameworkMetadata.invalidationRulesTriggered || [];
     
     if (strategy === 'TREND_MOMENTUM' || strategy === 'PULLBACK_IN_UPTREND') {
       invalidationRules.push('Price closes below SMA50 for 2 consecutive days.');
       invalidationRules.push('Calibrated score drops below 40.');
       exitRules.push('Exit condition met: momentum evidence weakened.');
       exitRules.push('Risk review required when smart money status turns to DISTRIBUTION.');
+    }
+    for (const rule of frameworkInvalidationRules) {
+      invalidationRules.push(`Strategy Framework invalidation rule triggered: ${rule}.`);
     }
 
     const sma50 = ctx.sma50;
@@ -1005,14 +1010,17 @@ export class StrategyDecisionEngineService {
       rationale: entryZoneType === 'BREAKOUT' ? 'Review on strength above SMA50 support.' : 'Review on successful test of SMA50 support.'
     } : undefined;
 
-    const riskPlan = entryZoneType && sma50 ? {
-      stopLoss: (sma50 * 0.96).toFixed(2),
+    const shouldIncludeRiskPlan = Boolean((entryZoneType && sma50) || frameworkInvalidationRules.length > 0);
+    const riskPlan = shouldIncludeRiskPlan ? {
+      stopLoss: entryZoneType && sma50 ? (sma50 * 0.96).toFixed(2) : 'Not applicable; framework invalidation evidence only.',
       targetPrice: null,
-      targetPriceCompatibilityNote: 'Deprecated compatibility field. No projected price is produced; Strategy Decision uses rule-based exit and invalidation review.',
+      targetPriceCompatibilityNote: 'Deprecated compatibility field. Strategy Decision uses rule-based exit and invalidation review.',
       rewardRiskRatio: null,
       riskReviewLevel: this.riskReviewLevel(decision, blockers, warnings, dataGaps),
-      rationale: 'Risk review uses SMA50 support, market gate, data quality, calibrated score, and smart-money evidence. Exit and invalidation are rule-based review conditions.',
-      reasonSummary: 'Candidate review is based on rule evidence, not a projected price.',
+      rationale: entryZoneType && sma50
+        ? 'Risk review uses SMA50 support, market gate, data quality, calibrated score, and smart-money evidence. Exit and invalidation are rule-based review conditions.'
+        : 'Risk review uses Strategy Framework invalidation evidence. No projected outcome is produced.',
+      reasonSummary: 'Candidate review is based on rule evidence.',
       invalidationRules,
       exitRules,
     } : undefined;

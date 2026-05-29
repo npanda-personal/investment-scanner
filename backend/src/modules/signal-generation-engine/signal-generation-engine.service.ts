@@ -52,7 +52,9 @@ export class SignalGenerationEngineService {
     private readonly researchService = new StockResearchWorkbenchService(),
     private readonly dataQualityService = new DataQualityEngineService(),
     private readonly strategyRegistry = new StrategyFrameworkRegistry(),
-    private readonly strategyFrameworkService?: { performance(code: string, query: { region?: string; assetType?: string }): Promise<StrategyPerformanceSummaryDto[]> }
+    private readonly strategyFrameworkService?: { performance(code: string, query: { region?: string; assetType?: string }): Promise<StrategyPerformanceSummaryDto[]> },
+    private readonly marketContextService?: { latestPersistedSummary?(region?: string): Promise<any | null> },
+    private readonly smartMoneyService?: { latestPersistedStocks?(instrumentIds: string[], range?: string): Promise<any[]> }
   ) {}
 
   async topSignals(query: SignalQuery): Promise<PaginatedSignalResponse> {
@@ -414,6 +416,11 @@ export class SignalGenerationEngineService {
     };
 
     if (options.includeStrategyMatches || options.strategyCode || options.onlyStrategyEligible || options.excludeNoiseFiltered) {
+      const [marketContext, persistedSmartMoney] = await Promise.all([
+        this.latestPersistedMarketSummary(this.canonicalRegion(options.region || instrument.region || instrument.country)),
+        this.latestPersistedSmartMoney([instrument.id]),
+      ]);
+      result = this.withPersistedStrategyContext(result, instrument, marketContext, persistedSmartMoney.get(instrument.id) ?? null);
       result = await this.attachStrategyMatches(result, prices, instrument, options, options.batchContext?.strategyPerformanceCache);
       if (!this.signalPassesStrategyFilters(result, options)) return null;
     }
@@ -428,7 +435,7 @@ export class SignalGenerationEngineService {
     return this.withTriggerContract(persisted, instrument);
   }
 
-  async enrichSignals(signals: SignalResultDto[], options: Pick<SignalQuery, 'strategyCode' | 'includeStrategyMatches' | 'onlyStrategyEligible' | 'excludeNoiseFiltered' | 'hasStrategyMatch' | 'hasBlockedStrategies' | 'frameworkBackedDecisionAvailable'> = {}): Promise<SignalResultDto[]> {
+  async enrichSignals(signals: SignalResultDto[], options: Pick<SignalQuery, 'strategyCode' | 'includeStrategyMatches' | 'onlyStrategyEligible' | 'excludeNoiseFiltered' | 'hasStrategyMatch' | 'hasBlockedStrategies' | 'frameworkBackedDecisionAvailable' | 'region' | 'assetType'> = {}): Promise<SignalResultDto[]> {
     if (signals.length === 0) return [];
     
     try {
@@ -445,6 +452,13 @@ export class SignalGenerationEngineService {
       const priceMap = new Map(latestPrices.map((p: any) => [p.symbol, p]));
       const includeStrategyContext = this.shouldAttachStrategyMatches(options);
       const ratingCache = new Map<string, Promise<StrategyPerformanceSummaryDto | null>>();
+      const strategyScopeRegion = this.canonicalRegion(options.region || signals[0]?.country);
+      const [marketContext, persistedSmartMoney] = includeStrategyContext
+        ? await Promise.all([
+          this.latestPersistedMarketSummary(strategyScopeRegion),
+          this.latestPersistedSmartMoney(instrumentIds),
+        ])
+        : [null, new Map<string, any>()];
 
       const enriched = await Promise.all(signals.map(async (signal) => {
         const instrument = instrumentMap.get(signal.instrument_id);
@@ -471,6 +485,9 @@ export class SignalGenerationEngineService {
           currency: instrument?.currency ?? signal.currency ?? null,
           priceTimestamp: (latest as any)?.date ? new Date((latest as any).date).toISOString() : null,
         };
+        if (includeStrategyContext) {
+          result = this.withPersistedStrategyContext(result, instrument, marketContext, persistedSmartMoney.get(signal.instrument_id) ?? null);
+        }
         if (!includeStrategyContext) return this.withTriggerContract(result, instrument);
         const history = await this.marketDataService.listPricesByInstrumentId(signal.instrument_id, 500).catch(() => null);
         const prices = this.toPricePoints(history?.prices || []);
@@ -822,6 +839,66 @@ export class SignalGenerationEngineService {
       return [this.strategyRegistry.get(strategyCode)].filter(Boolean) as any[];
     }
     return this.strategyRegistry.active();
+  }
+
+  private withPersistedStrategyContext(signal: SignalResultDto, instrument: any, marketContext: any | null, smartMoney: any | null): SignalResultDto {
+    const sector = signal.sector || instrument?.sector || null;
+    const sectorContext = sector && marketContext
+      ? [...(marketContext.topSectors || []), ...(marketContext.weakSectors || [])].find((item: any) => item.sector === sector)
+      : null;
+    return {
+      ...signal,
+      marketGate: (signal as any).marketGate ?? this.marketGateFromPersistedContext(marketContext),
+      marketRegime: (signal as any).marketRegime ?? marketContext?.regime?.regime ?? null,
+      sectorLeadership: (signal as any).sectorLeadership ?? sectorContext?.leadershipStatus ?? null,
+      sectorRelativeStrengthScore: (signal as any).sectorRelativeStrengthScore ?? sectorContext?.relativeStrengthScore ?? null,
+      smartMoneyStatus: (signal as any).smartMoneyStatus ?? smartMoney?.status ?? null,
+      smartMoneyScore: (signal as any).smartMoneyScore ?? smartMoney?.smartMoneyScore ?? null,
+    } as SignalResultDto;
+  }
+
+  private marketGateFromPersistedContext(marketContext: any | null): 'OPEN' | 'SELECTIVE' | 'CLOSED' | 'UNKNOWN' {
+    const regime = marketContext?.regime?.regime;
+    const breadthAbove50 = marketContext?.breadth?.percentAboveSma50;
+    if (regime === 'RISK_ON' && (breadthAbove50 ?? 0) >= 0.6) return 'OPEN';
+    if (regime === 'RISK_OFF' || (breadthAbove50 ?? 1) <= 0.3) return 'CLOSED';
+    if (regime) return 'SELECTIVE';
+    return 'UNKNOWN';
+  }
+
+  private async latestPersistedMarketSummary(region?: string | null): Promise<any | null> {
+    const service = this.marketContextService || this.defaultMarketContextService();
+    if (typeof service.latestPersistedSummary === 'function') {
+      return service.latestPersistedSummary(region || undefined).catch(() => null);
+    }
+    return null;
+  }
+
+  private async latestPersistedSmartMoney(instrumentIds: string[]): Promise<Map<string, any>> {
+    const service = this.smartMoneyService || this.defaultSmartMoneyService();
+    if (typeof service.latestPersistedStocks !== 'function') return new Map();
+    const rows = await service.latestPersistedStocks(instrumentIds, '3M').catch(() => []);
+    return new Map((Array.isArray(rows) ? rows : []).map((row: any) => [row.instrumentId, row]));
+  }
+
+  private defaultMarketContextService(): any {
+    if (process.env.NODE_ENV === 'test') return {};
+    try {
+      const { MarketContextIntelligenceService } = require('../market-context-intelligence') as typeof import('../market-context-intelligence');
+      return new MarketContextIntelligenceService();
+    } catch {
+      return {};
+    }
+  }
+
+  private defaultSmartMoneyService(): any {
+    if (process.env.NODE_ENV === 'test') return {};
+    try {
+      const { SmartMoneyIntelligenceService } = require('../smart-money-intelligence') as typeof import('../smart-money-intelligence');
+      return new SmartMoneyIntelligenceService();
+    } catch {
+      return {};
+    }
   }
 
   private strategyContextForSignal(signal: SignalResultDto, prices: SignalPricePoint[], instrument: any): StrategyContext {

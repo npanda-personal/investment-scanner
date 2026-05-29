@@ -82,7 +82,7 @@ Signal Generation consumes Strategy Framework evaluators for optional strategy m
 Strategy Framework owns strategy definitions, versions, metadata, rule declarations, evaluator contracts, strategy registry, performance summaries, ratings, and future automation eligibility flags. It does not own raw market data, indicator source data, signal persistence, backtest simulation internals, portfolios, broker execution, live trading, or order placement.
 
 ### Strategy Definition Schema
-Definitions include code, name, description, category, style, timeframe, asset types, supported regions, version, status, required inputs, entry rules, exit rules, noise filters, risk rules, market gate rules, parameters, explanation template, and examples.
+Definitions include code, name, description, category, style, timeframe, asset types, supported regions, version, status, required inputs, entry rules, exit rules, invalidation rules, noise filters, risk rules, market gate rules, parameters, explanation template, and examples.
 
 ### Registry Pattern
 `strategy-framework.registry.ts` contains 10 deterministic built-in strategies. The database can persist the same definitions through `POST /strategies/seed`, but TypeScript registry remains the MVP source of truth so local development works without seed state.
@@ -99,7 +99,7 @@ The MVP uses typed JSON rule declarations plus TypeScript evaluators, not a scri
 Strategy Decision Engine consumes this public evaluator for `TREND_MOMENTUM`, `PULLBACK_IN_UPTREND`, and `DEFENSIVE_EXIT`, adapting framework output back into the existing Strategy Decision API response shape.
 
 ### Rule Models
-Entry, exit, noise, risk, and market gate rules are declared as typed JSON with `code`, `label`, `kind`, `input`, optional `threshold`, and optional `weight`. Evaluators are deterministic and return reasons, blockers, warnings, data gaps, passed entry rules, triggered exit rules, and triggered noise filters.
+Entry, exit, invalidation, noise, risk, and market gate rules are declared as typed JSON with `code`, `label`, `kind`, `input`, optional `threshold`, and optional `weight`. Evaluators are deterministic and return reasons, blockers, warnings, data gaps, passed entry rules, triggered exit rules, triggered invalidation rules, and triggered noise filters.
 
 ### Required Data Inputs
 The common context can include instrument metadata, latest price, price history, SMA50/SMA200, RSI, 20D return, 52-week high/low, volatility, volume, raw signal, calibrated signal, reliability/noise result, data quality, market gate/regime, sector leadership, country strength, smart-money status, holdings, and backtest assumptions. Missing required inputs are reported as `dataGaps`.
@@ -150,7 +150,9 @@ User-facing readiness labels are conservative: `RESEARCH_ONLY`, `WATCHLIST_CANDI
 Each strategy has a semantic `version`. Performance summaries are unique by strategy code, version, timeframe, region, asset type, and universe key.
 
 ### Persistence Model
-`StrategyDefinition` stores the registry definition shape. `StrategyPerformanceSummary` stores idempotent summary metrics and rating fields. Its natural key is `strategyCode + strategyVersion + timeframe + region + assetType + universeKey`, so rerunning the same registered strategy/timeframe/region/universe updates the existing summary. Large backtest internals remain in `BacktestRun`.
+`StrategyDefinition` stores the registry definition shape for the current code-only persistence model. `StrategyPerformanceSummary` stores idempotent summary metrics and rating fields. Its natural key is `strategyCode + strategyVersion + timeframe + region + assetType + universeKey`, so rerunning the same registered strategy/timeframe/region/universe updates the existing summary. Large backtest internals remain in `BacktestRun`.
+
+Known persistence limitation: durable `StrategyDefinition.invalidationRules` and version-safe definition history require separate Prisma/schema decisions. Until those are approved, runtime registry definitions remain the source of truth for invalidation rules, and proof surfaces filter persisted summaries to the current registry version before displaying them as current evidence.
 
 ### API Design
 Endpoints under `/api/v1`:
@@ -166,7 +168,7 @@ Endpoints under `/api/v1`:
 ### Frontend UX
 `/strategies` provides tabs for catalog, detail, performance, rankings, and stock evaluation. The performance tab shows a compact 1Y/3Y/5Y/10Y/15Y matrix and links to Backtesting Lab for detailed simulation. Backtests are manual only and run in Backtesting Lab.
 
-The catalog separates definitions by category: Entry, Exit, Gates, Filters, and Drafts. Only active entry strategy rows show an enabled Backtesting Lab action. Support rules and draft definitions remain visible for transparency, but their backtest actions are disabled with an explanation.
+The catalog separates definitions by category: Entry, Exit, Gates, Filters, Risk, Calibration, Diagnostics, and Drafts. Only active entry strategy rows show an enabled Backtesting Lab action. Support rules and draft definitions remain visible for transparency, but their backtest actions are disabled with an explanation.
 
 ### Built-In Strategies
 Active: `TREND_MOMENTUM`, `PULLBACK_IN_UPTREND`, `BREAKOUT_CONFIRMATION`, `SMART_MONEY_ACCUMULATION`, `SECTOR_LEADER_MOMENTUM`, `DEFENSIVE_EXIT`, `RISK_OFF_AVOIDANCE`, `LOW_QUALITY_DATA_REJECTION`.
@@ -177,11 +179,15 @@ Draft: `QUALITY_TREND`, `MEAN_REVERSION_PULLBACK`.
 
 The strategy registry now treats rule declarations as the product contract for candidate eligibility, while the TypeScript evaluator remains the deterministic execution path. First-class `invalidationRules` are part of each strategy definition, and evaluator output includes `invalidationRulesTriggered` alongside entry and exit rule evidence.
 
-All built-in strategy definitions were version-bumped to `1.1.0` for this semantic hardening pass so persisted performance summaries keyed by strategy code and version cannot mix old and new evidence.
+All built-in strategy definitions were version-bumped to `1.2.0` for this semantic hardening pass so persisted performance summaries keyed by strategy code and version cannot mix old and new evidence.
 
 Active long-entry strategies now fail closed when Data Quality evidence is missing, incomplete, not ready, unusable, ineligible for signals, or illiquid. `WATCH` is no longer eligible for signal generation or registered backtest proof; only active `ENTRY` strategies that reach `ENTRY_CANDIDATE` may be promoted.
 
 `GATE` and `FILTER` definitions such as `RISK_OFF_AVOIDANCE` and `LOW_QUALITY_DATA_REJECTION` remain neutral support rules. They cannot emit bullish entry candidates, cannot become registered backtest entries, and are not counted as matched entry proof.
+
+`LOW_QUALITY_DATA_REJECTION` now blocks `THIN` and `UNKNOWN` liquidity as support-filter evidence, matching the stricter active-entry gate. Active entry strategies also fail closed when market gate or liquidity evidence is unknown.
+
+Proof registry, proof detail, detail performance summaries, rankings, and Strategy Decision rating reads use only summaries whose `strategyVersion` matches the current registry definition. Stale persisted proof is treated as missing current-version proof instead of being surfaced as current evidence.
 
 `COMMON_LONG_EXIT_RULES` and `COMMON_LONG_INVALIDATION_RULES` declare reusable exit/invalidation evidence for long-entry strategies. Current common evidence includes DQ failure, market risk-off, structural support break, relative-strength decay, distribution warnings, and signal decay. Exit evaluation produces rule IDs and invalidation IDs for downstream audit, but holding context is still required before a strategy-owned exit can be treated as more than review evidence.
 

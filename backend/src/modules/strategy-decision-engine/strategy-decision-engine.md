@@ -57,7 +57,7 @@ Framework output is mapped to existing Strategy Decision fields:
 - `decision` -> existing `decision` values such as `TRADE_CANDIDATE`, `WATCH`, `AVOID`, `EXIT_CANDIDATE`, `REDUCE_RISK`, and `HOLD`
 - `score` -> `decisionScore`
 - `confidence`, `reasons`, `blockers`, `warnings`, and `dataGaps` are preserved
-- framework rule arrays are exposed additively as `entryRulesPassed`, `exitRulesTriggered`, and `noiseFiltersTriggered`
+- framework rule arrays are exposed additively as `entryRulesPassed`, `exitRulesTriggered`, `invalidationRulesTriggered`, and `noiseFiltersTriggered`
 
 Additive compatibility fields:
 
@@ -96,6 +96,10 @@ Market context must exist as a persisted snapshot for the requested `region`. If
 `StrategyDecisionResult` remains daily-idempotent by `instrumentId + strategy + modelVersion + generatedDate`. Framework-backed metadata is stored additively on the same row, so same-day re-evaluation updates rather than duplicates the decision.
 
 Persisted decision rows include the existing API-compatible `scoreBreakdown` JSON payload. `entryZone` is serialized before persistence and parsed back for API responses, matching the current Prisma column shape while preserving the frontend response contract.
+
+Framework invalidation rule IDs are also copied into the rule-based `riskPlan.invalidationRules` text so existing persisted JSON evidence keeps the invalidation context even before a future schema slice adds a dedicated top-level persisted `invalidationRulesTriggered` column.
+
+The Strategy Decision UI treats these compatibility risk packets as risk-review evidence. It does not display target-price or reward-risk fields when the backend returns null/deprecated compatibility values; users see review evidence, risk level, and exit/invalidation rule context instead.
 
 ### Evaluation Performance
 

@@ -30,7 +30,7 @@ import { evaluateStrategy, fetchStrategies, fetchStrategy, fetchStrategyPerforma
 import type { StrategyDefinition, StrategyEvaluationResult, StrategyPerformanceSummary, StrategyProofRegistryResponse, StrategyProofRegistryRow, StrategyTimeframe } from '../types';
 
 const timeframes: StrategyTimeframe[] = ['1Y', '3Y', '5Y', '10Y', '15Y'];
-const categoryFilters = ['ALL', 'ENTRY', 'EXIT', 'GATE', 'FILTER', 'DRAFT'] as const;
+const categoryFilters = ['ALL', 'ENTRY', 'EXIT', 'GATE', 'FILTER', 'RISK', 'CALIBRATION', 'DIAGNOSTIC', 'DRAFT'] as const;
 
 const StrategyFrameworkPage: React.FC = () => {
   const { scope } = useMarketScope();
@@ -147,7 +147,7 @@ const StrategyFrameworkPage: React.FC = () => {
         badges={<Stack direction="row" spacing={1}>{[`${strategies.length} configured`, scope.region, scope.assetType].map((item) => <Chip key={item} size="small" label={item} />)}</Stack>}
       />
       <Alert severity="info" sx={{ mb: 2 }}>Research support only, not financial advice. No real-money automation is enabled.</Alert>
-      <Alert severity="info" sx={{ mb: 2 }}>Active ENTRY strategies are standalone candidates for registered backtests. EXIT, GATE, FILTER, and DRAFT definitions support decisions and diagnostics until dedicated simulation semantics exist.</Alert>
+      <Alert severity="info" sx={{ mb: 2 }}>Active ENTRY strategies are standalone candidates for registered backtests. EXIT, GATE, FILTER, RISK, CALIBRATION, DIAGNOSTIC, and DRAFT definitions support decisions and diagnostics until dedicated simulation semantics exist.</Alert>
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
       <Paper variant="outlined" sx={{ mb: 2 }}>
         <Tabs value={tab} onChange={(_event, value) => setTab(value)} variant="scrollable" scrollButtons="auto">
@@ -358,6 +358,7 @@ function StrategyDetail({ strategy, proof, onStrategyChange, strategies, region,
           <Divider />
           <RuleSection title="Entry Rules" rules={strategy.entryRules} />
           <RuleSection title="Exit Rules" rules={strategy.exitRules} />
+          <RuleSection title="Invalidation Rules" rules={strategy.invalidationRules || []} />
           <RuleSection title="Noise Filters" rules={strategy.noiseFilters} />
           <RuleSection title="Default Risk Rules" rules={strategy.riskRules} />
           <RuleSection title="Required Data" rules={strategy.requiredInputs.map((input) => ({ code: input, label: input, kind: 'REQUIRES', input }))} />
@@ -452,6 +453,7 @@ function EvaluationList({ results, instrument }: { results: StrategyEvaluationRe
               {result.marketGateStatus && <Chip size="small" label={`Market: ${result.marketGateStatus}`} variant="outlined" />}
             </Stack>
             <Typography variant="body2">{result.reasons.slice(0, 3).join(' ') || 'No positive rules passed.'}</Typography>
+            {(result.invalidationRulesTriggered || []).length > 0 && <Typography variant="caption" color="warning.main">Invalidation evidence: {(result.invalidationRulesTriggered || []).join('; ')}</Typography>}
             {result.blockers.length > 0 && <Alert severity="warning">{result.blockers.join(' ')}</Alert>}
             {result.dataGaps.length > 0 && <Typography variant="caption" color="text.secondary">Data gaps: {result.dataGaps.join('; ')}</Typography>}
           </Stack>
@@ -513,7 +515,7 @@ function backtestUnavailableReason(strategy: StrategyDefinition) {
 }
 
 function categoryChip(category: string) {
-  const color = category === 'ENTRY' ? 'primary' : category === 'EXIT' ? 'warning' : category === 'GATE' ? 'secondary' : 'default';
+  const color = category === 'ENTRY' ? 'primary' : category === 'EXIT' || category === 'RISK' ? 'warning' : category === 'GATE' || category === 'CALIBRATION' ? 'secondary' : 'default';
   return <Chip size="small" label={category} color={color as any} variant={category === 'FILTER' ? 'outlined' : 'filled'} />;
 }
 
@@ -523,7 +525,7 @@ function categoryFilterLabel(filter: typeof categoryFilters[number], strategies:
     : filter === 'DRAFT'
       ? strategies.filter((strategy) => strategy.status === 'DRAFT').length
       : strategies.filter((strategy) => strategy.category === filter && strategy.status !== 'DRAFT').length;
-  const label = filter === 'ALL' ? 'All' : filter === 'ENTRY' ? 'Entry' : filter === 'EXIT' ? 'Exit' : filter === 'GATE' ? 'Gates' : filter === 'FILTER' ? 'Filters' : 'Drafts';
+  const label = filter === 'ALL' ? 'All' : filter === 'ENTRY' ? 'Entry' : filter === 'EXIT' ? 'Exit' : filter === 'GATE' ? 'Gates' : filter === 'FILTER' ? 'Filters' : filter === 'RISK' ? 'Risk' : filter === 'CALIBRATION' ? 'Calibration' : filter === 'DIAGNOSTIC' ? 'Diagnostics' : 'Drafts';
   return `${label} (${count})`;
 }
 

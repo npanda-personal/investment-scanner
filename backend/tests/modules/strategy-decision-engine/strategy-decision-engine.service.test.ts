@@ -269,6 +269,13 @@ describe('StrategyDecisionEngineService', () => {
         ...overrides.marketData,
       };
       const context = {
+        latestPersistedSummary: jest.fn().mockResolvedValue({
+          dataStatus: 'COMPLETE',
+          topSectors: [{ sector: 'Tech', leadershipStatus: 'LEADING', relativeStrengthScore: 70 }],
+          weakSectors: [],
+          regime: { regime: 'RISK_ON' },
+          breadth: { percentAboveSma50: 0.7 },
+        }),
         summary: jest.fn().mockResolvedValue({
           dataStatus: 'COMPLETE',
           topSectors: [{ sector: 'Tech', leadershipStatus: 'LEADING', relativeStrengthScore: 70 }],
@@ -300,6 +307,7 @@ describe('StrategyDecisionEngineService', () => {
         ...overrides.quality,
       };
       const smartMoney = {
+        latestPersistedStock: jest.fn().mockResolvedValue({ status: 'ACCUMULATION', smartMoneyScore: 75 }),
         stock: jest.fn().mockResolvedValue({ status: 'ACCUMULATION', smartMoneyScore: 75 }),
         ...overrides.smartMoney,
       };
@@ -339,7 +347,7 @@ describe('StrategyDecisionEngineService', () => {
       });
 
       expect(result?.frameworkBacked).toBe(true);
-      expect(result?.strategyVersion).toBe('1.0.0');
+      expect(result?.strategyVersion).toBe(new StrategyFrameworkRegistry().get('TREND_MOMENTUM')?.version);
       expect(result?.strategy).toBe('TREND_MOMENTUM');
       expect(result?.action).toBeDefined();
       expect(result?.decisionScore).toBeGreaterThan(0);
@@ -374,7 +382,7 @@ describe('StrategyDecisionEngineService', () => {
       const svc = createFrameworkBackedService({
         signal: { latestForInstrument: jest.fn().mockResolvedValue({ score: 25, direction: 'BEARISH' }) },
         calibration: { latestForInstrument: jest.fn().mockResolvedValue({ calibratedScore: 25, calibratedDirection: 'BEARISH', calibratedConfidence: 'HIGH' }) },
-        smartMoney: { stock: jest.fn().mockResolvedValue({ status: 'DISTRIBUTION', smartMoneyScore: 20 }) },
+        smartMoney: { latestPersistedStock: jest.fn().mockResolvedValue({ status: 'DISTRIBUTION', smartMoneyScore: 20 }) },
       });
       const result = await svc.evaluateInstrumentStrategy('stock-1', 'DEFENSIVE_EXIT', {
         marketCondition: 'BAD',
@@ -390,6 +398,40 @@ describe('StrategyDecisionEngineService', () => {
       expect(result?.frameworkBacked).toBe(true);
       expect(result?.strategy).toBe('DEFENSIVE_EXIT');
       expect(['EXIT_CANDIDATE', 'REDUCE_RISK', 'HOLD', 'WATCH']).toContain(result?.decision);
+    });
+
+    it('preserves Strategy Framework invalidation evidence on adapted decision DTOs', async () => {
+      const svc = createFrameworkBackedService({
+        signal: { latestForInstrument: jest.fn().mockResolvedValue({ score: 25, direction: 'BEARISH' }) },
+        calibration: { latestForInstrument: jest.fn().mockResolvedValue({ calibratedScore: 25, calibratedDirection: 'BEARISH', calibratedConfidence: 'HIGH' }) },
+        quality: {
+          diagnostics: jest.fn().mockResolvedValue({
+            eligibleForSignals: false,
+            eligibleForBacktesting: false,
+            signalReadinessStatus: 'NOT_READY',
+            coverageStatus: 'UNUSABLE',
+            liquidityStatus: 'LIQUID',
+          }),
+        },
+        smartMoney: { latestPersistedStock: jest.fn().mockResolvedValue({ status: 'DISTRIBUTION', smartMoneyScore: 20 }) },
+      });
+      const result = await svc.evaluateInstrumentStrategy('stock-1', 'DEFENSIVE_EXIT', {
+        marketCondition: 'BAD',
+        marketGate: 'CLOSED',
+        allowedActions: ['MANAGE_EXISTING_POSITIONS_ONLY'],
+        marketScore: 20,
+        reasons: [],
+        blockers: [],
+        dataStatus: 'COMPLETE',
+        updatedAt: new Date().toISOString(),
+      });
+
+      expect(result?.frameworkBacked).toBe(true);
+      expect((result as any)?.invalidationRulesTriggered).toEqual(expect.arrayContaining([
+        'DQ_EVIDENCE_INVALIDATED',
+        'MARKET_GATE_INVALIDATED',
+        'DISTRIBUTION_EXIT',
+      ]));
     });
 
     it('uses Strategy Framework evaluator for additional active review strategies', async () => {
@@ -483,9 +525,15 @@ describe('StrategyDecisionEngineService', () => {
 
     it('does not throw when optional context is missing', async () => {
       const svc = createFrameworkBackedService({
-        context: { summary: jest.fn().mockRejectedValue(new Error('no context')) },
+        context: {
+          latestPersistedSummary: jest.fn().mockRejectedValue(new Error('no context')),
+          summary: jest.fn().mockRejectedValue(new Error('no context')),
+        },
         quality: { diagnostics: jest.fn().mockResolvedValue(null) },
-        smartMoney: { stock: jest.fn().mockResolvedValue(null) },
+        smartMoney: {
+          latestPersistedStock: jest.fn().mockResolvedValue(null),
+          stock: jest.fn().mockResolvedValue(null),
+        },
         signal: { latestForInstrument: jest.fn().mockResolvedValue(null) },
       });
 

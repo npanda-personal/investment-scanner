@@ -254,6 +254,9 @@ export class StrategyFrameworkEvaluator implements StrategyEvaluator {
     if (latestVolume && context.averageVolume20 && latestVolume >= context.averageVolume20 * 1.5) this.add(state, 25, 'Volume confirms the breakout.', 'VOLUME_BREAKOUT');
     else state.warnings.push('Volume breakout confirmation is missing.');
     if (this.signalDirection(context) === 'BULLISH') this.add(state, 20, 'Bullish signal confirms breakout direction.', 'BULLISH_SIGNAL');
+    this.requireContext(context, state, 'sectorLeadership', 'SECTOR_CONTEXT_MISSING', 'Sector leadership context is missing for breakout confirmation.');
+    this.requireContext(context, state, 'sectorRelativeStrengthScore', 'SECTOR_RS_MISSING', 'Sector relative-strength score is missing for breakout confirmation.');
+    this.requireContext(context, state, 'smartMoneyStatus', 'SMART_MONEY_CONTEXT_MISSING', 'Smart-money context is missing for breakout confirmation.');
     const extension = this.extension(context.latestPrice, context.sma50);
     if (extension !== null && extension > 0.18) this.block(state, 'OVEREXTENDED', 'Breakout is too extended above SMA50.');
   }
@@ -313,15 +316,31 @@ export class StrategyFrameworkEvaluator implements StrategyEvaluator {
     if (context.dataQuality.coverageStatus === 'UNUSABLE') this.block(state, 'COVERAGE_UNUSABLE', 'Coverage is unusable.');
     if (context.dataQuality.signalReadinessStatus === 'NOT_READY') this.block(state, 'READINESS_NOT_READY', 'Signal readiness is not ready.');
     if (context.dataQuality.liquidityStatus === 'ILLIQUID') this.block(state, 'ILLIQUID', 'Instrument is illiquid.');
+    if (context.dataQuality.liquidityStatus === 'THIN') this.block(state, 'THIN_LIQUIDITY', 'Liquidity is thin.');
+    if (!context.dataQuality.liquidityStatus || context.dataQuality.liquidityStatus === 'UNKNOWN') this.block(state, 'LIQUIDITY_UNKNOWN', 'Liquidity evidence is unknown.');
     if (state.blockers.length === 0) this.add(state, 80, 'Data quality is usable for downstream strategies.', 'DATA_QUALITY_READY');
   }
 
   private scoreSectorAndSmartMoney(context: StrategyContext, state: MutableState) {
     if (['LEADING', 'IMPROVING'].includes(String(context.sectorLeadership || ''))) this.add(state, 10, 'Sector is supportive.', 'SECTOR_NOT_WEAK');
     else if (['LAGGING', 'WEAKENING'].includes(String(context.sectorLeadership || ''))) this.block(state, 'SECTOR_WEAK', 'Sector context is weak.');
-    else state.dataGaps.push('Sector context is missing.');
+    else {
+      state.dataGaps.push('Sector context is missing.');
+      this.block(state, 'SECTOR_CONTEXT_MISSING', 'Sector context is missing.');
+    }
     if (context.smartMoneyStatus === 'ACCUMULATION') this.add(state, 10, 'Smart-money accumulation supports setup.', 'SMART_MONEY_ACCUMULATION');
     if (context.smartMoneyStatus === 'DISTRIBUTION') this.block(state, 'SMART_MONEY_DISTRIBUTION', 'Smart-money distribution contradicts setup.');
+    if (!context.smartMoneyStatus) {
+      state.dataGaps.push('Smart-money context is missing.');
+      this.block(state, 'SMART_MONEY_CONTEXT_MISSING', 'Smart-money context is missing.');
+    }
+  }
+
+  private requireContext(context: StrategyContext, state: MutableState, key: keyof StrategyContext, code: string, message: string) {
+    if (context[key] === null || context[key] === undefined || context[key] === '') {
+      state.dataGaps.push(message);
+      this.block(state, code, message);
+    }
   }
 
   private evaluateCommonLongExit(context: StrategyContext, state: MutableState) {
@@ -352,7 +371,7 @@ export class StrategyFrameworkEvaluator implements StrategyEvaluator {
   }
 
   private applyCommonNoise(context: StrategyContext, state: MutableState, options: { skipClosedMarketBlock?: boolean; skipDataQualityBlock?: boolean } = {}) {
-    if (!context.latestPrice) state.dataGaps.push('Latest price is missing.');
+    if (!context.latestPrice && (this.definition.category === 'ENTRY' || this.definition.category === 'EXIT' || this.requires('latestPrice'))) state.dataGaps.push('Latest price is missing.');
     if (!context.sma50 && this.requires('sma50')) state.dataGaps.push('SMA50 is missing.');
     if (!context.sma200 && this.requires('sma200')) state.dataGaps.push('SMA200 is missing.');
     if (!context.rawSignal && this.requires('rawSignal')) state.dataGaps.push('Raw signal is missing.');
@@ -370,6 +389,10 @@ export class StrategyFrameworkEvaluator implements StrategyEvaluator {
       const liquidity = String(context.dataQuality?.liquidityStatus || 'UNKNOWN').toUpperCase();
       if (liquidity === 'UNKNOWN') this.block(state, 'LIQUIDITY_UNKNOWN', 'Liquidity context is unknown.');
       if (liquidity === 'THIN') this.block(state, 'THIN_LIQUIDITY', 'Liquidity is thin.');
+      this.requireDeclaredInput(context, state, 'marketRegime', 'MARKET_REGIME_MISSING', 'Market regime context is missing.');
+      this.requireDeclaredInput(context, state, 'sectorLeadership', 'SECTOR_CONTEXT_MISSING', 'Sector leadership context is missing.');
+      this.requireDeclaredInput(context, state, 'sectorRelativeStrengthScore', 'SECTOR_RS_MISSING', 'Sector relative-strength score is missing.');
+      this.requireDeclaredInput(context, state, 'smartMoneyStatus', 'SMART_MONEY_CONTEXT_MISSING', 'Smart-money context is missing.');
     }
     if (!options.skipClosedMarketBlock && context.marketGate === 'CLOSED' && this.definition.category === 'ENTRY') this.block(state, 'MARKET_CLOSED', 'Market gate is closed.');
     if (context.reliability?.status === 'LOW' || context.reliability?.noiseLevel === 'HIGH') this.block(state, 'LOW_RELIABILITY', 'Signal reliability is low/noisy.');
@@ -383,6 +406,7 @@ export class StrategyFrameworkEvaluator implements StrategyEvaluator {
     else if (state.blockers.length > 0) decision = 'AVOID';
     else if (exit) decision = score >= 60 ? 'EXIT_CANDIDATE' : score >= 40 ? 'REDUCE_RISK' : 'HOLD';
     else if (this.definition.category === 'FILTER' || this.definition.category === 'GATE') decision = 'WAIT';
+    else if (this.definition.category === 'ENTRY' && state.dataGaps.length > 0) decision = score >= 50 ? 'WATCH' : 'INSUFFICIENT_DATA';
     else if (score >= Number(this.definition.parameters.minScore ?? 70)) decision = 'ENTRY_CANDIDATE';
     else if (score >= 50) decision = 'WATCH';
 
@@ -441,6 +465,14 @@ export class StrategyFrameworkEvaluator implements StrategyEvaluator {
 
   private requires(input: string) {
     return this.definition.requiredInputs.some((item) => item.toLowerCase().includes(input.toLowerCase()));
+  }
+
+  private requireDeclaredInput(context: StrategyContext, state: MutableState, key: keyof StrategyContext, code: string, message: string) {
+    if (!this.requires(key)) return;
+    if (context[key] === null || context[key] === undefined || context[key] === '') {
+      state.dataGaps.push(message);
+      this.block(state, code, message);
+    }
   }
 
   private signalScore(context: StrategyContext): number {

@@ -112,6 +112,7 @@ export interface StrategyDecisionDto {
   frameworkAction?: string;
   entryRulesPassed?: string[];
   exitRulesTriggered?: string[];
+  invalidationRulesTriggered?: string[];
   noiseFiltersTriggered?: string[];
   strategyRating?: {
     ratingScore: number;

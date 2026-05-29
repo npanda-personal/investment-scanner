@@ -19,7 +19,9 @@ describe('Strategy Framework evaluator', () => {
       rawSignal: { score: 82, direction: 'BULLISH' } as any,
       dataQuality: { signalReadinessStatus: 'READY', coverageStatus: 'GOOD', liquidityStatus: 'LIQUID', eligibleForSignals: true, eligibleForBacktesting: true },
       marketGate: 'OPEN',
+      marketRegime: 'RISK_ON',
       sectorLeadership: 'LEADING',
+      sectorRelativeStrengthScore: 72,
       smartMoneyStatus: 'ACCUMULATION',
     });
 
@@ -38,6 +40,28 @@ describe('Strategy Framework evaluator', () => {
 
     expect(['AVOID', 'INSUFFICIENT_DATA']).toContain(result.decision);
     expect(result.noiseFiltersTriggered).toEqual(expect.arrayContaining(['DATA_NOT_READY', 'COVERAGE_UNUSABLE', 'ILLIQUID']));
+  });
+
+  it.each([
+    ['THIN', 'THIN_LIQUIDITY'],
+    ['UNKNOWN', 'LIQUIDITY_UNKNOWN'],
+  ])('blocks low-quality data support filters when liquidity is %s', (liquidityStatus, expectedRule) => {
+    const strategy = registry.get('LOW_QUALITY_DATA_REJECTION')!;
+    const result = new StrategyFrameworkEvaluator(strategy).evaluateEntry({
+      instrumentId: 'stock-1',
+      symbol: 'TEST',
+      dataQuality: {
+        signalReadinessStatus: 'READY',
+        coverageStatus: 'GOOD',
+        liquidityStatus,
+        eligibleForSignals: true,
+      },
+    });
+
+    expect(result.decision).toBe('AVOID');
+    expect(result.direction).toBe('NEUTRAL');
+    expect(result.eligibleForSignalGeneration).toBe(false);
+    expect(result.noiseFiltersTriggered).toContain(expectedRule);
   });
 
   it('marks missing required inputs as data gaps', () => {
@@ -69,6 +93,7 @@ describe('Strategy Framework evaluator', () => {
         bars: latestFirstBreakoutBars(3000),
         rawSignal: { score: 82, direction: 'BULLISH' } as any,
         marketGate: 'OPEN',
+        marketRegime: 'RISK_ON',
         sectorLeadership: 'LEADING',
         sectorRelativeStrengthScore: 72,
         smartMoneyStatus: 'ACCUMULATION',
@@ -91,6 +116,7 @@ describe('Strategy Framework evaluator', () => {
       rawSignal: { score: 82, direction: 'BULLISH' } as any,
       dataQuality: { coverageStatus: 'GOOD', liquidityStatus: 'LIQUID' },
       marketGate: 'OPEN',
+      marketRegime: 'RISK_ON',
       sectorLeadership: 'LEADING',
       sectorRelativeStrengthScore: 72,
       smartMoneyStatus: 'ACCUMULATION',
@@ -180,6 +206,10 @@ describe('Strategy Framework evaluator', () => {
       rawSignal: { score: 82, direction: 'BULLISH' } as any,
       dataQuality: { signalReadinessStatus: 'READY', coverageStatus: 'GOOD', liquidityStatus: 'LIQUID', eligibleForSignals: true },
       marketGate: 'OPEN',
+      marketRegime: 'RISK_ON',
+      sectorLeadership: 'LEADING',
+      sectorRelativeStrengthScore: 72,
+      smartMoneyStatus: 'ACCUMULATION',
     });
 
     expect(result.entryRulesPassed).toContain('VOLUME_BREAKOUT');
@@ -195,6 +225,7 @@ describe('Strategy Framework evaluator', () => {
         rawSignal: { score: 82, direction: 'BULLISH' },
         dataQuality: { signalReadinessStatus: 'READY', coverageStatus: 'GOOD', liquidityStatus: 'LIQUID', eligibleForSignals: true },
         marketGate: 'OPEN',
+        marketRegime: 'RISK_ON',
         sectorLeadership: 'LEADING',
         sectorRelativeStrengthScore: 72,
         smartMoneyStatus: 'ACCUMULATION',
@@ -205,8 +236,13 @@ describe('Strategy Framework evaluator', () => {
         sma50: 100,
         sma200: 80,
         rsi: 45,
+        rawSignal: { score: 82, direction: 'BULLISH' },
         dataQuality: { signalReadinessStatus: 'READY', coverageStatus: 'GOOD', liquidityStatus: 'LIQUID', eligibleForSignals: true },
         marketGate: 'OPEN',
+        marketRegime: 'RISK_ON',
+        sectorLeadership: 'LEADING',
+        sectorRelativeStrengthScore: 72,
+        smartMoneyStatus: 'ACCUMULATION',
       },
       BREAKOUT_CONFIRMATION: {
         latestPrice: 121,
@@ -217,6 +253,10 @@ describe('Strategy Framework evaluator', () => {
         rawSignal: { score: 82, direction: 'BULLISH' },
         dataQuality: { signalReadinessStatus: 'READY', coverageStatus: 'GOOD', liquidityStatus: 'LIQUID', eligibleForSignals: true },
         marketGate: 'OPEN',
+        marketRegime: 'RISK_ON',
+        sectorLeadership: 'LEADING',
+        sectorRelativeStrengthScore: 72,
+        smartMoneyStatus: 'ACCUMULATION',
       },
       SMART_MONEY_ACCUMULATION: {
         latestPrice: 120,
@@ -224,8 +264,12 @@ describe('Strategy Framework evaluator', () => {
         averageVolume20: 1000,
         smartMoneyStatus: 'ACCUMULATION',
         smartMoneyScore: 78,
+        rawSignal: { score: 82, direction: 'BULLISH' },
         dataQuality: { signalReadinessStatus: 'READY', coverageStatus: 'GOOD', liquidityStatus: 'LIQUID', eligibleForSignals: true },
         marketGate: 'OPEN',
+        marketRegime: 'RISK_ON',
+        sectorLeadership: 'LEADING',
+        sectorRelativeStrengthScore: 72,
       },
       SECTOR_LEADER_MOMENTUM: {
         latestPrice: 120,
@@ -234,8 +278,10 @@ describe('Strategy Framework evaluator', () => {
         rawSignal: { score: 82, direction: 'BULLISH' },
         sectorLeadership: 'LEADING',
         sectorRelativeStrengthScore: 72,
+        smartMoneyStatus: 'ACCUMULATION',
         dataQuality: { signalReadinessStatus: 'READY', coverageStatus: 'GOOD', liquidityStatus: 'LIQUID', eligibleForSignals: true },
         marketGate: 'OPEN',
+        marketRegime: 'RISK_ON',
       },
     };
 
@@ -396,6 +442,25 @@ describe('Strategy Framework evaluator', () => {
     expect(registry.get('BREAKOUT_CONFIRMATION')?.riskRules.some((rule) => rule.input === 'stopLossPercent')).toBe(true);
   });
 
+  it('keeps requiredInputs consistent with executable rule evidence inputs', () => {
+    const missing = registry.list().flatMap((strategy) => {
+      const declared = new Set(strategy.requiredInputs);
+      const evidenceRules = [
+        ...strategy.entryRules,
+        ...strategy.exitRules,
+        ...strategy.invalidationRules,
+        ...strategy.noiseFilters,
+        ...strategy.marketGateRules,
+      ];
+
+      return evidenceRules.flatMap((rule) => inputRoots(rule.input)
+        .filter((input) => !inputSatisfied(input, declared))
+        .map((input) => `${strategy.code}.${rule.code}:${input}`));
+    });
+
+    expect(missing).toEqual([]);
+  });
+
   it('marks only active entry strategies as standalone backtest eligible', () => {
     const entry = new StrategyFrameworkEvaluator(registry.get('TREND_MOMENTUM')!).evaluateEntry({
       instrumentId: 'stock-1',
@@ -406,7 +471,9 @@ describe('Strategy Framework evaluator', () => {
       rawSignal: { score: 82, direction: 'BULLISH' } as any,
       dataQuality: { signalReadinessStatus: 'READY', coverageStatus: 'GOOD', liquidityStatus: 'LIQUID', eligibleForSignals: true },
       marketGate: 'OPEN',
+      marketRegime: 'RISK_ON',
       sectorLeadership: 'LEADING',
+      sectorRelativeStrengthScore: 72,
       smartMoneyStatus: 'ACCUMULATION',
     });
     const filter = new StrategyFrameworkEvaluator(registry.get('LOW_QUALITY_DATA_REJECTION')!).evaluateEntry({
@@ -439,6 +506,7 @@ function completeTrendMomentumContext() {
     rawSignal: { score: 82, direction: 'BULLISH' } as any,
     dataQuality: { signalReadinessStatus: 'READY', coverageStatus: 'GOOD', liquidityStatus: 'LIQUID', eligibleForSignals: true, eligibleForBacktesting: true },
     marketGate: 'OPEN',
+    marketRegime: 'RISK_ON',
     sectorLeadership: 'LEADING',
     sectorRelativeStrengthScore: 72,
     smartMoneyStatus: 'ACCUMULATION',
@@ -454,4 +522,18 @@ function latestFirstBreakoutBars(latestVolume: number, oldestVolume = 1000) {
     volume: index === 0 ? latestVolume : index === 29 ? oldestVolume : 900,
   }));
   return bars;
+}
+
+function inputRoots(input: string): string[] {
+  return input
+    .split('/')
+    .map((part) => part.trim().split('.')[0])
+    .filter(Boolean);
+}
+
+function inputSatisfied(input: string, declared: Set<string>) {
+  if (declared.has(input)) return true;
+  if (input === 'signal') return declared.has('rawSignal') || declared.has('calibratedSignal');
+  if (input === 'sma') return declared.has('sma50') || declared.has('sma200');
+  return false;
 }

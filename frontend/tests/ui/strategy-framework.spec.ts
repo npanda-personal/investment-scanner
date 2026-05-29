@@ -15,6 +15,7 @@ const strategy = (code: string, name: string, category: string, status = 'ACTIVE
   requiredInputs: [],
   entryRules: category === 'ENTRY' ? [{ code: 'ENTRY_RULE', label: 'Entry rule', kind: 'SCORES', input: 'price' }] : [],
   exitRules: category === 'EXIT' ? [{ code: 'EXIT_RULE', label: 'Exit rule', kind: 'SCORES', input: 'risk' }] : [],
+  invalidationRules: [{ code: 'INVALIDATION_RULE', label: 'Invalidation rule', kind: 'BLOCKS', input: 'risk' }],
   noiseFilters: category === 'FILTER' ? [{ code: 'FILTER_RULE', label: 'Filter rule', kind: 'BLOCKS', input: 'data' }] : [],
   riskRules: [],
   marketGateRules: category === 'GATE' ? [{ code: 'GATE_RULE', label: 'Gate rule', kind: 'BLOCKS', input: 'market' }] : [],
@@ -172,6 +173,9 @@ test.describe('Strategy Framework UI', () => {
     await expect(page.getByTestId('strategy-category-exit')).toContainText('Exit (1)');
     await expect(page.getByTestId('strategy-category-gate')).toContainText('Gates (1)');
     await expect(page.getByTestId('strategy-category-filter')).toContainText('Filters (1)');
+    await expect(page.getByTestId('strategy-category-risk')).toContainText('Risk (0)');
+    await expect(page.getByTestId('strategy-category-calibration')).toContainText('Calibration (0)');
+    await expect(page.getByTestId('strategy-category-diagnostic')).toContainText('Diagnostics (0)');
     await expect(page.getByTestId('strategy-category-draft')).toContainText('Drafts (1)');
 
     await page.getByTestId('strategy-category-entry').click();
@@ -209,5 +213,14 @@ test.describe('Strategy Framework UI', () => {
     await expect(page.getByRole('row').filter({ hasText: 'Breakout Confirmation' }).getByText('Warnings/Caps')).toBeVisible();
     await expect(page.getByText('No compact StrategyPerformanceSummary exists for 3Y in the selected scope.')).toBeVisible();
     await expect(page.getByRole('link', { name: 'Inspect or run bounded backtest' }).first()).toHaveAttribute('href', /backtests\?mode=registered/);
+  });
+
+  test('shows invalidation rules on the strategy detail surface', async ({ page }) => {
+    await visitModule(page, '/strategies', 'Strategy Framework');
+
+    await page.getByRole('tab', { name: 'Detail' }).click();
+
+    await expect(page.getByText('Invalidation Rules')).toBeVisible();
+    await expect(page.getByText('- Invalidation rule')).toBeVisible();
   });
 });

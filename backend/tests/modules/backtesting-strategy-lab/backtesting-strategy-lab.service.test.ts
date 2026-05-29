@@ -326,7 +326,7 @@ describe('BacktestingStrategyLabService', () => {
       ...config,
       mode: 'REGISTERED_STRATEGY',
       strategyCode: 'TREND_MOMENTUM',
-      strategyVersion: '1.1.0',
+      strategyVersion: '1.2.0',
       entryRule: { type: 'SMA50_ABOVE_SMA200' },
       exitRule: { type: 'PRICE_BELOW_SMA50' },
     };
@@ -355,7 +355,7 @@ describe('BacktestingStrategyLabService', () => {
       universe: { type: 'SYMBOLS', symbols: ['AAA'] },
       mode: 'REGISTERED_STRATEGY',
       strategyCode: 'BREAKOUT_CONFIRMATION',
-      strategyVersion: '1.1.0',
+      strategyVersion: '1.2.0',
       timeframe: '1Y',
       entryRule: { type: 'SIGNAL_DIRECTION_BULLISH' },
       exitRule: { type: 'PRICE_BELOW_SMA50' },
@@ -537,14 +537,14 @@ describe('BacktestingStrategyLabService', () => {
     expect(run.status).toBe('COMPLETED');
     expect(strategyFrameworkService.persistBacktestPerformance).toHaveBeenCalledWith(expect.objectContaining({
       strategyCode: 'TREND_MOMENTUM',
-      strategyVersion: '1.1.0',
+      strategyVersion: '1.2.0',
       timeframe: '1Y',
       universeKey: 'SYMBOLS:AAA,BBB',
     }));
     expect(repository.createRun).toHaveBeenCalledWith(expect.objectContaining({
       config: expect.objectContaining({
         strategyCode: 'TREND_MOMENTUM',
-        strategyVersion: '1.1.0',
+        strategyVersion: '1.2.0',
       }),
     }), 'default-user');
     expect(repository.updateRunMetrics).toHaveBeenCalled();
