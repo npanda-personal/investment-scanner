@@ -28,6 +28,15 @@ const bars = (mode: 'accumulation' | 'distribution' = 'accumulation'): SmartMone
 
 const instrument = { id: 'stock-1', symbol: 'AAA', company_name: 'AAA Co', sector: 'Technology' };
 
+const readyQuality = {
+  coverageStatus: 'GOOD',
+  signalReadinessStatus: 'READY',
+  liquidityStatus: 'LIQUID',
+  dataGaps: [],
+  warnings: [],
+  readinessBlockers: [],
+};
+
 const priceRows = (count: number) => {
   const start = new Date('2026-01-01T00:00:00.000Z');
   return Array.from({ length: count }, (_item, index) => {
@@ -117,6 +126,17 @@ describe('SmartMoneyIntelligenceService', () => {
 
     expect(summary.status).toBe('INSUFFICIENT_DATA');
     expect(summary.dataStatus).toBe('MISSING');
+    expect(summary.evidence?.evidenceStatus).toBe('UNAVAILABLE');
+  });
+
+  it('treats missing recent volume as insufficient instead of scoring it as zero-volume pressure', () => {
+    const service = new SmartMoneyIntelligenceService({} as any, {} as any);
+    const missingVolumeBars = bars('accumulation').map((bar, index) => index > 3 ? { ...bar, volume: null } : bar);
+    const summary = service.calculateStockSummary(instrument, missingVolumeBars);
+
+    expect(summary.status).toBe('INSUFFICIENT_DATA');
+    expect(summary.explanation).toContain('volume history');
+    expect(summary.evidence?.reasonCodes).toContain('INSUFFICIENT_VOLUME_HISTORY');
   });
 
   it('aggregates sector smart money scores', () => {
@@ -154,13 +174,14 @@ describe('SmartMoneyIntelligenceService', () => {
 
   it('refreshes persisted snapshots for every supported range', async () => {
     const repository = {
-      saveSnapshot: jest.fn(async () => undefined),
+      saveSnapshot: jest.fn(async () => 'created'),
     };
     const marketDataService = {
       listInstruments: jest.fn(async () => ({ instruments: [instrument] })),
       listPricesByInstrumentId: jest.fn(async () => ({ prices: priceRows(181) })),
     };
-    const service = new SmartMoneyIntelligenceService(repository as any, marketDataService as any, {} as any);
+    const dataQualityService = { diagnostics: jest.fn(async () => readyQuality) };
+    const service = new SmartMoneyIntelligenceService(repository as any, marketDataService as any, {} as any, dataQualityService as any);
 
     const result = await service.run(10, { region: 'IN', assetType: 'STOCK' });
 
@@ -171,10 +192,11 @@ describe('SmartMoneyIntelligenceService', () => {
     const savedRanges = (repository.saveSnapshot.mock.calls as any[][]).map((call) => call[0].range).sort();
     expect(savedRanges).toEqual(['1M', '3M', '6M']);
     expect(result.byRange).toEqual({
-      '1M': { generated: 1, skipped: 0 },
-      '3M': { generated: 1, skipped: 0 },
-      '6M': { generated: 1, skipped: 0 },
+      '1M': { generated: 1, skipped: 0, unchanged: 0 },
+      '3M': { generated: 1, skipped: 0, unchanged: 0 },
+      '6M': { generated: 1, skipped: 0, unchanged: 0 },
     });
+    expect(result.unchangedCount).toBe(0);
     expect(result.processedCount).toBe(1);
     expect(result.totalCount).toBe(1);
     expect(result.hasMore).toBe(false);
@@ -184,7 +206,7 @@ describe('SmartMoneyIntelligenceService', () => {
 
   it('returns bounded batch progress metadata for snapshot refresh', async () => {
     const repository = {
-      saveSnapshot: jest.fn(async () => undefined),
+      saveSnapshot: jest.fn(async () => 'created'),
     };
     const instruments = [
       { ...instrument, id: 'stock-1', symbol: 'AAA' },
@@ -197,7 +219,8 @@ describe('SmartMoneyIntelligenceService', () => {
       })),
       listPricesByInstrumentId: jest.fn(async () => ({ prices: priceRows(181) })),
     };
-    const service = new SmartMoneyIntelligenceService(repository as any, marketDataService as any, {} as any);
+    const dataQualityService = { diagnostics: jest.fn(async () => readyQuality) };
+    const service = new SmartMoneyIntelligenceService(repository as any, marketDataService as any, {} as any, dataQualityService as any);
 
     const result = await service.run(2, { region: 'IN', assetType: 'STOCK', offset: 0 });
 
@@ -214,7 +237,7 @@ describe('SmartMoneyIntelligenceService', () => {
 
   it('refreshes explicit instrument ids without region-wide pagination', async () => {
     const repository = {
-      saveSnapshot: jest.fn(async () => undefined),
+      saveSnapshot: jest.fn(async () => 'created'),
     };
     const marketDataService = {
       getInstrumentsByIds: jest.fn(async () => [
@@ -224,7 +247,8 @@ describe('SmartMoneyIntelligenceService', () => {
       listInstruments: jest.fn(),
       listPricesByInstrumentId: jest.fn(async () => ({ prices: priceRows(181) })),
     };
-    const service = new SmartMoneyIntelligenceService(repository as any, marketDataService as any, {} as any);
+    const dataQualityService = { diagnostics: jest.fn(async () => readyQuality) };
+    const service = new SmartMoneyIntelligenceService(repository as any, marketDataService as any, {} as any, dataQualityService as any);
 
     const result = await service.run(25, {
       region: 'IN',
@@ -246,6 +270,71 @@ describe('SmartMoneyIntelligenceService', () => {
       generatedCount: 6,
       failedCount: 0,
     });
+  });
+
+  it('reports unchanged snapshots without rewriting persisted evidence', async () => {
+    const repository = {
+      saveSnapshot: jest.fn(async () => 'unchanged'),
+    };
+    const marketDataService = {
+      listInstruments: jest.fn(async () => ({ instruments: [instrument] })),
+      listPricesByInstrumentId: jest.fn(async () => ({ prices: priceRows(181) })),
+    };
+    const dataQualityService = { diagnostics: jest.fn(async () => readyQuality) };
+    const service = new SmartMoneyIntelligenceService(repository as any, marketDataService as any, {} as any, dataQualityService as any);
+
+    const result = await service.run(10, { region: 'IN', assetType: 'STOCK' });
+
+    expect(result.generatedCount).toBe(0);
+    expect(result.unchangedCount).toBe(3);
+    expect(result.byRange['3M']).toEqual({ generated: 0, skipped: 0, unchanged: 1 });
+  });
+
+  it('skips refresh scoring when Data Quality blocks the instrument', async () => {
+    const repository = {
+      saveSnapshot: jest.fn(),
+    };
+    const marketDataService = {
+      listInstruments: jest.fn(async () => ({ instruments: [instrument] })),
+      listPricesByInstrumentId: jest.fn(async () => ({ prices: priceRows(181) })),
+    };
+    const dataQualityService = {
+      diagnostics: jest.fn(async () => ({
+        ...readyQuality,
+        coverageStatus: 'UNUSABLE',
+        signalReadinessStatus: 'NOT_READY',
+        dataGaps: ['stale or unusable prices'],
+      })),
+    };
+    const service = new SmartMoneyIntelligenceService(repository as any, marketDataService as any, {} as any, dataQualityService as any);
+
+    const result = await service.run(10, { region: 'IN', assetType: 'STOCK' });
+
+    expect(repository.saveSnapshot).not.toHaveBeenCalled();
+    expect(result.generatedCount).toBe(0);
+    expect(result.skippedCount).toBe(3);
+    expect(result.failedCount).toBe(0);
+    expect(result.errors).toHaveLength(0);
+    expect(result.warnings[0]).toContain('Data quality blocks');
+  });
+
+  it('does not persist on-demand detail fallback when no snapshot exists', async () => {
+    const repository = {
+      latestStockSnapshot: jest.fn(async () => null),
+      saveSnapshot: jest.fn(),
+    };
+    const marketDataService = {
+      getInstrument: jest.fn(async () => instrument),
+      listPricesByInstrumentId: jest.fn(async () => ({ prices: priceRows(181) })),
+    };
+    const dataQualityService = { diagnostics: jest.fn(async () => readyQuality) };
+    const service = new SmartMoneyIntelligenceService(repository as any, marketDataService as any, {} as any, dataQualityService as any);
+
+    const summary = await service.stock('stock-1', '3M');
+
+    expect(summary?.evidence?.provenance.source).toBe('ON_DEMAND_DERIVED');
+    expect(summary?.evidence?.provenance.downstreamSafe).toBe(false);
+    expect(repository.saveSnapshot).not.toHaveBeenCalled();
   });
 
   it('uses the selected range window as scoring evidence instead of cloning the latest 20-day result', () => {

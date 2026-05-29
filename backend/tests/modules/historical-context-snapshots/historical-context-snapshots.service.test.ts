@@ -44,17 +44,23 @@ const marketContext = {
   }),
 };
 
+const smartMoneySummary = {
+  smartMoneyScore: 72,
+  status: 'ACCUMULATION',
+  confidence: 'MEDIUM',
+  signals: [{ direction: 'ACCUMULATION', type: 'UNUSUAL_VOLUME' }],
+  explanation: 'Accumulation leaning.',
+  source: 'market-data-foundation',
+  dataStatus: 'PARTIAL',
+  sector: 'Technology',
+};
+
 const smartMoney = {
   stock: jest.fn().mockResolvedValue({
-    smartMoneyScore: 72,
-    status: 'ACCUMULATION',
-    confidence: 'MEDIUM',
-    signals: [{ direction: 'ACCUMULATION', type: 'UNUSUAL_VOLUME' }],
-    explanation: 'Accumulation leaning.',
-    source: 'market-data-foundation',
-    dataStatus: 'PARTIAL',
-    sector: 'Technology',
+    ...smartMoneySummary,
+    evidence: { provenance: { source: 'ON_DEMAND_DERIVED', downstreamSafe: false } },
   }),
+  latestPersistedStock: jest.fn().mockResolvedValue(smartMoneySummary),
 };
 
 const marketData = {
@@ -84,9 +90,45 @@ describe('historical context snapshots service', () => {
     expect(marketData.listInstruments).toHaveBeenCalledWith(expect.objectContaining({ region: 'IN', assetType: 'STOCK' }));
     expect(marketData.listPricesByInstrumentId).toHaveBeenCalledWith('stock-1', 500, undefined, undefined, { region: 'IN', assetType: 'STOCK' });
     expect(marketData.latestPriceByInstrumentId).toHaveBeenCalledWith('stock-1', { region: 'IN', assetType: 'STOCK' });
+    expect(smartMoney.latestPersistedStock).toHaveBeenCalledWith('stock-1', '3M');
+    expect(smartMoney.stock).not.toHaveBeenCalled();
     expect(repository.upsertMarket).toHaveBeenCalledWith(expect.objectContaining({ snapshotDate, region: 'IN', regime: 'RISK_ON' }));
     expect(repository.upsertSector).toHaveBeenCalledWith(expect.objectContaining({ snapshotDate, region: 'IN' }));
     expect(repository.upsertCountry).toHaveBeenCalledWith(expect.objectContaining({ snapshotDate, region: 'IN' }));
+  });
+
+  it('does not persist on-demand smart-money evidence into historical context snapshots', async () => {
+    const repository = repo();
+    const unsafeSmartMoney = {
+      stock: jest.fn().mockResolvedValue({
+        ...smartMoneySummary,
+        evidence: { provenance: { source: 'ON_DEMAND_DERIVED', downstreamSafe: false } },
+      }),
+    };
+    const service = new HistoricalContextSnapshotsService(repository as any, marketContext as any, unsafeSmartMoney as any, marketData as any);
+
+    const result = await service.generate(snapshotDate, 5, { region: 'IN', assetType: 'STOCK' });
+
+    expect(unsafeSmartMoney.stock).not.toHaveBeenCalled();
+    expect(repository.upsertSmartMoney).not.toHaveBeenCalled();
+    expect(result.smartMoney.skipped).toBe(1);
+  });
+
+  it('skips explicitly downstream-unsafe smart-money evidence', async () => {
+    const repository = repo();
+    const unsafeSmartMoney = {
+      latestPersistedStock: jest.fn().mockResolvedValue({
+        ...smartMoneySummary,
+        evidence: { provenance: { source: 'ON_DEMAND_DERIVED', downstreamSafe: false } },
+      }),
+    };
+    const service = new HistoricalContextSnapshotsService(repository as any, marketContext as any, unsafeSmartMoney as any, marketData as any);
+
+    const result = await service.generate(snapshotDate, 5, { region: 'IN', assetType: 'STOCK' });
+
+    expect(repository.upsertSmartMoney).not.toHaveBeenCalled();
+    expect(result.smartMoney.skipped).toBe(1);
+    expect(result.warnings).toContain('AAPL smart-money snapshot skipped: on-demand evidence is not downstream safe.');
   });
 
   it('handles partial generation failures with warnings', async () => {

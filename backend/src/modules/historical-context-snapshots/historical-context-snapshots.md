@@ -52,13 +52,15 @@ Repeated snapshot generation uses upsert behavior and returns inserted/updated/s
 - accepts optional `region` and `assetType`, defaulting to `IN` and `STOCK`
 - defaults to today
 - calls Market Context Intelligence public service for scoped market/sector/country context
-- calls Smart Money Intelligence public service per scoped instrument within limit
+- reads persisted Smart Money Intelligence snapshots per scoped instrument within limit; it does not calculate on-demand smart-money context during generation
 - calculates lightweight data-quality readiness from Market Data Foundation public services
 - persists with upsert behavior
 - returns inserted/updated/skipped counts and warnings
 - skips sector rows whose sector metadata is `Unknown`, blank, `N/A`, `NA`, or null-equivalent. These rows increment skipped-sector count and return a metadata-gap warning; they are not persisted as ranked leadership/weakness evidence.
 
 Scheduled pipeline automation may call the service with explicit `instrumentIds`. That path uses latest persisted Market Context and latest persisted Smart Money snapshots instead of generating missing upstream context on demand. Missing upstream rows are recorded as skipped/gap evidence, keeping the scheduled chain DB-only and avoiding provider fallback behavior.
+
+Historical Context treats missing Smart Money snapshots as a data gap. Smart Money summaries marked `ON_DEMAND_DERIVED` or `downstreamSafe=false` are skipped and must not be persisted as historical context evidence.
 
 Partial failures are captured as warnings instead of failing the full batch.
 

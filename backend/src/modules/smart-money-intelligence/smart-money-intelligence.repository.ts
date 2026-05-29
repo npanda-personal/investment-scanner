@@ -1,7 +1,9 @@
 import { PrismaClient } from '@prisma/client';
 import prisma from '../../db/prisma';
-import type { SmartMoneyListQuery, SmartMoneyRange, SmartMoneyStockSummary, SectorSmartMoneySummary } from './smart-money-intelligence.types';
+import type { SmartMoneyEvidenceReasonCode, SmartMoneyListQuery, SmartMoneyRange, SmartMoneyStockSummary, SectorSmartMoneySummary } from './smart-money-intelligence.types';
 import { resolveMarketRegionFilter } from '../../shared/utils/market-scope';
+
+export type SmartMoneySnapshotWriteAction = 'created' | 'updated' | 'unchanged';
 
 export class SmartMoneyIntelligenceRepository {
   constructor(private readonly db: PrismaClient = prisma) {}
@@ -14,7 +16,7 @@ export class SmartMoneyIntelligenceRepository {
       range: query.range,
       ...(query.sector && { sector: query.sector }),
     };
-    const snapshotDate = await this.latestSnapshotDate(baseWhere);
+    const snapshotDate = await this.latestSnapshotDate(this.validSnapshotWhere(baseWhere));
     if (!snapshotDate) return { results: [], total: 0 };
 
     const where: any = {
@@ -23,14 +25,24 @@ export class SmartMoneyIntelligenceRepository {
     };
 
     if (isDistribution) {
-      where.OR = [{ status: 'DISTRIBUTION' }, { smartMoneyScore: { lte: 40 } }];
+      where.AND = [
+        ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
+        { status: { not: 'INSUFFICIENT_DATA' } },
+        { OR: [{ status: 'DISTRIBUTION' }, { smartMoneyScore: { lte: 40 } }] },
+      ];
     } else {
-      where.OR = [{ status: 'ACCUMULATION' }, { smartMoneyScore: { gte: 60 } }];
+      where.AND = [
+        ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
+        { status: { not: 'INSUFFICIENT_DATA' } },
+        { OR: [{ status: 'ACCUMULATION' }, { smartMoneyScore: { gte: 60 } }] },
+      ];
     }
 
-    const orderBy: any = {
-      smartMoneyScore: isDistribution ? 'asc' : 'desc'
-    };
+    const orderBy: any = [
+      { smartMoneyScore: isDistribution ? 'asc' : 'desc' },
+      { symbol: 'asc' },
+      { instrumentId: 'asc' },
+    ];
 
     const [count, rows] = await Promise.all([
       this.db.smartMoneyContextSnapshot.count({ where }),
@@ -54,7 +66,10 @@ export class SmartMoneyIntelligenceRepository {
         instrumentId,
         range,
       },
-      orderBy: { snapshotDate: 'desc' },
+      orderBy: [
+        { updatedAt: 'desc' },
+        { snapshotDate: 'desc' },
+      ],
     });
 
     if (!row) return null;
@@ -70,10 +85,10 @@ export class SmartMoneyIntelligenceRepository {
         instrumentId: { in: uniqueIds },
         range,
       },
-      _max: { snapshotDate: true },
+      _max: { updatedAt: true },
     });
-    const latestPairs: Array<{ instrumentId: string; snapshotDate: Date }> = latestByInstrument.flatMap((item: any) => (
-      item._max?.snapshotDate ? [{ instrumentId: item.instrumentId, snapshotDate: item._max.snapshotDate }] : []
+    const latestPairs: Array<{ instrumentId: string; updatedAt: Date }> = latestByInstrument.flatMap((item: any) => (
+      item._max?.updatedAt ? [{ instrumentId: item.instrumentId, updatedAt: item._max.updatedAt }] : []
     ));
     if (latestPairs.length === 0) return [];
 
@@ -82,9 +97,23 @@ export class SmartMoneyIntelligenceRepository {
         range,
         OR: latestPairs,
       },
+      orderBy: [
+        { updatedAt: 'desc' },
+        { snapshotDate: 'desc' },
+      ],
     });
 
-    return rows.map((row) => this.mapSnapshotToSummary(row));
+    const latestRowsByInstrument = new Map<string, any>();
+    for (const row of rows) {
+      if (!latestRowsByInstrument.has(row.instrumentId)) {
+        latestRowsByInstrument.set(row.instrumentId, row);
+      }
+    }
+    return uniqueIds
+      .flatMap((instrumentId) => {
+        const row = latestRowsByInstrument.get(instrumentId);
+        return row ? [this.mapSnapshotToSummary(row)] : [];
+      });
   }
 
   async latestSectorSnapshots(range: SmartMoneyRange, query: Pick<SmartMoneyListQuery, 'region' | 'assetType'> = {}): Promise<SectorSmartMoneySummary[]> {
@@ -93,13 +122,14 @@ export class SmartMoneyIntelligenceRepository {
        ...(stockFilters.length > 0 ? { stock: { AND: stockFilters } } : {}),
        range,
      };
-     const snapshotDate = await this.latestSnapshotDate(baseWhere);
+     const snapshotDate = await this.latestSnapshotDate(this.validSnapshotWhere(baseWhere));
      if (!snapshotDate) return [];
 
      const rows = await this.db.smartMoneyContextSnapshot.findMany({
        where: {
          ...baseWhere,
          snapshotDate,
+         status: { not: 'INSUFFICIENT_DATA' },
        }
      });
 
@@ -117,7 +147,8 @@ export class SmartMoneyIntelligenceRepository {
      return [...groups.entries()].map(([sector, items]) => {
        const average = Math.round(items.reduce((sum, item) => sum + item.smartMoneyScore, 0) / Math.max(1, items.length));
        const sectorStatus: any = average >= 65 ? 'ACCUMULATING' : average <= 40 ? 'DISTRIBUTING' : 'NEUTRAL';
-       const dataStatus: any = items.some((item) => item.dataStatus === 'PARTIAL') ? 'PARTIAL' : 'COMPLETE';
+       const dataStatus: any = items.some((item) => item.dataStatus === 'PARTIAL' || item.dataStatus === 'ERROR') ? 'PARTIAL' : 'COMPLETE';
+       const updatedAt = items.map((item) => item.updatedAt).sort().at(-1) || new Date(0).toISOString();
        return {
          sector,
          averageSmartMoneyScore: average,
@@ -127,25 +158,30 @@ export class SmartMoneyIntelligenceRepository {
          instrumentCount: items.length,
          sectorStatus,
          dataStatus,
-         updatedAt: new Date().toISOString(),
+         updatedAt,
        };
      }).sort((a, b) => b.averageSmartMoneyScore - a.averageSmartMoneyScore);
   }
 
-  async saveSnapshot(summary: SmartMoneyStockSummary): Promise<void> {
-    const today = new Date();
-    today.setUTCHours(0, 0, 0, 0);
+  async saveSnapshot(summary: SmartMoneyStockSummary): Promise<SmartMoneySnapshotWriteAction> {
+    const snapshotDate = this.snapshotDateForSummary(summary);
+    const where = {
+      snapshotDate_instrumentId_range: {
+        snapshotDate,
+        instrumentId: summary.instrumentId,
+        range: summary.range,
+      }
+    };
+
+    const existing = await this.db.smartMoneyContextSnapshot.findUnique({ where });
+    if (existing && this.sameSnapshotPayload(existing, summary)) {
+      return 'unchanged';
+    }
 
     await this.db.smartMoneyContextSnapshot.upsert({
-      where: {
-        snapshotDate_instrumentId_range: {
-          snapshotDate: today,
-          instrumentId: summary.instrumentId,
-          range: summary.range,
-        }
-      },
+      where,
       create: {
-        snapshotDate: today,
+        snapshotDate,
         instrumentId: summary.instrumentId,
         symbol: summary.symbol,
         companyName: summary.companyName,
@@ -187,6 +223,87 @@ export class SmartMoneyIntelligenceRepository {
         insiderOwnership: summary.insiderOwnership as any,
       }
     });
+    return existing ? 'updated' : 'created';
+  }
+
+  private snapshotDateForSummary(summary: SmartMoneyStockSummary): Date {
+    const basis = summary.snapshotDate || summary.dataThroughDate || summary.updatedAt;
+    const parsed = basis ? new Date(String(basis)) : new Date();
+    const snapshotDate = Number.isFinite(parsed.getTime()) ? parsed : new Date();
+    snapshotDate.setUTCHours(0, 0, 0, 0);
+    return snapshotDate;
+  }
+
+  private sameSnapshotPayload(row: any, summary: SmartMoneyStockSummary): boolean {
+    const expected = this.snapshotComparable(summary);
+    const actual = {
+      symbol: row.symbol,
+      companyName: row.companyName,
+      sector: row.sector,
+      smartMoneyScore: this.numberOrNull(row.smartMoneyScore),
+      status: row.status,
+      confidence: row.confidence,
+      accumulationSignalCount: row.accumulationSignalCount,
+      distributionSignalCount: row.distributionSignalCount,
+      unusualVolumeDetected: row.unusualVolumeDetected,
+      explanation: row.explanation,
+      source: row.source,
+      dataStatus: row.dataStatus,
+      latestClose: this.numberOrNull(row.latestClose),
+      latestVolume: this.numberOrNull(row.latestVolume),
+      averageVolume20: this.numberOrNull(row.averageVolume20),
+      dailyChangePercent: this.numberOrNull(row.dailyChangePercent),
+      signals: row.signals || [],
+      insiderOwnership: row.insiderOwnership || null,
+    };
+    return this.stableStringify(actual) === this.stableStringify(expected);
+  }
+
+  private snapshotComparable(summary: SmartMoneyStockSummary) {
+    return {
+      symbol: summary.symbol,
+      companyName: summary.companyName,
+      sector: summary.sector,
+      smartMoneyScore: this.numberOrNull(summary.smartMoneyScore),
+      status: summary.status,
+      confidence: summary.confidence,
+      accumulationSignalCount: summary.signals.filter(s => s.direction === 'ACCUMULATION').length,
+      distributionSignalCount: summary.signals.filter(s => s.direction === 'DISTRIBUTION').length,
+      unusualVolumeDetected: summary.signals.some(s => s.type === 'UNUSUAL_VOLUME'),
+      explanation: summary.explanation,
+      source: summary.source,
+      dataStatus: summary.dataStatus,
+      latestClose: this.numberOrNull(summary.latestClose),
+      latestVolume: this.numberOrNull(summary.latestVolume),
+      averageVolume20: this.numberOrNull(summary.averageVolume20),
+      dailyChangePercent: this.numberOrNull(summary.dailyChangePercent),
+      signals: summary.signals || [],
+      insiderOwnership: summary.insiderOwnership || null,
+    };
+  }
+
+  private numberOrNull(value: unknown): number | null {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  private stableStringify(value: unknown): string {
+    return JSON.stringify(this.stableValue(value));
+  }
+
+  private stableValue(value: unknown): unknown {
+    if (value === null || value === undefined) return value ?? null;
+    if (value instanceof Date) return value.toISOString();
+    if (Array.isArray(value)) return value.map((item) => this.stableValue(item));
+    if (typeof value === 'object') {
+      return Object.keys(value as Record<string, unknown>)
+        .sort()
+        .reduce<Record<string, unknown>>((acc, key) => {
+          acc[key] = this.stableValue((value as Record<string, unknown>)[key]);
+          return acc;
+        }, {});
+    }
+    return value;
   }
 
   private assetTypeFilter(assetType?: string): any | null {
@@ -212,17 +329,51 @@ export class SmartMoneyIntelligenceRepository {
     return stockFilters;
   }
 
+  private validSnapshotWhere(where: any): any {
+    return {
+      ...where,
+      status: { not: 'INSUFFICIENT_DATA' },
+    };
+  }
+
   private async latestSnapshotDate(where: any): Promise<Date | null> {
-    const row = await this.db.smartMoneyContextSnapshot.findFirst({
+    const groups = await this.db.smartMoneyContextSnapshot.groupBy({
+      by: ['snapshotDate'],
       where,
+      _count: { _all: true },
+      _max: { updatedAt: true },
       orderBy: { snapshotDate: 'desc' },
-      select: { snapshotDate: true },
     });
-    return row?.snapshotDate ?? null;
+    if (!groups.length) return null;
+    const maxCount = Math.max(...groups.map((item: any) => Number(item._count?._all || 0)));
+    const stableGroups = groups
+      .filter((item: any) => Number(item._count?._all || 0) >= maxCount)
+      .sort((a: any, b: any) => {
+        const updatedDelta = this.timeValue(b._max?.updatedAt) - this.timeValue(a._max?.updatedAt);
+        if (updatedDelta !== 0) return updatedDelta;
+        return this.timeValue(b.snapshotDate) - this.timeValue(a.snapshotDate);
+      });
+    return stableGroups[0]?.snapshotDate ?? groups[0]?.snapshotDate ?? null;
+  }
+
+  private timeValue(value: unknown): number {
+    if (!value) return 0;
+    const date = value instanceof Date ? value : new Date(String(value));
+    return Number.isFinite(date.getTime()) ? date.getTime() : 0;
   }
 
   private mapSnapshotToSummary(row: any): SmartMoneyStockSummary {
-    return {
+    const snapshotDate = row.snapshotDate instanceof Date ? row.snapshotDate.toISOString().slice(0, 10) : null;
+    const ownership = (row.insiderOwnership as any) || {
+      insiderBuyCount: null,
+      insiderSellCount: null,
+      netInsiderActivity: null,
+      institutionalOwnershipPercent: null,
+      ownershipDataStatus: 'MISSING',
+      source: 'not-configured',
+      explanation: 'Free insider and institutional ownership provider is not configured for the MVP.',
+    };
+    const summary: SmartMoneyStockSummary = {
       instrumentId: row.instrumentId,
       symbol: row.symbol,
       companyName: row.companyName,
@@ -240,16 +391,68 @@ export class SmartMoneyIntelligenceRepository {
       averageVolume20: row.averageVolume20,
       dailyChangePercent: row.dailyChangePercent,
       signals: (row.signals as any) || [],
-      insiderOwnership: (row.insiderOwnership as any) || {
-        insiderBuyCount: null,
-        insiderSellCount: null,
-        netInsiderActivity: null,
-        institutionalOwnershipPercent: null,
-        ownershipDataStatus: 'MISSING',
-        source: 'not-configured',
-        explanation: 'Free insider and institutional ownership provider is not configured for the MVP.',
+      insiderOwnership: ownership,
+      researchUrl: `/research/stocks/${row.instrumentId}`,
+      snapshotDate,
+      dataThroughDate: snapshotDate,
+    };
+    return {
+      ...summary,
+      evidence: this.persistedEvidence(summary, row),
+    };
+  }
+
+  private persistedEvidence(summary: SmartMoneyStockSummary, row: any): SmartMoneyStockSummary['evidence'] {
+    const snapshotDate = summary.snapshotDate || null;
+    const updatedAt = row.updatedAt instanceof Date ? row.updatedAt : new Date(row.updatedAt);
+    const boundary = snapshotDate ? new Date(`${snapshotDate}T00:00:00.000Z`) : null;
+    const freshnessStatus = !boundary || !Number.isFinite(updatedAt.getTime())
+      ? 'UNKNOWN'
+      : updatedAt.getTime() + 1 < boundary.getTime()
+        ? 'STALE'
+        : 'CURRENT';
+    const ownershipMissing = summary.insiderOwnership.ownershipDataStatus === 'MISSING';
+    const unavailable = summary.status === 'INSUFFICIENT_DATA' || summary.dataStatus === 'ERROR';
+    const limited = ownershipMissing || freshnessStatus !== 'CURRENT' || summary.dataStatus !== 'COMPLETE';
+    const freshnessReason = freshnessStatus === 'STALE'
+      ? 'SNAPSHOT_STALE'
+      : freshnessStatus === 'CURRENT'
+        ? 'SNAPSHOT_CURRENT'
+        : null;
+    const reasonCodes: SmartMoneyEvidenceReasonCode[] = [
+      'PERSISTED_SNAPSHOT_USED',
+      ...(freshnessReason ? [freshnessReason as SmartMoneyEvidenceReasonCode] : []),
+      'DATA_THROUGH_FROM_SNAPSHOT_DATE',
+      'DOWNSTREAM_PERSISTED_ONLY',
+      ...(ownershipMissing ? ['OWNERSHIP_PLACEHOLDER' as SmartMoneyEvidenceReasonCode] : []),
+    ];
+    const provenanceSummary = 'Persisted smart-money snapshot was used.';
+    const ownershipSummary = ownershipMissing
+      ? 'Insider and institutional ownership evidence is unavailable; treat this as partial price-volume evidence.'
+      : 'Ownership evidence is present.';
+    return {
+      evidenceStatus: unavailable ? 'UNAVAILABLE' : limited ? 'LIMITED' : 'USABLE',
+      freshnessStatus,
+      provenance: {
+        source: 'PERSISTED_SNAPSHOT',
+        persistedSnapshotAvailableAtRequestStart: true,
+        downstreamSafe: true,
+        reasonSummary: provenanceSummary,
       },
-      researchUrl: `/research/stocks/${row.instrumentId}`
+      coverage: {
+        requestedRange: summary.range,
+        snapshotDate,
+        dataThroughDate: snapshotDate,
+        dataThroughBasis: 'SNAPSHOT_DATE',
+        rangeLabel: `${summary.range} price-volume window`,
+      },
+      ownershipTrust: {
+        status: ownershipMissing ? 'PARTIAL_OWNERSHIP_GAP' : 'COMPLETE',
+        ownershipDataStatus: summary.insiderOwnership.ownershipDataStatus,
+        reasonSummary: ownershipSummary,
+      },
+      reasonCodes: [...new Set(reasonCodes)],
+      reasonSummary: `${provenanceSummary} ${ownershipSummary}`,
     };
   }
 }

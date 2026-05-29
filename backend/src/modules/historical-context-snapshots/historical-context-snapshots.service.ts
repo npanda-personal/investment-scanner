@@ -97,9 +97,9 @@ export class HistoricalContextSnapshotsService {
     for (const instrument of instruments || []) {
       const [smart, prices, latest, fundamentals] = await Promise.all([
         this.safe<any>(
-          () => explicitInstrumentIds.length > 0 && typeof smartMoneyAny.latestPersistedStock === 'function'
+          () => typeof smartMoneyAny.latestPersistedStock === 'function'
             ? smartMoneyAny.latestPersistedStock(instrument.id, '3M')
-            : this.smartMoneyService.stock(instrument.id),
+            : Promise.resolve(null),
           `${instrument.symbol} smart-money failed`,
           warnings
         ),
@@ -107,7 +107,7 @@ export class HistoricalContextSnapshotsService {
         this.safe(() => this.marketDataService.latestPriceByInstrumentId(instrument.id, { region, assetType }), `${instrument.symbol} latest price failed`, warnings),
         this.safe(() => this.marketDataService.fundamentalsByInstrumentId(instrument.id, { region, assetType }), `${instrument.symbol} fundamentals failed`, warnings),
       ]);
-      if (smart) {
+      if (smart && this.isDownstreamSafeSmartMoney(smart)) {
         this.bump(smartMoney, await this.repository.upsertSmartMoney({
           snapshotDate,
           instrumentId: instrument.id,
@@ -125,6 +125,7 @@ export class HistoricalContextSnapshotsService {
         }));
       } else {
         smartMoney.skipped += 1;
+        if (smart) warnings.push(`${instrument.symbol} smart-money snapshot skipped: on-demand evidence is not downstream safe.`);
       }
       const priceHistoryDays = prices?.prices?.length || 0;
       const readiness = this.readinessScore({
@@ -207,6 +208,12 @@ export class HistoricalContextSnapshotsService {
 
   private bump(count: SnapshotCount, status: 'inserted' | 'updated') {
     count[status] += 1;
+  }
+
+  private isDownstreamSafeSmartMoney(smart: any): boolean {
+    const provenance = smart?.evidence?.provenance;
+    if (!provenance) return true;
+    return provenance.source !== 'ON_DEMAND_DERIVED' && provenance.downstreamSafe !== false;
   }
 
   private async safe<T>(fn: () => Promise<T>, label: string, warnings: string[]): Promise<T | null> {

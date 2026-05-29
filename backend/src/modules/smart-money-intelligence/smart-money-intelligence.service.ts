@@ -1,4 +1,5 @@
 import { MarketDataFoundationService } from '../market-data-foundation';
+import { DataQualityEngineService, type DataQualityEvaluationDto } from '../data-quality-engine';
 import { SmartMoneyIntelligenceProvider } from './smart-money-intelligence.provider';
 import { SmartMoneyIntelligenceRepository } from './smart-money-intelligence.repository';
 import type {
@@ -14,6 +15,8 @@ import type {
   SmartMoneyDataStatus,
   SmartMoneyRunResponse,
   SmartMoneyRunQuery,
+  SmartMoneyEvidence,
+  SmartMoneyEvidenceReasonCode,
 } from './smart-money-intelligence.types';
 
 interface InstrumentLike {
@@ -27,12 +30,21 @@ const RANGE_LIMITS: Record<SmartMoneyRange, number> = { '1M': 35, '3M': 90, '6M'
 const SMART_MONEY_REFRESH_RANGES: SmartMoneyRange[] = ['1M', '3M', '6M'];
 const SMART_MONEY_DEFAULT_REGION = 'IN';
 const SMART_MONEY_DEFAULT_ASSET_TYPE = 'STOCK';
+const MIN_PRIOR_VOLUME_OBSERVATIONS = 18;
+
+interface SmartMoneyDataQualityGate {
+  status: 'READY' | 'LIMITED' | 'BLOCKED' | 'UNAVAILABLE';
+  dataStatus: SmartMoneyDataStatus;
+  reason: string;
+  warnings: string[];
+}
 
 export class SmartMoneyIntelligenceService {
   constructor(
     private readonly repository = new SmartMoneyIntelligenceRepository(),
     private readonly marketDataService = new MarketDataFoundationService(),
-    private readonly provider = new SmartMoneyIntelligenceProvider()
+    private readonly provider = new SmartMoneyIntelligenceProvider(),
+    private readonly dataQualityService: Pick<DataQualityEngineService, 'diagnostics'> | null = new DataQualityEngineService()
   ) {}
 
   async health(): Promise<SmartMoneyHealth> {
@@ -44,8 +56,9 @@ export class SmartMoneyIntelligenceService {
       updatedAt: new Date().toISOString(),
       notes: [
         'Price and volume signals are calculated from local persisted market data.',
+        'Data Quality Engine diagnostics gate refresh scoring; blocked instruments are skipped and limited diagnostics degrade evidence.',
         'Insider and institutional ownership are explicit MISSING placeholders until a free provider is configured.',
-        'Data is persisted as daily snapshots to avoid N+1 calculation bottlenecks.'
+        'Persisted snapshots use source data-through dates and no-op updates when the calculated evidence is unchanged.'
       ],
     };
   }
@@ -71,11 +84,13 @@ export class SmartMoneyIntelligenceService {
 
     let generated = 0;
     let skipped = 0;
+    let unchanged = 0;
     const errors: string[] = [];
-    const byRange: Record<SmartMoneyRange, { generated: number; skipped: number }> = {
-      '1M': { generated: 0, skipped: 0 },
-      '3M': { generated: 0, skipped: 0 },
-      '6M': { generated: 0, skipped: 0 },
+    const warnings: string[] = [];
+    const byRange: SmartMoneyRunResponse['byRange'] = {
+      '1M': { generated: 0, skipped: 0, unchanged: 0 },
+      '3M': { generated: 0, skipped: 0, unchanged: 0 },
+      '6M': { generated: 0, skipped: 0, unchanged: 0 },
     };
     const requestedCount = explicitIds.length ? explicitBatchIds.length : instruments.length;
     const missingInstrumentSkipped = explicitIds.length ? Math.max(0, requestedCount - instruments.length) : 0;
@@ -86,17 +101,36 @@ export class SmartMoneyIntelligenceService {
 
     await Promise.all(instruments.map(async (instrument: any) => {
       try {
-        const fullRangeBars = await this.loadBars(instrument.id, '6M').catch(() => []);
+        const [fullRangeBars, dataQuality] = await Promise.all([
+          this.loadBars(instrument.id, '6M').catch(() => []),
+          this.loadDataQuality(instrument.id),
+        ]);
+        const dataQualityGate = this.evaluateDataQuality(dataQuality);
+        if (dataQualityGate.status === 'BLOCKED') {
+          const warning = `${instrument.symbol || instrument.id} smart-money snapshot skipped: ${dataQualityGate.reason}`;
+          warnings.push(warning);
+          skipped += SMART_MONEY_REFRESH_RANGES.length;
+          for (const range of SMART_MONEY_REFRESH_RANGES) byRange[range].skipped += 1;
+          return;
+        }
         const ownership = this.missingOwnership(); // Placeholder until provider is configured
 
         for (const range of SMART_MONEY_REFRESH_RANGES) {
           const bars = fullRangeBars.slice(-RANGE_LIMITS[range]);
-          const summary = this.calculateStockSummary(instrument, bars, ownership, range);
+          const summary = this.applyDataQualityGate(
+            this.calculateStockSummary(instrument, bars, ownership, range),
+            dataQualityGate
+          );
 
           if (summary.status !== 'INSUFFICIENT_DATA') {
-            await this.repository.saveSnapshot(summary);
-            generated++;
-            byRange[range].generated++;
+            const action = await this.repository.saveSnapshot(summary);
+            if (action === 'unchanged') {
+              unchanged++;
+              byRange[range].unchanged = (byRange[range].unchanged ?? 0) + 1;
+            } else {
+              generated++;
+              byRange[range].generated++;
+            }
           } else {
             skipped++;
             byRange[range].skipped++;
@@ -113,6 +147,7 @@ export class SmartMoneyIntelligenceService {
     return {
       generated,
       skipped,
+      unchanged,
       errors,
       byRange,
       processedCount,
@@ -123,8 +158,9 @@ export class SmartMoneyIntelligenceService {
       hasMore: nextOffset !== null,
       generatedCount: generated,
       skippedCount: skipped,
+      unchangedCount: unchanged,
       failedCount: errors.length,
-      warnings: errors,
+      warnings: [...warnings, ...errors],
       durationMs: Date.now() - startedAt,
       scope: { region, assetType },
     };
@@ -140,16 +176,17 @@ export class SmartMoneyIntelligenceService {
     // Fallback to on-the-fly calculation if missing
     const instrument = await this.marketDataService.getInstrument(instrumentId) as InstrumentLike | null;
     if (!instrument) return null;
-    const bars = await this.loadBars(instrumentId, range);
-    const ownership = await this.provider.fetchInsiderOwnership(instrument.symbol).catch(() => this.missingOwnership());
-    const summary = this.calculateStockSummary(instrument, bars, ownership, range);
-    
-    if (summary.status !== 'INSUFFICIENT_DATA') {
-        await this.repository.saveSnapshot(summary);
+    const [bars, dataQuality] = await Promise.all([
+      this.loadBars(instrumentId, range),
+      this.loadDataQuality(instrumentId),
+    ]);
+    const dataQualityGate = this.evaluateDataQuality(dataQuality);
+    if (dataQualityGate.status === 'BLOCKED') {
+      return this.unavailableSummary(instrument, range, dataQualityGate.reason, dataQualityGate);
     }
-    
-      return summary;
-    }
+    const ownership = await this.loadOwnership(instrument.symbol);
+    return this.applyDataQualityGate(this.calculateStockSummary(instrument, bars, ownership, range), dataQualityGate);
+  }
 
   async latestPersistedStock(instrumentId: string, range: SmartMoneyRange = '3M'): Promise<SmartMoneyStockSummary | null> {
     if (!instrumentId) throw new Error('instrumentId is required');
@@ -179,8 +216,12 @@ export class SmartMoneyIntelligenceService {
     range: SmartMoneyRange = '3M'
   ): SmartMoneyStockSummary {
     const updatedAt = new Date().toISOString();
-    if (bars.length < 21 || bars.every((bar) => !Number.isFinite(bar.volume))) {
-      return {
+    const dataThroughDate = this.latestBarDate(bars);
+    if (bars.length < 21 || !this.hasUsableVolumeHistory(bars)) {
+      const insufficientReason = bars.length < 21
+        ? 'Insufficient price/volume history to infer accumulation or distribution.'
+        : 'Insufficient usable volume history to infer accumulation or distribution.';
+      const summary: SmartMoneyStockSummary = {
         instrumentId: instrument.id,
         symbol: instrument.symbol,
         companyName: instrument.company_name ?? null,
@@ -188,7 +229,7 @@ export class SmartMoneyIntelligenceService {
         smartMoneyScore: 0,
         status: 'INSUFFICIENT_DATA',
         confidence: 'LOW',
-        explanation: 'Insufficient price/volume history to infer accumulation or distribution.',
+        explanation: insufficientReason,
         updatedAt,
         dataStatus: 'MISSING',
         source: 'market-data-foundation',
@@ -200,7 +241,10 @@ export class SmartMoneyIntelligenceService {
         signals: [],
         insiderOwnership,
         researchUrl: `/research/stocks/${instrument.id}`,
+        snapshotDate: dataThroughDate,
+        dataThroughDate,
       };
+      return this.withEvidence(summary, 'ON_DEMAND_DERIVED', false);
     }
 
     const latest = bars[bars.length - 1];
@@ -220,7 +264,7 @@ export class SmartMoneyIntelligenceService {
       : (signals.length >= 3 ? 'HIGH' : 'MEDIUM');
     const explanation = this.explain(status, signals, insiderOwnership.ownershipDataStatus);
 
-    return {
+    const summary: SmartMoneyStockSummary = {
       instrumentId: instrument.id,
       symbol: instrument.symbol,
       companyName: instrument.company_name ?? null,
@@ -240,7 +284,10 @@ export class SmartMoneyIntelligenceService {
       signals,
       insiderOwnership,
       researchUrl: `/research/stocks/${instrument.id}`,
+      snapshotDate: dataThroughDate,
+      dataThroughDate,
     };
+    return this.withEvidence(summary, 'ON_DEMAND_DERIVED', false);
   }
 
   detectSignals(bars: SmartMoneyPriceBar[], averageVolume20: number | null): SmartMoneySignal[] {
@@ -288,6 +335,8 @@ export class SmartMoneyIntelligenceService {
   detectRangeSignals(bars: SmartMoneyPriceBar[], range: SmartMoneyRange): SmartMoneySignal[] {
     const signals: SmartMoneySignal[] = [];
     if (bars.length < 30) return signals;
+    const usableVolumeCount = bars.filter((bar) => Number.isFinite(bar.volume)).length;
+    if (usableVolumeCount < Math.min(20, Math.floor(bars.length * 0.75))) return signals;
 
     const first = bars[0];
     const latest = bars[bars.length - 1];
@@ -305,16 +354,16 @@ export class SmartMoneyIntelligenceService {
     for (let index = 1; index < bars.length; index += 1) {
       const current = bars[index];
       const previous = bars[index - 1];
-      const volume = Number.isFinite(current.volume) ? current.volume as number : 0;
+      const volume = Number.isFinite(current.volume) ? current.volume as number : null;
       const change = current.close - previous.close;
       if (change > 0) {
         upDays += 1;
-        upVolume += volume;
-        if (rangeVolume && volume >= rangeVolume * 1.1) highVolumeUpDays += 1;
+        if (volume !== null) upVolume += volume;
+        if (rangeVolume && volume !== null && volume >= rangeVolume * 1.1) highVolumeUpDays += 1;
       } else if (change < 0) {
         downDays += 1;
-        downVolume += volume;
-        if (rangeVolume && volume >= rangeVolume * 1.1) highVolumeDownDays += 1;
+        if (volume !== null) downVolume += volume;
+        if (rangeVolume && volume !== null && volume >= rangeVolume * 1.1) highVolumeDownDays += 1;
       }
     }
 
@@ -376,7 +425,7 @@ export class SmartMoneyIntelligenceService {
 
   aggregateSectors(summaries: SmartMoneyStockSummary[]): SectorSmartMoneySummary[] {
     const groups = new Map<string, SmartMoneyStockSummary[]>();
-    summaries.forEach((summary) => {
+    summaries.filter((summary) => summary.status !== 'INSUFFICIENT_DATA').forEach((summary) => {
       const sector = summary.sector || 'Unknown';
       groups.set(sector, [...(groups.get(sector) || []), summary]);
     });
@@ -384,6 +433,7 @@ export class SmartMoneyIntelligenceService {
       const average = Math.round(items.reduce((sum, item) => sum + item.smartMoneyScore, 0) / Math.max(1, items.length));
       const sectorStatus: SectorSmartMoneyStatus = average >= 65 ? 'ACCUMULATING' : average <= 40 ? 'DISTRIBUTING' : 'NEUTRAL';
       const dataStatus: SmartMoneyDataStatus = items.some((item) => item.dataStatus === 'PARTIAL') ? 'PARTIAL' : 'COMPLETE';
+      const updatedAt = items.map((item) => item.updatedAt).sort().at(-1) || new Date(0).toISOString();
       return {
         sector,
         averageSmartMoneyScore: average,
@@ -393,12 +443,227 @@ export class SmartMoneyIntelligenceService {
         instrumentCount: items.length,
         sectorStatus,
         dataStatus,
-        updatedAt: new Date().toISOString(),
+        updatedAt,
       };
     }).sort((a, b) => b.averageSmartMoneyScore - a.averageSmartMoneyScore);
   }
 
+  private async loadDataQuality(instrumentId: string): Promise<DataQualityEvaluationDto | null> {
+    if (!this.dataQualityService) return null;
+    return this.dataQualityService.diagnostics(instrumentId).catch(() => null);
+  }
 
+  private async loadOwnership(symbol: string): Promise<InsiderOwnershipSummary> {
+    if (typeof this.provider?.fetchInsiderOwnership !== 'function') return this.missingOwnership();
+    return this.provider.fetchInsiderOwnership(symbol).catch(() => this.missingOwnership());
+  }
+
+  private evaluateDataQuality(dataQuality: DataQualityEvaluationDto | null): SmartMoneyDataQualityGate {
+    if (!dataQuality) {
+      return {
+        status: 'UNAVAILABLE',
+        dataStatus: 'PARTIAL',
+        reason: 'Data quality evaluation is unavailable; smart-money evidence is limited.',
+        warnings: ['Data quality evaluation is unavailable.'],
+      };
+    }
+
+    const warnings = [
+      ...(dataQuality.dataGaps || []),
+      ...(dataQuality.warnings || []),
+      ...(dataQuality.readinessBlockers || []),
+    ];
+    const blocked = dataQuality.coverageStatus === 'UNUSABLE'
+      || dataQuality.signalReadinessStatus === 'NOT_READY'
+      || dataQuality.useCaseTiers?.signal?.status === 'BLOCKED';
+    if (blocked) {
+      return {
+        status: 'BLOCKED',
+        dataStatus: 'ERROR',
+        reason: `Data quality blocks smart-money scoring: ${warnings[0] || dataQuality.signalReadinessStatus || dataQuality.coverageStatus}.`,
+        warnings,
+      };
+    }
+
+    const limited = dataQuality.coverageStatus !== 'GOOD'
+      || dataQuality.signalReadinessStatus !== 'READY'
+      || dataQuality.liquidityStatus === 'ILLIQUID'
+      || dataQuality.liquidityStatus === 'THIN'
+      || dataQuality.useCaseTiers?.signal?.status === 'LIMITED';
+    if (limited) {
+      return {
+        status: 'LIMITED',
+        dataStatus: 'PARTIAL',
+        reason: `Data quality limits smart-money evidence: ${warnings[0] || dataQuality.signalReadinessStatus || dataQuality.coverageStatus}.`,
+        warnings,
+      };
+    }
+
+    return {
+      status: 'READY',
+      dataStatus: 'COMPLETE',
+      reason: 'Data quality is ready for smart-money scoring.',
+      warnings: [],
+    };
+  }
+
+  private applyDataQualityGate(summary: SmartMoneyStockSummary, gate: SmartMoneyDataQualityGate): SmartMoneyStockSummary {
+    const next: SmartMoneyStockSummary = {
+      ...summary,
+      dataQualityStatus: gate.status,
+      dataQualityWarnings: gate.warnings,
+      dataStatus: summary.dataStatus === 'ERROR' || gate.dataStatus === 'ERROR'
+        ? 'ERROR'
+        : summary.dataStatus === 'MISSING'
+          ? 'MISSING'
+          : summary.dataStatus === 'PARTIAL' || gate.status !== 'READY'
+            ? 'PARTIAL'
+            : 'COMPLETE',
+    };
+
+    if (gate.status !== 'READY') {
+      next.explanation = `${summary.explanation} ${gate.reason}`;
+    }
+
+    const reasonCode: SmartMoneyEvidenceReasonCode = gate.status === 'READY'
+      ? 'DATA_QUALITY_READY'
+      : gate.status === 'BLOCKED'
+        ? 'DATA_QUALITY_BLOCKED'
+        : gate.status === 'LIMITED'
+          ? 'DATA_QUALITY_LIMITED'
+          : 'DATA_QUALITY_UNAVAILABLE';
+    return this.withEvidence(next, next.evidence?.provenance.source || 'ON_DEMAND_DERIVED', next.evidence?.provenance.downstreamSafe || false, [reasonCode]);
+  }
+
+  private unavailableSummary(
+    instrument: InstrumentLike,
+    range: SmartMoneyRange,
+    reason: string,
+    gate: SmartMoneyDataQualityGate
+  ): SmartMoneyStockSummary {
+    const now = new Date().toISOString();
+    return this.withEvidence({
+      instrumentId: instrument.id,
+      symbol: instrument.symbol,
+      companyName: instrument.company_name ?? null,
+      sector: instrument.sector ?? null,
+      smartMoneyScore: 0,
+      status: 'INSUFFICIENT_DATA',
+      confidence: 'LOW',
+      explanation: reason,
+      updatedAt: now,
+      dataStatus: gate.dataStatus,
+      source: 'market-data-foundation',
+      range,
+      latestClose: null,
+      latestVolume: null,
+      averageVolume20: null,
+      dailyChangePercent: null,
+      signals: [],
+      insiderOwnership: this.missingOwnership(),
+      researchUrl: `/research/stocks/${instrument.id}`,
+      snapshotDate: null,
+      dataThroughDate: null,
+      dataQualityStatus: gate.status,
+      dataQualityWarnings: gate.warnings,
+    }, 'ON_DEMAND_DERIVED', false, ['DATA_QUALITY_BLOCKED']);
+  }
+
+  private withEvidence(
+    summary: SmartMoneyStockSummary,
+    source: SmartMoneyEvidence['provenance']['source'],
+    downstreamSafe: boolean,
+    extraReasonCodes: SmartMoneyEvidenceReasonCode[] = []
+  ): SmartMoneyStockSummary {
+    const snapshotDate = source === 'PERSISTED_SNAPSHOT'
+      ? this.toIsoDate(summary.snapshotDate || summary.dataThroughDate)
+      : null;
+    const dataThroughDate = source === 'PERSISTED_SNAPSHOT'
+      ? snapshotDate
+      : this.toIsoDate(summary.dataThroughDate || summary.snapshotDate);
+    const updatedAt = this.validDate(summary.updatedAt);
+    const boundary = this.validDate(snapshotDate);
+    const freshnessStatus: SmartMoneyEvidence['freshnessStatus'] = !boundary || !updatedAt
+      ? 'UNKNOWN'
+      : updatedAt.getTime() + 1 < boundary.getTime()
+        ? 'STALE'
+        : 'CURRENT';
+    const ownershipMissing = summary.insiderOwnership.ownershipDataStatus === 'MISSING';
+    const unavailable = summary.status === 'INSUFFICIENT_DATA' || summary.dataStatus === 'ERROR';
+    const limited = ownershipMissing || !downstreamSafe || freshnessStatus !== 'CURRENT' || summary.dataStatus !== 'COMPLETE';
+    const evidenceStatus: SmartMoneyEvidence['evidenceStatus'] = unavailable ? 'UNAVAILABLE' : limited ? 'LIMITED' : 'USABLE';
+    const freshnessReason = freshnessStatus === 'STALE'
+      ? 'SNAPSHOT_STALE'
+      : freshnessStatus === 'CURRENT'
+        ? 'SNAPSHOT_CURRENT'
+        : null;
+    const reasonCodes: SmartMoneyEvidenceReasonCode[] = [
+      source === 'PERSISTED_SNAPSHOT' ? 'PERSISTED_SNAPSHOT_USED' : 'ON_DEMAND_FALLBACK_USED',
+      ...(freshnessReason ? [freshnessReason as SmartMoneyEvidenceReasonCode] : []),
+      source === 'PERSISTED_SNAPSHOT' ? 'DATA_THROUGH_FROM_SNAPSHOT_DATE' : (dataThroughDate ? 'DATA_THROUGH_FROM_LAST_PRICE_BAR' : 'INSUFFICIENT_PRICE_HISTORY'),
+      downstreamSafe ? 'DOWNSTREAM_PERSISTED_ONLY' : 'ON_DEMAND_FALLBACK_USED',
+      ...(ownershipMissing ? ['OWNERSHIP_PLACEHOLDER' as SmartMoneyEvidenceReasonCode] : []),
+      ...(summary.explanation.toLowerCase().includes('volume history') ? ['INSUFFICIENT_VOLUME_HISTORY' as SmartMoneyEvidenceReasonCode] : []),
+      ...extraReasonCodes,
+    ];
+    const uniqueReasonCodes = [...new Set(reasonCodes)];
+    const provenanceSummary = source === 'PERSISTED_SNAPSHOT'
+      ? 'Persisted smart-money snapshot was used.'
+      : 'On-demand derived smart-money context was calculated for detail inspection and is not downstream-safe.';
+    const ownershipSummary = ownershipMissing
+      ? 'Insider and institutional ownership evidence is unavailable; treat this as partial price-volume evidence.'
+      : 'Ownership evidence is present.';
+    const evidence: SmartMoneyEvidence = {
+      evidenceStatus,
+      freshnessStatus,
+      provenance: {
+        source,
+        persistedSnapshotAvailableAtRequestStart: source === 'PERSISTED_SNAPSHOT',
+        downstreamSafe,
+        reasonSummary: provenanceSummary,
+      },
+      coverage: {
+        requestedRange: summary.range,
+        snapshotDate,
+        dataThroughDate,
+        dataThroughBasis: source === 'PERSISTED_SNAPSHOT'
+          ? 'SNAPSHOT_DATE'
+          : dataThroughDate ? 'LAST_PRICE_BAR_DATE' : 'UNAVAILABLE',
+        rangeLabel: `${summary.range} price-volume window`,
+      },
+      ownershipTrust: {
+        status: ownershipMissing ? 'PARTIAL_OWNERSHIP_GAP' : 'COMPLETE',
+        ownershipDataStatus: summary.insiderOwnership.ownershipDataStatus,
+        reasonSummary: ownershipSummary,
+      },
+      reasonCodes: uniqueReasonCodes,
+      reasonSummary: `${provenanceSummary} ${ownershipSummary}`,
+    };
+    return { ...summary, snapshotDate, dataThroughDate, evidence };
+  }
+
+  private hasUsableVolumeHistory(bars: SmartMoneyPriceBar[]): boolean {
+    const priorWindow = bars.slice(-21, -1);
+    const priorVolumeCount = priorWindow.filter((bar) => Number.isFinite(bar.volume) && Number(bar.volume) > 0).length;
+    const latestVolumeUsable = Number.isFinite(bars.at(-1)?.volume) && Number(bars.at(-1)?.volume) > 0;
+    return latestVolumeUsable && priorVolumeCount >= MIN_PRIOR_VOLUME_OBSERVATIONS;
+  }
+
+  private latestBarDate(bars: SmartMoneyPriceBar[]): string | null {
+    return this.toIsoDate(bars.at(-1)?.date);
+  }
+
+  private toIsoDate(value: unknown): string | null {
+    if (!value) return null;
+    const date = value instanceof Date ? value : new Date(String(value));
+    return Number.isFinite(date.getTime()) ? date.toISOString().slice(0, 10) : null;
+  }
+
+  private validDate(value: unknown): Date | null {
+    if (!value) return null;
+    const date = value instanceof Date ? value : new Date(String(value));
+    return Number.isFinite(date.getTime()) ? date : null;
+  }
 
   private async loadBars(instrumentId: string, range: SmartMoneyRange): Promise<SmartMoneyPriceBar[]> {
     const result = await this.marketDataService.listPricesByInstrumentId(instrumentId, RANGE_LIMITS[range]);
@@ -410,6 +675,7 @@ export class SmartMoneyIntelligenceService {
         low: this.toNumberOrNull(price.low),
         close: Number(price.adjusted_close ?? price.close),
         volume: this.toNumberOrNull(price.volume),
+        dataStatus: price.data_status || price.dataStatus || null,
       }))
       .filter((bar: SmartMoneyPriceBar) => Number.isFinite(bar.close))
       .sort((a: SmartMoneyPriceBar, b: SmartMoneyPriceBar) => a.date.localeCompare(b.date));

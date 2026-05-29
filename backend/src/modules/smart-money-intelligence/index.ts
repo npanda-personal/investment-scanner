@@ -6,7 +6,7 @@ export {
 } from './smart-money-intelligence.router';
 export { SmartMoneyIntelligenceController } from './smart-money-intelligence.controller';
 export { SmartMoneyIntelligenceProvider } from './smart-money-intelligence.provider';
-export { SmartMoneyIntelligenceRepository } from './smart-money-intelligence.repository';
+export { SmartMoneyIntelligenceRepository, type SmartMoneySnapshotWriteAction } from './smart-money-intelligence.repository';
 export { SmartMoneyIntelligenceService } from './smart-money-intelligence.service';
 export { getParam, parseLimit, parseOffset, parseOptionalText, parseRange, SMART_MONEY_RANGES } from './smart-money-intelligence.validation';
 export type {
@@ -15,8 +15,15 @@ export type {
   SectorSmartMoneySummary,
   SmartMoneyConfidence,
   SmartMoneyDataStatus,
+  SmartMoneyDataThroughBasis,
+  SmartMoneyEvidence,
+  SmartMoneyEvidenceReasonCode,
+  SmartMoneyEvidenceSource,
+  SmartMoneyEvidenceStatus,
+  SmartMoneyFreshnessStatus,
   SmartMoneyHealth,
   SmartMoneyListQuery,
+  SmartMoneyOwnershipTrustStatus,
   SmartMoneyPriceBar,
   SmartMoneyRange,
   SmartMoneyRunResponse,
