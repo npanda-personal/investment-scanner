@@ -36,6 +36,8 @@ These factories are persistent teams, not substeps inside one prompt. They may r
 - Force push and push to `main` or `master` are forbidden.
 - Prefer module-local, non-conflicting work.
 - Do not choose downstream implementation that depends on unresolved upstream trust gates.
+- Do not promote implementation work unless Team 04 has authored the test cases or recorded an explicit test-first exception.
+- Implementation teams write or update QA-specified tests before production code changes.
 - Implementation teams pull from `12-ready-queue/` rather than waiting for human prompts.
 - Team 0 integrates results and does not implement by default.
 
@@ -45,6 +47,7 @@ Implementation teams may pull work when:
 
 - the ready queue lists a matching requirement,
 - the team charter covers the module/lane,
+- a QA-authored test-first plan exists,
 - exact files are reserved,
 - branch/worktree isolation is available or unnecessary because no other team writes the same files,
 - all standing delegation criteria pass.

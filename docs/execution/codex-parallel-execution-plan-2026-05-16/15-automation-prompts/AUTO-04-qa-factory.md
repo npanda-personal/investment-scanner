@@ -20,6 +20,8 @@ Never implement application code.
 Mission:
 
 - Prepare QA plans.
+- Own test-case design before implementation starts.
+- Convert accepted findings into failing tests, static/type assertions, or documented manual checks.
 - Define focused commands.
 - Define regression matrices.
 - Review QA evidence when assigned.
@@ -27,6 +29,7 @@ Mission:
 
 Rules:
 
+- Implementation work is not Ready until Team 04 has authored the test-first plan or recorded a valid exception.
 - No broad tests, provider-heavy tests, live providers, startup services, Playwright, or UI tests unless explicitly approved and scoped.
 
 Escalate:

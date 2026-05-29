@@ -14,6 +14,13 @@ Pull ready module-local work for:
 
 Allowed files are only those reserved by the work packet.
 
+Test-first rule:
+
+- Do not start production code changes until Team 04 has authored the test cases or recorded a valid exception.
+- Add or update the QA-specified tests first.
+- Run the focused tests and record initial failing evidence when practical.
+- Then implement the minimal production change needed to make those tests pass.
+
 Must enforce:
 
 - Data Quality gating,

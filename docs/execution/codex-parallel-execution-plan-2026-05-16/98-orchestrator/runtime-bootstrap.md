@@ -38,10 +38,17 @@ The Product Owner has approved standing authorization for:
 - Teams 01-10 as independent Codex workstreams or automations where supported.
 - Separate branches or worktrees for implementation teams.
 - Module-local implementation when Ready criteria and standing delegation conditions pass.
+- Test-first implementation using QA-authored test cases before production fixes.
 - Focused tests or builds required by the work packet.
 - QA evidence, code review, Architect signoff, Product Owner packets, local commits, and scoped push to `dev` when all gates pass.
 
 This authorization does not bypass root `AGENTS.md`, active execution docs, current git state, or true consent blockers.
+
+The active test-first policy is:
+
+```text
+98-orchestrator/test-first-qa-gate-policy.md
+```
 
 ## Push Gate
 

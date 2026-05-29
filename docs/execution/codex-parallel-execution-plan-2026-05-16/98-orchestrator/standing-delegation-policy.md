@@ -18,20 +18,21 @@ Codex may act autonomously only when all conditions are true:
 
 1. Work stays inside an already approved boundary.
 2. Work is module-local or documentation-only.
-3. No forbidden/high-risk files are touched.
-4. No new Product Owner policy decision is required.
-5. No Angel One/live provider/broker/paid/cloud risk is involved.
-6. No Prisma/schema/migration changes are required.
-7. No route registry changes are required.
-8. No shared utility or shared UI changes are required.
-9. No package manifest or generated/common fixture changes are required.
-10. Focused tests pass.
-11. QA accepts.
-12. Code review accepts.
-13. Architect accepts when required.
-14. Product Owner packet clearly states limitations and does not overclaim.
-15. Staged scope is exact.
-16. No stop condition is hit.
+3. A QA-authored test-first plan exists, or Team 04 has recorded a valid exception.
+4. No forbidden/high-risk files are touched.
+5. No new Product Owner policy decision is required.
+6. No Angel One/live provider/broker/paid/cloud risk is involved.
+7. No Prisma/schema/migration changes are required.
+8. No route registry changes are required.
+9. No shared utility or shared UI changes are required.
+10. No package manifest or generated/common fixture changes are required.
+11. Focused tests pass.
+12. QA accepts.
+13. Code review accepts.
+14. Architect accepts when required.
+15. Product Owner packet clearly states limitations and does not overclaim.
+16. Staged scope is exact.
+17. No stop condition is hit.
 
 These conditions apply to each persistent team independently. A blocked Team 6 item must not stop Team 1 audits, Team 2 requirement refinement, Team 3 architecture prep, Team 4 QA planning, or unrelated implementation teams.
 

@@ -29,12 +29,13 @@ One Orchestrator prompt with substeps is not sufficient. The operating model exp
 1. Audit Factory continuously produces findings.
 2. Requirement Factory converts findings into requirement candidates.
 3. Architecture Factory prepares contracts and exact file reservations.
-4. QA Factory prepares focused validation plans.
-5. Ready Queue receives only items that satisfy readiness criteria.
-6. Implementation teams pull matching ready items into isolated worktrees or branches.
-7. Review / Release Factory validates team outboxes.
-8. Orchestrator integrates accepted work, resolves conflicts, and updates queues.
-9. Human Product Owner reviews only true consent blockers in Decision Inbox.
+4. QA Factory prepares test-first plans and owns the primary test-case design.
+5. Ready Queue receives only items that satisfy readiness criteria, including a QA-authored test-first plan.
+6. Implementation teams add or update QA-specified tests before production code.
+7. Implementation teams pull matching ready items into isolated worktrees or branches.
+8. Review / Release Factory validates team outboxes.
+9. Orchestrator integrates accepted work, resolves conflicts, and updates queues.
+10. Human Product Owner reviews only true consent blockers in Decision Inbox.
 
 ## Team 0 - Orchestrator / Integration
 
@@ -78,6 +79,8 @@ Mission:
 Mission:
 
 - Prepare QA plans, validation matrices, focused commands, evidence expectations, and regression criteria.
+- Own test-case design before implementation starts.
+- Convert accepted review findings into failing regression tests, static/type assertions, or documented non-testable manual checks.
 - Review QA evidence when assigned.
 - Keep upcoming requirements testable.
 - Never implement application code.
@@ -97,6 +100,7 @@ Mission:
 
 - Pull ready module-local work from Strategy, Signal, Signal Quality, Calibration, Strategy Decision, Backtesting, and Trade Plan queues.
 - Run in its own branch/worktree.
+- Write or update QA-specified tests before production code changes.
 - Enforce Data Quality gates, no arbitrary target semantics, trigger contract, rule-based exits/invalidation, and research-support language.
 
 ## Team 7 - Portfolio / Watchlists / Alerts Implementation
