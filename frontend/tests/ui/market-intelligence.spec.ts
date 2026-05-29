@@ -64,6 +64,58 @@ function missingPersistedMarketContextPayload() {
   };
 }
 
+function persistedBreadthPayload() {
+  return {
+    status: 'ready',
+    scope: { region: 'IN' },
+    asOf: '2026-05-27T05:15:00.000Z',
+    materialized: false,
+    sourceLabels: {
+      savedBreadth: 'Persisted Market Context breadth',
+      officialAdvancesDeclines: 'NSE official advances/declines not persisted',
+    },
+    gaps: [
+      'Official advances are not persisted yet.',
+      'Official declines are not persisted yet.',
+      'Official unchanged counts are not persisted yet.',
+    ],
+    breadth: {
+      percentAboveSma50: 0.62,
+      percentAboveSma200: 0.54,
+      sma50SampleCount: 220,
+      sma200SampleCount: 180,
+      advanceDeclineRatio: 1.35,
+      newHigh52WeekCount: 18,
+      newLow52WeekCount: 4,
+      bullishSignalCount: 34,
+      bearishSignalCount: 12,
+      instrumentCount: 240,
+      officialAdvanceCount: null,
+      officialDeclineCount: null,
+      officialUnchangedCount: null,
+      dataStatus: 'COMPLETE',
+    },
+  };
+}
+
+function missingPersistedBreadthPayload() {
+  return {
+    status: 'missing',
+    scope: { region: 'IN' },
+    asOf: null,
+    materialized: false,
+    sourceLabels: {
+      savedBreadth: 'Persisted Market Context breadth',
+      officialAdvancesDeclines: 'NSE official advances/declines not persisted',
+    },
+    gaps: [
+      'Saved breadth is not available for this scope.',
+      'Official advances, declines, and unchanged counts are not persisted yet.',
+    ],
+    breadth: null,
+  };
+}
+
 function todayReviewPayload() {
   return {
     run: {
@@ -148,8 +200,9 @@ function instrumentsPayload(assetType: string) {
   };
 }
 
-async function fulfillMarketReads(route: Route, persistedMarketContext = persistedMarketContextPayload()) {
+async function fulfillMarketReads(route: Route, persistedMarketContext = persistedMarketContextPayload(), persistedBreadth = persistedBreadthPayload()) {
   const url = new URL(route.request().url());
+  if (url.pathname.includes('/market-context/persisted-breadth')) return route.fulfill({ json: persistedBreadth });
   if (url.pathname.includes('/market-context/persisted-summary')) return route.fulfill({ json: persistedMarketContext });
   if (url.pathname.includes('/today-review/latest')) return route.fulfill({ json: todayReviewPayload() });
   if (url.pathname.includes('/market-data/movers')) return route.fulfill({ json: moversPayload() });
@@ -158,21 +211,29 @@ async function fulfillMarketReads(route: Route, persistedMarketContext = persist
   return route.continue();
 }
 
-async function setupMarketPage(page: Page, options: { persistedMarketContext?: ReturnType<typeof persistedMarketContextPayload> | ReturnType<typeof missingPersistedMarketContextPayload> } = {}) {
+async function setupMarketPage(page: Page, options: {
+  persistedMarketContext?: ReturnType<typeof persistedMarketContextPayload> | ReturnType<typeof missingPersistedMarketContextPayload>;
+  persistedBreadth?: ReturnType<typeof persistedBreadthPayload> | ReturnType<typeof missingPersistedBreadthPayload>;
+} = {}) {
   const apiRequests: string[] = [];
   const persistedMarketContext = options.persistedMarketContext ?? persistedMarketContextPayload();
+  const persistedBreadth = options.persistedBreadth ?? persistedBreadthPayload();
   await mockAuthenticatedUser(page);
   page.on('request', (request) => {
     const url = new URL(request.url());
     if (url.pathname.includes('/api/')) apiRequests.push(`${request.method()} ${url.pathname}`);
   });
-  await page.route('**/api/v1/market-context/persisted-summary**', (route) => fulfillMarketReads(route, persistedMarketContext));
-  await page.route('**/api/v1/today-review/latest**', (route) => fulfillMarketReads(route, persistedMarketContext));
-  await page.route('**/api/v1/market-data/movers**', (route) => fulfillMarketReads(route, persistedMarketContext));
-  await page.route('**/api/v1/market-data/universe/health**', (route) => fulfillMarketReads(route, persistedMarketContext));
-  await page.route('**/api/v1/instruments**', (route) => fulfillMarketReads(route, persistedMarketContext));
+  await page.route('**/api/v1/market-context/persisted-breadth**', (route) => fulfillMarketReads(route, persistedMarketContext, persistedBreadth));
+  await page.route('**/api/v1/market-context/persisted-summary**', (route) => fulfillMarketReads(route, persistedMarketContext, persistedBreadth));
+  await page.route('**/api/v1/today-review/latest**', (route) => fulfillMarketReads(route, persistedMarketContext, persistedBreadth));
+  await page.route('**/api/v1/market-data/movers**', (route) => fulfillMarketReads(route, persistedMarketContext, persistedBreadth));
+  await page.route('**/api/v1/market-data/universe/health**', (route) => fulfillMarketReads(route, persistedMarketContext, persistedBreadth));
+  await page.route('**/api/v1/instruments**', (route) => fulfillMarketReads(route, persistedMarketContext, persistedBreadth));
   await page.route('**/api/v1/market-context/summary**', async (route) => {
     throw new Error(`Trader page must not call materializing summary: ${route.request().url()}`);
+  });
+  await page.route('**/api/v1/market-context/breadth**', async (route) => {
+    throw new Error(`Trader page must not call materializing breadth: ${route.request().url()}`);
   });
   return apiRequests;
 }
@@ -180,9 +241,10 @@ async function setupMarketPage(page: Page, options: { persistedMarketContext?: R
 async function expectNoSharedWritesOrDeveloperCopy(page: Page, apiRequests: string[]) {
   expect(apiRequests.some((item) => item.includes('/market-context/summary'))).toBe(false);
   expect(apiRequests.some((item) => item.startsWith('POST '))).toBe(false);
-  const body = await page.locator('body').innerText();
-  expect(body).not.toMatch(/persisted-only|materializ|not wired|endpoint|read model|shared analysis pipeline|downstream|implementation|IndexContextSnapshot|BreadthSnapshot|InstitutionalFlowSnapshot|DerivativesContextSnapshot|Product Owner approval/i);
-  expect(body).not.toMatch(/buy now|sell now|guaranteed|price target|profit target|financial advice|option strategy recommendation/i);
+  const main = await page.locator('main').innerText();
+  expect(main).not.toMatch(/persisted-only|materializ|not wired|endpoint|read model|shared analysis pipeline|downstream|implementation|IndexContextSnapshot|BreadthSnapshot|InstitutionalFlowSnapshot|DerivativesContextSnapshot|Product Owner approval/i);
+  expect(main).not.toMatch(/operator|data ops|ops dashboard|bulk pipeline|pipeline dashboard|manual trigger|run pipeline|sync catalog|sync market data|shared refresh/i);
+  expect(main).not.toMatch(/buy now|sell now|guaranteed|price target|profit target|financial advice|option strategy recommendation/i);
 }
 
 test.describe('Market Intelligence user pages', () => {
@@ -218,6 +280,12 @@ test.describe('Market Intelligence user pages', () => {
 
     await expect(page.getByRole('heading', { name: 'Indices Workspace' }).first()).toBeVisible();
     await expect(page.getByText('NIFTY 50').first()).toBeVisible();
+    await expect(page.getByText('Index Catalog')).toBeVisible();
+    await expect(page.getByText('Index Context Gaps')).toBeVisible();
+    await expect(page.getByText('constituents and weights')).toBeVisible();
+    await expect(page.getByText('top contributors and detractors')).toBeVisible();
+    const body = await page.locator('body').innerText();
+    expect(body).not.toMatch(/constituents available|weights available|contributors available|constituent weights loaded|top contributors loaded/i);
     await expectNoSharedWritesOrDeveloperCopy(page, apiRequests);
   });
 
@@ -227,8 +295,33 @@ test.describe('Market Intelligence user pages', () => {
     await visitAuthenticated(page, '/breadth');
 
     await expect(page.getByRole('heading', { name: 'Breadth And Participation' }).first()).toBeVisible();
-    await expect(page.getByText('Sample: 220')).toBeVisible();
-    await expect(page.getByText('Sample: 180')).toBeVisible();
+    await expect(page.getByText('Saved market participation snapshot')).toBeVisible();
+    await expect(page.getByText('Official advance/decline counts not available yet')).toBeVisible();
+    await expect(page.getByText('SMA50 denominator: 220')).toBeVisible();
+    await expect(page.getByText('SMA200 denominator: 180')).toBeVisible();
+    await expect(page.getByText('Official advances are not persisted yet.')).toBeVisible();
+    await expect(page.getByText('Official declines are not persisted yet.')).toBeVisible();
+    await expect(page.getByText('Official unchanged counts are not persisted yet.')).toBeVisible();
+    await expect.poll(() => apiRequests.some((item) => item.includes('/market-context/persisted-breadth'))).toBe(true);
+    expect(apiRequests.some((item) => item.includes('/market-context/breadth'))).toBe(false);
+    const body = await page.locator('body').innerText();
+    expect(body).not.toMatch(/official advances:\s*\d+|official declines:\s*\d+|official unchanged:\s*\d+/i);
+    expect(body).not.toMatch(/official advance\/decline ratio\s*1\.35/i);
+    await expectNoSharedWritesOrDeveloperCopy(page, apiRequests);
+  });
+
+  test('Breadth And Participation shows honest gap when saved breadth is missing', async ({ page }) => {
+    const apiRequests = await setupMarketPage(page, { persistedBreadth: missingPersistedBreadthPayload() });
+
+    await visitAuthenticated(page, '/breadth');
+
+    await expect(page.getByRole('heading', { name: 'Breadth And Participation' }).first()).toBeVisible();
+    await expect(page.getByText('Saved participation snapshot is not available for this market.')).toBeVisible();
+    await expect(page.getByText('Official advances, declines, and unchanged counts are not available yet.')).toBeVisible();
+    await expect(page.getByText('NSE official advances/declines')).toBeVisible();
+    await expect.poll(() => apiRequests.some((item) => item.includes('/market-context/persisted-breadth'))).toBe(true);
+    const body = await page.locator('body').innerText();
+    expect(body).not.toMatch(/official advances:\s*\d+|official declines:\s*\d+|official unchanged:\s*\d+/i);
     await expectNoSharedWritesOrDeveloperCopy(page, apiRequests);
   });
 

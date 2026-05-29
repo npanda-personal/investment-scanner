@@ -7,6 +7,7 @@ export {
   fetchMacroSnapshot,
   fetchMarketBreadth,
   fetchMarketContextSummary,
+  fetchPersistedMarketBreadth,
   fetchPersistedMarketContextSummary,
   fetchMarketRegime,
   fetchSectorRotation,
@@ -22,5 +23,7 @@ export type {
   MarketContextSummary,
   MarketRegime,
   MarketRegimeSummary,
+  PersistedMarketBreadth,
+  PersistedMarketBreadthResponse,
   SectorRotationItem,
 } from './types';

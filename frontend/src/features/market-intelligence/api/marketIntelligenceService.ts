@@ -1,5 +1,5 @@
 import { fetchDailyOverviewMarketMovers, fetchDailyOverviewTodayReview } from '@/features/daily-overview-dashboard/api/dailyOverviewDashboardApi';
-import { fetchPersistedMarketContextSummary, type MarketContextSummary } from '@/features/market-context-intelligence';
+import { fetchPersistedMarketBreadth, fetchPersistedMarketContextSummary, type MarketContextSummary } from '@/features/market-context-intelligence';
 import { fetchInstruments, fetchMarketDataUniverseHealth } from '@/features/market-data-foundation';
 import type { MarketScope } from '@/contexts/MarketScopeContext';
 import type { MarketIntelligenceSnapshot, SnapshotResource } from '../types';
@@ -16,6 +16,7 @@ export async function fetchMarketIntelligenceSnapshot(scope: MarketScope): Promi
   const [
     todayReview,
     persistedMarketContext,
+    persistedBreadth,
     marketMovers,
     universeHealth,
     indices,
@@ -24,6 +25,7 @@ export async function fetchMarketIntelligenceSnapshot(scope: MarketScope): Promi
   ] = await Promise.allSettled([
     fetchDailyOverviewTodayReview(scopeParams),
     fetchPersistedMarketContextSummary({ region: scope.region }),
+    fetchPersistedMarketBreadth({ region: scope.region }),
     fetchDailyOverviewMarketMovers({ ...scopeParams, range: '1D' }),
     fetchMarketDataUniverseHealth(scopeParams),
     fetchInstruments({ region: scope.region, assetType: 'INDEX', pageSize: 75 }),
@@ -37,6 +39,7 @@ export async function fetchMarketIntelligenceSnapshot(scope: MarketScope): Promi
     fetchedAt,
     marketContext: settlePersistedMarketContext(persistedMarketContext),
     persistedMarketContext: settle(persistedMarketContext, 'Market context evidence', valueTimestamp(persistedMarketContext, (value) => value.asOf), undefined),
+    persistedBreadth: settle(persistedBreadth, 'Persisted Market Context breadth', valueTimestamp(persistedBreadth, (value) => value.asOf), SOURCE_URLS.advanceDecline),
     todayReview: settle(todayReview, 'Today Review latest snapshot', valueTimestamp(todayReview, (value) => value.run?.updatedAt || value.run?.finishedAt || value.run?.dataThroughDate || null)),
     marketMovers: settle(marketMovers, 'Market Data Foundation movers', valueTimestamp(marketMovers, (value) => value.generatedAt)),
     universeHealth: settle(universeHealth, 'Market Data Foundation universe health', valueTimestamp(universeHealth, (value) => value.generatedAt)),

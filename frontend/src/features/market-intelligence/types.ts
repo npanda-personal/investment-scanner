@@ -1,5 +1,5 @@
 import type { MarketScope } from '@/contexts/MarketScopeContext';
-import type { MarketContextSummary, PersistedMarketContextSummaryResponse } from '@/features/market-context-intelligence';
+import type { MarketContextSummary, PersistedMarketBreadthResponse, PersistedMarketContextSummaryResponse } from '@/features/market-context-intelligence';
 import type { MarketDataUniverseHealth, V1InstrumentsResponse } from '@/features/market-data-foundation';
 import type { MarketMoversSummary } from '@/features/daily-overview-dashboard/types';
 import type { TodayReviewResponse } from '@/features/today-trade-review/types';
@@ -18,6 +18,7 @@ export interface MarketIntelligenceSnapshot {
   fetchedAt: string;
   marketContext: SnapshotResource<MarketContextSummary>;
   persistedMarketContext: SnapshotResource<PersistedMarketContextSummaryResponse>;
+  persistedBreadth: SnapshotResource<PersistedMarketBreadthResponse>;
   todayReview: SnapshotResource<TodayReviewResponse>;
   marketMovers: SnapshotResource<MarketMoversSummary>;
   universeHealth: SnapshotResource<MarketDataUniverseHealth>;

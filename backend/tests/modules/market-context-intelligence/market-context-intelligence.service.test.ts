@@ -236,4 +236,122 @@ describe('MarketContextIntelligenceService', () => {
     expect(marketDataService.listInstruments).not.toHaveBeenCalled();
     expect(signalService.topSignals).not.toHaveBeenCalled();
   });
+
+  it('returns a ready persisted breadth envelope from persisted storage only', async () => {
+    const summary = {
+      regime: { regime: 'RISK_ON', score: 80, explanation: '', dataStatus: 'COMPLETE', updatedAt: '2026-05-27T05:00:00.000Z' },
+      topSectors: [],
+      weakSectors: [],
+      breadth: {
+        percentAboveSma50: 0.62,
+        percentAboveSma200: 0.54,
+        sma50SampleCount: 220,
+        sma200SampleCount: 180,
+        advanceDeclineRatio: 1.35,
+        newHigh52WeekCount: 18,
+        newLow52WeekCount: 4,
+        bullishSignalCount: 34,
+        bearishSignalCount: 12,
+        instrumentCount: 240,
+        dataStatus: 'COMPLETE',
+      },
+      countryStrength: [],
+      macro: { macroStatus: 'UNKNOWN', dataStatus: 'MISSING', explanation: 'missing', interestRateProxy: null, inflationProxy: null, usdStrengthProxy: null, commodityProxy: null },
+      explanation: ['Test'],
+      updatedAt: '2026-05-27T05:00:00.000Z',
+      dataStatus: 'COMPLETE',
+    };
+    const repository = {
+      latestPersistedSnapshot: jest.fn().mockResolvedValue(summary),
+      latestSnapshot: jest.fn(),
+      saveSnapshot: jest.fn(),
+    };
+    const marketDataService = {
+      listInstruments: jest.fn(),
+      listPricesByInstrumentId: jest.fn(),
+    };
+    const signalService = { topSignals: jest.fn() };
+    const service = new MarketContextIntelligenceService(repository as any, marketDataService as any, signalService as any);
+    const summarySpy = jest.spyOn(service, 'summary');
+    const runSpy = jest.spyOn(service, 'run');
+
+    const result = await (service as any).latestPersistedBreadth('IN');
+
+    expect(result).toEqual({
+      status: 'ready',
+      scope: { region: 'IN' },
+      asOf: '2026-05-27T05:00:00.000Z',
+      materialized: false,
+      sourceLabels: {
+        savedBreadth: 'Persisted Market Context breadth',
+        officialAdvancesDeclines: 'NSE official advances/declines not persisted',
+      },
+      gaps: expect.arrayContaining([
+        expect.stringMatching(/official advances/i),
+        expect.stringMatching(/official declines/i),
+        expect.stringMatching(/official unchanged/i),
+      ]),
+      breadth: expect.objectContaining({
+        percentAboveSma50: 0.62,
+        percentAboveSma200: 0.54,
+        sma50SampleCount: 220,
+        sma200SampleCount: 180,
+        instrumentCount: 240,
+        officialAdvanceCount: null,
+        officialDeclineCount: null,
+        officialUnchangedCount: null,
+      }),
+    });
+    expect(repository.latestPersistedSnapshot).toHaveBeenCalledWith('IN');
+    expect(repository.latestSnapshot).not.toHaveBeenCalled();
+    expect(repository.saveSnapshot).not.toHaveBeenCalled();
+    expect(summarySpy).not.toHaveBeenCalled();
+    expect(runSpy).not.toHaveBeenCalled();
+    expect(marketDataService.listInstruments).not.toHaveBeenCalled();
+    expect(marketDataService.listPricesByInstrumentId).not.toHaveBeenCalled();
+    expect(signalService.topSignals).not.toHaveBeenCalled();
+  });
+
+  it('returns a missing persisted breadth envelope without generating when no persisted summary exists', async () => {
+    const repository = {
+      latestPersistedSnapshot: jest.fn().mockResolvedValue(null),
+      latestSnapshot: jest.fn(),
+      saveSnapshot: jest.fn(),
+    };
+    const marketDataService = {
+      listInstruments: jest.fn(),
+      listPricesByInstrumentId: jest.fn(),
+    };
+    const signalService = { topSignals: jest.fn() };
+    const service = new MarketContextIntelligenceService(repository as any, marketDataService as any, signalService as any);
+    const summarySpy = jest.spyOn(service, 'summary');
+    const runSpy = jest.spyOn(service, 'run');
+
+    const result = await (service as any).latestPersistedBreadth('IN');
+
+    expect(result).toEqual({
+      status: 'missing',
+      scope: { region: 'IN' },
+      asOf: null,
+      materialized: false,
+      breadth: null,
+      sourceLabels: {
+        savedBreadth: 'Persisted Market Context breadth',
+        officialAdvancesDeclines: 'NSE official advances/declines not persisted',
+      },
+      gaps: expect.arrayContaining([
+        expect.stringMatching(/saved breadth/i),
+        expect.stringMatching(/official advances/i),
+        expect.stringMatching(/official declines/i),
+        expect.stringMatching(/official unchanged/i),
+      ]),
+    });
+    expect(repository.latestPersistedSnapshot).toHaveBeenCalledWith('IN');
+    expect(repository.latestSnapshot).not.toHaveBeenCalled();
+    expect(repository.saveSnapshot).not.toHaveBeenCalled();
+    expect(summarySpy).not.toHaveBeenCalled();
+    expect(runSpy).not.toHaveBeenCalled();
+    expect(marketDataService.listInstruments).not.toHaveBeenCalled();
+    expect(signalService.topSignals).not.toHaveBeenCalled();
+  });
 });

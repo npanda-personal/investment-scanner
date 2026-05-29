@@ -7,6 +7,7 @@ export const createMarketContextIntelligenceRouter = (
   const router = express.Router();
   router.get('/market-context/summary', controller.summary);
   router.get('/market-context/persisted-summary', controller.persistedSummary);
+  router.get('/market-context/persisted-breadth', controller.persistedBreadth);
   router.get('/market-context/regime', controller.regime);
   router.get('/market-context/sectors', controller.sectors);
   router.get('/market-context/breadth', controller.breadth);

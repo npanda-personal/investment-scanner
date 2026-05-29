@@ -70,4 +70,88 @@ describe('MarketContextIntelligenceController', () => {
       message: 'Persisted market context is not available for this scope.',
     });
   });
+
+  it('persistedBreadth returns ready envelope from latestPersistedBreadth only', async () => {
+    const envelope = {
+      status: 'ready',
+      scope: { region: 'IN' },
+      asOf: '2026-05-27T05:00:00.000Z',
+      materialized: false,
+      breadth: {
+        percentAboveSma50: 0.62,
+        percentAboveSma200: 0.54,
+        sma50SampleCount: 220,
+        sma200SampleCount: 180,
+        instrumentCount: 240,
+        officialAdvanceCount: null,
+        officialDeclineCount: null,
+        officialUnchangedCount: null,
+      },
+      sourceLabels: {
+        savedBreadth: 'Persisted Market Context breadth',
+        officialAdvancesDeclines: 'NSE official advances/declines not persisted',
+      },
+      gaps: [
+        'Official advances are not persisted yet.',
+        'Official declines are not persisted yet.',
+        'Official unchanged counts are not persisted yet.',
+      ],
+    };
+    const service = {
+      latestPersistedBreadth: jest.fn().mockResolvedValue(envelope),
+      latestPersistedSummary: jest.fn(),
+      summary: jest.fn(),
+      run: jest.fn(),
+      breadth: jest.fn(),
+    };
+    const controller = new MarketContextIntelligenceController(service as any);
+    const req = { query: { region: 'IN' } } as unknown as Request;
+    const res = responseMock();
+
+    await (controller as any).persistedBreadth(req, res);
+
+    expect(service.latestPersistedBreadth).toHaveBeenCalledWith('IN');
+    expect(service.latestPersistedSummary).not.toHaveBeenCalled();
+    expect(service.summary).not.toHaveBeenCalled();
+    expect(service.run).not.toHaveBeenCalled();
+    expect(service.breadth).not.toHaveBeenCalled();
+    expect(res.json).toHaveBeenCalledWith(envelope);
+  });
+
+  it('persistedBreadth returns missing envelope without materializing when no saved breadth exists', async () => {
+    const envelope = {
+      status: 'missing',
+      scope: { region: 'IN' },
+      asOf: null,
+      materialized: false,
+      breadth: null,
+      sourceLabels: {
+        savedBreadth: 'Persisted Market Context breadth',
+        officialAdvancesDeclines: 'NSE official advances/declines not persisted',
+      },
+      gaps: [
+        'Saved breadth is not available for this scope.',
+        'Official advances, declines, and unchanged counts are not persisted yet.',
+      ],
+    };
+    const service = {
+      latestPersistedBreadth: jest.fn().mockResolvedValue(envelope),
+      latestPersistedSummary: jest.fn(),
+      summary: jest.fn(),
+      run: jest.fn(),
+      breadth: jest.fn(),
+    };
+    const controller = new MarketContextIntelligenceController(service as any);
+    const req = { query: { region: 'IN' } } as unknown as Request;
+    const res = responseMock();
+
+    await (controller as any).persistedBreadth(req, res);
+
+    expect(service.latestPersistedBreadth).toHaveBeenCalledWith('IN');
+    expect(service.latestPersistedSummary).not.toHaveBeenCalled();
+    expect(service.summary).not.toHaveBeenCalled();
+    expect(service.run).not.toHaveBeenCalled();
+    expect(service.breadth).not.toHaveBeenCalled();
+    expect(res.json).toHaveBeenCalledWith(envelope);
+  });
 });

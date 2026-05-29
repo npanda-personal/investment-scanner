@@ -207,8 +207,12 @@ export function IndicesWorkspacePage() {
 
 export function BreadthParticipationPage() {
   const view = useMarketIntelligenceSnapshot();
-  const breadth = view.snapshot?.marketContext.value?.breadth ?? null;
+  const persistedBreadth = view.snapshot?.persistedBreadth.value ?? null;
+  const breadth = persistedBreadth?.breadth ?? null;
   const health = view.snapshot?.universeHealth.value;
+  const breadthGaps = persistedBreadth?.gaps ?? [
+    'Official advances, declines, and unchanged counts are not persisted yet.',
+  ];
 
   return (
     <MarketPageShell
@@ -221,17 +225,26 @@ export function BreadthParticipationPage() {
       {view.snapshot && (
         <Grid container spacing={2}>
           <Grid item xs={12} md={3}><MetricCard label="A/D ratio" value={formatRatio(breadth?.advanceDeclineRatio)} helper="Official advance, decline, unchanged counts are not yet persisted." /></Grid>
-          <Grid item xs={12} md={3}><MetricCard label="Above SMA50" value={formatPercent(breadth?.percentAboveSma50)} helper={`Sample: ${formatNumber(breadth?.sma50SampleCount ?? breadth?.instrumentCount ?? null)}`} /></Grid>
-          <Grid item xs={12} md={3}><MetricCard label="Above SMA200" value={formatPercent(breadth?.percentAboveSma200)} helper={`Sample: ${formatNumber(breadth?.sma200SampleCount ?? breadth?.instrumentCount ?? null)}`} /></Grid>
+          <Grid item xs={12} md={3}><MetricCard label="Above SMA50" value={formatPercent(breadth?.percentAboveSma50)} helper={`SMA50 denominator: ${formatNumber(breadth?.sma50SampleCount ?? breadth?.instrumentCount ?? null)}`} /></Grid>
+          <Grid item xs={12} md={3}><MetricCard label="Above SMA200" value={formatPercent(breadth?.percentAboveSma200)} helper={`SMA200 denominator: ${formatNumber(breadth?.sma200SampleCount ?? breadth?.instrumentCount ?? null)}`} /></Grid>
           <Grid item xs={12} md={3}><MetricCard label="Review-ready denominator" value={formatNumber(health?.counts.reviewReady ?? null)} helper={`Catalog: ${formatNumber(health?.counts.totalCatalogInstruments ?? null)}`} /></Grid>
           <Grid item xs={12} lg={7}>
-            <SectionCard title="Official Advance/Decline" subtitle="Saved breadth evidence gap">
-              <MissingEvidence
-                title="Advance, decline, and unchanged counts are not persisted yet"
-                message="The user-facing page must show official counts, denominators, and freshness. Until those source rows are persisted, this page shows a gap instead of deriving confidence from incomplete data."
-                source="NSE Advances/Declines"
-                sourceUrl="https://www.nseindia.com/market-data/advance"
-              />
+            <SectionCard title="Breadth Evidence" subtitle="Saved participation evidence">
+              {persistedBreadth?.status === 'ready' && breadth ? (
+                <Stack spacing={1}>
+                  <InlineMetric label="Evidence basis" value="Saved market participation snapshot" />
+                  <InlineMetric label="Official counts" value="Official advance/decline counts not available yet" />
+                  <InlineMetric label="Snapshot time" value={formatDateTime(persistedBreadth.asOf)} />
+                  <GapList items={breadthGaps} />
+                </Stack>
+              ) : (
+                <MissingEvidence
+                  title="Saved participation snapshot is not available for this market."
+                  message="Official advances, declines, and unchanged counts are not available yet."
+                  source="NSE official advances/declines"
+                  sourceUrl="https://www.nseindia.com/market-data/advance"
+                />
+              )}
             </SectionCard>
           </Grid>
           <Grid item xs={12} lg={5}>

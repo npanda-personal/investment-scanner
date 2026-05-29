@@ -51,6 +51,25 @@ export interface MarketBreadth {
   dataStatus: MarketDataStatus;
 }
 
+export interface PersistedMarketBreadth extends MarketBreadth {
+  officialAdvanceCount: number | null;
+  officialDeclineCount: number | null;
+  officialUnchangedCount: number | null;
+}
+
+export interface PersistedMarketBreadthEnvelope {
+  status: 'ready' | 'missing';
+  scope: { region: string };
+  asOf: string | null;
+  materialized: false;
+  breadth: PersistedMarketBreadth | null;
+  sourceLabels: {
+    savedBreadth: string;
+    officialAdvancesDeclines: string;
+  };
+  gaps: string[];
+}
+
 export interface CountryStrengthItem {
   country: string;
   return1M: number | null;

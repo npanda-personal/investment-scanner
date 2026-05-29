@@ -19,5 +19,7 @@ export type {
   MarketContextSummary,
   MarketRegime,
   MarketRegimeSummary,
+  PersistedMarketBreadth,
+  PersistedMarketBreadthEnvelope,
   SectorRotationItem,
 } from './market-context-intelligence.types';

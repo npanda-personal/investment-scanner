@@ -22,6 +22,7 @@ Persisted summary reads must keep sample-count and breadth metrics coherent. If 
 | --- | --- | --- |
 | `GET /api/v1/market-context/summary` | Consolidated context; may generate a snapshot when missing | Supported for admin/operator contexts |
 | `GET /api/v1/market-context/persisted-summary` | Latest saved market context without generation | Supported for trader-facing read-only pages |
+| `GET /api/v1/market-context/persisted-breadth` | Latest saved breadth envelope without generation | Supported for trader-facing read-only pages |
 | `GET /api/v1/market-context/regime` | Region-aware regime | Supported |
 | `GET /api/v1/market-context/sectors` | Sector strength per region | Supported |
 
@@ -29,6 +30,7 @@ Persisted summary reads must keep sample-count and breadth metrics coherent. If 
 
 - **Regime**: Combines broad index/price behavior and breadth signals into a market condition and gate.
 - **Breadth**: `percentAboveSma50` is calculated over instruments that have an SMA50 sample; `percentAboveSma200` is calculated over instruments that have an SMA200 sample. The response exposes `sma50SampleCount` and `sma200SampleCount` so the UI can show the denominators used for each displayed percentage.
+- **Persisted breadth envelope**: `/persisted-breadth` reads only saved `MarketContextSnapshot` evidence. It returns official NSE advance, decline, and unchanged counts as `null` with explicit gaps because those source rows are not persisted yet.
 - **Sample count coherence**: The displayed sample count must match the data source used for the displayed breadth metrics, or the UI must label the distinction. The current UI shows `Price Sample` for the persisted/price universe count and `SMA Samples` for the SMA50/SMA200 denominators.
 - **Sector leadership**: Missing metadata buckets such as `Unknown`, empty sector names, `N/A`, `NA`, and null-equivalent labels are excluded from leading/weak sector rankings through the shared known-sector predicate. They may be diagnosed as missing metadata elsewhere, but they are not treated as a real leading or weak sector.
 - **Takeaways**: A single named sector is not described as both leading and lagging.

@@ -101,6 +101,38 @@ Next active item after commit:
 
 - `CF-W3-MI-01D` index context and official breadth durable read-model slice.
 
+## Latest Team 00 Routing Update - Market Intelligence Persisted Index/Breadth Slice
+
+Date: 2026-05-29
+
+Current slice:
+
+- `CF-W3-MI-01D` persisted index and breadth read is accepted for scoped local commit.
+- Branch: `codex/team00-market-intelligence/CF-W3-MI-01D-index-breadth-read`.
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team00-CF-W3-MI-01D-index-breadth-read`.
+
+Implemented:
+
+- `GET /api/v1/market-context/persisted-breadth`.
+- Breadth And Participation uses saved market participation evidence and does not call materializing market-context reads.
+- Official advance, decline, and unchanged counts stay unavailable with explicit trader-facing gap copy.
+- Indices Workspace uses the existing local `INDEX` catalog and keeps constituents, weights, contributors, and index breadth as explicit gaps.
+
+Validation:
+
+- QA-owned TDD tests failed first for missing persisted breadth service/controller/route.
+- Backend focused tests passed, 3 suites / 20 tests.
+- Backend build passed.
+- Frontend build passed.
+- Focused UI smoke passed, 10 tests before PO copy rework and 8 tests after PO copy rework.
+- Architect final review accepted.
+- Product Owner rereview accepted after trader-facing copy cleanup.
+- QA final review accepted.
+
+Next active item after commit:
+
+- `CF-W3-MI-01E` institutional flow and derivatives context persistence strategy/read model slice.
+
 ## Latest Team 00 Routing Update - Narrowed Focus / UX-01B Closed
 
 Date: 2026-05-26

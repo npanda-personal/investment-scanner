@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { CountryStrengthItem, MacroSnapshot, MarketBreadth, MarketContextSummary, MarketRegimeSummary, SectorRotationItem } from '../types';
+import type { CountryStrengthItem, MacroSnapshot, MarketBreadth, MarketContextSummary, MarketRegimeSummary, PersistedMarketBreadthResponse, SectorRotationItem } from '../types';
 
 const API_BASE = '/api/v1/market-context';
 
@@ -18,6 +18,10 @@ export async function fetchMarketContextSummary(params: { region?: string } = {}
 }
 export async function fetchPersistedMarketContextSummary(params: { region?: string } = {}): Promise<PersistedMarketContextSummaryResponse> {
   const response = await axios.get<PersistedMarketContextSummaryResponse>(`${API_BASE}/persisted-summary`, { params });
+  return response.data;
+}
+export async function fetchPersistedMarketBreadth(params: { region?: string } = {}): Promise<PersistedMarketBreadthResponse> {
+  const response = await axios.get<PersistedMarketBreadthResponse>(`${API_BASE}/persisted-breadth`, { params });
   return response.data;
 }
 export async function fetchMarketRegime(): Promise<MarketRegimeSummary> {

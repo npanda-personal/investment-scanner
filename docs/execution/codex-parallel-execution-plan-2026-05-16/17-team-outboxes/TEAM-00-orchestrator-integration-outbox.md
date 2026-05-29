@@ -1,5 +1,50 @@
 # TEAM-00 Orchestrator / Integration Outbox
 
+## Latest Runtime Checkpoint - Market Intelligence Index/Breadth Slice
+
+Date: 2026-05-29
+
+Status:
+
+- Branch: `codex/team00-market-intelligence/CF-W3-MI-01D-index-breadth-read`.
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team00-CF-W3-MI-01D-index-breadth-read`.
+- Product Owner action required: no.
+- Push performed: no.
+
+Completed:
+
+- Added persisted-only `GET /api/v1/market-context/persisted-breadth`.
+- Wired Breadth And Participation to saved breadth evidence.
+- Kept official advance, decline, and unchanged counts unavailable with explicit user-facing gaps.
+- Kept Indices Workspace on the existing local `INDEX` catalog with explicit gaps for constituents, weights, contributors, and index breadth.
+
+Validation:
+
+- Backend focused Jest passed, 3 suites / 20 tests.
+- Backend build passed.
+- Frontend build passed.
+- Playwright Market Intelligence smoke passed, 8 tests after final Product Owner copy rework.
+- Playwright Market Intelligence smoke passed, 8 tests after QA operator-wording coverage rework.
+- Broader Market Intelligence / Daily Overview / user-admin route smoke passed, 10 tests before the copy-only rework.
+- Temporary Vite process was stopped.
+
+Review gates:
+
+- Architect final review: accepted.
+- Product Owner final review: accepted after copy rework.
+- QA final review: accepted.
+
+Teams ready to pick up new tasks:
+
+- Team 03: architecture for institutional flow and derivatives context persistence/read model strategy.
+- Team 04: QA plan for institutional flow and derivatives context read-only user pages after architecture.
+- Team 08: frontend implementation after the next slice is promoted.
+- Team 00: commit this accepted slice, fast-forward `dev`, then prepare the next slice.
+
+Next action:
+
+- Commit `CF-W3-MI-01D` locally and merge/fast-forward into `dev`; then continue with `CF-W3-MI-01E`.
+
 ## Latest Runtime Checkpoint - Priority Closure Only
 
 Date: 2026-05-26

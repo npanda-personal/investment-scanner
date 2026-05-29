@@ -30,6 +30,11 @@ export class MarketContextIntelligenceController {
     });
   };
 
+  persistedBreadth = async (req: Request, res: Response) => {
+    const region = this.region(req) || 'GLOBAL';
+    return this.respond(res, () => this.service.latestPersistedBreadth(region));
+  };
+
   run = async (req: Request, res: Response) => this.respond(res, () => this.service.run(this.region(req)));
 
   regime = async (req: Request, res: Response) => this.respond(res, () => this.service.regime(this.region(req)));

@@ -11,6 +11,7 @@ import type {
   MarketContextSummary,
   MarketRegime,
   MarketRegimeSummary,
+  PersistedMarketBreadthEnvelope,
   SectorRotationItem,
 } from './market-context-intelligence.types';
 
@@ -59,6 +60,51 @@ export class MarketContextIntelligenceService {
 
   async latestPersistedSummary(region?: string): Promise<MarketContextSummary | null> {
     return this.repository.latestPersistedSnapshot(region);
+  }
+
+  async latestPersistedBreadth(region: string = 'GLOBAL'): Promise<PersistedMarketBreadthEnvelope> {
+    const summary = await this.repository.latestPersistedSnapshot(region);
+    const sourceLabels = {
+      savedBreadth: 'Persisted Market Context breadth',
+      officialAdvancesDeclines: 'NSE official advances/declines not persisted',
+    };
+
+    if (!summary) {
+      return {
+        status: 'missing',
+        scope: { region },
+        asOf: null,
+        materialized: false,
+        breadth: null,
+        sourceLabels,
+        gaps: [
+          'Saved breadth is not available for this scope.',
+          'Official advances, declines, and unchanged counts are not persisted yet.',
+          'Official advances are not persisted yet.',
+          'Official declines are not persisted yet.',
+          'Official unchanged counts are not persisted yet.',
+        ],
+      };
+    }
+
+    return {
+      status: 'ready',
+      scope: { region },
+      asOf: summary.updatedAt || summary.regime.updatedAt || null,
+      materialized: false,
+      sourceLabels,
+      gaps: [
+        'Official advances are not persisted yet.',
+        'Official declines are not persisted yet.',
+        'Official unchanged counts are not persisted yet.',
+      ],
+      breadth: {
+        ...summary.breadth,
+        officialAdvanceCount: null,
+        officialDeclineCount: null,
+        officialUnchangedCount: null,
+      },
+    };
   }
 
   async regime(region?: string) {
