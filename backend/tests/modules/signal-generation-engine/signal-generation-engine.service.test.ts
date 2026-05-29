@@ -253,6 +253,7 @@ describe('SignalGenerationEngineService', () => {
           generated_at: '2026-04-28T00:00:00.000Z',
           source: 'signal-generation-engine',
           data_status: 'COMPLETE',
+          marketGate: 'OPEN',
           ...trustedReadEvidence,
         }],
         total: 1,
@@ -307,6 +308,7 @@ describe('SignalGenerationEngineService', () => {
             generated_at: '2026-04-28T00:00:00.000Z',
             source: 'signal-generation-engine',
             data_status: 'COMPLETE',
+            marketGate: 'OPEN',
             ...trustedReadEvidence,
           },
           {
@@ -409,6 +411,7 @@ describe('SignalGenerationEngineService', () => {
             generated_at: '2026-04-28T00:00:00.000Z',
             source: 'signal-generation-engine',
             data_status: 'COMPLETE',
+            marketGate: 'OPEN',
             ...trustedReadEvidence,
           },
           {
@@ -1066,6 +1069,7 @@ describe('SignalGenerationEngineService', () => {
           generated_at: '2026-04-28T00:00:00.000Z',
           source: 'signal-generation-engine',
           data_status: 'COMPLETE',
+          marketGate: 'OPEN',
           ...trustedReadEvidence,
         }],
         total: 1,
@@ -1128,7 +1132,7 @@ describe('SignalGenerationEngineService', () => {
       dataQualityEligibility: { filterApplied: true, eligible: true, coverageStatus: 'GOOD', liquidityStatus: 'LIQUID' },
     } as any], { includeStrategyMatches: true, strategyCode: 'BREAKOUT_CONFIRMATION' });
 
-    expect(result.strategyMatches).toHaveLength(0);
+    expect(result.strategyMatches ?? []).toHaveLength(0);
     expect(result.blockedStrategies?.[0]).toMatchObject({
       strategyCode: 'BREAKOUT_CONFIRMATION',
       noiseFiltersTriggered: expect.arrayContaining(['DATA_QUALITY_MISSING']),
@@ -1136,6 +1140,90 @@ describe('SignalGenerationEngineService', () => {
     expect(result.triggerContract?.trigger_price).toBeNull();
     expect(result.triggerContract?.trigger_price_evidence.status).toBe('UNAVAILABLE');
   });
+
+  it('does not promote Strategy Framework matches when market gate context is unavailable', async () => {
+    const prices = breakoutMatchPrices();
+    const service = new SignalGenerationEngineService({} as any, {
+      getInstrumentsByIds: jest.fn().mockResolvedValue([{ id: 'stock-1', symbol: 'ABC', region: 'IN', asset_type: 'STOCK', currency: 'INR' }]),
+      getLatestPricesBySymbols: jest.fn().mockResolvedValue([{ symbol: 'ABC', adjusted_close: 121, date: prices[0].date }]),
+      listPricesByInstrumentId: jest.fn().mockResolvedValue({ prices }),
+    } as any, {} as any, {} as any, new StrategyFrameworkRegistry(), { performance: jest.fn().mockResolvedValue([]) } as any);
+
+    const [result] = await service.enrichSignals([{
+      instrument_id: 'stock-1',
+      symbol: 'ABC',
+      company_name: 'ABC Co',
+      sector: 'Technology',
+      country: 'IN',
+      currentPrice: null,
+      previousClose: null,
+      dailyChange: null,
+      dailyChangePercent: null,
+      currency: null,
+      priceTimestamp: null,
+      score: 85,
+      direction: 'BULLISH',
+      confidence: 'HIGH',
+      triggered_signals: [{ code: 'PRICE_ABOVE_SMA50', label: 'price is above SMA50', category: 'TECHNICAL' }],
+      negative_signals: [],
+      explanation: 'Bullish because price is above SMA50.',
+      generated_at: '2026-04-28T00:00:00.000Z',
+      source: 'signal-generation-engine',
+      data_status: 'COMPLETE',
+      ...trustedReadEvidence,
+    } as any], { includeStrategyMatches: true, strategyCode: 'BREAKOUT_CONFIRMATION' });
+
+    expect(result.strategyMatches ?? []).toHaveLength(0);
+    expect(result.blockedStrategies?.[0]).toMatchObject({ strategyCode: 'BREAKOUT_CONFIRMATION' });
+    expect([
+      ...(result.blockedStrategies?.[0]?.blockers ?? []),
+      ...(result.blockedStrategies?.[0]?.noiseFiltersTriggered ?? []),
+      ...(result.blockedStrategies?.[0]?.dataGaps ?? []),
+      ...(result.blockedStrategies?.[0]?.warnings ?? []),
+    ].join(' ')).toMatch(/market.*unknown|unknown.*market/i);
+  });
+
+  it('passes sector and smart-money context into Strategy Framework matching', async () => {
+    const prices = breakoutMatchPrices();
+    const service = new SignalGenerationEngineService({} as any, {
+      getInstrumentsByIds: jest.fn().mockResolvedValue([{ id: 'stock-1', symbol: 'ABC', region: 'IN', asset_type: 'STOCK', currency: 'INR' }]),
+      getLatestPricesBySymbols: jest.fn().mockResolvedValue([{ symbol: 'ABC', adjusted_close: 121, date: prices[0].date }]),
+      listPricesByInstrumentId: jest.fn().mockResolvedValue({ prices }),
+    } as any, {} as any, {} as any, new StrategyFrameworkRegistry(), { performance: jest.fn().mockResolvedValue([]) } as any);
+
+    const [result] = await service.enrichSignals([{
+      instrument_id: 'stock-1',
+      symbol: 'ABC',
+      company_name: 'ABC Co',
+      sector: 'Technology',
+      country: 'IN',
+      currentPrice: null,
+      previousClose: null,
+      dailyChange: null,
+      dailyChangePercent: null,
+      currency: null,
+      priceTimestamp: null,
+      score: 85,
+      direction: 'BULLISH',
+      confidence: 'HIGH',
+      triggered_signals: [{ code: 'PRICE_ABOVE_SMA50', label: 'price is above SMA50', category: 'TECHNICAL' }],
+      negative_signals: [],
+      explanation: 'Bullish because price is above SMA50.',
+      generated_at: '2026-04-28T00:00:00.000Z',
+      source: 'signal-generation-engine',
+      data_status: 'COMPLETE',
+      marketGate: 'OPEN',
+      sectorLeadership: 'LEADING',
+      sectorRelativeStrengthScore: 75,
+      smartMoneyStatus: 'ACCUMULATION',
+      smartMoneyScore: 78,
+      ...trustedReadEvidence,
+    } as any], { includeStrategyMatches: true, strategyCode: 'TREND_MOMENTUM' });
+
+    expect(result.strategyMatches?.[0]).toMatchObject({ strategyCode: 'TREND_MOMENTUM' });
+    expect(result.strategyMatches?.[0]?.entryRulesPassed).toEqual(expect.arrayContaining(['SECTOR_NOT_WEAK', 'SMART_MONEY_ACCUMULATION']));
+  });
+
 
   it('returns blocked strategies with data gaps instead of failing matching', async () => {
     const service = new SignalGenerationEngineService({} as any, {
@@ -1200,6 +1288,7 @@ describe('SignalGenerationEngineService', () => {
             generated_at: '2026-04-28T00:00:00.000Z',
             source: 'signal-generation-engine',
             data_status: 'COMPLETE',
+            marketGate: 'OPEN',
             ...trustedReadEvidence,
           },
           {

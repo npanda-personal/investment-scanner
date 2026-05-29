@@ -194,7 +194,9 @@ export class BacktestingStrategyLabService {
         if (position) position.highestClose = Math.max(position.highestClose, bar.close);
         const exit = position ? this.exitDecision(config, history.bars, barIndex, position) : null;
         if (position && exit?.exit) {
-          const registeredExit = this.evaluateRegisteredStrategy(config, history.bars, barIndex, true, position);
+          const registeredExit = exit.reason === EXIT_REASONS.STRATEGY_EXIT
+            ? this.evaluateRegisteredStrategy(config, history.bars, barIndex, true, position)
+            : null;
           const exitReasons = registeredExit ? this.uniqueStrings([
             ...registeredExit.exitRulesTriggered,
             ...registeredExit.invalidationRulesTriggered,
@@ -390,6 +392,7 @@ export class BacktestingStrategyLabService {
     const previous = bars[index - 1];
     const averageVolume20 = this.average(latestFirst.slice(1, 21).map((bar) => bar.volume).filter((value): value is number => typeof value === 'number' && Number.isFinite(value)));
     const signal = this.signalProxy(bars, index);
+    const proxyContextScore = Math.max(0, Math.min(100, signal.score));
     return {
       latestPrice: latest?.close ?? null,
       previousClose: previous?.close ?? null,
@@ -432,6 +435,10 @@ export class BacktestingStrategyLabService {
       },
       marketGate: 'OPEN',
       marketRegime: 'NEUTRAL',
+      sectorLeadership: proxyContextScore >= 70 ? 'LEADING' : proxyContextScore >= 55 ? 'IMPROVING' : 'NEUTRAL',
+      sectorRelativeStrengthScore: proxyContextScore,
+      smartMoneyStatus: signal.direction === 'BULLISH' && averageVolume20 !== null ? 'ACCUMULATION' : 'NEUTRAL',
+      smartMoneyScore: signal.direction === 'BULLISH' && averageVolume20 !== null ? proxyContextScore : null,
       region: config.region || 'IN',
       assetType: config.assetType || 'STOCK',
       backtestDate: latest?.date ?? null,

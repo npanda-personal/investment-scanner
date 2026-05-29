@@ -1,4 +1,5 @@
 import { StrategyFrameworkRegistry, StrategyFrameworkService } from '../../../src/modules/strategy-framework';
+import type { StrategyPerformanceSummaryDto } from '../../../src/modules/strategy-framework';
 
 describe('Strategy Framework service', () => {
   const registry = new StrategyFrameworkRegistry();
@@ -131,6 +132,55 @@ describe('Strategy Framework service', () => {
     expect(blocked.missingEvidenceReason).toContain('support rules');
   });
 
+  it('does not surface stale persisted ranking proof for active strategy versions', async () => {
+    const repo = {
+      rankings: jest.fn().mockResolvedValue([
+        strategyPerformanceSummary({ strategyCode: 'TREND_MOMENTUM', strategyVersion: '1.0.0', ratingScore: 95 }),
+      ]),
+    };
+    const rankingService = new StrategyFrameworkService(
+      repo as any,
+      registry,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any
+    );
+
+    const rows = await rankingService.rankings({ timeframe: '3Y', region: 'IN', assetType: 'STOCK' });
+    const trendRow = rows.find((row) => row.strategyCode === 'TREND_MOMENTUM');
+
+    expect(trendRow).toBeDefined();
+    expect(trendRow?.strategyVersion).toBe(registry.get('TREND_MOMENTUM')?.version);
+    expect(rows.every((row) => row.strategyVersion === registry.get(row.strategyCode)?.version)).toBe(true);
+  });
+
+  it('keeps minRating filters when adding current-version fallback ranking rows', async () => {
+    const repo = {
+      rankings: jest.fn().mockResolvedValue([
+        strategyPerformanceSummary({ strategyCode: 'TREND_MOMENTUM', strategyVersion: '1.0.0', ratingScore: 95, ratingGrade: 'EXCELLENT' }),
+      ]),
+    };
+    const rankingService = new StrategyFrameworkService(
+      repo as any,
+      registry,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any
+    );
+
+    const rows = await rankingService.rankings({ timeframe: '3Y', region: 'IN', assetType: 'STOCK', minRating: 'GOOD' });
+
+    expect(rows.every((row) => ['GOOD', 'EXCELLENT'].includes(row.ratingGrade))).toBe(true);
+    expect(rows.some((row) => row.ratingGrade === 'UNPROVEN')).toBe(false);
+  });
+
+
   it('does not count WATCH decisions as matched entry proof', async () => {
     const watchService = new StrategyFrameworkService(
       {} as any,
@@ -165,7 +215,7 @@ describe('Strategy Framework service', () => {
       { latestForInstrument: jest.fn().mockResolvedValue({ score: 85, direction: 'BULLISH' }) } as any,
       { latestForInstrument: jest.fn().mockResolvedValue(null) } as any,
       { diagnostics: jest.fn().mockResolvedValue({ signalReadinessStatus: 'READY', coverageStatus: 'GOOD', liquidityStatus: 'LIQUID', eligibleForSignals: true }) } as any,
-      { summary: jest.fn().mockResolvedValue({ regime: { regime: null }, breadth: { percentAboveSma50: 0.7 }, topSectors: [], weakSectors: [] }) } as any,
+      { summary: jest.fn().mockResolvedValue({ regime: { regime: 'RISK_ON' }, breadth: { percentAboveSma50: 0.7 }, topSectors: [], weakSectors: [] }) } as any,
       { stock: jest.fn().mockResolvedValue(null) } as any,
     );
 
@@ -187,6 +237,41 @@ function servicePricesForWatchDecision() {
     const close = index < 50 ? 100 : index < 200 ? 80 : 70;
     return { date: date.toISOString(), close, adjusted_close: index === 0 ? 120 : close, volume: 1000 };
   });
+}
+
+function strategyPerformanceSummary(overrides: Partial<StrategyPerformanceSummaryDto> = {}): StrategyPerformanceSummaryDto {
+  return {
+    strategyCode: 'TREND_MOMENTUM',
+    strategyVersion: '1.1.0',
+    timeframe: '3Y',
+    region: 'IN',
+    assetType: 'STOCK',
+    universeKey: 'ALL_ELIGIBLE',
+    startingCapital: 100000,
+    endingCapital: 125000,
+    totalReturn: 0.25,
+    cagr: 0.08,
+    maxDrawdown: -0.12,
+    volatility: 0.18,
+    sharpe: 1.2,
+    winRate: 0.56,
+    profitFactor: 1.4,
+    tradeCount: 75,
+    averageHoldingDays: 22,
+    exposurePercent: 0.45,
+    benchmarkCagr: 0.05,
+    excessCagr: 0.03,
+    dataCoveragePercent: 0.95,
+    ratingScore: 82,
+    ratingGrade: 'GOOD',
+    automationEligibility: 'WATCHLIST_ONLY',
+    readinessLabel: 'WATCHLIST_CANDIDATE',
+    ratingReasons: ['Positive excess CAGR with controlled drawdown.'],
+    ratingWarnings: [],
+    ratingCapsApplied: [],
+    generatedAt: '2026-05-13T00:00:00.000Z',
+    ...overrides,
+  };
 }
 
 function strategyServiceBreakoutPrices() {

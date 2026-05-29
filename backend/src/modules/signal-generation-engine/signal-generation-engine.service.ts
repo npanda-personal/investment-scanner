@@ -859,7 +859,12 @@ export class SignalGenerationEngineService {
         eligibleForSignals: signal.dataQualityEligibility.eligible === true,
         eligibleForBacktesting: prices.length >= 252,
       } : null,
-      marketGate: 'UNKNOWN',
+      marketGate: (signal as any).marketGate ?? (signal as any).marketContext?.marketGate ?? 'UNKNOWN',
+      marketRegime: (signal as any).marketRegime ?? (signal as any).marketContext?.marketRegime ?? null,
+      sectorLeadership: (signal as any).sectorLeadership ?? null,
+      sectorRelativeStrengthScore: (signal as any).sectorRelativeStrengthScore ?? null,
+      smartMoneyStatus: (signal as any).smartMoneyStatus ?? null,
+      smartMoneyScore: (signal as any).smartMoneyScore ?? null,
     };
   }
 

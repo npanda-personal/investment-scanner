@@ -92,8 +92,15 @@ export class StrategyFrameworkService {
 
   async rankings(query: StrategyRankingsQuery = {}) {
     const persisted = await this.repository.rankings(query).catch(() => []);
-    if (persisted.length > 0) return persisted;
-    return this.registry.list().map((strategy) => this.unprovenSummary(strategy, query.timeframe || '1Y', query.region || 'IN', query.assetType || 'STOCK'));
+    const activeByCode = new Map(this.registry.list().map((strategy) => [strategy.code, strategy]));
+    const currentPersisted = persisted.filter((row) => activeByCode.get(row.strategyCode)?.version === row.strategyVersion);
+    const currentCodes = new Set(currentPersisted.map((row) => row.strategyCode));
+    const missingCurrentRows = this.registry.list()
+      .filter((strategy) => !currentCodes.has(strategy.code))
+      .map((strategy) => this.unprovenSummary(strategy, query.timeframe || '1Y', query.region || 'IN', query.assetType || 'STOCK'));
+    return [...currentPersisted, ...missingCurrentRows]
+      .filter((row) => !query.minRating || ratingRank(row.ratingGrade) >= ratingRank(query.minRating))
+      .sort((left, right) => right.ratingScore - left.ratingScore || left.strategyCode.localeCompare(right.strategyCode));
   }
 
   async evaluate(request: StrategyEvaluateRequest) {
@@ -557,4 +564,8 @@ export class StrategyFrameworkService {
     for (const row of rows) counts[row.status] += 1;
     return counts;
   }
+}
+
+function ratingRank(grade: string): number {
+  return { UNPROVEN: 0, WEAK: 1, AVERAGE: 2, GOOD: 3, EXCELLENT: 4 }[grade] ?? 0;
 }

@@ -101,6 +101,55 @@ describe('Strategy Framework evaluator', () => {
     expect(result.noiseFiltersTriggered).toContain('DATA_QUALITY_MISSING');
   });
 
+  it('does not promote active entry candidates when market gate context is unknown', () => {
+    const result = new StrategyFrameworkEvaluator(registry.get('TREND_MOMENTUM')!).evaluateEntry({
+      ...completeTrendMomentumContext(),
+      marketGate: 'UNKNOWN',
+    });
+
+    expect(result.decision).not.toBe('ENTRY_CANDIDATE');
+    expect(result.eligibleForSignalGeneration).toBe(false);
+    expect([...result.blockers, ...result.noiseFiltersTriggered, ...result.dataGaps, ...result.warnings].join(' '))
+      .toMatch(/market.*unknown|unknown.*market/i);
+  });
+
+  it('does not promote active entry candidates when liquidity status is unknown', () => {
+    const result = new StrategyFrameworkEvaluator(registry.get('TREND_MOMENTUM')!).evaluateEntry({
+      ...completeTrendMomentumContext(),
+      dataQuality: {
+        signalReadinessStatus: 'READY',
+        coverageStatus: 'GOOD',
+        liquidityStatus: 'UNKNOWN',
+        eligibleForSignals: true,
+        eligibleForBacktesting: true,
+      },
+    });
+
+    expect(result.decision).not.toBe('ENTRY_CANDIDATE');
+    expect(result.eligibleForSignalGeneration).toBe(false);
+    expect([...result.blockers, ...result.noiseFiltersTriggered, ...result.dataGaps, ...result.warnings].join(' '))
+      .toMatch(/liquidity.*unknown|unknown.*liquidity/i);
+  });
+
+  it('does not promote active entry candidates when liquidity is thin', () => {
+    const result = new StrategyFrameworkEvaluator(registry.get('TREND_MOMENTUM')!).evaluateEntry({
+      ...completeTrendMomentumContext(),
+      dataQuality: {
+        signalReadinessStatus: 'READY',
+        coverageStatus: 'GOOD',
+        liquidityStatus: 'THIN',
+        eligibleForSignals: true,
+        eligibleForBacktesting: true,
+      },
+    });
+
+    expect(result.decision).not.toBe('ENTRY_CANDIDATE');
+    expect(result.eligibleForSignalGeneration).toBe(false);
+    expect([...result.blockers, ...result.noiseFiltersTriggered, ...result.dataGaps, ...result.warnings].join(' '))
+      .toMatch(/thin.*liquidity|liquidity.*thin/i);
+  });
+
+
   it('keeps gate and filter strategies neutral and ineligible for entry promotion', () => {
     for (const code of ['RISK_OFF_AVOIDANCE', 'LOW_QUALITY_DATA_REJECTION']) {
       const result = new StrategyFrameworkEvaluator(registry.get(code)!).evaluateEntry({
@@ -379,6 +428,23 @@ describe('Strategy Framework evaluator', () => {
     expect(draft.eligibleForBacktest).toBe(false);
   });
 });
+
+function completeTrendMomentumContext() {
+  return {
+    instrumentId: 'stock-1',
+    symbol: 'TEST',
+    latestPrice: 120,
+    sma50: 100,
+    sma200: 80,
+    rawSignal: { score: 82, direction: 'BULLISH' } as any,
+    dataQuality: { signalReadinessStatus: 'READY', coverageStatus: 'GOOD', liquidityStatus: 'LIQUID', eligibleForSignals: true, eligibleForBacktesting: true },
+    marketGate: 'OPEN',
+    sectorLeadership: 'LEADING',
+    sectorRelativeStrengthScore: 72,
+    smartMoneyStatus: 'ACCUMULATION',
+    smartMoneyScore: 78,
+  };
+}
 
 function latestFirstBreakoutBars(latestVolume: number, oldestVolume = 1000) {
   const latestDate = new Date('2026-05-28T00:00:00.000Z');

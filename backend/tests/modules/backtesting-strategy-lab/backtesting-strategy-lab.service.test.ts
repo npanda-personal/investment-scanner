@@ -319,6 +319,57 @@ describe('BacktestingStrategyLabService', () => {
     expect(service.shouldEnter(registeredConfig, bars, bars.length - 1)).toBe(true);
   });
 
+  it('provides registered backtests the sector and smart-money context required by active entries', () => {
+    const { service } = createService();
+    const bars = makeRegisteredTrendBars();
+    const registeredConfig: BacktestStrategyConfig = {
+      ...config,
+      mode: 'REGISTERED_STRATEGY',
+      strategyCode: 'TREND_MOMENTUM',
+      strategyVersion: '1.1.0',
+      entryRule: { type: 'SMA50_ABOVE_SMA200' },
+      exitRule: { type: 'PRICE_BELOW_SMA50' },
+    };
+
+    expect(service.shouldEnter(registeredConfig, bars, bars.length - 1)).toBe(true);
+  });
+
+  it('does not attach registered exit rule evidence to operational stop-loss exits', async () => {
+    const bars = makeRegisteredBreakoutStopLossBars();
+    const { service } = createService({
+      marketDataService: {
+        listInstruments: jest.fn().mockResolvedValue({ instruments: [{ id: 'stock-1', symbol: 'AAA' }] }),
+        listPricesByInstrumentId: jest.fn(async () => ({
+          prices: bars.map((bar) => ({
+            date: bar.date,
+            close: bar.close,
+            adjusted_close: bar.close,
+            volume: bar.volume,
+          })),
+        })),
+      },
+    });
+
+    const result = await service.simulate({
+      ...config,
+      universe: { type: 'SYMBOLS', symbols: ['AAA'] },
+      mode: 'REGISTERED_STRATEGY',
+      strategyCode: 'BREAKOUT_CONFIRMATION',
+      strategyVersion: '1.1.0',
+      timeframe: '1Y',
+      entryRule: { type: 'SIGNAL_DIRECTION_BULLISH' },
+      exitRule: { type: 'PRICE_BELOW_SMA50' },
+      stopLossPercent: 0.07,
+      takeProfitPercent: undefined,
+      maxHoldingDays: undefined,
+      transactionCostPercent: 0,
+    });
+    const stopLossTrade = result.trades.find((trade) => trade.exitReason === 'STOP_LOSS');
+
+    expect(stopLossTrade).toBeDefined();
+    expect(stopLossTrade?.exitReasons ?? []).toHaveLength(0);
+  });
+
   it('counts end-of-test exits and returns benchmark gaps without failing', async () => {
     const { service } = createService({
       marketDataService: {
@@ -570,4 +621,18 @@ function makeRegisteredBreakoutBars() {
     volume: 3000,
   };
   return bars;
+}
+
+function makeRegisteredBreakoutStopLossBars() {
+  const bars = makeRegisteredBreakoutBars();
+  const finalDate = new Date(bars[bars.length - 1].date);
+  finalDate.setDate(finalDate.getDate() + 1);
+  return [
+    ...bars,
+    {
+      date: finalDate.toISOString(),
+      close: bars[bars.length - 1].close * 0.85,
+      volume: 3000,
+    },
+  ];
 }

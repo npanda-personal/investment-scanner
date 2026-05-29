@@ -364,6 +364,13 @@ export class StrategyFrameworkEvaluator implements StrategyEvaluator {
     }
     if (!options.skipDataQualityBlock && context.dataQuality?.coverageStatus === 'UNUSABLE') this.block(state, 'COVERAGE_UNUSABLE', 'Data coverage is unusable.');
     if (!options.skipDataQualityBlock && context.dataQuality?.liquidityStatus === 'ILLIQUID') this.block(state, 'ILLIQUID', 'Liquidity is illiquid.');
+    if (!options.skipDataQualityBlock && this.definition.category === 'ENTRY') {
+      const marketGate = String(context.marketGate || 'UNKNOWN').toUpperCase();
+      if (marketGate === 'UNKNOWN') this.block(state, 'MARKET_GATE_UNKNOWN', 'Market gate context is unknown.');
+      const liquidity = String(context.dataQuality?.liquidityStatus || 'UNKNOWN').toUpperCase();
+      if (liquidity === 'UNKNOWN') this.block(state, 'LIQUIDITY_UNKNOWN', 'Liquidity context is unknown.');
+      if (liquidity === 'THIN') this.block(state, 'THIN_LIQUIDITY', 'Liquidity is thin.');
+    }
     if (!options.skipClosedMarketBlock && context.marketGate === 'CLOSED' && this.definition.category === 'ENTRY') this.block(state, 'MARKET_CLOSED', 'Market gate is closed.');
     if (context.reliability?.status === 'LOW' || context.reliability?.noiseLevel === 'HIGH') this.block(state, 'LOW_RELIABILITY', 'Signal reliability is low/noisy.');
   }
