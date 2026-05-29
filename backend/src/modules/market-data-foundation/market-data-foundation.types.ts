@@ -241,6 +241,45 @@ export interface MarketMoversSummary {
   ranges: MarketMoverRangeSummary[];
 }
 
+export interface MarketMapTile {
+  instrumentId: string;
+  symbol: string;
+  displaySymbol: string;
+  companyName: string;
+  sector: string | null;
+  derivativesEligible: boolean | null;
+  dataStatus: MarketDataStatus | null;
+  returnPercent: number | null;
+  latestDate: string | null;
+  priceBasis?: 'ADJUSTED_CLOSE' | 'CLOSE_FALLBACK';
+}
+
+export interface MarketMapGroup {
+  key: string;
+  label: string;
+  tileCount: number;
+  avgReturnPercent: number | null;
+}
+
+export interface MarketMapSummary {
+  status: 'ready' | 'missing';
+  scope: {
+    region: string;
+    assetType: string;
+  };
+  asOf: string | null;
+  range: MarketMoverRange;
+  materialized: false;
+  sourceLabels: {
+    catalog: string;
+    prices: string;
+  };
+  warnings: string[];
+  gaps: string[];
+  groups: MarketMapGroup[];
+  tiles: MarketMapTile[];
+}
+
 export interface OfficialEodBulkSyncEvidence {
   enabled: boolean;
   attempted: boolean;

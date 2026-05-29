@@ -1,8 +1,11 @@
+import axios from 'axios';
 import { fetchDailyOverviewMarketMovers, fetchDailyOverviewTodayReview } from '@/features/daily-overview-dashboard/api/dailyOverviewDashboardApi';
 import { fetchPersistedMarketBreadth, fetchPersistedMarketContextSummary, type MarketContextSummary } from '@/features/market-context-intelligence';
 import { fetchInstruments, fetchMarketDataUniverseHealth } from '@/features/market-data-foundation';
 import type { MarketScope } from '@/contexts/MarketScopeContext';
-import type { MarketIntelligenceSnapshot, SnapshotResource } from '../types';
+import type { MarketMapSummary, MarketIntelligenceSnapshot, SnapshotResource } from '../types';
+
+const API_BASE = '/api';
 
 const SOURCE_URLS = {
   fiiDii: 'https://www.nseindia.com/reports/fii-dii/',
@@ -47,6 +50,18 @@ export async function fetchMarketIntelligenceSnapshot(scope: MarketScope): Promi
     fnoUnderlyings: settle(fnoUnderlyings, 'F&O underlying catalog flag', null, SOURCE_URLS.dataSharing),
     mapInstruments: settle(mapInstruments, 'Instrument catalog evidence', null),
   };
+}
+
+export async function fetchMarketMap(scope: MarketScope, range = '1D', limit = 60): Promise<MarketMapSummary> {
+  const response = await axios.get<MarketMapSummary>(`${API_BASE}/v1/market-data/market-map`, {
+    params: {
+      region: scope.region,
+      assetType: scope.assetType,
+      range,
+      limit,
+    },
+  });
+  return response.data;
 }
 
 function settlePersistedMarketContext(result: PromiseSettledResult<Awaited<ReturnType<typeof fetchPersistedMarketContextSummary>>>): SnapshotResource<MarketContextSummary> {

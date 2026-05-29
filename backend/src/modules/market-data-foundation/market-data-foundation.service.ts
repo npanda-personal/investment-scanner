@@ -31,6 +31,8 @@ import type {
   MarketDataPriceIdentityRepairSummary,
   MarketDataRepairStateStatus,
   MarketDataUniverseHealth,
+  MarketMapGroup,
+  MarketMapSummary,
   StockColumnMissingDataDiagnostic,
   StockExpectedNullColumnDiagnostic,
   StockIdentityMismatchWarning,
@@ -615,12 +617,120 @@ export class MarketDataFoundationService {
     };
   }
 
+  async marketMap(options: Pick<PaginationOptions, 'region' | 'assetType'> & { limit?: number; range?: string } = {}): Promise<MarketMapSummary> {
+    const scope = {
+      region: options.region?.trim().toUpperCase() || 'IN',
+      assetType: options.assetType?.trim().toUpperCase() || 'STOCK',
+    };
+    const range = this.marketMoverRange(options.range) ?? '1D';
+    const limit = Math.max(1, Math.min(Number(options.limit) || 60, 100));
+    const latestDataTimestamp = await this.repository.latestDataTimestamp(scope).catch(() => null);
+    const latestDateStart = latestDataTimestamp ? new Date(latestDataTimestamp) : null;
+    latestDateStart?.setUTCHours(0, 0, 0, 0);
+    const latestDateEnd = latestDateStart ? new Date(latestDateStart) : null;
+    latestDateEnd?.setUTCDate(latestDateEnd.getUTCDate() + 1);
+    const rowLimit = Math.max(1, Math.ceil(limit / 2));
+    const rows = await this.repository.marketMoversForRange(MARKET_MOVER_LOOKBACK_DAYS[range], {
+      ...scope,
+      limit: rowLimit,
+      minHistoryBars: MARKET_MOVER_MIN_HISTORY_BARS[range],
+      maxAbsReturn: MARKET_MOVER_MAX_ABS_RETURN[range],
+      recentBars: Math.min(20, MARKET_MOVER_MIN_HISTORY_BARS[range]),
+      latestDateStart,
+      latestDateEnd,
+    }).catch(() => []);
+    const seen = new Set<string>();
+    const orderedRows = rows
+      .filter((row) => Number.isFinite(row.returnPercent))
+      .sort((left, right) => Math.abs(right.returnPercent) - Math.abs(left.returnPercent))
+      .filter((row) => {
+        if (seen.has(row.instrumentId)) return false;
+        seen.add(row.instrumentId);
+        return true;
+      })
+      .slice(0, limit);
+
+    const tiles = orderedRows.map((row) => ({
+      instrumentId: row.instrumentId,
+      symbol: row.symbol,
+      displaySymbol: row.symbol,
+      companyName: row.companyName,
+      sector: row.sector,
+      derivativesEligible: null,
+      dataStatus: 'COMPLETE' as MarketDataStatus,
+      returnPercent: row.returnPercent,
+      latestDate: row.latestDate,
+      priceBasis: row.priceBasis,
+    }));
+    const groups = this.marketMapGroups(tiles);
+    const hasMissingSector = tiles.some((tile) => !tile.sector?.trim());
+    const gaps = [
+      ...(tiles.length === 0 ? ['Market map needs catalog rows and stored price movement evidence for the selected scope.'] : []),
+      'Additional stock overlays require later saved evidence before they can appear here.',
+      'Additional grouping modes require later saved evidence before they can appear here.',
+      ...(hasMissingSector ? ['Some map rows are missing sector metadata and are not included in sector groups.'] : []),
+    ];
+    const warnings = tiles.length > 0
+      ? ['Map returns are based on stored daily candles for the selected range and exclude unsupported, stale, insufficient-history, low-liquidity, or mixed-source rows.']
+      : ['No priced stocks have enough stored movement evidence for the selected Market Map range.'];
+
+    return {
+      status: tiles.length > 0 ? 'ready' : 'missing',
+      scope,
+      asOf: latestDataTimestamp?.toISOString() ?? null,
+      range,
+      materialized: false,
+      sourceLabels: {
+        catalog: 'Market Data Foundation stock catalog',
+        prices: 'Stored daily price history',
+      },
+      warnings,
+      gaps,
+      groups,
+      tiles,
+    };
+  }
+
   private marketMoverRange(value: unknown): MarketMoverRange | null {
     if (typeof value !== 'string') return null;
     const normalized = value.trim().toUpperCase();
     return Object.prototype.hasOwnProperty.call(MARKET_MOVER_LOOKBACK_DAYS, normalized)
       ? normalized as MarketMoverRange
       : null;
+  }
+
+  private marketMapGroups(tiles: MarketMapSummary['tiles']): MarketMapGroup[] {
+    const groups = new Map<string, MarketMapSummary['tiles']>();
+    for (const tile of tiles) {
+      const key = tile.sector?.trim();
+      if (!key) continue;
+      groups.set(key, [...(groups.get(key) || []), tile]);
+    }
+    return [...groups.entries()]
+      .map(([key, rows]) => ({
+        key,
+        label: key,
+        tileCount: rows.length,
+        avgReturnPercent: this.roundNullable(this.averageNumber(rows.map((row) => row.returnPercent).filter(this.isFiniteNumber))),
+      }))
+      .sort((left, right) => {
+        const leftAbs = Math.abs(left.avgReturnPercent ?? 0);
+        const rightAbs = Math.abs(right.avgReturnPercent ?? 0);
+        return rightAbs - leftAbs || left.label.localeCompare(right.label);
+      });
+  }
+
+  private averageNumber(values: number[]): number | null {
+    if (values.length === 0) return null;
+    return values.reduce((sum, value) => sum + value, 0) / values.length;
+  }
+
+  private isFiniteNumber(value: number | null): value is number {
+    return typeof value === 'number' && Number.isFinite(value);
+  }
+
+  private roundNullable(value: number | null): number | null {
+    return value === null ? null : Number(value.toFixed(6));
   }
 
   async stockMissingDataDiagnostics(options: Pick<PaginationOptions, 'region' | 'assetType'> & { sampleLimit?: number } = {}): Promise<StockMissingDataDiagnostics> {

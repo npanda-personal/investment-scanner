@@ -168,6 +168,42 @@ Next active item after commit:
 
 - Continue with the next Market Intelligence persisted read-model slice after `CF-W3-MI-01E` is committed and fast-forwarded into `dev`.
 
+## Latest Team 00 Routing Update - Market Intelligence Market Map Read Slice
+
+Date: 2026-05-29
+
+Current slice:
+
+- `CF-W3-MI-01F` Market Map dedicated read path is accepted for scoped local commit.
+- Branch: `codex/team00-market-intelligence/CF-W3-MI-01F-market-map-read`.
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team00-CF-W3-MI-01F-market-map-read`.
+
+Implemented:
+
+- Added read-only `GET /api/v1/market-data/market-map` inside the existing Market Data v1 router.
+- Market Map now uses the dedicated Market Map read path instead of the broad Market Intelligence snapshot fanout.
+- Market Map renders sector-grouped stock tiles from stored daily price movement evidence only.
+- Page-load calls to Today Review, universe health, persisted market context, persisted breadth, materializing market-context reads, and generic instruments reads are blocked by UI smoke coverage.
+- Trader-facing copy avoids claims for trigger, Smart Money, portfolio/watchlist, derivatives, institutional-flow, market-cap, or industry overlays.
+
+Validation:
+
+- Backend focused Jest passed, 2 suites / 163 tests.
+- Backend build passed.
+- Frontend build passed with the existing large chunk warning.
+- Market Intelligence Playwright smoke passed, 9 tests.
+- Temporary Vite process was stopped after UI validation.
+
+Review gates:
+
+- QA final review accepted.
+- Product Owner review accepted.
+- Architect signoff accepted.
+
+Next active item after commit:
+
+- Continue with the next Market Intelligence target-state persisted/read-only slice after `CF-W3-MI-01F` is committed and fast-forwarded into `dev`.
+
 ## Latest Team 00 Routing Update - Narrowed Focus / UX-01B Closed
 
 Date: 2026-05-26

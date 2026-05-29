@@ -104,6 +104,112 @@ describe('MarketDataFoundationService syncV1', () => {
     }));
   });
 
+  it('builds market-map tiles from scoped stored-price movers without generating shared data', async () => {
+    const latestDataTimestamp = jest.fn().mockResolvedValue(new Date('2026-05-27T00:00:00.000Z'));
+    const marketMoversForRange = jest.fn().mockResolvedValue([
+      {
+        instrumentId: 'stock-1',
+        symbol: 'ALPHA',
+        companyName: 'Alpha Ltd',
+        sector: 'Financial Services',
+        latestDate: '2026-05-27T00:00:00.000Z',
+        latestClose: 120,
+        baseDate: '2026-05-26T00:00:00.000Z',
+        baseClose: 115,
+        returnPercent: 0.043,
+        priceBasis: 'ADJUSTED_CLOSE',
+        historyBarsInWindow: 20,
+      },
+      {
+        instrumentId: 'stock-2',
+        symbol: 'BETA',
+        companyName: 'Beta Ltd',
+        sector: 'Utilities',
+        latestDate: '2026-05-27T00:00:00.000Z',
+        latestClose: 85,
+        baseDate: '2026-05-26T00:00:00.000Z',
+        baseClose: 88,
+        returnPercent: -0.034,
+        priceBasis: 'ADJUSTED_CLOSE',
+        historyBarsInWindow: 20,
+      },
+    ]);
+    const repository = {
+      latestDataTimestamp,
+      marketMoversForRange,
+      listInstruments: jest.fn(),
+      listStocksForUniverseHealth: jest.fn(),
+    };
+    const service = new MarketDataFoundationService(repository as any, {} as any);
+
+    const result = await (service as any).marketMap({ region: 'IN', assetType: 'STOCK', range: '1D', limit: 60 });
+
+    expect(result).toMatchObject({
+      status: 'ready',
+      scope: { region: 'IN', assetType: 'STOCK' },
+      range: '1D',
+      materialized: false,
+      sourceLabels: {
+        catalog: 'Market Data Foundation stock catalog',
+        prices: 'Stored daily price history',
+      },
+    });
+    expect(result.tiles).toEqual([
+      expect.objectContaining({
+        instrumentId: 'stock-1',
+        symbol: 'ALPHA',
+        displaySymbol: 'ALPHA',
+        companyName: 'Alpha Ltd',
+        sector: 'Financial Services',
+        returnPercent: 0.043,
+        dataStatus: 'COMPLETE',
+      }),
+      expect.objectContaining({
+        instrumentId: 'stock-2',
+        symbol: 'BETA',
+        sector: 'Utilities',
+        returnPercent: -0.034,
+      }),
+    ]);
+    expect(result.groups).toEqual(expect.arrayContaining([
+      expect.objectContaining({ key: 'Financial Services', label: 'Financial Services', tileCount: 1, avgReturnPercent: 0.043 }),
+      expect.objectContaining({ key: 'Utilities', label: 'Utilities', tileCount: 1, avgReturnPercent: -0.034 }),
+    ]));
+    expect(marketMoversForRange).toHaveBeenCalledWith(1, expect.objectContaining({
+      region: 'IN',
+      assetType: 'STOCK',
+      limit: 30,
+      latestDateStart: new Date('2026-05-27T00:00:00.000Z'),
+      latestDateEnd: new Date('2026-05-28T00:00:00.000Z'),
+    }));
+    expect(repository.listInstruments).not.toHaveBeenCalled();
+    expect(repository.listStocksForUniverseHealth).not.toHaveBeenCalled();
+  });
+
+  it('returns an honest missing market-map envelope without materializing when no mover rows exist', async () => {
+    const repository = {
+      latestDataTimestamp: jest.fn().mockResolvedValue(null),
+      marketMoversForRange: jest.fn().mockResolvedValue([]),
+    };
+    const service = new MarketDataFoundationService(repository as any, {} as any);
+
+    const result = await (service as any).marketMap({ region: 'IN', assetType: 'STOCK', range: '1M', limit: 60 });
+
+    expect(result).toMatchObject({
+      status: 'missing',
+      scope: { region: 'IN', assetType: 'STOCK' },
+      range: '1M',
+      asOf: null,
+      materialized: false,
+      tiles: [],
+      groups: [],
+    });
+    expect(result.gaps[0]).toBe('Market map needs catalog rows and stored price movement evidence for the selected scope.');
+    expect(result.gaps).toEqual(expect.arrayContaining([
+      expect.stringMatching(/catalog rows and stored price movement evidence/i),
+    ]));
+  });
+
   it('keeps price fallback-blocked rows out of universe-health automatic backfill counts', async () => {
     const repository = {
       listStocksForUniverseHealth: jest.fn().mockResolvedValue([

@@ -13,6 +13,7 @@ const controller = {
   stockMissingDataDiagnostics: jest.fn(),
   reviewReadinessSummary: jest.fn(),
   marketMovers: jest.fn(),
+  marketMap: jest.fn(),
   trustedReviewUniverseHealth: jest.fn(),
   trustedReviewUniverseInstruments: jest.fn(),
   repairPlan: jest.fn(),
@@ -80,6 +81,7 @@ describe('market data routers', () => {
         'GET /market-data/stocks/missing-data-diagnostics',
         'GET /market-data/review-readiness-summary',
         'GET /market-data/movers',
+        'GET /market-data/market-map',
         'GET /market-data/review-universe',
         'GET /market-data/review-universe/instruments',
         'GET /market-data/universe/repair-plan',
@@ -218,6 +220,47 @@ describe('market data controller', () => {
       policy: 'INCREMENTAL_LATEST_ONLY',
     }));
     expect(res.json).toHaveBeenCalledWith({ processedCount: 3 });
+  });
+
+  it('passes market-map read params to service without mutation semantics', async () => {
+    const service = {
+      marketMap: jest.fn().mockResolvedValue({
+        status: 'ready',
+        scope: { region: 'IN', assetType: 'STOCK' },
+        range: '1D',
+        materialized: false,
+        tiles: [],
+        groups: [],
+      }),
+    };
+    const controller = new MarketDataFoundationController(service as any);
+    const req = {
+      query: {
+        region: 'IN',
+        assetType: 'STOCK',
+        range: '1W',
+        limit: '60',
+      },
+      originalUrl: '/api/v1/market-data/market-map',
+    } as any;
+    const res = {
+      json: jest.fn(),
+      status: jest.fn().mockReturnThis(),
+    } as any;
+
+    await (controller as any).marketMap(req, res);
+
+    expect(service.marketMap).toHaveBeenCalledWith({
+      region: 'IN',
+      assetType: 'STOCK',
+      range: '1W',
+      limit: 60,
+    });
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      materialized: false,
+      range: '1D',
+    }));
+    expect(res.status).not.toHaveBeenCalled();
   });
 
   it('starts price backfill as a background run with bounded parameters', async () => {

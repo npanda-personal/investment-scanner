@@ -417,6 +417,21 @@ export class MarketDataFoundationController {
     }
   };
 
+  marketMap = async (req: Request, res: Response) => {
+    try {
+      const { region, assetType } = this.getMarketFilter(req);
+      return res.json(await this.service.marketMap({
+        region,
+        assetType,
+        limit: this.numberParam(req, 'limit'),
+        range: typeof req.query.range === 'string' ? req.query.range : undefined,
+      }));
+    } catch (error) {
+      console.error('Market map read error:', error);
+      return res.status(500).json({ error: 'Market map read failed' });
+    }
+  };
+
   trustedReviewUniverseInstruments = async (req: Request, res: Response) => {
     try {
       const { region, assetType } = this.getMarketFilter(req);

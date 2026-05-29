@@ -1,5 +1,48 @@
 # TEAM-00 Orchestrator / Integration Outbox
 
+## Latest Runtime Checkpoint - Market Intelligence Market Map Read Slice
+
+Date: 2026-05-29
+
+Status:
+
+- Branch: `codex/team00-market-intelligence/CF-W3-MI-01F-market-map-read`.
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team00-CF-W3-MI-01F-market-map-read`.
+- Product Owner action required: no.
+- Push performed: no.
+
+Completed:
+
+- Added read-only `GET /api/v1/market-data/market-map`.
+- Reworked Market Map to call only the dedicated Market Map read path.
+- Removed Market Map dependency on broad Market Intelligence snapshot fanout.
+- Kept the first Market Map slice sector-grouped and performance-only from stored daily price movement evidence.
+- Kept trigger, Smart Money, portfolio/watchlist, institutional-flow, derivatives, market-cap, and industry overlays deferred.
+
+Validation:
+
+- Backend focused Jest passed, 2 suites / 163 tests.
+- Backend build passed.
+- Frontend build passed with the existing large chunk warning.
+- Full Market Intelligence Playwright smoke passed, 9 tests.
+- Temporary Vite process was stopped.
+
+Review gates:
+
+- QA final review: accepted.
+- Product Owner review: accepted.
+- Architect signoff: accepted.
+
+Teams ready to pick up new tasks:
+
+- Team 00: commit this accepted slice, fast-forward `dev`, then choose the next Market Intelligence persisted/read-only slice.
+- Team 03: architecture for the next read model selected by Team 00.
+- Team 04: QA plan/tests-first pass for the next selected slice.
+
+Next action:
+
+- Commit `CF-W3-MI-01F` locally and merge/fast-forward into `dev`; then continue with the next Market Intelligence target-state slice.
+
 ## Latest Runtime Checkpoint - Market Intelligence Institutional Flow/Derivatives Slice
 
 Date: 2026-05-29

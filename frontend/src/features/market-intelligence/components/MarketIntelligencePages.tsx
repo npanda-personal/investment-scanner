@@ -25,8 +25,9 @@ import { useMarketScope } from '@/contexts/MarketScopeContext';
 import { PageHeader, StatusBadge } from '@/shared/components';
 import type { MarketMoverRange, MarketMoverRow } from '@/features/daily-overview-dashboard/types';
 import { fetchInstruments, type V1Instrument } from '@/features/market-data-foundation';
+import { fetchMarketMap } from '../api/marketIntelligenceService';
 import { useMarketIntelligenceSnapshot } from '../hooks/useMarketIntelligenceSnapshot';
-import type { MarketEnvironmentState, MarketIntelligenceSnapshot } from '../types';
+import type { MarketEnvironmentState, MarketIntelligenceSnapshot, MarketMapSummary, MarketMapTile } from '../types';
 
 const rangeOptions: MarketMoverRange[] = ['1D', '1W', '1M', '3M', '6M'];
 
@@ -361,23 +362,19 @@ export function DerivativesContextPage() {
 }
 
 export function MarketMapPage() {
-  const view = useMarketIntelligenceSnapshot();
-  const snapshot = view.snapshot;
   const [range, setRange] = useState<MarketMoverRange>('1D');
-  const moverRange = snapshot?.marketMovers.value?.ranges.find((item) => item.range === range) ?? null;
-  const movers = [...(moverRange?.gainers ?? []), ...(moverRange?.losers ?? [])];
-  const instruments = snapshot?.mapInstruments.value?.instruments ?? [];
-  const rows = mergeMapRows(instruments, movers).slice(0, 60);
+  const view = useMarketMap(range);
+  const summary = view.summary;
+  const rows = summary?.tiles ?? [];
 
   return (
-    <MarketPageShell
+    <ScopedMarketPageShell
       title="Market Map"
-      subtitle="Big-picture stock map by sector, industry, market cap, price performance, trigger density, data readiness, smart-money status, and F&O eligibility where evidence exists."
+      subtitle="Stock map by sector and stored price movement. This page uses read-only saved market data and does not start refresh work."
       loading={view.loading}
       error={view.error}
-      snapshot={snapshot}
     >
-      {snapshot && (
+      {summary && (
         <Stack spacing={2}>
           <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', md: 'center' }} gap={1}>
             <ToggleButtonGroup
@@ -396,13 +393,35 @@ export function MarketMapPage() {
               <Button component={RouterLink} to="/alerts" variant="outlined">Create Alert</Button>
             </Stack>
           </Stack>
+          <SectionCard title="Map Evidence" subtitle="Catalog plus stored daily price movement">
+            <Grid container spacing={1}>
+              <Grid item xs={12} md={3}><InlineMetric label="Range" value={summary.range} /></Grid>
+              <Grid item xs={12} md={3}><InlineMetric label="Rows" value={formatNumber(rows.length)} /></Grid>
+              <Grid item xs={12} md={3}><InlineMetric label="As of" value={formatDate(summary.asOf)} /></Grid>
+              <Grid item xs={12} md={3}><InlineMetric label="Groups" value={formatNumber(summary.groups.length)} /></Grid>
+            </Grid>
+          </SectionCard>
+          {summary.groups.length > 0 && (
+            <SectionCard title="Sector Groups" subtitle="Grouped only where sector metadata is present">
+              <Stack direction="row" gap={0.75} flexWrap="wrap" useFlexGap>
+                {summary.groups.map((group) => (
+                  <Chip
+                    key={group.key}
+                    label={`${group.label} ${formatPercent(group.avgReturnPercent)}`}
+                    variant="outlined"
+                    color={(group.avgReturnPercent ?? 0) >= 0 ? 'success' : 'warning'}
+                  />
+                ))}
+              </Stack>
+            </SectionCard>
+          )}
           <Grid container spacing={1.25}>
             {rows.map((row) => (
-              <Grid key={row.id} item xs={12} sm={6} md={4} lg={3}>
+              <Grid key={row.instrumentId} item xs={12} sm={6} md={4} lg={3}>
                 <Paper
                   variant="outlined"
                   component={RouterLink}
-                  to={`/stocks/${row.id}`}
+                  to={`/stocks/${row.instrumentId}`}
                   sx={{
                     display: 'block',
                     height: '100%',
@@ -416,14 +435,14 @@ export function MarketMapPage() {
                 >
                   <Stack spacing={1}>
                     <Stack direction="row" justifyContent="space-between" gap={1}>
-                      <Typography variant="subtitle2" fontWeight={800} noWrap>{row.symbol}</Typography>
+                      <Typography variant="subtitle2" fontWeight={800} noWrap>{row.displaySymbol || row.symbol}</Typography>
                       <Typography variant="body2" fontWeight={800} color={returnColor(row.returnPercent)}>{formatPercent(row.returnPercent)}</Typography>
                     </Stack>
                     <Typography variant="caption" color="text.secondary" noWrap>{row.companyName}</Typography>
                     <Stack direction="row" gap={0.5} flexWrap="wrap" useFlexGap>
                       <Chip size="small" label={row.sector || 'Sector missing'} variant="outlined" />
-                      <Chip size="small" label={row.derivativesEligible ? 'F&O' : 'Cash'} variant="outlined" />
-                      <StatusBadge label={row.dataStatus || 'DQ unknown'} />
+                      <Chip size="small" label={fnoLabel(row.derivativesEligible)} variant="outlined" />
+                      <StatusBadge label={row.dataStatus || 'Price status unknown'} />
                     </Stack>
                   </Stack>
                 </Paper>
@@ -433,13 +452,18 @@ export function MarketMapPage() {
           {rows.length === 0 && (
             <MissingEvidence
               title="No map rows available"
-              message="Market map needs instrument catalog rows and persisted price evidence for the selected scope."
-              source="Instrument catalog and market movers"
+              message={summary.gaps[0] || 'Market map needs catalog rows and stored price movement evidence for the selected scope.'}
+              source={`${summary.sourceLabels.catalog} and ${summary.sourceLabels.prices}`}
             />
+          )}
+          {summary.gaps.length > 0 && rows.length > 0 && (
+            <SectionCard title="Missing Overlay Evidence" subtitle="Not inferred in this slice">
+              <GapList items={summary.gaps} />
+            </SectionCard>
           )}
         </Stack>
       )}
-    </MarketPageShell>
+    </ScopedMarketPageShell>
   );
 }
 
@@ -541,6 +565,36 @@ function useFnoUnderlyings() {
   }, [scope]);
 
   return { rows, loading, error };
+}
+
+function useMarketMap(range: MarketMoverRange) {
+  const { scope } = useMarketScope();
+  const requestRef = useRef(0);
+  const [summary, setSummary] = useState<MarketMapSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const requestId = requestRef.current + 1;
+    requestRef.current = requestId;
+    setLoading(true);
+    setError(null);
+
+    fetchMarketMap(scope, range, 60)
+      .then((result) => {
+        if (requestRef.current === requestId) setSummary(result);
+      })
+      .catch((caught) => {
+        if (requestRef.current !== requestId) return;
+        setSummary(null);
+        setError(toErrorMessage(caught));
+      })
+      .finally(() => {
+        if (requestRef.current === requestId) setLoading(false);
+      });
+  }, [scope, range]);
+
+  return { summary, loading, error };
 }
 
 function FreshnessStrip({ snapshot }: { snapshot: MarketIntelligenceSnapshot }) {
@@ -752,22 +806,6 @@ function environmentMessage(state: MarketEnvironmentState) {
   return 'Persisted market evidence is unavailable for this scope.';
 }
 
-function mergeMapRows(instruments: V1Instrument[], movers: MarketMoverRow[]) {
-  const moverByInstrumentId = new Map(movers.map((item) => [item.instrumentId, item]));
-  return instruments.map((instrument) => {
-    const mover = moverByInstrumentId.get(instrument.id);
-    return {
-      id: instrument.id,
-      symbol: instrument.display_symbol || instrument.symbol,
-      companyName: instrument.company_name,
-      sector: instrument.sector,
-      derivativesEligible: Boolean(instrument.derivatives_eligible),
-      dataStatus: instrument.data_status,
-      returnPercent: mover?.returnPercent ?? null,
-    };
-  });
-}
-
 function formatNumber(value: number | null | undefined) {
   if (typeof value !== 'number' || Number.isNaN(value)) return 'Unavailable';
   return new Intl.NumberFormat().format(value);
@@ -821,4 +859,10 @@ function toneForReturn(value: number | null) {
 function toErrorMessage(error: unknown) {
   if (error instanceof Error) return error.message;
   return 'Market evidence is unavailable.';
+}
+
+function fnoLabel(value: MarketMapTile['derivativesEligible']) {
+  if (value === true) return 'F&O';
+  if (value === false) return 'Cash';
+  return 'F&O unknown';
 }

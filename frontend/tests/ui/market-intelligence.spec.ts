@@ -230,6 +230,69 @@ function fnoUnderlyingsPayload() {
   };
 }
 
+function marketMapPayload() {
+  return {
+    status: 'ready',
+    scope: { region: 'IN', assetType: 'STOCK' },
+    asOf: '2026-05-27T00:00:00.000Z',
+    range: '1D',
+    materialized: false,
+    sourceLabels: {
+      catalog: 'Market Data Foundation stock catalog',
+      prices: 'Stored daily price history',
+    },
+    warnings: ['Map returns are based on stored daily candles for the selected range.'],
+    gaps: ['Additional stock overlays require later saved evidence before they can appear here.'],
+    groups: [
+      { key: 'Financial Services', label: 'Financial Services', tileCount: 1, avgReturnPercent: 0.043 },
+      { key: 'Utilities', label: 'Utilities', tileCount: 1, avgReturnPercent: -0.034 },
+    ],
+    tiles: [
+      {
+        instrumentId: 'stock-1',
+        symbol: 'ALPHA',
+        displaySymbol: 'ALPHA',
+        companyName: 'Alpha Ltd',
+        sector: 'Financial Services',
+        derivativesEligible: null,
+        dataStatus: 'COMPLETE',
+        returnPercent: 0.043,
+      },
+      {
+        instrumentId: 'stock-2',
+        symbol: 'BETA',
+        displaySymbol: 'BETA',
+        companyName: 'Beta Ltd',
+        sector: 'Utilities',
+        derivativesEligible: null,
+        dataStatus: 'COMPLETE',
+        returnPercent: -0.034,
+      },
+    ],
+  };
+}
+
+function missingMarketMapPayload() {
+  return {
+    status: 'missing',
+    scope: { region: 'IN', assetType: 'STOCK' },
+    asOf: null,
+    range: '1D',
+    materialized: false,
+    sourceLabels: {
+      catalog: 'Market Data Foundation stock catalog',
+      prices: 'Stored daily price history',
+    },
+    warnings: [],
+    gaps: [
+      'Market map needs catalog rows and stored price movement evidence for the selected scope.',
+      'Additional stock overlays require later saved evidence before they can appear here.',
+    ],
+    groups: [],
+    tiles: [],
+  };
+}
+
 async function fulfillMarketReads(route: Route, persistedMarketContext = persistedMarketContextPayload(), persistedBreadth = persistedBreadthPayload()) {
   const url = new URL(route.request().url());
   if (url.pathname.includes('/market-context/persisted-breadth')) return route.fulfill({ json: persistedBreadth });
@@ -282,6 +345,30 @@ async function setupScopedMarketPage(page: Page) {
   await page.route('**/api/v1/market-context/breadth**', async (route) => {
     throw new Error(`Trader page must not call materializing breadth: ${route.request().url()}`);
   });
+  return apiRequests;
+}
+
+async function setupMarketMapPage(page: Page, payload = marketMapPayload()) {
+  const apiRequests: string[] = [];
+  await mockAuthenticatedUser(page);
+  page.on('request', (request) => {
+    const url = new URL(request.url());
+    if (url.pathname.includes('/api/v1/')) apiRequests.push(`${request.method()} ${url.pathname}${url.search}`);
+  });
+  await page.route('**/api/v1/market-data/market-map**', (route) => route.fulfill({ json: payload }));
+  for (const blockedPath of [
+    '**/api/v1/today-review/latest**',
+    '**/api/v1/market-data/universe/health**',
+    '**/api/v1/market-context/persisted-summary**',
+    '**/api/v1/market-context/persisted-breadth**',
+    '**/api/v1/market-context/summary**',
+    '**/api/v1/market-context/breadth**',
+    '**/api/v1/instruments**',
+  ]) {
+    await page.route(blockedPath, async (route) => {
+      throw new Error(`Market Map must not use broad snapshot fanout: ${route.request().url()}`);
+    });
+  }
   return apiRequests;
 }
 
@@ -421,13 +508,34 @@ test.describe('Market Intelligence user pages', () => {
     await expectNoSharedWritesOrDeveloperCopy(page, apiRequests);
   });
 
-  test('Market Map renders catalog evidence and drilldown links without shared writes', async ({ page }) => {
-    const apiRequests = await setupMarketPage(page);
+  test('Market Map loads only narrow read-only evidence on page load and blocks broad market-intelligence fanout', async ({ page }) => {
+    const apiRequests = await setupMarketMapPage(page);
 
     await visitAuthenticated(page, '/market-map');
 
     await expect(page.getByRole('heading', { name: 'Market Map' }).first()).toBeVisible();
+    await expect(page.getByText('Stock map by sector and stored price movement.')).toBeVisible();
+    await expect(page.getByText('Financial Services').first()).toBeVisible();
+    await expect(page.getByText('ALPHA').first()).toBeVisible();
+    await expect(page.getByText('Alpha Ltd').first()).toBeVisible();
+    await expect(page.getByText('+4.3%').first()).toBeVisible();
     await expect(page.locator('a[href="/stocks/stock-1"]').first()).toBeVisible();
+    await expect.poll(() => apiRequests.some((item) => item.includes('/api/v1/market-data/market-map') && item.includes('region=IN') && item.includes('assetType=STOCK') && item.includes('range=1D'))).toBe(true);
+    expect(apiRequests.filter((item) => item.includes('/api/v1/') && !item.includes('/api/v1/auth/me') && !item.includes('/api/v1/market-data/market-map'))).toEqual([]);
+    const main = await page.locator('main').innerText();
+    expect(main).not.toMatch(/trigger density|smart-money status|portfolio overlay|watchlist overlay|market-cap mode/i);
+    await expectNoSharedWritesOrDeveloperCopy(page, apiRequests);
+  });
+
+  test('Market Map shows a domain-specific empty state from narrow read-only evidence without broad fanout', async ({ page }) => {
+    const apiRequests = await setupMarketMapPage(page, missingMarketMapPayload());
+
+    await visitAuthenticated(page, '/market-map');
+
+    await expect(page.getByRole('heading', { name: 'Market Map' }).first()).toBeVisible();
+    await expect(page.getByText('No map rows available')).toBeVisible();
+    await expect(page.getByText('Market map needs catalog rows and stored price movement evidence for the selected scope.')).toBeVisible();
+    await expect.poll(() => apiRequests.some((item) => item.includes('/api/v1/market-data/market-map'))).toBe(true);
     await expectNoSharedWritesOrDeveloperCopy(page, apiRequests);
   });
 });
