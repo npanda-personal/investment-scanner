@@ -19,11 +19,12 @@ import {
   ToggleButtonGroup,
   Typography,
 } from '@mui/material';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
+import { useMarketScope } from '@/contexts/MarketScopeContext';
 import { PageHeader, StatusBadge } from '@/shared/components';
 import type { MarketMoverRange, MarketMoverRow } from '@/features/daily-overview-dashboard/types';
-import type { V1Instrument } from '@/features/market-data-foundation';
+import { fetchInstruments, type V1Instrument } from '@/features/market-data-foundation';
 import { useMarketIntelligenceSnapshot } from '../hooks/useMarketIntelligenceSnapshot';
 import type { MarketEnvironmentState, MarketIntelligenceSnapshot } from '../types';
 
@@ -264,82 +265,98 @@ export function BreadthParticipationPage() {
 }
 
 export function InstitutionalFlowPage() {
-  const view = useMarketIntelligenceSnapshot();
-
   return (
-    <MarketPageShell
+    <ScopedMarketPageShell
       title="Institutional Flow"
       subtitle="Institutional flow context from FII/FPI and DII activity. This page must not imply a direct entry or exit recommendation."
-      loading={view.loading}
-      error={view.error}
-      snapshot={view.snapshot}
     >
-      {view.snapshot && (
-        <Grid container spacing={2}>
-          <Grid item xs={12} md={4}><MetricCard label="FII/FPI net flow" value="Missing" helper="Requires persisted daily capital-market activity rows." /></Grid>
-          <Grid item xs={12} md={4}><MetricCard label="DII net flow" value="Missing" helper="Requires persisted daily capital-market activity rows." /></Grid>
-          <Grid item xs={12} md={4}><MetricCard label="Flow regime" value="Unavailable" helper="Examples: FII_ACCUMULATION, DII_SUPPORT, INSTITUTIONAL_DISTRIBUTION." /></Grid>
-          <Grid item xs={12}>
-            <SectionCard title="Required Flow Evidence" subtitle="Saved institutional flow evidence">
-              <MissingEvidence
-                title="FII/FPI and DII flow data is not available yet"
-                message="When available, this view should show buy, sell, net values, 5/20-day rolling net flow, divergence versus index movement, and flow regime labels. Copy must stay institutional flow context, not a recommendation."
-                source="NSE FII/DII capital-market activity"
-                sourceUrl="https://www.nseindia.com/reports/fii-dii/"
-              />
-            </SectionCard>
-          </Grid>
+      <Grid container spacing={2}>
+        <Grid item xs={12} md={3}><MetricCard label="FII/FPI buy value" value="Unavailable" helper="Requires a saved institutional-flow snapshot." /></Grid>
+        <Grid item xs={12} md={3}><MetricCard label="FII/FPI sell value" value="Unavailable" helper="Requires a saved institutional-flow snapshot." /></Grid>
+        <Grid item xs={12} md={3}><MetricCard label="DII buy value" value="Unavailable" helper="Requires a saved institutional-flow snapshot." /></Grid>
+        <Grid item xs={12} md={3}><MetricCard label="DII sell value" value="Unavailable" helper="Requires a saved institutional-flow snapshot." /></Grid>
+        <Grid item xs={12} md={3}><MetricCard label="FII/FPI net flow" value="Unavailable" helper="Net flow appears after persisted buy and sell evidence exists." /></Grid>
+        <Grid item xs={12} md={3}><MetricCard label="DII net flow" value="Unavailable" helper="Net flow appears after persisted buy and sell evidence exists." /></Grid>
+        <Grid item xs={12} md={3}><MetricCard label="5-day net flow" value="Unavailable" helper="Rolling flow needs saved daily history." /></Grid>
+        <Grid item xs={12} md={3}><MetricCard label="20-day net flow" value="Unavailable" helper="Rolling flow needs saved daily history." /></Grid>
+        <Grid item xs={12} md={6}><MetricCard label="Index divergence" value="Unavailable" helper="Flow versus index movement needs persisted flow and index evidence." /></Grid>
+        <Grid item xs={12} md={6}><MetricCard label="Flow regime" value="Unavailable" helper="Regime labels need persisted FII/FPI and DII evidence." /></Grid>
+        <Grid item xs={12}>
+          <SectionCard title="Institutional Flow Evidence" subtitle="Saved institutional-flow snapshot status">
+            <MissingEvidence
+              title="FII/FPI and DII flow data is not available yet"
+              message="When available, this view should show buy, sell, net values, rolling flow, divergence versus index movement, and classification labels. Until then, no institutional-flow numbers are shown."
+              source="NSE FII/DII capital-market activity"
+              sourceUrl="https://www.nseindia.com/reports/fii-dii/"
+            />
+          </SectionCard>
         </Grid>
-      )}
-    </MarketPageShell>
+        <Grid item xs={12}>
+          <SectionCard title="Current Limitations" subtitle="What is intentionally not inferred">
+            <GapList items={[
+              'No persisted FII/FPI or DII source rows exist yet.',
+              'Smart Money price-volume context is not treated as institutional-flow evidence.',
+              'This page is read-only and does not update shared market data.',
+            ]} />
+          </SectionCard>
+        </Grid>
+      </Grid>
+    </ScopedMarketPageShell>
   );
 }
 
 export function DerivativesContextPage() {
-  const view = useMarketIntelligenceSnapshot();
-  const rows = view.snapshot?.fnoUnderlyings.value?.instruments ?? [];
+  const view = useFnoUnderlyings();
+  const rows = view.rows;
 
   return (
-    <MarketPageShell
+    <ScopedMarketPageShell
       title="Derivatives Context"
       subtitle="Read-only derivatives market context. Options strategy recommendations and trading instructions are out of scope."
       loading={view.loading}
       error={view.error}
-      snapshot={view.snapshot}
     >
-      {view.snapshot && (
-        <Grid container spacing={2}>
-          <Grid item xs={12}>
-            <Alert severity="warning">
-              Derivatives context is not enabled for this scope yet. Existing F&O eligibility flags are catalog context only, not options-chain or futures evidence.
-            </Alert>
-          </Grid>
-          <Grid item xs={12} lg={7}>
-            <SectionCard title="F&O Eligible Underlyings" subtitle="Catalog flag only, not option-chain evidence">
-              {rows.length ? <InstrumentTable rows={rows} emptyMessage="No F&O eligible rows found." /> : (
-                <MissingEvidence
-                  title="No F&O eligibility rows found"
-                  message="F&O eligibility may not be imported for this scope, or the catalog has no eligible underlyings."
-                  source="Local instrument catalog"
-                />
-              )}
-            </SectionCard>
-          </Grid>
-          <Grid item xs={12} lg={5}>
-            <SectionCard title="Not Enabled Yet" subtitle="Derivatives context needs">
-              <GapList items={[
-                'index futures trend',
-                'option-chain summary',
-                'put-call ratio',
-                'open-interest change',
-                'top strikes by OI and OI change',
-                'expiry proximity',
-              ]} />
-            </SectionCard>
-          </Grid>
+      <Grid container spacing={2}>
+        <Grid item xs={12}>
+          <Alert severity="warning">
+            Derivatives context is not enabled for this scope yet. Existing F&O eligibility flags are catalog context only, not option-chain or futures evidence.
+          </Alert>
         </Grid>
-      )}
-    </MarketPageShell>
+        <Grid item xs={12} lg={7}>
+          <SectionCard title="F&O Eligible Underlyings" subtitle="Catalog eligibility only, not option-chain evidence">
+            {rows.length ? <InstrumentTable rows={rows} emptyMessage="No F&O eligible rows found." /> : (
+              <MissingEvidence
+                title="No F&O eligibility rows found"
+                message="F&O eligibility may not be imported for this scope, or the catalog has no eligible underlyings."
+                source="Local instrument catalog"
+              />
+            )}
+          </SectionCard>
+        </Grid>
+        <Grid item xs={12} lg={5}>
+          <SectionCard title="Unavailable Derivatives Evidence" subtitle="Shown only after persisted snapshots exist">
+            <GapList items={[
+              'Index futures trend',
+              'Option-chain summary',
+              'Put-call ratio',
+              'Open-interest change',
+              'Top strikes by OI',
+              'Top strikes by OI change',
+              'Expiry proximity',
+            ]} />
+          </SectionCard>
+        </Grid>
+        <Grid item xs={12}>
+          <SectionCard title="Current Limitations" subtitle="Catalog context only">
+            <GapList items={[
+              'F&O eligibility is not futures or options-chain evidence.',
+              'No PCR, OI, strike, expiry, or futures trend snapshot is persisted yet.',
+              'This page is read-only and does not update shared market data.',
+            ]} />
+          </SectionCard>
+        </Grid>
+      </Grid>
+    </ScopedMarketPageShell>
   );
 }
 
@@ -462,6 +479,68 @@ function MarketPageShell({
       {children}
     </Box>
   );
+}
+
+function ScopedMarketPageShell({
+  title,
+  subtitle,
+  loading = false,
+  error = null,
+  children,
+}: {
+  title: string;
+  subtitle: string;
+  loading?: boolean;
+  error?: string | null;
+  children: ReactNode;
+}) {
+  const { scope } = useMarketScope();
+  return (
+    <Box className="page-container page-container--hub">
+      <PageHeader
+        title={title}
+        subtitle={subtitle}
+        badges={(
+          <Stack direction="row" gap={1} flexWrap="wrap" useFlexGap>
+            <Chip label={`${scope.region} / ${scope.assetType}`} color="primary" variant="outlined" size="small" />
+          </Stack>
+        )}
+      />
+      {loading && <LinearProgress sx={{ mb: 2 }} />}
+      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+      {children}
+    </Box>
+  );
+}
+
+function useFnoUnderlyings() {
+  const { scope } = useMarketScope();
+  const requestRef = useRef(0);
+  const [rows, setRows] = useState<V1Instrument[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const requestId = requestRef.current + 1;
+    requestRef.current = requestId;
+    setLoading(true);
+    setError(null);
+
+    fetchInstruments({ region: scope.region, assetType: scope.assetType, derivativesEligible: true, pageSize: 75 })
+      .then((result) => {
+        if (requestRef.current === requestId) setRows(result.instruments);
+      })
+      .catch((caught) => {
+        if (requestRef.current !== requestId) return;
+        setRows([]);
+        setError(toErrorMessage(caught));
+      })
+      .finally(() => {
+        if (requestRef.current === requestId) setLoading(false);
+      });
+  }, [scope]);
+
+  return { rows, loading, error };
 }
 
 function FreshnessStrip({ snapshot }: { snapshot: MarketIntelligenceSnapshot }) {
@@ -737,4 +816,9 @@ function toneForReturn(value: number | null) {
   if (value > 0) return 'success.main';
   if (value < 0) return 'error.main';
   return 'divider';
+}
+
+function toErrorMessage(error: unknown) {
+  if (error instanceof Error) return error.message;
+  return 'Market evidence is unavailable.';
 }

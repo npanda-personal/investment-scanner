@@ -1,5 +1,47 @@
 # TEAM-00 Orchestrator / Integration Outbox
 
+## Latest Runtime Checkpoint - Market Intelligence Institutional Flow/Derivatives Slice
+
+Date: 2026-05-29
+
+Status:
+
+- Branch: `codex/team00-market-intelligence/CF-W3-MI-01E-flow-derivatives-read`.
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team00-CF-W3-MI-01E-flow-derivatives-read`.
+- Product Owner action required: no.
+- Push performed: no.
+
+Completed:
+
+- Reworked Institutional Flow into a read-only missing-state surface for FII/FPI and DII evidence.
+- Removed shared market snapshot reads from Institutional Flow.
+- Reworked Derivatives Context into a read-only catalog-eligibility surface using only existing F&O eligible underlyings.
+- Kept futures, option-chain, PCR, OI, strike, expiry, and derivatives interpretation unavailable until persisted evidence exists.
+- Expanded Market Intelligence UI smoke coverage to prevent user-page writes, materializing/run/sync/generate/evaluate/calibrate/provider/live-like calls, operator wording, and advice-like language.
+
+Validation:
+
+- Playwright Market Intelligence smoke passed, 8 tests.
+- Frontend build passed with the existing large chunk warning.
+- Backend validation was not run because no backend source or contract changed.
+- Temporary Vite process was stopped.
+
+Review gates:
+
+- QA final review: accepted.
+- Product Owner review: accepted; no true consent blocker.
+- Architect signoff: accepted.
+
+Teams ready to pick up new tasks:
+
+- Team 00: commit this accepted slice, fast-forward `dev`, then prepare the next Market Intelligence persisted read-model slice.
+- Team 03: architecture for the next persisted read model after Team 00 selects the next slice.
+- Team 04: QA plan for the next promoted Market Intelligence slice.
+
+Next action:
+
+- Commit `CF-W3-MI-01E` locally and merge/fast-forward into `dev`; then continue with the next Market Intelligence target-state slice.
+
 ## Latest Runtime Checkpoint - Market Intelligence Index/Breadth Slice
 
 Date: 2026-05-29

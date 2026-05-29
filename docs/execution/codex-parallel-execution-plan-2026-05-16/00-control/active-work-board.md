@@ -133,6 +133,41 @@ Next active item after commit:
 
 - `CF-W3-MI-01E` institutional flow and derivatives context persistence strategy/read model slice.
 
+## Latest Team 00 Routing Update - Market Intelligence Institutional Flow/Derivatives Slice
+
+Date: 2026-05-29
+
+Current slice:
+
+- `CF-W3-MI-01E` institutional flow and derivatives read-only frontend slice is accepted for scoped local commit.
+- Branch: `codex/team00-market-intelligence/CF-W3-MI-01E-flow-derivatives-read`.
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team00-CF-W3-MI-01E-flow-derivatives-read`.
+
+Implemented:
+
+- Institutional Flow renders explicit unavailable FII/FPI and DII evidence slots without invented flow numbers or regime labels.
+- Institutional Flow does not call shared market-context snapshot or materializing market APIs.
+- Derivatives Context renders explicit not-enabled derivatives evidence and existing F&O eligible underlyings from the local catalog only.
+- Derivatives Context does not claim futures, option-chain, PCR, OI, strike, or expiry evidence.
+- Market Intelligence UI smoke coverage rejects user-page writes, materializing/run/sync/generate/evaluate/calibrate/provider/live-like paths, operator wording, and advice-like language.
+
+Validation:
+
+- Focused Playwright Market Intelligence smoke passed, 8 tests.
+- Frontend build passed with the existing large chunk warning.
+- Backend build/tests were not run because this slice changed frontend-only files and no backend contract.
+- Temporary Vite process was stopped after UI validation.
+
+Review gates:
+
+- QA final review accepted.
+- Product Owner review accepted with no true consent blocker.
+- Architect signoff accepted.
+
+Next active item after commit:
+
+- Continue with the next Market Intelligence persisted read-model slice after `CF-W3-MI-01E` is committed and fast-forwarded into `dev`.
+
 ## Latest Team 00 Routing Update - Narrowed Focus / UX-01B Closed
 
 Date: 2026-05-26

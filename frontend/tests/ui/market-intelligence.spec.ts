@@ -200,6 +200,36 @@ function instrumentsPayload(assetType: string) {
   };
 }
 
+function fnoUnderlyingsPayload() {
+  return {
+    instruments: [{
+      id: 'stock-fno-1',
+      symbol: 'FNOALPHA',
+      company_name: 'FNO Alpha Ltd',
+      display_symbol: 'FNOALPHA',
+      exchange: 'NSE',
+      country: 'IN',
+      region: 'IN',
+      sector: 'Financial Services',
+      industry: null,
+      currency: 'INR',
+      market_cap: 100000,
+      asset_type: 'STOCK',
+      instrument_segment: 'CASH',
+      derivatives_eligible: true,
+      is_active: true,
+      is_delisted: false,
+      ipo_date: null,
+      isin: null,
+      source: 'LOCAL_TEST',
+      ingestion_timestamp: '2026-05-27T05:00:00.000Z',
+      last_updated_timestamp: '2026-05-27T05:00:00.000Z',
+      data_status: 'COMPLETE',
+    }],
+    pagination: { page: 1, pageSize: 75, total: 1, totalPages: 1 },
+  };
+}
+
 async function fulfillMarketReads(route: Route, persistedMarketContext = persistedMarketContextPayload(), persistedBreadth = persistedBreadthPayload()) {
   const url = new URL(route.request().url());
   if (url.pathname.includes('/market-context/persisted-breadth')) return route.fulfill({ json: persistedBreadth });
@@ -238,13 +268,31 @@ async function setupMarketPage(page: Page, options: {
   return apiRequests;
 }
 
+async function setupScopedMarketPage(page: Page) {
+  const apiRequests: string[] = [];
+  await mockAuthenticatedUser(page);
+  page.on('request', (request) => {
+    const url = new URL(request.url());
+    if (url.pathname.includes('/api/v1/')) apiRequests.push(`${request.method()} ${url.pathname}${url.search}`);
+  });
+  await page.route('**/api/v1/instruments**', (route) => route.fulfill({ json: fnoUnderlyingsPayload() }));
+  await page.route('**/api/v1/market-context/summary**', async (route) => {
+    throw new Error(`Trader page must not call materializing summary: ${route.request().url()}`);
+  });
+  await page.route('**/api/v1/market-context/breadth**', async (route) => {
+    throw new Error(`Trader page must not call materializing breadth: ${route.request().url()}`);
+  });
+  return apiRequests;
+}
+
 async function expectNoSharedWritesOrDeveloperCopy(page: Page, apiRequests: string[]) {
   expect(apiRequests.some((item) => item.includes('/market-context/summary'))).toBe(false);
-  expect(apiRequests.some((item) => item.startsWith('POST '))).toBe(false);
+  expect(apiRequests.some((item) => /^(POST|PATCH|DELETE) /.test(item))).toBe(false);
+  expect(apiRequests.some((item) => /\/(?:provider|live|materializ|write|sync|repair|backfill|import|generate|evaluate|calibrat|run)(?:\/|\?|$|-)/i.test(item))).toBe(false);
   const main = await page.locator('main').innerText();
   expect(main).not.toMatch(/persisted-only|materializ|not wired|endpoint|read model|shared analysis pipeline|downstream|implementation|IndexContextSnapshot|BreadthSnapshot|InstitutionalFlowSnapshot|DerivativesContextSnapshot|Product Owner approval/i);
   expect(main).not.toMatch(/operator|data ops|ops dashboard|bulk pipeline|pipeline dashboard|manual trigger|run pipeline|sync catalog|sync market data|shared refresh/i);
-  expect(main).not.toMatch(/buy now|sell now|guaranteed|price target|profit target|financial advice|option strategy recommendation/i);
+  expect(main).not.toMatch(/buy now|sell now|guaranteed|price target|profit target|financial advice|option strategy recommendation|buy signal|sell signal|must buy|must sell|broker|order/i);
 }
 
 test.describe('Market Intelligence user pages', () => {
@@ -326,22 +374,50 @@ test.describe('Market Intelligence user pages', () => {
   });
 
   test('Institutional Flow shows unavailable state without recommendation language', async ({ page }) => {
-    const apiRequests = await setupMarketPage(page);
+    const apiRequests = await setupScopedMarketPage(page);
 
     await visitAuthenticated(page, '/institutional-flow');
 
     await expect(page.getByRole('heading', { name: 'Institutional Flow' }).first()).toBeVisible();
+    await expect(page.getByText('Institutional flow context from FII/FPI and DII activity.')).toBeVisible();
     await expect(page.getByText('FII/FPI and DII flow data is not available yet')).toBeVisible();
+    await expect(page.getByText('FII/FPI buy value')).toBeVisible();
+    await expect(page.getByText('FII/FPI sell value')).toBeVisible();
+    await expect(page.getByText('DII buy value')).toBeVisible();
+    await expect(page.getByText('DII sell value')).toBeVisible();
+    await expect(page.getByText('5-day net flow')).toBeVisible();
+    await expect(page.getByText('20-day net flow')).toBeVisible();
+    await expect(page.getByText('Index divergence')).toBeVisible();
+    await expect(page.getByText('Flow regime')).toBeVisible();
+    await expect.poll(() => apiRequests.length > 0).toBe(true);
+    expect(apiRequests.every((item) => item.includes('/api/v1/auth/me'))).toBe(true);
+    const main = await page.locator('main').innerText();
+    expect(main).not.toMatch(/FII_ACCUMULATION|FII_DISTRIBUTION|DII_SUPPORT|DII_WITHDRAWAL|MIXED_INSTITUTIONAL_FLOW/i);
+    expect(main).not.toMatch(/₹\s*\d|Rs\.?\s*\d|\b\d+(?:\.\d+)?\s*cr\b/i);
     await expectNoSharedWritesOrDeveloperCopy(page, apiRequests);
   });
 
   test('Derivatives Context stays unavailable and read-only until enabled', async ({ page }) => {
-    const apiRequests = await setupMarketPage(page);
+    const apiRequests = await setupScopedMarketPage(page);
 
     await visitAuthenticated(page, '/derivatives-context');
 
     await expect(page.getByRole('heading', { name: 'Derivatives Context' }).first()).toBeVisible();
     await expect(page.getByText('Derivatives context is not enabled for this scope yet')).toBeVisible();
+    await expect(page.getByText('Options strategy recommendations and trading instructions are out of scope.')).toBeVisible();
+    await expect(page.getByText('FNOALPHA')).toBeVisible();
+    await expect(page.getByText('Catalog eligibility only')).toBeVisible();
+    await expect(page.getByText('Index futures trend')).toBeVisible();
+    await expect(page.getByText('Option-chain summary')).toBeVisible();
+    await expect(page.getByText('Put-call ratio')).toBeVisible();
+    await expect(page.getByText('Open-interest change')).toBeVisible();
+    await expect(page.getByText('Top strikes by OI', { exact: true })).toBeVisible();
+    await expect(page.getByText('Top strikes by OI change')).toBeVisible();
+    await expect(page.getByText('Expiry proximity')).toBeVisible();
+    await expect.poll(() => apiRequests.some((item) => item.includes('/api/v1/instruments') && item.includes('derivativesEligible=true'))).toBe(true);
+    expect(apiRequests.filter((item) => item.includes('/api/v1/') && !item.includes('/api/v1/auth/me') && !item.includes('/api/v1/instruments'))).toEqual([]);
+    const main = await page.locator('main').innerText();
+    expect(main).not.toMatch(/buy call|sell put|write option|long call|short straddle|option trade|supportive derivatives|bullish PCR|bearish PCR/i);
     await expectNoSharedWritesOrDeveloperCopy(page, apiRequests);
   });
 
