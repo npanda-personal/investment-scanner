@@ -62,7 +62,7 @@ export default function AiInvestmentCopilotPage() {
       <PageHeader
         title="AI Investment Copilot"
         badges={<PsychologyIcon color="primary" />}
-        subtitle="Deterministic research summaries from your existing modules. For research support only, not financial advice."
+        subtitle="Deterministic research summaries from your existing modules. Research support only, never an instruction."
       />
 
       {error && <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 2 }}>{error}</Alert>}
@@ -123,7 +123,7 @@ function ActionCard({ title, onRun, loading }: { title: string; onRun: () => voi
     <Paper sx={{ p: 2 }}>
       <Typography variant="h6" sx={{ mb: 1 }}>{title}</Typography>
       <Button variant="contained" disabled={loading} onClick={onRun}>
-        {loading ? 'Loading...' : 'Generate Report'}
+        {loading ? 'Loading...' : 'Load Brief'}
       </Button>
     </Paper>
   );
@@ -154,7 +154,7 @@ function SummaryPanel({ summary }: { summary: CopilotSummaryResponse | null }) {
     return (
       <Paper sx={{ p: 3 }}>
         <Typography variant="h6">Summary</Typography>
-        <Typography color="text.secondary">Select an entity to generate a focused summary.</Typography>
+        <Typography color="text.secondary">Select an entity to load a focused summary.</Typography>
       </Paper>
     );
   }
@@ -168,7 +168,7 @@ function SummaryPanel({ summary }: { summary: CopilotSummaryResponse | null }) {
         </Box>
         <Chip label={summary.dataStatus} color={statusColor(summary.dataStatus)} />
       </Stack>
-      <Alert severity="info" sx={{ mb: 2 }}>For research support only, not financial advice.</Alert>
+      <Alert severity="info" sx={{ mb: 2 }}>Research support only; never an instruction.</Alert>
       <Typography sx={{ mb: 2 }}>{summary.summary}</Typography>
       <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mb: 2 }}>
         {summary.sourceModules.map((module) => <Chip key={module} size="small" label={module} variant="outlined" />)}

@@ -27,8 +27,6 @@ const SignalPositionLedgerPage: React.FC = () => {
     setPageSize,
     setSort,
     reload,
-    refreshLedger,
-    refreshingLedger,
   } = useSignalPositionLedgerActiveRows();
   const closed = useSignalPositionLedgerClosedRows();
   const scopeLabel = `${scope.region} / ${scope.assetType}`;
@@ -70,9 +68,8 @@ const SignalPositionLedgerPage: React.FC = () => {
   return (
     <Box sx={{ p: 3, maxWidth: 1500, mx: 'auto' }}>
       <PageHeader
-        title="Signal Position Ledger"
-        subtitle={`Rule-triggered entry candidate evidence for the current market scope. Scope: ${scopeLabel}.`}
-        primaryAction={<Button variant="contained" onClick={() => void refreshLedger()} disabled={refreshingLedger}>Refresh ledger data</Button>}
+        title="Trigger Monitor"
+        subtitle={`Read-only rule-trigger lifecycle evidence for the current market scope. Scope: ${scopeLabel}. Ledger materialization is an Admin / Data Ops workflow.`}
         secondaryActions={(
           <Stack direction={{ xs: 'column', sm: 'row' }} gap={1}>
             <Button variant="outlined" onClick={reload} disabled={loading}>Reload snapshot</Button>

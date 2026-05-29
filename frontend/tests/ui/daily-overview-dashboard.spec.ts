@@ -1,15 +1,15 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page, type Route } from '@playwright/test';
 import { visitAuthenticated } from './support/auth';
 
 async function mockAuthenticatedUser(page: Page) {
   await page.addInitScript(() => {
-    window.localStorage.setItem('investment_scanner_auth_token', 'playwright-daily-overview-token');
+    window.localStorage.setItem('investment_scanner_auth_token', 'playwright-market-pulse-token');
     window.localStorage.setItem('market_scope', JSON.stringify({ region: 'IN', assetType: 'STOCK' }));
   });
   await page.route('**/api/v1/auth/me', async (route) => {
     await route.fulfill({
       json: {
-        id: 'playwright-daily-overview-user',
+        id: 'playwright-market-pulse-user',
         email: 'codex.test@example.com',
         name: 'Codex Test',
       },
@@ -17,7 +17,7 @@ async function mockAuthenticatedUser(page: Page) {
   });
 }
 
-function candidate(rank: number, confidenceScore: number) {
+function candidate(rank: number) {
   return {
     id: `candidate-${rank}`,
     runId: 'today-run-1',
@@ -30,11 +30,11 @@ function candidate(rank: number, confidenceScore: number) {
     strategyCode: 'TREND_BREAKOUT',
     strategyVersion: '1.2.0',
     rank,
-    grade: rank <= 3 ? 'A' : 'B',
-    confidenceScore,
+    grade: 'A',
+    confidenceScore: 80,
     reasonSummary: `Rank ${rank} trigger reason from Today Review evidence.`,
     blockers: [],
-    watchReasons: rank === 1 ? ['Data quality is ready for research review.'] : [],
+    watchReasons: [],
     dataQualitySnapshot: { signalReadinessStatus: 'READY' },
     marketContextSnapshot: null,
     strategyProofSnapshot: null,
@@ -46,7 +46,7 @@ function candidate(rank: number, confidenceScore: number) {
 }
 
 function todayReviewPayload() {
-  const ranked = Array.from({ length: 12 }, (_unused, index) => candidate(13 - index, 40 + (13 - index)));
+  const candidates = [candidate(1), candidate(2)];
   return {
     run: {
       id: 'today-run-1',
@@ -54,19 +54,23 @@ function todayReviewPayload() {
       region: 'IN',
       assetType: 'STOCK',
       status: 'COMPLETED',
+      trustStatus: 'OK',
       dataThroughDate: '2026-05-26T00:00:00.000Z',
       startedAt: '2026-05-26T05:00:00.000Z',
       finishedAt: '2026-05-26T05:05:00.000Z',
       warnings: [],
-      candidateCounts: { LONG_REVIEW: 12, SHORT_REVIEW: 1 },
+      candidateCounts: { LONG_REVIEW: 2 },
       sourceSnapshot: {},
+      reviewUniverseMode: 'FULL_REVIEW',
+      trustedUniverseCount: 144,
+      catalogCount: 300,
       createdAt: '2026-05-26T05:00:00.000Z',
       updatedAt: '2026-05-26T05:05:00.000Z',
-      candidates: [],
+      candidates,
     },
     groups: {
-      longReview: ranked,
-      shortReview: [candidate(1, 41)],
+      longReview: candidates,
+      shortReview: [],
       exitRiskReview: [],
       watchOnly: [],
       blocked: [],
@@ -93,73 +97,141 @@ function mover(index: number, returnPercent: number) {
   };
 }
 
-function moversPayload(range: string) {
+function moversPayload() {
   return {
     scope: { region: 'IN', assetType: 'STOCK' },
     generatedAt: '2026-05-27T05:00:00.000Z',
     ranges: [{
-      range,
-      gainers: Array.from({ length: 20 }, (_unused, index) => mover(index + 1, (index + 1) / 100)),
-      losers: Array.from({ length: 20 }, (_unused, index) => mover(index + 1, -(index + 1) / 100)),
+      range: '1D',
+      gainers: [mover(1, 0.04), mover(2, 0.03)],
+      losers: [mover(3, -0.02), mover(4, -0.01)],
       warnings: [],
     }],
   };
 }
 
-function marketContextPayload() {
+function universeHealthPayload() {
   return {
-    regime: { regime: 'NEUTRAL', score: 55, explanation: 'Mixed data', updatedAt: '2026-05-26T05:00:00.000Z', dataStatus: 'PARTIAL' },
-    topSectors: [{ sector: 'Financials', return1M: 0.03, return3M: 0.05, return6M: 0.09, relativeStrengthScore: 68 }],
-    weakSectors: [{ sector: 'Utilities', return1M: -0.01, return3M: -0.02, return6M: -0.03, relativeStrengthScore: 30 }],
-    breadth: { advanceDeclineRatio: 1.1 },
-    countryStrength: [],
-    macro: null,
-    explanation: ['Partial evidence'],
-    updatedAt: '2026-05-26T05:00:00.000Z',
-    dataStatus: 'PARTIAL',
+    scope: { region: 'IN', assetType: 'STOCK' },
+    generatedAt: '2026-05-27T05:10:00.000Z',
+    latestStoredEodDate: '2026-05-26',
+    expectedLatestTradingDate: '2026-05-26',
+    counts: {
+      byUniverseState: {},
+      readiness: { priceReady: 180, contextReady: 160, reviewReady: 144 },
+      totalCatalogInstruments: 300,
+      activeInstruments: 250,
+      inactiveOrDelistedInstruments: 50,
+      providerSupported: 200,
+      providerUnknown: 10,
+      providerUnknownValidationNeeded: 0,
+      providerRetryValidationNeeded: 0,
+      providerUnsupportedExcluded: 0,
+      providerValidationFailed: 0,
+      unsupported: 0,
+      unsupportedExcluded: 0,
+      supportedCatalogIdentityRepairNeeded: 0,
+      supportedBusinessMetadataRepairNeeded: 0,
+      supportedPriceBackfillNeeded: 0,
+      catalogOnly: 0,
+      priceReady: 180,
+      contextReady: 160,
+      reviewReady: 144,
+      staleOrIncomplete: 5,
+      missingLatestPrice: 0,
+      staleLatestPrice: 0,
+      missingOrInadequatePriceHistory: 0,
+      missingRecentVolume: 0,
+      missingSector: 0,
+      missingIndustry: 0,
+      missingCountry: 0,
+      missingCurrency: 0,
+      missingMarketCap: 0,
+      missingIsin: 0,
+      missingListingDate: 0,
+    },
+    coverage: { priceCoveragePercentage: 90, metadataCoveragePercentage: 88, reviewReadyPercentage: 48 },
+    topBlockers: [],
+    warnings: [],
+    trustStatus: 'OK',
+    trustReasons: ['Trusted baseline ready.'],
+    universeSignoff: { status: 'PASS', minReviewReadyRequired: 100, reviewReadyActual: 144, blockers: [], nextAction: null, downstreamAllowed: true },
   };
 }
 
-test.describe('Daily Overview dashboard', () => {
-  test('shows 20 market movers and top 10 ranked signal candidates with details', async ({ page }) => {
-    await mockAuthenticatedUser(page);
-    let moversQuery: URLSearchParams | null = null;
+function instrumentsPayload(assetType: string) {
+  return {
+    instruments: [
+      {
+        id: `${assetType.toLowerCase()}-1`,
+        symbol: assetType === 'INDEX' ? 'NIFTY 50' : 'ALPHA',
+        company_name: assetType === 'INDEX' ? 'Nifty 50 Index' : 'Alpha Ltd',
+        display_symbol: assetType === 'INDEX' ? 'NIFTY 50' : 'ALPHA',
+        exchange: 'NSE',
+        country: 'IN',
+        region: 'IN',
+        sector: assetType === 'INDEX' ? null : 'Financial Services',
+        industry: null,
+        currency: 'INR',
+        market_cap: 100000,
+        asset_type: assetType,
+        instrument_segment: assetType,
+        derivatives_eligible: assetType !== 'INDEX',
+        is_active: true,
+        is_delisted: false,
+        ipo_date: null,
+        isin: null,
+        source: 'LOCAL_TEST',
+        ingestion_timestamp: '2026-05-27T05:00:00.000Z',
+        last_updated_timestamp: '2026-05-27T05:00:00.000Z',
+        data_status: 'COMPLETE',
+      },
+    ],
+    pagination: { page: 1, pageSize: 75, total: 1, totalPages: 1 },
+  };
+}
 
-    await page.route('**/api/v1/today-review/latest**', async (route) => {
-      await route.fulfill({ json: todayReviewPayload() });
+async function fulfillMarketIntelligence(route: Route) {
+  const url = new URL(route.request().url());
+  if (url.pathname.includes('/today-review/latest')) return route.fulfill({ json: todayReviewPayload() });
+  if (url.pathname.includes('/market-data/movers')) return route.fulfill({ json: moversPayload() });
+  if (url.pathname.includes('/market-data/universe/health')) return route.fulfill({ json: universeHealthPayload() });
+  if (url.pathname.includes('/v1/instruments')) return route.fulfill({ json: instrumentsPayload(url.searchParams.get('assetType') || 'STOCK') });
+  return route.continue();
+}
+
+test.describe('Market Pulse dashboard', () => {
+  test('uses read-only snapshots and shows missing states for unavailable market domains', async ({ page }) => {
+    await mockAuthenticatedUser(page);
+    const requestedPaths: string[] = [];
+    page.on('request', (request) => {
+      const url = new URL(request.url());
+      if (url.pathname.includes('/api/')) requestedPaths.push(`${request.method()} ${url.pathname}`);
     });
-    await page.route('**/api/v1/market-data/movers**', async (route) => {
-      const url = new URL(route.request().url());
-      moversQuery = url.searchParams;
-      await route.fulfill({ json: moversPayload(url.searchParams.get('range') || '1D') });
-    });
+    await page.route('**/api/v1/today-review/latest**', fulfillMarketIntelligence);
+    await page.route('**/api/v1/market-data/movers**', fulfillMarketIntelligence);
+    await page.route('**/api/v1/market-data/universe/health**', fulfillMarketIntelligence);
+    await page.route('**/api/v1/instruments**', fulfillMarketIntelligence);
     await page.route('**/api/v1/market-context/summary**', async (route) => {
-      await route.fulfill({ json: marketContextPayload() });
+      throw new Error(`Market Pulse must not call ${route.request().url()}`);
     });
 
     await visitAuthenticated(page, '/');
 
-    await expect(page.locator('h4').filter({ hasText: 'Daily Overview' })).toBeVisible();
-    expect(moversQuery?.get('region')).toBe('IN');
-    expect(moversQuery?.get('assetType')).toBe('STOCK');
-    expect(moversQuery?.get('range')).toBe('1D');
-    expect(moversQuery?.get('limit')).toBe('20');
+    await expect(page.getByRole('heading', { name: 'Market Pulse' }).first()).toBeVisible();
+    await expect(page.getByText('Market is Supportive')).toBeVisible();
+    await expect(page.getByText('Review candidates')).toBeVisible();
+    await expect(page.getByText('GAIN01')).toBeVisible();
+    await expect(page.getByText('LOSS03')).toBeVisible();
+    await expect(page.getByText('Index performance snapshot not wired yet')).toBeVisible();
+    await expect(page.getByText('Official breadth snapshot missing')).toBeVisible();
+    await expect(page.getByText('Institutional flow snapshot missing')).toBeVisible();
+    await expect(page.getByText('Product Owner approval required')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Open Daily Review' })).toHaveAttribute('href', '/today-review');
 
-    await expect(page.getByText('GAIN20 - Industrials')).toBeVisible();
-    await expect(page.getByText('LOSS20 - Industrials')).toBeVisible();
-    await expect(page.getByText(/GAIN\d{2} - Industrials/)).toHaveCount(20);
-    await expect(page.getByText(/LOSS\d{2} - Industrials/)).toHaveCount(20);
-
-    await expect(page.getByRole('heading', { name: 'Top Signal Candidates' })).toBeVisible();
-    await expect(page.getByRole('cell', { name: '#1', exact: true })).toBeVisible();
-    await expect(page.getByText('CAND01 - Candidate 1 Ltd')).toBeVisible();
-    await expect(page.getByText('CAND10 - Candidate 10 Ltd')).toBeVisible();
-    await expect(page.getByText('CAND11 - Candidate 11 Ltd')).toHaveCount(0);
-
-    await page.getByText('CAND01 - Candidate 1 Ltd').click();
-    await expect(page.getByRole('dialog')).toContainText('Rank #1');
-    await expect(page.getByRole('dialog')).toContainText('Rank 1 trigger reason from Today Review evidence.');
-    await expect(page.getByRole('dialog')).toContainText('Strategy TREND_BREAKOUT v1.2.0');
-    await expect(page.getByRole('dialog')).toContainText('DQ READY');
+    expect(requestedPaths.some((item) => item.includes('/market-context/summary'))).toBe(false);
+    expect(requestedPaths.some((item) => item.startsWith('POST '))).toBe(false);
+    const body = await page.locator('body').innerText();
+    expect(body).not.toMatch(/Run Today's Review|Run Daily Pipeline|Generate Plans|Sync Market Data|buy now|sell now|guaranteed|price target|financial advice/i);
   });
 });

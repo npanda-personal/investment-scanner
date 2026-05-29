@@ -1,6 +1,5 @@
 import ClearIcon from '@mui/icons-material/Clear';
 import DownloadIcon from '@mui/icons-material/Download';
-import RefreshIcon from '@mui/icons-material/Refresh';
 import SearchIcon from '@mui/icons-material/Search';
 import {
   Alert,
@@ -55,7 +54,7 @@ const groupTabs: Array<{ key: keyof TodayReviewGroups; label: string }> = [
 ];
 
 export function TodayReviewPage() {
-  const { data, loading, running, error, reload, runReview, scope } = useTodayReview();
+  const { data, loading, error, reload, scope } = useTodayReview();
   const [tab, setTab] = useState<keyof TodayReviewGroups>('longReview');
   const run = data?.run || null;
   const groups = data?.groups || emptyGroups();
@@ -82,25 +81,15 @@ export function TodayReviewPage() {
     <Box className="page-container page-container--workspace">
       <Stack spacing={3}>
       <PageHeader
-        title="Today's Trade Review"
-        subtitle="Before-market research support shortlist built from trusted OHLCV coverage, supporting evidence, and trade-plan geometry."
+        title="Daily Review"
+        subtitle="Persisted research support shortlist built from trusted OHLCV coverage, supporting evidence, and trade-plan geometry. This page does not run review generation."
         badges={<Chip label={`${scope.region} / ${scope.assetType}`} color="primary" variant="outlined" />}
-        primaryAction={
-          <Button
-            variant="contained"
-            startIcon={running ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
-            onClick={() => void runReview()}
-            disabled={running}
-          >
-            {running ? 'Running review' : "Run Today's Review"}
-          </Button>
-        }
-        secondaryActions={<Button onClick={() => void reload()} disabled={loading || running}>Refresh</Button>}
+        secondaryActions={<Button onClick={() => void reload()} disabled={loading}>Reload snapshot</Button>}
       />
 
       {loading && (
         <Alert severity="info" icon={<CircularProgress size={18} />}>
-          Loading Today's Trade Review for {scope.region} / {scope.assetType}.
+          Loading Daily Review for {scope.region} / {scope.assetType}.
         </Alert>
       )}
 
@@ -114,11 +103,8 @@ export function TodayReviewPage() {
       )}
 
       {!loading && !error && !run && (
-        <Alert
-          severity="info"
-          action={<Button color="inherit" size="small" onClick={() => void runReview()} disabled={running}>Run review</Button>}
-        >
-          No Today review has been published for {scope.region} / {scope.assetType}. Run the review to create a persisted shortlist snapshot.
+        <Alert severity="info">
+          No Daily Review snapshot has been published for {scope.region} / {scope.assetType}. Data-production workflows are handled in Admin / Data Ops.
         </Alert>
       )}
 

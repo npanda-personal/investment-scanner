@@ -1,5 +1,5 @@
-import { DailyOverviewDashboardPage } from '@/features/daily-overview-dashboard';
+import { MarketPulsePage } from '@/features/market-intelligence/components/MarketIntelligencePages';
 
 export default function HomePage() {
-  return <DailyOverviewDashboardPage />;
+  return <MarketPulsePage />;
 }

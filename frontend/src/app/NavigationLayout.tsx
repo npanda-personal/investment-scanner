@@ -18,6 +18,7 @@ import {
   Divider,
   Stack,
   Switch,
+  Chip,
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
@@ -60,15 +61,28 @@ export default function NavigationLayout() {
         {navGroups.map((group, groupIndex) => (
           <React.Fragment key={group.group}>
             {open && (
-              <Typography variant="overline" sx={{ px: 2, mt: groupIndex > 0 ? 1 : 0, mb: 0.5, display: 'block', color: 'text.secondary', lineHeight: 1 }}>
-                {group.group}
-              </Typography>
+              <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 2, mt: groupIndex > 0 ? 1 : 0, mb: 0.5 }}>
+                <Typography variant="overline" sx={{ color: group.operatorOnly ? 'warning.main' : 'text.secondary', lineHeight: 1 }}>
+                  {group.group}
+                </Typography>
+                {group.operatorOnly && <Chip size="small" label="Admin" color="warning" variant="outlined" sx={{ height: 20 }} />}
+              </Stack>
             )}
             {group.items.map((item) => {
               const isActive = isNavItemActive(location.pathname, item);
               return (
                 <ListItem key={item.path} disablePadding sx={{ mb: 0.5 }}>
-                  <ListItemButton component={Link} to={item.path} selected={isActive} sx={{ borderRadius: 2, py: 1 }}>
+                  <ListItemButton
+                    component={Link}
+                    to={item.path}
+                    selected={isActive}
+                    sx={{
+                      borderRadius: 2,
+                      py: 1,
+                      border: item.operatorOnly ? '1px solid' : '1px solid transparent',
+                      borderColor: item.operatorOnly ? 'divider' : 'transparent',
+                    }}
+                  >
                     <ListItemIcon sx={{ minWidth: 40 }}>{item.icon}</ListItemIcon>
                     {open && <ListItemText primary={item.label} primaryTypographyProps={{ variant: 'body2' }} />}
                   </ListItemButton>

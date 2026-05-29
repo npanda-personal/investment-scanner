@@ -15,7 +15,6 @@ import {
   TableRow,
   Typography,
 } from '@mui/material';
-import SyncIcon from '@mui/icons-material/Sync';
 import {
   Line,
   LineChart,
@@ -30,7 +29,6 @@ import {
   fetchInstrumentFundamentals,
   fetchInstrumentLatestPrice,
   fetchInstrumentPrices,
-  syncMarketData,
   type V1CorporateActionsResponse,
   type V1FundamentalsResponse,
   type V1Instrument,
@@ -58,9 +56,7 @@ const InstrumentDetailPage: React.FC = () => {
   const [fundamentals, setFundamentals] = useState<V1FundamentalsResponse | null>(null);
   const [actions, setActions] = useState<V1CorporateActionsResponse | null>(null);
   const [loading, setLoading] = useState(true);
-  const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
 
   const loadDetail = async () => {
     if (!id) return;
@@ -99,26 +95,6 @@ const InstrumentDetailPage: React.FC = () => {
       }));
   }, [prices]);
 
-  const handleSync = async () => {
-    if (!id) return;
-    setSyncing(true);
-    setError(null);
-    setSuccess(null);
-    try {
-      const result = await syncMarketData({ instrumentId: id, region: scope.region, asset_type: scope.assetType });
-      if (result.success) {
-        setSuccess(result.message);
-        await loadDetail();
-      } else {
-        setError(result.message);
-      }
-    } catch (err: any) {
-      setError(err.response?.data?.message || err.message || 'Sync failed');
-    } finally {
-      setSyncing(false);
-    }
-  };
-
   if (loading) {
     return (
       <Box sx={{ p: 3, display: 'flex', justifyContent: 'center' }}>
@@ -140,12 +116,8 @@ const InstrumentDetailPage: React.FC = () => {
       <PageHeader
         title={instrument.symbol}
         subtitle={instrument.company_name}
-        backTo="/market-data-foundation"
-        primaryAction={
-          <Button variant="contained" startIcon={<SyncIcon />} onClick={handleSync} disabled={syncing}>
-            {syncing ? 'Syncing...' : 'Sync Market Data'}
-          </Button>
-        }
+        backTo="/market-map"
+        backLabel="Back to market map"
         secondaryActions={
           <Button variant="outlined" onClick={() => navigate(`/research/stocks/${instrument.id}`)}>
             Research
@@ -154,7 +126,9 @@ const InstrumentDetailPage: React.FC = () => {
       />
 
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>{error}</Alert>}
-      {success && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess(null)}>{success}</Alert>}
+      <Alert severity="info" sx={{ mb: 2 }}>
+        This instrument workspace is read-only for shared market data. Data sync, import, repair, and backfill workflows belong in Admin / Data Ops.
+      </Alert>
 
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(4, 1fr)' }, gap: 2, mb: 3 }}>
         <Paper sx={{ p: 2 }}>

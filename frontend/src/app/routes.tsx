@@ -1,7 +1,10 @@
 import type { RouteObject } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
 import NavigationLayout from './NavigationLayout';
 import HomePage from './HomePage';
+import { marketIntelligenceRoutes } from '@/features/market-intelligence';
 import { marketDataFoundationRoutes } from '@/features/market-data-foundation';
+import UnifiedStockPage from '@/features/market-data-foundation/components/UnifiedStockPage';
 import { stockResearchWorkbenchRoutes } from '@/features/stock-research-workbench';
 import { signalGenerationEngineRoutes } from '@/features/signal-generation-engine';
 import { portfolioManagementRoutes } from '@/features/portfolio-management';
@@ -26,6 +29,44 @@ import { todayTradeReviewRoutes } from '@/features/today-trade-review';
 import { pipelineOpsRoutes } from '@/features/pipeline-ops';
 import { signalPositionLedgerRoutes } from '@/features/signal-position-ledger';
 
+const userInstrumentRoutes: RouteObject[] = [
+  { path: 'stocks', element: <Navigate to="/market-map" replace /> },
+  { path: 'stocks/:id', element: <UnifiedStockPage /> },
+];
+
+const marketDataOperatorRoutes = marketDataFoundationRoutes.filter((route) => !String(route.path).startsWith('stocks'));
+
+const operatorRoutes: RouteObject[] = [
+  ...marketDataOperatorRoutes,
+  ...pipelineOpsRoutes,
+  ...signalGenerationEngineRoutes,
+  ...signalQualityLabRoutes,
+  ...signalCalibrationEngineRoutes,
+  ...dataQualityEngineRoutes,
+  ...strategyDecisionEngineRoutes,
+  ...strategyFrameworkRoutes,
+  ...historicalContextSnapshotsRoutes,
+  ...marketContextIntelligenceRoutes,
+  ...backtestingStrategyLabRoutes,
+  ...smartMoneyIntelligenceRoutes,
+  ...tradePlanRiskEngineRoutes,
+  ...signalPositionLedgerRoutes,
+  ...subscriptionBillingRoutes,
+];
+
+function prefixedAdminRoutes(routes: RouteObject[]): RouteObject[] {
+  return routes.map((route) => {
+    const next = {
+      ...route,
+      path: route.path ? `admin/${route.path.replace(/^\//, '')}` : route.path,
+    } as RouteObject;
+    if ('children' in next && next.children) {
+      next.children = prefixedAdminRoutes(next.children);
+    }
+    return next;
+  });
+}
+
 export const appRoutes: RouteObject[] = [
   ...publicAuthIdentityRoutes,
   {
@@ -37,30 +78,19 @@ export const appRoutes: RouteObject[] = [
         element: <NavigationLayout />,
         children: [
           { index: true, element: <HomePage /> },
+          ...marketIntelligenceRoutes,
           ...todayTradeReviewRoutes,
-          ...signalPositionLedgerRoutes,
           ...researchHubRoutes,
-          ...tradePlanRiskEngineRoutes,
-          ...marketDataFoundationRoutes,
-          ...pipelineOpsRoutes,
+          ...userInstrumentRoutes,
           ...stockResearchWorkbenchRoutes,
-          ...signalGenerationEngineRoutes,
-          ...signalQualityLabRoutes,
-          ...signalCalibrationEngineRoutes,
-          ...dataQualityEngineRoutes,
-          ...strategyDecisionEngineRoutes,
-          ...strategyFrameworkRoutes,
-          ...historicalContextSnapshotsRoutes,
           ...portfolioManagementRoutes,
           ...watchlistManagementRoutes,
           ...alertsMonitoringRoutes,
-          ...marketContextIntelligenceRoutes,
-          ...backtestingStrategyLabRoutes,
-          ...smartMoneyIntelligenceRoutes,
           ...aiInvestmentCopilotRoutes,
-          ...subscriptionBillingRoutes,
           ...notificationsDeliveryRoutes,
           ...protectedAuthIdentityRoutes,
+          ...prefixedAdminRoutes(operatorRoutes),
+          ...operatorRoutes,
         ],
       },
     ],

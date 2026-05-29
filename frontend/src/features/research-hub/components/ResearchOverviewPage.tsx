@@ -107,7 +107,7 @@ const ResearchOverviewPage: React.FC = () => {
       <PageHeader
         title="Research Command Center"
         subtitle={`Prioritized market intelligence for ${scope.region} / ${scope.assetType}.`}
-        primaryAction={<Button variant="contained" onClick={reload} startIcon={<UpdateOutlined />}>Refresh Intelligence</Button>}
+        primaryAction={<Button variant="outlined" onClick={reload} startIcon={<UpdateOutlined />}>Reload Snapshot</Button>}
       />
 
       <Grid container spacing={4}>
@@ -372,7 +372,7 @@ const PriorityCard: React.FC<{ title: string; items: ResearchPriorityCandidate[]
                   secondaryAction={
                     <Stack direction="row" spacing={1} alignItems="center">
                       {type === 'candidate' && (
-                        <Button size="small" variant="outlined" component={Link} to={`/trade-plans`}>Plan Review</Button>
+                        <Button size="small" variant="outlined" component={Link} to="/today-review">Daily Review</Button>
                       )}
                       <IconButton edge="end" size="small" component={Link} to={item.stockRoute || `/stocks/${item.instrumentId}`}>
                         <ArrowForwardOutlined fontSize="small" />
@@ -571,10 +571,10 @@ const WhatChangedPanel: React.FC<{ whatChanged: ResearchOverview['whatChanged'] 
 
 const ResearchModuleDrilldowns: React.FC = () => {
   const modules = [
-    { label: 'Strategy Engine', icon: <FlashOnOutlined />, route: '/strategy', desc: 'Decision board' },
-    { label: 'Signals', icon: <TimelineOutlined />, route: '/signals', desc: 'Signal pulse' },
-    { label: 'Smart Money', icon: <GppGoodOutlined />, route: '/smart-money', desc: 'Accumulation' },
-    { label: 'Market Context', icon: <TrendingUpOutlined />, route: '/market-context', desc: 'Regime' },
+    { label: 'Market Pulse', icon: <TrendingUpOutlined />, route: '/market-pulse', desc: 'Daily context' },
+    { label: 'Market Map', icon: <TimelineOutlined />, route: '/market-map', desc: 'Stock map' },
+    { label: 'Breadth', icon: <GppGoodOutlined />, route: '/breadth', desc: 'Participation' },
+    { label: 'Flow', icon: <FlashOnOutlined />, route: '/institutional-flow', desc: 'Institutional context' },
   ];
 
   return (

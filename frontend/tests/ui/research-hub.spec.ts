@@ -1,7 +1,127 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { visitModule } from './support/moduleAssertions';
 
+async function mockAuthenticatedUser(page: Page) {
+  await page.addInitScript(() => {
+    window.localStorage.setItem('investment_scanner_auth_token', 'playwright-research-hub-token');
+    window.localStorage.setItem('market_scope', JSON.stringify({ region: 'IN', assetType: 'STOCK' }));
+  });
+  await page.route('**/api/v1/auth/me', async (route) => {
+    await route.fulfill({
+      json: {
+        id: 'playwright-research-hub-user',
+        email: 'codex.test@example.com',
+        name: 'Codex Test',
+      },
+    });
+  });
+}
+
+function researchOverviewPayload() {
+  return {
+    actionability: {
+      overallStatus: 'INSUFFICIENT_DATA',
+      canReviewActionableSetups: false,
+      headline: 'Actionable setup review is not confirmed because required readiness evidence is unavailable.',
+      researchSupportOnly: true,
+      dimensions: {
+        marketEnvironment: {
+          status: 'READY',
+          label: 'Market Environment',
+          sourceModule: 'strategy-decision-engine',
+          blocking: false,
+          message: 'Market environment is open, but this does not prove actionable setup readiness.'
+        },
+        dataReadiness: {
+          status: 'LIMITED',
+          label: 'Data Readiness',
+          sourceModule: 'research-hub',
+          blocking: false,
+          message: 'Research Hub has no local data gaps, but trusted review-universe readiness is not yet wired.'
+        },
+        signalEvidence: {
+          status: 'INSUFFICIENT_DATA',
+          label: 'Signal Evidence',
+          sourceModule: 'signal-quality-lab',
+          blocking: true,
+          message: 'Signal Quality evidence maturity is not yet available for this overview.'
+        },
+        calibrationReadiness: {
+          status: 'INSUFFICIENT_DATA',
+          label: 'Calibration Readiness',
+          sourceModule: 'signal-calibration-engine',
+          blocking: true,
+          message: 'Calibration readiness is not yet wired into Research Hub actionability.'
+        },
+        strategyProof: {
+          status: 'INSUFFICIENT_DATA',
+          label: 'Strategy Proof',
+          sourceModule: 'strategy-decision-engine',
+          blocking: true,
+          message: 'No framework-backed strategy proof is available for review candidates.'
+        },
+        todayReviewReadiness: {
+          status: 'INSUFFICIENT_DATA',
+          label: 'Today Review Readiness',
+          sourceModule: 'today-trade-review',
+          blocking: true,
+          message: 'Today Review readiness is not yet a stable Research Hub input.'
+        },
+        tradePlanReadiness: {
+          status: 'INSUFFICIENT_DATA',
+          label: 'Trade Plan Readiness',
+          sourceModule: 'trade-plan-risk-engine',
+          blocking: true,
+          message: 'Trade Plan paper-readiness is not yet a stable Research Hub input.'
+        }
+      },
+      nextBestAction: null,
+      blockers: []
+    },
+    marketReadiness: {
+      marketGate: 'OPEN',
+      marketCondition: 'HEALTHY',
+      headline: 'Environment is healthy: high-conviction setups allowed.',
+      allowedActions: ['NEW_LONG_TRADES_ALLOWED'],
+      reasons: [],
+      blockers: [],
+      dataStatus: 'COMPLETE'
+    },
+    researchPriorities: {
+      tradeCandidates: [],
+      watchCandidates: [],
+      avoidCandidates: [],
+      exitCandidates: []
+    },
+    strategyProofSummary: {
+      strategiesProducingCandidates: [],
+      provenCandidateCount: 0,
+      unprovenCandidateCount: 0,
+      blockedByMarketGateCount: 0,
+      missingBacktestCount: 0,
+      notes: []
+    },
+    confirmationSummary: {
+      signalSummary: { topBullishCount: 0, topBearishCount: 0, reliabilityAvailable: false, notes: [] },
+      smartMoneySummary: { accumulationCount: 0, distributionCount: 0, topConfirmations: [], topContradictions: [] },
+      marketContextSummary: { leadingSectors: [], weakSectors: [], breadthStatus: 'Neutral', notes: [] }
+    },
+    whatChanged: {
+      newTradeCandidates: [],
+      downgradedCandidates: [],
+      warnings: []
+    },
+    nextActions: [],
+    dataGaps: [],
+    generatedAt: '2026-05-10T00:00:00.000Z'
+  };
+}
+
 test.describe('Research Hub UI', () => {
+  test.beforeEach(async ({ page }) => {
+    await mockAuthenticatedUser(page);
+  });
+
   test('exposes proof-driven triage and research-only language', async ({ page }) => {
     const overviewRequests: string[] = [];
     page.on('request', (request) => {
@@ -11,105 +131,7 @@ test.describe('Research Hub UI', () => {
       }
     });
     await page.route('**/api/v1/research/overview**', async (route) => {
-      await route.fulfill({
-        json: {
-          actionability: {
-            overallStatus: 'INSUFFICIENT_DATA',
-            canReviewActionableSetups: false,
-            headline: 'Actionable setup review is not confirmed because required readiness evidence is unavailable.',
-            researchSupportOnly: true,
-            dimensions: {
-              marketEnvironment: {
-                status: 'READY',
-                label: 'Market Environment',
-                sourceModule: 'strategy-decision-engine',
-                blocking: false,
-                message: 'Market environment is open, but this does not prove actionable setup readiness.'
-              },
-              dataReadiness: {
-                status: 'LIMITED',
-                label: 'Data Readiness',
-                sourceModule: 'research-hub',
-                blocking: false,
-                message: 'Research Hub has no local data gaps, but trusted review-universe readiness is not yet wired.'
-              },
-              signalEvidence: {
-                status: 'INSUFFICIENT_DATA',
-                label: 'Signal Evidence',
-                sourceModule: 'signal-quality-lab',
-                blocking: true,
-                message: 'Signal Quality evidence maturity is not yet available for this overview.'
-              },
-              calibrationReadiness: {
-                status: 'INSUFFICIENT_DATA',
-                label: 'Calibration Readiness',
-                sourceModule: 'signal-calibration-engine',
-                blocking: true,
-                message: 'Calibration readiness is not yet wired into Research Hub actionability.'
-              },
-              strategyProof: {
-                status: 'INSUFFICIENT_DATA',
-                label: 'Strategy Proof',
-                sourceModule: 'strategy-decision-engine',
-                blocking: true,
-                message: 'No framework-backed strategy proof is available for review candidates.'
-              },
-              todayReviewReadiness: {
-                status: 'INSUFFICIENT_DATA',
-                label: 'Today Review Readiness',
-                sourceModule: 'today-trade-review',
-                blocking: true,
-                message: 'Today Review readiness is not yet a stable Research Hub input.'
-              },
-              tradePlanReadiness: {
-                status: 'INSUFFICIENT_DATA',
-                label: 'Trade Plan Readiness',
-                sourceModule: 'trade-plan-risk-engine',
-                blocking: true,
-                message: 'Trade Plan paper-readiness is not yet a stable Research Hub input.'
-              }
-            },
-            nextBestAction: null,
-            blockers: []
-          },
-          marketReadiness: {
-            marketGate: 'OPEN',
-            marketCondition: 'HEALTHY',
-            headline: 'Environment is healthy: high-conviction setups allowed.',
-            allowedActions: ['NEW_LONG_TRADES_ALLOWED'],
-            reasons: [],
-            blockers: [],
-            dataStatus: 'COMPLETE'
-          },
-          researchPriorities: {
-            tradeCandidates: [],
-            watchCandidates: [],
-            avoidCandidates: [],
-            exitCandidates: []
-          },
-          strategyProofSummary: {
-            strategiesProducingCandidates: [],
-            provenCandidateCount: 0,
-            unprovenCandidateCount: 0,
-            blockedByMarketGateCount: 0,
-            missingBacktestCount: 0,
-            notes: []
-          },
-          confirmationSummary: {
-            signalSummary: { topBullishCount: 0, topBearishCount: 0, reliabilityAvailable: false, notes: [] },
-            smartMoneySummary: { accumulationCount: 0, distributionCount: 0, topConfirmations: [], topContradictions: [] },
-            marketContextSummary: { leadingSectors: [], weakSectors: [], breadthStatus: 'Neutral', notes: [] }
-          },
-          whatChanged: {
-            newTradeCandidates: [],
-            downgradedCandidates: [],
-            warnings: []
-          },
-          nextActions: [],
-          dataGaps: [],
-          generatedAt: '2026-05-10T00:00:00.000Z'
-        }
-      });
+      await route.fulfill({ json: researchOverviewPayload() });
     });
 
     await visitModule(page, '/research', 'Research Command Center');
@@ -131,7 +153,10 @@ test.describe('Research Hub UI', () => {
     await expect.poll(() => overviewRequests.some((search) => search.includes('region=IN') && search.includes('assetType=STOCK'))).toBe(true);
   });
 
-  test('links to current module routes', async ({ page }) => {
+  test('links user drilldowns to market intelligence pages instead of operator dashboards', async ({ page }) => {
+    await page.route('**/api/v1/research/overview**', async (route) => {
+      await route.fulfill({ json: researchOverviewPayload() });
+    });
     await visitModule(page, '/research', 'Research Command Center');
     await expect(page.getByRole('heading', { name: 'Research Command Center' })).toBeVisible();
 
@@ -140,9 +165,14 @@ test.describe('Research Hub UI', () => {
     await expect(page.locator('a[href="/research/smart-money"]')).toHaveCount(0);
     await expect(page.locator('a[href="/research/market-context"]')).toHaveCount(0);
 
-    await expect(page.locator('a[href="/strategy"]').first()).toBeVisible();
-    await expect(page.locator('a[href="/signals"]').first()).toBeVisible();
-    await expect(page.locator('a[href="/smart-money"]').first()).toBeVisible();
-    await expect(page.locator('a[href="/market-context"]').first()).toBeVisible();
+    await expect(page.locator('a[href="/strategy"]')).toHaveCount(0);
+    await expect(page.locator('a[href="/signals"]')).toHaveCount(0);
+    await expect(page.locator('a[href="/smart-money"]')).toHaveCount(0);
+    await expect(page.locator('a[href="/market-context"]')).toHaveCount(0);
+
+    await expect(page.locator('a[href="/market-pulse"]').first()).toBeVisible();
+    await expect(page.locator('a[href="/market-map"]').first()).toBeVisible();
+    await expect(page.locator('a[href="/breadth"]').first()).toBeVisible();
+    await expect(page.locator('a[href="/institutional-flow"]').first()).toBeVisible();
   });
 });

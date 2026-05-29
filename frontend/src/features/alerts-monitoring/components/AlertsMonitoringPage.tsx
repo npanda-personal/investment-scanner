@@ -50,14 +50,14 @@ export const AlertsMonitoringPage: React.FC = () => {
     <Box sx={{ p: 3, maxWidth: 1400, mx: 'auto' }}>
       <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={2} sx={{ mb: 3 }}>
         <Box>
-          <Typography variant="h4">Alerts & Monitoring</Typography>
+          <Typography variant="h4">Alerts</Typography>
           <Stack direction="row" spacing={1} alignItems="center">
-            <Typography color="text.secondary">Batch/on-demand monitoring for stocks, signals, portfolios, and watchlists.</Typography>
+            <Typography color="text.secondary">Personal alert rules and alert inbox for stocks, triggers, portfolios, and watchlists.</Typography>
             <Chip label={`Scope: ${scope.region}`} size="small" variant="outlined" color="info" />
           </Stack>
         </Box>
         <Stack direction="row" spacing={1}>
-          <Button variant="outlined" onClick={run}>Evaluate Now</Button>
+          <Button variant="outlined" onClick={run}>Check Alerts</Button>
           <Button variant="contained" onClick={() => setDialogOpen(true)}>Create Alert</Button>
         </Stack>
       </Stack>
@@ -71,7 +71,7 @@ export const AlertsMonitoringPage: React.FC = () => {
             <Button size="small" onClick={async () => { await markAllAlertsRead(); await reload(); }}>Mark All Read</Button>
           </Stack>
           {events.length === 0 ? (
-            <Typography color="text.secondary">No alert events yet. Create rules and run evaluation.</Typography>
+            <Typography color="text.secondary">No alert events yet. Create rules and check alerts when you want a local review.</Typography>
           ) : (
             <Stack spacing={1.5}>
               {events.filter((event) => !event.dismissedAt).map((event) => (

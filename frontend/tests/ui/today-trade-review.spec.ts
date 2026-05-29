@@ -400,8 +400,15 @@ test.describe('Today Trade Review UI', () => {
     await mockAuthenticatedUser(page);
   });
 
-  test('deep link settles, no-run state offers manual run, and completed run shows grouped shortlist', async ({ page }) => {
-    let manualRunCompleted = false;
+  test('deep link settles, missing snapshot explains admin ownership, and completed run shows grouped shortlist', async ({ page }) => {
+    let showCompletedSnapshot = false;
+    const postRequests: string[] = [];
+    page.on('request', (request) => {
+      const url = new URL(request.url());
+      if (request.method() === 'POST' && url.pathname.includes('/api/v1/today-review')) {
+        postRequests.push(url.pathname);
+      }
+    });
     await page.route('**/api/v1/today-review/latest**', async (route) => {
       const url = new URL(route.request().url());
       expect(url.searchParams.get('region')).toBe('IN');
@@ -409,28 +416,24 @@ test.describe('Today Trade Review UI', () => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify(!manualRunCompleted ? {
+        body: JSON.stringify(!showCompletedSnapshot ? {
           run: null,
           groups: { longReview: [], shortReview: [], exitRiskReview: [], watchOnly: [], blocked: [], avoid: [], insufficientData: [], unproven: [] },
           scope: { region: 'IN', assetType: 'STOCK' },
         } : completedResponse),
       });
     });
-    await page.route('**/api/v1/today-review/run', async (route) => {
-      const body = route.request().postDataJSON();
-      expect(body).toEqual({ region: 'IN', assetType: 'STOCK' });
-      manualRunCompleted = true;
-      await route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify(completedResponse) });
-    });
 
     await visitAuthenticated(page, '/today-review');
 
-    await expect(page.getByRole('heading', { name: "Today's Trade Review" })).toBeVisible();
-    await expect(page.getByText('No Today review has been published for IN / STOCK.')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Run review' })).toBeVisible();
+    await expect(page.getByRole('main').getByRole('heading', { name: 'Daily Review' })).toBeVisible();
+    await expect(page.getByText('No Daily Review snapshot has been published for IN / STOCK.')).toBeVisible();
+    await expect(page.getByText('Data-production workflows are handled in Admin / Data Ops.')).toBeVisible();
+    await expect(page.getByRole('button', { name: /Run review|Run Today's Review/i })).toHaveCount(0);
     await expect(page.getByRole('progressbar')).toHaveCount(0);
 
-    await page.getByRole('button', { name: 'Run review' }).click();
+    showCompletedSnapshot = true;
+    await page.getByRole('button', { name: 'Reload snapshot' }).click();
 
     await expect(page.getByText('Scope: IN / STOCK')).toBeVisible();
     await expect(page.getByText('Long review candidates', { exact: true })).toBeVisible();
@@ -472,7 +475,7 @@ test.describe('Today Trade Review UI', () => {
     await expect(page.getByTitle('Daily: BLOCKED - DAILY_REVIEW_BLOCKED_BY_HISTORY').first()).toBeVisible();
 
     await page.reload();
-    await expect(page.getByRole('heading', { name: "Today's Trade Review" })).toBeVisible();
+    await expect(page.getByRole('main').getByRole('heading', { name: 'Daily Review' })).toBeVisible();
     await expect(page.getByRole('progressbar')).toHaveCount(0);
     await expect(page.getByRole('link', { name: 'ALPHA.NS' })).toBeVisible();
     await expect(page.getByText('Missing DQ tier context')).toBeVisible();
@@ -480,6 +483,7 @@ test.describe('Today Trade Review UI', () => {
     const body = await page.locator('body').innerText();
     expect(body).not.toMatch(/buy now|sell now|guaranteed|place order|execute order|live trade|financial advice|execution/i);
     expect(body).not.toContain('Raw signal count');
+    expect(postRequests).toEqual([]);
   });
 
   test('candidate table supports filtering, sorting, pagination, and hover-only full cell text', async ({ page }, testInfo) => {

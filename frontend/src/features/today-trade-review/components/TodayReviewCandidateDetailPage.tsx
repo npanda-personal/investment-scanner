@@ -28,7 +28,7 @@ export function TodayReviewCandidateDetailPage() {
   if (loading) {
     return (
       <Stack spacing={3}>
-        <PageHeader title="Today's Trade Review Candidate" backTo="/today-review" backLabel="Today Review" />
+        <PageHeader title="Daily Review Candidate" backTo="/today-review" backLabel="Daily Review" />
         <Alert severity="info" icon={<CircularProgress size={18} />}>Loading candidate research snapshot.</Alert>
       </Stack>
     );
@@ -37,7 +37,7 @@ export function TodayReviewCandidateDetailPage() {
   if (error) {
     return (
       <Stack spacing={3}>
-        <PageHeader title="Today's Trade Review Candidate" backTo="/today-review" backLabel="Today Review" />
+        <PageHeader title="Daily Review Candidate" backTo="/today-review" backLabel="Daily Review" />
         <Alert severity="error" action={<Button color="inherit" size="small" onClick={() => void reload()}>Retry</Button>}>{error}</Alert>
       </Stack>
     );
@@ -46,7 +46,7 @@ export function TodayReviewCandidateDetailPage() {
   if (!candidate) {
     return (
       <Stack spacing={3}>
-        <PageHeader title="Today's Trade Review Candidate" backTo="/today-review" backLabel="Today Review" />
+        <PageHeader title="Daily Review Candidate" backTo="/today-review" backLabel="Daily Review" />
         <Alert severity="warning">Candidate snapshot was not found.</Alert>
       </Stack>
     );
