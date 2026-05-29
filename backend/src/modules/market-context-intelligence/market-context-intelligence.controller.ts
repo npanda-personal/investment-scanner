@@ -6,6 +6,30 @@ export class MarketContextIntelligenceController {
 
   summary = async (req: Request, res: Response) => this.respond(res, () => this.service.summary({ region: this.region(req) }));
 
+  persistedSummary = async (req: Request, res: Response) => {
+    const region = this.region(req) || 'GLOBAL';
+    return this.respond(res, async () => {
+      const summary = await this.service.latestPersistedSummary(region);
+      if (!summary) {
+        return {
+          status: 'missing',
+          scope: { region },
+          summary: null,
+          asOf: null,
+          materialized: false,
+          message: 'Persisted market context is not available for this scope.',
+        };
+      }
+      return {
+        status: 'ready',
+        scope: { region },
+        summary,
+        asOf: summary.updatedAt || summary.regime.updatedAt || null,
+        materialized: false,
+      };
+    });
+  };
+
   run = async (req: Request, res: Response) => this.respond(res, () => this.service.run(this.region(req)));
 
   regime = async (req: Request, res: Response) => this.respond(res, () => this.service.regime(this.region(req)));

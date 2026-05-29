@@ -34,6 +34,43 @@ No historical active work items have been migrated as active.
 - Rejected / Rework
 - Deferred
 
+## Latest Team 00 Routing Update - Market Intelligence Persisted Context Slice
+
+Date: 2026-05-29
+
+Product Owner direction:
+
+- Prioritize the Market Intelligence target state above other backlog work.
+- Implement in slices, committing each accepted slice before moving to the next.
+- Keep user pages read-only against saved evidence and avoid user-facing operator controls.
+
+Current slice:
+
+- `CF-W3-MI-01B` persisted market-context read is accepted for scoped local commit.
+- Branch: `codex/team00-market-intelligence/CF-W3-MI-01B-persisted-context`.
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team00-CF-W3-MI-01B-persisted-context`.
+
+Implemented:
+
+- `GET /api/v1/market-context/persisted-summary`.
+- Market Intelligence frontend uses the persisted read route and does not call the materializing `/summary` path.
+- Missing persisted context shows an honest unavailable state.
+- Trader-facing copy was cleaned of internal implementation wording.
+
+Validation:
+
+- Backend focused tests passed, 3 suites / 16 tests.
+- Backend build passed.
+- Frontend build passed.
+- Focused UI smoke passed, 16 tests.
+- QA accepted after rereview.
+- Architect accepted after rereview.
+
+Next active item:
+
+- `CF-W3-MI-01C` persisted-only Signal Position Ledger / trigger monitor read path.
+- Keep FII/DII, derivatives, index constituent, official breadth, and market-map durable models queued as later slices.
+
 ## Latest Team 00 Routing Update - Narrowed Focus / UX-01B Closed
 
 Date: 2026-05-26

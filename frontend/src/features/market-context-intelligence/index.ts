@@ -7,9 +7,11 @@ export {
   fetchMacroSnapshot,
   fetchMarketBreadth,
   fetchMarketContextSummary,
+  fetchPersistedMarketContextSummary,
   fetchMarketRegime,
   fetchSectorRotation,
 } from './api/marketContextIntelligenceService';
+export type { PersistedMarketContextSummaryResponse } from './api/marketContextIntelligenceService';
 export type {
   CountryStrengthItem,
   DataStatus,

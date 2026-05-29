@@ -3,8 +3,21 @@ import type { CountryStrengthItem, MacroSnapshot, MarketBreadth, MarketContextSu
 
 const API_BASE = '/api/v1/market-context';
 
+export interface PersistedMarketContextSummaryResponse {
+  status: 'ready' | 'missing';
+  scope: { region: string };
+  summary: MarketContextSummary | null;
+  asOf: string | null;
+  materialized: false;
+  message?: string;
+}
+
 export async function fetchMarketContextSummary(params: { region?: string } = {}): Promise<MarketContextSummary> {
   const response = await axios.get<MarketContextSummary>(`${API_BASE}/summary`, { params });
+  return response.data;
+}
+export async function fetchPersistedMarketContextSummary(params: { region?: string } = {}): Promise<PersistedMarketContextSummaryResponse> {
+  const response = await axios.get<PersistedMarketContextSummaryResponse>(`${API_BASE}/persisted-summary`, { params });
   return response.data;
 }
 export async function fetchMarketRegime(): Promise<MarketRegimeSummary> {

@@ -1,4 +1,5 @@
 import { fetchDailyOverviewMarketMovers, fetchDailyOverviewTodayReview } from '@/features/daily-overview-dashboard/api/dailyOverviewDashboardApi';
+import { fetchPersistedMarketContextSummary, type MarketContextSummary } from '@/features/market-context-intelligence';
 import { fetchInstruments, fetchMarketDataUniverseHealth } from '@/features/market-data-foundation';
 import type { MarketScope } from '@/contexts/MarketScopeContext';
 import type { MarketIntelligenceSnapshot, SnapshotResource } from '../types';
@@ -14,6 +15,7 @@ export async function fetchMarketIntelligenceSnapshot(scope: MarketScope): Promi
   const scopeParams = { region: scope.region, assetType: scope.assetType };
   const [
     todayReview,
+    persistedMarketContext,
     marketMovers,
     universeHealth,
     indices,
@@ -21,6 +23,7 @@ export async function fetchMarketIntelligenceSnapshot(scope: MarketScope): Promi
     mapInstruments,
   ] = await Promise.allSettled([
     fetchDailyOverviewTodayReview(scopeParams),
+    fetchPersistedMarketContextSummary({ region: scope.region }),
     fetchDailyOverviewMarketMovers({ ...scopeParams, range: '1D' }),
     fetchMarketDataUniverseHealth(scopeParams),
     fetchInstruments({ region: scope.region, assetType: 'INDEX', pageSize: 75 }),
@@ -32,13 +35,44 @@ export async function fetchMarketIntelligenceSnapshot(scope: MarketScope): Promi
   return {
     scope,
     fetchedAt,
-    marketContext: missingPersistedOnly('Market Context Intelligence persisted-only snapshot', 'Persisted-only market context endpoint is not available yet. Existing summary reads may materialize data and are intentionally not called from trader pages.'),
+    marketContext: settlePersistedMarketContext(persistedMarketContext),
+    persistedMarketContext: settle(persistedMarketContext, 'Market context evidence', valueTimestamp(persistedMarketContext, (value) => value.asOf), undefined),
     todayReview: settle(todayReview, 'Today Review latest snapshot', valueTimestamp(todayReview, (value) => value.run?.updatedAt || value.run?.finishedAt || value.run?.dataThroughDate || null)),
     marketMovers: settle(marketMovers, 'Market Data Foundation movers', valueTimestamp(marketMovers, (value) => value.generatedAt)),
     universeHealth: settle(universeHealth, 'Market Data Foundation universe health', valueTimestamp(universeHealth, (value) => value.generatedAt)),
     indices: settle(indices, 'NSE index catalog snapshot', null, SOURCE_URLS.indices),
     fnoUnderlyings: settle(fnoUnderlyings, 'F&O underlying catalog flag', null, SOURCE_URLS.dataSharing),
-    mapInstruments: settle(mapInstruments, 'Instrument catalog read model', null),
+    mapInstruments: settle(mapInstruments, 'Instrument catalog evidence', null),
+  };
+}
+
+function settlePersistedMarketContext(result: PromiseSettledResult<Awaited<ReturnType<typeof fetchPersistedMarketContextSummary>>>): SnapshotResource<MarketContextSummary> {
+  if (result.status === 'fulfilled' && result.value.status === 'ready' && result.value.summary) {
+    return {
+      value: result.value.summary,
+      status: 'ready',
+      error: null,
+      source: 'Market context evidence',
+      asOf: result.value.asOf,
+    };
+  }
+
+  if (result.status === 'fulfilled') {
+    return {
+      value: null,
+      status: 'missing',
+      error: result.value.message || 'Saved market context is not available yet.',
+      source: 'Market context evidence',
+      asOf: result.value.asOf,
+    };
+  }
+
+  return {
+    value: null,
+    status: 'missing',
+    error: toErrorMessage(result.reason),
+    source: 'Market context evidence',
+    asOf: null,
   };
 }
 
@@ -65,16 +99,6 @@ function settle<T>(
     error: toErrorMessage(result.reason),
     source,
     sourceUrl,
-    asOf: null,
-  };
-}
-
-function missingPersistedOnly<T>(source: string, reason: string): SnapshotResource<T> {
-  return {
-    value: null,
-    status: 'missing',
-    error: reason,
-    source,
     asOf: null,
   };
 }

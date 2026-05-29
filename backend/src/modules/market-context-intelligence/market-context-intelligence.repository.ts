@@ -25,6 +25,25 @@ export class MarketContextIntelligenceRepository {
 
     if (!market) return null;
 
+    return this.toSummary(market, sectors, countries);
+  }
+
+  async latestPersistedSnapshot(region: string = 'GLOBAL'): Promise<MarketContextSummary | null> {
+    const market = await this.db.marketContextSnapshot.findFirst({
+      where: { region },
+      orderBy: [{ snapshotDate: 'desc' }, { updatedAt: 'desc' }],
+    });
+    if (!market) return null;
+
+    const [sectors, countries] = await Promise.all([
+      this.db.sectorContextSnapshot.findMany({ where: { snapshotDate: market.snapshotDate, region }, orderBy: { relativeStrengthScore: 'desc' } }),
+      this.db.countryContextSnapshot.findMany({ where: { snapshotDate: market.snapshotDate, region }, orderBy: { relativeStrengthScore: 'desc' } })
+    ]);
+
+    return this.toSummary(market, sectors, countries);
+  }
+
+  private toSummary(market: any, sectors: any[], countries: any[]): MarketContextSummary {
     const regime: MarketRegimeSummary = {
       regime: market.regime as any,
       score: Number(market.regimeScore),

@@ -81,10 +81,12 @@ test.describe('User/admin route segregation', () => {
     await expect(page.locator('a[href="/signals/calibration"]')).toHaveCount(0);
     await expect(page.locator('a[href="/backtests"]')).toHaveCount(0);
     await expect(page.locator('a[href="/trade-plans"]')).toHaveCount(0);
+    await expect(page.locator('a[href="/signal-position-ledger"]')).toHaveCount(0);
 
     await expect(page.locator('a[href="/admin/pipeline-ops"]')).toBeVisible();
     await expect(page.locator('a[href="/admin/market-data-foundation"]')).toBeVisible();
     await expect(page.locator('a[href="/admin/trade-plans"]')).toBeVisible();
+    await expect(page.locator('a[href="/admin/signal-position-ledger"]')).toBeVisible();
 
     const prohibitedWrites = [
       '/today-review/run',

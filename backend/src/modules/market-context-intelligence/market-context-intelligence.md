@@ -20,7 +20,8 @@ Persisted summary reads must keep sample-count and breadth metrics coherent. If 
 
 | Endpoint | Purpose | Region Support |
 | --- | --- | --- |
-| `GET /api/v1/market-context/summary` | Consolidated context | Supported |
+| `GET /api/v1/market-context/summary` | Consolidated context; may generate a snapshot when missing | Supported for admin/operator contexts |
+| `GET /api/v1/market-context/persisted-summary` | Latest saved market context without generation | Supported for trader-facing read-only pages |
 | `GET /api/v1/market-context/regime` | Region-aware regime | Supported |
 | `GET /api/v1/market-context/sectors` | Sector strength per region | Supported |
 

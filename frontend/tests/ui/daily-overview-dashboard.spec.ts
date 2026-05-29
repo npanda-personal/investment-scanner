@@ -193,6 +193,27 @@ function instrumentsPayload(assetType: string) {
 
 async function fulfillMarketIntelligence(route: Route) {
   const url = new URL(route.request().url());
+  if (url.pathname.includes('/market-context/persisted-summary')) {
+    return route.fulfill({
+      json: {
+        status: 'ready',
+        scope: { region: 'IN' },
+        asOf: '2026-05-27T05:15:00.000Z',
+        materialized: false,
+        summary: {
+          regime: { regime: 'RISK_ON', score: 74, explanation: 'Participation is supportive.', updatedAt: '2026-05-27T05:15:00.000Z', dataStatus: 'COMPLETE' },
+          topSectors: [{ sector: 'Financial Services', return1M: 0.04, return3M: 0.09, return6M: 0.14, relativeStrengthScore: 78, instrumentCount: 24, bullishSignalCount: 8, bearishSignalCount: 1, leadershipStatus: 'LEADING' }],
+          weakSectors: [],
+          breadth: { percentAboveSma50: 0.62, percentAboveSma200: 0.54, sma50SampleCount: 220, sma200SampleCount: 180, advanceDeclineRatio: 1.35, newHigh52WeekCount: 18, newLow52WeekCount: 4, bullishSignalCount: 34, bearishSignalCount: 12, instrumentCount: 240, dataStatus: 'COMPLETE' },
+          countryStrength: [],
+          macro: { interestRateProxy: null, inflationProxy: null, usdStrengthProxy: null, commodityProxy: null, macroStatus: 'UNKNOWN', dataStatus: 'MISSING', explanation: 'Macro providers are not configured yet.' },
+          explanation: ['Participation is supportive.'],
+          updatedAt: '2026-05-27T05:15:00.000Z',
+          dataStatus: 'COMPLETE',
+        },
+      },
+    });
+  }
   if (url.pathname.includes('/today-review/latest')) return route.fulfill({ json: todayReviewPayload() });
   if (url.pathname.includes('/market-data/movers')) return route.fulfill({ json: moversPayload() });
   if (url.pathname.includes('/market-data/universe/health')) return route.fulfill({ json: universeHealthPayload() });
@@ -209,6 +230,7 @@ test.describe('Market Pulse dashboard', () => {
       if (url.pathname.includes('/api/')) requestedPaths.push(`${request.method()} ${url.pathname}`);
     });
     await page.route('**/api/v1/today-review/latest**', fulfillMarketIntelligence);
+    await page.route('**/api/v1/market-context/persisted-summary**', fulfillMarketIntelligence);
     await page.route('**/api/v1/market-data/movers**', fulfillMarketIntelligence);
     await page.route('**/api/v1/market-data/universe/health**', fulfillMarketIntelligence);
     await page.route('**/api/v1/instruments**', fulfillMarketIntelligence);
@@ -223,13 +245,14 @@ test.describe('Market Pulse dashboard', () => {
     await expect(page.getByText('Review candidates')).toBeVisible();
     await expect(page.getByText('GAIN01')).toBeVisible();
     await expect(page.getByText('LOSS03')).toBeVisible();
-    await expect(page.getByText('Index performance snapshot not wired yet')).toBeVisible();
-    await expect(page.getByText('Official breadth snapshot missing')).toBeVisible();
-    await expect(page.getByText('Institutional flow snapshot missing')).toBeVisible();
-    await expect(page.getByText('Product Owner approval required')).toBeVisible();
+    await expect(page.getByText('Financial Services')).toBeVisible();
+    await expect(page.getByText('Index context is not available yet')).toBeVisible();
+    await expect(page.getByText('FII/FPI and DII flow data is not available yet')).toBeVisible();
+    await expect(page.getByText('Derivatives context is not enabled for this scope yet')).toBeVisible();
     await expect(page.getByRole('link', { name: 'Open Daily Review' })).toHaveAttribute('href', '/today-review');
 
     expect(requestedPaths.some((item) => item.includes('/market-context/summary'))).toBe(false);
+    expect(requestedPaths.some((item) => item.includes('/market-context/persisted-summary'))).toBe(true);
     expect(requestedPaths.some((item) => item.startsWith('POST '))).toBe(false);
     const body = await page.locator('body').innerText();
     expect(body).not.toMatch(/Run Today's Review|Run Daily Pipeline|Generate Plans|Sync Market Data|buy now|sell now|guaranteed|price target|financial advice/i);

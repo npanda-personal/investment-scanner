@@ -5,6 +5,7 @@ describe('market context routes', () => {
   it('registers MVP endpoints', () => {
     const router = createMarketContextIntelligenceRouter({
       summary: jest.fn(),
+      persistedSummary: jest.fn(),
       regime: jest.fn(),
       sectors: jest.fn(),
       breadth: jest.fn(),
@@ -16,6 +17,7 @@ describe('market context routes', () => {
 
     expect(routes).toEqual([
       'GET /market-context/summary',
+      'GET /market-context/persisted-summary',
       'GET /market-context/regime',
       'GET /market-context/sectors',
       'GET /market-context/breadth',

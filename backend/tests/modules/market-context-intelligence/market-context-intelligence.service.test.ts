@@ -183,4 +183,57 @@ describe('MarketContextIntelligenceService', () => {
     expect(repository.saveSnapshot).toHaveBeenCalledWith(expect.any(Object), 'IN');
     expect(result).toBe(summary);
   });
+
+  it('returns persisted summary without generating when snapshot exists', async () => {
+    const summary = {
+      regime: { regime: 'RISK_ON', score: 80, explanation: '', dataStatus: 'COMPLETE', updatedAt: '2026-05-27T05:00:00.000Z' },
+      topSectors: [],
+      weakSectors: [],
+      breadth: { percentAboveSma50: 0.8, percentAboveSma200: 0.8, advanceDeclineRatio: 1.5, newHigh52WeekCount: 10, newLow52WeekCount: 2, bullishSignalCount: 10, bearishSignalCount: 2, instrumentCount: 100, dataStatus: 'COMPLETE' },
+      countryStrength: [],
+      macro: { macroStatus: 'UNKNOWN', dataStatus: 'MISSING', explanation: 'Macro providers are not configured yet.', interestRateProxy: null, inflationProxy: null, usdStrengthProxy: null, commodityProxy: null },
+      explanation: ['Test'],
+      updatedAt: '2026-05-27T05:00:00.000Z',
+      dataStatus: 'COMPLETE'
+    };
+    const repository = {
+      latestPersistedSnapshot: jest.fn().mockResolvedValue(summary),
+      saveSnapshot: jest.fn(),
+    };
+    const marketDataService = {
+      listInstruments: jest.fn(),
+      listPricesByInstrumentId: jest.fn(),
+    };
+    const signalService = { topSignals: jest.fn() };
+    const service = new MarketContextIntelligenceService(repository as any, marketDataService as any, signalService as any);
+
+    const result = await service.latestPersistedSummary('IN');
+
+    expect(result).toBe(summary);
+    expect(repository.latestPersistedSnapshot).toHaveBeenCalledWith('IN');
+    expect(repository.saveSnapshot).not.toHaveBeenCalled();
+    expect(marketDataService.listInstruments).not.toHaveBeenCalled();
+    expect(signalService.topSignals).not.toHaveBeenCalled();
+  });
+
+  it('returns null for latest persisted summary without generating when no snapshot exists', async () => {
+    const repository = {
+      latestPersistedSnapshot: jest.fn().mockResolvedValue(null),
+      saveSnapshot: jest.fn(),
+    };
+    const marketDataService = {
+      listInstruments: jest.fn(),
+      listPricesByInstrumentId: jest.fn(),
+    };
+    const signalService = { topSignals: jest.fn() };
+    const service = new MarketContextIntelligenceService(repository as any, marketDataService as any, signalService as any);
+
+    const result = await service.latestPersistedSummary('IN');
+
+    expect(result).toBeNull();
+    expect(repository.latestPersistedSnapshot).toHaveBeenCalledWith('IN');
+    expect(repository.saveSnapshot).not.toHaveBeenCalled();
+    expect(marketDataService.listInstruments).not.toHaveBeenCalled();
+    expect(signalService.topSignals).not.toHaveBeenCalled();
+  });
 });

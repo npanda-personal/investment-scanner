@@ -709,6 +709,45 @@ Product Owner action required: no.
 
 ---
 
+# Runtime Checkpoint - CF-W3-MI-01B Persisted Market Context Read
+
+Date: 2026-05-29
+
+Team 00 implemented the first Market Intelligence backend/frontend slice in the fresh worktree:
+
+- Branch: `codex/team00-market-intelligence/CF-W3-MI-01B-persisted-context`.
+- Worktree: `C:\work\repo\investment-scanner-worktrees\team00-CF-W3-MI-01B-persisted-context`.
+
+Implemented:
+
+- Read-only `GET /api/v1/market-context/persisted-summary`.
+- Ready/missing response envelope that does not materialize market context.
+- Market Intelligence frontend consumption through the `market-context-intelligence` public feature export.
+- Honest missing-state Market Pulse behavior when persisted market context is absent.
+- UI smoke coverage proving user pages do not call materializing market-context summary or shared write endpoints.
+
+Validation:
+
+- Backend focused tests passed: 3 suites / 16 tests.
+- Backend build passed.
+- Frontend build passed.
+- Focused UI smoke passed: 16 tests.
+- `git diff --check` passed with normal CRLF warnings only.
+
+Review gates:
+
+- QA accepted after rereview.
+- Architect accepted after rereview.
+
+Next:
+
+- Commit this scoped slice locally.
+- Continue with persisted-only Signal Position Ledger / trigger monitor read path as the next Market Intelligence dependency.
+
+Product Owner action required: no.
+
+---
+
 ## Runtime Checkpoint - Pipeline Command API Ready Promotion
 
 Date: 2026-05-25

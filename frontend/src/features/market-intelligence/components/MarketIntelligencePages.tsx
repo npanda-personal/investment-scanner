@@ -43,7 +43,7 @@ export function MarketPulsePage() {
   return (
     <MarketPageShell
       title="Market Pulse"
-      subtitle="Trader-facing market environment from persisted evidence only. This page never runs ingestion, generation, repair, calibration, or shared analysis pipelines."
+      subtitle="Market environment from saved research evidence. This page is read-only and does not start data refresh work."
       loading={view.loading}
       error={view.error}
       snapshot={snapshot}
@@ -60,7 +60,7 @@ export function MarketPulsePage() {
               <MetricCard label="Review candidates" value={formatNumber(candidateCount)} helper="Bullish, bearish, and exit-risk candidates from the latest Today Review snapshot." />
             </Grid>
             <Grid item xs={12} md={3}>
-              <MetricCard label="Trusted universe" value={formatNumber(snapshot.universeHealth.value?.counts.reviewReady ?? snapshot.todayReview.value?.run?.trustedUniverseCount ?? null)} helper="Data Quality gated stock count available to downstream review workflows." />
+              <MetricCard label="Trusted universe" value={formatNumber(snapshot.universeHealth.value?.counts.reviewReady ?? snapshot.todayReview.value?.run?.trustedUniverseCount ?? null)} helper="Data Quality gated stock count available for candidate review." />
             </Grid>
             <Grid item xs={12} md={3}>
               <MetricCard label="Data trust" value={snapshot.universeHealth.value?.trustStatus ?? snapshot.todayReview.value?.run?.trustStatus ?? 'Unavailable'} helper={snapshot.universeHealth.value?.trustReasons?.[0] ?? 'Trust status is shown from persisted data readiness evidence.'} />
@@ -71,8 +71,8 @@ export function MarketPulsePage() {
             <Grid item xs={12} lg={7}>
               <SectionCard title="Index Tape" subtitle="Persisted index snapshot status">
                 <MissingEvidence
-                  title="Index performance snapshot not wired yet"
-                  message="Nifty 50, Bank Nifty, sector-index, and broad-market index read models are planned as IndexContextSnapshot. Until then, this user page does not call data-production endpoints."
+                  title="Index context is not available yet"
+                  message="Nifty 50, Bank Nifty, sector-index, and broad-market index evidence still needs a saved source before it can appear here."
                   source="NSE Indices"
                   sourceUrl="https://www.nseindia.com/nse-indices"
                 />
@@ -90,7 +90,7 @@ export function MarketPulsePage() {
                 ) : (
                   <MissingEvidence
                     title="Official breadth snapshot missing"
-                    message="Advance, decline, unchanged, and denominator counts require a persisted BreadthSnapshot. Existing market-context reads are intentionally skipped until persisted-only reads are available."
+                    message="Advance, decline, unchanged, and denominator counts are not saved yet. Available participation evidence is shown only when it exists in saved market context."
                     source="NSE Advances/Declines"
                     sourceUrl="https://www.nseindia.com/market-data/advance"
                   />
@@ -107,7 +107,7 @@ export function MarketPulsePage() {
                 ) : (
                   <MissingEvidence
                     title="Sector rotation snapshot unavailable"
-                    message="Sector leadership will appear after a persisted-only market context read model is available."
+                    message="Sector leadership appears when saved market context evidence is available."
                     source="Market Context Intelligence"
                   />
                 )}
@@ -116,8 +116,8 @@ export function MarketPulsePage() {
             <Grid item xs={12} lg={4}>
               <SectionCard title="Institutional Flow" subtitle="FII/FPI and DII context">
                 <MissingEvidence
-                  title="Institutional flow snapshot missing"
-                  message="FII/FPI and DII buy, sell, net, and rolling-flow regime labels require InstitutionalFlowSnapshot. This page shows context only, not recommendations."
+                  title="FII/FPI and DII flow data is not available yet"
+                  message="FII/FPI and DII buy, sell, net, and rolling-flow regime labels are not available yet. This page shows context only, not recommendations."
                   source="NSE FII/DII capital-market activity"
                   sourceUrl="https://www.nseindia.com/reports/fii-dii/"
                 />
@@ -126,8 +126,8 @@ export function MarketPulsePage() {
             <Grid item xs={12} lg={4}>
               <SectionCard title="Derivatives Sentiment" subtitle="Read-only derivatives context">
                 <MissingEvidence
-                  title="Product Owner approval required"
-                  message="Option-chain, futures trend, PCR, OI change, strikes, and expiry context are marked as an expanded data domain and remain blocked until approval and a persisted read model exist."
+                  title="Derivatives context is not enabled for this scope yet"
+                  message="Option-chain, futures trend, PCR, OI change, strikes, and expiry context remain unavailable until this data domain is enabled and saved evidence exists."
                   source="NSE data sharing policy list"
                   sourceUrl="https://nsearchives.nseindia.com/web/sites/default/files/inline-files/Data%20list%20under%20NSE%20Data%20Sharing%20Policy%20for%20Research%20and%20Analysis_20250728.pdf"
                 />
@@ -167,7 +167,7 @@ export function IndicesWorkspacePage() {
   return (
     <MarketPageShell
       title="Indices Workspace"
-      subtitle="Index context for Nifty, sector, broad-market, and approved regional/global indices. Constituent and contribution analytics are read-model gaps until IndexContextSnapshot exists."
+      subtitle="Index context for Nifty, sector, broad-market, and approved regional/global indices. Constituent and contribution analytics appear after saved index evidence exists."
       loading={view.loading}
       error={view.error}
       snapshot={view.snapshot}
@@ -188,7 +188,7 @@ export function IndicesWorkspacePage() {
             </SectionCard>
           </Grid>
           <Grid item xs={12} lg={4}>
-            <SectionCard title="Index Context Gaps" subtitle="Required before implementation can be considered complete">
+            <SectionCard title="Index Context Gaps" subtitle="Data still needed for a fuller index view">
               <GapList items={[
                 'constituents and weights',
                 'top contributors and detractors',
@@ -225,7 +225,7 @@ export function BreadthParticipationPage() {
           <Grid item xs={12} md={3}><MetricCard label="Above SMA200" value={formatPercent(breadth?.percentAboveSma200)} helper={`Sample: ${formatNumber(breadth?.sma200SampleCount ?? breadth?.instrumentCount ?? null)}`} /></Grid>
           <Grid item xs={12} md={3}><MetricCard label="Review-ready denominator" value={formatNumber(health?.counts.reviewReady ?? null)} helper={`Catalog: ${formatNumber(health?.counts.totalCatalogInstruments ?? null)}`} /></Grid>
           <Grid item xs={12} lg={7}>
-            <SectionCard title="Official Advance/Decline" subtitle="Persisted BreadthSnapshot requirement">
+            <SectionCard title="Official Advance/Decline" subtitle="Saved breadth evidence gap">
               <MissingEvidence
                 title="Advance, decline, and unchanged counts are not persisted yet"
                 message="The user-facing page must show official counts, denominators, and freshness. Until those source rows are persisted, this page shows a gap instead of deriving confidence from incomplete data."
@@ -267,10 +267,10 @@ export function InstitutionalFlowPage() {
           <Grid item xs={12} md={4}><MetricCard label="DII net flow" value="Missing" helper="Requires persisted daily capital-market activity rows." /></Grid>
           <Grid item xs={12} md={4}><MetricCard label="Flow regime" value="Unavailable" helper="Examples: FII_ACCUMULATION, DII_SUPPORT, INSTITUTIONAL_DISTRIBUTION." /></Grid>
           <Grid item xs={12}>
-            <SectionCard title="Required Flow Evidence" subtitle="InstitutionalFlowSnapshot">
+            <SectionCard title="Required Flow Evidence" subtitle="Saved institutional flow evidence">
               <MissingEvidence
-                title="FII/FPI and DII flow read model not implemented"
-                message="Future implementation should show buy, sell, net values, 5/20-day rolling net flow, divergence versus index movement, and flow regime labels. Copy must stay institutional flow context, not a recommendation."
+                title="FII/FPI and DII flow data is not available yet"
+                message="When available, this view should show buy, sell, net values, 5/20-day rolling net flow, divergence versus index movement, and flow regime labels. Copy must stay institutional flow context, not a recommendation."
                 source="NSE FII/DII capital-market activity"
                 sourceUrl="https://www.nseindia.com/reports/fii-dii/"
               />
@@ -298,7 +298,7 @@ export function DerivativesContextPage() {
         <Grid container spacing={2}>
           <Grid item xs={12}>
             <Alert severity="warning">
-              Product Owner approval is required before derivatives data implementation. This page currently displays only existing F&O eligibility flags when available.
+              Derivatives context is not enabled for this scope yet. Existing F&O eligibility flags are catalog context only, not options-chain or futures evidence.
             </Alert>
           </Grid>
           <Grid item xs={12} lg={7}>
@@ -313,7 +313,7 @@ export function DerivativesContextPage() {
             </SectionCard>
           </Grid>
           <Grid item xs={12} lg={5}>
-            <SectionCard title="Blocked Until Approved" subtitle="DerivativesContextSnapshot needs">
+            <SectionCard title="Not Enabled Yet" subtitle="Derivatives context needs">
               <GapList items={[
                 'index futures trend',
                 'option-chain summary',
@@ -643,8 +643,9 @@ function classifyEnvironment(snapshot: MarketIntelligenceSnapshot): MarketEnviro
   const health = snapshot.universeHealth.value;
   const breadth = snapshot.marketContext.value?.breadth;
   const reviewMode = snapshot.todayReview.value?.run?.reviewUniverseMode;
-  if (!snapshot.todayReview.value?.run && !health) return 'UNAVAILABLE';
+  if (!snapshot.todayReview.value?.run && !health && !snapshot.marketContext.value) return 'UNAVAILABLE';
   if (health?.trustStatus === 'NOT_TRUSTWORTHY' || reviewMode === 'NO_REVIEW') return 'BLOCKED';
+  if (!snapshot.marketContext.value) return 'UNAVAILABLE';
   if (breadth?.percentAboveSma50 !== null && breadth?.percentAboveSma50 !== undefined && breadth.percentAboveSma50 < 0.35) return 'RISKY';
   if (breadth?.advanceDeclineRatio !== null && breadth?.advanceDeclineRatio !== undefined && breadth.advanceDeclineRatio < 0.9) return 'NARROW';
   if (health?.trustStatus === 'OK' || snapshot.todayReview.value?.run?.trustStatus === 'OK') return 'SUPPORTIVE';
