@@ -136,6 +136,55 @@ export class MarketDataFoundationRepository {
     });
   }
 
+  async findExchangeIdentitiesForExchangeSymbols(exchange: string, symbols: string[]) {
+    const uniqueSymbols = [...new Set(symbols.map((symbol) => symbol.trim()).filter(Boolean))];
+    if (uniqueSymbols.length === 0) return [];
+    return (this.prisma as any).instrumentExchangeIdentity.findMany({
+      where: {
+        exchange,
+        OR: [
+          { exchangeSymbol: { in: uniqueSymbols, mode: 'insensitive' } },
+          { securityCode: { in: uniqueSymbols, mode: 'insensitive' } },
+          { securityId: { in: uniqueSymbols, mode: 'insensitive' } },
+        ],
+      },
+      include: {
+        stock: {
+          select: {
+            id: true,
+            symbol: true,
+            region: true,
+            assetType: true,
+            exchange: true,
+            isActive: true,
+            isDelisted: true,
+          },
+        },
+      },
+    });
+  }
+
+  async filterPricesMissingPrimaryExchangeCandles(prices: HistoricalPrice[], primaryExchange: string): Promise<HistoricalPrice[]> {
+    if (prices.length === 0) return [];
+    const symbols = [...new Set(prices.map((price) => price.symbol))];
+    const timestamps = [...new Set(prices.map((price) => this.normalizeUtcDay(price.date).toISOString()))]
+      .map((date) => new Date(date));
+    const primarySources = EXCHANGE_PRICE_SOURCES.filter((source) => source.toUpperCase().startsWith(primaryExchange.toUpperCase()));
+    const existing = await this.prisma.priceTick.findMany({
+      where: {
+        symbol: { in: symbols },
+        timestamp: { in: timestamps },
+        OR: [
+          { exchange: { equals: primaryExchange, mode: 'insensitive' } },
+          { source: { in: primarySources, mode: 'insensitive' } },
+        ],
+      },
+      select: { symbol: true, timestamp: true },
+    });
+    const existingKeys = new Set(existing.map((row) => this.priceStorageKey(row.symbol, this.normalizeUtcDay(row.timestamp))));
+    return prices.filter((price) => !existingKeys.has(this.priceStorageKey(price.symbol, this.normalizeUtcDay(price.date))));
+  }
+
   async providerDataCleanupReport() {
     const providerSource = this.providerSourceWhere();
     const [

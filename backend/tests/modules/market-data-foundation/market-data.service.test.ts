@@ -297,6 +297,105 @@ describe('MarketDataFoundationService syncV1', () => {
     }));
   });
 
+  it('imports BSE backup candles only through explicit exchange identity matches and missing NSE candles', async () => {
+    const csvText = [
+      'TradDt,Sgmt,Src,FinInstrmTp,TckrSymb,SctySrs,OpnPric,HghPric,LwPric,ClsPric,TtlTradgVol',
+      '2026-05-27,CM,BSE,STK,500325,A,1400,1420,1390,1410,1000',
+      '2026-05-27,CM,BSE,STK,999999,A,100,101,99,100.5,200',
+    ].join('\n');
+    const repository = {
+      findSourceFileImportByKey: jest.fn().mockResolvedValue(null),
+      upsertSourceFileImport: jest.fn()
+        .mockResolvedValueOnce({ id: 'bse-import-1', status: 'PENDING' })
+        .mockResolvedValueOnce({ id: 'bse-import-1', status: 'COMPLETED' }),
+      findExchangeIdentitiesForExchangeSymbols: jest.fn().mockResolvedValue([
+        { exchangeSymbol: '500325', securityCode: '500325', stock: { id: 'stock-1', symbol: 'RELIANCE' } },
+      ]),
+      filterPricesMissingPrimaryExchangeCandles: jest.fn().mockImplementation(async (prices: any[]) => prices),
+      storeHistoricalBulk: jest.fn().mockResolvedValue({
+        rowsReceived: 1,
+        rowsInserted: 1,
+        rowsUpdated: 0,
+        rowsSkipped: 0,
+        rowsNoOp: 0,
+        warningCount: 0,
+        warnings: [],
+        summaryBySymbol: new Map([
+          ['RELIANCE', { rowsReceived: 1, rowsInserted: 1, rowsUpdated: 0, rowsSkipped: 0, rowsNoOp: 0, warningCount: 0, warnings: [] }],
+        ]),
+      }),
+    };
+    const service = new MarketDataFoundationService(repository as any, {
+      inferRegion: jest.fn().mockReturnValue({ region: 'IN', exchange: 'BSE' }),
+    } as any);
+
+    const result = await (service as any).importBseCmBackupDaily({
+      tradingDate: '2026-05-27',
+      csvText,
+      fileName: 'BhavCopy_BSE_CM_0_0_0_20260527_F_0000.csv',
+      fileUrl: 'local-bse-fixture.csv',
+    });
+
+    expect(repository.findExchangeIdentitiesForExchangeSymbols).toHaveBeenCalledWith('BSE', ['500325', '999999']);
+    expect(repository.filterPricesMissingPrimaryExchangeCandles).toHaveBeenCalledWith([
+      expect.objectContaining({
+        symbol: 'RELIANCE',
+        source: 'BSE_UDIFF_CM_BHAVCOPY',
+      }),
+    ], 'NSE');
+    expect(repository.storeHistoricalBulk).toHaveBeenCalledWith(
+      [expect.objectContaining({ symbol: 'RELIANCE', source: 'BSE_UDIFF_CM_BHAVCOPY' })],
+      expect.any(Function),
+      expect.any(Map),
+      { sourceFileImportId: 'bse-import-1' }
+    );
+    expect(result).toMatchObject({
+      status: 'COMPLETED',
+      source: 'BSE',
+      rowsParsed: 2,
+      rowsInserted: 1,
+      rowsSkipped: 1,
+      changedSymbols: ['RELIANCE'],
+    });
+  });
+
+  it('does not store BSE backup candles when an NSE primary candle already exists', async () => {
+    const csvText = [
+      'TradDt,Sgmt,Src,FinInstrmTp,TckrSymb,SctySrs,OpnPric,HghPric,LwPric,ClsPric,TtlTradgVol',
+      '2026-05-27,CM,BSE,STK,500325,A,1400,1420,1390,1410,1000',
+    ].join('\n');
+    const repository = {
+      findSourceFileImportByKey: jest.fn().mockResolvedValue(null),
+      upsertSourceFileImport: jest.fn()
+        .mockResolvedValueOnce({ id: 'bse-import-1', status: 'PENDING' })
+        .mockResolvedValueOnce({ id: 'bse-import-1', status: 'COMPLETED' }),
+      findExchangeIdentitiesForExchangeSymbols: jest.fn().mockResolvedValue([
+        { exchangeSymbol: '500325', securityCode: '500325', stock: { id: 'stock-1', symbol: 'RELIANCE' } },
+      ]),
+      filterPricesMissingPrimaryExchangeCandles: jest.fn().mockResolvedValue([]),
+      storeHistoricalBulk: jest.fn(),
+    };
+    const service = new MarketDataFoundationService(repository as any, {
+      inferRegion: jest.fn().mockReturnValue({ region: 'IN', exchange: 'BSE' }),
+    } as any);
+
+    const result = await (service as any).importBseCmBackupDaily({
+      tradingDate: '2026-05-27',
+      csvText,
+      fileName: 'BhavCopy_BSE_CM_0_0_0_20260527_F_0000.csv',
+      fileUrl: 'local-bse-fixture.csv',
+    });
+
+    expect(repository.storeHistoricalBulk).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      status: 'COMPLETED',
+      rowsInserted: 0,
+      rowsSkipped: 1,
+      changedSymbols: [],
+      downstreamSymbols: [],
+    });
+  });
+
   it('returns health metadata', async () => {
     const service = new MarketDataFoundationService({
       instrumentCount: jest.fn().mockResolvedValue(2),

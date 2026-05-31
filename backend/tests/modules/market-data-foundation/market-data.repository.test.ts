@@ -112,6 +112,59 @@ describe('MarketDataFoundationRepository', () => {
     }));
   });
 
+  it('loads exchange identities by explicit BSE exchange symbols or security codes', async () => {
+    const findMany = jest.fn().mockResolvedValue([
+      { id: 'identity-1', exchange: 'BSE', exchangeSymbol: '500325', securityCode: '500325', stock: { id: 'stock-1', symbol: 'RELIANCE' } },
+    ]);
+    const prisma = {
+      instrumentExchangeIdentity: { findMany },
+    };
+    const repository = new MarketDataFoundationRepository(prisma as any);
+
+    const rows = await (repository as any).findExchangeIdentitiesForExchangeSymbols('BSE', ['500325', 'NO_MATCH']);
+
+    expect(rows).toHaveLength(1);
+    expect(findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        exchange: 'BSE',
+        OR: expect.arrayContaining([
+          { exchangeSymbol: { in: ['500325', 'NO_MATCH'], mode: 'insensitive' } },
+          { securityCode: { in: ['500325', 'NO_MATCH'], mode: 'insensitive' } },
+          { securityId: { in: ['500325', 'NO_MATCH'], mode: 'insensitive' } },
+        ]),
+      }),
+      include: expect.objectContaining({
+        stock: expect.objectContaining({
+          select: expect.objectContaining({ id: true, symbol: true }),
+        }),
+      }),
+    }));
+  });
+
+  it('filters BSE backup candles when an NSE primary candle already exists for the stock/date', async () => {
+    const prisma = {
+      priceTick: {
+        findMany: jest.fn().mockResolvedValue([
+          { symbol: 'RELIANCE', timestamp: new Date('2026-05-27T00:00:00.000Z') },
+        ]),
+      },
+    };
+    const repository = new MarketDataFoundationRepository(prisma as any);
+
+    const result = await (repository as any).filterPricesMissingPrimaryExchangeCandles([
+      { symbol: 'RELIANCE', date: new Date('2026-05-27T00:00:00.000Z'), open: 1, high: 2, low: 1, close: 2, source: 'BSE_UDIFF_CM_BHAVCOPY' },
+      { symbol: 'TCS', date: new Date('2026-05-27T00:00:00.000Z'), open: 1, high: 2, low: 1, close: 2, source: 'BSE_UDIFF_CM_BHAVCOPY' },
+    ], 'NSE');
+
+    expect(result.map((price: any) => price.symbol)).toEqual(['TCS']);
+    expect(prisma.priceTick.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        symbol: { in: ['RELIANCE', 'TCS'] },
+        timestamp: { in: [new Date('2026-05-27T00:00:00.000Z')] },
+      }),
+    }));
+  });
+
   it('counts provider-sourced market data rows before cleanup without deleting user-owned data', async () => {
     const prisma = {
       priceTick: { count: jest.fn().mockResolvedValue(2) },

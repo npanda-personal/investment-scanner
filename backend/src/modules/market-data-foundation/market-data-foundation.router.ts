@@ -69,6 +69,7 @@ export const createMarketDataV1Router = (
   router.get('/market-data/provider-cleanup/report', controller.providerCleanupReport);
   router.post('/market-data/provider-cleanup/execute', controller.executeProviderCleanup);
   router.post('/market-data/exchange-files/nse-cm-udiff/import', controller.importNseCmUdiffDaily);
+  router.post('/market-data/exchange-files/bse-cm-backup/import', controller.importBseCmBackupDaily);
   router.get('/market-data/metadata/manual-template', controller.manualMetadataTemplate);
   router.post('/market-data/provider/validate', controller.validateProviders);
   router.post('/market-data/catalog/identity/repair', controller.repairCatalogIdentity);

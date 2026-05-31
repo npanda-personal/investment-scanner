@@ -4085,6 +4085,221 @@ export class MarketDataFoundationService {
     }
   }
 
+  async importBseCmBackupDaily(input: {
+    tradingDate: Date | string;
+    csvText?: string;
+    fileName?: string;
+    fileUrl?: string | null;
+    force?: boolean;
+  }): Promise<ExchangeDailyImportSummary> {
+    const tradingDate = this.normalizeExchangeTradingDate(input.tradingDate);
+    const tradingDateText = tradingDate.toISOString().slice(0, 10);
+    const fileName = input.fileName?.trim() || `BhavCopy_BSE_CM_${tradingDateText.replace(/-/g, '')}.csv`;
+    const fileUrl = input.fileUrl ?? null;
+    if (!input.csvText && !fileUrl) {
+      throw new Error('csvText or fileUrl is required for BSE backup import.');
+    }
+    const csvText = input.csvText ?? await this.downloadOfficialExchangeText(fileUrl as string);
+    const parsed = parseIndianExchangeEodCsv(csvText, {
+      source: 'BSE_UDIFF_CM_BHAVCOPY',
+      sourceName: 'BSE_UDIFF_CM_BHAVCOPY',
+      sourceUrl: fileUrl,
+      exchange: 'BSE',
+      symbolSuffix: '',
+      tradingDate,
+    });
+    const fileHash = parsed.sourceIdentity.contentSha256;
+    const fileSize = Buffer.byteLength(csvText, 'utf8');
+    const repository = this.repository as any;
+
+    const existingImport = typeof repository.findSourceFileImportByKey === 'function'
+      ? await repository.findSourceFileImportByKey({
+        source: 'BSE',
+        segment: 'CM',
+        tradingDate,
+        fileHash,
+      })
+      : null;
+    if (!input.force && existingImport?.status === 'COMPLETED') {
+      return {
+        status: 'SKIPPED_DUPLICATE',
+        source: 'BSE',
+        segment: 'CM',
+        tradingDate: tradingDateText,
+        sourceName: parsed.sourceName,
+        fileName,
+        fileUrl,
+        sourceFileImportId: existingImport.id ?? null,
+        sourceFingerprint: parsed.sourceFingerprint,
+        rowsRead: parsed.rowsRead,
+        rowsParsed: parsed.rowsParsed,
+        rowsInserted: 0,
+        rowsUpdated: 0,
+        rowsNoOp: 0,
+        rowsSkipped: parsed.rowsSkipped,
+        warningCount: parsed.warnings.length,
+        warnings: parsed.warnings.slice(0, 10),
+        errors: [],
+        changedSymbols: [],
+        downstreamSymbols: [],
+      };
+    }
+
+    const pendingImport = await repository.upsertSourceFileImport({
+      source: 'BSE',
+      segment: 'CM',
+      tradingDate,
+      fileName,
+      fileUrl,
+      fileHash,
+      fileSize,
+      status: 'PENDING',
+      rowsRaw: parsed.rowsRead,
+      rowsAccepted: 0,
+      rowsRejected: parsed.rowsSkipped,
+      parserVersion: 'bse-cm-udiff-fill-v1',
+      errorMessage: null,
+    });
+
+    try {
+      const parsedSymbols = [...new Set(parsed.prices.map((price) => price.symbol))];
+      const identities = await repository.findExchangeIdentitiesForExchangeSymbols('BSE', parsedSymbols);
+      const identityBySymbol = new Map<string, any>();
+      identities.forEach((identity: any) => {
+        [identity.exchangeSymbol, identity.securityCode, identity.securityId]
+          .filter(Boolean)
+          .forEach((value) => identityBySymbol.set(String(value).trim().toUpperCase(), identity));
+      });
+
+      const matchedPrices: HistoricalPrice[] = [];
+      let unmatchedRows = 0;
+      for (const price of parsed.prices) {
+        const identity = identityBySymbol.get(price.symbol.trim().toUpperCase());
+        const stockSymbol = identity?.stock?.symbol;
+        if (!stockSymbol) {
+          unmatchedRows += 1;
+          continue;
+        }
+        matchedPrices.push({
+          ...price,
+          symbol: stockSymbol,
+          source: 'BSE_UDIFF_CM_BHAVCOPY',
+        });
+      }
+
+      const fillPrices: HistoricalPrice[] = typeof repository.filterPricesMissingPrimaryExchangeCandles === 'function'
+        ? await repository.filterPricesMissingPrimaryExchangeCandles(matchedPrices, 'NSE')
+        : matchedPrices;
+      const skippedForPrimary = Math.max(0, matchedPrices.length - fillPrices.length);
+      const regionInfoBySymbol = new Map<string, PriceRegionInfo>();
+      fillPrices.forEach((price) => {
+        regionInfoBySymbol.set(price.symbol, { region: 'IN', exchange: 'BSE' });
+      });
+      const emptyStoreSummary: HistoricalBulkStoreResult = {
+        rowsReceived: 0,
+        rowsInserted: 0,
+        rowsUpdated: 0,
+        rowsSkipped: 0,
+        rowsNoOp: 0,
+        warningCount: 0,
+        warnings: [],
+        summaryBySymbol: new Map(),
+      };
+      const storeSummary = fillPrices.length > 0
+        ? await this.storeHistoricalBulk(fillPrices, regionInfoBySymbol, { sourceFileImportId: pendingImport?.id ?? null })
+        : emptyStoreSummary;
+      const changedSymbols: string[] = [];
+      const downstreamSymbols: string[] = [];
+      storeSummary.summaryBySymbol.forEach((summary, symbol) => {
+        if ((summary.rowsReceived || 0) > 0 || (summary.rowsInserted || 0) > 0 || (summary.rowsUpdated || 0) > 0 || (summary.rowsNoOp || 0) > 0) {
+          downstreamSymbols.push(symbol);
+        }
+        if ((summary.rowsInserted || 0) > 0 || (summary.rowsUpdated || 0) > 0) {
+          changedSymbols.push(symbol);
+        }
+      });
+
+      const rowsSkipped = parsed.rowsSkipped + unmatchedRows + skippedForPrimary + (storeSummary.rowsSkipped || 0);
+      const completedImport = await repository.upsertSourceFileImport({
+        source: 'BSE',
+        segment: 'CM',
+        tradingDate,
+        fileName,
+        fileUrl,
+        fileHash,
+        fileSize,
+        status: 'COMPLETED',
+        rowsRaw: parsed.rowsRead,
+        rowsAccepted: fillPrices.length,
+        rowsRejected: rowsSkipped,
+        parserVersion: 'bse-cm-udiff-fill-v1',
+        errorMessage: null,
+      });
+
+      return {
+        status: 'COMPLETED',
+        source: 'BSE',
+        segment: 'CM',
+        tradingDate: tradingDateText,
+        sourceName: parsed.sourceName,
+        fileName,
+        fileUrl,
+        sourceFileImportId: completedImport?.id ?? pendingImport?.id ?? null,
+        sourceFingerprint: parsed.sourceFingerprint,
+        rowsRead: parsed.rowsRead,
+        rowsParsed: parsed.rowsParsed,
+        rowsInserted: storeSummary.rowsInserted || 0,
+        rowsUpdated: storeSummary.rowsUpdated || 0,
+        rowsNoOp: storeSummary.rowsNoOp || 0,
+        rowsSkipped,
+        warningCount: (storeSummary.warningCount || 0) + parsed.warnings.length,
+        warnings: [...parsed.warnings, ...(storeSummary.warnings || [])].slice(0, 10),
+        errors: [],
+        changedSymbols: changedSymbols.sort((a, b) => a.localeCompare(b)),
+        downstreamSymbols: downstreamSymbols.sort((a, b) => a.localeCompare(b)),
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'BSE CM backup import failed';
+      await repository.upsertSourceFileImport({
+        source: 'BSE',
+        segment: 'CM',
+        tradingDate,
+        fileName,
+        fileUrl,
+        fileHash,
+        fileSize,
+        status: 'FAILED',
+        rowsRaw: parsed.rowsRead,
+        rowsAccepted: 0,
+        rowsRejected: parsed.rowsRead,
+        parserVersion: 'bse-cm-udiff-fill-v1',
+        errorMessage: message,
+      }).catch(() => undefined);
+      return {
+        status: 'FAILED',
+        source: 'BSE',
+        segment: 'CM',
+        tradingDate: tradingDateText,
+        sourceName: parsed.sourceName,
+        fileName,
+        fileUrl,
+        sourceFileImportId: pendingImport?.id ?? null,
+        sourceFingerprint: parsed.sourceFingerprint,
+        rowsRead: parsed.rowsRead,
+        rowsParsed: parsed.rowsParsed,
+        rowsInserted: 0,
+        rowsUpdated: 0,
+        rowsNoOp: 0,
+        rowsSkipped: parsed.rowsRead,
+        warningCount: parsed.warnings.length,
+        warnings: parsed.warnings.slice(0, 10),
+        errors: [message],
+        changedSymbols: [],
+        downstreamSymbols: [],
+      };
+    }
+  }
+
   async syncScheduledRegion(region: string, options: {
     assetType?: string;
     batchSize?: number;
