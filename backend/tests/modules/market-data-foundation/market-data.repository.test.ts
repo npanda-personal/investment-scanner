@@ -344,36 +344,46 @@ describe('MarketDataFoundationRepository', () => {
   });
 
   it('executes provider cleanup and rebuilds latest prices only from exchange candles', async () => {
-    const deleteMany = jest.fn().mockResolvedValue({ count: 1 });
     const count = jest.fn().mockResolvedValue(0);
     const latestRows = [
       { symbol: 'RELIANCE', region: 'IN', timestamp: new Date('2026-05-27T00:00:00.000Z'), close: 1430 },
     ];
-    const executeRaw = jest.fn().mockResolvedValue(2);
+    const executeRaw = jest.fn()
+      .mockResolvedValueOnce(50000)
+      .mockResolvedValueOnce(2)
+      .mockResolvedValueOnce(1)
+      .mockResolvedValueOnce(1)
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(3)
+      .mockResolvedValueOnce(4)
+      .mockResolvedValueOnce(2);
     const prisma = {
-      priceTick: { count, deleteMany },
-      fundamental: { count, deleteMany },
-      corporateAction: { count, deleteMany },
-      fxRate: { count, deleteMany },
-      marketDataRepairAttempt: { count, deleteMany },
-      marketDataRepairState: { count, deleteMany },
+      priceTick: { count },
+      fundamental: { count },
+      corporateAction: { count },
+      fxRate: { count },
+      marketDataRepairAttempt: { count },
+      marketDataRepairState: { count },
       latestPrice: {
         count,
-        deleteMany,
         upsert: jest.fn().mockResolvedValue({}),
       },
       $queryRaw: jest.fn().mockResolvedValueOnce([{ count: 0 }]).mockResolvedValueOnce(latestRows),
       $executeRaw: executeRaw,
-      $transaction: jest.fn(async (callback: any): Promise<any> => callback(prisma)),
     } as any;
     const repository = new MarketDataFoundationRepository(prisma as any);
 
     const result = await (repository as any).executeProviderDataCleanup();
 
     expect(result.dryRun).toBe(false);
-    expect(prisma.priceTick.deleteMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: expect.objectContaining({ source: expect.objectContaining({ in: expect.arrayContaining(['yahoo', 'angel_one']) }) }),
-    }));
+    expect(result.deleted).toMatchObject({
+      priceTicks: 50002,
+      fundamentals: 1,
+      corporateActions: 1,
+      fxRates: 0,
+      repairAttempts: 3,
+      repairStates: 4,
+    });
     expect(prisma.latestPrice.upsert).toHaveBeenCalledWith(expect.objectContaining({
       where: { symbol: 'RELIANCE' },
       update: expect.objectContaining({
@@ -382,7 +392,7 @@ describe('MarketDataFoundationRepository', () => {
         timestamp: new Date('2026-05-27T00:00:00.000Z'),
       }),
     }));
-    expect(executeRaw).toHaveBeenCalled();
+    expect(executeRaw).toHaveBeenCalledTimes(8);
   });
 
   it('lists stocks with pagination, sorting, and market segmentation filters', async () => {

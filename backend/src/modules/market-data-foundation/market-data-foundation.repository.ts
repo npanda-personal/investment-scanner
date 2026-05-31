@@ -39,6 +39,9 @@ const PROVIDER_MARKET_DATA_SOURCES = [
   'ANGEL_ONE',
   'ANGEL_ONE_HISTORICAL',
 ];
+const PROVIDER_MARKET_DATA_SOURCE_UPPER = PROVIDER_MARKET_DATA_SOURCES.map((source) => source.toUpperCase());
+const PROVIDER_REPAIR_TYPES = ['PROVIDER_VALIDATION', 'PROVIDER_BUSINESS_METADATA'];
+const PROVIDER_CLEANUP_DELETE_BATCH_SIZE = 50_000;
 const EXCHANGE_PRICE_SOURCES = [
   'NSE',
   'NSE_CM',
@@ -415,46 +418,14 @@ export class MarketDataFoundationRepository {
 
   async executeProviderDataCleanup() {
     const before = await this.providerDataCleanupReport();
-    const providerSource = this.providerSourceWhere();
-    const deleted = await this.prisma.$transaction(async (tx: any) => {
-      const [
-        priceTicks,
-        fundamentals,
-        corporateActions,
-        fxRates,
-        repairAttempts,
-        repairStates,
-      ] = await Promise.all([
-        tx.priceTick.deleteMany({ where: { source: providerSource } }),
-        tx.fundamental.deleteMany({ where: { source: providerSource } }),
-        tx.corporateAction.deleteMany({ where: { source: providerSource } }),
-        tx.fxRate.deleteMany({ where: { source: providerSource } }),
-        tx.marketDataRepairAttempt.deleteMany({
-          where: {
-            OR: [
-              { provider: providerSource },
-              { repairType: { in: ['PROVIDER_VALIDATION', 'PROVIDER_BUSINESS_METADATA'] } },
-            ],
-          },
-        }),
-        tx.marketDataRepairState.deleteMany({
-          where: {
-            OR: [
-              { provider: providerSource },
-              { repairType: { in: ['PROVIDER_VALIDATION', 'PROVIDER_BUSINESS_METADATA'] } },
-            ],
-          },
-        }),
-      ]);
-      return {
-        priceTicks: priceTicks.count,
-        fundamentals: fundamentals.count,
-        corporateActions: corporateActions.count,
-        fxRates: fxRates.count,
-        repairAttempts: repairAttempts.count,
-        repairStates: repairStates.count,
-      };
-    });
+    const deleted = {
+      priceTicks: await this.batchDeleteProviderSourceRows('price_ticks'),
+      fundamentals: await this.batchDeleteProviderSourceRows('fundamentals'),
+      corporateActions: await this.batchDeleteProviderSourceRows('corporate_actions'),
+      fxRates: await this.batchDeleteProviderSourceRows('fx_rates'),
+      repairAttempts: await this.batchDeleteProviderRepairRows('market_data_repair_attempts'),
+      repairStates: await this.batchDeleteProviderRepairRows('market_data_repair_states'),
+    };
     const latestPriceRebuild = await this.rebuildLatestPricesFromExchangeCandles();
 
     return {
@@ -465,6 +436,49 @@ export class MarketDataFoundationRepository {
       latestPriceRebuild,
       protectedData: before.protectedData,
     };
+  }
+
+  private async batchDeleteProviderSourceRows(
+    tableName: 'price_ticks' | 'fundamentals' | 'corporate_actions' | 'fx_rates',
+    batchSize = PROVIDER_CLEANUP_DELETE_BATCH_SIZE,
+  ): Promise<number> {
+    let deletedCount = 0;
+    while (true) {
+      const result = await this.prisma.$executeRaw(Prisma.sql`
+        DELETE FROM ${Prisma.raw(tableName)}
+        WHERE id IN (
+          SELECT id
+          FROM ${Prisma.raw(tableName)}
+          WHERE UPPER(COALESCE(source, '')) IN (${Prisma.join(PROVIDER_MARKET_DATA_SOURCE_UPPER)})
+          LIMIT ${batchSize}
+        )
+      `);
+      const count = Number(result || 0);
+      deletedCount += count;
+      if (count < batchSize) return deletedCount;
+    }
+  }
+
+  private async batchDeleteProviderRepairRows(
+    tableName: 'market_data_repair_attempts' | 'market_data_repair_states',
+    batchSize = PROVIDER_CLEANUP_DELETE_BATCH_SIZE,
+  ): Promise<number> {
+    let deletedCount = 0;
+    while (true) {
+      const result = await this.prisma.$executeRaw(Prisma.sql`
+        DELETE FROM ${Prisma.raw(tableName)}
+        WHERE id IN (
+          SELECT id
+          FROM ${Prisma.raw(tableName)}
+          WHERE UPPER(COALESCE(provider, '')) IN (${Prisma.join(PROVIDER_MARKET_DATA_SOURCE_UPPER)})
+             OR "repairType" IN (${Prisma.join(PROVIDER_REPAIR_TYPES)})
+          LIMIT ${batchSize}
+        )
+      `);
+      const count = Number(result || 0);
+      deletedCount += count;
+      if (count < batchSize) return deletedCount;
+    }
   }
 
   async rebuildLatestPricesFromExchangeCandles() {
