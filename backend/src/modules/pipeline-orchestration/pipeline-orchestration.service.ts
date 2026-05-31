@@ -972,7 +972,7 @@ export class PipelineOrchestrationService {
       });
 
       const response = this.scheduledResponseFromStage(status, request, normalizedScope, completedStage, inputFingerprint, normalizedBatchSize, changedInstrumentIds.length);
-      if (status === 'COMPLETED') {
+      if (status === 'COMPLETED' || (status === 'PARTIAL' && completedStage.succeededCount > 0)) {
         response.downstreamRawSignals = await this.runScheduledRawSignalsStage({
           region: normalizedScope.region,
           assetType: normalizedScope.assetType,
@@ -1399,7 +1399,7 @@ export class PipelineOrchestrationService {
       });
 
       const response = this.scheduledRawSignalsResponseFromStage(status, request, normalizedScope, completedStage, inputFingerprint, normalizedBatchSize, changedInstrumentIds.length);
-      if (status === 'COMPLETED' || (status === 'PARTIAL' && completedStage.succeededCount > 0)) {
+      if (status === 'COMPLETED' || (status === 'PARTIAL' && completedStage.succeededCount > 0) || status === 'SKIPPED') {
         response.downstreamSignalCalibration = await this.runScheduledSignalCalibrationStage({
           region: normalizedScope.region,
           assetType: normalizedScope.assetType,
@@ -1805,7 +1805,7 @@ export class PipelineOrchestrationService {
       });
 
       const response = this.scheduledSignalCalibrationResponseFromStage(status, request, normalizedScope, completedStage, inputFingerprint, normalizedBatchSize, changedInstrumentIds.length);
-      if (status === 'COMPLETED' || (status === 'PARTIAL' && completedStage.succeededCount > 0)) {
+      if (status === 'COMPLETED' || (status === 'PARTIAL' && completedStage.succeededCount > 0) || status === 'SKIPPED') {
         response.downstream = await this.runScheduledMarketContextStage({
           region: normalizedScope.region,
           assetType: normalizedScope.assetType,
@@ -4360,6 +4360,8 @@ function commandPolicy(
     maxBatchSize: 100,
     providerAccess,
     schedulerAccess: availability === 'ENABLED' ? 'NONE' : 'FORBIDDEN',
-    downstreamFanout: availability === 'ENABLED' ? 'NONE' : 'FORBIDDEN',
+    downstreamFanout: commandKey === 'PIPELINE_RUN_ALL'
+      ? 'APPROVED'
+      : availability === 'ENABLED' ? 'NONE' : 'FORBIDDEN',
   };
 }

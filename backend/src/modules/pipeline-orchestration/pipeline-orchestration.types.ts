@@ -323,7 +323,7 @@ export interface PipelineCommandCatalogItem {
   maxBatchSize: number;
   providerAccess: 'NONE' | 'FORBIDDEN' | 'APPROVED';
   schedulerAccess: 'NONE' | 'FORBIDDEN';
-  downstreamFanout: 'NONE' | 'FORBIDDEN';
+  downstreamFanout: 'NONE' | 'FORBIDDEN' | 'APPROVED';
 }
 
 export interface PipelineCommandCatalogResponse {

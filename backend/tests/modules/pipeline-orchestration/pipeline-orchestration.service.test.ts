@@ -1265,7 +1265,7 @@ describe('PipelineOrchestrationService', () => {
     }));
   });
 
-  it('does not fan out raw signals when scheduled Data Quality is partial', async () => {
+  it('fans out raw signals when scheduled Data Quality is partial with successful readiness output', async () => {
     const run = {
       id: 'run-dq-partial',
       pipelineKey: 'market-intelligence',
@@ -1359,7 +1359,6 @@ describe('PipelineOrchestrationService', () => {
       recordStageProgress: jest.fn().mockResolvedValue(leasedStage),
       latestStages: jest.fn(),
     };
-    const signalRun = jest.fn();
     const service = new PipelineOrchestrationService(repository as any, {
       evaluateScheduledStage: jest.fn().mockResolvedValue({
         processedCount: 2,
@@ -1371,7 +1370,26 @@ describe('PipelineOrchestrationService', () => {
         durationMs: 100,
       }),
       evaluate: jest.fn(),
-    } as any, { run: signalRun } as any);
+    } as any, {} as any);
+    const downstreamRawSignals = {
+      status: 'SKIPPED',
+      stageKey: 'RAW_SIGNALS',
+      stageRunId: 'stage-raw',
+      pipelineRunId: 'run-raw',
+      scope: { region: 'IN', assetType: 'STOCK', timeframe: '1d', pipelineKey: 'market-intelligence' },
+      triggerType: 'scheduled',
+      dataThroughDate: '2026-05-25',
+      inputFingerprint: 'raw-input',
+      outputFingerprint: 'raw-output',
+      batch: { totalInstrumentCount: 2, processedCount: 2, batchSize: 2, nextOffset: null, hasMore: false },
+      counts: { totalCount: 2, processedCount: 2, succeededCount: 0, partialCount: 0, failedCount: 0, skippedCount: 2, unchangedCount: 0 },
+      warnings: ['No raw signals generated for DQ-ready subset.'],
+      errors: [],
+      startedAt: '2026-05-25T03:00:03.000Z',
+      completedAt: '2026-05-25T03:00:04.000Z',
+    };
+    const rawSignalsFanout = jest.spyOn(service, 'runScheduledRawSignalsStage')
+      .mockResolvedValue(downstreamRawSignals as any);
 
     const response = await service.runScheduledDataQualityStage({
       region: 'IN',
@@ -1387,13 +1405,17 @@ describe('PipelineOrchestrationService', () => {
     }, new Date('2026-05-25T03:00:00.000Z'));
 
     expect(response.status).toBe('PARTIAL');
-    expect(response.downstreamRawSignals).toBeUndefined();
-    expect(signalRun).not.toHaveBeenCalled();
+    expect(response.downstreamRawSignals).toBe(downstreamRawSignals);
+    expect(rawSignalsFanout).toHaveBeenCalledWith(expect.objectContaining({
+      sourceFingerprint: expect.any(String),
+      changedInstrumentIds: ['stock-1', 'stock-2'],
+      upstreamStageRunId: 'stage-dq-partial',
+    }));
     expect(repository.upsertRun).toHaveBeenCalledTimes(1);
     expect(repository.upsertStage).toHaveBeenCalledTimes(1);
   });
 
-  it('does not fan out calibration when scheduled Raw Signals is skipped', async () => {
+  it('fans out calibration with explicit skipped evidence when scheduled Raw Signals is skipped', async () => {
     const rawRun = {
       id: 'run-raw-skipped',
       pipelineKey: 'market-intelligence',
@@ -1503,8 +1525,26 @@ describe('PipelineOrchestrationService', () => {
         missingQualityEvaluationCount: 0,
       },
     });
-    const calibrationRun = jest.fn();
-    const service = new PipelineOrchestrationService(repository as any, {} as any, { run: signalRun } as any, { run: calibrationRun } as any);
+    const service = new PipelineOrchestrationService(repository as any, {} as any, { run: signalRun } as any, {} as any);
+    const downstreamCalibration = {
+      status: 'SKIPPED',
+      stageKey: 'SIGNAL_CALIBRATION',
+      stageRunId: null,
+      pipelineRunId: null,
+      scope: { region: 'IN', assetType: 'STOCK', timeframe: '1d', pipelineKey: 'market-intelligence' },
+      triggerType: 'scheduled',
+      dataThroughDate: '2026-05-25',
+      inputFingerprint: 'scheduled-signal-calibration:empty-input',
+      outputFingerprint: null,
+      batch: { totalInstrumentCount: 2, processedCount: 0, batchSize: 2, nextOffset: null, hasMore: false },
+      counts: { totalCount: 2, processedCount: 0, succeededCount: 0, partialCount: 0, failedCount: 0, skippedCount: 2, unchangedCount: 0 },
+      warnings: ['Raw Signals produced no persisted output; calibration skipped explicitly.'],
+      errors: [],
+      startedAt: null,
+      completedAt: null,
+    };
+    const calibrationFanout = jest.spyOn(service, 'runScheduledSignalCalibrationStage')
+      .mockResolvedValue(downstreamCalibration as any);
 
     const response = await service.runScheduledRawSignalsStage({
       region: 'IN',
@@ -1521,8 +1561,12 @@ describe('PipelineOrchestrationService', () => {
     }, new Date('2026-05-25T03:00:00.000Z'));
 
     expect(response.status).toBe('SKIPPED');
-    expect(response.downstreamSignalCalibration).toBeUndefined();
-    expect(calibrationRun).not.toHaveBeenCalled();
+    expect(response.downstreamSignalCalibration).toBe(downstreamCalibration);
+    expect(calibrationFanout).toHaveBeenCalledWith(expect.objectContaining({
+      sourceFingerprint: expect.any(String),
+      changedInstrumentIds: ['stock-1', 'stock-2'],
+      upstreamStageRunId: 'stage-raw-skipped',
+    }));
   });
 
   it('fans out calibration when scheduled Raw Signals is partial with successful persisted output', async () => {
