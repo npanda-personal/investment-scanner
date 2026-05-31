@@ -470,6 +470,8 @@ describe('PipelineOrchestrationService', () => {
     const recordSnapshot = jest.spyOn(service, 'recordMarketDataStageSnapshot')
       .mockResolvedValueOnce({ ...completedStage, status: 'RUNNING', completedAt: null } as any)
       .mockResolvedValueOnce(completedStage as any);
+    const catchUp = jest.spyOn(service, 'runScheduledPipelineCatchUpFromMarketDataSummary')
+      .mockResolvedValue(null as any);
 
     const result = await service.executeCommand({
       commandKey: 'PIPELINE_RUN_ALL',
@@ -501,6 +503,11 @@ describe('PipelineOrchestrationService', () => {
       changedInstrumentIds: ['stock-1'],
       downstreamInstrumentIds: ['stock-1', 'stock-2'],
     }));
+    expect(catchUp).toHaveBeenCalledWith(expect.objectContaining({
+      dataThroughDate: '2026-05-25',
+      downstreamInstrumentIds: ['stock-1', 'stock-2'],
+      dqStageEligible: true,
+    }), expect.any(Date));
     expect(result).toMatchObject({
       commandKey: 'PIPELINE_RUN_ALL',
       stageKey: 'MARKET_DATA',

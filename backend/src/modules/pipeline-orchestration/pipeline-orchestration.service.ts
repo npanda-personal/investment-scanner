@@ -627,8 +627,9 @@ export class PipelineOrchestrationService {
           changedInstrumentCount: summary.changedInstrumentIds?.length || 0,
         },
       });
-      if (priorSyncSummary) {
-        await this.runScheduledPipelineCatchUpFromMarketDataSummary(priorSyncSummary, new Date()).catch((error) => {
+      const downstreamSummary = summary.dqStageEligible ? summary : priorSyncSummary;
+      if (downstreamSummary) {
+        await this.runScheduledPipelineCatchUpFromMarketDataSummary(downstreamSummary, new Date()).catch((error) => {
           console.error('[PipelineOrchestration] manual daily pipeline downstream catch-up failed', {
             region: request.region,
             assetType: request.assetType,
