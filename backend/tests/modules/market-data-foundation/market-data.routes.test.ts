@@ -26,6 +26,7 @@ const controller = {
   importBseCmBackupDaily: jest.fn(),
   importNseIndexEodDaily: jest.fn(),
   importNseFoUdiffDaily: jest.fn(),
+  importNseDeliveryDaily: jest.fn(),
   runExchangeHistoricalBackfill: jest.fn(),
   manualMetadataTemplate: jest.fn(),
   validateProviders: jest.fn(),
@@ -102,6 +103,7 @@ describe('market data routers', () => {
         'POST /market-data/exchange-files/bse-cm-backup/import',
         'POST /market-data/exchange-files/nse-index-eod/import',
         'POST /market-data/exchange-files/nse-fo-udiff/import',
+        'POST /market-data/exchange-files/nse-delivery/import',
         'POST /market-data/exchange-files/historical-backfill',
         'GET /market-data/metadata/manual-template',
         'POST /market-data/provider/validate',
@@ -166,6 +168,41 @@ describe('market data routers', () => {
 });
 
 describe('market data exchange-file controller', () => {
+  it('passes NSE delivery files to the delivery import service path', async () => {
+    const service = {
+      importNseDeliveryDaily: jest.fn().mockResolvedValue({
+        status: 'COMPLETED',
+        source: 'NSE',
+        segment: 'DELIVERY',
+      }),
+    };
+    const controller = new MarketDataFoundationController(service as any);
+    const req = {
+      query: {},
+      body: {
+        tradingDate: '2026-05-27',
+        csvText: 'SYMBOL,DELIV_QTY\nRELIANCE,650\n',
+        fileName: 'delivery.csv',
+        fileUrl: 'local-delivery.csv',
+      },
+    };
+    const res = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn(),
+    };
+
+    await controller.importNseDeliveryDaily(req as any, res as any);
+
+    expect(service.importNseDeliveryDaily).toHaveBeenCalledWith({
+      tradingDate: '2026-05-27',
+      csvText: 'SYMBOL,DELIV_QTY\nRELIANCE,650\n',
+      fileName: 'delivery.csv',
+      fileUrl: 'local-delivery.csv',
+      force: false,
+    });
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
+
   it('passes NSE F&O UDiFF file imports to the enrichment service path', async () => {
     const service = {
       importNseFoUdiffDaily: jest.fn().mockResolvedValue({

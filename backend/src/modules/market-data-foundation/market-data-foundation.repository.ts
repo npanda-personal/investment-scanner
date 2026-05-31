@@ -91,6 +91,17 @@ type ManualVerifiedFundamentalInput = {
   validatedAt?: Date | null;
   currency?: string | null;
 };
+type DeliverySnapshotInput = {
+  stockId: string;
+  symbol: string;
+  exchange: string;
+  tradingDate: Date;
+  tradedQuantity?: number | null;
+  deliverableQuantity?: number | null;
+  deliveryPercent?: number | null;
+  source: string;
+  sourceFileImportId?: string | null;
+};
 
 export class MarketDataFoundationRepository {
   constructor(public readonly prisma: PrismaClient = defaultPrisma) {}
@@ -280,6 +291,67 @@ export class MarketDataFoundationRepository {
         isDelisted: true,
       },
     });
+  }
+
+  async findStocksBySymbolsInScope(symbols: string[], options: Pick<PaginationOptions, 'region' | 'assetType'> = {}) {
+    const uniqueSymbols = [...new Set(symbols.map((symbol) => symbol.trim().toUpperCase()).filter(Boolean))];
+    if (uniqueSymbols.length === 0) return [];
+    return this.prisma.stock.findMany({
+      where: {
+        ...this.stockWhere(options),
+        OR: [
+          { symbol: { in: uniqueSymbols, mode: 'insensitive' } },
+          { sourceSymbol: { in: uniqueSymbols, mode: 'insensitive' } },
+          { displaySymbol: { in: uniqueSymbols, mode: 'insensitive' } },
+        ],
+      },
+      select: {
+        id: true,
+        symbol: true,
+        sourceSymbol: true,
+        displaySymbol: true,
+        region: true,
+        assetType: true,
+      },
+    });
+  }
+
+  async upsertDeliverySnapshots(snapshots: DeliverySnapshotInput[]): Promise<{ insertedOrUpdated: number }> {
+    let insertedOrUpdated = 0;
+    for (const snapshot of snapshots) {
+      const tradingDate = this.normalizeUtcDay(snapshot.tradingDate);
+      const data = {
+        stockId: snapshot.stockId,
+        symbol: snapshot.symbol,
+        exchange: snapshot.exchange,
+        tradingDate,
+        tradedQuantity: snapshot.tradedQuantity === null || snapshot.tradedQuantity === undefined ? null : BigInt(Math.trunc(snapshot.tradedQuantity)),
+        deliverableQuantity: snapshot.deliverableQuantity === null || snapshot.deliverableQuantity === undefined ? null : BigInt(Math.trunc(snapshot.deliverableQuantity)),
+        deliveryPercent: snapshot.deliveryPercent ?? null,
+        source: snapshot.source,
+        sourceFileImportId: snapshot.sourceFileImportId ?? null,
+      };
+      await (this.prisma as any).marketDeliverySnapshot.upsert({
+        where: {
+          stockId_exchange_tradingDate_source: {
+            stockId: snapshot.stockId,
+            exchange: snapshot.exchange,
+            tradingDate,
+            source: snapshot.source,
+          },
+        },
+        create: data,
+        update: {
+          symbol: snapshot.symbol,
+          tradedQuantity: data.tradedQuantity,
+          deliverableQuantity: data.deliverableQuantity,
+          deliveryPercent: data.deliveryPercent,
+          sourceFileImportId: data.sourceFileImportId,
+        },
+      });
+      insertedOrUpdated += 1;
+    }
+    return { insertedOrUpdated };
   }
 
   async providerDataCleanupReport() {

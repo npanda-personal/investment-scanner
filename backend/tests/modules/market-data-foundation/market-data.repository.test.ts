@@ -226,6 +226,48 @@ describe('MarketDataFoundationRepository', () => {
     }));
   });
 
+  it('upserts NSE delivery snapshots with source-file provenance', async () => {
+    const upsert = jest.fn().mockResolvedValue({});
+    const prisma = {
+      marketDeliverySnapshot: { upsert },
+    };
+    const repository = new MarketDataFoundationRepository(prisma as any);
+
+    const result = await (repository as any).upsertDeliverySnapshots([
+      {
+        stockId: 'stock-1',
+        symbol: 'RELIANCE',
+        exchange: 'NSE',
+        tradingDate: new Date('2026-05-27T00:00:00.000Z'),
+        tradedQuantity: 1000,
+        deliverableQuantity: 650,
+        deliveryPercent: 65,
+        source: 'NSE_DELIVERY',
+        sourceFileImportId: 'delivery-import-1',
+      },
+    ]);
+
+    expect(result).toMatchObject({ insertedOrUpdated: 1 });
+    expect(upsert).toHaveBeenCalledWith(expect.objectContaining({
+      where: {
+        stockId_exchange_tradingDate_source: {
+          stockId: 'stock-1',
+          exchange: 'NSE',
+          tradingDate: new Date('2026-05-27T00:00:00.000Z'),
+          source: 'NSE_DELIVERY',
+        },
+      },
+      create: expect.objectContaining({
+        symbol: 'RELIANCE',
+        sourceFileImportId: 'delivery-import-1',
+      }),
+      update: expect.objectContaining({
+        deliverableQuantity: BigInt(650),
+        deliveryPercent: 65,
+      }),
+    }));
+  });
+
   it('upserts manual verified fundamentals with validation evidence by period end date', async () => {
     const upsert = jest.fn().mockResolvedValue({ id: 'fundamental-1' });
     const prisma = {

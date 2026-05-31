@@ -649,6 +649,58 @@ describe('MarketDataFoundationService syncV1', () => {
     expect(repository.upsertCatalogInstrument).not.toHaveBeenCalled();
   });
 
+  it('imports NSE delivery data as persisted stock delivery evidence with source-file provenance', async () => {
+    const repository = {
+      findSourceFileImportByKey: jest.fn().mockResolvedValue(null),
+      upsertSourceFileImport: jest.fn()
+        .mockResolvedValueOnce({ id: 'delivery-import-1', status: 'PENDING' })
+        .mockResolvedValueOnce({ id: 'delivery-import-1', status: 'COMPLETED' }),
+      findStocksBySymbolsInScope: jest.fn().mockResolvedValue([
+        { id: 'stock-1', symbol: 'RELIANCE' },
+      ]),
+      upsertDeliverySnapshots: jest.fn().mockResolvedValue({ insertedOrUpdated: 1 }),
+    };
+    const provider = { fetchHistorical: jest.fn() };
+    const service = new MarketDataFoundationService(repository as any, provider as any);
+
+    const result = await (service as any).importNseDeliveryDaily({
+      tradingDate: '2026-05-27',
+      csvText: [
+        'SYMBOL,SERIES,DATE1,TTL_TRD_QNTY,DELIV_QTY,DELIV_PER',
+        'RELIANCE,EQ,27-May-2026,1000,650,65.00',
+        'NO_MATCH,EQ,27-May-2026,500,100,20.00',
+      ].join('\n'),
+      fileName: 'sec_bhavdata_full_27052026.csv',
+      fileUrl: 'local-delivery.csv',
+    });
+
+    expect(result).toMatchObject({
+      status: 'COMPLETED',
+      source: 'NSE',
+      segment: 'DELIVERY',
+      tradingDate: '2026-05-27',
+      rowsRead: 2,
+      rowsParsed: 2,
+      rowsInserted: 1,
+      rowsSkipped: 1,
+      sourceFileImportId: 'delivery-import-1',
+    });
+    expect(repository.findStocksBySymbolsInScope).toHaveBeenCalledWith(['RELIANCE', 'NO_MATCH'], { region: 'IN', assetType: 'STOCK' });
+    expect(repository.upsertDeliverySnapshots).toHaveBeenCalledWith([
+      expect.objectContaining({
+        stockId: 'stock-1',
+        symbol: 'RELIANCE',
+        exchange: 'NSE',
+        tradedQuantity: 1000,
+        deliverableQuantity: 650,
+        deliveryPercent: 65,
+        source: 'NSE_DELIVERY',
+        sourceFileImportId: 'delivery-import-1',
+      }),
+    ]);
+    expect(provider.fetchHistorical).not.toHaveBeenCalled();
+  });
+
   it('imports manual verified fundamentals without provider or Screener scraping', async () => {
     const repository = {
       findStockByIdInScope: jest.fn().mockResolvedValue({ id: 'stock-1', symbol: 'RELIANCE' }),
