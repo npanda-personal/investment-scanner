@@ -211,6 +211,92 @@ describe('MarketDataFoundationService syncV1', () => {
     expect(repository.storeHistoricalBulk).not.toHaveBeenCalled();
   });
 
+  it('uses the NSE CM UDiFF import path for scheduled daily IN/STOCK syncs', async () => {
+    const repository = {
+      latestStoredTradingDateForRegion: jest.fn()
+        .mockResolvedValueOnce('2026-05-26')
+        .mockResolvedValueOnce('2026-05-27'),
+      getSyncState: jest.fn().mockResolvedValue(null),
+      upsertSyncState: jest.fn().mockResolvedValue({}),
+      upsertSourceFileImport: jest.fn(),
+      storeHistoricalBulk: jest.fn(),
+      listActiveStockSyncTasks: jest.fn().mockResolvedValue([
+        {
+          id: 'reliance-id',
+          symbol: 'RELIANCE',
+          providerSymbol: 'RELIANCE.NS',
+          sourceSymbol: 'RELIANCE',
+          displaySymbol: 'RELIANCE',
+          exchange: 'NSE',
+        },
+        {
+          id: 'tcs-id',
+          symbol: 'TCS',
+          providerSymbol: 'TCS.NS',
+          sourceSymbol: 'TCS',
+          displaySymbol: 'TCS',
+          exchange: 'NSE',
+        },
+      ]),
+    };
+    const service = new MarketDataFoundationService(repository as any, {
+      inferRegion: jest.fn().mockReturnValue({ region: 'IN', exchange: 'NSE' }),
+    } as any);
+    const importSpy = jest.spyOn(service, 'importNseCmUdiffDaily').mockResolvedValue({
+      status: 'COMPLETED',
+      source: 'NSE',
+      segment: 'CM',
+      tradingDate: '2026-05-27',
+      sourceName: 'NSE_UDIFF_CM_BHAVCOPY',
+      fileName: 'BhavCopy_NSE_CM_0_0_0_20260527_F_0000.csv.zip',
+      fileUrl: 'https://nsearchives.nseindia.com/content/cm/BhavCopy_NSE_CM_0_0_0_20260527_F_0000.csv.zip',
+      sourceFileImportId: 'import-1',
+      sourceFingerprint: 'source-fingerprint-1',
+      rowsRead: 2,
+      rowsParsed: 2,
+      rowsInserted: 1,
+      rowsUpdated: 0,
+      rowsNoOp: 1,
+      rowsSkipped: 0,
+      warningCount: 0,
+      warnings: [],
+      errors: [],
+      changedSymbols: ['RELIANCE'],
+      downstreamSymbols: ['RELIANCE', 'TCS'],
+    } as any);
+
+    const summary = await service.syncScheduledRegion('IN', {
+      assetType: 'STOCK',
+      now: new Date('2026-05-27T18:00:00.000Z'),
+      skipWeekends: false,
+    });
+
+    expect(importSpy).toHaveBeenCalledWith(expect.objectContaining({
+      tradingDate: '2026-05-27',
+    }));
+    expect(repository.listActiveStockSyncTasks).toHaveBeenCalledWith({ region: 'IN', assetType: 'STOCK' });
+    expect(summary).toMatchObject({
+      rowsInserted: 1,
+      rowsNoOp: 1,
+      changedInstrumentIds: ['reliance-id'],
+      downstreamInstrumentIds: ['reliance-id', 'tcs-id'],
+      changedInstrumentCount: 1,
+      dqStageEligible: true,
+      sourceFingerprint: 'source-fingerprint-1',
+      officialEodBulk: {
+        attempted: true,
+        sourceName: 'NSE_UDIFF_CM_BHAVCOPY',
+        matchedInstruments: 2,
+      },
+    });
+    expect(repository.upsertSyncState).toHaveBeenLastCalledWith(expect.objectContaining({
+      region: 'IN',
+      assetType: 'STOCK',
+      tradingDate: '2026-05-27',
+      status: 'SYNCED',
+    }));
+  });
+
   it('returns health metadata', async () => {
     const service = new MarketDataFoundationService({
       instrumentCount: jest.fn().mockResolvedValue(2),

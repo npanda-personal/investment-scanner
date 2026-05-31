@@ -170,6 +170,8 @@ type ExchangeDailyImportSummary = {
   warningCount: number;
   warnings: string[];
   errors: string[];
+  changedSymbols?: string[];
+  downstreamSymbols?: string[];
 };
 type StockMissingDataColumnConfig = {
   column: string;
@@ -3994,6 +3996,16 @@ export class MarketDataFoundationService {
       const storeSummary = await this.storeHistoricalBulk(parsed.prices, regionInfoBySymbol, {
         sourceFileImportId: pendingImport?.id ?? null,
       });
+      const changedSymbols: string[] = [];
+      const downstreamSymbols: string[] = [];
+      storeSummary.summaryBySymbol.forEach((summary, symbol) => {
+        if ((summary.rowsReceived || 0) > 0 || (summary.rowsInserted || 0) > 0 || (summary.rowsUpdated || 0) > 0 || (summary.rowsNoOp || 0) > 0) {
+          downstreamSymbols.push(symbol);
+        }
+        if ((summary.rowsInserted || 0) > 0 || (summary.rowsUpdated || 0) > 0) {
+          changedSymbols.push(symbol);
+        }
+      });
 
       const completedImport = await repository.upsertSourceFileImport({
         source: 'NSE',
@@ -4030,6 +4042,8 @@ export class MarketDataFoundationService {
         warningCount: (storeSummary.warningCount || 0) + parsed.warnings.length,
         warnings: [...parsed.warnings, ...(storeSummary.warnings || [])].slice(0, 10),
         errors: [],
+        changedSymbols: changedSymbols.sort((a, b) => a.localeCompare(b)),
+        downstreamSymbols: downstreamSymbols.sort((a, b) => a.localeCompare(b)),
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'NSE CM UDiFF import failed';
@@ -4123,6 +4137,87 @@ export class MarketDataFoundationService {
     }
 
     const batchSize = Math.max(1, Math.min(options.batchSize ?? 25, 250));
+
+    if (this.shouldUseExchangeDailyImportPath(region, assetType)) {
+      const summary: ScheduledRegionSyncSummary = {
+        region,
+        assetType,
+        tradingDate,
+        dataThroughDate: targetTradingDate,
+        instrumentsProcessed: 0,
+        rowsReceived: 0,
+        rowsInserted: 0,
+        rowsUpdated: 0,
+        rowsSkipped: 0,
+        rowsNoOp: 0,
+        changedInstrumentIds: [],
+        downstreamInstrumentIds: [],
+        changedInstrumentCount: 0,
+        dqStageEligible: false,
+        warningCount: 0,
+        warnings: [],
+        errors: [],
+      };
+      await this.repository.upsertSyncState({ region, assetType, tradingDate, status: 'PENDING', summary, lastCheckedAt: now });
+
+      const tasks = await this.repository.listActiveStockSyncTasks({ region, assetType });
+      const importSummary = await this.importNseCmUdiffDaily({ tradingDate: targetTradingDate });
+      const changedInstrumentIds = this.instrumentIdsForImportedSymbols(tasks, importSummary.changedSymbols || []);
+      const downstreamInstrumentIds = this.instrumentIdsForImportedSymbols(tasks, importSummary.downstreamSymbols || importSummary.changedSymbols || []);
+
+      summary.instrumentsProcessed = importSummary.rowsParsed;
+      summary.rowsReceived = importSummary.rowsParsed;
+      summary.rowsInserted = importSummary.rowsInserted;
+      summary.rowsUpdated = importSummary.rowsUpdated;
+      summary.rowsSkipped = importSummary.rowsSkipped;
+      summary.rowsNoOp = importSummary.rowsNoOp;
+      summary.warningCount = importSummary.warningCount;
+      summary.warnings = importSummary.warnings.slice(0, 10);
+      summary.errors = importSummary.errors.slice(0, 10);
+      summary.sourceFingerprint = importSummary.sourceFingerprint || this.scheduledRegionSourceFingerprint({
+        region,
+        assetType,
+        dataThroughDate: targetTradingDate,
+        rowsInserted: importSummary.rowsInserted,
+        rowsUpdated: importSummary.rowsUpdated,
+        changedInstrumentIds,
+        downstreamInstrumentIds,
+      });
+      summary.changedInstrumentIds = changedInstrumentIds;
+      summary.downstreamInstrumentIds = downstreamInstrumentIds;
+      summary.changedInstrumentCount = changedInstrumentIds.length;
+      summary.dqStageEligible = downstreamInstrumentIds.length > 0 && importSummary.status !== 'FAILED';
+      summary.officialEodBulk = {
+        enabled: true,
+        attempted: true,
+        sourceName: importSummary.sourceName,
+        sourceUrl: importSummary.fileUrl,
+        sourceFileName: importSummary.fileName,
+        targetTradingDate,
+        sourceFingerprint: importSummary.sourceFingerprint,
+        rowsRead: importSummary.rowsRead,
+        rowsParsed: importSummary.rowsParsed,
+        matchedInstruments: downstreamInstrumentIds.length,
+        rowsInserted: importSummary.rowsInserted,
+        rowsUpdated: importSummary.rowsUpdated,
+        rowsNoOp: importSummary.rowsNoOp,
+        fallbackReason: importSummary.status === 'SKIPPED_DUPLICATE' ? 'SOURCE_FILE_ALREADY_IMPORTED' : null,
+        warnings: importSummary.warnings.slice(0, 10),
+      };
+
+      if (downstreamInstrumentIds.length > 0) {
+        const downstreamSymbols = this.importedSymbolsForInstrumentIds(tasks, downstreamInstrumentIds);
+        await this.updateStockLoadTimestampsForSymbols(downstreamSymbols);
+      }
+
+      const status = importSummary.status === 'FAILED' ? 'FAILED' : 'SYNCED';
+      await this.repository.upsertSyncState({ region, assetType, tradingDate, status, summary, lastCheckedAt: now, lastProviderFetchAt: null });
+      return {
+        ...summary,
+        warnings: summary.warnings.slice(0, 10),
+        errors: summary.errors.slice(0, 10),
+      };
+    }
 
     const repositoryAny = this.repository as any;
     const canListStaleTasks = typeof repositoryAny.listStaleActiveStockSyncTasks === 'function';
@@ -4425,6 +4520,31 @@ export class MarketDataFoundationService {
     return { region: defaultRegion, exchange: exchange || null };
   }
 
+  private shouldUseExchangeDailyImportPath(region: string, assetType: string): boolean {
+    const repository = this.repository as any;
+    return region === 'IN'
+      && assetType === 'STOCK'
+      && typeof repository.upsertSourceFileImport === 'function'
+      && typeof repository.storeHistoricalBulk === 'function';
+  }
+
+  private instrumentIdsForImportedSymbols(tasks: StockSyncTask[], symbols: string[]): string[] {
+    const symbolSet = new Set(symbols.flatMap((symbol) => [...this.symbolAliasCandidates(symbol)]));
+    return tasks
+      .filter((task) => [...this.taskSymbolAliases(task)].some((alias) => symbolSet.has(alias)))
+      .map((task) => task.id)
+      .sort((a, b) => a.localeCompare(b));
+  }
+
+  private importedSymbolsForInstrumentIds(tasks: StockSyncTask[], instrumentIds: string[]): string[] {
+    const ids = new Set(instrumentIds);
+    return tasks
+      .filter((task) => ids.has(task.id))
+      .map((task) => task.symbol)
+      .filter(Boolean)
+      .sort((a, b) => a.localeCompare(b));
+  }
+
   private async updateStockLoadTimestampsForSymbols(symbols: string[]): Promise<void> {
     const uniqueSymbols = [...new Set(symbols.filter(Boolean))];
     if (uniqueSymbols.length === 0) return;
@@ -4437,6 +4557,7 @@ export class MarketDataFoundationService {
         // Fall through to per-symbol compatibility path for older repository doubles.
       }
     }
+    if (typeof repository.updateStockLoadTimestampBySymbol !== 'function') return;
     await Promise.all(uniqueSymbols.map((symbol) =>
       this.repository.updateStockLoadTimestampBySymbol(symbol).catch(() => null)
     ));

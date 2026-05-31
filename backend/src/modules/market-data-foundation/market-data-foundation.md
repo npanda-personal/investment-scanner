@@ -33,6 +33,8 @@ The second slice adds the first source-file-backed import path:
 - Imported NSE CM candles are stored under canonical exchange symbols without `.NS` / `.BO` suffixes.
 - Each imported candle receives `PriceTick.sourceFileImportId` provenance.
 - Duplicate completed source-file imports are skipped by `source`, `segment`, `tradingDate`, and `fileHash`.
+- Scheduled IN/STOCK market-data sync now uses the same NSE CM UDiFF source-file import path when the repository supports the source-file ledger.
+- Scheduled downstream eligibility is derived from imported symbols mapped back to active instruments, not from a provider fetch loop.
 
 Provider-sourced cleanup is explicit operator work. Dry-run must be reviewed before execution. Cleanup must not delete `Stock`, portfolios, watchlists, alerts, notes, or other user-owned data.
 
