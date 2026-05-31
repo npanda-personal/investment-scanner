@@ -4300,6 +4300,237 @@ export class MarketDataFoundationService {
     }
   }
 
+  async importNseIndexEodDaily(input: {
+    tradingDate: Date | string;
+    csvText?: string;
+    fileName?: string;
+    fileUrl?: string | null;
+    force?: boolean;
+    segment?: 'INDEX' | 'SECTOR_INDEX';
+  }): Promise<ExchangeDailyImportSummary> {
+    const tradingDate = this.normalizeExchangeTradingDate(input.tradingDate);
+    const tradingDateText = tradingDate.toISOString().slice(0, 10);
+    const segment = input.segment || 'INDEX';
+    const fileName = input.fileName?.trim() || `nse-index-eod-${tradingDateText}.csv`;
+    const fileUrl = input.fileUrl ?? null;
+    if (!input.csvText && !fileUrl) {
+      throw new Error('csvText or fileUrl is required for NSE index EOD import.');
+    }
+    const csvText = input.csvText ?? await this.downloadOfficialExchangeText(fileUrl as string);
+    const fileHash = this.sha256(csvText);
+    const fileSize = Buffer.byteLength(csvText, 'utf8');
+    const rows = this.parseCsv(csvText);
+    const parsedRows: Array<{
+      officialName: string;
+      date: Date;
+      open: number;
+      high: number;
+      low: number;
+      close: number;
+    }> = [];
+    const warnings: string[] = [];
+
+    rows.forEach((row, index) => {
+      const officialName = this.cleanIndexName(this.readObjectString(row, ['INDEX NAME', 'INDEX', 'INDEX_NAME', 'NAME']));
+      const date = this.parseCatalogDate(this.readObjectString(row, ['INDEX DATE', 'INDEX_DATE', 'DATE', 'TIMESTAMP'])) || tradingDate;
+      const open = this.parseMarketDataNumber(this.readObjectString(row, ['OPEN INDEX VALUE', 'OPEN', 'OPEN_INDEX_VALUE']));
+      const high = this.parseMarketDataNumber(this.readObjectString(row, ['HIGH INDEX VALUE', 'HIGH', 'HIGH_INDEX_VALUE']));
+      const low = this.parseMarketDataNumber(this.readObjectString(row, ['LOW INDEX VALUE', 'LOW', 'LOW_INDEX_VALUE']));
+      const close = this.parseMarketDataNumber(this.readObjectString(row, ['CLOSING INDEX VALUE', 'CLOSE', 'CLOSING_INDEX_VALUE', 'CLOSE INDEX VALUE']));
+      if (!officialName || !date || open === null || high === null || low === null || close === null) {
+        warnings.push(`Row ${index + 1}: missing or invalid index EOD fields; skipped.`);
+        return;
+      }
+      parsedRows.push({ officialName, date: this.startOfUtcDay(date), open, high, low, close });
+    });
+
+    const repository = this.repository as any;
+    const existingImport = typeof repository.findSourceFileImportByKey === 'function'
+      ? await repository.findSourceFileImportByKey({
+        source: 'NSE',
+        segment,
+        tradingDate,
+        fileHash,
+      })
+      : null;
+    if (!input.force && existingImport?.status === 'COMPLETED') {
+      return {
+        status: 'SKIPPED_DUPLICATE',
+        source: 'NSE',
+        segment,
+        tradingDate: tradingDateText,
+        sourceName: segment === 'SECTOR_INDEX' ? 'NIFTY_SECTOR_INDEX' : 'NSE_INDEX_EOD',
+        fileName,
+        fileUrl,
+        sourceFileImportId: existingImport.id ?? null,
+        sourceFingerprint: `nse-index-eod:${fileHash}`,
+        rowsRead: rows.length,
+        rowsParsed: parsedRows.length,
+        rowsInserted: 0,
+        rowsUpdated: 0,
+        rowsNoOp: 0,
+        rowsSkipped: rows.length - parsedRows.length,
+        warningCount: warnings.length,
+        warnings: warnings.slice(0, 10),
+        errors: [],
+        changedSymbols: [],
+        downstreamSymbols: [],
+      };
+    }
+
+    const pendingImport = await repository.upsertSourceFileImport({
+      source: 'NSE',
+      segment,
+      tradingDate,
+      fileName,
+      fileUrl,
+      fileHash,
+      fileSize,
+      status: 'PENDING',
+      rowsRaw: rows.length,
+      rowsAccepted: 0,
+      rowsRejected: rows.length - parsedRows.length,
+      parserVersion: 'nse-index-eod-v1',
+      errorMessage: null,
+    });
+
+    try {
+      const officialNames = [...new Set(parsedRows.map((row) => row.officialName))];
+      const indexStocks = await repository.findIndexStocksBySourceSymbols(officialNames);
+      const stockByName = new Map<string, any>();
+      indexStocks.forEach((stock: any) => {
+        [stock.sourceSymbol, stock.displaySymbol, stock.name]
+          .filter(Boolean)
+          .forEach((value) => stockByName.set(this.cleanIndexName(String(value)).toUpperCase(), stock));
+      });
+
+      const prices: HistoricalPrice[] = [];
+      let unmatchedRows = 0;
+      parsedRows.forEach((row) => {
+        const stock = stockByName.get(row.officialName.toUpperCase());
+        if (!stock?.symbol) {
+          unmatchedRows += 1;
+          return;
+        }
+        const source = this.isBroadIndianIndexName(row.officialName) ? 'NSE_INDEX_EOD' : 'NIFTY_SECTOR_INDEX';
+        prices.push({
+          symbol: stock.symbol,
+          date: row.date,
+          open: row.open,
+          high: row.high,
+          low: row.low,
+          close: row.close,
+          adjustedClose: null,
+          source,
+        });
+      });
+
+      const regionInfoBySymbol = new Map<string, PriceRegionInfo>();
+      prices.forEach((price) => regionInfoBySymbol.set(price.symbol, { region: 'IN', exchange: 'NSE_INDEX' }));
+      const emptyStoreSummary: HistoricalBulkStoreResult = {
+        rowsReceived: 0,
+        rowsInserted: 0,
+        rowsUpdated: 0,
+        rowsSkipped: 0,
+        rowsNoOp: 0,
+        warningCount: 0,
+        warnings: [],
+        summaryBySymbol: new Map(),
+      };
+      const storeSummary = prices.length > 0
+        ? await this.storeHistoricalBulk(prices, regionInfoBySymbol, { sourceFileImportId: pendingImport?.id ?? null })
+        : emptyStoreSummary;
+      const changedSymbols: string[] = [];
+      const downstreamSymbols: string[] = [];
+      storeSummary.summaryBySymbol.forEach((summary, symbol) => {
+        if ((summary.rowsReceived || 0) > 0 || (summary.rowsInserted || 0) > 0 || (summary.rowsUpdated || 0) > 0 || (summary.rowsNoOp || 0) > 0) {
+          downstreamSymbols.push(symbol);
+        }
+        if ((summary.rowsInserted || 0) > 0 || (summary.rowsUpdated || 0) > 0) {
+          changedSymbols.push(symbol);
+        }
+      });
+      const rowsSkipped = (rows.length - parsedRows.length) + unmatchedRows + (storeSummary.rowsSkipped || 0);
+      const completedImport = await repository.upsertSourceFileImport({
+        source: 'NSE',
+        segment,
+        tradingDate,
+        fileName,
+        fileUrl,
+        fileHash,
+        fileSize,
+        status: 'COMPLETED',
+        rowsRaw: rows.length,
+        rowsAccepted: prices.length,
+        rowsRejected: rowsSkipped,
+        parserVersion: 'nse-index-eod-v1',
+        errorMessage: null,
+      });
+
+      return {
+        status: 'COMPLETED',
+        source: 'NSE',
+        segment,
+        tradingDate: tradingDateText,
+        sourceName: segment === 'SECTOR_INDEX' ? 'NIFTY_SECTOR_INDEX' : 'NSE_INDEX_EOD',
+        fileName,
+        fileUrl,
+        sourceFileImportId: completedImport?.id ?? pendingImport?.id ?? null,
+        sourceFingerprint: `nse-index-eod:${fileHash}`,
+        rowsRead: rows.length,
+        rowsParsed: parsedRows.length,
+        rowsInserted: storeSummary.rowsInserted || 0,
+        rowsUpdated: storeSummary.rowsUpdated || 0,
+        rowsNoOp: storeSummary.rowsNoOp || 0,
+        rowsSkipped,
+        warningCount: (storeSummary.warningCount || 0) + warnings.length,
+        warnings: [...warnings, ...(storeSummary.warnings || [])].slice(0, 10),
+        errors: [],
+        changedSymbols: changedSymbols.sort((a, b) => a.localeCompare(b)),
+        downstreamSymbols: downstreamSymbols.sort((a, b) => a.localeCompare(b)),
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'NSE index EOD import failed';
+      await repository.upsertSourceFileImport({
+        source: 'NSE',
+        segment,
+        tradingDate,
+        fileName,
+        fileUrl,
+        fileHash,
+        fileSize,
+        status: 'FAILED',
+        rowsRaw: rows.length,
+        rowsAccepted: 0,
+        rowsRejected: rows.length,
+        parserVersion: 'nse-index-eod-v1',
+        errorMessage: message,
+      }).catch(() => undefined);
+      return {
+        status: 'FAILED',
+        source: 'NSE',
+        segment,
+        tradingDate: tradingDateText,
+        sourceName: segment === 'SECTOR_INDEX' ? 'NIFTY_SECTOR_INDEX' : 'NSE_INDEX_EOD',
+        fileName,
+        fileUrl,
+        sourceFileImportId: pendingImport?.id ?? null,
+        sourceFingerprint: `nse-index-eod:${fileHash}`,
+        rowsRead: rows.length,
+        rowsParsed: parsedRows.length,
+        rowsInserted: 0,
+        rowsUpdated: 0,
+        rowsNoOp: 0,
+        rowsSkipped: rows.length,
+        warningCount: warnings.length,
+        warnings: warnings.slice(0, 10),
+        errors: [message],
+        changedSymbols: [],
+        downstreamSymbols: [],
+      };
+    }
+  }
+
   async syncScheduledRegion(region: string, options: {
     assetType?: string;
     batchSize?: number;
@@ -10401,6 +10632,17 @@ export class MarketDataFoundationService {
 
   private isDerivativesEligibleIndexName(upperName: string): boolean {
     return ['NIFTY 50', 'NIFTY BANK', 'NIFTY FINANCIAL SERVICES', 'NIFTY MIDCAP SELECT', 'NIFTY NEXT 50', 'SENSEX', 'BSE SENSEX', 'S&P BSE SENSEX'].includes(upperName);
+  }
+
+  private isBroadIndianIndexName(name: string): boolean {
+    return this.isDerivativesEligibleIndexName(this.cleanIndexName(name).toUpperCase());
+  }
+
+  private parseMarketDataNumber(value: string): number | null {
+    const normalized = value.replace(/,/g, '').trim();
+    if (!normalized || normalized === '-' || /^NA$/i.test(normalized)) return null;
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : null;
   }
 
   private isKnownNseDerivativesEligibleStock(symbol?: string | null): boolean {

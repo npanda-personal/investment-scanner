@@ -165,6 +165,31 @@ describe('MarketDataFoundationRepository', () => {
     }));
   });
 
+  it('loads index instruments by official source/display names for index EOD imports', async () => {
+    const findMany = jest.fn().mockResolvedValue([
+      { id: 'idx-1', symbol: '^NSEI', sourceSymbol: 'NIFTY 50', displaySymbol: 'NIFTY 50', name: 'NIFTY 50' },
+    ]);
+    const prisma = {
+      stock: { findMany },
+    };
+    const repository = new MarketDataFoundationRepository(prisma as any);
+
+    const rows = await (repository as any).findIndexStocksBySourceSymbols(['NIFTY 50', 'NIFTY IT']);
+
+    expect(rows).toHaveLength(1);
+    expect(findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        region: 'IN',
+        assetType: 'INDEX',
+        OR: expect.arrayContaining([
+          { sourceSymbol: { in: ['NIFTY 50', 'NIFTY IT'], mode: 'insensitive' } },
+          { displaySymbol: { in: ['NIFTY 50', 'NIFTY IT'], mode: 'insensitive' } },
+          { name: { in: ['NIFTY 50', 'NIFTY IT'], mode: 'insensitive' } },
+        ]),
+      }),
+    }));
+  });
+
   it('counts provider-sourced market data rows before cleanup without deleting user-owned data', async () => {
     const prisma = {
       priceTick: { count: jest.fn().mockResolvedValue(2) },

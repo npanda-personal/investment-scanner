@@ -185,6 +185,32 @@ export class MarketDataFoundationRepository {
     return prices.filter((price) => !existingKeys.has(this.priceStorageKey(price.symbol, this.normalizeUtcDay(price.date))));
   }
 
+  async findIndexStocksBySourceSymbols(sourceSymbols: string[]) {
+    const uniqueSymbols = [...new Set(sourceSymbols.map((symbol) => symbol.trim()).filter(Boolean))];
+    if (uniqueSymbols.length === 0) return [];
+    return this.prisma.stock.findMany({
+      where: {
+        region: 'IN',
+        assetType: 'INDEX',
+        OR: [
+          { sourceSymbol: { in: uniqueSymbols, mode: 'insensitive' } },
+          { displaySymbol: { in: uniqueSymbols, mode: 'insensitive' } },
+          { name: { in: uniqueSymbols, mode: 'insensitive' } },
+        ],
+      },
+      select: {
+        id: true,
+        symbol: true,
+        sourceSymbol: true,
+        displaySymbol: true,
+        name: true,
+        exchange: true,
+        isActive: true,
+        isDelisted: true,
+      },
+    });
+  }
+
   async providerDataCleanupReport() {
     const providerSource = this.providerSourceWhere();
     const [

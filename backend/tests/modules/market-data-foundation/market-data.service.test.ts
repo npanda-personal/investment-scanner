@@ -396,6 +396,67 @@ describe('MarketDataFoundationService syncV1', () => {
     });
   });
 
+  it('imports NSE index and sector-index EOD rows into persisted index candles', async () => {
+    const csvText = [
+      'Index Name,Index Date,Open Index Value,High Index Value,Low Index Value,Closing Index Value',
+      'NIFTY 50,27-May-2026,23000,23100,22900,23050',
+      'NIFTY IT,27-May-2026,35000,35200,34800,35150',
+    ].join('\n');
+    const repository = {
+      findSourceFileImportByKey: jest.fn().mockResolvedValue(null),
+      upsertSourceFileImport: jest.fn()
+        .mockResolvedValueOnce({ id: 'index-import-1', status: 'PENDING' })
+        .mockResolvedValueOnce({ id: 'index-import-1', status: 'COMPLETED' }),
+      findIndexStocksBySourceSymbols: jest.fn().mockResolvedValue([
+        { id: 'idx-1', symbol: '^NSEI', sourceSymbol: 'NIFTY 50', displaySymbol: 'NIFTY 50', name: 'NIFTY 50' },
+        { id: 'idx-2', symbol: '^CNXIT', sourceSymbol: 'NIFTY IT', displaySymbol: 'NIFTY IT', name: 'NIFTY IT' },
+      ]),
+      storeHistoricalBulk: jest.fn().mockResolvedValue({
+        rowsReceived: 2,
+        rowsInserted: 2,
+        rowsUpdated: 0,
+        rowsSkipped: 0,
+        rowsNoOp: 0,
+        warningCount: 0,
+        warnings: [],
+        summaryBySymbol: new Map([
+          ['^NSEI', { rowsReceived: 1, rowsInserted: 1, rowsUpdated: 0, rowsSkipped: 0, rowsNoOp: 0, warningCount: 0, warnings: [] }],
+          ['^CNXIT', { rowsReceived: 1, rowsInserted: 1, rowsUpdated: 0, rowsSkipped: 0, rowsNoOp: 0, warningCount: 0, warnings: [] }],
+        ]),
+      }),
+    };
+    const service = new MarketDataFoundationService(repository as any, {
+      inferRegion: jest.fn().mockReturnValue({ region: 'IN', exchange: 'NSE_INDEX' }),
+    } as any);
+
+    const result = await (service as any).importNseIndexEodDaily({
+      tradingDate: '2026-05-27',
+      csvText,
+      fileName: 'ind_close_all_27052026.csv',
+      fileUrl: 'local-index-fixture.csv',
+      segment: 'SECTOR_INDEX',
+    });
+
+    expect(repository.findIndexStocksBySourceSymbols).toHaveBeenCalledWith(['NIFTY 50', 'NIFTY IT']);
+    expect(repository.storeHistoricalBulk).toHaveBeenCalledWith(
+      [
+        expect.objectContaining({ symbol: '^NSEI', source: 'NSE_INDEX_EOD', close: 23050 }),
+        expect.objectContaining({ symbol: '^CNXIT', source: 'NIFTY_SECTOR_INDEX', close: 35150 }),
+      ],
+      expect.any(Function),
+      expect.any(Map),
+      { sourceFileImportId: 'index-import-1' }
+    );
+    expect(result).toMatchObject({
+      status: 'COMPLETED',
+      source: 'NSE',
+      segment: 'SECTOR_INDEX',
+      rowsParsed: 2,
+      rowsInserted: 2,
+      changedSymbols: ['^CNXIT', '^NSEI'],
+    });
+  });
+
   it('returns health metadata', async () => {
     const service = new MarketDataFoundationService({
       instrumentCount: jest.fn().mockResolvedValue(2),
