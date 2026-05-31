@@ -211,6 +211,115 @@ describe('MarketDataFoundationService syncV1', () => {
     expect(repository.storeHistoricalBulk).not.toHaveBeenCalled();
   });
 
+  it('runs exchange historical backfill date-first and skips already completed source-file dates', async () => {
+    const repository = {
+      listCompletedSourceFileImportDates: jest.fn().mockResolvedValue([
+        new Date('2026-05-27T00:00:00.000Z'),
+      ]),
+      listExchangeIdentitiesMissingPriceHistory: jest.fn().mockResolvedValue([
+        { exchangeSymbol: 'RELIANCE', stock: { symbol: 'RELIANCE' } },
+      ]),
+    };
+    const service = new MarketDataFoundationService(repository as any, {
+      inferRegion: jest.fn().mockReturnValue({ region: 'IN', exchange: 'NSE' }),
+    } as any);
+    jest.spyOn(service as any, 'importNseCmUdiffDaily')
+      .mockResolvedValueOnce({
+        status: 'COMPLETED',
+        source: 'NSE',
+        segment: 'CM',
+        tradingDate: '2026-05-26',
+        rowsRead: 2,
+        rowsParsed: 2,
+        rowsInserted: 2,
+        rowsUpdated: 0,
+        rowsNoOp: 0,
+        rowsSkipped: 0,
+        warningCount: 0,
+        warnings: [],
+        errors: [],
+      })
+      .mockResolvedValueOnce({
+        status: 'COMPLETED',
+        source: 'NSE',
+        segment: 'CM',
+        tradingDate: '2026-05-28',
+        rowsRead: 2,
+        rowsParsed: 2,
+        rowsInserted: 0,
+        rowsUpdated: 1,
+        rowsNoOp: 1,
+        rowsSkipped: 0,
+        warningCount: 0,
+        warnings: [],
+        errors: [],
+      });
+
+    const result = await (service as any).runExchangeHistoricalBackfill({
+      region: 'IN',
+      assetType: 'STOCK',
+      startDate: '2026-05-26',
+      endDate: '2026-05-28',
+      maxDates: 10,
+    });
+
+    expect(result).toMatchObject({
+      status: 'COMPLETED',
+      source: 'NSE',
+      segment: 'CM',
+      startDate: '2026-05-26',
+      endDate: '2026-05-28',
+      datesAttempted: 2,
+      datesSkippedAlreadyImported: 1,
+      queuedInstrumentCount: 1,
+      rowsInserted: 2,
+      rowsUpdated: 1,
+      rowsNoOp: 1,
+      hasMore: false,
+    });
+    expect((service as any).importNseCmUdiffDaily).toHaveBeenNthCalledWith(1, { tradingDate: new Date('2026-05-26T00:00:00.000Z') });
+    expect((service as any).importNseCmUdiffDaily).toHaveBeenNthCalledWith(2, { tradingDate: new Date('2026-05-28T00:00:00.000Z') });
+  });
+
+  it('bounds exchange historical backfill runs and exposes the next date for resume', async () => {
+    const repository = {
+      listCompletedSourceFileImportDates: jest.fn().mockResolvedValue([]),
+      listExchangeIdentitiesMissingPriceHistory: jest.fn().mockResolvedValue([]),
+    };
+    const service = new MarketDataFoundationService(repository as any, {
+      inferRegion: jest.fn().mockReturnValue({ region: 'IN', exchange: 'NSE' }),
+    } as any);
+    jest.spyOn(service as any, 'importNseCmUdiffDaily').mockResolvedValue({
+      status: 'COMPLETED',
+      source: 'NSE',
+      segment: 'CM',
+      tradingDate: '2026-05-26',
+      rowsRead: 1,
+      rowsParsed: 1,
+      rowsInserted: 1,
+      rowsUpdated: 0,
+      rowsNoOp: 0,
+      rowsSkipped: 0,
+      warningCount: 0,
+      warnings: [],
+      errors: [],
+    });
+
+    const result = await (service as any).runExchangeHistoricalBackfill({
+      startDate: '2026-05-26',
+      endDate: '2026-05-29',
+      maxDates: 2,
+    });
+
+    expect(result).toMatchObject({
+      status: 'PARTIAL',
+      datesAttempted: 2,
+      hasMore: true,
+      nextStartDate: '2026-05-28',
+    });
+    expect((service as any).importNseCmUdiffDaily).toHaveBeenCalledTimes(2);
+  });
+
   it('uses the NSE CM UDiFF import path for scheduled daily IN/STOCK syncs', async () => {
     const repository = {
       latestStoredTradingDateForRegion: jest.fn()

@@ -32,6 +32,7 @@ The second slice adds the first source-file-backed import path:
 - `POST /api/v1/market-data/exchange-files/nse-cm-udiff/import` imports a specific NSE CM UDiFF daily file.
 - `POST /api/v1/market-data/exchange-files/bse-cm-backup/import` imports BSE CM rows as fill-only backup.
 - `POST /api/v1/market-data/exchange-files/nse-index-eod/import` imports NSE index or sector-index daily rows.
+- `POST /api/v1/market-data/exchange-files/historical-backfill` runs a bounded NSE/BSE-only historical candle backfill by trading date.
 - `POST /api/v1/market-data/fundamentals/manual-verified-import` imports operator-verified fundamentals without scraping.
 - Imported NSE CM candles are stored under canonical exchange symbols without `.NS` / `.BO` suffixes.
 - Each imported candle receives `PriceTick.sourceFileImportId` provenance.
@@ -41,6 +42,9 @@ The second slice adds the first source-file-backed import path:
 - BSE backup rows are stored only when an explicit BSE `InstrumentExchangeIdentity` maps the row to a stock and no NSE primary candle exists for that stock/date.
 - Index/sector-index rows map official index names to existing index catalog instruments and persist daily index candles without provider calls.
 - Manual fundamentals store explicit validation evidence (`sourceNote`, `sourceUrl`, `validatedBy`, `validatedAt`) and use `MANUAL_VERIFIED` source only.
+- Historical candle backfill is date-first, not stock-first. It recomputes its queue from `SourceFileImport`, skips dates with completed NSE CM imports, retries dates with missing/failed/pending imports, and imports candles through the same NSE CM UDiFF path as the daily scheduler.
+- Historical backfill is bounded by `maxDates`, returns `nextStartDate` when more work remains, and reports attempted, skipped, failed, accepted, rejected, inserted, updated, and no-op counts. It does not write fundamentals, corporate actions, FX, provider metadata, portfolios, watchlists, alerts, or notes.
+- BSE historical fill remains explicit per-date backup import work until a durable BSE file-discovery source is configured; BSE rows still require explicit exchange identity matching and cannot override existing NSE primary candles.
 
 Provider-sourced cleanup is explicit operator work. Dry-run must be reviewed before execution. Cleanup must not delete `Stock`, portfolios, watchlists, alerts, notes, or other user-owned data.
 

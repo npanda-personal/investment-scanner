@@ -173,6 +173,34 @@ type ExchangeDailyImportSummary = {
   changedSymbols?: string[];
   downstreamSymbols?: string[];
 };
+type ExchangeHistoricalBackfillSummary = {
+  status: 'COMPLETED' | 'PARTIAL' | 'FAILED';
+  source: 'NSE';
+  segment: 'CM';
+  region: string;
+  assetType: string;
+  startDate: string;
+  endDate: string;
+  maxDates: number;
+  datesAttempted: number;
+  datesSkippedAlreadyImported: number;
+  datesSkippedNonTrading: number;
+  queuedInstrumentCount: number;
+  rowsRead: number;
+  rowsParsed: number;
+  rowsInserted: number;
+  rowsUpdated: number;
+  rowsNoOp: number;
+  rowsSkipped: number;
+  warningCount: number;
+  warnings: string[];
+  errors: string[];
+  attemptedDates: string[];
+  skippedDates: string[];
+  failedDates: string[];
+  hasMore: boolean;
+  nextStartDate: string | null;
+};
 type StockMissingDataColumnConfig = {
   column: string;
   label: string;
@@ -4589,6 +4617,152 @@ export class MarketDataFoundationService {
     }
   }
 
+  async runExchangeHistoricalBackfill(input: {
+    region?: string;
+    assetType?: string;
+    startDate: Date | string;
+    endDate: Date | string;
+    maxDates?: number;
+    includeBseFill?: boolean;
+  }): Promise<ExchangeHistoricalBackfillSummary> {
+    const region = (input.region || 'IN').trim().toUpperCase();
+    const assetType = (input.assetType || 'STOCK').trim().toUpperCase();
+    if (region !== 'IN' || assetType !== 'STOCK') {
+      throw new Error('Exchange historical backfill currently supports IN/STOCK only.');
+    }
+
+    const startDate = this.normalizeExchangeTradingDate(input.startDate);
+    const endDate = this.normalizeExchangeTradingDate(input.endDate);
+    if (startDate.getTime() > endDate.getTime()) {
+      throw new Error('startDate must be on or before endDate.');
+    }
+
+    const requestedMaxDates = Number(input.maxDates);
+    const maxDates = Number.isFinite(requestedMaxDates) && requestedMaxDates > 0
+      ? Math.max(1, Math.min(Math.floor(requestedMaxDates), 50))
+      : 5;
+    const repository = this.repository as any;
+    const completedDates = typeof repository.listCompletedSourceFileImportDates === 'function'
+      ? await repository.listCompletedSourceFileImportDates({
+        source: 'NSE',
+        segment: 'CM',
+        startDate,
+        endDate,
+      })
+      : [];
+    const completedDateKeys = new Set(completedDates.map((date: Date) => this.exchangeDateKey(date)));
+    const candidateIdentities = typeof repository.listExchangeIdentitiesMissingPriceHistory === 'function'
+      ? await repository.listExchangeIdentitiesMissingPriceHistory({ region, assetType }, ['NSE', 'BSE'])
+      : [];
+
+    const summary: ExchangeHistoricalBackfillSummary = {
+      status: 'COMPLETED',
+      source: 'NSE',
+      segment: 'CM',
+      region,
+      assetType,
+      startDate: this.exchangeDateKey(startDate),
+      endDate: this.exchangeDateKey(endDate),
+      maxDates,
+      datesAttempted: 0,
+      datesSkippedAlreadyImported: 0,
+      datesSkippedNonTrading: 0,
+      queuedInstrumentCount: candidateIdentities.length,
+      rowsRead: 0,
+      rowsParsed: 0,
+      rowsInserted: 0,
+      rowsUpdated: 0,
+      rowsNoOp: 0,
+      rowsSkipped: 0,
+      warningCount: 0,
+      warnings: [],
+      errors: [],
+      attemptedDates: [],
+      skippedDates: [],
+      failedDates: [],
+      hasMore: false,
+      nextStartDate: null,
+    };
+
+    const datesToAttempt: Date[] = [];
+    const allDates = this.exchangeBackfillDates(startDate, endDate);
+    for (const date of allDates) {
+      const key = this.exchangeDateKey(date);
+      if (!this.isWeekdayTradingCandidate(date)) {
+        summary.datesSkippedNonTrading += 1;
+        summary.skippedDates.push(key);
+        continue;
+      }
+      if (completedDateKeys.has(key)) {
+        summary.datesSkippedAlreadyImported += 1;
+        summary.skippedDates.push(key);
+        continue;
+      }
+      if (datesToAttempt.length >= maxDates) {
+        summary.hasMore = true;
+        summary.nextStartDate = key;
+        break;
+      }
+      datesToAttempt.push(date);
+    }
+
+    if (input.includeBseFill) {
+      summary.warningCount += 1;
+      summary.warnings.push('BSE fill-only historical backfill is not run without explicit BSE file input; use the BSE backup import route for a specific date.');
+    }
+
+    for (const date of datesToAttempt) {
+      const key = this.exchangeDateKey(date);
+      summary.datesAttempted += 1;
+      summary.attemptedDates.push(key);
+      const importSummary = await this.importNseCmUdiffDaily({ tradingDate: date });
+      summary.rowsRead += importSummary.rowsRead || 0;
+      summary.rowsParsed += importSummary.rowsParsed || 0;
+      summary.rowsInserted += importSummary.rowsInserted || 0;
+      summary.rowsUpdated += importSummary.rowsUpdated || 0;
+      summary.rowsNoOp += importSummary.rowsNoOp || 0;
+      summary.rowsSkipped += importSummary.rowsSkipped || 0;
+      summary.warningCount += importSummary.warningCount || 0;
+      summary.warnings.push(...(importSummary.warnings || []));
+      if (importSummary.errors?.length) {
+        summary.errors.push(...importSummary.errors.map((error) => `${key}: ${error}`));
+      }
+      if (importSummary.status === 'FAILED') {
+        summary.failedDates.push(key);
+        summary.hasMore = true;
+        summary.nextStartDate = key;
+        break;
+      }
+    }
+
+    if (!summary.hasMore) {
+      const attemptedDateKeys = new Set(summary.attemptedDates);
+      const skippedDateKeys = new Set(summary.skippedDates);
+      const remaining = allDates.find((date) => {
+        const key = this.exchangeDateKey(date);
+        return this.isWeekdayTradingCandidate(date)
+          && !attemptedDateKeys.has(key)
+          && !skippedDateKeys.has(key)
+          && !completedDateKeys.has(key);
+      });
+      if (remaining) {
+        summary.hasMore = true;
+        summary.nextStartDate = this.exchangeDateKey(remaining);
+      }
+    }
+
+    summary.warnings = summary.warnings.slice(0, 10);
+    summary.errors = summary.errors.slice(0, 10);
+    summary.warningCount = summary.warnings.length;
+    summary.status = summary.failedDates.length > 0
+      ? (summary.datesAttempted > summary.failedDates.length ? 'PARTIAL' : 'FAILED')
+      : summary.hasMore
+        ? 'PARTIAL'
+        : 'COMPLETED';
+
+    return summary;
+  }
+
   async syncScheduledRegion(region: string, options: {
     assetType?: string;
     batchSize?: number;
@@ -5526,6 +5700,26 @@ export class MarketDataFoundationService {
       throw new Error('tradingDate must be a valid exchange trading date.');
     }
     return this.startOfUtcDay(date);
+  }
+
+  private exchangeDateKey(date: Date): string {
+    return this.startOfUtcDay(date).toISOString().slice(0, 10);
+  }
+
+  private exchangeBackfillDates(startDate: Date, endDate: Date): Date[] {
+    const dates: Date[] = [];
+    const cursor = this.startOfUtcDay(startDate);
+    const stop = this.startOfUtcDay(endDate);
+    while (cursor.getTime() <= stop.getTime()) {
+      dates.push(new Date(cursor));
+      cursor.setUTCDate(cursor.getUTCDate() + 1);
+    }
+    return dates;
+  }
+
+  private isWeekdayTradingCandidate(date: Date): boolean {
+    const day = this.startOfUtcDay(date).getUTCDay();
+    return day !== 0 && day !== 6;
   }
 
   async syncV1(request: V1IngestionRequest): Promise<V1SyncResult> {

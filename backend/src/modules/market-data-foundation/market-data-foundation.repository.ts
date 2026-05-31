@@ -150,6 +150,63 @@ export class MarketDataFoundationRepository {
     });
   }
 
+  async listCompletedSourceFileImportDates(input: {
+    source: string;
+    segment: string;
+    startDate: Date;
+    endDate: Date;
+  }): Promise<Date[]> {
+    const rows = await (this.prisma as any).sourceFileImport.findMany({
+      where: {
+        source: input.source,
+        segment: input.segment,
+        status: 'COMPLETED',
+        tradingDate: {
+          gte: this.normalizeUtcDay(input.startDate),
+          lte: this.normalizeUtcDay(input.endDate),
+        },
+      },
+      orderBy: { tradingDate: 'asc' },
+      select: { tradingDate: true },
+    });
+    return rows.map((row: { tradingDate: Date }) => this.normalizeUtcDay(row.tradingDate));
+  }
+
+  async listExchangeIdentitiesMissingPriceHistory(
+    options: Pick<PaginationOptions, 'region' | 'assetType'> = {},
+    exchanges: string[] = ['NSE', 'BSE']
+  ) {
+    const normalizedExchanges = [...new Set(exchanges.map((exchange) => exchange.trim().toUpperCase()).filter(Boolean))];
+    if (normalizedExchanges.length === 0) return [];
+    const sourceFilter = EXCHANGE_PRICE_SOURCES.map((source) => source.toUpperCase());
+    return this.prisma.$queryRaw<Array<{
+      id: string;
+      stockId: string;
+      exchange: string;
+      exchangeSymbol: string;
+      isin: string | null;
+      stockSymbol: string;
+    }>>(Prisma.sql`
+      SELECT
+        identities.id,
+        identities."stockId",
+        identities.exchange,
+        identities."exchangeSymbol",
+        identities.isin,
+        stocks.symbol AS "stockSymbol"
+      FROM instrument_exchange_identities identities
+      JOIN stocks ON stocks.id = identities."stockId"
+      LEFT JOIN price_ticks
+        ON price_ticks.symbol = stocks.symbol
+        AND UPPER(COALESCE(price_ticks.source, '')) IN (${Prisma.join(sourceFilter)})
+      WHERE ${this.scopedStockSqlWhere(options)}
+        AND stocks."isActive" = TRUE
+        AND UPPER(identities.exchange) IN (${Prisma.join(normalizedExchanges)})
+        AND price_ticks.id IS NULL
+      ORDER BY stocks.symbol ASC, identities.exchange ASC, identities."exchangeSymbol" ASC
+    `);
+  }
+
   async findExchangeIdentitiesForExchangeSymbols(exchange: string, symbols: string[]) {
     const uniqueSymbols = [...new Set(symbols.map((symbol) => symbol.trim()).filter(Boolean))];
     if (uniqueSymbols.length === 0) return [];

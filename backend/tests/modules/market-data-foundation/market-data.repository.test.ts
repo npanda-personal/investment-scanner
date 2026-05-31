@@ -72,6 +72,42 @@ describe('MarketDataFoundationRepository', () => {
     });
   });
 
+  it('lists completed source-file import dates for resumable historical backfills', async () => {
+    const findMany = jest.fn().mockResolvedValue([
+      { tradingDate: new Date('2026-05-26T00:00:00.000Z') },
+      { tradingDate: new Date('2026-05-28T00:00:00.000Z') },
+    ]);
+    const prisma = {
+      sourceFileImport: { findMany },
+    };
+    const repository = new MarketDataFoundationRepository(prisma as any);
+
+    const rows = await (repository as any).listCompletedSourceFileImportDates({
+      source: 'NSE',
+      segment: 'CM',
+      startDate: new Date('2026-05-26T00:00:00.000Z'),
+      endDate: new Date('2026-05-29T00:00:00.000Z'),
+    });
+
+    expect(rows).toEqual([
+      new Date('2026-05-26T00:00:00.000Z'),
+      new Date('2026-05-28T00:00:00.000Z'),
+    ]);
+    expect(findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: {
+        source: 'NSE',
+        segment: 'CM',
+        status: 'COMPLETED',
+        tradingDate: {
+          gte: new Date('2026-05-26T00:00:00.000Z'),
+          lte: new Date('2026-05-29T00:00:00.000Z'),
+        },
+      },
+      orderBy: { tradingDate: 'asc' },
+      select: { tradingDate: true },
+    }));
+  });
+
   it('stores exchange-file candles with source file provenance in bulk', async () => {
     const createMany = jest.fn().mockResolvedValue({ count: 1 });
     const upsert = jest.fn().mockResolvedValue({});

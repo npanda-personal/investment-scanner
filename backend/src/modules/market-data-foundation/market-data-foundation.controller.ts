@@ -161,6 +161,29 @@ export class MarketDataFoundationController {
     }
   };
 
+  runExchangeHistoricalBackfill = async (req: Request, res: Response) => {
+    try {
+      const startDate = req.body?.startDate || req.query.startDate;
+      const endDate = req.body?.endDate || req.query.endDate;
+      if (!startDate || !endDate) {
+        return res.status(400).json({ error: 'startDate and endDate are required' });
+      }
+      const maxDatesValue = req.body?.maxDates ?? req.query.maxDates;
+      const result = await this.service.runExchangeHistoricalBackfill({
+        region: typeof req.body?.region === 'string' ? req.body.region : typeof req.query.region === 'string' ? req.query.region : undefined,
+        assetType: typeof req.body?.assetType === 'string' ? req.body.assetType : typeof req.query.assetType === 'string' ? req.query.assetType : undefined,
+        startDate: String(startDate),
+        endDate: String(endDate),
+        maxDates: maxDatesValue === undefined ? undefined : Number(maxDatesValue),
+        includeBseFill: req.body?.includeBseFill === true || req.query.includeBseFill === 'true',
+      });
+      return res.status(result.status === 'FAILED' ? 500 : 200).json(result);
+    } catch (error) {
+      console.error('Error running exchange historical backfill:', error);
+      return res.status(500).json({ error: this.errorMessage(error, 'Exchange historical backfill failed') });
+    }
+  };
+
   importManualVerifiedFundamental = async (req: Request, res: Response) => {
     try {
       const result = await this.service.importManualVerifiedFundamental({

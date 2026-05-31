@@ -25,6 +25,7 @@ const controller = {
   importNseCmUdiffDaily: jest.fn(),
   importBseCmBackupDaily: jest.fn(),
   importNseIndexEodDaily: jest.fn(),
+  runExchangeHistoricalBackfill: jest.fn(),
   manualMetadataTemplate: jest.fn(),
   validateProviders: jest.fn(),
   repairCatalogIdentity: jest.fn(),
@@ -99,6 +100,7 @@ describe('market data routers', () => {
         'POST /market-data/exchange-files/nse-cm-udiff/import',
         'POST /market-data/exchange-files/bse-cm-backup/import',
         'POST /market-data/exchange-files/nse-index-eod/import',
+        'POST /market-data/exchange-files/historical-backfill',
         'GET /market-data/metadata/manual-template',
         'POST /market-data/provider/validate',
         'POST /market-data/catalog/identity/repair',
@@ -158,6 +160,50 @@ describe('market data routers', () => {
     );
 
     expect(createMarketDataFoundationRouter(controller).stack.length).toBeGreaterThan(0);
+  });
+});
+
+describe('market data exchange-file controller', () => {
+  it('passes bounded historical backfill requests to the exchange backfill service path', async () => {
+    const service = {
+      runExchangeHistoricalBackfill: jest.fn().mockResolvedValue({
+        status: 'PARTIAL',
+        datesAttempted: 2,
+        nextStartDate: '2026-05-28',
+      }),
+    };
+    const controller = new MarketDataFoundationController(service as any);
+    const req = {
+      query: {},
+      body: {
+        region: 'IN',
+        assetType: 'STOCK',
+        startDate: '2026-05-26',
+        endDate: '2026-05-29',
+        maxDates: 2,
+        includeBseFill: true,
+      },
+    };
+    const res = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn(),
+    };
+
+    await controller.runExchangeHistoricalBackfill(req as any, res as any);
+
+    expect(service.runExchangeHistoricalBackfill).toHaveBeenCalledWith({
+      region: 'IN',
+      assetType: 'STOCK',
+      startDate: '2026-05-26',
+      endDate: '2026-05-29',
+      maxDates: 2,
+      includeBseFill: true,
+    });
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      status: 'PARTIAL',
+      nextStartDate: '2026-05-28',
+    }));
   });
 });
 
