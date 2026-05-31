@@ -566,6 +566,89 @@ describe('MarketDataFoundationService syncV1', () => {
     });
   });
 
+  it('imports NSE F&O UDiFF enrichment through the source-file ledger without creating futures rows', async () => {
+    const rows: any[] = [];
+    const repository = {
+      findSourceFileImportByKey: jest.fn().mockResolvedValue(null),
+      upsertSourceFileImport: jest.fn()
+        .mockResolvedValueOnce({ id: 'fo-import-1', status: 'PENDING' })
+        .mockResolvedValueOnce({ id: 'fo-import-1', status: 'COMPLETED' }),
+      upsertCatalogInstrument: jest.fn().mockImplementation((row) => {
+        rows.push(row);
+        return Promise.resolve({ action: 'updated', stock: {} });
+      }),
+    };
+    const provider = { validateProviderSymbol: jest.fn() };
+    const service = new MarketDataFoundationService(repository as any, provider as any);
+
+    const result = await (service as any).importNseFoUdiffDaily({
+      tradingDate: '2026-05-27',
+      csvText: 'SYMBOL\nRELIANCE\nNIFTY 50\n',
+      fileName: 'fo-udiff.csv',
+      fileUrl: 'local-fo.csv',
+    });
+
+    expect(result).toMatchObject({
+      status: 'COMPLETED',
+      source: 'NSE',
+      segment: 'FO',
+      tradingDate: '2026-05-27',
+      rowsRead: 2,
+      rowsParsed: 2,
+      rowsUpdated: 2,
+      sourceFileImportId: 'fo-import-1',
+    });
+    expect(rows).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        symbol: 'RELIANCE',
+        assetType: 'STOCK',
+        instrumentSegment: 'CASH',
+        derivativesEligible: true,
+      }),
+      expect.objectContaining({
+        symbol: '^NSEI',
+        assetType: 'INDEX',
+        instrumentSegment: 'INDEX',
+        derivativesEligible: true,
+      }),
+    ]));
+    expect(rows.some((row) => row.assetType === 'FUTURE' || row.instrumentSegment === 'FUTURES')).toBe(false);
+    expect(provider.validateProviderSymbol).not.toHaveBeenCalled();
+    expect(repository.upsertSourceFileImport).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      source: 'NSE',
+      segment: 'FO',
+      status: 'PENDING',
+      rowsRaw: 2,
+    }));
+    expect(repository.upsertSourceFileImport).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      status: 'COMPLETED',
+      rowsAccepted: 2,
+    }));
+  });
+
+  it('skips duplicate completed NSE F&O enrichment imports by source file hash', async () => {
+    const repository = {
+      findSourceFileImportByKey: jest.fn().mockResolvedValue({ id: 'fo-import-1', status: 'COMPLETED' }),
+      upsertSourceFileImport: jest.fn(),
+      upsertCatalogInstrument: jest.fn(),
+    };
+    const service = new MarketDataFoundationService(repository as any, {} as any);
+
+    const result = await (service as any).importNseFoUdiffDaily({
+      tradingDate: '2026-05-27',
+      csvText: 'SYMBOL\nRELIANCE\n',
+      fileName: 'fo-udiff.csv',
+    });
+
+    expect(result).toMatchObject({
+      status: 'SKIPPED_DUPLICATE',
+      sourceFileImportId: 'fo-import-1',
+      rowsParsed: 1,
+    });
+    expect(repository.upsertSourceFileImport).not.toHaveBeenCalled();
+    expect(repository.upsertCatalogInstrument).not.toHaveBeenCalled();
+  });
+
   it('imports manual verified fundamentals without provider or Screener scraping', async () => {
     const repository = {
       findStockByIdInScope: jest.fn().mockResolvedValue({ id: 'stock-1', symbol: 'RELIANCE' }),

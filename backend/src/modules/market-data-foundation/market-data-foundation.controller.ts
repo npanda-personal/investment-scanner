@@ -161,6 +161,26 @@ export class MarketDataFoundationController {
     }
   };
 
+  importNseFoUdiffDaily = async (req: Request, res: Response) => {
+    try {
+      const tradingDate = req.body?.tradingDate || req.query.tradingDate;
+      if (!tradingDate) {
+        return res.status(400).json({ error: 'tradingDate is required' });
+      }
+      const result = await this.service.importNseFoUdiffDaily({
+        tradingDate: String(tradingDate),
+        csvText: typeof req.body?.csvText === 'string' ? req.body.csvText : undefined,
+        fileName: typeof req.body?.fileName === 'string' ? req.body.fileName : undefined,
+        fileUrl: typeof req.body?.fileUrl === 'string' ? req.body.fileUrl : undefined,
+        force: req.body?.force === true,
+      });
+      return res.status(result.status === 'FAILED' ? 500 : 200).json(result);
+    } catch (error) {
+      console.error('Error importing NSE F&O UDiFF file:', error);
+      return res.status(500).json({ error: this.errorMessage(error, 'NSE F&O UDiFF import failed') });
+    }
+  };
+
   runExchangeHistoricalBackfill = async (req: Request, res: Response) => {
     try {
       const startDate = req.body?.startDate || req.query.startDate;

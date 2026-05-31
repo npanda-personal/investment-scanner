@@ -4617,6 +4617,164 @@ export class MarketDataFoundationService {
     }
   }
 
+  async importNseFoUdiffDaily(input: {
+    tradingDate: Date | string;
+    csvText?: string;
+    fileName?: string;
+    fileUrl?: string | null;
+    force?: boolean;
+  }): Promise<ExchangeDailyImportSummary> {
+    const tradingDate = this.normalizeExchangeTradingDate(input.tradingDate);
+    const tradingDateText = tradingDate.toISOString().slice(0, 10);
+    const fileName = input.fileName?.trim() || `nse-fo-udiff-${tradingDateText}.csv`;
+    const fileUrl = input.fileUrl ?? null;
+    if (!input.csvText && !fileUrl) {
+      throw new Error('csvText or fileUrl is required for NSE F&O UDiFF import.');
+    }
+    const csvText = input.csvText ?? await this.downloadOfficialExchangeText(fileUrl as string);
+    const fileHash = this.sha256(csvText);
+    const fileSize = Buffer.byteLength(csvText, 'utf8');
+    const rows = this.parseCsv(csvText);
+    const repository = this.repository as any;
+    const existingImport = typeof repository.findSourceFileImportByKey === 'function'
+      ? await repository.findSourceFileImportByKey({
+        source: 'NSE',
+        segment: 'FO',
+        tradingDate,
+        fileHash,
+      })
+      : null;
+
+    if (!input.force && existingImport?.status === 'COMPLETED') {
+      return {
+        status: 'SKIPPED_DUPLICATE',
+        source: 'NSE',
+        segment: 'FO',
+        tradingDate: tradingDateText,
+        sourceName: 'NSE_FO_UDIFF',
+        fileName,
+        fileUrl,
+        sourceFileImportId: existingImport.id ?? null,
+        sourceFingerprint: `nse-fo-udiff:${fileHash}`,
+        rowsRead: rows.length,
+        rowsParsed: rows.length,
+        rowsInserted: 0,
+        rowsUpdated: 0,
+        rowsNoOp: 0,
+        rowsSkipped: 0,
+        warningCount: 0,
+        warnings: [],
+        errors: [],
+        changedSymbols: [],
+        downstreamSymbols: [],
+      };
+    }
+
+    const pendingImport = await repository.upsertSourceFileImport({
+      source: 'NSE',
+      segment: 'FO',
+      tradingDate,
+      fileName,
+      fileUrl,
+      fileHash,
+      fileSize,
+      status: 'PENDING',
+      rowsRaw: rows.length,
+      rowsAccepted: 0,
+      rowsRejected: 0,
+      parserVersion: 'nse-fo-udiff-underlying-v1',
+      errorMessage: null,
+    });
+
+    try {
+      const catalogSummary = await this.importCatalog({
+        catalogSource: 'NSE_EQUITY_DERIVATIVES_UNDERLYINGS',
+        importMode: 'MANUAL_CSV',
+        csvText,
+        validateProvider: false,
+      });
+      const rowsAccepted = catalogSummary.underlyingsRead ?? catalogSummary.processedCount ?? catalogSummary.sourceRows;
+      const rowsRejected = (catalogSummary.invalid || 0) + (catalogSummary.skipped || 0) + (catalogSummary.unmatchedUnderlyings || 0);
+      const completedImport = await repository.upsertSourceFileImport({
+        source: 'NSE',
+        segment: 'FO',
+        tradingDate,
+        fileName,
+        fileUrl,
+        fileHash,
+        fileSize,
+        status: 'COMPLETED',
+        rowsRaw: catalogSummary.sourceRows,
+        rowsAccepted,
+        rowsRejected,
+        parserVersion: 'nse-fo-udiff-underlying-v1',
+        errorMessage: null,
+      });
+
+      return {
+        status: 'COMPLETED',
+        source: 'NSE',
+        segment: 'FO',
+        tradingDate: tradingDateText,
+        sourceName: 'NSE_FO_UDIFF',
+        fileName,
+        fileUrl,
+        sourceFileImportId: completedImport?.id ?? pendingImport?.id ?? null,
+        sourceFingerprint: `nse-fo-udiff:${fileHash}`,
+        rowsRead: catalogSummary.sourceRows,
+        rowsParsed: rowsAccepted,
+        rowsInserted: catalogSummary.inserted || 0,
+        rowsUpdated: catalogSummary.updated || 0,
+        rowsNoOp: catalogSummary.noOp || 0,
+        rowsSkipped: rowsRejected,
+        warningCount: catalogSummary.warnings.length,
+        warnings: catalogSummary.warnings.slice(0, 10),
+        errors: [],
+        changedSymbols: [],
+        downstreamSymbols: [],
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'NSE F&O UDiFF import failed';
+      await repository.upsertSourceFileImport({
+        source: 'NSE',
+        segment: 'FO',
+        tradingDate,
+        fileName,
+        fileUrl,
+        fileHash,
+        fileSize,
+        status: 'FAILED',
+        rowsRaw: rows.length,
+        rowsAccepted: 0,
+        rowsRejected: rows.length,
+        parserVersion: 'nse-fo-udiff-underlying-v1',
+        errorMessage: message,
+      }).catch(() => undefined);
+      return {
+        status: 'FAILED',
+        source: 'NSE',
+        segment: 'FO',
+        tradingDate: tradingDateText,
+        sourceName: 'NSE_FO_UDIFF',
+        fileName,
+        fileUrl,
+        sourceFileImportId: pendingImport?.id ?? null,
+        sourceFingerprint: `nse-fo-udiff:${fileHash}`,
+        rowsRead: rows.length,
+        rowsParsed: 0,
+        rowsInserted: 0,
+        rowsUpdated: 0,
+        rowsNoOp: 0,
+        rowsSkipped: rows.length,
+        warningCount: 0,
+        warnings: [],
+        errors: [message],
+        changedSymbols: [],
+        downstreamSymbols: [],
+      };
+    }
+  }
+
   async runExchangeHistoricalBackfill(input: {
     region?: string;
     assetType?: string;
