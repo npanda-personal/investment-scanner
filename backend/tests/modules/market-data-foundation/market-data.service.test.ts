@@ -114,6 +114,103 @@ describe('MarketDataFoundationService syncV1', () => {
     expect(repository.upsertFundamentals).not.toHaveBeenCalled();
   });
 
+  it('imports NSE CM UDiFF daily candles through the source-file ledger with no provider suffix storage', async () => {
+    const csvText = [
+      'TradDt,Sgmt,Src,FinInstrmTp,TckrSymb,SctySrs,OpnPric,HghPric,LwPric,ClsPric,TtlTradgVol',
+      '2026-05-27,CM,NSE,STK,RELIANCE,EQ,1400,1420,1390,1410,1000',
+      '2026-05-27,CM,NSE,STK,TCS,EQ,3300,3350,3280,3333,2000',
+    ].join('\n');
+    const repository = {
+      findSourceFileImportByKey: jest.fn().mockResolvedValue(null),
+      upsertSourceFileImport: jest.fn()
+        .mockResolvedValueOnce({ id: 'import-1', status: 'PENDING' })
+        .mockResolvedValueOnce({ id: 'import-1', status: 'COMPLETED' }),
+      storeHistoricalBulk: jest.fn().mockResolvedValue({
+        rowsReceived: 2,
+        rowsInserted: 2,
+        rowsUpdated: 0,
+        rowsSkipped: 0,
+        rowsNoOp: 0,
+        warningCount: 0,
+        warnings: [],
+        summaryBySymbol: new Map(),
+      }),
+    };
+    const service = new MarketDataFoundationService(repository as any, {
+      inferRegion: jest.fn().mockReturnValue({ region: 'IN', exchange: 'NSE' }),
+    } as any);
+
+    const result = await (service as any).importNseCmUdiffDaily({
+      tradingDate: '2026-05-27',
+      csvText,
+      fileName: 'BhavCopy_NSE_CM_0_0_0_20260527_F_0000.csv',
+      fileUrl: 'local-fixture.csv',
+    });
+
+    expect(result).toMatchObject({
+      status: 'COMPLETED',
+      source: 'NSE',
+      segment: 'CM',
+      tradingDate: '2026-05-27',
+      rowsRead: 2,
+      rowsParsed: 2,
+      rowsInserted: 2,
+      sourceFileImportId: 'import-1',
+    });
+    expect(repository.upsertSourceFileImport).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      source: 'NSE',
+      segment: 'CM',
+      status: 'PENDING',
+      rowsRaw: 2,
+      rowsAccepted: 0,
+    }));
+    expect(repository.storeHistoricalBulk).toHaveBeenCalledWith(
+      [
+        expect.objectContaining({ symbol: 'RELIANCE', source: 'NSE_UDIFF_CM_BHAVCOPY' }),
+        expect.objectContaining({ symbol: 'TCS', source: 'NSE_UDIFF_CM_BHAVCOPY' }),
+      ],
+      expect.any(Function),
+      expect.any(Map),
+      { sourceFileImportId: 'import-1' }
+    );
+    expect(repository.storeHistoricalBulk.mock.calls[0][0][0].symbol).not.toContain('.NS');
+    expect(repository.upsertSourceFileImport).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      status: 'COMPLETED',
+      rowsAccepted: 2,
+      rowsRejected: 0,
+    }));
+  });
+
+  it('skips duplicate completed NSE CM UDiFF imports by source file hash', async () => {
+    const csvText = [
+      'TradDt,Sgmt,Src,FinInstrmTp,TckrSymb,SctySrs,OpnPric,HghPric,LwPric,ClsPric,TtlTradgVol',
+      '2026-05-27,CM,NSE,STK,RELIANCE,EQ,1400,1420,1390,1410,1000',
+    ].join('\n');
+    const repository = {
+      findSourceFileImportByKey: jest.fn().mockResolvedValue({ id: 'import-1', status: 'COMPLETED' }),
+      upsertSourceFileImport: jest.fn(),
+      storeHistoricalBulk: jest.fn(),
+    };
+    const service = new MarketDataFoundationService(repository as any, {
+      inferRegion: jest.fn().mockReturnValue({ region: 'IN', exchange: 'NSE' }),
+    } as any);
+
+    const result = await (service as any).importNseCmUdiffDaily({
+      tradingDate: '2026-05-27',
+      csvText,
+      fileName: 'BhavCopy_NSE_CM_0_0_0_20260527_F_0000.csv',
+      fileUrl: 'local-fixture.csv',
+    });
+
+    expect(result).toMatchObject({
+      status: 'SKIPPED_DUPLICATE',
+      sourceFileImportId: 'import-1',
+      rowsParsed: 1,
+    });
+    expect(repository.upsertSourceFileImport).not.toHaveBeenCalled();
+    expect(repository.storeHistoricalBulk).not.toHaveBeenCalled();
+  });
+
   it('returns health metadata', async () => {
     const service = new MarketDataFoundationService({
       instrumentCount: jest.fn().mockResolvedValue(2),

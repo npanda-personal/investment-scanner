@@ -45,6 +45,73 @@ describe('MarketDataFoundationRepository', () => {
     }));
   });
 
+  it('finds source file imports by source, segment, trading date, and file hash before duplicate processing', async () => {
+    const findUnique = jest.fn().mockResolvedValue({ id: 'import-1', status: 'COMPLETED' });
+    const prisma = {
+      sourceFileImport: { findUnique },
+    };
+    const repository = new MarketDataFoundationRepository(prisma as any);
+
+    const row = await (repository as any).findSourceFileImportByKey({
+      source: 'NSE',
+      segment: 'CM',
+      tradingDate: new Date('2026-05-27T00:00:00.000Z'),
+      fileHash: 'sha256:test',
+    });
+
+    expect(row).toMatchObject({ id: 'import-1', status: 'COMPLETED' });
+    expect(findUnique).toHaveBeenCalledWith({
+      where: {
+        source_segment_tradingDate_fileHash: {
+          source: 'NSE',
+          segment: 'CM',
+          tradingDate: new Date('2026-05-27T00:00:00.000Z'),
+          fileHash: 'sha256:test',
+        },
+      },
+    });
+  });
+
+  it('stores exchange-file candles with source file provenance in bulk', async () => {
+    const createMany = jest.fn().mockResolvedValue({ count: 1 });
+    const upsert = jest.fn().mockResolvedValue({});
+    const prisma = {
+      priceTick: {
+        findMany: jest.fn().mockResolvedValue([]),
+        createMany,
+      },
+      latestPrice: { upsert },
+      $transaction: jest.fn(async (callback: any): Promise<any> => callback(prisma)),
+    } as any;
+    const repository = new MarketDataFoundationRepository(prisma as any);
+
+    await repository.storeHistoricalBulk(
+      [{
+        symbol: 'RELIANCE',
+        date: new Date('2026-05-27T00:00:00.000Z'),
+        open: 1400,
+        high: 1420,
+        low: 1390,
+        close: 1410,
+        volume: 1000,
+        source: 'NSE_UDIFF_CM_BHAVCOPY',
+      }],
+      () => ({ region: 'IN', exchange: 'NSE' }),
+      new Map(),
+      { sourceFileImportId: 'import-1' }
+    );
+
+    expect(createMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: [
+        expect.objectContaining({
+          symbol: 'RELIANCE',
+          source: 'NSE_UDIFF_CM_BHAVCOPY',
+          sourceFileImportId: 'import-1',
+        }),
+      ],
+    }));
+  });
+
   it('counts provider-sourced market data rows before cleanup without deleting user-owned data', async () => {
     const prisma = {
       priceTick: { count: jest.fn().mockResolvedValue(2) },

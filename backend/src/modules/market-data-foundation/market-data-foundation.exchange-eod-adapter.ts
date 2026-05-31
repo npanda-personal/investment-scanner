@@ -108,7 +108,7 @@ export const mapIndianExchangeEodRows = (
   const resolvedSource = options.source || detectSource(normalizedRows, options);
   const sourceName = options.sourceName?.trim() || resolvedSource;
   const exchange = resolveExchange(normalizedRows, resolvedSource, options);
-  const symbolSuffix = options.symbolSuffix ?? (exchange === 'BSE' ? '.BO' : '.NS');
+  const symbolSuffix = options.symbolSuffix ?? '';
   const warnings: string[] = [];
   const prices: HistoricalPrice[] = [];
   let malformedRows = 0;

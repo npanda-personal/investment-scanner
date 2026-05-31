@@ -9,7 +9,7 @@ import {
 } from '../../../src/modules/market-data-foundation/market-data-foundation.exchange-eod-adapter';
 
 describe('Indian exchange EOD adapter', () => {
-  it('parses NSE security bhavdata rows into HistoricalPrice rows with source names', () => {
+  it('parses NSE security bhavdata rows into no-suffix canonical HistoricalPrice rows with source names', () => {
     const csv = [
       'SYMBOL,SERIES,DATE1,OPEN_PRICE,HIGH_PRICE,LOW_PRICE,CLOSE_PRICE,TTL_TRD_QNTY',
       'RELIANCE,EQ,13-May-2026,1430.00,1450.50,1420.25,1444.10,1234567',
@@ -29,7 +29,7 @@ describe('Indian exchange EOD adapter', () => {
       rowCount: 2,
     });
     expect(result.prices[0]).toMatchObject({
-      symbol: 'RELIANCE.NS',
+      symbol: 'RELIANCE',
       open: 1430,
       high: 1450.5,
       low: 1420.25,
@@ -58,7 +58,7 @@ describe('Indian exchange EOD adapter', () => {
     expect(result.rowsSkipped).toBe(1);
     expect(result.prices).toEqual([
       expect.objectContaining({
-        symbol: 'INFY.NS',
+        symbol: 'INFY',
         open: 1500,
         high: 1512.5,
         low: 1494.2,
@@ -69,7 +69,7 @@ describe('Indian exchange EOD adapter', () => {
     ]);
   });
 
-  it('supports BSE UDiFF-style aliases and BSE provider symbols', () => {
+  it('supports BSE UDiFF-style aliases without storing .BO provider suffixes', () => {
     const rows = [
       {
         TradDt: '2026-05-13',
@@ -92,7 +92,7 @@ describe('Indian exchange EOD adapter', () => {
     expect(result.sourceIdentity.exchange).toBe('BSE');
     expect(result.prices).toHaveLength(1);
     expect(result.prices[0]).toMatchObject({
-      symbol: '500325.BO',
+      symbol: '500325',
       open: 1400,
       high: 1425,
       low: 1390,

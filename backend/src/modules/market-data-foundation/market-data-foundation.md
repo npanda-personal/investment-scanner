@@ -27,6 +27,13 @@ The first NSE/BSE-only foundation slice adds:
 - `LatestPrice` rebuild from approved NSE/BSE candle sources only.
 - startup provider price backfill disabled even when legacy Angel env flags are present.
 
+The second slice adds the first source-file-backed import path:
+
+- `POST /api/v1/market-data/exchange-files/nse-cm-udiff/import` imports a specific NSE CM UDiFF daily file.
+- Imported NSE CM candles are stored under canonical exchange symbols without `.NS` / `.BO` suffixes.
+- Each imported candle receives `PriceTick.sourceFileImportId` provenance.
+- Duplicate completed source-file imports are skipped by `source`, `segment`, `tradingDate`, and `fileHash`.
+
 Provider-sourced cleanup is explicit operator work. Dry-run must be reviewed before execution. Cleanup must not delete `Stock`, portfolios, watchlists, alerts, notes, or other user-owned data.
 
 ## Epic 1 Status

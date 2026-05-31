@@ -59,6 +59,9 @@ type PriceRegionInfo = { region?: string | null; exchange?: string | null };
 type HistoricalBulkStoreSummary = SyncSummary & {
   summaryBySymbol: Map<string, SyncSummary>;
 };
+type HistoricalStoreOptions = {
+  sourceFileImportId?: string | null;
+};
 type SourceFileImportInput = {
   source: string;
   segment: string;
@@ -116,6 +119,19 @@ export class MarketDataFoundationRepository {
         rowsRejected: input.rowsRejected ?? 0,
         parserVersion: input.parserVersion,
         errorMessage: input.errorMessage ?? null,
+      },
+    });
+  }
+
+  async findSourceFileImportByKey(input: Pick<SourceFileImportInput, 'source' | 'segment' | 'tradingDate' | 'fileHash'>) {
+    return (this.prisma as any).sourceFileImport.findUnique({
+      where: {
+        source_segment_tradingDate_fileHash: {
+          source: input.source,
+          segment: input.segment,
+          tradingDate: this.normalizeUtcDay(input.tradingDate),
+          fileHash: input.fileHash,
+        },
       },
     });
   }
@@ -2049,7 +2065,8 @@ export class MarketDataFoundationRepository {
   async storeHistoricalBulk(
     prices: HistoricalPrice[],
     inferRegion: YahooFinanceIngestionService['inferRegion'],
-    regionInfoBySymbol: Map<string, PriceRegionInfo> = new Map()
+    regionInfoBySymbol: Map<string, PriceRegionInfo> = new Map(),
+    options: HistoricalStoreOptions = {}
   ): Promise<HistoricalBulkStoreSummary> {
     const rowsReceived = prices.length;
     const receivedBySymbol = new Map<string, number>();
@@ -2129,7 +2146,7 @@ export class MarketDataFoundationRepository {
       for (let i = 0; i < rowsToInsert.length; i += batchSize) {
         const batch = rowsToInsert.slice(i, i + batchSize);
         await tx.priceTick.createMany({
-          data: batch.map((price) => this.priceTickCreateData(price, regionInfoBySymbol.get(price.symbol) ?? inferRegion(price.symbol))),
+          data: batch.map((price) => this.priceTickCreateData(price, regionInfoBySymbol.get(price.symbol) ?? inferRegion(price.symbol), options)),
           skipDuplicates: true,
         });
       }
@@ -2145,7 +2162,7 @@ export class MarketDataFoundationRepository {
                 timestamp: price.date,
               },
             },
-            data: this.priceTickUpdateData(price, regionInfo),
+            data: this.priceTickUpdateData(price, regionInfo, options),
           });
         }));
       }
@@ -2595,7 +2612,7 @@ export class MarketDataFoundationRepository {
     };
   }
 
-  private priceTickCreateData(price: HistoricalPrice, regionInfo: PriceRegionInfo) {
+  private priceTickCreateData(price: HistoricalPrice, regionInfo: PriceRegionInfo, options: HistoricalStoreOptions = {}) {
     const source = price.source || 'yahoo';
     return {
       symbol: price.symbol,
@@ -2609,11 +2626,12 @@ export class MarketDataFoundationRepository {
       adjustedClose: price.adjustedClose !== undefined && price.adjustedClose !== null ? new Prisma.Decimal(price.adjustedClose) : null,
       volume: price.volume !== undefined && price.volume !== null ? BigInt(price.volume) : null,
       source,
+      sourceFileImportId: options.sourceFileImportId ?? null,
       dataStatus: 'COMPLETE',
     };
   }
 
-  private priceTickUpdateData(price: HistoricalPrice, regionInfo: PriceRegionInfo) {
+  private priceTickUpdateData(price: HistoricalPrice, regionInfo: PriceRegionInfo, options: HistoricalStoreOptions = {}) {
     const source = price.source || 'yahoo';
     return {
       open: new Prisma.Decimal(price.open),
@@ -2623,6 +2641,7 @@ export class MarketDataFoundationRepository {
       adjustedClose: price.adjustedClose !== undefined && price.adjustedClose !== null ? new Prisma.Decimal(price.adjustedClose) : null,
       volume: price.volume !== undefined && price.volume !== null ? BigInt(price.volume) : null,
       source,
+      ...(options.sourceFileImportId !== undefined ? { sourceFileImportId: options.sourceFileImportId } : {}),
       region: regionInfo.region,
       exchange: regionInfo.exchange ?? null,
       dataStatus: 'COMPLETE',

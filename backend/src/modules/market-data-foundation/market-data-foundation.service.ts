@@ -99,6 +99,7 @@ import {
 import {
   buildNseOfficialArchiveUrls,
   buildNseSecurityBhavdataArchiveUrl,
+  buildNseUdiffCmBhavcopyArchiveUrl,
   type NseArchiveUrl,
   parseIndianExchangeEodCsv,
 } from './market-data-foundation.exchange-eod-adapter';
@@ -146,6 +147,29 @@ type UniverseComputationSnapshotCacheEntry = {
   expiresAt: number;
   snapshot?: UniverseComputationSnapshot;
   promise?: Promise<UniverseComputationSnapshot>;
+};
+type HistoricalStoreOptions = {
+  sourceFileImportId?: string | null;
+};
+type ExchangeDailyImportSummary = {
+  status: 'COMPLETED' | 'SKIPPED_DUPLICATE' | 'FAILED';
+  source: 'NSE' | 'BSE';
+  segment: string;
+  tradingDate: string;
+  sourceName: string;
+  fileName: string;
+  fileUrl: string | null;
+  sourceFileImportId: string | null;
+  sourceFingerprint: string | null;
+  rowsRead: number;
+  rowsParsed: number;
+  rowsInserted: number;
+  rowsUpdated: number;
+  rowsNoOp: number;
+  rowsSkipped: number;
+  warningCount: number;
+  warnings: string[];
+  errors: string[];
 };
 type StockMissingDataColumnConfig = {
   column: string;
@@ -3817,14 +3841,16 @@ export class MarketDataFoundationService {
 
   async storeHistoricalBulk(
     prices: HistoricalPrice[],
-    regionInfoBySymbol: Map<string, PriceRegionInfo> = new Map()
+    regionInfoBySymbol: Map<string, PriceRegionInfo> = new Map(),
+    options: HistoricalStoreOptions = {}
   ): Promise<HistoricalBulkStoreResult> {
     const repository = this.repository as any;
     if (typeof repository.storeHistoricalBulk === 'function') {
       return repository.storeHistoricalBulk(
         prices,
         this.marketDataProvider.inferRegion.bind(this.marketDataProvider),
-        regionInfoBySymbol
+        regionInfoBySymbol,
+        options
       );
     }
 
@@ -3884,6 +3910,165 @@ export class MarketDataFoundationService {
       latestTradingDate: latest.latestTradingDate,
       finalConfirmed: latest.finalConfirmed,
     }, options);
+  }
+
+  async importNseCmUdiffDaily(input: {
+    tradingDate: Date | string;
+    csvText?: string;
+    fileName?: string;
+    fileUrl?: string | null;
+    force?: boolean;
+  }): Promise<ExchangeDailyImportSummary> {
+    const tradingDate = this.normalizeExchangeTradingDate(input.tradingDate);
+    const tradingDateText = tradingDate.toISOString().slice(0, 10);
+    const archive = buildNseUdiffCmBhavcopyArchiveUrl(tradingDate);
+    const fileName = input.fileName?.trim() || archive.fileName;
+    const fileUrl = input.fileUrl === undefined ? archive.url : input.fileUrl;
+    const csvText = input.csvText ?? await this.downloadOfficialExchangeText(fileUrl || archive.url);
+    const parsed = parseIndianExchangeEodCsv(csvText, {
+      source: 'NSE_UDIFF_CM_BHAVCOPY',
+      sourceName: 'NSE_UDIFF_CM_BHAVCOPY',
+      sourceUrl: fileUrl || null,
+      exchange: 'NSE',
+      symbolSuffix: '',
+      includeSeries: ['EQ', 'BE'],
+      tradingDate,
+    });
+    const fileHash = parsed.sourceIdentity.contentSha256;
+    const fileSize = Buffer.byteLength(csvText, 'utf8');
+    const repository = this.repository as any;
+
+    const existingImport = typeof repository.findSourceFileImportByKey === 'function'
+      ? await repository.findSourceFileImportByKey({
+        source: 'NSE',
+        segment: 'CM',
+        tradingDate,
+        fileHash,
+      })
+      : null;
+
+    if (!input.force && existingImport?.status === 'COMPLETED') {
+      return {
+        status: 'SKIPPED_DUPLICATE',
+        source: 'NSE',
+        segment: 'CM',
+        tradingDate: tradingDateText,
+        sourceName: parsed.sourceName,
+        fileName,
+        fileUrl: fileUrl || null,
+        sourceFileImportId: existingImport.id ?? null,
+        sourceFingerprint: parsed.sourceFingerprint,
+        rowsRead: parsed.rowsRead,
+        rowsParsed: parsed.rowsParsed,
+        rowsInserted: 0,
+        rowsUpdated: 0,
+        rowsNoOp: 0,
+        rowsSkipped: parsed.rowsSkipped,
+        warningCount: parsed.warnings.length,
+        warnings: parsed.warnings.slice(0, 10),
+        errors: [],
+      };
+    }
+
+    const pendingImport = await repository.upsertSourceFileImport({
+      source: 'NSE',
+      segment: 'CM',
+      tradingDate,
+      fileName,
+      fileUrl: fileUrl || null,
+      fileHash,
+      fileSize,
+      status: 'PENDING',
+      rowsRaw: parsed.rowsRead,
+      rowsAccepted: 0,
+      rowsRejected: parsed.rowsSkipped,
+      parserVersion: 'nse-cm-udiff-v1',
+      errorMessage: null,
+    });
+
+    try {
+      const regionInfoBySymbol = new Map<string, PriceRegionInfo>();
+      parsed.prices.forEach((price) => {
+        regionInfoBySymbol.set(price.symbol, { region: 'IN', exchange: 'NSE' });
+      });
+      const storeSummary = await this.storeHistoricalBulk(parsed.prices, regionInfoBySymbol, {
+        sourceFileImportId: pendingImport?.id ?? null,
+      });
+
+      const completedImport = await repository.upsertSourceFileImport({
+        source: 'NSE',
+        segment: 'CM',
+        tradingDate,
+        fileName,
+        fileUrl: fileUrl || null,
+        fileHash,
+        fileSize,
+        status: 'COMPLETED',
+        rowsRaw: parsed.rowsRead,
+        rowsAccepted: parsed.rowsParsed,
+        rowsRejected: parsed.rowsSkipped,
+        parserVersion: 'nse-cm-udiff-v1',
+        errorMessage: null,
+      });
+
+      return {
+        status: 'COMPLETED',
+        source: 'NSE',
+        segment: 'CM',
+        tradingDate: tradingDateText,
+        sourceName: parsed.sourceName,
+        fileName,
+        fileUrl: fileUrl || null,
+        sourceFileImportId: completedImport?.id ?? pendingImport?.id ?? null,
+        sourceFingerprint: parsed.sourceFingerprint,
+        rowsRead: parsed.rowsRead,
+        rowsParsed: parsed.rowsParsed,
+        rowsInserted: storeSummary.rowsInserted || 0,
+        rowsUpdated: storeSummary.rowsUpdated || 0,
+        rowsNoOp: storeSummary.rowsNoOp || 0,
+        rowsSkipped: (storeSummary.rowsSkipped || 0) + parsed.rowsSkipped,
+        warningCount: (storeSummary.warningCount || 0) + parsed.warnings.length,
+        warnings: [...parsed.warnings, ...(storeSummary.warnings || [])].slice(0, 10),
+        errors: [],
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'NSE CM UDiFF import failed';
+      await repository.upsertSourceFileImport({
+        source: 'NSE',
+        segment: 'CM',
+        tradingDate,
+        fileName,
+        fileUrl: fileUrl || null,
+        fileHash,
+        fileSize,
+        status: 'FAILED',
+        rowsRaw: parsed.rowsRead,
+        rowsAccepted: 0,
+        rowsRejected: parsed.rowsRead,
+        parserVersion: 'nse-cm-udiff-v1',
+        errorMessage: message,
+      }).catch(() => undefined);
+      return {
+        status: 'FAILED',
+        source: 'NSE',
+        segment: 'CM',
+        tradingDate: tradingDateText,
+        sourceName: parsed.sourceName,
+        fileName,
+        fileUrl: fileUrl || null,
+        sourceFileImportId: pendingImport?.id ?? null,
+        sourceFingerprint: parsed.sourceFingerprint,
+        rowsRead: parsed.rowsRead,
+        rowsParsed: parsed.rowsParsed,
+        rowsInserted: 0,
+        rowsUpdated: 0,
+        rowsNoOp: 0,
+        rowsSkipped: parsed.rowsRead,
+        warningCount: parsed.warnings.length,
+        warnings: parsed.warnings.slice(0, 10),
+        errors: [message],
+      };
+    }
   }
 
   async syncScheduledRegion(region: string, options: {
@@ -4706,6 +4891,16 @@ export class MarketDataFoundationService {
     const value = new Date(date);
     value.setUTCHours(0, 0, 0, 0);
     return value;
+  }
+
+  private normalizeExchangeTradingDate(value: Date | string): Date {
+    const date = value instanceof Date
+      ? value
+      : new Date(`${String(value).slice(0, 10)}T00:00:00.000Z`);
+    if (Number.isNaN(date.getTime())) {
+      throw new Error('tradingDate must be a valid exchange trading date.');
+    }
+    return this.startOfUtcDay(date);
   }
 
   async syncV1(request: V1IngestionRequest): Promise<V1SyncResult> {
