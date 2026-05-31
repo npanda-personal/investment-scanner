@@ -190,6 +190,46 @@ describe('MarketDataFoundationRepository', () => {
     }));
   });
 
+  it('upserts manual verified fundamentals with validation evidence by period end date', async () => {
+    const upsert = jest.fn().mockResolvedValue({ id: 'fundamental-1' });
+    const prisma = {
+      fundamental: { upsert },
+    };
+    const repository = new MarketDataFoundationRepository(prisma as any);
+
+    await (repository as any).upsertManualVerifiedFundamental('stock-1', {
+      periodType: 'ANNUAL',
+      periodEndDate: new Date('2026-03-31T00:00:00.000Z'),
+      revenue: 100,
+      eps: 12.5,
+      netIncome: 20,
+      peRatio: 25,
+      marketCap: 1000,
+      sourceNote: 'Validated manually from exchange filing and Screener view.',
+      sourceUrl: 'https://www.nseindia.com/companies-listing/corporate-filings-financial-results',
+      validatedBy: 'Nrusingha',
+      validatedAt: new Date('2026-05-31T12:00:00.000Z'),
+    });
+
+    expect(upsert).toHaveBeenCalledWith(expect.objectContaining({
+      where: {
+        stockId_periodType_periodEndDate_source: {
+          stockId: 'stock-1',
+          periodType: 'ANNUAL',
+          periodEndDate: new Date('2026-03-31T00:00:00.000Z'),
+          source: 'MANUAL_VERIFIED',
+        },
+      },
+      create: expect.objectContaining({
+        source: 'MANUAL_VERIFIED',
+        sourceNote: 'Validated manually from exchange filing and Screener view.',
+        sourceUrl: 'https://www.nseindia.com/companies-listing/corporate-filings-financial-results',
+        validatedBy: 'Nrusingha',
+        validatedAt: new Date('2026-05-31T12:00:00.000Z'),
+      }),
+    }));
+  });
+
   it('counts provider-sourced market data rows before cleanup without deleting user-owned data', async () => {
     const prisma = {
       priceTick: { count: jest.fn().mockResolvedValue(2) },
@@ -1738,9 +1778,10 @@ describe('MarketDataFoundationRepository', () => {
       asOf: '2026-01-02T00:00:00.000Z',
     });
 
-    expect(prisma.fundamental.upsert.mock.calls[0][0].where.stockId_periodType_source).toEqual({
+    expect(prisma.fundamental.upsert.mock.calls[0][0].where.stockId_periodType_periodEndDate_source).toEqual({
       stockId: 'stock-1',
       periodType: 'TTM',
+      periodEndDate: new Date('2026-01-02T00:00:00.000Z'),
       source: 'yahoo',
     });
     expect(prisma.fundamental.upsert.mock.calls[0][0].update.periodEndDate).toEqual(

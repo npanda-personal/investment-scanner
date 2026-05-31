@@ -3773,6 +3773,64 @@ export class MarketDataFoundationService {
     return this.formatFundamentalsResponse(stock, records);
   }
 
+  async importManualVerifiedFundamental(input: {
+    stockId: string;
+    region?: string;
+    assetType?: string;
+    periodType: string;
+    periodEndDate: Date | string;
+    revenue?: number | null;
+    eps?: number | null;
+    netIncome?: number | null;
+    peRatio?: number | null;
+    marketCap?: number | null;
+    sourceNote?: string | null;
+    sourceUrl?: string | null;
+    validatedBy?: string | null;
+    validatedAt?: Date | string | null;
+    currency?: string | null;
+  }) {
+    const stockId = input.stockId?.trim();
+    if (!stockId) throw new Error('stockId is required.');
+    const periodType = input.periodType?.trim().toUpperCase();
+    if (!periodType) throw new Error('periodType is required.');
+    const periodEndDate = this.normalizeExchangeTradingDate(input.periodEndDate);
+    const validatedAt = input.validatedAt ? new Date(input.validatedAt) : new Date();
+    if (Number.isNaN(validatedAt.getTime())) throw new Error('validatedAt must be a valid date.');
+
+    const stock = await this.repository.findStockByIdInScope(stockId, {
+      region: input.region,
+      assetType: input.assetType,
+    });
+    if (!stock) throw new Error('Instrument not found for manual verified fundamental import.');
+
+    const row = await (this.repository as any).upsertManualVerifiedFundamental(stock.id, {
+      periodType,
+      periodEndDate,
+      revenue: input.revenue ?? null,
+      eps: input.eps ?? null,
+      netIncome: input.netIncome ?? null,
+      peRatio: input.peRatio ?? null,
+      marketCap: input.marketCap ?? null,
+      sourceNote: input.sourceNote ?? null,
+      sourceUrl: input.sourceUrl ?? null,
+      validatedBy: input.validatedBy ?? null,
+      validatedAt,
+      currency: input.currency ?? stock.currency ?? 'INR',
+    });
+
+    return {
+      status: 'IMPORTED',
+      stockId: stock.id,
+      symbol: stock.symbol,
+      source: 'MANUAL_VERIFIED',
+      periodType,
+      periodEndDate: periodEndDate.toISOString(),
+      validatedAt: validatedAt.toISOString(),
+      id: row?.id ?? null,
+    };
+  }
+
   async corporateActionsByInstrumentId(instrumentId: string, options: Pick<PaginationOptions, 'region' | 'assetType'> = {}) {
     const stock = await this.repository.findStockByIdInScope(instrumentId, options);
     if (!stock) {
@@ -11043,6 +11101,10 @@ export class MarketDataFoundationService {
         period_type: record.periodType,
         period_end_date: record.periodEndDate.toISOString(),
         source: record.source,
+        source_note: record.sourceNote ?? null,
+        source_url: record.sourceUrl ?? null,
+        validated_by: record.validatedBy ?? null,
+        validated_at: record.validatedAt?.toISOString?.() ?? null,
         ingestion_timestamp: record.ingestionTimestamp.toISOString(),
         last_updated_timestamp: record.lastUpdatedTimestamp.toISOString(),
         data_status: record.dataStatus,

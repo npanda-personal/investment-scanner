@@ -77,6 +77,20 @@ type SourceFileImportInput = {
   parserVersion: string;
   errorMessage?: string | null;
 };
+type ManualVerifiedFundamentalInput = {
+  periodType: string;
+  periodEndDate: Date;
+  revenue?: number | null;
+  eps?: number | null;
+  netIncome?: number | null;
+  peRatio?: number | null;
+  marketCap?: number | null;
+  sourceNote?: string | null;
+  sourceUrl?: string | null;
+  validatedBy?: string | null;
+  validatedAt?: Date | null;
+  currency?: string | null;
+};
 
 export class MarketDataFoundationRepository {
   constructor(public readonly prisma: PrismaClient = defaultPrisma) {}
@@ -2447,9 +2461,10 @@ export class MarketDataFoundationRepository {
 
     return (this.prisma as any).fundamental.upsert({
       where: {
-        stockId_periodType_source: {
+        stockId_periodType_periodEndDate_source: {
           stockId,
           periodType: fundamentals.periodType,
+          periodEndDate,
           source: fundamentals.source,
         },
       },
@@ -2479,6 +2494,43 @@ export class MarketDataFoundationRepository {
         periodEndDate,
         source: fundamentals.source,
         dataStatus,
+      },
+    });
+  }
+
+  async upsertManualVerifiedFundamental(stockId: string, input: ManualVerifiedFundamentalInput) {
+    const periodEndDate = this.normalizeUtcDay(input.periodEndDate);
+    const validatedAt = input.validatedAt || new Date();
+    const data = {
+      revenue: input.revenue !== undefined && input.revenue !== null ? new Prisma.Decimal(input.revenue) : null,
+      eps: input.eps !== undefined && input.eps !== null ? new Prisma.Decimal(input.eps) : null,
+      netIncome: input.netIncome !== undefined && input.netIncome !== null ? new Prisma.Decimal(input.netIncome) : null,
+      peRatio: input.peRatio !== undefined && input.peRatio !== null ? new Prisma.Decimal(input.peRatio) : null,
+      marketCap: input.marketCap !== undefined && input.marketCap !== null ? new Prisma.Decimal(input.marketCap) : null,
+      currency: input.currency ?? 'INR',
+      sourceNote: input.sourceNote ?? null,
+      sourceUrl: input.sourceUrl ?? null,
+      validatedBy: input.validatedBy ?? null,
+      validatedAt,
+      dataStatus: 'PARTIAL',
+    };
+
+    return (this.prisma as any).fundamental.upsert({
+      where: {
+        stockId_periodType_periodEndDate_source: {
+          stockId,
+          periodType: input.periodType,
+          periodEndDate,
+          source: 'MANUAL_VERIFIED',
+        },
+      },
+      update: data,
+      create: {
+        stockId,
+        periodType: input.periodType,
+        periodEndDate,
+        source: 'MANUAL_VERIFIED',
+        ...data,
       },
     });
   }

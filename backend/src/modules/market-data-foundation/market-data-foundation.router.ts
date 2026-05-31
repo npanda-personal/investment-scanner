@@ -78,6 +78,7 @@ export const createMarketDataV1Router = (
   router.post('/market-data/metadata/provider-business/repair', controller.repairProviderBusinessMetadata);
   router.post('/market-data/prices/identity-repair', controller.repairPriceIdentity);
   router.post('/market-data/metadata/manual-import', controller.importManualMetadata);
+  router.post('/market-data/fundamentals/manual-verified-import', controller.importManualVerifiedFundamental);
   router.post('/market-data/metadata/enrich', controller.enrichMetadata);
   router.post('/market-data/prices/backfill', controller.backfillPrices);
   router.post('/market-data/prices/backfill-runs', controller.startPriceBackfillRun);

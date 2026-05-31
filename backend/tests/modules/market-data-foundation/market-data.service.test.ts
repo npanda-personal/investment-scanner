@@ -457,6 +457,49 @@ describe('MarketDataFoundationService syncV1', () => {
     });
   });
 
+  it('imports manual verified fundamentals without provider or Screener scraping', async () => {
+    const repository = {
+      findStockByIdInScope: jest.fn().mockResolvedValue({ id: 'stock-1', symbol: 'RELIANCE' }),
+      upsertManualVerifiedFundamental: jest.fn().mockResolvedValue({ id: 'fundamental-1' }),
+    };
+    const provider = {
+      fetchCoreFundamentals: jest.fn(),
+    };
+    const service = new MarketDataFoundationService(repository as any, provider as any);
+
+    const result = await (service as any).importManualVerifiedFundamental({
+      stockId: 'stock-1',
+      region: 'IN',
+      assetType: 'STOCK',
+      periodType: 'ANNUAL',
+      periodEndDate: '2026-03-31',
+      revenue: 100,
+      eps: 12.5,
+      netIncome: 20,
+      peRatio: 25,
+      marketCap: 1000,
+      sourceNote: 'Validated manually from NSE/BSE filing. Screener used only for manual cross-check.',
+      sourceUrl: 'https://www.bseindia.com/corporates/ann.html',
+      validatedBy: 'Nrusingha',
+      validatedAt: '2026-05-31T12:00:00.000Z',
+    });
+
+    expect(repository.findStockByIdInScope).toHaveBeenCalledWith('stock-1', { region: 'IN', assetType: 'STOCK' });
+    expect(repository.upsertManualVerifiedFundamental).toHaveBeenCalledWith('stock-1', expect.objectContaining({
+      periodType: 'ANNUAL',
+      periodEndDate: new Date('2026-03-31T00:00:00.000Z'),
+      sourceNote: 'Validated manually from NSE/BSE filing. Screener used only for manual cross-check.',
+      validatedBy: 'Nrusingha',
+    }));
+    expect(provider.fetchCoreFundamentals).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      status: 'IMPORTED',
+      stockId: 'stock-1',
+      symbol: 'RELIANCE',
+      source: 'MANUAL_VERIFIED',
+    });
+  });
+
   it('returns health metadata', async () => {
     const service = new MarketDataFoundationService({
       instrumentCount: jest.fn().mockResolvedValue(2),

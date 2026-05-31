@@ -376,11 +376,15 @@ model Fundamental {
   periodType           String
   periodEndDate        DateTime
   source               String
+  sourceNote           String?
+  sourceUrl            String?
+  validatedBy          String?
+  validatedAt          DateTime?
   ingestionTimestamp   DateTime @default(now())
   lastUpdatedTimestamp DateTime @updatedAt
   dataStatus           String   @default("PARTIAL")
 
-  @@unique([stockId, periodType, source])
+  @@unique([stockId, periodType, periodEndDate, source])
   @@index([stockId, periodEndDate])
   @@map("fundamentals")
 }

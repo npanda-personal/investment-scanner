@@ -161,6 +161,32 @@ export class MarketDataFoundationController {
     }
   };
 
+  importManualVerifiedFundamental = async (req: Request, res: Response) => {
+    try {
+      const result = await this.service.importManualVerifiedFundamental({
+        stockId: String(req.body?.stockId || req.body?.instrumentId || ''),
+        region: typeof req.body?.region === 'string' ? req.body.region : undefined,
+        assetType: typeof req.body?.assetType === 'string' ? req.body.assetType : undefined,
+        periodType: String(req.body?.periodType || ''),
+        periodEndDate: req.body?.periodEndDate,
+        revenue: req.body?.revenue ?? null,
+        eps: req.body?.eps ?? null,
+        netIncome: req.body?.netIncome ?? null,
+        peRatio: req.body?.peRatio ?? null,
+        marketCap: req.body?.marketCap ?? null,
+        sourceNote: req.body?.sourceNote ?? null,
+        sourceUrl: req.body?.sourceUrl ?? null,
+        validatedBy: req.body?.validatedBy ?? null,
+        validatedAt: req.body?.validatedAt ?? null,
+        currency: req.body?.currency ?? null,
+      });
+      return res.status(201).json(result);
+    } catch (error) {
+      console.error('Manual verified fundamental import error:', error);
+      return res.status(400).json({ error: this.errorMessage(error, 'Manual verified fundamental import failed') });
+    }
+  };
+
   yahooSearch = async (req: Request, res: Response) => {
     try {
       const query = req.query.q as string;
