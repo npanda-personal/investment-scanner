@@ -23,7 +23,7 @@ describe('MarketDataFoundationScheduler', () => {
         ANGEL_ONE_ENABLE_MARKET_DATA: 'true',
         MARKET_DATA_STARTUP_PRICE_BACKFILL_ENABLED: 'true',
       } as any)).resolves.toBeNull();
-      expect(warn).toHaveBeenCalledWith(expect.stringContaining('startup price backfill skipped'));
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('provider startup price backfill disabled'));
     } finally {
       warn.mockRestore();
     }

@@ -10,6 +10,8 @@ import { enqueueIngestionJob } from './market-data-foundation.queue';
 import { getCatalogDownloadConfig, getCatalogSourceConfig, getCatalogSourceConfigs } from './market-data-foundation.catalog-sources';
 import type {
   CreateStockRequest,
+  CorporateAction,
+  CoreFundamentals,
   HistoricalPrice,
   MarketDataStatus,
   MarketDataRepairPlan,
@@ -126,6 +128,9 @@ const MARKET_MOVER_MAX_ABS_RETURN: Record<MarketMoverRange, number> = {
   '6M': 250,
   '1Y': 1000,
 };
+const NSE_BSE_ONLY_PROVIDER_DISABLED_CODE = 'EXTERNAL_PROVIDER_DISABLED_NSE_BSE_ONLY';
+const NSE_BSE_ONLY_PROVIDER_DISABLED_MESSAGE =
+  'External Yahoo/yfinance and Angel One provider paths are disabled. Use NSE/BSE exchange-file imports or manual verified evidence only.';
 
 type TrustedReviewUniverseOptions = Pick<PaginationOptions, 'region' | 'assetType'> & { now?: Date };
 type UniverseComputationSnapshot = {
@@ -539,6 +544,14 @@ export class MarketDataFoundationService {
 
   list(options: PaginationOptions) {
     return this.repository.listStocks(options);
+  }
+
+  providerDataCleanupReport() {
+    return this.repository.providerDataCleanupReport();
+  }
+
+  executeProviderDataCleanup() {
+    return this.repository.executeProviderDataCleanup();
   }
 
   async health(options: Pick<PaginationOptions, 'region' | 'assetType'> = {}) {
@@ -2052,6 +2065,8 @@ export class MarketDataFoundationService {
   }
 
   async validateProviders(request: MarketDataRepairRequest = {}): Promise<MarketDataRepairSummary> {
+    return this.providerDisabledRepairSummary(request, 'Provider validation is disabled for NSE/BSE-only market data.');
+    // Legacy provider validation remains below as historical code only. It is unreachable from the approved runtime path.
     const started = Date.now();
     const scope = this.repairScope(request);
     const batch = this.mutatingRepairBatch(request);
@@ -2216,10 +2231,11 @@ export class MarketDataFoundationService {
           ?? (sourceName === 'ANGEL_ONE_HISTORICAL' ? null : this.shouldUseAngelProviderValidation(providerSymbol, scope) ? 'YAHOO_CHART' : null);
         summary.providerValidated = (summary.providerValidated || 0) + 1;
         summary.providerCalls = (summary.providerCalls || 0) + 1;
-        if (validation.providerCallMs !== undefined) {
-          providerCallDurations.push(validation.providerCallMs);
-          summary.maxProviderCallMs = Math.max(summary.maxProviderCallMs || 0, validation.providerCallMs);
-          if (validation.providerCallMs >= 3000) summary.slowProviderCalls = (summary.slowProviderCalls || 0) + 1;
+        const providerCallMs = Number(validation.providerCallMs);
+        if (Number.isFinite(providerCallMs)) {
+          providerCallDurations.push(providerCallMs);
+          summary.maxProviderCallMs = Math.max(summary.maxProviderCallMs || 0, providerCallMs);
+          if (providerCallMs >= 3000) summary.slowProviderCalls = (summary.slowProviderCalls || 0) + 1;
         }
         const classification = validation.classification || this.compatibleProviderValidationClassification(validation);
         const status = this.providerStatusForValidation(validation, classification);
@@ -2263,7 +2279,7 @@ export class MarketDataFoundationService {
           summary.failed += 1;
         }
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Provider validation failed.';
+        const message = error instanceof Error ? (error as Error).message : 'Provider validation failed.';
         const classification: ProviderValidationClassification = /timeout/i.test(message) ? 'RETRYABLE_TIMEOUT' : 'RETRYABLE_PROVIDER_ERROR';
         const nextRetryAt = await this.nextProviderValidationRetryAt(stock);
         await this.repository.updateProviderSupportStatus(stock.symbol, 'VALIDATION_FAILED', message);
@@ -2921,20 +2937,64 @@ export class MarketDataFoundationService {
 
   async startPriceBackfillRun(request: PriceBackfillRunRequest = {}): Promise<PriceBackfillRunStatusResponse> {
     const scope = this.repairScope(request);
+    const now = new Date();
+    return {
+      success: false,
+      runId: `provider-backfill-disabled-${now.toISOString().replace(/[-:.TZ]/g, '').slice(0, 14)}`,
+      status: 'FAILED',
+      message: NSE_BSE_ONLY_PROVIDER_DISABLED_MESSAGE,
+      region: scope.region,
+      assetType: scope.assetType,
+      scopeType: 'PRICE_BACKFILL',
+      batchSize: 0,
+      workerConcurrency: 0,
+      providerThrottleMs: 0,
+      maxBatches: 0,
+      totalCount: 0,
+      processedCount: 0,
+      currentBatchNumber: 0,
+      batchesPlanned: 0,
+      batchesExecuted: 0,
+      updated: 0,
+      skipped: 0,
+      failed: 0,
+      noOp: 0,
+      priceRowsReceived: 0,
+      priceRowsInserted: 0,
+      priceRowsUpdated: 0,
+      priceRowsNoOp: 0,
+      zeroRowProviderReturns: 0,
+      warningCount: 1,
+      warnings: [NSE_BSE_ONLY_PROVIDER_DISABLED_CODE],
+      recentErrors: [],
+      latestBatch: null,
+      remainingCandidates: 0,
+      hasMore: false,
+      percentComplete: 100,
+      startedAt: now.toISOString(),
+      updatedAt: now.toISOString(),
+      completedAt: now.toISOString(),
+      statusUrl: '',
+    };
+    // Legacy provider backfill remains below as historical code only. It is unreachable from the approved runtime path.
     const activeKey = this.priceBackfillActiveKey(scope.region, scope.assetType);
     const activeRunId = MarketDataFoundationService.activePriceBackfillRuns.get(activeKey);
     if (activeRunId) {
-      const activeRun = MarketDataFoundationService.priceBackfillRuns.get(activeRunId);
-      if (activeRun && !activeRun.completedAt) {
-        return this.toPriceBackfillRunResponse(activeRun, {
-          alreadyRunning: true,
-          message: `A price backfill run is already running for ${scope.region}/${scope.assetType}.`,
-        });
+      const activeRun = MarketDataFoundationService.priceBackfillRuns.get(activeRunId as string) as PriceBackfillRunRecord | undefined;
+      if (!activeRun) {
+        MarketDataFoundationService.activePriceBackfillRuns.delete(activeKey);
+      } else {
+        const activeRunRecord = activeRun as PriceBackfillRunRecord;
+        if (!activeRunRecord.completedAt) {
+          return this.toPriceBackfillRunResponse(activeRunRecord, {
+            alreadyRunning: true,
+            message: `A price backfill run is already running for ${scope.region}/${scope.assetType}.`,
+          });
+        }
+        MarketDataFoundationService.activePriceBackfillRuns.delete(activeKey);
       }
-      MarketDataFoundationService.activePriceBackfillRuns.delete(activeKey);
     }
 
-    const now = new Date();
     const clamped = this.normalizePriceBackfillRunRequest(request);
     const policy = request.policy || (request.fullReload ? 'FORCE_DEEP' : 'INCREMENTAL_LATEST_ONLY');
     const totalCount = await this.countPriceBackfillRunCandidates(scope, { ...request, policy });
@@ -3565,57 +3625,27 @@ export class MarketDataFoundationService {
       }));
     }
 
-    const externalResults: SearchResult[] = await this.marketDataProvider.search(query);
-    const createdStocks = [];
-
-    for (const ext of externalResults) {
-      const existing = await this.repository.findStockBySymbol(ext.symbol);
-      if (existing) {
-        createdStocks.push(existing);
-        continue;
-      }
-
-      const regionInfo = this.marketDataProvider.inferRegion(ext.symbol);
-      const stock = await this.create({
-        symbol: ext.symbol,
-        name: ext.name,
-        region: regionInfo.region || 'US',
-        exchange: regionInfo.exchange,
-      }, true);
-      createdStocks.push(stock);
-    }
-
-    return createdStocks.map(stock => ({
-      symbol: stock.symbol,
-      name: stock.name,
-      region: stock.region,
-      exchange: stock.exchange,
-      source: 'external',
-    }));
+    return [];
   }
 
   async yahooSearch(query: string): Promise<any[]> {
-    const externalResults: SearchResult[] = await this.marketDataProvider.search(query);
-    return externalResults.map(result => ({
-      symbol: result.symbol,
-      name: result.name,
-      type: result.type,
-      exchange: result.exchange,
-      region: result.region,
-      source: 'yahoo',
-    }));
+    void query;
+    throw this.providerDisabledError('Yahoo Finance search');
   }
 
-  searchProvider(query: string) {
-    return this.marketDataProvider.search(query);
+  async searchProvider(query: string): Promise<SearchResult[]> {
+    void query;
+    throw this.providerDisabledError('external provider search');
   }
 
-  fetchCoreFundamentals(symbol: string) {
-    return this.marketDataProvider.fetchCoreFundamentals(symbol);
+  async fetchCoreFundamentals(symbol: string): Promise<CoreFundamentals> {
+    void symbol;
+    throw this.providerDisabledError('provider fundamentals fetch');
   }
 
-  fetchCorporateActions(symbol: string) {
-    return this.marketDataProvider.fetchCorporateActions(symbol);
+  async fetchCorporateActions(symbol: string): Promise<CorporateAction[]> {
+    void symbol;
+    throw this.providerDisabledError('provider corporate actions fetch');
   }
 
   listPrices(symbol: string, limit: number, startDate?: Date, endDate?: Date) {
@@ -3702,12 +3732,7 @@ export class MarketDataFoundationService {
       return null;
     }
 
-    let records = await this.repository.listFundamentals(stock.id);
-    if (records.length === 0) {
-      const fundamentals = await this.fetchCoreFundamentals(stock.symbol);
-      await this.repository.upsertFundamentals(stock.id, fundamentals);
-      records = await this.repository.listFundamentals(stock.id);
-    }
+    const records = await this.repository.listFundamentals(stock.id);
 
     return this.formatFundamentalsResponse(stock, records);
   }
@@ -3729,13 +3754,7 @@ export class MarketDataFoundationService {
     }
 
     await this.repository.dedupeCorporateActions(stock.id);
-    let actions = await this.repository.listCorporateActions(stock.id);
-    if (actions.length === 0) {
-      const providerActions = await this.fetchCorporateActions(stock.symbol);
-      await this.repository.upsertCorporateActions(stock.id, providerActions);
-      await this.repository.dedupeCorporateActions(stock.id);
-      actions = await this.repository.listCorporateActions(stock.id);
-    }
+    const actions = await this.repository.listCorporateActions(stock.id);
 
     return this.formatCorporateActionsResponse(stock, actions);
   }
@@ -3776,16 +3795,12 @@ export class MarketDataFoundationService {
     };
   }
 
-  async fetchHistorical(symbol: string, startDate?: Date, endDate?: Date, options: { region?: string; assetType?: string; exchange?: string | null } = {}) {
-    if (this.angelOneMarketDataProvider.canHandleHistorical(symbol, options)) {
-      try {
-        return await this.angelOneMarketDataProvider.fetchHistorical(symbol, startDate, endDate, options);
-      } catch (error) {
-        if (this.angelOneMarketDataProvider.shouldFailClosed()) throw error;
-        console.warn(`${symbol}: Angel One historical fetch failed; falling back to Yahoo because ANGEL_ONE_FAIL_CLOSED=false.`);
-      }
-    }
-    return this.marketDataProvider.fetchHistorical(this.yahooHistoricalProviderSymbol(symbol, options), startDate, endDate);
+  async fetchHistorical(symbol: string, startDate?: Date, endDate?: Date, options: { region?: string; assetType?: string; exchange?: string | null } = {}): Promise<HistoricalPrice[]> {
+    void symbol;
+    void startDate;
+    void endDate;
+    void options;
+    throw this.providerDisabledError('provider historical candle fetch');
   }
 
   async storeHistorical(prices: HistoricalPrice[]): Promise<SyncSummary> {
@@ -3922,9 +3937,6 @@ export class MarketDataFoundationService {
       }
     }
 
-    const providerEndDate = gate.shouldSkip
-      ? this.endOfTradingDateUtc(targetTradingDate)
-      : gate.providerEndDate ?? now;
     const batchSize = Math.max(1, Math.min(options.batchSize ?? 25, 250));
 
     const repositoryAny = this.repository as any;
@@ -3993,29 +4005,10 @@ export class MarketDataFoundationService {
 
     for (const task of providerTasks) {
       if (officialBulk.matchedTaskIds.has(task.id)) continue;
-      try {
-        await this.throttleIngestion(250);
-        const startDate = this.catalogSyncTaskStartDate({ force: false, fullReload: false, providerEndDate }, task);
-        const result = await this.ingestSymbol(task.symbol, startDate, providerEndDate, false, {
-          region,
-          assetType,
-          skipFreshnessGate: true,
-        });
-        downstreamInstrumentIds.add(task.id);
-        summary.instrumentsProcessed += 1;
-        summary.rowsReceived += result.rowsReceived;
-        summary.rowsInserted += result.rowsInserted;
-        summary.rowsUpdated += result.rowsUpdated;
-        summary.rowsSkipped += result.rowsSkipped;
-        summary.rowsNoOp += result.rowsNoOp ?? 0;
-        summary.warningCount += result.warningCount;
-        summary.warnings.push(...(result.warnings || []));
-        if (result.rowsInserted > 0 || result.rowsUpdated > 0) {
-          changedInstrumentIds.add(task.id);
-        }
-      } catch (error) {
-        summary.errors.push(`${task.symbol}: ${error instanceof Error ? error.message : 'unknown error'}`);
-      }
+      summary.instrumentsProcessed += 1;
+      summary.rowsSkipped += 1;
+      summary.warningCount += 1;
+      summary.warnings.push(`${task.symbol}: no NSE/BSE exchange-file row matched; Yahoo/Angel provider fallback is disabled.`);
     }
     const sortedChangedInstrumentIds = [...changedInstrumentIds].sort((a, b) => a.localeCompare(b));
     const sortedDownstreamInstrumentIds = [...downstreamInstrumentIds].sort((a, b) => a.localeCompare(b));
@@ -8585,6 +8578,23 @@ export class MarketDataFoundationService {
       warnings: [],
       durationMs: 0,
     };
+  }
+
+  private providerDisabledRepairSummary(request: MarketDataRepairRequest, message: string): MarketDataRepairSummary {
+    const started = Date.now();
+    const scope = this.repairScope(request);
+    const batch = this.mutatingRepairBatch(request);
+    const summary = this.emptyRepairSummary(scope, batch, 0, true);
+    (summary as any).warningCount = 1;
+    summary.warnings.push(`${NSE_BSE_ONLY_PROVIDER_DISABLED_CODE}: ${message}`);
+    this.finishRepairSummary(summary, started);
+    return summary;
+  }
+
+  private providerDisabledError(operation: string) {
+    const error = new Error(`${operation} disabled: ${NSE_BSE_ONLY_PROVIDER_DISABLED_MESSAGE}`);
+    (error as any).code = NSE_BSE_ONLY_PROVIDER_DISABLED_CODE;
+    return error;
   }
 
   private finishRepairSummary(summary: MarketDataRepairSummary, started: number) {

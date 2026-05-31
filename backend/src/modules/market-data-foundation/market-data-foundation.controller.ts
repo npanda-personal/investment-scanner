@@ -24,6 +24,14 @@ export class MarketDataFoundationController {
     return { region, assetType };
   }
 
+  private isProviderDisabled(error: unknown): boolean {
+    return Boolean(error && typeof error === 'object' && (error as any).code === 'EXTERNAL_PROVIDER_DISABLED_NSE_BSE_ONLY');
+  }
+
+  private errorMessage(error: unknown, fallback: string): string {
+    return error instanceof Error ? error.message : fallback;
+  }
+
   listStocks = async (req: Request, res: Response) => {
     try {
       const page = parseInt(req.query.page as string) || 1;
@@ -74,6 +82,24 @@ export class MarketDataFoundationController {
     }
   };
 
+  providerCleanupReport = async (_req: Request, res: Response) => {
+    try {
+      return res.json(await this.service.providerDataCleanupReport());
+    } catch (error) {
+      console.error('Error building provider cleanup report:', error);
+      return res.status(500).json({ error: 'Failed to build provider cleanup report' });
+    }
+  };
+
+  executeProviderCleanup = async (_req: Request, res: Response) => {
+    try {
+      return res.json(await this.service.executeProviderDataCleanup());
+    } catch (error) {
+      console.error('Error executing provider cleanup:', error);
+      return res.status(500).json({ error: 'Failed to execute provider cleanup' });
+    }
+  };
+
   yahooSearch = async (req: Request, res: Response) => {
     try {
       const query = req.query.q as string;
@@ -84,7 +110,7 @@ export class MarketDataFoundationController {
       return res.json(results);
     } catch (error) {
       console.error('Error in Yahoo search:', error);
-      return res.status(500).json({ error: 'Failed to search Yahoo Finance' });
+      return res.status(this.isProviderDisabled(error) ? 410 : 500).json({ error: this.errorMessage(error, 'Failed to search Yahoo Finance') });
     }
   };
 

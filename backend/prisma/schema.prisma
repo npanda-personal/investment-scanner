@@ -21,6 +21,8 @@ model PriceTick {
   adjustedClose        Decimal?
   volume               BigInt?
   source               String? // e.g., "yahoo", "coinbase"
+  sourceFileImportId   String?
+  sourceFileImport     SourceFileImport? @relation(fields: [sourceFileImportId], references: [id], onDelete: SetNull)
   ingestionTimestamp   DateTime @default(now())
   lastUpdatedTimestamp DateTime @updatedAt
   dataStatus           String   @default("COMPLETE")
@@ -28,6 +30,7 @@ model PriceTick {
   @@unique([symbol, timestamp])
   @@index([symbol, timestamp])
   @@index([region])
+  @@index([sourceFileImportId])
   @@map("price_ticks")
 }
 
@@ -89,10 +92,60 @@ model Stock {
   marketDataRepairAttempts      MarketDataRepairAttempt[]
   marketDataRepairStates        MarketDataRepairState[]
   signalPositionLedgerEntries   SignalPositionLedgerEntry[]
+  exchangeIdentities            InstrumentExchangeIdentity[]
 
   @@index([region, assetType, symbol], map: "stocks_region_assetType_symbol_idx")
   @@index([region, assetType, providerSupportStatus, isActive, isDelisted], map: "stocks_region_assetType_providerSupport_active_delisted_idx")
   @@map("stocks")
+}
+
+model SourceFileImport {
+  id                           String   @id @default(cuid())
+  source                       String
+  segment                      String
+  tradingDate                  DateTime
+  fileName                     String
+  fileUrl                      String?
+  fileHash                     String
+  fileSize                     Int?
+  status                       String
+  rowsRaw                      Int      @default(0)
+  rowsAccepted                 Int      @default(0)
+  rowsRejected                 Int      @default(0)
+  parserVersion                String
+  importedAt                   DateTime @default(now())
+  errorMessage                 String?
+  createdAt                    DateTime @default(now())
+  updatedAt                    DateTime @updatedAt
+  priceTicks                   PriceTick[]
+  instrumentExchangeIdentities InstrumentExchangeIdentity[]
+
+  @@unique([source, segment, tradingDate, fileHash])
+  @@index([source, segment, tradingDate, status])
+  @@map("source_file_imports")
+}
+
+model InstrumentExchangeIdentity {
+  id                 String   @id @default(cuid())
+  stockId            String
+  stock              Stock    @relation(fields: [stockId], references: [id], onDelete: Cascade)
+  exchange           String
+  isin               String?
+  exchangeSymbol     String
+  securityCode       String?
+  securityId         String?
+  series             String?
+  status             String
+  sourceFileImportId String?
+  sourceFileImport   SourceFileImport? @relation(fields: [sourceFileImportId], references: [id], onDelete: SetNull)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@unique([stockId, exchange, exchangeSymbol])
+  @@index([exchange, exchangeSymbol])
+  @@index([exchange, isin])
+  @@index([sourceFileImportId])
+  @@map("instrument_exchange_identities")
 }
 
 model MarketDataRepairAttempt {

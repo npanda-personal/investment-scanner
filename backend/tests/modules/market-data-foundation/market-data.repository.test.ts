@@ -2,6 +2,126 @@
 import { MarketDataFoundationRepository } from '../../../src/modules/market-data-foundation';
 
 describe('MarketDataFoundationRepository', () => {
+  it('upserts source file imports by source, segment, trading date, and file hash', async () => {
+    const upsert = jest.fn().mockResolvedValue({ id: 'import-1' });
+    const prisma = {
+      sourceFileImport: { upsert },
+    };
+    const repository = new MarketDataFoundationRepository(prisma as any);
+
+    await (repository as any).upsertSourceFileImport({
+      source: 'NSE',
+      segment: 'CM',
+      tradingDate: new Date('2026-05-27T00:00:00.000Z'),
+      fileName: 'BhavCopy_NSE_CM_0_0_0_20260527_F_0000.csv.zip',
+      fileUrl: 'https://archives.nseindia.com/test.zip',
+      fileHash: 'sha256:test',
+      fileSize: 1234,
+      status: 'COMPLETED',
+      rowsRaw: 2613,
+      rowsAccepted: 2600,
+      rowsRejected: 13,
+      parserVersion: 'nse-cm-udiff-v1',
+    });
+
+    expect(upsert).toHaveBeenCalledWith(expect.objectContaining({
+      where: {
+        source_segment_tradingDate_fileHash: {
+          source: 'NSE',
+          segment: 'CM',
+          tradingDate: new Date('2026-05-27T00:00:00.000Z'),
+          fileHash: 'sha256:test',
+        },
+      },
+      create: expect.objectContaining({
+        source: 'NSE',
+        segment: 'CM',
+        fileName: 'BhavCopy_NSE_CM_0_0_0_20260527_F_0000.csv.zip',
+      }),
+      update: expect.objectContaining({
+        status: 'COMPLETED',
+        rowsAccepted: 2600,
+      }),
+    }));
+  });
+
+  it('counts provider-sourced market data rows before cleanup without deleting user-owned data', async () => {
+    const prisma = {
+      priceTick: { count: jest.fn().mockResolvedValue(2) },
+      fundamental: { count: jest.fn().mockResolvedValue(1) },
+      corporateAction: { count: jest.fn().mockResolvedValue(1) },
+      fxRate: { count: jest.fn().mockResolvedValue(1) },
+      marketDataRepairAttempt: { count: jest.fn().mockResolvedValue(3) },
+      marketDataRepairState: { count: jest.fn().mockResolvedValue(4) },
+      latestPrice: { count: jest.fn().mockResolvedValue(5) },
+    };
+    const repository = new MarketDataFoundationRepository(prisma as any);
+
+    const report = await (repository as any).providerDataCleanupReport();
+
+    expect(report).toMatchObject({
+      dryRun: true,
+      providerSources: expect.arrayContaining(['yahoo', 'yfinance', 'angel_one']),
+      counts: {
+        priceTicks: 2,
+        fundamentals: 1,
+        corporateActions: 1,
+        fxRates: 1,
+        repairAttempts: 3,
+        repairStates: 4,
+        latestPricesWithoutExchangeCandles: 5,
+      },
+    });
+    expect(prisma.priceTick.count).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        source: expect.objectContaining({ in: expect.arrayContaining(['yahoo', 'angel_one']) }),
+      }),
+    }));
+    expect((prisma as any).stock?.deleteMany).toBeUndefined();
+  });
+
+  it('executes provider cleanup and rebuilds latest prices only from exchange candles', async () => {
+    const deleteMany = jest.fn().mockResolvedValue({ count: 1 });
+    const count = jest.fn().mockResolvedValue(0);
+    const latestRows = [
+      { symbol: 'RELIANCE', region: 'IN', timestamp: new Date('2026-05-27T00:00:00.000Z'), close: 1430 },
+    ];
+    const executeRaw = jest.fn().mockResolvedValue(2);
+    const prisma = {
+      priceTick: { count, deleteMany },
+      fundamental: { count, deleteMany },
+      corporateAction: { count, deleteMany },
+      fxRate: { count, deleteMany },
+      marketDataRepairAttempt: { count, deleteMany },
+      marketDataRepairState: { count, deleteMany },
+      latestPrice: {
+        count,
+        deleteMany,
+        upsert: jest.fn().mockResolvedValue({}),
+      },
+      $queryRaw: jest.fn().mockResolvedValueOnce([{ count: 0 }]).mockResolvedValueOnce(latestRows),
+      $executeRaw: executeRaw,
+      $transaction: jest.fn(async (callback: any): Promise<any> => callback(prisma)),
+    } as any;
+    const repository = new MarketDataFoundationRepository(prisma as any);
+
+    const result = await (repository as any).executeProviderDataCleanup();
+
+    expect(result.dryRun).toBe(false);
+    expect(prisma.priceTick.deleteMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ source: expect.objectContaining({ in: expect.arrayContaining(['yahoo', 'angel_one']) }) }),
+    }));
+    expect(prisma.latestPrice.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      where: { symbol: 'RELIANCE' },
+      update: expect.objectContaining({
+        region: 'IN',
+        price: expect.anything(),
+        timestamp: new Date('2026-05-27T00:00:00.000Z'),
+      }),
+    }));
+    expect(executeRaw).toHaveBeenCalled();
+  });
+
   it('lists stocks with pagination, sorting, and market segmentation filters', async () => {
     const prisma = {
       stock: {

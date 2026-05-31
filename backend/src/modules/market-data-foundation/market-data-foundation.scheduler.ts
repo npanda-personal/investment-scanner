@@ -362,40 +362,9 @@ export async function startMarketDataStartupLoads(env = process.env) {
 }
 
 export async function startMarketDataStartupPriceBackfill(env = process.env) {
-  if (env.NODE_ENV === 'test') return null;
-  const angelEnabled = parseBoolean(env.ANGEL_ONE_ENABLE_MARKET_DATA, false);
-  const startupEnabled = parseBoolean(env.MARKET_DATA_STARTUP_PRICE_BACKFILL_ENABLED, false);
-  const providerStartupAllowed = parseBoolean(env.MARKET_DATA_ALLOW_STARTUP_PROVIDER_LOADS, false);
-  if (startupEnabled && angelEnabled && !providerStartupAllowed) {
-    console.warn('[MarketDataStartupBackfill] startup price backfill skipped because provider startup loads are not explicitly allowed');
-    return null;
-  }
-  if (!startupEnabled || !angelEnabled) return null;
-
-  const service = new MarketDataFoundationService();
-  const result = await service.startPriceBackfillRun({
-    region: env.MARKET_DATA_STARTUP_PRICE_BACKFILL_REGION || 'IN',
-    assetType: env.MARKET_DATA_STARTUP_PRICE_BACKFILL_ASSET_TYPE || 'STOCK',
-    batchSize: parseNumber(env.MARKET_DATA_STARTUP_PRICE_BACKFILL_BATCH_SIZE, 20),
-    workerConcurrency: parseNumber(env.MARKET_DATA_STARTUP_PRICE_BACKFILL_WORKER_CONCURRENCY, 2),
-    maxBatches: parseNumber(env.MARKET_DATA_STARTUP_PRICE_BACKFILL_MAX_BATCHES, 5),
-    triggerType: 'startup',
-    force: false,
-    fullReload: false,
-    policy: 'INCREMENTAL_LATEST_ONLY',
-  });
-  console.log('[MarketDataStartupBackfill] price backfill background run', {
-    runId: result.runId,
-    status: result.status,
-    region: result.region,
-    assetType: result.assetType,
-    batchSize: result.batchSize,
-    workerConcurrency: result.workerConcurrency,
-    providerThrottleMs: result.providerThrottleMs,
-    totalCount: result.totalCount,
-    alreadyRunning: result.alreadyRunning === true,
-  });
-  return result;
+  void env;
+  console.warn('[MarketDataStartupBackfill] provider startup price backfill disabled for NSE/BSE-only market data.');
+  return null;
 }
 
 export function getMarketDataFoundationScheduler() {

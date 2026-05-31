@@ -4,6 +4,31 @@ Market Data Foundation owns the application's baseline market data capabilities.
 
 The module is implemented as a flat backend module and a dedicated frontend feature. It remains locally runnable and uses free/open-source tooling only.
 
+## NSE/BSE-Only Data Foundation Direction
+
+Current Product Owner direction is NSE/BSE-only for active market-data foundation work.
+
+Approved active sources for this phase:
+
+- NSE CM UDiFF Bhavcopy.
+- BSE BhavCopy as ISIN/security-matched fill-only backup.
+- NSE delivery data.
+- NSE F&O UDiFF as enrichment.
+- NSE/BSE official filings or manual verified fundamentals.
+
+Yahoo/yfinance, Angel One, broker APIs, and Screener scraping are disabled for active runtime paths. Legacy provider files may remain temporarily only as quarantined historical code while NSE/BSE replacement slices land, but approved scheduler, startup, repair, provider-validation, backfill, manual daily pipeline, fundamentals, and corporate-action reads must not call them.
+
+The first NSE/BSE-only foundation slice adds:
+
+- `SourceFileImport`, the durable file-import ledger for exchange files.
+- `InstrumentExchangeIdentity`, the explicit exchange identity mapping for NSE/BSE instruments.
+- nullable `PriceTick.sourceFileImportId`, so exchange candles can point to the exact file import.
+- provider cleanup dry-run and execute methods/routes.
+- `LatestPrice` rebuild from approved NSE/BSE candle sources only.
+- startup provider price backfill disabled even when legacy Angel env flags are present.
+
+Provider-sourced cleanup is explicit operator work. Dry-run must be reviewed before execution. Cleanup must not delete `Stock`, portfolios, watchlists, alerts, notes, or other user-owned data.
+
 ## Epic 1 Status
 
 Implemented:

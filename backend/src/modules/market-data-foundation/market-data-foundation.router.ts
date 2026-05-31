@@ -66,6 +66,8 @@ export const createMarketDataV1Router = (
   router.get('/market-data/universe/repair-workbench', controller.repairWorkbench);
   router.get('/market-data/universe/repair-runs/latest', controller.latestRepairRun);
   router.post('/market-data/universe/repair-run', controller.repairRun);
+  router.get('/market-data/provider-cleanup/report', controller.providerCleanupReport);
+  router.post('/market-data/provider-cleanup/execute', controller.executeProviderCleanup);
   router.get('/market-data/metadata/manual-template', controller.manualMetadataTemplate);
   router.post('/market-data/provider/validate', controller.validateProviders);
   router.post('/market-data/catalog/identity/repair', controller.repairCatalogIdentity);

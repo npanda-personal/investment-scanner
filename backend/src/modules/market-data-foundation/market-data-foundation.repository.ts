@@ -29,14 +29,280 @@ import { STANDARD_REVIEW_MIN_BARS, type UniversePriceStats } from './market-data
 const MARKET_MOVER_BASE_WINDOW_DAYS = 14;
 const MARKET_MOVER_MIN_PRICE = 10;
 const MARKET_MOVER_MIN_RECENT_TURNOVER = 1_000_000;
+const PROVIDER_MARKET_DATA_SOURCES = [
+  'yahoo',
+  'yahoo_finance',
+  'yfinance',
+  'YAHOO',
+  'YAHOO_CHART',
+  'angel_one',
+  'ANGEL_ONE',
+  'ANGEL_ONE_HISTORICAL',
+];
+const EXCHANGE_PRICE_SOURCES = [
+  'NSE',
+  'NSE_CM',
+  'NSE_CM_UDIFF',
+  'NSE_CM_UDIFF_BHAVCOPY',
+  'NSE_UDIFF_CM_BHAVCOPY',
+  'NSE_SECURITY_BHAVDATA',
+  'NSE_INDEX_EOD',
+  'NIFTY_SECTOR_INDEX',
+  'BSE',
+  'BSE_CM',
+  'BSE_CM_BHAVCOPY',
+  'BSE_CM_BACKUP_BHAVCOPY',
+  'BSE_UDIFF_CM_BHAVCOPY',
+];
 
 type PriceRegionInfo = { region?: string | null; exchange?: string | null };
 type HistoricalBulkStoreSummary = SyncSummary & {
   summaryBySymbol: Map<string, SyncSummary>;
 };
+type SourceFileImportInput = {
+  source: string;
+  segment: string;
+  tradingDate: Date;
+  fileName: string;
+  fileUrl?: string | null;
+  fileHash: string;
+  fileSize?: number | null;
+  status: string;
+  rowsRaw?: number;
+  rowsAccepted?: number;
+  rowsRejected?: number;
+  parserVersion: string;
+  errorMessage?: string | null;
+};
 
 export class MarketDataFoundationRepository {
   constructor(public readonly prisma: PrismaClient = defaultPrisma) {}
+
+  async upsertSourceFileImport(input: SourceFileImportInput) {
+    const tradingDate = this.normalizeUtcDay(input.tradingDate);
+    const data = {
+      source: input.source,
+      segment: input.segment,
+      tradingDate,
+      fileName: input.fileName,
+      fileUrl: input.fileUrl ?? null,
+      fileHash: input.fileHash,
+      fileSize: input.fileSize ?? null,
+      status: input.status,
+      rowsRaw: input.rowsRaw ?? 0,
+      rowsAccepted: input.rowsAccepted ?? 0,
+      rowsRejected: input.rowsRejected ?? 0,
+      parserVersion: input.parserVersion,
+      errorMessage: input.errorMessage ?? null,
+    };
+
+    return (this.prisma as any).sourceFileImport.upsert({
+      where: {
+        source_segment_tradingDate_fileHash: {
+          source: input.source,
+          segment: input.segment,
+          tradingDate,
+          fileHash: input.fileHash,
+        },
+      },
+      create: data,
+      update: {
+        fileName: input.fileName,
+        fileUrl: input.fileUrl ?? null,
+        fileSize: input.fileSize ?? null,
+        status: input.status,
+        rowsRaw: input.rowsRaw ?? 0,
+        rowsAccepted: input.rowsAccepted ?? 0,
+        rowsRejected: input.rowsRejected ?? 0,
+        parserVersion: input.parserVersion,
+        errorMessage: input.errorMessage ?? null,
+      },
+    });
+  }
+
+  async providerDataCleanupReport() {
+    const providerSource = this.providerSourceWhere();
+    const [
+      priceTicks,
+      fundamentals,
+      corporateActions,
+      fxRates,
+      repairAttempts,
+      repairStates,
+      latestPricesWithoutExchangeCandles,
+    ] = await Promise.all([
+      this.prisma.priceTick.count({ where: { source: providerSource } }),
+      (this.prisma as any).fundamental.count({ where: { source: providerSource } }),
+      (this.prisma as any).corporateAction.count({ where: { source: providerSource } }),
+      (this.prisma as any).fxRate.count({ where: { source: providerSource } }),
+      (this.prisma as any).marketDataRepairAttempt.count({
+        where: {
+          OR: [
+            { provider: providerSource },
+            { repairType: { in: ['PROVIDER_VALIDATION', 'PROVIDER_BUSINESS_METADATA'] } },
+          ],
+        },
+      }),
+      (this.prisma as any).marketDataRepairState.count({
+        where: {
+          OR: [
+            { provider: providerSource },
+            { repairType: { in: ['PROVIDER_VALIDATION', 'PROVIDER_BUSINESS_METADATA'] } },
+          ],
+        },
+      }),
+      this.countLatestPricesWithoutExchangeCandles(),
+    ]);
+
+    return {
+      dryRun: true,
+      providerSources: PROVIDER_MARKET_DATA_SOURCES,
+      exchangeSources: EXCHANGE_PRICE_SOURCES,
+      counts: {
+        priceTicks,
+        fundamentals,
+        corporateActions,
+        fxRates,
+        repairAttempts,
+        repairStates,
+        latestPricesWithoutExchangeCandles,
+      },
+      protectedData: [
+        'stocks',
+        'portfolio_holdings',
+        'portfolio_transactions',
+        'watchlist_items',
+        'alert_rules',
+        'alert_events',
+        'notes',
+      ],
+    };
+  }
+
+  async executeProviderDataCleanup() {
+    const before = await this.providerDataCleanupReport();
+    const providerSource = this.providerSourceWhere();
+    const deleted = await this.prisma.$transaction(async (tx: any) => {
+      const [
+        priceTicks,
+        fundamentals,
+        corporateActions,
+        fxRates,
+        repairAttempts,
+        repairStates,
+      ] = await Promise.all([
+        tx.priceTick.deleteMany({ where: { source: providerSource } }),
+        tx.fundamental.deleteMany({ where: { source: providerSource } }),
+        tx.corporateAction.deleteMany({ where: { source: providerSource } }),
+        tx.fxRate.deleteMany({ where: { source: providerSource } }),
+        tx.marketDataRepairAttempt.deleteMany({
+          where: {
+            OR: [
+              { provider: providerSource },
+              { repairType: { in: ['PROVIDER_VALIDATION', 'PROVIDER_BUSINESS_METADATA'] } },
+            ],
+          },
+        }),
+        tx.marketDataRepairState.deleteMany({
+          where: {
+            OR: [
+              { provider: providerSource },
+              { repairType: { in: ['PROVIDER_VALIDATION', 'PROVIDER_BUSINESS_METADATA'] } },
+            ],
+          },
+        }),
+      ]);
+      return {
+        priceTicks: priceTicks.count,
+        fundamentals: fundamentals.count,
+        corporateActions: corporateActions.count,
+        fxRates: fxRates.count,
+        repairAttempts: repairAttempts.count,
+        repairStates: repairStates.count,
+      };
+    });
+    const latestPriceRebuild = await this.rebuildLatestPricesFromExchangeCandles();
+
+    return {
+      dryRun: false,
+      providerSources: PROVIDER_MARKET_DATA_SOURCES,
+      before: before.counts,
+      deleted,
+      latestPriceRebuild,
+      protectedData: before.protectedData,
+    };
+  }
+
+  async rebuildLatestPricesFromExchangeCandles() {
+    const sourceList = EXCHANGE_PRICE_SOURCES.map((source) => source.toUpperCase());
+    const latestRows = await this.prisma.$queryRaw<Array<{
+      symbol: string;
+      region: string | null;
+      timestamp: Date;
+      close: Prisma.Decimal | number | string;
+    }>>(Prisma.sql`
+      SELECT DISTINCT ON (pt.symbol)
+        pt.symbol,
+        pt.region,
+        pt.timestamp,
+        pt.close
+      FROM price_ticks pt
+      WHERE UPPER(COALESCE(pt.source, '')) IN (${Prisma.join(sourceList)})
+      ORDER BY pt.symbol ASC, pt.timestamp DESC, pt."lastUpdatedTimestamp" DESC
+    `);
+
+    for (const row of latestRows) {
+      await this.prisma.latestPrice.upsert({
+        where: { symbol: row.symbol },
+        update: {
+          region: row.region,
+          price: new Prisma.Decimal(row.close),
+          timestamp: row.timestamp,
+          updatedAt: new Date(),
+        },
+        create: {
+          symbol: row.symbol,
+          region: row.region,
+          price: new Prisma.Decimal(row.close),
+          timestamp: row.timestamp,
+          updatedAt: new Date(),
+        },
+      });
+    }
+
+    const staleDeleted = await this.prisma.$executeRaw(Prisma.sql`
+      DELETE FROM latest_prices lp
+      WHERE NOT EXISTS (
+        SELECT 1
+        FROM price_ticks pt
+        WHERE pt.symbol = lp.symbol
+          AND UPPER(COALESCE(pt.source, '')) IN (${Prisma.join(sourceList)})
+      )
+    `);
+
+    return {
+      rebuiltCount: latestRows.length,
+      staleDeletedCount: Number(staleDeleted || 0),
+    };
+  }
+
+  private async countLatestPricesWithoutExchangeCandles(): Promise<number> {
+    if (typeof (this.prisma as any).$queryRaw !== 'function') {
+      return this.prisma.latestPrice.count({ where: {} });
+    }
+    const sourceList = EXCHANGE_PRICE_SOURCES.map((source) => source.toUpperCase());
+    const rows = await this.prisma.$queryRaw<Array<{ count: number | bigint | string }>>(Prisma.sql`
+      SELECT COUNT(*)::int AS count
+      FROM latest_prices lp
+      WHERE NOT EXISTS (
+        SELECT 1
+        FROM price_ticks pt
+        WHERE pt.symbol = lp.symbol
+          AND UPPER(COALESCE(pt.source, '')) IN (${Prisma.join(sourceList)})
+      )
+    `);
+    return Number(rows[0]?.count || 0);
+  }
 
   async listStocks(options: PaginationOptions) {
     const {
@@ -2320,6 +2586,13 @@ export class MarketDataFoundationRepository {
 
   private priceStorageKey(symbol: string, timestamp: Date): string {
     return `${symbol}|${timestamp.toISOString()}`;
+  }
+
+  private providerSourceWhere(): Prisma.StringNullableFilter {
+    return {
+      in: PROVIDER_MARKET_DATA_SOURCES,
+      mode: 'insensitive',
+    };
   }
 
   private priceTickCreateData(price: HistoricalPrice, regionInfo: PriceRegionInfo) {
