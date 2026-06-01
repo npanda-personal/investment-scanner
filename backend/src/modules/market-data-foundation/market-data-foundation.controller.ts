@@ -32,6 +32,21 @@ export class MarketDataFoundationController {
     return error instanceof Error ? error.message : fallback;
   }
 
+  private providerDisabledResponse(res: Response, operation: string) {
+    return res.status(410).json({
+      code: 'EXTERNAL_PROVIDER_DISABLED_NSE_BSE_ONLY',
+      error: `${operation} is disabled`,
+      message: 'Yahoo/yfinance, Angel One, broker API, provider fallback, provider validation, and provider backfill workflows are disabled. Use NSE/BSE exchange-file imports, historical exchange backfill, or manual verified evidence only.',
+      allowedWorkflows: [
+        'POST /api/v1/market-data/exchange-files/nse-cm-udiff/import',
+        'POST /api/v1/market-data/exchange-files/historical-backfill',
+        'POST /api/v1/market-data/fundamentals/manual-verified-import',
+        'GET /api/v1/market-data/provider-cleanup/report',
+        'POST /api/v1/market-data/provider-cleanup/execute',
+      ],
+    });
+  }
+
   listStocks = async (req: Request, res: Response) => {
     try {
       const page = parseInt(req.query.page as string) || 1;
@@ -97,6 +112,22 @@ export class MarketDataFoundationController {
     } catch (error) {
       console.error('Error executing provider cleanup:', error);
       return res.status(500).json({ error: 'Failed to execute provider cleanup' });
+    }
+  };
+
+  listSourceFileImports = async (req: Request, res: Response) => {
+    try {
+      return res.json(await this.service.listSourceFileImports({
+        source: typeof req.query.source === 'string' ? req.query.source : undefined,
+        segment: typeof req.query.segment === 'string' ? req.query.segment : undefined,
+        status: typeof req.query.status === 'string' ? req.query.status : undefined,
+        startDate: typeof req.query.startDate === 'string' ? req.query.startDate : undefined,
+        endDate: typeof req.query.endDate === 'string' ? req.query.endDate : undefined,
+        limit: this.numberParam(req, 'limit'),
+      }));
+    } catch (error) {
+      console.error('Error listing source file imports:', error);
+      return res.status(500).json({ error: 'Failed to list source file imports' });
     }
   };
 
@@ -334,48 +365,15 @@ export class MarketDataFoundationController {
   };
 
   syncStock = async (req: Request, res: Response) => {
-    try {
-      const result = await this.service.syncData(this.getParam(req.params.id));
-      if (result.success) {
-        return res.json(result);
-      }
-      return res.status(500).json(result);
-    } catch (error: any) {
-      console.error('Error syncing stock data:', error);
-      return res.status(500).json({ error: 'Failed to sync stock data' });
-    }
+    void req;
+    return this.providerDisabledResponse(res, 'Instrument provider sync');
+
   };
 
   syncAllStocks = async (req: Request, res: Response) => {
-    try {
-      const workerCount = parseInt(req.query.workerCount as string) || 4;
-      const workerConcurrency = parseInt(req.query.workerConcurrency as string) || 4;
-      const delayBetweenBatchesMs = parseInt(req.query.delayBetweenBatchesMs as string) || 3000;
-      const force = this.parseBoolean(req.query.force as string | undefined) || this.parseBoolean(req.body?.force);
-      const fullReload = this.parseBoolean(req.query.fullReload as string | undefined) || this.parseBoolean(req.body?.fullReload);
-      const { region, assetType } = this.getMarketFilter(req);
+    void req;
+    return this.providerDisabledResponse(res, 'Bulk provider stock sync');
 
-      if (workerCount < 1 || workerCount > 10) {
-        return res.status(400).json({ success: false, message: 'workerCount must be between 1 and 10' });
-      }
-      if (workerConcurrency < 1 || workerConcurrency > 10) {
-        return res.status(400).json({ success: false, message: 'workerConcurrency must be between 1 and 10' });
-      }
-
-      console.log(`Starting bulk sync with ${workerCount} workers, ${workerConcurrency} concurrency each`);
-      const result = await this.service.syncAll(workerCount, workerConcurrency, delayBetweenBatchesMs, { region, assetType, force, fullReload });
-
-      if (result.success) {
-        return res.json(result);
-      }
-      return res.status(500).json(result);
-    } catch (error: any) {
-      console.error('Error in bulk sync:', error);
-      return res.status(500).json({
-        success: false,
-        message: `Bulk sync failed: ${error.message}`
-      });
-    }
   };
 
   startStockCatalogSyncRun = async (req: Request, res: Response) => {
@@ -696,41 +694,15 @@ export class MarketDataFoundationController {
   };
 
   validateProviders = async (req: Request, res: Response) => {
-    try {
-      const { region, assetType } = this.getMarketFilter(req);
-      return res.json(await this.service.validateProviders({
-        region,
-        assetType,
-        batchSize: this.numberParam(req, 'batchSize') ?? this.numberParam(req, 'limit'),
-        offset: this.numberParam(req, 'offset'),
-        includeRetryFailed: this.parseOptionalBoolean(req.query.includeRetryFailed ?? req.body?.includeRetryFailed),
-        providerValidationQueue: req.body?.providerValidationQueue === 'RETRY_FAILED' || req.query.providerValidationQueue === 'RETRY_FAILED'
-          ? 'RETRY_FAILED'
-          : req.body?.providerValidationQueue === 'UNKNOWN_FIRST' || req.query.providerValidationQueue === 'UNKNOWN_FIRST'
-            ? 'UNKNOWN_FIRST'
-            : undefined,
-      }));
-    } catch (error) {
-      console.error('Provider validation repair error:', error);
-      return res.status(500).json({ error: 'Provider validation repair failed' });
-    }
+    void req;
+    return this.providerDisabledResponse(res, 'Provider validation');
+
   };
 
   enrichMetadata = async (req: Request, res: Response) => {
-    try {
-      const { region, assetType } = this.getMarketFilter(req);
-      return res.json(await this.service.enrichMetadata({
-        region,
-        assetType,
-        batchSize: this.numberParam(req, 'batchSize') ?? this.numberParam(req, 'limit'),
-        offset: this.numberParam(req, 'offset'),
-        csvText: typeof req.body?.csvText === 'string' ? req.body.csvText : undefined,
-        catalogSource: typeof req.body?.catalogSource === 'string' ? req.body.catalogSource : undefined,
-      }));
-    } catch (error) {
-      console.error('Metadata enrichment repair error:', error);
-      return res.status(500).json({ error: 'Metadata enrichment repair failed' });
-    }
+    void req;
+    return this.providerDisabledResponse(res, 'Provider metadata enrichment');
+
   };
 
   repairCatalogIdentity = async (req: Request, res: Response) => {
@@ -752,20 +724,9 @@ export class MarketDataFoundationController {
   };
 
   repairProviderBusinessMetadata = async (req: Request, res: Response) => {
-    try {
-      const { region, assetType } = this.getMarketFilter(req);
-      return res.json(await this.service.repairProviderBusinessMetadata({
-        region,
-        assetType,
-        batchSize: this.numberParam(req, 'batchSize') ?? this.numberParam(req, 'limit'),
-        offset: this.numberParam(req, 'offset'),
-        workerConcurrency: this.numberParam(req, 'workerConcurrency'),
-        force: this.parseOptionalBoolean(req.query.force ?? req.body?.force),
-      }));
-    } catch (error) {
-      console.error('Provider business metadata repair error:', error);
-      return res.status(500).json({ error: 'Provider business metadata repair failed' });
-    }
+    void req;
+    return this.providerDisabledResponse(res, 'Provider business metadata repair');
+
   };
 
   repairPriceIdentity = async (req: Request, res: Response) => {
@@ -801,74 +762,33 @@ export class MarketDataFoundationController {
   };
 
   backfillPrices = async (req: Request, res: Response) => {
-    try {
-      const { region, assetType } = this.getMarketFilter(req);
-      return res.json(await this.service.backfillPrices({
-        region,
-        assetType,
-        batchSize: this.numberParam(req, 'batchSize') ?? this.numberParam(req, 'limit'),
-        offset: this.numberParam(req, 'offset'),
-        workerConcurrency: this.numberParam(req, 'workerConcurrency'),
-        policy: this.parsePriceBackfillPolicy(req.query.policy ?? req.body?.policy),
-        force: this.parseOptionalBoolean(req.query.force ?? req.body?.force),
-        fullReload: this.parseOptionalBoolean(req.query.fullReload ?? req.body?.fullReload),
-      }));
-    } catch (error) {
-      console.error('Price backfill repair error:', error);
-      return res.status(500).json({ error: 'Price backfill repair failed' });
-    }
+    void req;
+    return this.providerDisabledResponse(res, 'Provider price backfill');
+
   };
 
   startPriceBackfillRun = async (req: Request, res: Response) => {
-    try {
-      const { region, assetType } = this.getMarketFilter(req);
-      return res.status(202).json(await this.service.startPriceBackfillRun({
-        region,
-        assetType,
-        batchSize: this.numberParam(req, 'batchSize') ?? this.numberParam(req, 'limit'),
-        workerConcurrency: this.numberParam(req, 'workerConcurrency'),
-        maxBatches: this.numberParam(req, 'maxBatches'),
-        triggerType: 'manual',
-        policy: this.parsePriceBackfillPolicy(req.query.policy ?? req.body?.policy),
-        force: this.parseOptionalBoolean(req.query.force ?? req.body?.force),
-        fullReload: this.parseOptionalBoolean(req.query.fullReload ?? req.body?.fullReload),
-      }));
-    } catch (error: any) {
-      console.error('Price backfill run start error:', error);
-      return res.status(500).json({ error: error.message || 'Price backfill run start failed' });
-    }
+    void req;
+    return this.providerDisabledResponse(res, 'Provider price backfill run');
+
   };
 
   getPriceBackfillRun = async (req: Request, res: Response) => {
-    try {
-      const run = this.service.getPriceBackfillRun(this.getParam(req.params.runId));
-      if (!run) return res.status(404).json({ error: 'Price backfill run not found' });
-      return res.json(run);
-    } catch (error: any) {
-      console.error('Price backfill run status error:', error);
-      return res.status(500).json({ error: error.message || 'Price backfill run status failed' });
-    }
+    void req;
+    return this.providerDisabledResponse(res, 'Provider price backfill run status');
+
   };
 
   activePriceBackfillRun = async (req: Request, res: Response) => {
-    try {
-      const { region, assetType } = this.getMarketFilter(req);
-      return res.json(this.service.activePriceBackfillRun({ region, assetType }));
-    } catch (error: any) {
-      console.error('Active price backfill run status error:', error);
-      return res.status(500).json({ error: error.message || 'Active price backfill run status failed' });
-    }
+    void req;
+    return this.providerDisabledResponse(res, 'Provider price backfill active run');
+
   };
 
   cancelPriceBackfillRun = async (req: Request, res: Response) => {
-    try {
-      const run = this.service.cancelPriceBackfillRun(this.getParam(req.params.runId));
-      if (!run) return res.status(404).json({ error: 'Price backfill run not found' });
-      return res.json(run);
-    } catch (error: any) {
-      console.error('Price backfill run cancel error:', error);
-      return res.status(500).json({ error: error.message || 'Price backfill run cancel failed' });
-    }
+    void req;
+    return this.providerDisabledResponse(res, 'Provider price backfill cancellation');
+
   };
 
   schedulerStatus = async (_req: Request, res: Response) => {
@@ -1006,17 +926,9 @@ export class MarketDataFoundationController {
   };
 
   syncV1 = async (req: Request, res: Response) => {
-    try {
-      const result = await this.service.syncV1(req.body);
-      return res.status(result.success ? 200 : 400).json(result);
-    } catch (error: any) {
-      console.error('Market data sync error:', error);
-      return res.status(500).json({
-        success: false,
-        message: 'Market data sync failed',
-        errors: [error.message],
-      });
-    }
+    void req;
+    return this.providerDisabledResponse(res, 'Legacy provider ingestion sync');
+
   };
 
   importCatalog = async (req: Request, res: Response) => {
@@ -1069,16 +981,6 @@ export class MarketDataFoundationController {
     return undefined;
   }
 
-  private parsePriceBackfillPolicy(value: unknown): 'INCREMENTAL_LATEST_ONLY' | 'AUTO_DEEP_FOR_SHALLOW' | 'FORCE_DEEP' | undefined {
-    const policy = Array.isArray(value) ? value[0] : value;
-    if (typeof policy !== 'string') return undefined;
-    const normalized = policy.trim().toUpperCase();
-    if (normalized === 'INCREMENTAL_LATEST_ONLY' || normalized === 'AUTO_DEEP_FOR_SHALLOW' || normalized === 'FORCE_DEEP') {
-      return normalized;
-    }
-    return undefined;
-  }
-
   listFxRates = async (_req: Request, res: Response) => {
     try {
       return res.json(await this.service.listFxRates());
@@ -1102,12 +1004,6 @@ export class MarketDataFoundationController {
   };
 
   syncFxRates = async (_req: Request, res: Response) => {
-    try {
-      const rates = await this.service.syncFxRates();
-      return res.json({ success: true, ratesSynced: rates.length });
-    } catch (error: any) {
-      console.error('Error syncing FX rates:', error);
-      return res.status(500).json({ success: false, message: error.message });
-    }
+    return this.providerDisabledResponse(res, 'Provider FX-rate sync');
   };
 }

@@ -22,6 +22,7 @@ const controller = {
   latestRepairRun: jest.fn(),
   providerCleanupReport: jest.fn(),
   executeProviderCleanup: jest.fn(),
+  listSourceFileImports: jest.fn(),
   importNseCmUdiffDaily: jest.fn(),
   importBseCmBackupDaily: jest.fn(),
   importNseIndexEodDaily: jest.fn(),
@@ -99,6 +100,7 @@ describe('market data routers', () => {
         'POST /market-data/universe/repair-run',
         'GET /market-data/provider-cleanup/report',
         'POST /market-data/provider-cleanup/execute',
+        'GET /market-data/source-file-imports',
         'POST /market-data/exchange-files/nse-cm-udiff/import',
         'POST /market-data/exchange-files/bse-cm-backup/import',
         'POST /market-data/exchange-files/nse-index-eod/import',
@@ -318,9 +320,9 @@ describe('market data controller', () => {
     expect(res.json).toHaveBeenCalledWith({ status: 'COMPLETED' });
   });
 
-  it('passes price backfill worker concurrency from request to service', async () => {
+  it('blocks legacy provider price backfill requests with NSE/BSE-only guidance', async () => {
     const service = {
-      backfillPrices: jest.fn().mockResolvedValue({ processedCount: 3 }),
+      backfillPrices: jest.fn(),
     };
     const controller = new MarketDataFoundationController(service as any);
     const req = {
@@ -343,15 +345,11 @@ describe('market data controller', () => {
 
     await controller.backfillPrices(req, res);
 
-    expect(service.backfillPrices).toHaveBeenCalledWith(expect.objectContaining({
-      region: 'IN',
-      assetType: 'STOCK',
-      batchSize: 25,
-      workerConcurrency: 3,
-      fullReload: false,
-      policy: 'INCREMENTAL_LATEST_ONLY',
+    expect(service.backfillPrices).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(410);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      code: 'EXTERNAL_PROVIDER_DISABLED_NSE_BSE_ONLY',
     }));
-    expect(res.json).toHaveBeenCalledWith({ processedCount: 3 });
   });
 
   it('passes market-map read params to service without mutation semantics', async () => {
@@ -395,9 +393,9 @@ describe('market data controller', () => {
     expect(res.status).not.toHaveBeenCalled();
   });
 
-  it('starts price backfill as a background run with bounded parameters', async () => {
+  it('blocks legacy provider price backfill background runs', async () => {
     const service = {
-      startPriceBackfillRun: jest.fn().mockResolvedValue({ runId: 'price-backfill-1', status: 'RUNNING' }),
+      startPriceBackfillRun: jest.fn(),
     };
     const controller = new MarketDataFoundationController(service as any);
     const req = {
@@ -421,23 +419,17 @@ describe('market data controller', () => {
 
     await controller.startPriceBackfillRun(req, res);
 
-    expect(service.startPriceBackfillRun).toHaveBeenCalledWith(expect.objectContaining({
-      region: 'IN',
-      assetType: 'STOCK',
-      batchSize: 20,
-      workerConcurrency: 2,
-      maxBatches: 100,
-      force: false,
-      policy: 'INCREMENTAL_LATEST_ONLY',
+    expect(service.startPriceBackfillRun).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(410);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      code: 'EXTERNAL_PROVIDER_DISABLED_NSE_BSE_ONLY',
     }));
-    expect(res.status).toHaveBeenCalledWith(202);
-    expect(res.json).toHaveBeenCalledWith({ runId: 'price-backfill-1', status: 'RUNNING' });
   });
 
-  it('returns and cancels background price backfill runs', async () => {
+  it('blocks legacy provider price backfill status and cancel endpoints', async () => {
     const service = {
-      getPriceBackfillRun: jest.fn().mockReturnValue({ runId: 'price-backfill-1', status: 'RUNNING' }),
-      cancelPriceBackfillRun: jest.fn().mockReturnValue({ runId: 'price-backfill-1', status: 'PARTIAL' }),
+      getPriceBackfillRun: jest.fn(),
+      cancelPriceBackfillRun: jest.fn(),
     };
     const controller = new MarketDataFoundationController(service as any);
     const res = {
@@ -448,9 +440,42 @@ describe('market data controller', () => {
     await controller.getPriceBackfillRun({ params: { runId: 'price-backfill-1' } } as any, res);
     await controller.cancelPriceBackfillRun({ params: { runId: 'price-backfill-1' } } as any, res);
 
-    expect(service.getPriceBackfillRun).toHaveBeenCalledWith('price-backfill-1');
-    expect(service.cancelPriceBackfillRun).toHaveBeenCalledWith('price-backfill-1');
-    expect(res.json).toHaveBeenNthCalledWith(1, { runId: 'price-backfill-1', status: 'RUNNING' });
-    expect(res.json).toHaveBeenNthCalledWith(2, { runId: 'price-backfill-1', status: 'PARTIAL' });
+    expect(service.getPriceBackfillRun).not.toHaveBeenCalled();
+    expect(service.cancelPriceBackfillRun).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenNthCalledWith(1, 410);
+    expect(res.status).toHaveBeenNthCalledWith(2, 410);
+  });
+
+  it('lists source-file import evidence through the Market Data Foundation service', async () => {
+    const service = {
+      listSourceFileImports: jest.fn().mockResolvedValue({ count: 1, imports: [{ id: 'import-1' }] }),
+    };
+    const controller = new MarketDataFoundationController(service as any);
+    const req = {
+      query: {
+        source: 'NSE',
+        segment: 'CM',
+        status: 'COMPLETED',
+        startDate: '2026-05-01',
+        endDate: '2026-05-31',
+        limit: '10',
+      },
+    } as any;
+    const res = {
+      json: jest.fn(),
+      status: jest.fn().mockReturnThis(),
+    } as any;
+
+    await controller.listSourceFileImports(req, res);
+
+    expect(service.listSourceFileImports).toHaveBeenCalledWith({
+      source: 'NSE',
+      segment: 'CM',
+      status: 'COMPLETED',
+      startDate: '2026-05-01',
+      endDate: '2026-05-31',
+      limit: 10,
+    });
+    expect(res.json).toHaveBeenCalledWith({ count: 1, imports: [{ id: 'import-1' }] });
   });
 });

@@ -7,7 +7,6 @@ import type {
   CatalogImportResponse,
   CatalogSourceInfo,
   CreateStockRequest,
-  BulkSyncResponse,
   MarketDataCatalogSyncRunRequest,
   MarketDataCatalogSyncRunResponse,
   MarketDataHealth,
@@ -16,9 +15,11 @@ import type {
   MarketDataRepairRunRecord,
   MarketDataRepairRunResponse,
   MarketDataRepairSummary,
-  MarketDataPriceBackfillRunRequest,
-  MarketDataPriceBackfillRunResponse,
+  MarketDataSourceFileImportsResponse,
   MarketDataManualMetadataTemplate,
+  ExchangeHistoricalBackfillRequest,
+  ExchangeHistoricalBackfillResponse,
+  ManualVerifiedFundamentalImportRequest,
   MarketDataStockMissingDataDiagnostics,
   MarketDataUniverseHealth,
   TrustedUniverseRepairWorkbench,
@@ -27,7 +28,6 @@ import type {
   TrustedReviewUniverseHealth,
   PaginatedResponse,
   PaginationOptions,
-  SyncResponse,
   Stock,
   UpdateStockRequest,
   V1CorporateActionsResponse,
@@ -39,8 +39,6 @@ import type {
   V1InstrumentsResponse,
   V1LatestPriceResponse,
   V1PricesResponse,
-  V1SyncRequest,
-  V1SyncResponse,
 } from '../types';
 import { logMarketDataApi, normalizeAssetTypeForMarketDataApi, normalizeMarketForApi } from './marketScopeApi';
 
@@ -66,7 +64,12 @@ export type {
   MarketDataRepairSummary,
   MarketDataPriceBackfillRunRequest,
   MarketDataPriceBackfillRunResponse,
+  MarketDataSourceFileImportRecord,
+  MarketDataSourceFileImportsResponse,
   MarketDataManualMetadataTemplate,
+  ExchangeHistoricalBackfillRequest,
+  ExchangeHistoricalBackfillResponse,
+  ManualVerifiedFundamentalImportRequest,
   MarketDataStockMissingDataDiagnostics,
   MarketDataUniverseHealth,
   TrustedUniverseRepairWorkbench,
@@ -164,33 +167,6 @@ export async function toggleStockActive(id: string): Promise<Stock> {
   return response.data;
 }
 
-/**
- * Trigger a manual data sync for a stock.
- */
-export async function syncStockData(id: string): Promise<SyncResponse> {
-  const response = await axios.post<SyncResponse>(`${API_BASE}/market-data-foundation/stocks/${id}/sync`);
-  return response.data;
-}
-
-/**
- * Trigger bulk sync for all active stocks.
- */
-export async function syncAllStocks(workerCount?: number, workerConcurrency?: number, delayBetweenBatchesMs?: number, options: MarketScopedApiOptions = {}): Promise<BulkSyncResponse> {
-  const params = new URLSearchParams();
-  if (workerCount !== undefined) params.append('workerCount', workerCount.toString());
-  if (workerConcurrency !== undefined) params.append('workerConcurrency', workerConcurrency.toString());
-  if (delayBetweenBatchesMs !== undefined) params.append('delayBetweenBatchesMs', delayBetweenBatchesMs.toString());
-  const region = normalizeMarketForApi(options.region);
-  const assetType = normalizeAssetTypeForMarketDataApi(options.assetType);
-  if (region) params.append('region', region);
-  if (assetType) params.append('assetType', assetType);
-  
-  const url = `${API_BASE}/market-data-foundation/stocks/sync-all${params.toString() ? `?${params.toString()}` : ''}`;
-  logMarketDataApi(options.region || 'GLOBAL', region, Object.fromEntries(params.entries()), url);
-  const response = await axios.post<BulkSyncResponse>(url);
-  return response.data;
-}
-
 export interface MarketScopedApiOptions {
   region?: string;
   assetType?: string;
@@ -225,24 +201,6 @@ export async function cancelCatalogSyncRun(runId: string): Promise<MarketDataCat
   const response = await axios.post<MarketDataCatalogSyncRunResponse>(
     `${API_BASE}/market-data-foundation/stocks/sync-runs/${encodeURIComponent(runId)}/cancel`
   );
-  return response.data;
-}
-
-/**
- * Search for stocks using external API (Yahoo Finance).
- */
-export async function externalSearch(query: string): Promise<any[]> {
-  const response = await axios.get(`${API_BASE}/market-data-foundation/data/search?q=${encodeURIComponent(query)}`);
-  return response.data;
-}
-
-/**
- * Search Yahoo Finance directly without auto-creating stocks.
- * Used by the global search bar in the Stock Manager.
- * Returns results with region information.
- */
-export async function yahooSearch(query: string): Promise<any[]> {
-  const response = await axios.get(`${API_BASE}/market-data-foundation/stocks/yahoo-search?q=${encodeURIComponent(query)}`);
   return response.data;
 }
 
@@ -329,20 +287,51 @@ export async function fetchManualMetadataTemplate(options: MarketScopedApiOption
   return response.data;
 }
 
+export async function fetchSourceFileImports(options: {
+  source?: string;
+  segment?: string;
+  status?: string;
+  startDate?: string;
+  endDate?: string;
+  limit?: number;
+} = {}): Promise<MarketDataSourceFileImportsResponse> {
+  const response = await axios.get<MarketDataSourceFileImportsResponse>(
+    `${API_BASE}/v1/market-data/source-file-imports`,
+    { params: options }
+  );
+  return response.data;
+}
+
+export async function runExchangeHistoricalBackfill(data: ExchangeHistoricalBackfillRequest): Promise<ExchangeHistoricalBackfillResponse> {
+  const response = await axios.post<ExchangeHistoricalBackfillResponse>(
+    `${API_BASE}/v1/market-data/exchange-files/historical-backfill`,
+    {
+      ...data,
+      region: normalizeMarketForApi(data.region) || 'IN',
+      assetType: normalizeAssetTypeForMarketDataApi(data.assetType) || 'STOCK',
+    }
+  );
+  return response.data;
+}
+
+export async function importManualVerifiedFundamental(data: ManualVerifiedFundamentalImportRequest): Promise<unknown> {
+  const response = await axios.post(
+    `${API_BASE}/v1/market-data/fundamentals/manual-verified-import`,
+    {
+      ...data,
+      region: normalizeMarketForApi(data.region) || 'IN',
+      assetType: normalizeAssetTypeForMarketDataApi(data.assetType) || 'STOCK',
+    }
+  );
+  return response.data;
+}
+
 function scopedRepairPayload(data: MarketDataRepairRequest): MarketDataRepairRequest {
   return {
     ...data,
     region: normalizeMarketForApi(data.region) || 'IN',
     assetType: normalizeAssetTypeForMarketDataApi(data.assetType) || 'STOCK',
   };
-}
-
-export async function validateMarketDataProviders(data: MarketDataRepairRequest): Promise<MarketDataRepairSummary> {
-  const response = await axios.post<MarketDataRepairSummary>(
-    `${API_BASE}/v1/market-data/provider/validate`,
-    scopedRepairPayload(data)
-  );
-  return response.data;
 }
 
 export async function runMarketDataUniverseRepair(data: MarketDataRepairRequest): Promise<MarketDataRepairRunResponse> {
@@ -361,14 +350,6 @@ export async function repairMarketDataCatalogIdentity(data: MarketDataRepairRequ
   return response.data;
 }
 
-export async function repairMarketDataProviderBusinessMetadata(data: MarketDataRepairRequest): Promise<MarketDataRepairSummary> {
-  const response = await axios.post<MarketDataRepairSummary>(
-    `${API_BASE}/v1/market-data/metadata/provider-business/repair`,
-    scopedRepairPayload(data)
-  );
-  return response.data;
-}
-
 export async function importMarketDataManualMetadata(data: MarketDataRepairRequest): Promise<MarketDataRepairSummary> {
   const response = await axios.post<MarketDataRepairSummary>(
     `${API_BASE}/v1/market-data/metadata/manual-import`,
@@ -381,52 +362,6 @@ export async function enrichMarketDataMetadata(data: MarketDataRepairRequest): P
   const response = await axios.post<MarketDataRepairSummary>(
     `${API_BASE}/v1/market-data/metadata/enrich`,
     scopedRepairPayload(data)
-  );
-  return response.data;
-}
-
-export async function backfillMarketDataPrices(data: MarketDataRepairRequest): Promise<MarketDataRepairSummary> {
-  const normalBackfillRequest = scopedRepairPayload(data);
-  delete normalBackfillRequest.fullReload;
-  const response = await axios.post<MarketDataRepairSummary>(
-    `${API_BASE}/v1/market-data/prices/backfill`,
-    normalBackfillRequest
-  );
-  return response.data;
-}
-
-export async function startMarketDataPriceBackfillRun(data: MarketDataPriceBackfillRunRequest): Promise<MarketDataPriceBackfillRunResponse> {
-  const payload = scopedRepairPayload(data) as MarketDataPriceBackfillRunRequest;
-  delete payload.fullReload;
-  const response = await axios.post<MarketDataPriceBackfillRunResponse>(
-    `${API_BASE}/v1/market-data/prices/backfill-runs`,
-    payload
-  );
-  return response.data;
-}
-
-export async function fetchMarketDataPriceBackfillRun(runId: string): Promise<MarketDataPriceBackfillRunResponse> {
-  const response = await axios.get<MarketDataPriceBackfillRunResponse>(
-    `${API_BASE}/v1/market-data/prices/backfill-runs/${encodeURIComponent(runId)}`
-  );
-  return response.data;
-}
-
-export async function fetchActiveMarketDataPriceBackfillRun(options: MarketScopedApiOptions = {}): Promise<MarketDataPriceBackfillRunResponse | null> {
-  const params = {
-    region: normalizeMarketForApi(options.region),
-    assetType: normalizeAssetTypeForMarketDataApi(options.assetType),
-  };
-  const response = await axios.get<MarketDataPriceBackfillRunResponse | null>(
-    `${API_BASE}/v1/market-data/prices/backfill-active-run`,
-    { params }
-  );
-  return response.data;
-}
-
-export async function cancelMarketDataPriceBackfillRun(runId: string): Promise<MarketDataPriceBackfillRunResponse> {
-  const response = await axios.post<MarketDataPriceBackfillRunResponse>(
-    `${API_BASE}/v1/market-data/prices/backfill-runs/${encodeURIComponent(runId)}/cancel`
   );
   return response.data;
 }
@@ -519,17 +454,6 @@ export async function fetchInstrumentCorporateActions(id: string, options: Marke
   };
   logMarketDataApi(options.region || 'GLOBAL', params.region, params, 'corporate-actions');
   const response = await axios.get<V1CorporateActionsResponse>(`${API_BASE}/v1/corporate-actions/${id}`, { params });
-  return response.data;
-}
-
-export async function syncMarketData(data: V1SyncRequest): Promise<V1SyncResponse> {
-  const payload = {
-    ...data,
-    region: normalizeMarketForApi((data as any).region),
-    asset_type: normalizeAssetTypeForMarketDataApi(data.asset_type),
-  };
-  logMarketDataApi((data as any).region || 'GLOBAL', payload.region, payload, 'manual-sync');
-  const response = await axios.post<V1SyncResponse>(`${API_BASE}/v1/ingestion/sync`, payload);
   return response.data;
 }
 

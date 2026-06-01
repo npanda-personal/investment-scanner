@@ -21,6 +21,7 @@ import {
   Typography,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
+import FactCheckIcon from '@mui/icons-material/FactCheck';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import SearchIcon from '@mui/icons-material/Search';
 import SyncIcon from '@mui/icons-material/Sync';
@@ -28,19 +29,21 @@ import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import {
   backfillCatalogMetadata,
   cancelCatalogSyncRun,
-  fetchActiveMarketDataPriceBackfillRun,
   fetchCatalogSyncRunStatus,
   fetchCatalogSources,
   fetchInstruments,
   fetchMarketDataSchedulerStatus,
+  fetchSourceFileImports,
+  importManualVerifiedFundamental,
   importCatalog,
+  runExchangeHistoricalBackfill,
   startCatalogSyncRun,
-  syncMarketData,
   type MarketDataCatalogSyncRunResponse,
   type MarketDataCatalogSyncRunStatus,
-  type MarketDataPriceBackfillRunResponse,
   type MarketDataSchedulerRegionStatus,
   type MarketDataSchedulerStatus,
+  type MarketDataSourceFileImportRecord,
+  type ExchangeHistoricalBackfillResponse,
   type CatalogSourceInfo,
   type V1Instrument,
 } from '../api/marketDataFoundationService';
@@ -75,12 +78,13 @@ type BatchProgressState = {
 };
 
 type CatalogTab = 'catalog' | 'import' | 'health';
+type ManualFundamentalField = 'revenue' | 'eps' | 'netIncome' | 'peRatio' | 'marketCap';
 
 type FilterPreset = {
   id: string;
   label: string;
   description: string;
-  value: 'all' | 'stocks' | 'fno' | 'needsValidation' | 'unsupported' | 'indices' | 'etfs';
+  value: 'all' | 'stocks' | 'fno' | 'indices' | 'etfs';
   apply: () => void;
 };
 
@@ -257,15 +261,35 @@ const MarketDataFoundationPage: React.FC = () => {
   const [industry, setIndustry] = useState('');
   const [dataStatus, setDataStatus] = useState('');
   const [catalogSource, setCatalogSource] = useState('');
-  const [providerSupportStatus, setProviderSupportStatus] = useState('');
   const [derivativesEligible, setDerivativesEligible] = useState('');
   const [importSource, setImportSource] = useState('NSE_EQUITY_SECURITIES');
   const [importMode, setImportMode] = useState<'CONFIGURED_URL' | 'MANUAL_CSV' | 'INTERNAL_SEED'>('CONFIGURED_URL');
   const [catalogSources, setCatalogSources] = useState<CatalogSourceInfo[]>([]);
   const [catalogCsv, setCatalogCsv] = useState('');
-  const [validateProvider, setValidateProvider] = useState(false);
   const [importingCatalog, setImportingCatalog] = useState(false);
   const [backfillingCatalog, setBackfillingCatalog] = useState(false);
+  const [historicalStartDate, setHistoricalStartDate] = useState('');
+  const [historicalEndDate, setHistoricalEndDate] = useState('');
+  const [historicalMaxDates, setHistoricalMaxDates] = useState('5');
+  const [historicalIncludeBse, setHistoricalIncludeBse] = useState(false);
+  const [historicalBackfillRunning, setHistoricalBackfillRunning] = useState(false);
+  const [historicalBackfillResult, setHistoricalBackfillResult] = useState<ExchangeHistoricalBackfillResponse | null>(null);
+  const [manualFundamental, setManualFundamental] = useState({
+    stockId: '',
+    periodType: 'ANNUAL',
+    periodEndDate: '',
+    revenue: '',
+    eps: '',
+    netIncome: '',
+    peRatio: '',
+    marketCap: '',
+    sourceNote: '',
+    sourceUrl: '',
+    validatedBy: '',
+  });
+  const [manualFundamentalRunning, setManualFundamentalRunning] = useState(false);
+  const [sourceImports, setSourceImports] = useState<MarketDataSourceFileImportRecord[]>([]);
+  const [sourceImportsLoading, setSourceImportsLoading] = useState(false);
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(25);
   const [sortBy, setSortBy] = useState('symbol');
@@ -276,9 +300,7 @@ const MarketDataFoundationPage: React.FC = () => {
   const [catalogSyncCanceling, setCatalogSyncCanceling] = useState(false);
   const [catalogSyncRun, setCatalogSyncRun] = useState<MarketDataCatalogSyncRunResponse | null>(null);
   const [catalogSyncError, setCatalogSyncError] = useState<string | null>(null);
-  const [activePriceBackfillRun, setActivePriceBackfillRun] = useState<MarketDataPriceBackfillRunResponse | null>(null);
   const [schedulerStatus, setSchedulerStatus] = useState<MarketDataSchedulerStatus | null>(null);
-  const [syncingId, setSyncingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [batchProgress, setBatchProgress] = useState<BatchProgressState | null>(null);
@@ -310,7 +332,6 @@ const MarketDataFoundationPage: React.FC = () => {
         industry: industry.trim() || undefined,
         dataStatus: dataStatus.trim() || undefined,
         catalogSource: catalogSource.trim() || undefined,
-        providerSupportStatus: providerSupportStatus.trim() || undefined,
         derivativesEligible: derivativesEligible === '' ? undefined : derivativesEligible === 'true',
         search: search.trim() || undefined,
       });
@@ -321,7 +342,7 @@ const MarketDataFoundationPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [assetType, catalogSource, currency, dataStatus, derivativesEligible, exchange, industry, instrumentSegment, page, pageSize, providerSupportStatus, search, sector, sortBy, sortDirection, scope.region, normalizedMarket]);
+  }, [assetType, catalogSource, currency, dataStatus, derivativesEligible, exchange, industry, instrumentSegment, page, pageSize, search, sector, sortBy, sortDirection, scope.region, normalizedMarket]);
 
   useEffect(() => {
     loadInstruments();
@@ -334,21 +355,32 @@ const MarketDataFoundationPage: React.FC = () => {
   }, []);
 
   const refreshBackgroundServices = useCallback(async () => {
-    const [priceBackfill, scheduler] = await Promise.all([
-      fetchActiveMarketDataPriceBackfillRun({ region: scope.region, assetType: scope.assetType }).catch(() => undefined),
+    const [scheduler] = await Promise.all([
       fetchMarketDataSchedulerStatus().catch(() => undefined),
     ]);
-    if (priceBackfill !== undefined) setActivePriceBackfillRun(priceBackfill);
     if (scheduler !== undefined) setSchedulerStatus(scheduler);
-  }, [scope.region, scope.assetType]);
+  }, []);
+
+  const loadSourceImports = useCallback(async () => {
+    setSourceImportsLoading(true);
+    try {
+      const result = await fetchSourceFileImports({ limit: 20 });
+      setSourceImports(result.imports);
+    } catch {
+      setSourceImports([]);
+    } finally {
+      setSourceImportsLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     void refreshBackgroundServices();
+    void loadSourceImports();
     const interval = window.setInterval(() => {
       void refreshBackgroundServices();
     }, 5000);
     return () => window.clearInterval(interval);
-  }, [refreshBackgroundServices]);
+  }, [refreshBackgroundServices, loadSourceImports]);
 
   useEffect(() => {
     const source = catalogSources.find((item) => item.catalogSource === importSource);
@@ -364,29 +396,6 @@ const MarketDataFoundationPage: React.FC = () => {
     // Reset page when global scope changes
     setPage(0);
   }, [scope.region, scope.assetType]);
-
-  const handleSync = async (instrument: V1Instrument) => {
-    if (providerBackgroundActive) {
-      setError('A background market-data load is already running. Wait for it to finish before starting another sync.');
-      return;
-    }
-    setSyncingId(instrument.id);
-    setError(null);
-    setSuccess(null);
-    try {
-      const result = await syncMarketData({ instrumentId: instrument.id, region: scope.region, asset_type: assetType.trim() || instrument.asset_type });
-      if (!result.success) {
-        setError(result.message);
-      } else {
-        setSuccess(`${instrument.symbol}: ${result.message}`);
-        await loadInstruments();
-      }
-    } catch (err: any) {
-      setError(err.response?.data?.message || err.message || 'Sync failed');
-    } finally {
-      setSyncingId(null);
-    }
-  };
 
   const refreshCatalogAfterTerminalSync = useCallback(async (run: MarketDataCatalogSyncRunResponse) => {
     const schedulerStatus = await fetchMarketDataSchedulerStatus().catch(() => null);
@@ -408,7 +417,7 @@ const MarketDataFoundationPage: React.FC = () => {
   });
 
   const handleCatalogSync = async (runToContinue?: MarketDataCatalogSyncRunResponse | null) => {
-    if (providerBackgroundActive && !catalogSyncActive) {
+    if (operatorBackgroundActive && !catalogSyncActive) {
       setError('A background market-data load is already running. Wait for it to finish before starting catalog sync.');
       return;
     }
@@ -507,7 +516,7 @@ const MarketDataFoundationPage: React.FC = () => {
   }, [catalogSyncRun, catalogSyncStarting, refreshCatalogAfterTerminalSync]);
 
   const handleCatalogImport = async () => {
-    if (providerBackgroundActive) {
+    if (operatorBackgroundActive) {
       setError('A background market-data load is already running. Wait for it to finish before importing catalog data.');
       return;
     }
@@ -521,8 +530,6 @@ const MarketDataFoundationPage: React.FC = () => {
         updated: 0,
         noOp: 0,
         invalid: 0,
-        providerValidated: 0,
-        providerUnsupported: 0,
         processed: 0,
         total: 0,
         downloadedBytes: 0,
@@ -536,7 +543,6 @@ const MarketDataFoundationPage: React.FC = () => {
           catalogSource: importSource,
           importMode,
           csvText: importMode === 'MANUAL_CSV' ? catalogCsv : undefined,
-          validateProvider,
           batchSize,
           offset,
         });
@@ -547,8 +553,6 @@ const MarketDataFoundationPage: React.FC = () => {
         aggregate.updated += result.updatedCount ?? result.updated ?? 0;
         aggregate.noOp += result.noOpCount ?? result.noOp ?? 0;
         aggregate.invalid += result.invalidCount ?? result.invalid ?? 0;
-        aggregate.providerValidated += result.providerValidatedCount ?? result.providerValidated ?? 0;
-        aggregate.providerUnsupported += result.providerUnsupportedCount ?? result.providerUnsupported ?? 0;
         aggregate.processed += result.processedCount ?? 0;
         aggregate.total = result.totalCount ?? result.sourceRows ?? aggregate.total;
         aggregate.downloadedBytes += result.fileSizeBytes ?? 0;
@@ -562,7 +566,7 @@ const MarketDataFoundationPage: React.FC = () => {
         offset = result.nextOffset ?? 0;
       }
       const download = aggregate.downloadedBytes > 0 ? ` Downloaded ${formatBytes(aggregate.downloadedBytes)} across batches; temp cleanup: ${aggregate.tempCleanupFailed ? 'check server logs' : 'ok'}.` : '';
-      setSuccess(`${importSource}: ${aggregate.inserted} inserted, ${aggregate.updated} updated, ${aggregate.noOp} no-op, ${aggregate.invalid} invalid, ${aggregate.providerUnsupported} unsupported. Processed ${aggregate.processed}/${aggregate.total || aggregate.processed}.${download}`);
+      setSuccess(`${importSource}: ${aggregate.inserted} inserted, ${aggregate.updated} updated, ${aggregate.noOp} no-op, ${aggregate.invalid} invalid. Processed ${aggregate.processed}/${aggregate.total || aggregate.processed}.${download}`);
       await loadInstruments();
     } catch (err: any) {
       setError(err.response?.data?.message || err.message || 'Catalog import failed');
@@ -582,7 +586,7 @@ const MarketDataFoundationPage: React.FC = () => {
   };
 
   const handleCatalogBackfill = async () => {
-    if (providerBackgroundActive) {
+    if (operatorBackgroundActive) {
       setError('A background market-data load is already running. Wait for it to finish before backfilling metadata.');
       return;
     }
@@ -598,7 +602,6 @@ const MarketDataFoundationPage: React.FC = () => {
         noOp: 0,
         skipped: 0,
         validated: 0,
-        providerUnsupported: 0,
         warningCount: 0,
       };
       let offset = 0;
@@ -612,7 +615,6 @@ const MarketDataFoundationPage: React.FC = () => {
           catalogSource: importSource,
           batchSize,
           offset,
-          validateProvider,
         });
         if (!result.success) {
           throw new Error(result.message || 'Catalog metadata backfill failed');
@@ -623,7 +625,6 @@ const MarketDataFoundationPage: React.FC = () => {
         aggregate.noOp += result.noOp ?? 0;
         aggregate.skipped += result.skipped ?? 0;
         aggregate.validated += result.validated ?? 0;
-        aggregate.providerUnsupported += result.providerUnsupported ?? 0;
         aggregate.warningCount += result.warnings?.length ?? 0;
         setBatchProgress({
           label: 'Backfilling metadata',
@@ -633,13 +634,94 @@ const MarketDataFoundationPage: React.FC = () => {
         hasMore = result.hasMore === true && result.nextOffset !== null && result.nextOffset !== undefined;
         offset = result.nextOffset ?? 0;
       }
-      setSuccess(`Backfill processed ${aggregate.processed}/${aggregate.total || aggregate.processed}: ${aggregate.updated} updated, ${aggregate.noOp} no-op, ${aggregate.skipped} skipped, ${aggregate.providerUnsupported} unsupported.${aggregate.warningCount ? ` ${aggregate.warningCount} warnings.` : ''}`);
+      setSuccess(`Backfill processed ${aggregate.processed}/${aggregate.total || aggregate.processed}: ${aggregate.updated} updated, ${aggregate.noOp} no-op, ${aggregate.skipped} skipped.${aggregate.warningCount ? ` ${aggregate.warningCount} warnings.` : ''}`);
       await loadInstruments();
     } catch (err: any) {
       setError(err.response?.data?.message || err.message || 'Catalog metadata backfill failed');
     } finally {
       setBackfillingCatalog(false);
       setBatchProgress(null);
+    }
+  };
+
+  const handleHistoricalBackfill = async () => {
+    if (!historicalStartDate || !historicalEndDate) {
+      setError('Historical exchange backfill requires start and end dates.');
+      return;
+    }
+    setHistoricalBackfillRunning(true);
+    setHistoricalBackfillResult(null);
+    setError(null);
+    setSuccess(null);
+    try {
+      const result = await runExchangeHistoricalBackfill({
+        region: scope.region,
+        assetType: assetType.trim() || scope.assetType || 'STOCK',
+        startDate: historicalStartDate,
+        endDate: historicalEndDate,
+        maxDates: Number(historicalMaxDates) || undefined,
+        includeBseFill: historicalIncludeBse,
+      });
+      setHistoricalBackfillResult(result);
+      setSuccess(`Historical exchange backfill ${result.status}: attempted ${formatCount(result.datesAttempted)} dates, inserted ${formatCount(result.rowsInserted)}, updated ${formatCount(result.rowsUpdated)}, no-op ${formatCount(result.rowsNoOp)}.`);
+      await Promise.all([loadInstruments(), loadSourceImports()]);
+    } catch (err: any) {
+      setError(err.response?.data?.error || err.response?.data?.message || err.message || 'Historical exchange backfill failed');
+    } finally {
+      setHistoricalBackfillRunning(false);
+    }
+  };
+
+  const updateManualFundamentalField = (field: keyof typeof manualFundamental, value: string) => {
+    setManualFundamental((current) => ({ ...current, [field]: value }));
+  };
+
+  const numericManualFundamental = (field: ManualFundamentalField) => {
+    const value = manualFundamental[field].trim();
+    if (!value) return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+
+  const handleManualFundamentalImport = async () => {
+    if (!manualFundamental.stockId.trim() || !manualFundamental.periodEndDate.trim()) {
+      setError('Manual verified fundamentals require stock id and period end date.');
+      return;
+    }
+    setManualFundamentalRunning(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      await importManualVerifiedFundamental({
+        stockId: manualFundamental.stockId.trim(),
+        region: scope.region,
+        assetType: assetType.trim() || scope.assetType || 'STOCK',
+        periodType: manualFundamental.periodType.trim() || 'ANNUAL',
+        periodEndDate: manualFundamental.periodEndDate,
+        revenue: numericManualFundamental('revenue'),
+        eps: numericManualFundamental('eps'),
+        netIncome: numericManualFundamental('netIncome'),
+        peRatio: numericManualFundamental('peRatio'),
+        marketCap: numericManualFundamental('marketCap'),
+        sourceNote: manualFundamental.sourceNote.trim() || null,
+        sourceUrl: manualFundamental.sourceUrl.trim() || null,
+        validatedBy: manualFundamental.validatedBy.trim() || null,
+        validatedAt: new Date().toISOString(),
+      });
+      setSuccess('Manual verified fundamentals imported.');
+      setManualFundamental((current) => ({
+        ...current,
+        revenue: '',
+        eps: '',
+        netIncome: '',
+        peRatio: '',
+        marketCap: '',
+      }));
+      await loadInstruments();
+    } catch (err: any) {
+      setError(err.response?.data?.error || err.response?.data?.message || err.message || 'Manual verified fundamentals import failed');
+    } finally {
+      setManualFundamentalRunning(false);
     }
   };
 
@@ -655,22 +737,10 @@ const MarketDataFoundationPage: React.FC = () => {
       ),
     },
     { id: 'name', label: 'Company', sortable: true, render: (instrument) => instrument.company_name },
-    { id: 'providerSymbol', label: 'Provider Symbol', render: (instrument) => instrument.provider_symbol || instrument.symbol },
     { id: 'exchange', label: 'Exchange', sortable: true, render: (instrument) => <Typography sx={subtleCellText}>{instrument.exchange || 'UNKNOWN'}</Typography> },
     { id: 'assetType', label: 'Asset Type', sortable: true, render: (instrument) => <Typography sx={subtleCellText}>{formatAssetType(instrument.asset_type)}</Typography> },
     { id: 'instrumentSegment', label: 'Segment/Class', render: (instrument) => <Typography sx={subtleCellText}>{instrument.instrument_segment || 'UNKNOWN'}</Typography> },
     { id: 'derivativesEligible', label: 'F&O Eligible', render: (instrument) => <Typography sx={subtleCellText}>{instrument.derivatives_eligible ? 'YES' : 'NO'}</Typography> },
-    {
-      id: 'providerSupport',
-      label: 'Provider Support',
-      render: (instrument) => (
-        <Tooltip title={(instrument.provider_support_status || 'UNKNOWN') === 'UNKNOWN' ? 'Provider support has not been validated yet.' : instrument.provider_error || ''} arrow>
-          <Typography component="span" sx={{ ...subtleCellText, color: (instrument.provider_support_status || 'UNKNOWN') === 'UNSUPPORTED' ? 'error.main' : 'text.primary' }}>
-            {instrument.provider_support_status || 'UNKNOWN'}
-          </Typography>
-        </Tooltip>
-      ),
-    },
     {
       id: 'dataHealth',
       label: 'Data Health',
@@ -714,18 +784,6 @@ const MarketDataFoundationPage: React.FC = () => {
               <VisibilityOutlinedIcon fontSize="small" />
             </IconButton>
           </Tooltip>
-          <Tooltip title="Sync market data" arrow>
-            <span>
-              <IconButton
-                size="small"
-                color="primary"
-                disabled={providerBackgroundActive || syncingId === instrument.id}
-                onClick={() => void handleSync(instrument)}
-              >
-                {syncingId === instrument.id ? <CircularProgress size={18} /> : <SyncIcon fontSize="small" />}
-              </IconButton>
-            </span>
-          </Tooltip>
         </Stack>
       ),
     },
@@ -741,12 +799,11 @@ const MarketDataFoundationPage: React.FC = () => {
     setIndustry('');
     setDataStatus('');
     setCatalogSource('');
-    setProviderSupportStatus('');
     setDerivativesEligible('');
     setPage(0);
   };
 
-  const applyPreset = (preset: 'all' | 'stocks' | 'fno' | 'needsValidation' | 'unsupported' | 'indices' | 'etfs') => {
+  const applyPreset = (preset: 'all' | 'stocks' | 'fno' | 'indices' | 'etfs') => {
     resetFilters();
     if (preset === 'stocks') {
       setAssetType('STOCK');
@@ -756,12 +813,6 @@ const MarketDataFoundationPage: React.FC = () => {
       setAssetType('STOCK');
       setInstrumentSegment('CASH');
       setDerivativesEligible('true');
-    }
-    if (preset === 'needsValidation') {
-      setProviderSupportStatus('UNKNOWN');
-    }
-    if (preset === 'unsupported') {
-      setProviderSupportStatus('UNSUPPORTED');
     }
     if (preset === 'indices') {
       setAssetType('INDEX');
@@ -780,16 +831,12 @@ const MarketDataFoundationPage: React.FC = () => {
     { id: 'fno', value: 'fno', label: 'F&O Eligible', description: 'Cash stocks that are known F&O underlyings.', apply: () => applyPreset('fno') },
     { id: 'indices', value: 'indices', label: 'Indices', description: 'Index catalog rows.', apply: () => applyPreset('indices') },
     { id: 'etfs', value: 'etfs', label: 'ETFs', description: 'ETF catalog rows.', apply: () => applyPreset('etfs') },
-    { id: 'needsValidation', value: 'needsValidation', label: 'Needs Validation', description: 'Provider support has not been validated.', apply: () => applyPreset('needsValidation') },
-    { id: 'unsupported', value: 'unsupported', label: 'Unsupported', description: 'Provider validation failed or is unsupported.', apply: () => applyPreset('unsupported') },
   ];
 
   const activePresetValue = (() => {
-    if (!assetType && !instrumentSegment && !providerSupportStatus && !derivativesEligible) return 'all';
+    if (!assetType && !instrumentSegment && !derivativesEligible) return 'all';
     if (assetType === 'STOCK' && instrumentSegment === 'CASH' && derivativesEligible === 'true') return 'fno';
-    if (assetType === 'STOCK' && instrumentSegment === 'CASH' && !derivativesEligible && !providerSupportStatus) return 'stocks';
-    if (providerSupportStatus === 'UNKNOWN' && !assetType && !instrumentSegment && !derivativesEligible) return 'needsValidation';
-    if (providerSupportStatus === 'UNSUPPORTED' && !assetType && !instrumentSegment && !derivativesEligible) return 'unsupported';
+    if (assetType === 'STOCK' && instrumentSegment === 'CASH' && !derivativesEligible) return 'stocks';
     if (assetType === 'INDEX' && instrumentSegment === 'INDEX') return 'indices';
     if (assetType === 'ETF' && instrumentSegment === 'ETF') return 'etfs';
     return false;
@@ -801,7 +848,6 @@ const MarketDataFoundationPage: React.FC = () => {
     assetType.trim() ? `Asset Type = ${assetType.trim().toUpperCase()}` : null,
     instrumentSegment.trim() ? `Segment = ${instrumentSegment.trim().toUpperCase()}` : null,
     currency.trim() ? `Currency = ${currency.trim().toUpperCase()}` : null,
-    providerSupportStatus.trim() ? `Provider = ${providerSupportStatus.trim().toUpperCase()}` : null,
     derivativesEligible ? `F&O Eligible = ${derivativesEligible === 'true' ? 'YES' : 'NO'}` : null,
   ].filter((item): item is string => Boolean(item));
   const hasLocalFilters = activeFilters.length > 0;
@@ -815,9 +861,8 @@ const MarketDataFoundationPage: React.FC = () => {
     ? `No instruments match ${activeFilters.join(', ')} in ${scopeLabel}.`
     : `No instruments found for ${scopeLabel}.`;
   const catalogSyncActive = catalogSyncStarting || isCatalogSyncActive(catalogSyncRun?.status);
-  const priceBackfillActive = isCatalogSyncActive(activePriceBackfillRun?.status);
   const schedulerActive = schedulerStatus?.activeRun === true;
-  const providerBackgroundActive = catalogSyncActive || priceBackfillActive || schedulerActive;
+  const operatorBackgroundActive = catalogSyncActive || historicalBackfillRunning || manualFundamentalRunning || schedulerActive;
   const catalogSyncTotal = catalogSyncRun?.totalCount ?? 0;
   const catalogSyncProcessed = catalogSyncRun?.processedCount ?? 0;
   const catalogSyncPercent = catalogSyncRun?.percentComplete ?? (catalogSyncTotal > 0 ? (catalogSyncProcessed / catalogSyncTotal) * 100 : 0);
@@ -842,12 +887,9 @@ const MarketDataFoundationPage: React.FC = () => {
             variant="outlined"
             startIcon={catalogSyncActive ? <CircularProgress size={18} /> : <SyncIcon />}
             onClick={() => void handleCatalogSync()}
-            disabled={providerBackgroundActive}
+            disabled={operatorBackgroundActive}
           >
-            {catalogSyncActive ? 'Syncing Catalog...' : providerBackgroundActive ? 'Data Load Running' : 'Sync Catalog'}
-          </Button>
-          <Button variant="outlined" startIcon={<SyncIcon />} onClick={() => navigate('/market-data-foundation/ingestion')}>
-            Ingestion
+            {catalogSyncActive ? 'Syncing Catalog...' : operatorBackgroundActive ? 'Data Load Running' : 'Sync Catalog'}
           </Button>
           </>
         }
@@ -895,7 +937,7 @@ const MarketDataFoundationPage: React.FC = () => {
               <Box>
                 <Typography variant="subtitle2">Catalog sync progress</Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Scope: {catalogSyncScope}; status {catalogSyncRun.status}; batch size {catalogSyncRun.batchSize ?? CATALOG_SYNC_DEFAULTS.batchSize}; provider concurrency {(catalogSyncRun.workerCount ?? CATALOG_SYNC_DEFAULTS.workerCount) * (catalogSyncRun.workerConcurrency ?? CATALOG_SYNC_DEFAULTS.workerConcurrency)}
+                  Scope: {catalogSyncScope}; status {catalogSyncRun.status}; batch size {catalogSyncRun.batchSize ?? CATALOG_SYNC_DEFAULTS.batchSize}; worker slots {(catalogSyncRun.workerCount ?? CATALOG_SYNC_DEFAULTS.workerCount) * (catalogSyncRun.workerConcurrency ?? CATALOG_SYNC_DEFAULTS.workerConcurrency)}
                 </Typography>
               </Box>
               <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
@@ -917,7 +959,7 @@ const MarketDataFoundationPage: React.FC = () => {
                     variant="contained"
                     aria-label="Continue catalog sync"
                     onClick={() => void handleCatalogSync(catalogSyncRun)}
-                    disabled={catalogSyncStarting || providerBackgroundActive}
+                    disabled={catalogSyncStarting || operatorBackgroundActive}
                   >
                     Continue Sync
                   </Button>
@@ -956,32 +998,16 @@ const MarketDataFoundationPage: React.FC = () => {
           </Stack>
         </Alert>
       )}
-      {(priceBackfillActive || schedulerActive) && (
+      {schedulerActive && (
         <Alert severity="info" sx={{ mb: 2 }}>
           <Stack spacing={1}>
             <Typography variant="body2">
-              Background market-data load is running. Sync and dataload buttons are disabled to avoid duplicate provider requests.
+              Background market-data load is running. Operator actions are disabled until this run completes.
             </Typography>
-            {priceBackfillActive && activePriceBackfillRun && (
-              <>
-                <Typography variant="caption">
-                  Price backfill {activePriceBackfillRun.status}: processed {formatCount(activePriceBackfillRun.processedCount)} / {formatCount(activePriceBackfillRun.totalCount)}, remaining {formatCount(activePriceBackfillRun.remainingCandidates)}, batch {formatCount(activePriceBackfillRun.currentBatchNumber)}.
-                </Typography>
-                <LinearProgress
-                  aria-label="Background price backfill progress"
-                  variant={(activePriceBackfillRun.totalCount ?? 0) > 0 ? 'determinate' : 'indeterminate'}
-                  value={(activePriceBackfillRun.totalCount ?? 0) > 0 ? Math.min(100, Math.max(0, activePriceBackfillRun.percentComplete ?? 0)) : undefined}
-                />
-              </>
-            )}
-            {schedulerActive && (
-              <>
-                <Typography variant="caption">
-                  Latest-day candle scheduler is active. Last run {schedulerStatus?.lastRunAt || 'starting'}.
-                </Typography>
-                <LinearProgress aria-label="Latest-day candle scheduler progress" />
-              </>
-            )}
+            <Typography variant="caption">
+              Latest-day candle scheduler is active. Last run {schedulerStatus?.lastRunAt || 'starting'}.
+            </Typography>
+            <LinearProgress aria-label="Latest-day candle scheduler progress" />
           </Stack>
         </Alert>
       )}
@@ -1021,10 +1047,6 @@ const MarketDataFoundationPage: React.FC = () => {
             <TextField select size="small" label="Catalog Source" value={importSource} onChange={(event) => handleImportSourceChange(event.target.value)}>
               {availableCatalogSources.map((item) => <MenuItem key={item.catalogSource} value={item.catalogSource}>{item.displayName || item.catalogSource}</MenuItem>)}
             </TextField>
-            <TextField select size="small" label="Provider Validation" value={validateProvider ? 'true' : 'false'} onChange={(event) => setValidateProvider(event.target.value === 'true')}>
-              <MenuItem value="false">Skip validation</MenuItem>
-              <MenuItem value="true">Validate batch</MenuItem>
-            </TextField>
             <Stack
               direction={{ xs: 'column', sm: 'row' }}
               spacing={1}
@@ -1036,7 +1058,7 @@ const MarketDataFoundationPage: React.FC = () => {
                 variant="outlined"
                 startIcon={importingCatalog ? <CircularProgress size={18} /> : <SyncIcon />}
                 onClick={handleCatalogImport}
-                disabled={providerBackgroundActive || importingCatalog || backfillingCatalog || !importAvailable}
+                disabled={operatorBackgroundActive || importingCatalog || backfillingCatalog || !importAvailable}
                 sx={{ flex: { xs: '1 1 auto', sm: '0 1 auto' }, whiteSpace: 'nowrap' }}
               >
                 {importingCatalog ? 'Importing...' : 'Import Catalog'}
@@ -1045,7 +1067,7 @@ const MarketDataFoundationPage: React.FC = () => {
                 variant="outlined"
                 startIcon={backfillingCatalog ? <CircularProgress size={18} /> : <SyncIcon />}
                 onClick={handleCatalogBackfill}
-                disabled={providerBackgroundActive || backfillingCatalog || importingCatalog}
+                disabled={operatorBackgroundActive || backfillingCatalog || importingCatalog}
                 sx={{ flex: { xs: '1 1 auto', sm: '0 1 auto' }, whiteSpace: 'nowrap' }}
               >
                 {backfillingCatalog ? 'Backfilling...' : 'Backfill Metadata'}
@@ -1087,6 +1109,107 @@ const MarketDataFoundationPage: React.FC = () => {
               placeholder="Paste NSE securities or F&O underlyings CSV here. Index seed import does not require CSV."
             />
           )}
+          <Divider />
+          <Box>
+            <Typography variant="subtitle2" gutterBottom>Historical Exchange Candle Backfill</Typography>
+            <Stack
+              direction={{ xs: 'column', md: 'row' }}
+              spacing={1}
+              alignItems={{ xs: 'stretch', md: 'center' }}
+              useFlexGap
+              flexWrap="wrap"
+            >
+              <TextField size="small" type="date" label="Start Date" value={historicalStartDate} onChange={(event) => setHistoricalStartDate(event.target.value)} InputLabelProps={{ shrink: true }} />
+              <TextField size="small" type="date" label="End Date" value={historicalEndDate} onChange={(event) => setHistoricalEndDate(event.target.value)} InputLabelProps={{ shrink: true }} />
+              <TextField size="small" label="Max Dates" value={historicalMaxDates} onChange={(event) => setHistoricalMaxDates(event.target.value.replace(/\D/g, ''))} sx={{ maxWidth: { md: 140 } }} />
+              <TextField select size="small" label="BSE Fill" value={historicalIncludeBse ? 'true' : 'false'} onChange={(event) => setHistoricalIncludeBse(event.target.value === 'true')} sx={{ maxWidth: { md: 160 } }}>
+                <MenuItem value="false">NSE only</MenuItem>
+                <MenuItem value="true">Fill NSE gaps</MenuItem>
+              </TextField>
+              <Button
+                variant="contained"
+                startIcon={historicalBackfillRunning ? <CircularProgress size={18} /> : <SyncIcon />}
+                onClick={() => void handleHistoricalBackfill()}
+                disabled={operatorBackgroundActive || historicalBackfillRunning}
+              >
+                {historicalBackfillRunning ? 'Running...' : 'Run Backfill'}
+              </Button>
+            </Stack>
+            {historicalBackfillResult && (
+              <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" sx={{ mt: 1 }}>
+                <Chip size="small" label={`Status ${historicalBackfillResult.status}`} color={historicalBackfillResult.status === 'FAILED' ? 'error' : historicalBackfillResult.status === 'PARTIAL' ? 'warning' : 'success'} />
+                <Chip size="small" label={`Dates ${formatCount(historicalBackfillResult.datesAttempted)}`} />
+                <Chip size="small" label={`Inserted ${formatCount(historicalBackfillResult.rowsInserted)}`} />
+                <Chip size="small" label={`Updated ${formatCount(historicalBackfillResult.rowsUpdated)}`} />
+                <Chip size="small" label={`No-op ${formatCount(historicalBackfillResult.rowsNoOp)}`} />
+                {historicalBackfillResult.nextStartDate && <Chip size="small" label={`Resume ${historicalBackfillResult.nextStartDate}`} />}
+              </Stack>
+            )}
+          </Box>
+          <Divider />
+          <Box>
+            <Typography variant="subtitle2" gutterBottom>Manual Verified Fundamentals</Typography>
+            <Stack
+              direction={{ xs: 'column', md: 'row' }}
+              spacing={1}
+              alignItems={{ xs: 'stretch', md: 'center' }}
+              useFlexGap
+              flexWrap="wrap"
+            >
+              <TextField size="small" label="Stock ID" value={manualFundamental.stockId} onChange={(event) => updateManualFundamentalField('stockId', event.target.value)} />
+              <TextField select size="small" label="Period" value={manualFundamental.periodType} onChange={(event) => updateManualFundamentalField('periodType', event.target.value)} sx={{ maxWidth: { md: 140 } }}>
+                <MenuItem value="ANNUAL">Annual</MenuItem>
+                <MenuItem value="QUARTERLY">Quarterly</MenuItem>
+                <MenuItem value="TTM">TTM</MenuItem>
+              </TextField>
+              <TextField size="small" type="date" label="Period End" value={manualFundamental.periodEndDate} onChange={(event) => updateManualFundamentalField('periodEndDate', event.target.value)} InputLabelProps={{ shrink: true }} />
+              <TextField size="small" label="EPS" value={manualFundamental.eps} onChange={(event) => updateManualFundamentalField('eps', event.target.value)} sx={{ maxWidth: { md: 120 } }} />
+              <TextField size="small" label="P/E" value={manualFundamental.peRatio} onChange={(event) => updateManualFundamentalField('peRatio', event.target.value)} sx={{ maxWidth: { md: 120 } }} />
+              <TextField size="small" label="Market Cap" value={manualFundamental.marketCap} onChange={(event) => updateManualFundamentalField('marketCap', event.target.value)} sx={{ maxWidth: { md: 150 } }} />
+              <TextField size="small" label="Source Note" value={manualFundamental.sourceNote} onChange={(event) => updateManualFundamentalField('sourceNote', event.target.value)} />
+              <TextField size="small" label="Source URL" value={manualFundamental.sourceUrl} onChange={(event) => updateManualFundamentalField('sourceUrl', event.target.value)} />
+              <TextField size="small" label="Validated By" value={manualFundamental.validatedBy} onChange={(event) => updateManualFundamentalField('validatedBy', event.target.value)} sx={{ maxWidth: { md: 180 } }} />
+              <Button
+                variant="contained"
+                startIcon={manualFundamentalRunning ? <CircularProgress size={18} /> : <FactCheckIcon />}
+                onClick={() => void handleManualFundamentalImport()}
+                disabled={operatorBackgroundActive || manualFundamentalRunning}
+              >
+                {manualFundamentalRunning ? 'Importing...' : 'Import Fundamentals'}
+              </Button>
+            </Stack>
+          </Box>
+          <Divider />
+          <Box>
+            <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+              <Typography variant="subtitle2">Source File Evidence</Typography>
+              <Button size="small" startIcon={sourceImportsLoading ? <CircularProgress size={16} /> : <RefreshIcon />} onClick={() => void loadSourceImports()} disabled={sourceImportsLoading}>
+                Refresh Evidence
+              </Button>
+            </Stack>
+            <Stack spacing={1}>
+              {sourceImports.length === 0 && (
+                <Typography variant="body2" color="text.secondary">No source file import evidence available yet.</Typography>
+              )}
+              {sourceImports.map((item) => (
+                <Paper key={item.id} variant="outlined" sx={{ p: 1.25 }}>
+                  <Stack direction={{ xs: 'column', md: 'row' }} spacing={1} justifyContent="space-between">
+                    <Box>
+                      <Typography variant="body2" fontWeight={700}>{item.source} {item.segment} - {item.tradingDate || 'unknown date'}</Typography>
+                      <Typography variant="caption" color="text.secondary">{item.fileName}</Typography>
+                    </Box>
+                    <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+                      <Chip size="small" label={item.status} color={item.status === 'FAILED' ? 'error' : item.status === 'COMPLETED' ? 'success' : 'warning'} />
+                      <Chip size="small" label={`Accepted ${formatCount(item.rowsAccepted)}`} />
+                      <Chip size="small" label={`Rejected ${formatCount(item.rowsRejected)}`} />
+                      <Chip size="small" label={`Raw ${formatCount(item.rowsRaw)}`} />
+                    </Stack>
+                  </Stack>
+                  {item.errorMessage && <Typography variant="caption" color="error">{item.errorMessage}</Typography>}
+                </Paper>
+              ))}
+            </Stack>
+          </Box>
         </Stack>
       </Paper>
       )}
@@ -1234,7 +1357,6 @@ const MarketDataFoundationPage: React.FC = () => {
               <StatusBadge label={formatAssetType(selectedInstrument.asset_type)} />
               <StatusBadge label={selectedInstrument.instrument_segment || 'UNKNOWN'} />
               <StatusBadge label={selectedInstrument.derivatives_eligible ? 'F&O YES' : 'F&O NO'} />
-              <StatusBadge label={selectedInstrument.provider_support_status || 'UNKNOWN'} />
             </Stack>
             <Box>
               <Typography variant="subtitle2" gutterBottom>Identity</Typography>
@@ -1242,7 +1364,6 @@ const MarketDataFoundationPage: React.FC = () => {
                 <Typography variant="body2"><strong>Stored symbol:</strong> {selectedInstrument.symbol}</Typography>
                 <Typography variant="body2"><strong>Display symbol:</strong> {selectedInstrument.display_symbol || formatDisplaySymbol(selectedInstrument)}</Typography>
                 <Typography variant="body2"><strong>Source symbol:</strong> {selectedInstrument.source_symbol || 'Missing'}</Typography>
-                <Typography variant="body2"><strong>Provider symbol:</strong> {selectedInstrument.provider_symbol || 'Missing'}</Typography>
               </Stack>
             </Box>
             <Box>
@@ -1266,10 +1387,8 @@ const MarketDataFoundationPage: React.FC = () => {
               </Stack>
             </Box>
             <Box>
-              <Typography variant="subtitle2" gutterBottom>Provider & Data</Typography>
+              <Typography variant="subtitle2" gutterBottom>Exchange Data</Typography>
               <Stack spacing={0.75}>
-                <Typography variant="body2"><strong>Provider support:</strong> {selectedInstrument.provider_support_status || 'UNKNOWN'}</Typography>
-                <Typography variant="body2"><strong>Provider error:</strong> {selectedInstrument.provider_error || 'None'}</Typography>
                 <Typography variant="body2"><strong>Universe state:</strong> {selectedInstrument.universe_state || 'Not classified'}</Typography>
                 <Typography variant="body2"><strong>Price history bars:</strong> {selectedInstrument.price_history_bars ?? 0}</Typography>
                 <Typography variant="body2"><strong>Latest price date:</strong> {selectedInstrument.latest_price_date || 'Missing'}</Typography>
@@ -1284,9 +1403,6 @@ const MarketDataFoundationPage: React.FC = () => {
             <Divider />
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
               <Button variant="outlined" onClick={() => navigate(`/stocks/${selectedInstrument.id}`)}>Open Workspace</Button>
-              <Button variant="contained" onClick={() => void handleSync(selectedInstrument)} disabled={providerBackgroundActive || syncingId === selectedInstrument.id}>
-                {syncingId === selectedInstrument.id ? 'Syncing...' : 'Sync Prices'}
-              </Button>
             </Stack>
           </Stack>
         )}

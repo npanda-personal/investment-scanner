@@ -21,7 +21,6 @@ import type {
   TrustedReviewUniversePriceRow,
 } from './market-data-foundation.types';
 import { partitionHistoricalPrices } from './market-data-foundation.validation';
-import type { YahooFinanceIngestionService } from './market-data-foundation.provider';
 import { normalizeMarketRegion, resolveMarketRegionFilter } from '../../shared/utils/market-scope';
 import { knownNseFnoStockUnderlyingSymbols } from './market-data-foundation.fno-underlyings';
 import { STANDARD_REVIEW_MIN_BARS, type UniversePriceStats } from './market-data-foundation.universe';
@@ -59,6 +58,7 @@ const EXCHANGE_PRICE_SOURCES = [
 ];
 
 type PriceRegionInfo = { region?: string | null; exchange?: string | null };
+type InferPriceRegion = (symbol: string) => PriceRegionInfo;
 type HistoricalBulkStoreSummary = SyncSummary & {
   summaryBySymbol: Map<string, SyncSummary>;
 };
@@ -184,6 +184,50 @@ export class MarketDataFoundationRepository {
       select: { tradingDate: true },
     });
     return rows.map((row: { tradingDate: Date }) => this.normalizeUtcDay(row.tradingDate));
+  }
+
+  async listSourceFileImports(input: {
+    source?: string;
+    segment?: string;
+    status?: string;
+    startDate?: Date;
+    endDate?: Date;
+    limit?: number;
+  } = {}) {
+    const where: any = {};
+    if (input.source) where.source = input.source.trim().toUpperCase();
+    if (input.segment) where.segment = input.segment.trim().toUpperCase();
+    if (input.status) where.status = input.status.trim().toUpperCase();
+    if (input.startDate || input.endDate) {
+      where.tradingDate = {};
+      if (input.startDate) where.tradingDate.gte = this.normalizeUtcDay(input.startDate);
+      if (input.endDate) where.tradingDate.lte = this.normalizeUtcDay(input.endDate);
+    }
+    const take = Math.max(1, Math.min(input.limit || 50, 200));
+    return (this.prisma as any).sourceFileImport.findMany({
+      where,
+      orderBy: [{ tradingDate: 'desc' }, { updatedAt: 'desc' }],
+      take,
+      select: {
+        id: true,
+        source: true,
+        segment: true,
+        tradingDate: true,
+        fileName: true,
+        fileUrl: true,
+        fileHash: true,
+        fileSize: true,
+        status: true,
+        rowsRaw: true,
+        rowsAccepted: true,
+        rowsRejected: true,
+        parserVersion: true,
+        importedAt: true,
+        errorMessage: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
   }
 
   async listExchangeIdentitiesMissingPriceHistory(
@@ -2151,7 +2195,7 @@ export class MarketDataFoundationRepository {
 
   async storeHistorical(
     prices: HistoricalPrice[],
-    inferRegion: YahooFinanceIngestionService['inferRegion'],
+    inferRegion: InferPriceRegion,
     regionInfoBySymbol: Map<string, PriceRegionInfo> = new Map()
   ): Promise<SyncSummary> {
     const rowsReceived = prices.length;
@@ -2296,7 +2340,7 @@ export class MarketDataFoundationRepository {
 
   async storeHistoricalBulk(
     prices: HistoricalPrice[],
-    inferRegion: YahooFinanceIngestionService['inferRegion'],
+    inferRegion: InferPriceRegion,
     regionInfoBySymbol: Map<string, PriceRegionInfo> = new Map(),
     options: HistoricalStoreOptions = {}
   ): Promise<HistoricalBulkStoreSummary> {

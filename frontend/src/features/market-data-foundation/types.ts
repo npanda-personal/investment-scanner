@@ -1032,7 +1032,6 @@ export interface CatalogImportRequest {
   catalogSource: string;
   importMode?: 'MANUAL_CSV' | 'CONFIGURED_URL' | 'INTERNAL_SEED';
   csvText?: string;
-  validateProvider?: boolean;
   batchSize?: number;
   offset?: number;
 }
@@ -1101,7 +1100,6 @@ export interface CatalogBackfillRequest {
   catalogSource?: string;
   batchSize?: number;
   offset?: number;
-  validateProvider?: boolean;
   workerConcurrency?: number;
 }
 
@@ -1290,6 +1288,83 @@ export interface MarketDataPriceBackfillRunResponse {
   statusUrl?: string;
   alreadyRunning?: boolean;
   cancelRequested?: boolean;
+}
+
+export interface MarketDataSourceFileImportRecord {
+  id: string;
+  source: string;
+  segment: string;
+  tradingDate: string | null;
+  fileName: string;
+  fileUrl: string | null;
+  fileHash: string;
+  fileSize: number | null;
+  status: string;
+  rowsRaw: number;
+  rowsAccepted: number;
+  rowsRejected: number;
+  parserVersion: string;
+  importedAt: string | null;
+  errorMessage: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface MarketDataSourceFileImportsResponse {
+  count: number;
+  imports: MarketDataSourceFileImportRecord[];
+}
+
+export interface ExchangeHistoricalBackfillRequest {
+  region?: string;
+  assetType?: string;
+  startDate: string;
+  endDate: string;
+  maxDates?: number;
+  includeBseFill?: boolean;
+}
+
+export interface ExchangeHistoricalBackfillResponse {
+  status: 'COMPLETED' | 'PARTIAL' | 'FAILED';
+  source: 'NSE';
+  segment: 'CM';
+  region: string;
+  assetType: string;
+  startDate: string;
+  endDate: string;
+  datesAttempted: number;
+  datesSkippedAlreadyImported: number;
+  queuedInstrumentCount: number;
+  rowsRead: number;
+  rowsParsed: number;
+  rowsInserted: number;
+  rowsUpdated: number;
+  rowsNoOp: number;
+  rowsSkipped: number;
+  warningCount: number;
+  warnings: string[];
+  errors: string[];
+  hasMore: boolean;
+  nextStartDate: string | null;
+  bseFill?: unknown;
+}
+
+export interface ManualVerifiedFundamentalImportRequest {
+  stockId: string;
+  region?: string;
+  assetType?: string;
+  periodType: string;
+  periodEndDate: string;
+  revenue?: number | null;
+  eps?: number | null;
+  netIncome?: number | null;
+  peRatio?: number | null;
+  marketCap?: number | null;
+  sourceNote?: string | null;
+  sourceUrl?: string | null;
+  validatedBy?: string | null;
+  validatedAt?: string | null;
+  currency?: string | null;
 }
 
 export interface MarketDataSchedulerRegionStatus {

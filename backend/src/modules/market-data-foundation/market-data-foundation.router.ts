@@ -68,6 +68,7 @@ export const createMarketDataV1Router = (
   router.post('/market-data/universe/repair-run', controller.repairRun);
   router.get('/market-data/provider-cleanup/report', controller.providerCleanupReport);
   router.post('/market-data/provider-cleanup/execute', controller.executeProviderCleanup);
+  router.get('/market-data/source-file-imports', controller.listSourceFileImports);
   router.post('/market-data/exchange-files/nse-cm-udiff/import', controller.importNseCmUdiffDaily);
   router.post('/market-data/exchange-files/bse-cm-backup/import', controller.importBseCmBackupDaily);
   router.post('/market-data/exchange-files/nse-index-eod/import', controller.importNseIndexEodDaily);

@@ -1,6 +1,5 @@
 export { default } from './components/MarketDataFoundationPage';
 export { default as AddInstrumentPage } from './components/AddInstrumentPage';
-export { default as DataIngestion } from './components/DataIngestion';
 export { default as InstrumentDetailPage } from './components/InstrumentDetailPage';
 export { default as MarketDataStatusPanel } from './components/MarketDataStatusPanel';
 export { marketDataFoundationRoutes } from './routes';

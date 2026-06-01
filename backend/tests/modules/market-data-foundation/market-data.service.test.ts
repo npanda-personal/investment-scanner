@@ -133,12 +133,26 @@ describe('MarketDataFoundationService syncV1', () => {
         rowsNoOp: 0,
         warningCount: 0,
         warnings: [],
-        summaryBySymbol: new Map(),
+        summaryBySymbol: new Map([
+          ['RELIANCE', { rowsReceived: 1, rowsInserted: 1, rowsUpdated: 0, rowsSkipped: 0, rowsNoOp: 0, warningCount: 0, warnings: [] }],
+          ['TCS', { rowsReceived: 1, rowsInserted: 1, rowsUpdated: 0, rowsSkipped: 0, rowsNoOp: 0, warningCount: 0, warnings: [] }],
+        ]),
       }),
     };
-    const service = new MarketDataFoundationService(repository as any, {
+    const provider = {
       inferRegion: jest.fn().mockReturnValue({ region: 'IN', exchange: 'NSE' }),
-    } as any);
+      search: jest.fn(),
+      fetchCoreFundamentals: jest.fn(),
+      fetchCorporateActions: jest.fn(),
+      fetchHistorical: jest.fn(),
+      fetchCompanyMasterData: jest.fn(),
+      fetchFxRate: jest.fn(),
+    };
+    const angel = {
+      canHandleHistorical: jest.fn(),
+      fetchHistorical: jest.fn(),
+    };
+    const service = new MarketDataFoundationService(repository as any, provider as any, angel as any);
 
     const result = await (service as any).importNseCmUdiffDaily({
       tradingDate: '2026-05-27',
@@ -155,7 +169,12 @@ describe('MarketDataFoundationService syncV1', () => {
       rowsRead: 2,
       rowsParsed: 2,
       rowsInserted: 2,
+      rowsUpdated: 0,
+      rowsNoOp: 0,
+      rowsSkipped: 0,
       sourceFileImportId: 'import-1',
+      changedSymbols: ['RELIANCE', 'TCS'],
+      downstreamSymbols: ['RELIANCE', 'TCS'],
     });
     expect(repository.upsertSourceFileImport).toHaveBeenNthCalledWith(1, expect.objectContaining({
       source: 'NSE',
@@ -178,6 +197,60 @@ describe('MarketDataFoundationService syncV1', () => {
       status: 'COMPLETED',
       rowsAccepted: 2,
       rowsRejected: 0,
+    }));
+    expect(provider.search).not.toHaveBeenCalled();
+    expect(provider.fetchCoreFundamentals).not.toHaveBeenCalled();
+    expect(provider.fetchCorporateActions).not.toHaveBeenCalled();
+    expect(provider.fetchHistorical).not.toHaveBeenCalled();
+    expect(provider.fetchCompanyMasterData).not.toHaveBeenCalled();
+    expect(provider.fetchFxRate).not.toHaveBeenCalled();
+    expect(angel.canHandleHistorical).not.toHaveBeenCalled();
+    expect(angel.fetchHistorical).not.toHaveBeenCalled();
+  });
+
+  it('returns failed NSE CM import summaries when candle persistence fails', async () => {
+    const csvText = [
+      'TradDt,Sgmt,Src,FinInstrmTp,TckrSymb,SctySrs,OpnPric,HghPric,LwPric,ClsPric,TtlTradgVol',
+      '2026-05-27,CM,NSE,STK,RELIANCE,EQ,1400,1420,1390,1410,1000',
+    ].join('\n');
+    const repository = {
+      findSourceFileImportByKey: jest.fn().mockResolvedValue(null),
+      upsertSourceFileImport: jest.fn()
+        .mockResolvedValueOnce({ id: 'import-1', status: 'PENDING' })
+        .mockResolvedValueOnce({ id: 'import-1', status: 'FAILED' }),
+      storeHistoricalBulk: jest.fn().mockRejectedValue(new Error('DB save failed')),
+    };
+    const service = new MarketDataFoundationService(repository as any, {
+      inferRegion: jest.fn().mockReturnValue({ region: 'IN', exchange: 'NSE' }),
+    } as any);
+
+    const result = await (service as any).importNseCmUdiffDaily({
+      tradingDate: '2026-05-27',
+      csvText,
+      fileName: 'BhavCopy_NSE_CM_0_0_0_20260527_F_0000.csv',
+      fileUrl: 'local-fixture.csv',
+    });
+
+    expect(result).toMatchObject({
+      status: 'FAILED',
+      source: 'NSE',
+      segment: 'CM',
+      tradingDate: '2026-05-27',
+      rowsRead: 1,
+      rowsParsed: 1,
+      rowsInserted: 0,
+      rowsUpdated: 0,
+      rowsNoOp: 0,
+      rowsSkipped: 1,
+      errors: ['DB save failed'],
+      sourceFileImportId: 'import-1',
+    });
+    expect(repository.upsertSourceFileImport).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      status: 'FAILED',
+      rowsRaw: 1,
+      rowsAccepted: 0,
+      rowsRejected: 1,
+      errorMessage: 'DB save failed',
     }));
   });
 
@@ -2007,170 +2080,8 @@ describe('MarketDataFoundationService syncV1', () => {
     process.env = originalEnv;
   });
 
-  it.skip('uses providerSymbol for OHLCV fetch while storing ticks under the canonical stored symbol', async () => {
-    const repository = {
-      findStockBySymbol: jest.fn().mockResolvedValue({
-        symbol: 'ABB',
-        providerSymbol: 'ABB.NS',
-        region: 'IN',
-        assetType: 'STOCK',
-        lastSuccessfulDataLoadTimestamp: null,
-      }),
-      latestStoredTradingDateForRegion: jest.fn().mockResolvedValue(null),
-      getSyncState: jest.fn().mockResolvedValue(null),
-      updateStockLoadTimestampBySymbol: jest.fn().mockResolvedValue({}),
-      updateProviderSupportStatus: jest.fn().mockResolvedValue({}),
-      upsertSyncState: jest.fn().mockResolvedValue({}),
-    };
-    const provider = {
-      inferRegion: jest.fn().mockReturnValue({ region: 'IN', exchange: 'NSE' }),
-      fetchHistorical: jest.fn().mockResolvedValue([
-        { symbol: 'ABB', date: new Date('2026-05-05T00:00:00.000Z'), open: 1, high: 1, low: 1, close: 1, volume: 1 },
-      ]),
-    };
-    const service = new MarketDataFoundationService(repository as any, provider as any);
-    const storeHistorical = jest.spyOn(service, 'storeHistorical').mockResolvedValue({
-      rowsReceived: 1,
-      rowsInserted: 1,
-      rowsUpdated: 0,
-      rowsSkipped: 0,
-      rowsNoOp: 0,
-      warningCount: 0,
-      warnings: [],
-    });
 
-    await service.ingestSymbol('ABB', new Date('2026-05-01T00:00:00.000Z'), new Date('2026-05-05T10:30:00.000Z'), false, { force: true });
 
-    expect(provider.fetchHistorical).toHaveBeenCalledWith('ABB.NS', expect.any(Date), expect.any(Date));
-    expect(storeHistorical).toHaveBeenCalledWith([
-      expect.objectContaining({ symbol: 'ABB' }),
-    ]);
-    expect(repository.updateProviderSupportStatus).toHaveBeenCalledWith('ABB', 'SUPPORTED', null);
-  });
-
-  it.skip('adds the Yahoo NSE suffix at the provider boundary when canonical IN/STOCK storage uses a base symbol', async () => {
-    const repository = {
-      findStockBySymbol: jest.fn().mockResolvedValue({
-        symbol: 'HAL',
-        providerSymbol: null,
-        sourceSymbol: 'HAL',
-        exchange: 'NSE',
-        region: 'IN',
-        assetType: 'STOCK',
-        lastSuccessfulDataLoadTimestamp: null,
-      }),
-      latestStoredTradingDateForRegion: jest.fn().mockResolvedValue(null),
-      getSyncState: jest.fn().mockResolvedValue(null),
-      updateStockLoadTimestampBySymbol: jest.fn().mockResolvedValue({}),
-      updateProviderSupportStatus: jest.fn().mockResolvedValue({}),
-      upsertSyncState: jest.fn().mockResolvedValue({}),
-    };
-    const provider = {
-      inferRegion: jest.fn().mockReturnValue({ region: 'IN', exchange: 'NSE' }),
-      fetchHistorical: jest.fn().mockResolvedValue([
-        { symbol: 'HAL', date: new Date('2026-05-05T00:00:00.000Z'), open: 1, high: 2, low: 1, close: 2, volume: 10 },
-      ]),
-    };
-    const service = new MarketDataFoundationService(repository as any, provider as any);
-    const storeHistorical = jest.spyOn(service, 'storeHistorical').mockResolvedValue({
-      rowsReceived: 1,
-      rowsInserted: 1,
-      rowsUpdated: 0,
-      rowsSkipped: 0,
-      rowsNoOp: 0,
-      warningCount: 0,
-      warnings: [],
-    });
-
-    await service.ingestSymbol('HAL', new Date('2026-05-01T00:00:00.000Z'), new Date('2026-05-05T10:30:00.000Z'), false, { force: true, region: 'IN', assetType: 'STOCK' });
-
-    expect(provider.fetchHistorical).toHaveBeenCalledWith('HAL.NS', expect.any(Date), expect.any(Date));
-    expect(storeHistorical).toHaveBeenCalledWith([
-      expect.objectContaining({ symbol: 'HAL' }),
-    ]);
-    expect(repository.updateStockLoadTimestampBySymbol).toHaveBeenCalledWith('HAL');
-  });
-
-  it.skip('stores free official NSE EOD fallback rows when Yahoo returns no backfill data', async () => {
-    const originalFallbackFlag = process.env.MARKET_DATA_EXCHANGE_EOD_FALLBACK_ENABLED;
-    const originalMaxDays = process.env.MARKET_DATA_EXCHANGE_EOD_FALLBACK_MAX_DAYS_PER_SYMBOL;
-    const originalFetch = global.fetch;
-    process.env.MARKET_DATA_EXCHANGE_EOD_FALLBACK_ENABLED = 'true';
-    process.env.MARKET_DATA_EXCHANGE_EOD_FALLBACK_MAX_DAYS_PER_SYMBOL = '1';
-    const csv = [
-      'SYMBOL,SERIES,DATE1,OPEN_PRICE,HIGH_PRICE,LOW_PRICE,CLOSE_PRICE,TTL_TRD_QNTY',
-      'RELIANCE,EQ,13-May-2026,1430.00,1450.50,1420.25,1444.10,1234567',
-    ].join('\n');
-    const bytes = Buffer.from(csv);
-    global.fetch = jest.fn().mockResolvedValue({
-      ok: true,
-      headers: { get: jest.fn().mockReturnValue(String(bytes.length)) },
-      arrayBuffer: async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
-    } as any);
-    const repository = {
-      findStockBySymbol: jest.fn().mockResolvedValue({
-        symbol: 'RELIANCE',
-        providerSymbol: 'RELIANCE.NS',
-        sourceSymbol: 'RELIANCE',
-        exchange: 'NSE',
-        region: 'IN',
-        assetType: 'STOCK',
-        lastSuccessfulDataLoadTimestamp: null,
-      }),
-      latestStoredTradingDateForRegion: jest.fn().mockResolvedValue(null),
-      getSyncState: jest.fn().mockResolvedValue(null),
-      updateStockLoadTimestampBySymbol: jest.fn().mockResolvedValue({}),
-      updateProviderSupportStatus: jest.fn().mockResolvedValue({}),
-      upsertSyncState: jest.fn().mockResolvedValue({}),
-    };
-    const provider = {
-      inferRegion: jest.fn().mockReturnValue({ region: 'IN', exchange: 'NSE' }),
-      fetchHistorical: jest.fn().mockResolvedValue([]),
-    };
-    const service = new MarketDataFoundationService(repository as any, provider as any);
-    const storeHistorical = jest.spyOn(service, 'storeHistorical').mockResolvedValue({
-      rowsReceived: 1,
-      rowsInserted: 1,
-      rowsUpdated: 0,
-      rowsSkipped: 0,
-      rowsNoOp: 0,
-      warningCount: 0,
-      warnings: [],
-    });
-
-    try {
-      const result = await service.ingestSymbol(
-        'RELIANCE.NS',
-        new Date('2026-05-13T00:00:00.000Z'),
-        new Date('2026-05-13T23:59:59.999Z'),
-        false,
-        { force: true, region: 'IN', assetType: 'STOCK', preserveProviderSupportOnZeroRows: true }
-      );
-
-      expect(global.fetch).toHaveBeenCalledWith(
-        'https://archives.nseindia.com/products/content/sec_bhavdata_full_13052026.csv',
-        expect.any(Object)
-      );
-      expect(storeHistorical).toHaveBeenCalledWith([
-        expect.objectContaining({
-          symbol: 'RELIANCE',
-          source: 'NSE_SECURITY_BHAVDATA',
-          close: 1444.1,
-        }),
-      ]);
-      expect(repository.updateProviderSupportStatus).toHaveBeenCalledWith('RELIANCE', 'SUPPORTED', null);
-      expect(result).toMatchObject({
-        rowsReceived: 1,
-        rowsInserted: 1,
-      });
-    } finally {
-      if (originalFallbackFlag === undefined) delete process.env.MARKET_DATA_EXCHANGE_EOD_FALLBACK_ENABLED;
-      else process.env.MARKET_DATA_EXCHANGE_EOD_FALLBACK_ENABLED = originalFallbackFlag;
-      if (originalMaxDays === undefined) delete process.env.MARKET_DATA_EXCHANGE_EOD_FALLBACK_MAX_DAYS_PER_SYMBOL;
-      else process.env.MARKET_DATA_EXCHANGE_EOD_FALLBACK_MAX_DAYS_PER_SYMBOL = originalMaxDays;
-      global.fetch = originalFetch;
-    }
-  });
 
   it('excludes provider-supported stocks from trusted review until required 15-year coverage exists', async () => {
     const repository = {
@@ -2537,346 +2448,10 @@ describe('MarketDataFoundationService syncV1', () => {
     });
   });
 
-  it.skip('marks scheduled post-close no-op runs as final confirmed', async () => {
-    const repository = {
-      listActiveStockSyncTasks: jest.fn().mockResolvedValue([{ id: 'stock-1', symbol: 'AAPL', lastSuccessfulDataLoadTimestamp: null }]),
-      upsertSyncState: jest.fn().mockResolvedValue({}),
-      latestStoredTradingDateForRegion: jest.fn().mockResolvedValue('2026-05-05'),
-      getSyncState: jest.fn().mockResolvedValue(null),
-    };
-    const service = new MarketDataFoundationService(repository as any, {} as any);
-    jest.spyOn(service, 'ingestSymbol').mockResolvedValue({
-      rowsReceived: 1,
-      rowsInserted: 0,
-      rowsUpdated: 0,
-      rowsSkipped: 0,
-      rowsNoOp: 1,
-      warningCount: 0,
-      warnings: [],
-    });
 
-    const summary = await service.syncScheduledRegion('IN', {
-      assetType: 'STOCK',
-      now: new Date('2026-05-05T10:30:00.000Z'),
-    });
 
-    expect(summary).toMatchObject({
-      rowsNoOp: 1,
-      rowsInserted: 0,
-      rowsUpdated: 0,
-      dataThroughDate: '2026-05-05',
-      changedInstrumentIds: [],
-      downstreamInstrumentIds: ['stock-1'],
-      changedInstrumentCount: 0,
-      dqStageEligible: true,
-    });
-    expect(summary.sourceFingerprint).toEqual(expect.any(String));
-    expect(service.ingestSymbol).toHaveBeenCalledWith(
-      'AAPL',
-      undefined,
-      expect.any(Date),
-      false,
-      expect.objectContaining({
-        region: 'IN',
-        assetType: 'STOCK',
-        skipFreshnessGate: true,
-      })
-    );
-    expect(repository.upsertSyncState).toHaveBeenLastCalledWith(expect.objectContaining({
-      region: 'IN',
-      assetType: 'STOCK',
-      tradingDate: '2026-05-05',
-      status: 'FINAL_CONFIRMED',
-    }));
-  });
 
-  it.skip('retries scheduled market data when prior sync state is pending from an interrupted run', async () => {
-    const repository = {
-      listActiveStockSyncTasks: jest.fn().mockResolvedValue([{ id: 'stock-1', symbol: 'RETRY', lastSuccessfulDataLoadTimestamp: null }]),
-      upsertSyncState: jest.fn().mockResolvedValue({}),
-      latestStoredTradingDateForRegion: jest.fn().mockResolvedValue('2026-05-04'),
-      getSyncState: jest.fn().mockResolvedValue({
-        status: 'PENDING',
-        lastCheckedAt: new Date('2026-05-05T02:59:00.000Z').toISOString(),
-      }),
-    };
-    const service = new MarketDataFoundationService(repository as any, {} as any);
-    jest.spyOn(service, 'ingestSymbol').mockResolvedValue({
-      rowsReceived: 1,
-      rowsInserted: 0,
-      rowsUpdated: 0,
-      rowsSkipped: 0,
-      rowsNoOp: 1,
-      warningCount: 0,
-      warnings: [],
-    });
 
-    const summary = await service.syncScheduledRegion('IN', {
-      assetType: 'STOCK',
-      now: new Date('2026-05-05T03:00:00.000Z'),
-    });
-
-    expect(repository.listActiveStockSyncTasks).toHaveBeenCalled();
-    expect(service.ingestSymbol).toHaveBeenCalledWith(
-      'RETRY',
-      undefined,
-      expect.any(Date),
-      false,
-      expect.objectContaining({
-        region: 'IN',
-        assetType: 'STOCK',
-        skipFreshnessGate: true,
-      })
-    );
-    expect(summary).toMatchObject({
-      instrumentsProcessed: 1,
-      rowsNoOp: 1,
-    });
-  });
-
-  it.skip('adds changed-set evidence only for instruments with inserted or updated rows', async () => {
-    const previousFlag = process.env.MARKET_DATA_NSE_OFFICIAL_EOD_BULK_ENABLED;
-    process.env.MARKET_DATA_NSE_OFFICIAL_EOD_BULK_ENABLED = 'false';
-    const tasks = [
-      {
-        id: 'stock-1',
-        symbol: 'CHANGED',
-        providerSymbol: 'CHANGED.NS',
-        sourceSymbol: 'CHANGED',
-        displaySymbol: 'CHANGED',
-        lastSuccessfulDataLoadTimestamp: null,
-      },
-      {
-        id: 'stock-2',
-        symbol: 'UNCHANGED',
-        providerSymbol: 'UNCHANGED.NS',
-        sourceSymbol: 'UNCHANGED',
-        displaySymbol: 'UNCHANGED',
-        lastSuccessfulDataLoadTimestamp: null,
-      },
-    ];
-    const repository = {
-      listActiveStockSyncTasks: jest.fn().mockResolvedValue(tasks),
-      upsertSyncState: jest.fn().mockResolvedValue({}),
-      latestStoredTradingDateForRegion: jest.fn().mockResolvedValue('2026-05-05'),
-      getSyncState: jest.fn().mockResolvedValue(null),
-    };
-    const service = new MarketDataFoundationService(repository as any, {} as any);
-    jest.spyOn(service, 'ingestSymbol')
-      .mockResolvedValueOnce({
-        rowsReceived: 1,
-        rowsInserted: 1,
-        rowsUpdated: 0,
-        rowsSkipped: 0,
-        rowsNoOp: 0,
-        warningCount: 0,
-        warnings: [],
-      })
-      .mockResolvedValueOnce({
-        rowsReceived: 1,
-        rowsInserted: 0,
-        rowsUpdated: 0,
-        rowsSkipped: 0,
-        rowsNoOp: 1,
-        warningCount: 0,
-        warnings: [],
-      });
-
-    try {
-      const summary = await service.syncScheduledRegion('IN', {
-        assetType: 'STOCK',
-        batchSize: 2,
-        now: new Date('2026-05-05T10:30:00.000Z'),
-      });
-
-      expect(summary).toMatchObject({
-        changedInstrumentIds: ['stock-1'],
-        downstreamInstrumentIds: ['stock-1', 'stock-2'],
-        changedInstrumentCount: 1,
-        dqStageEligible: true,
-      });
-      expect(summary.sourceFingerprint).toEqual(expect.any(String));
-    } finally {
-      if (previousFlag === undefined) delete process.env.MARKET_DATA_NSE_OFFICIAL_EOD_BULK_ENABLED;
-      else process.env.MARKET_DATA_NSE_OFFICIAL_EOD_BULK_ENABLED = previousFlag;
-    }
-  });
-
-  it.skip('uses per-symbol stored candle basis for scheduled stale catch-up', async () => {
-    const tasks = [
-      {
-        id: 'stock-1',
-        symbol: 'STALE',
-        providerSymbol: 'STALE.NS',
-        lastSuccessfulDataLoadTimestamp: new Date('2026-05-19T00:00:00.000Z'),
-        latestStoredTimestamp: new Date('2026-05-17T00:00:00.000Z'),
-      },
-    ];
-    const repository = {
-      countStaleActiveStockSyncTasks: jest.fn().mockResolvedValue(tasks.length),
-      listStaleActiveStockSyncTasks: jest.fn().mockResolvedValue(tasks),
-      listActiveStockSyncTasks: jest.fn(),
-      upsertSyncState: jest.fn().mockResolvedValue({}),
-      latestStoredTradingDateForRegion: jest.fn().mockResolvedValue('2026-05-18'),
-      getSyncState: jest.fn().mockResolvedValue({
-        status: 'SYNCED',
-        lastCheckedAt: new Date('2026-05-18T12:00:00.000Z').toISOString(),
-      }),
-      updateStockLoadTimestampBySymbol: jest.fn().mockResolvedValue({}),
-    };
-    const service = new MarketDataFoundationService(repository as any, {} as any);
-    jest.spyOn(service, 'ingestSymbol').mockResolvedValue({
-      rowsReceived: 1,
-      rowsInserted: 1,
-      rowsUpdated: 0,
-      rowsSkipped: 0,
-      rowsNoOp: 0,
-      warningCount: 0,
-      warnings: [],
-    });
-
-    await service.syncScheduledRegion('IN', {
-      assetType: 'STOCK',
-      batchSize: 1,
-      now: new Date('2026-05-18T12:00:00.000Z'),
-    });
-
-    expect(repository.listStaleActiveStockSyncTasks).toHaveBeenCalledWith(
-      { region: 'IN', assetType: 'STOCK' },
-      '2026-05-18',
-      1,
-      []
-    );
-    expect(repository.listActiveStockSyncTasks).not.toHaveBeenCalled();
-    expect(service.ingestSymbol).toHaveBeenCalledWith(
-      'STALE',
-      new Date('2026-05-14T00:00:00.000Z'),
-      new Date('2026-05-18T23:59:59.999Z'),
-      false,
-      expect.objectContaining({
-        region: 'IN',
-        assetType: 'STOCK',
-        skipFreshnessGate: true,
-      })
-    );
-  });
-
-  it.skip('attempts one official NSE EOD bulk file first and stores matched rows under canonical symbols', async () => {
-    const previousFlag = process.env.MARKET_DATA_NSE_OFFICIAL_EOD_BULK_ENABLED;
-    const previousFetch = global.fetch;
-    process.env.MARKET_DATA_NSE_OFFICIAL_EOD_BULK_ENABLED = 'true';
-    const csvText = [
-      'SYMBOL,SERIES,DATE1,OPEN_PRICE,HIGH_PRICE,LOW_PRICE,CLOSE_PRICE,TTL_TRD_QNTY',
-      'RELIANCE,EQ,18-05-2026,100,110,95,108,1000',
-    ].join('\n');
-    const payload = Buffer.from(csvText);
-    global.fetch = jest.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      headers: { get: (name: string) => (name.toLowerCase() === 'content-length' ? String(payload.length) : null) },
-      arrayBuffer: async () => payload.buffer.slice(payload.byteOffset, payload.byteOffset + payload.byteLength),
-    }) as any;
-
-    const tasks = [
-      {
-        id: 'stock-1',
-        symbol: 'RELIANCE',
-        providerSymbol: 'RELIANCE.NS',
-        sourceSymbol: 'RELIANCE',
-        displaySymbol: 'RELIANCE',
-        lastSuccessfulDataLoadTimestamp: new Date('2026-05-19T00:00:00.000Z'),
-        latestStoredTimestamp: new Date('2026-05-17T00:00:00.000Z'),
-      },
-      {
-        id: 'stock-2',
-        symbol: 'UNMATCHED',
-        providerSymbol: 'UNMATCHED.NS',
-        sourceSymbol: 'UNMATCHED',
-        displaySymbol: 'UNMATCHED',
-        lastSuccessfulDataLoadTimestamp: new Date('2026-05-19T00:00:00.000Z'),
-        latestStoredTimestamp: new Date('2026-05-17T00:00:00.000Z'),
-      },
-    ];
-    const repository = {
-      countStaleActiveStockSyncTasks: jest.fn().mockResolvedValue(tasks.length),
-      listStaleActiveStockSyncTasks: jest.fn().mockResolvedValue(tasks),
-      listActiveStockSyncTasks: jest.fn(),
-      upsertSyncState: jest.fn().mockResolvedValue({}),
-      latestStoredTradingDateForRegion: jest.fn().mockResolvedValue('2026-05-18'),
-      getSyncState: jest.fn().mockResolvedValue({
-        status: 'SYNCED',
-        lastCheckedAt: new Date('2026-05-18T12:00:00.000Z').toISOString(),
-      }),
-      updateStockLoadTimestampBySymbol: jest.fn().mockResolvedValue({}),
-    };
-    const service = new MarketDataFoundationService(repository as any, {} as any);
-    const storeHistorical = jest.spyOn(service, 'storeHistorical').mockResolvedValue({
-      rowsReceived: 1,
-      rowsInserted: 1,
-      rowsUpdated: 0,
-      rowsSkipped: 0,
-      rowsNoOp: 0,
-      warningCount: 0,
-      warnings: [],
-    });
-    const ingestSymbol = jest.spyOn(service, 'ingestSymbol').mockResolvedValue({
-      rowsReceived: 1,
-      rowsInserted: 0,
-      rowsUpdated: 0,
-      rowsSkipped: 0,
-      rowsNoOp: 1,
-      warningCount: 0,
-      warnings: [],
-    });
-
-    try {
-      const summary = await service.syncScheduledRegion('IN', {
-        assetType: 'STOCK',
-        batchSize: 2,
-        now: new Date('2026-05-18T12:00:00.000Z'),
-      });
-
-      expect(global.fetch).toHaveBeenCalledWith(
-        'https://archives.nseindia.com/products/content/sec_bhavdata_full_18052026.csv',
-        expect.any(Object)
-      );
-      expect(storeHistorical).toHaveBeenCalledWith([
-        expect.objectContaining({
-          symbol: 'RELIANCE',
-          source: 'NSE_SECURITY_BHAVDATA',
-          date: new Date('2026-05-18T00:00:00.000Z'),
-        }),
-      ]);
-      expect(repository.updateStockLoadTimestampBySymbol).toHaveBeenCalledWith('RELIANCE');
-      expect(ingestSymbol).toHaveBeenCalledTimes(1);
-      expect(ingestSymbol).toHaveBeenCalledWith(
-        'UNMATCHED',
-        new Date('2026-05-14T00:00:00.000Z'),
-        new Date('2026-05-18T23:59:59.999Z'),
-        false,
-        expect.objectContaining({
-          region: 'IN',
-          assetType: 'STOCK',
-          skipFreshnessGate: true,
-        })
-      );
-      expect(summary).toMatchObject({
-        instrumentsProcessed: 2,
-        rowsInserted: 1,
-        rowsNoOp: 1,
-        officialEodBulk: {
-          attempted: true,
-          sourceName: 'NSE_SECURITY_BHAVDATA',
-          matchedInstruments: 1,
-          fallbackReason: 'OFFICIAL_EOD_PARTIAL_MATCH:1_UNMATCHED',
-        },
-      });
-    } finally {
-      if (previousFlag === undefined) delete process.env.MARKET_DATA_NSE_OFFICIAL_EOD_BULK_ENABLED;
-      else process.env.MARKET_DATA_NSE_OFFICIAL_EOD_BULK_ENABLED = previousFlag;
-      global.fetch = previousFetch;
-    }
-  });
 
   it('uses NSE UDiFF zip as the first official EOD source when available', async () => {
     const previousFlag = process.env.MARKET_DATA_NSE_OFFICIAL_EOD_BULK_ENABLED;
@@ -2972,197 +2547,8 @@ describe('MarketDataFoundationService syncV1', () => {
     }
   });
 
-  it.skip('does not match BSE tasks to official NSE EOD rows by bare symbol and falls back to per-symbol ingest', async () => {
-    const previousFlag = process.env.MARKET_DATA_NSE_OFFICIAL_EOD_BULK_ENABLED;
-    const previousFetch = global.fetch;
-    process.env.MARKET_DATA_NSE_OFFICIAL_EOD_BULK_ENABLED = 'true';
-    const csvText = [
-      'SYMBOL,SERIES,DATE1,OPEN_PRICE,HIGH_PRICE,LOW_PRICE,CLOSE_PRICE,TTL_TRD_QNTY',
-      'RELIANCE,EQ,18-05-2026,100,110,95,108,1000',
-    ].join('\n');
-    const payload = Buffer.from(csvText);
-    global.fetch = jest.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      headers: { get: (name: string) => (name.toLowerCase() === 'content-length' ? String(payload.length) : null) },
-      arrayBuffer: async () => payload.buffer.slice(payload.byteOffset, payload.byteOffset + payload.byteLength),
-    }) as any;
 
-    const tasks = [
-      {
-        id: 'stock-bse',
-        symbol: 'RELIANCE.BO',
-        providerSymbol: 'RELIANCE.BO',
-        sourceSymbol: 'RELIANCE',
-        displaySymbol: 'RELIANCE',
-        exchange: 'BSE',
-        lastSuccessfulDataLoadTimestamp: new Date('2026-05-19T00:00:00.000Z'),
-        latestStoredTimestamp: new Date('2026-05-17T00:00:00.000Z'),
-      },
-      {
-        id: 'stock-nse',
-        symbol: 'RELIANCE',
-        providerSymbol: 'RELIANCE.NS',
-        sourceSymbol: 'RELIANCE',
-        displaySymbol: 'RELIANCE',
-        exchange: 'NSE',
-        lastSuccessfulDataLoadTimestamp: new Date('2026-05-19T00:00:00.000Z'),
-        latestStoredTimestamp: new Date('2026-05-17T00:00:00.000Z'),
-      },
-    ];
-    const repository = {
-      countStaleActiveStockSyncTasks: jest.fn().mockResolvedValue(tasks.length),
-      listStaleActiveStockSyncTasks: jest.fn().mockResolvedValue(tasks),
-      listActiveStockSyncTasks: jest.fn(),
-      upsertSyncState: jest.fn().mockResolvedValue({}),
-      latestStoredTradingDateForRegion: jest.fn().mockResolvedValue('2026-05-18'),
-      getSyncState: jest.fn().mockResolvedValue({
-        status: 'SYNCED',
-        lastCheckedAt: new Date('2026-05-18T12:00:00.000Z').toISOString(),
-      }),
-      updateStockLoadTimestampBySymbol: jest.fn().mockResolvedValue({}),
-    };
-    const service = new MarketDataFoundationService(repository as any, {} as any);
-    const storeHistorical = jest.spyOn(service, 'storeHistorical').mockResolvedValue({
-      rowsReceived: 1,
-      rowsInserted: 1,
-      rowsUpdated: 0,
-      rowsSkipped: 0,
-      rowsNoOp: 0,
-      warningCount: 0,
-      warnings: [],
-    });
-    const ingestSymbol = jest.spyOn(service, 'ingestSymbol').mockResolvedValue({
-      rowsReceived: 1,
-      rowsInserted: 0,
-      rowsUpdated: 0,
-      rowsSkipped: 0,
-      rowsNoOp: 1,
-      warningCount: 0,
-      warnings: [],
-    });
 
-    try {
-      await service.syncScheduledRegion('IN', {
-        assetType: 'STOCK',
-        batchSize: 2,
-        now: new Date('2026-05-18T12:00:00.000Z'),
-      });
-
-      expect(storeHistorical).toHaveBeenCalledTimes(1);
-      expect(storeHistorical).toHaveBeenCalledWith([
-        expect.objectContaining({
-          symbol: 'RELIANCE',
-          source: 'NSE_SECURITY_BHAVDATA',
-          date: new Date('2026-05-18T00:00:00.000Z'),
-        }),
-      ]);
-      expect(storeHistorical).not.toHaveBeenCalledWith([
-        expect.objectContaining({
-          symbol: 'RELIANCE.BO',
-        }),
-      ]);
-      expect(repository.updateStockLoadTimestampBySymbol).toHaveBeenCalledWith('RELIANCE');
-      expect(ingestSymbol).toHaveBeenCalledTimes(1);
-      expect((ingestSymbol as jest.Mock).mock.calls[0][0]).toBe('RELIANCE.BO');
-    } finally {
-      if (previousFlag === undefined) delete process.env.MARKET_DATA_NSE_OFFICIAL_EOD_BULK_ENABLED;
-      else process.env.MARKET_DATA_NSE_OFFICIAL_EOD_BULK_ENABLED = previousFlag;
-      global.fetch = previousFetch;
-    }
-  });
-
-  it.skip('falls back to per-symbol provider loop when official NSE EOD bulk is disabled', async () => {
-    const previousFlag = process.env.MARKET_DATA_NSE_OFFICIAL_EOD_BULK_ENABLED;
-    const previousFetch = global.fetch;
-    process.env.MARKET_DATA_NSE_OFFICIAL_EOD_BULK_ENABLED = 'false';
-    global.fetch = jest.fn() as any;
-
-    const repository = {
-      listActiveStockSyncTasks: jest.fn().mockResolvedValue([{
-        id: 'stock-1',
-        symbol: 'CURRENT',
-        providerSymbol: 'CURRENT.NS',
-        sourceSymbol: 'CURRENT',
-        displaySymbol: 'CURRENT',
-        lastSuccessfulDataLoadTimestamp: new Date('2026-05-17T00:00:00.000Z'),
-      }]),
-      upsertSyncState: jest.fn().mockResolvedValue({}),
-      latestStoredTradingDateForRegion: jest.fn().mockResolvedValue(null),
-      getSyncState: jest.fn().mockResolvedValue(null),
-    };
-    const service = new MarketDataFoundationService(repository as any, {} as any);
-    const ingestSymbol = jest.spyOn(service, 'ingestSymbol').mockResolvedValue({
-      rowsReceived: 1,
-      rowsInserted: 0,
-      rowsUpdated: 0,
-      rowsSkipped: 0,
-      rowsNoOp: 1,
-      warningCount: 0,
-      warnings: [],
-    });
-
-    try {
-      const summary = await service.syncScheduledRegion('IN', {
-        assetType: 'STOCK',
-        batchSize: 1,
-        now: new Date('2026-05-18T10:30:00.000Z'),
-      });
-
-      expect(global.fetch).not.toHaveBeenCalled();
-      expect(ingestSymbol).toHaveBeenCalledTimes(1);
-      expect(summary.officialEodBulk).toMatchObject({
-        enabled: false,
-        attempted: false,
-        fallbackReason: 'OFFICIAL_EOD_DISABLED',
-      });
-    } finally {
-      if (previousFlag === undefined) delete process.env.MARKET_DATA_NSE_OFFICIAL_EOD_BULK_ENABLED;
-      else process.env.MARKET_DATA_NSE_OFFICIAL_EOD_BULK_ENABLED = previousFlag;
-      global.fetch = previousFetch;
-    }
-  });
-
-  it.skip('preserves incremental start-date selection for ordinary scheduled tasks', async () => {
-    const repository = {
-      listActiveStockSyncTasks: jest.fn().mockResolvedValue([{
-        id: 'stock-1',
-        symbol: 'CURRENT',
-        lastSuccessfulDataLoadTimestamp: new Date('2026-05-17T00:00:00.000Z'),
-      }]),
-      upsertSyncState: jest.fn().mockResolvedValue({}),
-      latestStoredTradingDateForRegion: jest.fn().mockResolvedValue('2026-05-18'),
-      getSyncState: jest.fn().mockResolvedValue(null),
-    };
-    const service = new MarketDataFoundationService(repository as any, {} as any);
-    jest.spyOn(service, 'ingestSymbol').mockResolvedValue({
-      rowsReceived: 1,
-      rowsInserted: 0,
-      rowsUpdated: 0,
-      rowsSkipped: 0,
-      rowsNoOp: 1,
-      warningCount: 0,
-      warnings: [],
-    });
-
-    await service.syncScheduledRegion('IN', {
-      assetType: 'STOCK',
-      batchSize: 1,
-      now: new Date('2026-05-18T10:30:00.000Z'),
-    });
-
-    expect(service.ingestSymbol).toHaveBeenCalledWith(
-      'CURRENT',
-      undefined,
-      expect.any(Date),
-      false,
-      expect.objectContaining({
-        region: 'IN',
-        assetType: 'STOCK',
-        skipFreshnessGate: true,
-      })
-    );
-  });
 
   it('skips recently synced catalog before provider workers are started', async () => {
     const lastCheckedAt = new Date(Date.now() - 5 * 60_000).toISOString();
@@ -3441,74 +2827,6 @@ describe('MarketDataFoundationService syncV1', () => {
     }
   });
 
-  it.skip('force instrument sync bypasses recent freshness gate and still allows no-op storage', async () => {
-    const repository = {
-      findStockBySymbol: jest.fn().mockResolvedValue({ symbol: 'AAPL', region: 'GLOBAL', assetType: 'STOCK', lastSuccessfulDataLoadTimestamp: new Date() }),
-      latestStoredTradingDateForRegion: jest.fn().mockResolvedValue(null),
-      getSyncState: jest.fn().mockResolvedValue({
-        status: 'SYNCED',
-        lastCheckedAt: new Date().toISOString(),
-      }),
-      updateStockLoadTimestampBySymbol: jest.fn().mockResolvedValue({}),
-      upsertSyncState: jest.fn().mockResolvedValue({}),
-    };
-    const provider = {
-      inferRegion: jest.fn().mockReturnValue({ region: 'US', exchange: 'NASDAQ' }),
-      fetchHistorical: jest.fn().mockResolvedValue([
-        { symbol: 'AAPL', date: new Date('2026-05-05T00:00:00.000Z'), open: 1, high: 1, low: 1, close: 1, volume: 1 },
-      ]),
-    };
-    const service = new MarketDataFoundationService(repository as any, provider as any);
-    jest.spyOn(service, 'storeHistorical').mockResolvedValue({
-      rowsReceived: 1,
-      rowsInserted: 0,
-      rowsUpdated: 0,
-      rowsSkipped: 0,
-      rowsNoOp: 1,
-      warningCount: 0,
-      warnings: [],
-    });
-
-    const result = await service.ingestSymbol('AAPL', new Date('2026-05-02T00:00:00.000Z'), new Date('2026-05-05T00:00:00.000Z'), false, { force: true });
-
-    expect(provider.fetchHistorical).toHaveBeenCalledTimes(1);
-    expect(result).toMatchObject({ rowsNoOp: 1, rowsInserted: 0, rowsUpdated: 0 });
-  });
-
-  const createCatchUpService = (latestStoredTradingDate: string | null) => {
-    const repository = {
-      findStockBySymbol: jest.fn().mockResolvedValue({
-        symbol: 'RELIANCE',
-        providerSymbol: 'RELIANCE.NS',
-        region: 'IN',
-        assetType: 'STOCK',
-        lastSuccessfulDataLoadTimestamp: new Date('2026-05-11T00:00:00.000Z'),
-      }),
-      latestStoredTradingDateForRegion: jest.fn().mockResolvedValue(latestStoredTradingDate),
-      getSyncState: jest.fn().mockResolvedValue(null),
-      updateStockLoadTimestampBySymbol: jest.fn().mockResolvedValue({}),
-      updateProviderSupportStatus: jest.fn().mockResolvedValue({}),
-      upsertSyncState: jest.fn().mockResolvedValue({}),
-    };
-    const provider = {
-      inferRegion: jest.fn().mockReturnValue({ region: 'IN', exchange: 'NSE' }),
-      fetchHistorical: jest.fn().mockResolvedValue([
-        { symbol: 'RELIANCE', date: new Date('2026-05-12T00:00:00.000Z'), open: 1, high: 1, low: 1, close: 1, volume: 1 },
-      ]),
-    };
-    const service = new MarketDataFoundationService(repository as any, provider as any);
-    jest.spyOn(service, 'storeHistorical').mockResolvedValue({
-      rowsReceived: 1,
-      rowsInserted: 1,
-      rowsUpdated: 0,
-      rowsSkipped: 0,
-      rowsNoOp: 0,
-      warningCount: 0,
-      warnings: [],
-    });
-    return { repository, provider, service };
-  };
-
   it('skips provider fetch before market open for 1D data when latest completed EOD is current', async () => {
     const repository = {
       findStockBySymbol: jest.fn().mockResolvedValue({ symbol: 'RELIANCE', region: 'IN', assetType: 'STOCK', lastSuccessfulDataLoadTimestamp: null }),
@@ -3531,61 +2849,9 @@ describe('MarketDataFoundationService syncV1', () => {
     });
   });
 
-  it.skip('fetches missing latest completed EOD before market open and caps the provider end date', async () => {
-    const { provider, service } = createCatchUpService('2026-05-11');
 
-    const result = await service.ingestSymbol('RELIANCE.NS', undefined, new Date('2026-05-13T03:00:00.000Z'));
 
-    expect(provider.fetchHistorical).toHaveBeenCalledTimes(1);
-    expect((provider.fetchHistorical as jest.Mock).mock.calls[0][2].toISOString()).toBe('2026-05-12T23:59:59.999Z');
-    expect(result).toMatchObject({ rowsReceived: 1, rowsInserted: 1 });
-  });
 
-  it.skip('fetches missing latest completed EOD during market hours without requesting the in-progress candle', async () => {
-    const { provider, service } = createCatchUpService('2026-05-11');
-
-    await service.ingestSymbol('RELIANCE.NS', undefined, new Date('2026-05-13T05:00:00.000Z'));
-
-    expect(provider.fetchHistorical).toHaveBeenCalledTimes(1);
-    expect((provider.fetchHistorical as jest.Mock).mock.calls[0][2].toISOString()).toBe('2026-05-12T23:59:59.999Z');
-  });
-
-  it.skip('fetches missing latest completed EOD after close grace through the current completed trading day', async () => {
-    const { provider, service } = createCatchUpService('2026-05-11');
-
-    await service.ingestSymbol('RELIANCE.NS', undefined, new Date('2026-05-13T10:30:00.000Z'));
-
-    expect(provider.fetchHistorical).toHaveBeenCalledTimes(1);
-    expect((provider.fetchHistorical as jest.Mock).mock.calls[0][2].toISOString()).toBe('2026-05-13T23:59:59.999Z');
-  });
-
-  it.skip('caps scheduled catch-up batches to the missing latest completed EOD before market open', async () => {
-    const repository = {
-      listActiveStockSyncTasks: jest.fn().mockResolvedValue([{ id: 'stock-1', symbol: 'RELIANCE', lastSuccessfulDataLoadTimestamp: null }]),
-      instrumentCount: jest.fn().mockResolvedValue(1),
-      upsertSyncState: jest.fn().mockResolvedValue({}),
-      latestStoredTradingDateForRegion: jest.fn().mockResolvedValue('2026-05-11'),
-      getSyncState: jest.fn().mockResolvedValue(null),
-    };
-    const service = new MarketDataFoundationService(repository as any, {} as any);
-    jest.spyOn(service, 'ingestSymbol').mockResolvedValue({
-      rowsReceived: 1,
-      rowsInserted: 1,
-      rowsUpdated: 0,
-      rowsSkipped: 0,
-      rowsNoOp: 0,
-      warningCount: 0,
-      warnings: [],
-    });
-
-    await service.syncScheduledRegion('IN', {
-      assetType: 'STOCK',
-      now: new Date('2026-05-13T03:00:00.000Z'),
-    });
-
-    const ingestCall = (service.ingestSymbol as jest.Mock).mock.calls[0];
-    expect((ingestCall[2] as Date).toISOString()).toBe('2026-05-12T23:59:59.999Z');
-  });
 
   it('skips provider fetch when final daily candle is confirmed', async () => {
     const repository = {
@@ -3634,402 +2900,17 @@ describe('MarketDataFoundationService syncV1', () => {
     });
   });
 
-  it.skip('allows provider fetch in post-close finalization window when final candle is not confirmed', async () => {
-    const repository = {
-      findStockBySymbol: jest.fn().mockResolvedValue({ symbol: 'RELIANCE', region: 'IN', assetType: 'STOCK', lastSuccessfulDataLoadTimestamp: null }),
-      latestStoredTradingDateForRegion: jest.fn().mockResolvedValue(null),
-      getSyncState: jest.fn().mockResolvedValue(null),
-      updateStockLoadTimestampBySymbol: jest.fn().mockResolvedValue({}),
-      upsertSyncState: jest.fn().mockResolvedValue({}),
-    };
-    const provider = {
-      inferRegion: jest.fn().mockReturnValue({ region: 'IN', exchange: 'NSE' }),
-      fetchHistorical: jest.fn().mockResolvedValue([
-        { symbol: 'RELIANCE', date: new Date('2026-05-05T00:00:00.000Z'), open: 1, high: 1, low: 1, close: 1, volume: 1 },
-      ]),
-    };
-    const service = new MarketDataFoundationService(repository as any, provider as any);
-    jest.spyOn(service, 'storeHistorical').mockResolvedValue({
-      rowsReceived: 1,
-      rowsInserted: 1,
-      rowsUpdated: 0,
-      rowsSkipped: 0,
-      rowsNoOp: 0,
-      warningCount: 0,
-      warnings: [],
-    });
 
-    await service.ingestSymbol('RELIANCE.NS', undefined, new Date('2026-05-05T10:30:00.000Z'));
 
-    expect(provider.fetchHistorical).toHaveBeenCalledTimes(1);
-  });
 
-  it.skip('runs bounded provider validation and updates supported rows', async () => {
-    const repository = {
-      listStocksForProviderValidation: jest.fn().mockResolvedValue({
-        total: 1,
-        stocks: [{ symbol: 'ABB', providerSymbol: 'ABB.NS', isActive: true, isDelisted: false }],
-      }),
-      updateProviderSupportStatus: jest.fn().mockResolvedValue({}),
-    };
-    const provider = { validateProviderSymbol: jest.fn().mockResolvedValue({ supported: true }) };
-    const service = new MarketDataFoundationService(repository as any, provider as any);
 
-    const result = await service.validateProviders({ region: 'IN', assetType: 'STOCK', batchSize: 1, offset: 0 });
 
-    expect(repository.listStocksForProviderValidation).toHaveBeenCalledWith(expect.objectContaining({
-      region: 'IN',
-      assetType: 'STOCK',
-      batchSize: 1,
-      offset: 0,
-    }));
-    expect(repository.updateProviderSupportStatus).toHaveBeenCalledWith('ABB', 'SUPPORTED', undefined);
-    expect(result).toMatchObject({
-      processedCount: 1,
-      providerValidated: 1,
-      providerSupported: 1,
-      updated: 1,
-    });
-  });
 
-  it.skip('uses offset zero for mutating provider validation queues to avoid skipped rows', async () => {
-    const repository = {
-      listStocksForProviderValidation: jest.fn().mockResolvedValue({
-        total: 75,
-        stocks: Array.from({ length: 50 }).map((_, index) => ({ symbol: `ROW${index}.NS`, providerSymbol: `ROW${index}.NS`, isActive: true, isDelisted: false })),
-      }),
-      updateProviderSupportStatus: jest.fn().mockResolvedValue({}),
-    };
-    const provider = { validateProviderSymbol: jest.fn().mockResolvedValue({ supported: true }) };
-    const service = new MarketDataFoundationService(repository as any, provider as any);
 
-    const result = await service.validateProviders({ region: 'IN', assetType: 'STOCK', batchSize: 50, offset: 50 });
 
-    expect(repository.listStocksForProviderValidation).toHaveBeenCalledWith(expect.objectContaining({
-      batchSize: 50,
-      offset: 0,
-    }));
-    expect(result).toMatchObject({
-      processedCount: 50,
-      nextOffset: 0,
-      hasMore: true,
-    });
-  });
 
-  it.skip('records provider validation errors as retryable VALIDATION_FAILED', async () => {
-    const repository = {
-      listStocksForProviderValidation: jest.fn().mockResolvedValue({
-        total: 1,
-        stocks: [{ symbol: 'ERR', providerSymbol: 'ERR.NS', isActive: true, isDelisted: false }],
-      }),
-      updateProviderSupportStatus: jest.fn().mockResolvedValue({}),
-    };
-    const provider = { validateProviderSymbol: jest.fn().mockResolvedValue({ supported: false, failed: true, message: 'network error' }) };
-    const service = new MarketDataFoundationService(repository as any, provider as any);
 
-    const result = await service.validateProviders({ region: 'IN', assetType: 'STOCK' });
 
-    expect(repository.updateProviderSupportStatus).toHaveBeenCalledWith('ERR', 'VALIDATION_FAILED', 'network error');
-    expect(result).toMatchObject({
-      failed: 1,
-      validationFailed: 1,
-    });
-  });
-
-  it.skip('uses Angel One provider validation for IN/STOCK symbols that Angel historical can handle', async () => {
-    const repository = {
-      listStocksForProviderValidation: jest.fn().mockResolvedValue({
-        total: 1,
-        stocks: [{ symbol: 'ANGEL', providerSymbol: 'ANGEL.NS', isActive: true, isDelisted: false }],
-      }),
-      updateProviderSupportStatus: jest.fn().mockResolvedValue({}),
-    };
-    const provider = {
-      validateProviderSymbol: jest.fn().mockResolvedValue({ supported: true }),
-    };
-    const angelProvider = {
-      canHandleHistorical: jest.fn().mockReturnValue(true),
-      shouldFailClosed: jest.fn().mockReturnValue(true),
-      validateProviderSymbol: jest.fn().mockResolvedValue({
-        supported: true,
-        classification: 'SUPPORTED_WITH_CANDLES',
-        provider: 'angel_one',
-        sourceName: 'ANGEL_ONE_HISTORICAL',
-        candlesFound: 12,
-      }),
-    };
-    const service = new MarketDataFoundationService(repository as any, provider as any, angelProvider as any);
-
-    const result = await service.validateProviders({ region: 'IN', assetType: 'STOCK' });
-
-    expect(angelProvider.validateProviderSymbol).toHaveBeenCalledWith('ANGEL.NS', expect.objectContaining({
-      region: 'IN',
-      assetType: 'STOCK',
-    }));
-    expect(provider.validateProviderSymbol).not.toHaveBeenCalled();
-    expect(repository.updateProviderSupportStatus).toHaveBeenCalledWith('ANGEL', 'SUPPORTED', undefined);
-    expect(result).toMatchObject({
-      processedCount: 1,
-      providerSupported: 1,
-      validationFailed: 0,
-    });
-    expect(result.sampleResults?.[0]).toMatchObject({
-      sourceName: 'ANGEL_ONE_HISTORICAL',
-      status: 'SUPPORTED',
-    });
-  });
-
-  it.skip('falls back to Yahoo validation for IN/STOCK when Angel validation fails and fail-open mode is enabled', async () => {
-    const repository = {
-      listStocksForProviderValidation: jest.fn().mockResolvedValue({
-        total: 1,
-        stocks: [{ symbol: 'FAILOPEN', providerSymbol: 'FAILOPEN.NS', isActive: true, isDelisted: false }],
-      }),
-      updateProviderSupportStatus: jest.fn().mockResolvedValue({}),
-    };
-    const provider = {
-      validateProviderSymbol: jest.fn().mockResolvedValue({
-        supported: true,
-        classification: 'SUPPORTED_WITH_CANDLES',
-        provider: 'yahoo',
-        sourceName: 'YAHOO_CHART',
-      }),
-    };
-    const angelProvider = {
-      canHandleHistorical: jest.fn().mockReturnValue(true),
-      shouldFailClosed: jest.fn().mockReturnValue(false),
-      validateProviderSymbol: jest.fn().mockResolvedValue({
-        supported: false,
-        failed: true,
-        classification: 'RETRYABLE_PROVIDER_ERROR',
-        provider: 'angel_one',
-        sourceName: 'ANGEL_ONE_HISTORICAL',
-        message: 'Angel One request failed.',
-      }),
-    };
-    const service = new MarketDataFoundationService(repository as any, provider as any, angelProvider as any);
-
-    const result = await service.validateProviders({ region: 'IN', assetType: 'STOCK' });
-
-    expect(angelProvider.validateProviderSymbol).toHaveBeenCalledTimes(1);
-    expect(provider.validateProviderSymbol).toHaveBeenCalledTimes(1);
-    expect(repository.updateProviderSupportStatus).toHaveBeenCalledWith('FAILOPEN', 'SUPPORTED', undefined);
-    expect(result).toMatchObject({
-      processedCount: 1,
-      providerSupported: 1,
-      validationFailed: 0,
-    });
-    expect(result.sampleResults?.[0]).toMatchObject({
-      sourceName: 'YAHOO_CHART',
-      status: 'SUPPORTED',
-    });
-  });
-
-  it.skip('does not fall back to Yahoo validation for IN/STOCK when Angel fail-closed mode is enabled', async () => {
-    const repository = {
-      listStocksForProviderValidation: jest.fn().mockResolvedValue({
-        total: 1,
-        stocks: [{ symbol: 'FAILCLOSED', providerSymbol: 'FAILCLOSED.NS', isActive: true, isDelisted: false }],
-      }),
-      updateProviderSupportStatus: jest.fn().mockResolvedValue({}),
-    };
-    const provider = {
-      validateProviderSymbol: jest.fn().mockResolvedValue({ supported: true }),
-    };
-    const angelProvider = {
-      canHandleHistorical: jest.fn().mockReturnValue(true),
-      shouldFailClosed: jest.fn().mockReturnValue(true),
-      validateProviderSymbol: jest.fn().mockResolvedValue({
-        supported: false,
-        failed: true,
-        classification: 'RETRYABLE_RATE_LIMITED',
-        provider: 'angel_one',
-        sourceName: 'ANGEL_ONE_HISTORICAL',
-        message: 'Access denied because of exceeding access rate.',
-      }),
-    };
-    const service = new MarketDataFoundationService(repository as any, provider as any, angelProvider as any);
-
-    const result = await service.validateProviders({ region: 'IN', assetType: 'STOCK' });
-
-    expect(angelProvider.validateProviderSymbol).toHaveBeenCalledTimes(1);
-    expect(provider.validateProviderSymbol).not.toHaveBeenCalled();
-    expect(repository.updateProviderSupportStatus).toHaveBeenCalledWith('FAILCLOSED', 'VALIDATION_FAILED', 'Access denied because of exceeding access rate.');
-    expect(result).toMatchObject({
-      processedCount: 1,
-      providerSupported: 0,
-      validationFailed: 1,
-    });
-    expect(result.sampleResults?.[0]).toMatchObject({
-      sourceName: 'ANGEL_ONE_HISTORICAL',
-      status: 'VALIDATION_FAILED',
-      classification: 'RETRYABLE_RATE_LIMITED',
-    });
-  });
-
-  it.skip('keeps Yahoo no-candle IN stock results visible as FREE_FALLBACK_REQUIRED', async () => {
-    const nextRetry = new Date('2026-05-13T12:30:00.000Z');
-    const repository = {
-      listStocksForProviderValidation: jest.fn().mockResolvedValue({
-        total: 1,
-        stocks: [{ id: 'stock-free-fallback', symbol: 'NODATA', providerSymbol: 'NODATA.NS', isActive: true, isDelisted: false, providerSupportStatus: 'UNKNOWN' }],
-      }),
-      priceReadinessStatsForSymbols: jest.fn().mockResolvedValue(new Map([['NODATA.NS', { priceHistoryBars: 0, firstPriceDate: null, latestPriceDate: null }]])),
-      updateProviderSupportStatus: jest.fn().mockResolvedValue({}),
-      countRepairAttempts: jest.fn().mockResolvedValue(0),
-      recordRepairAttempt: jest.fn().mockResolvedValue({ id: 'attempt-free-fallback' }),
-      upsertRepairState: jest.fn().mockResolvedValue({}),
-      countProviderValidationRepairStates: jest.fn().mockResolvedValue(0),
-      nextProviderValidationRetryAt: jest.fn().mockResolvedValue(nextRetry),
-    };
-    const provider = {
-      validateProviderSymbol: jest.fn().mockResolvedValue({
-        supported: false,
-        failed: true,
-        classification: 'FREE_FALLBACK_REQUIRED',
-        message: 'Yahoo returned no daily candles over the completed-EOD validation window.',
-        candlesFound: 0,
-        providerCallMs: 42,
-      }),
-    };
-    const service = new MarketDataFoundationService(repository as any, provider as any);
-
-    const result = await service.validateProviders({ region: 'IN', assetType: 'STOCK', batchSize: 1 });
-
-    expect(repository.updateProviderSupportStatus).toHaveBeenCalledWith(
-      'NODATA',
-      'VALIDATION_FAILED',
-      expect.stringContaining('Yahoo returned no daily candles')
-    );
-    expect(repository.upsertRepairState).toHaveBeenCalledWith(expect.objectContaining({
-      repairType: 'PROVIDER_VALIDATION',
-      status: 'FAILED_RETRYABLE',
-      nextRetryAt: expect.any(Date),
-      fieldsFilledJson: expect.objectContaining({
-        classification: 'FREE_FALLBACK_REQUIRED',
-        freeFallbackRequired: true,
-        requiredHistoryStartDate: expect.any(String),
-        latestCompletedEodDate: expect.any(String),
-        storedHistoryStartDate: null,
-        storedHistoryEndDate: null,
-      }),
-    }));
-    expect(result).toMatchObject({
-      validationFailed: 1,
-      freeFallbackRequired: 1,
-      providerRetryableFailures: 1,
-      requiredHistoryCoverageStatus: 'FALLBACK_REQUIRED',
-      latestCompletedEodDate: expect.any(String),
-      requiredHistoryStartDate: expect.any(String),
-      storedHistoryBars: 0,
-    });
-    expect(result.sampleResults?.[0]).toMatchObject({
-      classification: 'FREE_FALLBACK_REQUIRED',
-      status: 'VALIDATION_FAILED',
-      requiredHistoryStartDate: expect.any(String),
-      storedHistoryStartDate: null,
-      storedHistoryEndDate: null,
-    });
-  });
-
-  it.skip('marks UNKNOWN provider rows supported from stored OHLCV without a provider call', async () => {
-    const repository = {
-      listStocksForProviderValidation: jest.fn().mockResolvedValue({
-        total: 1,
-        stocks: [{ id: 'stock-stored', symbol: 'STORED', providerSymbol: 'STORED.NS', isActive: true, isDelisted: false, providerSupportStatus: 'UNKNOWN' }],
-      }),
-      priceReadinessStatsForSymbols: jest.fn().mockResolvedValue(new Map([[
-        'STORED',
-        { priceHistoryBars: 3820, firstPriceDate: '2011-05-13', latestPriceDate: '2026-05-12' },
-      ]])),
-      markProviderSupportedFromStoredPrices: jest.fn().mockResolvedValue({ count: 1 }),
-      recordRepairAttempt: jest.fn().mockResolvedValue({ id: 'attempt-stored' }),
-      upsertRepairState: jest.fn().mockResolvedValue({}),
-      countProviderValidationRepairStates: jest.fn().mockResolvedValue(0),
-      nextProviderValidationRetryAt: jest.fn().mockResolvedValue(null),
-    };
-    const provider = { validateProviderSymbol: jest.fn() };
-    const service = new MarketDataFoundationService(repository as any, provider as any);
-
-    const result = await service.validateProviders({ region: 'IN', assetType: 'STOCK', batchSize: 1 });
-
-    expect(provider.validateProviderSymbol).not.toHaveBeenCalled();
-    expect(repository.markProviderSupportedFromStoredPrices).toHaveBeenCalledWith(['STORED']);
-    expect(repository.upsertRepairState).toHaveBeenCalledWith(expect.objectContaining({
-      repairType: 'PROVIDER_VALIDATION',
-      status: 'RESOLVED',
-      fieldsFilledJson: expect.objectContaining({
-        classification: 'SUPPORTED_FROM_STORED_PRICES',
-        storedHistoryStartDate: '2011-05-13',
-        storedHistoryEndDate: '2026-05-12',
-      }),
-    }));
-    expect(result).toMatchObject({
-      processedCount: 1,
-      providerSupported: 1,
-      supportedFromStoredPrices: 1,
-      providerCalls: 0,
-      requiredHistoryCoverageStatus: 'NEEDS_BACKFILL',
-      storedHistoryStartDate: '2011-05-13',
-      storedHistoryEndDate: '2026-05-12',
-    });
-  });
-
-  it.skip('validates UNKNOWN provider rows by default instead of retry-failed rows', async () => {
-    const repository = {
-      listStocksForProviderValidation: jest.fn().mockResolvedValue({
-        total: 0,
-        stocks: [],
-      }),
-    };
-    const provider = { validateProviderSymbol: jest.fn() };
-    const service = new MarketDataFoundationService(repository as any, provider as any);
-
-    await service.validateProviders({ region: 'IN', assetType: 'STOCK', includeRetryFailed: true });
-
-    expect(repository.listStocksForProviderValidation).toHaveBeenCalledWith(expect.objectContaining({
-      providerValidationQueue: 'UNKNOWN_FIRST',
-    }));
-  });
-
-  it.skip('validates retry-failed provider rows only when explicitly requested', async () => {
-    const repository = {
-      listStocksForProviderValidation: jest.fn().mockResolvedValue({
-        total: 0,
-        stocks: [],
-      }),
-    };
-    const provider = { validateProviderSymbol: jest.fn() };
-    const service = new MarketDataFoundationService(repository as any, provider as any);
-
-    const result = await service.validateProviders({ region: 'IN', assetType: 'STOCK', providerValidationQueue: 'RETRY_FAILED' });
-
-    expect(repository.listStocksForProviderValidation).toHaveBeenCalledWith(expect.objectContaining({
-      providerValidationQueue: 'RETRY_FAILED',
-    }));
-    expect(result.providerValidationQueue).toBe('RETRY_FAILED');
-  });
-
-  it.skip('records clean provider validation failures as UNSUPPORTED', async () => {
-    const repository = {
-      listStocksForProviderValidation: jest.fn().mockResolvedValue({
-        total: 1,
-        stocks: [{ symbol: 'BAD', providerSymbol: 'BAD.NS', isActive: true, isDelisted: false }],
-      }),
-      updateProviderSupportStatus: jest.fn().mockResolvedValue({}),
-    };
-    const provider = { validateProviderSymbol: jest.fn().mockResolvedValue({ supported: false, message: 'no provider match' }) };
-    const service = new MarketDataFoundationService(repository as any, provider as any);
-
-    const result = await service.validateProviders({ region: 'IN', assetType: 'STOCK' });
-
-    expect(repository.updateProviderSupportStatus).toHaveBeenCalledWith('BAD', 'UNSUPPORTED', 'no provider match');
-    expect(result).toMatchObject({
-      processedCount: 1,
-      failed: 0,
-      providerUnsupported: 1,
-    });
-  });
 
   it('enriches missing metadata from provider and manual NSE catalog fields', async () => {
     const updateCompanyMasterData = jest.fn().mockResolvedValue({});
@@ -5975,70 +4856,6 @@ describe('MarketDataFoundationService syncV1', () => {
     }
   });
 
-  it.skip('mirrors price backfill run progress into the pipeline ledger', async () => {
-    const stocks = ['AAA.NS', 'BBB.NS', 'CCC.NS'].map((symbol, index) => ({
-      id: `stock-${index + 1}`,
-      symbol,
-      providerSupportStatus: 'SUPPORTED',
-      isActive: true,
-      isDelisted: false,
-      providerSymbol: symbol,
-      sector: 'Tech',
-      industry: 'Software',
-      marketCap: 100000000,
-      country: 'India',
-      currency: 'INR',
-      isin: `INE000A0100${index}`,
-      ipoDate: new Date('2020-01-01T00:00:00.000Z'),
-      assetType: 'STOCK',
-    }));
-    const repository = {
-      listStocksForUniverseHealth: jest.fn().mockResolvedValue(stocks),
-      priceReadinessStatsForSymbols: jest.fn().mockResolvedValue(new Map(stocks.map((stock) => [
-        stock.symbol,
-        {
-          priceHistoryBars: 300,
-          firstPriceDate: '2020-01-01',
-          latestPriceDate: '2026-05-01',
-          latestVolume: 1000,
-          latestAdjustedClose: 100,
-          latestClose: 100,
-        },
-      ]))),
-      listBlockedPriceBackfillStockIds: jest.fn().mockResolvedValue([]),
-    };
-    const recorder = {
-      recordMarketDataStageSnapshot: jest.fn().mockResolvedValue({}),
-    };
-    const service = new MarketDataFoundationService(repository as any, {} as any, {} as any, recorder as any);
-    jest.spyOn(service as any, 'processPriceBackfillRun').mockResolvedValue(undefined);
-
-    const result = await service.startPriceBackfillRun({
-      region: 'IN',
-      assetType: 'STOCK',
-      batchSize: 2,
-      workerConcurrency: 1,
-      maxBatches: 2,
-      triggerType: 'startup',
-    });
-    await new Promise((resolve) => setImmediate(resolve));
-
-    expect(recorder.recordMarketDataStageSnapshot).toHaveBeenCalledWith(expect.objectContaining({
-      region: 'IN',
-      assetType: 'STOCK',
-      timeframe: '1d',
-      pipelineKey: 'market-intelligence',
-      triggerType: 'startup',
-      operation: 'PRICE_BACKFILL',
-      runId: result.runId,
-      status: 'RUNNING',
-      totalCount: 3,
-      processedCount: 0,
-      changedInstrumentIds: [],
-      batchSize: 2,
-      hasMore: true,
-    }));
-  });
 
   it('skips already-attempted price backfill stock ids so background runs keep draining', async () => {
     const stocks = [
@@ -6283,53 +5100,6 @@ describe('MarketDataFoundationService syncV1', () => {
     });
   });
 
-  it.skip('keeps Yahoo zero-row price backfill results as free fallback required', async () => {
-    const repository = {
-      listStocksForUniverseHealth: jest.fn().mockResolvedValue([
-        {
-          id: 'stock-empty',
-          symbol: 'EMPTY',
-          providerSupportStatus: 'SUPPORTED',
-          isActive: true,
-          isDelisted: false,
-          providerSymbol: 'EMPTY.NS',
-          sector: 'Tech',
-          industry: 'Software',
-          country: 'India',
-          currency: 'INR',
-        },
-      ]),
-      priceReadinessStatsForSymbols: jest.fn().mockResolvedValue(new Map([
-        ['EMPTY.NS', { priceHistoryBars: 0, firstPriceDate: null, latestPriceDate: null, latestVolume: null, latestAdjustedClose: null, latestClose: null }],
-      ])),
-    };
-    const service = new MarketDataFoundationService(repository as any, {} as any);
-    jest.spyOn(service, 'ingestSymbol').mockResolvedValue({
-      rowsReceived: 0,
-      rowsInserted: 0,
-      rowsUpdated: 0,
-      rowsSkipped: 0,
-      rowsNoOp: 0,
-      warningCount: 1,
-      warnings: ['Provider returned zero usable historical price rows.'],
-    });
-
-    const result = await service.backfillPrices({ region: 'IN', assetType: 'STOCK', batchSize: 1 });
-
-    expect(result).toMatchObject({
-      zeroRowProviderReturns: 1,
-      historyCoverageFallbackRequired: 1,
-      requiredHistoryCoverageStatus: 'FALLBACK_REQUIRED',
-      skipped: 1,
-    });
-    expect(result.warnings).toEqual(expect.arrayContaining([
-      expect.stringContaining('approved free official/public exchange fallback is required'),
-    ]));
-    expect(result.sampleCoverageResults?.[0]).toMatchObject({
-      symbol: 'EMPTY',
-      sourceFallbackReason: 'YAHOO_ZERO_ROWS',
-    });
-  });
 
   it('records Yahoo zero-row price backfill as manual official fallback required', async () => {
     const repository = {
@@ -6889,64 +5659,7 @@ describe('MarketDataFoundationService syncV1', () => {
     expect(result.warnings.join('\n')).toContain('MARKET_CALENDAR_UNCERTAIN');
   });
 
-  it.skip('reports zero-row provider returns without preserving them as successful repairs', async () => {
-    const repository = {
-      listStocksForUniverseHealth: jest.fn().mockResolvedValue([
-        { symbol: 'EMPTY', providerSupportStatus: 'SUPPORTED', isActive: true, isDelisted: false, providerSymbol: 'EMPTY.NS', sector: 'Tech', industry: 'Software', country: 'India', currency: 'INR' },
-      ]),
-      priceReadinessStatsForSymbols: jest.fn().mockResolvedValue(new Map([
-        ['EMPTY.NS', { priceHistoryBars: 20, latestPriceDate: '2026-05-11', latestVolume: 100, latestAdjustedClose: null, latestClose: 10, rollingWindowBars: 20, recentVolumeCoveragePercent: 100 }],
-      ])),
-      findStockBySymbol: jest.fn().mockResolvedValue({ symbol: 'EMPTY', providerSymbol: 'EMPTY.NS', region: 'IN', assetType: 'STOCK', lastSuccessfulDataLoadTimestamp: new Date('2026-05-11T00:00:00.000Z') }),
-      upsertSyncState: jest.fn().mockResolvedValue({}),
-      updateProviderSupportStatus: jest.fn().mockResolvedValue({}),
-    };
-    const provider = {
-      inferRegion: jest.fn().mockReturnValue({ region: 'IN', exchange: 'NSE' }),
-      fetchHistorical: jest.fn().mockResolvedValue([]),
-    };
-    const service = new MarketDataFoundationService(repository as any, provider as any);
 
-    const result = await service.backfillPrices({ region: 'IN', assetType: 'STOCK', batchSize: 1 });
-
-    expect(repository.updateProviderSupportStatus).not.toHaveBeenCalled();
-    expect(result).toMatchObject({
-      processedCount: 1,
-      updated: 0,
-      skipped: 1,
-      zeroRowProviderReturns: 1,
-      priceRowsReceived: 0,
-      hasMore: true,
-      nextOffset: 0,
-    });
-  });
-
-  it.skip('does not mark zero provider price rows as a successful sync', async () => {
-    const repository = {
-      findStockBySymbol: jest.fn().mockResolvedValue({ symbol: 'EMPTY', providerSymbol: 'EMPTY.NS', region: 'IN', assetType: 'STOCK', lastSuccessfulDataLoadTimestamp: null }),
-      latestStoredTradingDateForRegion: jest.fn().mockResolvedValue(null),
-      getSyncState: jest.fn().mockResolvedValue(null),
-      updateStockLoadTimestampBySymbol: jest.fn().mockResolvedValue({}),
-      updateProviderSupportStatus: jest.fn().mockResolvedValue({}),
-      upsertSyncState: jest.fn().mockResolvedValue({}),
-    };
-    const provider = {
-      inferRegion: jest.fn().mockReturnValue({ region: 'IN', exchange: 'NSE' }),
-      fetchHistorical: jest.fn().mockResolvedValue([]),
-    };
-    const service = new MarketDataFoundationService(repository as any, provider as any);
-
-    const result = await service.ingestSymbol('EMPTY.NS', new Date('2026-01-01T00:00:00.000Z'), new Date('2026-05-11T00:00:00.000Z'), false, { force: true });
-
-    expect(repository.updateStockLoadTimestampBySymbol).not.toHaveBeenCalled();
-    expect(repository.updateProviderSupportStatus).toHaveBeenCalledWith('EMPTY', 'UNSUPPORTED', 'Provider returned zero usable historical price rows.');
-    expect(repository.upsertSyncState).toHaveBeenCalledWith(expect.objectContaining({ status: 'FAILED' }));
-    expect(result).toMatchObject({
-      rowsReceived: 0,
-      warningCount: 1,
-      warnings: ['Provider returned zero usable historical price rows.'],
-    });
-  });
 });
 
 describe('MarketDataFoundationService operational repair run', () => {
@@ -7436,39 +6149,6 @@ describe('MarketDataFoundationService operational repair run', () => {
     expect(result.anotherRunNeeded).toBe(false);
   });
 
-  it.skip('drain mode validates UNKNOWN provider rows before retry-failed rows', async () => {
-    const repository = {
-      createRepairRun: jest.fn().mockResolvedValue({ id: 'run-unknown-first' }),
-      updateRepairRun: jest.fn().mockResolvedValue({}),
-    };
-    const service = new MarketDataFoundationService(repository as any, {} as any);
-    const queues: string[] = [];
-    (service as any).repairRunSourceFingerprints = jest.fn().mockResolvedValue({
-      CATALOG_IDENTITY_REPAIR: catalogSourceSnapshot('catalog-unknown-first'),
-    });
-    jest.spyOn(service, 'universeHealth').mockResolvedValue(health());
-    jest.spyOn(service, 'repairPlan')
-      .mockResolvedValueOnce(plan({ providerValidationNeeded: 2, retryFailedValidations: 2, catalogIdentityRepairNeeded: 0, businessMetadataAutoRepairable: 0, priceBackfillNeeded: 0 }))
-      .mockResolvedValueOnce(plan({ providerValidationNeeded: 1, retryFailedValidations: 2, catalogIdentityRepairNeeded: 0, businessMetadataAutoRepairable: 0, priceBackfillNeeded: 0 }))
-      .mockResolvedValueOnce(plan({ providerValidationNeeded: 1, retryFailedValidations: 2, catalogIdentityRepairNeeded: 0, businessMetadataAutoRepairable: 0, priceBackfillNeeded: 0 }));
-    jest.spyOn(service, 'validateProviders').mockImplementation(async (request: any) => {
-      queues.push(request.providerValidationQueue);
-      return summary({ totalCount: 2, hasMore: true, nextOffset: 0, providerValidated: 1 });
-    });
-
-    const result = await service.repairRun({
-      region: 'IN',
-      assetType: 'STOCK',
-      mode: 'DRAIN_UNTIL_BLOCKED',
-      batchSize: 1,
-      maxBatchesPerAction: 1,
-    });
-
-    expect(queues).toEqual(['UNKNOWN_FIRST']);
-    expect(result.status).toBe('PARTIAL');
-    expect(result.expectedNextAction).toBe('VALIDATE_PROVIDERS');
-    expect(result.warnings.join(' ')).toContain('Validate unknown providers still has more rows');
-  });
 
   it('drain mode treats UNKNOWN rows moved to VALIDATION_FAILED as progress', async () => {
     const repository = {

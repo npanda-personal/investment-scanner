@@ -1,6 +1,5 @@
 /// <reference types="@types/jest" />
 import { parseIndianExchangeEodCsv } from '../../../src/modules/market-data-foundation/market-data-foundation.exchange-eod-adapter';
-import { YahooFinanceIngestionService } from '../../../src/modules/market-data-foundation/market-data-foundation.provider';
 import { classifyInstrumentUniverseReadiness } from '../../../src/modules/market-data-foundation/market-data-foundation.universe';
 import {
   partitionHistoricalPrices,
@@ -159,32 +158,16 @@ describe('market data readiness evidence invariants', () => {
     expect(manualRequired.readinessBlockers).toEqual(expect.arrayContaining(['PROVIDER_SYMBOL_MISSING']));
   });
 
-  it('keeps retryable provider evidence distinct from fallback-required evidence using mocked local provider behavior only', async () => {
-    const provider = new YahooFinanceIngestionService(undefined, 0);
-    const chart = jest.fn().mockRejectedValue(new Error('429 Too Many Requests'));
-    (provider as any).yahooFinance = { chart };
+  it('keeps provider-era fallback evidence out of exchange-only readiness evidence', () => {
+    const readiness = classifyInstrumentUniverseReadiness(completeInstrument({
+      providerSupportStatus: 'UNKNOWN',
+      providerSymbol: null,
+      priceStats: completePriceStats(),
+    }));
 
-    const result = await provider.validateProviderSymbol('RETRY.NS', {
-      region: 'IN',
-      assetType: 'STOCK',
-      validationWindowStartDate: new Date('2026-05-01T00:00:00.000Z'),
-      validationWindowEndDate: new Date('2026-05-15T00:00:00.000Z'),
-      timeoutMs: 1000,
-    });
-
-    expect(chart).toHaveBeenCalledTimes(1);
-    expect(result).toMatchObject({
-      supported: false,
-      failed: true,
-      classification: 'RETRYABLE_RATE_LIMITED',
-      provider: 'yahoo',
-      providerSymbol: 'RETRY.NS',
-      candlesFound: 0,
-      sourceName: 'YAHOO_CHART',
-    });
-    expect(result.fallbackSourceAttempted).toBeUndefined();
-    expect(result.freeFallbackRequired).toBeUndefined();
-    expect(result.classification).not.toBe('FREE_FALLBACK_REQUIRED');
+    expect(readiness.isReviewReady).toBe(false);
+    expect(readiness.readinessBlockers).toEqual(expect.arrayContaining(['PROVIDER_UNKNOWN']));
+    expect(JSON.stringify(readiness)).not.toMatch(/YAHOO_CHART|angel_one|FREE_FALLBACK_REQUIRED/i);
   });
 
   it('keeps provider/source provenance on local exchange EOD rows and excludes non-stock rows from trusted prices', () => {
@@ -216,7 +199,7 @@ describe('market data readiness evidence invariants', () => {
     expect(result.sourceIdentity.rowsSha256).toMatch(/^[a-f0-9]{64}$/);
     expect(result.prices).toEqual([
       expect.objectContaining({
-        symbol: 'RELIANCE.NS',
+        symbol: 'RELIANCE',
         source: 'NSE_SECURITY_BHAVDATA',
         open: 2800,
         high: 2825,

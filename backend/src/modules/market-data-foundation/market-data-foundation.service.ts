@@ -4,14 +4,14 @@ import net from 'net';
 import path from 'path';
 import { inflateRawSync } from 'zlib';
 import { MarketDataFoundationRepository } from './market-data-foundation.repository';
-import { YahooFinanceIngestionService } from './market-data-foundation.provider';
-import { AngelOneMarketDataProvider } from './market-data-foundation.angel-one-provider';
 import { enqueueIngestionJob } from './market-data-foundation.queue';
 import { getCatalogDownloadConfig, getCatalogSourceConfig, getCatalogSourceConfigs } from './market-data-foundation.catalog-sources';
 import type {
   CreateStockRequest,
+  CompanyMasterData,
   CorporateAction,
   CoreFundamentals,
+  FxRateInput,
   HistoricalPrice,
   MarketDataStatus,
   MarketDataRepairPlan,
@@ -132,6 +132,55 @@ const MARKET_MOVER_MAX_ABS_RETURN: Record<MarketMoverRange, number> = {
 const NSE_BSE_ONLY_PROVIDER_DISABLED_CODE = 'EXTERNAL_PROVIDER_DISABLED_NSE_BSE_ONLY';
 const NSE_BSE_ONLY_PROVIDER_DISABLED_MESSAGE =
   'External Yahoo/yfinance and Angel One provider paths are disabled. Use NSE/BSE exchange-file imports or manual verified evidence only.';
+
+type LegacyMarketDataProviderPort = {
+  inferRegion(symbol: string): { region: string; exchange?: string | null };
+  search(query: string): Promise<SearchResult[]>;
+  validateProviderSymbol(symbol: string, options?: Record<string, unknown>): Promise<ProviderValidationResult>;
+  fetchCompanyMasterData(symbol: string): Promise<CompanyMasterData | null>;
+  fetchCoreFundamentals(symbol: string): Promise<CoreFundamentals | null>;
+  fetchCorporateActions(symbol: string): Promise<CorporateAction[]>;
+  fetchHistorical(symbol: string, startDate?: Date, endDate?: Date): Promise<HistoricalPrice[]>;
+  fetchFxRate(pair: string): Promise<FxRateInput | null>;
+};
+
+type LegacyAngelProviderPort = {
+  canHandleHistorical(symbol: string, options?: Record<string, unknown>): boolean;
+  validateProviderSymbol(symbol: string, options?: Record<string, unknown>): Promise<ProviderValidationResult>;
+  shouldFailClosed(): boolean;
+  fetchHistorical(symbol: string, startDate?: Date, endDate?: Date): Promise<HistoricalPrice[]>;
+};
+
+const providerDisabledError = (operation: string) => {
+  const error = new Error(`${operation} disabled: ${NSE_BSE_ONLY_PROVIDER_DISABLED_MESSAGE}`);
+  (error as any).code = NSE_BSE_ONLY_PROVIDER_DISABLED_CODE;
+  return error;
+};
+
+const inferExchangeOnlyRegion = (symbol: string): { region: string; exchange?: string | null } => {
+  const normalized = String(symbol || '').trim().toUpperCase();
+  if (normalized.endsWith('.NS')) return { region: 'IN', exchange: 'NSE' };
+  if (normalized.endsWith('.BO') || normalized.endsWith('.BS')) return { region: 'IN', exchange: 'BSE' };
+  return { region: 'GLOBAL', exchange: null };
+};
+
+const disabledMarketDataProvider: LegacyMarketDataProviderPort = {
+  inferRegion: inferExchangeOnlyRegion,
+  search: async () => { throw providerDisabledError('external provider search'); },
+  validateProviderSymbol: async () => { throw providerDisabledError('provider validation'); },
+  fetchCompanyMasterData: async () => { throw providerDisabledError('provider company master fetch'); },
+  fetchCoreFundamentals: async () => { throw providerDisabledError('provider fundamentals fetch'); },
+  fetchCorporateActions: async () => { throw providerDisabledError('provider corporate actions fetch'); },
+  fetchHistorical: async () => { throw providerDisabledError('provider historical candle fetch'); },
+  fetchFxRate: async () => { throw providerDisabledError('provider FX fetch'); },
+};
+
+const disabledAngelProvider: LegacyAngelProviderPort = {
+  canHandleHistorical: () => false,
+  validateProviderSymbol: async () => { throw providerDisabledError('Angel One provider validation'); },
+  shouldFailClosed: () => true,
+  fetchHistorical: async () => { throw providerDisabledError('Angel One historical candle fetch'); },
+};
 
 type TrustedReviewUniverseOptions = Pick<PaginationOptions, 'region' | 'assetType'> & { now?: Date };
 type UniverseComputationSnapshot = {
@@ -591,8 +640,8 @@ export class MarketDataFoundationService {
 
   constructor(
     private readonly repository = new MarketDataFoundationRepository(),
-    private readonly marketDataProvider = new YahooFinanceIngestionService(),
-    private readonly angelOneMarketDataProvider = new AngelOneMarketDataProvider(),
+    private readonly marketDataProvider: LegacyMarketDataProviderPort = disabledMarketDataProvider,
+    private readonly angelOneMarketDataProvider: LegacyAngelProviderPort = disabledAngelProvider,
     private readonly pipelineRecorder?: MarketDataPipelineRecorder
   ) {}
 
@@ -606,6 +655,46 @@ export class MarketDataFoundationService {
 
   executeProviderDataCleanup() {
     return this.repository.executeProviderDataCleanup();
+  }
+
+  async listSourceFileImports(input: {
+    source?: string;
+    segment?: string;
+    status?: string;
+    startDate?: string;
+    endDate?: string;
+    limit?: number;
+  } = {}) {
+    const rows = await this.repository.listSourceFileImports({
+      source: input.source,
+      segment: input.segment,
+      status: input.status,
+      startDate: input.startDate ? new Date(input.startDate) : undefined,
+      endDate: input.endDate ? new Date(input.endDate) : undefined,
+      limit: input.limit,
+    });
+    return {
+      count: rows.length,
+      imports: rows.map((row: any) => ({
+        id: row.id,
+        source: row.source,
+        segment: row.segment,
+        tradingDate: row.tradingDate?.toISOString?.().slice(0, 10) ?? null,
+        fileName: row.fileName,
+        fileUrl: row.fileUrl,
+        fileHash: row.fileHash,
+        fileSize: row.fileSize,
+        status: row.status,
+        rowsRaw: row.rowsRaw,
+        rowsAccepted: row.rowsAccepted,
+        rowsRejected: row.rowsRejected,
+        parserVersion: row.parserVersion,
+        importedAt: row.importedAt?.toISOString?.() ?? null,
+        errorMessage: row.errorMessage,
+        createdAt: row.createdAt?.toISOString?.() ?? null,
+        updatedAt: row.updatedAt?.toISOString?.() ?? null,
+      })),
+    };
   }
 
   async health(options: Pick<PaginationOptions, 'region' | 'assetType'> = {}) {
@@ -7410,25 +7499,14 @@ export class MarketDataFoundationService {
   }
 
   async syncFxRates(pairs = ['USD/EUR', 'USD/GBP', 'USD/INR', 'EUR/GBP']) {
-    const results = [];
-    for (const pair of pairs) {
-      await this.throttleIngestion(250);
-      const rate = await this.marketDataProvider.fetchFxRate(pair);
-      if (rate) {
-        results.push(await this.repository.upsertFxRate(rate));
-      }
-    }
-    return results;
+    void pairs;
+    throw this.providerDisabledError('provider FX-rate sync');
   }
 
   async listFxRates() {
-    let rates = await this.repository.listFxRates();
-    if (rates.length === 0) {
-      await this.syncFxRates();
-      rates = await this.repository.listFxRates();
-    }
+    const rates = await this.repository.listFxRates();
     return {
-      source: rates[0]?.source || 'yahoo',
+      source: rates[0]?.source || 'database',
       ingestion_timestamp: rates[0]?.ingestionTimestamp?.toISOString?.() ?? null,
       last_updated_timestamp: rates[0]?.lastUpdatedTimestamp?.toISOString?.() ?? null,
       data_status: rates.length > 0 ? 'COMPLETE' : 'MISSING',
@@ -7438,13 +7516,7 @@ export class MarketDataFoundationService {
 
   async getFxRate(pair: string) {
     const normalizedPair = this.normalizePair(pair);
-    let rate = await this.repository.findFxRate(normalizedPair);
-    if (!rate) {
-      const providerRate = await this.marketDataProvider.fetchFxRate(normalizedPair);
-      if (providerRate) {
-        rate = await this.repository.upsertFxRate(providerRate);
-      }
-    }
+    const rate = await this.repository.findFxRate(normalizedPair);
     return rate ? this.toV1FxRate(rate) : null;
   }
 
@@ -9984,9 +10056,7 @@ export class MarketDataFoundationService {
   }
 
   private providerDisabledError(operation: string) {
-    const error = new Error(`${operation} disabled: ${NSE_BSE_ONLY_PROVIDER_DISABLED_MESSAGE}`);
-    (error as any).code = NSE_BSE_ONLY_PROVIDER_DISABLED_CODE;
-    return error;
+    return providerDisabledError(operation);
   }
 
   private finishRepairSummary(summary: MarketDataRepairSummary, started: number) {

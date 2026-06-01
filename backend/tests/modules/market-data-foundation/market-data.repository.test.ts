@@ -108,7 +108,7 @@ describe('MarketDataFoundationRepository', () => {
     }));
   });
 
-  it('stores exchange-file candles with source file provenance in bulk', async () => {
+  it('stores exchange-file candles with source file provenance and latest price in bulk', async () => {
     const createMany = jest.fn().mockResolvedValue({ count: 1 });
     const upsert = jest.fn().mockResolvedValue({});
     const prisma = {
@@ -145,6 +145,85 @@ describe('MarketDataFoundationRepository', () => {
           sourceFileImportId: 'import-1',
         }),
       ],
+    }));
+    expect(upsert).toHaveBeenCalledWith({
+      where: { symbol: 'RELIANCE' },
+      update: expect.objectContaining({
+        region: 'IN',
+        price: expect.anything(),
+        timestamp: new Date('2026-05-27T00:00:00.000Z'),
+      }),
+      create: expect.objectContaining({
+        symbol: 'RELIANCE',
+        region: 'IN',
+        price: expect.anything(),
+        timestamp: new Date('2026-05-27T00:00:00.000Z'),
+      }),
+    });
+  });
+
+  it('treats same-date exchange candle reruns as no-op while refreshing latest price', async () => {
+    const tradingDate = new Date('2026-05-27T00:00:00.000Z');
+    const createMany = jest.fn();
+    const update = jest.fn();
+    const latestUpsert = jest.fn().mockResolvedValue({});
+    const prisma = {
+      priceTick: {
+        findMany: jest.fn().mockResolvedValue([{
+          symbol: 'RELIANCE',
+          timestamp: tradingDate,
+          open: 1400,
+          high: 1420,
+          low: 1390,
+          close: 1410,
+          adjustedClose: 1410,
+          volume: BigInt(1000),
+          source: 'NSE_UDIFF_CM_BHAVCOPY',
+        }]),
+        createMany,
+        update,
+      },
+      latestPrice: { upsert: latestUpsert },
+      $transaction: jest.fn(async (callback: any): Promise<any> => callback(prisma)),
+    } as any;
+    const repository = new MarketDataFoundationRepository(prisma as any);
+
+    const result = await repository.storeHistoricalBulk(
+      [{
+        symbol: 'RELIANCE',
+        date: tradingDate,
+        open: 1400,
+        high: 1420,
+        low: 1390,
+        close: 1410,
+        adjustedClose: 1410,
+        volume: 1000,
+        source: 'NSE_UDIFF_CM_BHAVCOPY',
+      }],
+      () => ({ region: 'IN', exchange: 'NSE' }),
+      new Map(),
+      { sourceFileImportId: 'import-1' }
+    );
+
+    expect(result).toMatchObject({
+      rowsReceived: 1,
+      rowsInserted: 0,
+      rowsUpdated: 0,
+      rowsNoOp: 1,
+    });
+    expect(createMany).not.toHaveBeenCalled();
+    expect(update).not.toHaveBeenCalled();
+    expect(latestUpsert).toHaveBeenCalledWith(expect.objectContaining({
+      where: { symbol: 'RELIANCE' },
+      update: expect.objectContaining({
+        region: 'IN',
+        timestamp: tradingDate,
+      }),
+      create: expect.objectContaining({
+        symbol: 'RELIANCE',
+        region: 'IN',
+        timestamp: tradingDate,
+      }),
     }));
   });
 

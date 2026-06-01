@@ -84,7 +84,7 @@ See the individual README files in `backend/` and `frontend/` for detailed instr
 
 ## Market Data Foundation APIs
 
-The Market Data Foundation module uses free/open-source tooling and free market data access through the `yahoo-finance2` package. MVP REST endpoints:
+The Market Data Foundation module uses free/open-source tooling with NSE/BSE exchange-file imports and manual verified evidence as the active market-data foundation. MVP REST endpoints:
 
 | Endpoint | Purpose |
 |----------|---------|

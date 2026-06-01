@@ -12,8 +12,6 @@ export {
 export { MarketDataFoundationController } from './market-data-foundation.controller';
 export { MarketDataFoundationService, StockService } from './market-data-foundation.service';
 export { MarketDataFoundationRepository } from './market-data-foundation.repository';
-export { YahooFinanceIngestionService } from './market-data-foundation.provider';
-export { AngelOneMarketDataProvider, readAngelOneProviderConfig } from './market-data-foundation.angel-one-provider';
 export {
   enqueueIngestionJob,
   ingestionQueue,

@@ -1,6 +1,6 @@
 # Market Data Foundation
 
-Market Data Foundation owns the application's baseline market data capabilities. It replaces the older Stock Management-centered organization and keeps instrument management, price data, fundamentals, corporate actions, FX rates, ingestion, provider integration, validation, workers, and queue glue in one detachable module boundary.
+Market Data Foundation owns the application's baseline market data capabilities. It replaces the older Stock Management-centered organization and keeps instrument management, exchange-file price data, manual verified fundamentals, corporate actions, FX-rate reads, source-file evidence, workers, and queue glue in one detachable module boundary.
 
 The module is implemented as a flat backend module and a dedicated frontend feature. It remains locally runnable and uses free/open-source tooling only.
 
@@ -16,7 +16,7 @@ Approved active sources for this phase:
 - NSE F&O UDiFF as enrichment.
 - NSE/BSE official filings or manual verified fundamentals.
 
-Yahoo/yfinance, Angel One, broker APIs, and Screener scraping are disabled for active runtime paths. Legacy provider files may remain temporarily only as quarantined historical code while NSE/BSE replacement slices land, but approved scheduler, startup, repair, provider-validation, backfill, manual daily pipeline, fundamentals, and corporate-action reads must not call them.
+Yahoo/yfinance, Angel One, broker APIs, and Screener scraping are disabled for active runtime paths. The provider implementation files and package dependency have been removed from Market Data Foundation. Approved scheduler, startup, repair, provider-validation, backfill, manual daily pipeline, fundamentals, and corporate-action reads must not call external providers.
 
 The first NSE/BSE-only foundation slice adds:
 
@@ -25,7 +25,7 @@ The first NSE/BSE-only foundation slice adds:
 - nullable `PriceTick.sourceFileImportId`, so exchange candles can point to the exact file import.
 - provider cleanup dry-run and execute methods/routes.
 - `LatestPrice` rebuild from approved NSE/BSE candle sources only.
-- startup provider price backfill disabled even when legacy Angel env flags are present.
+- startup provider price backfill disabled even when legacy provider env flags are present.
 
 The second slice adds the first source-file-backed import path:
 
@@ -117,16 +117,15 @@ Backend module files are intentionally flat. Do not recreate nested `routes/`, `
 - `market-data-foundation.controller.ts`
   - Express request/response handlers. Controllers call services.
 - `market-data-foundation.service.ts`
-  - Business workflows for instruments, prices, coverage-aware ingestion, sync summaries, fundamentals, corporate actions, and FX rates.
+  - Business workflows for instruments, exchange-file prices, coverage-aware NSE/BSE import, sync summaries, manual verified fundamentals, corporate actions, and persisted FX-rate reads.
   - Public batch lookup methods: `getInstrumentsByIds` and `getLatestPricesBySymbols`.
 - `market-data-foundation.repository.ts`
   - Prisma access for `Stock`, `PriceTick`, `LatestPrice`, `Fundamental`, `CorporateAction`, and `FxRate`, plus price coverage checks and normalized fundamentals upserts.
 - `market-data-foundation.validation.ts`
   - Required-field validation, instrument validation, OHLCV validation, duplicate-bar checks, malformed row partitioning, and abnormal spike checks.
 - `market-data-foundation.types.ts`
-  - Module-owned DTOs, provider result types, sync request/response types, FX types, status enum, and validation result types.
-- `market-data-foundation.provider.ts`
-  - Free Yahoo Finance provider integration through the open-source `yahoo-finance2` package.
+  - Module-owned DTOs, exchange-file import result types, sync request/response types, FX types, status enum, and validation result types.
+- Provider implementation files have been removed for the NSE/BSE-only reset. Legacy provider routes return explicit disabled responses until compatibility routes are fully retired.
 - `market-data-foundation.worker.ts`
   - Bulk historical data sync worker owned by this module.
 - `market-data-foundation.queue.ts`
