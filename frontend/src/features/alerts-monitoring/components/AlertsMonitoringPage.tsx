@@ -19,7 +19,7 @@ import {
   PowerSettingsNewOutlined
 } from '@mui/icons-material';
 import { Link } from 'react-router-dom';
-import { deleteAlertRule, dismissAlert, evaluateAlerts, markAlertRead, markAllAlertsRead, updateAlertRule } from '../api/alertsMonitoringService';
+import { deleteAlertRule, dismissAlert, markAlertRead, markAllAlertsRead, updateAlertRule } from '../api/alertsMonitoringService';
 import { useAlertsMonitoring } from '../hooks';
 import { CreateAlertDialog } from './CreateAlertDialog';
 import type { AlertEvent } from '../types';
@@ -32,17 +32,6 @@ export const AlertsMonitoringPage: React.FC = () => {
   const { scope } = useMarketScope();
   const { rules, events, loading, error, reload } = useAlertsMonitoring();
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [actionError, setActionError] = useState<string | null>(null);
-
-  const run = async () => {
-    setActionError(null);
-    try {
-      await evaluateAlerts();
-      await reload();
-    } catch (err: any) {
-      setActionError(err.response?.data?.error || err.message || 'Failed to evaluate alerts');
-    }
-  };
 
   if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress /></Box>;
 
@@ -57,12 +46,23 @@ export const AlertsMonitoringPage: React.FC = () => {
           </Stack>
         </Box>
         <Stack direction="row" spacing={1}>
-          <Button variant="outlined" onClick={run}>Check Alerts</Button>
           <Button variant="contained" onClick={() => setDialogOpen(true)}>Create Alert</Button>
         </Stack>
       </Stack>
-      {(error || actionError) && <Alert severity="error" sx={{ mb: 2 }}>{error || actionError}</Alert>}
+      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
       <CreateAlertDialog open={dialogOpen} onClose={() => setDialogOpen(false)} onCreated={reload} />
+
+      <Paper sx={{ p: 2, mb: 3 }}>
+        <Typography variant="h6" sx={{ mb: 1 }}>Planned Radar Alert States</Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+          These states appear after persisted alert read models exist. This trader page does not evaluate shared alert conditions.
+        </Typography>
+        <Stack direction="row" gap={1} flexWrap="wrap" useFlexGap>
+          {['Entered Radar', 'Upcoming Result', 'Risk Radar Entry', 'Sector Weakness', '52W High', 'Delivery Accumulation'].map((item) => (
+            <Chip key={item} label={item} variant="outlined" />
+          ))}
+        </Stack>
+      </Paper>
 
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', xl: '1.4fr 1fr' }, gap: 3 }}>
         <Paper sx={{ p: 2 }}>

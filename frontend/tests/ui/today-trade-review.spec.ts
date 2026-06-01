@@ -608,7 +608,7 @@ test.describe('Today Trade Review UI', () => {
     await expect(page.getByRole('heading', { name: 'Supporting evidence' })).toBeVisible();
     const supportingEvidencePanel = page.getByRole('heading', { name: 'Supporting evidence' }).locator('xpath=..');
     await expect(supportingEvidencePanel.getByText('Trade-plan proof-chain', { exact: true })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Research Hub stock view' })).toHaveAttribute('href', '/research/stocks/stock-1');
+    await expect(page.getByRole('main').getByRole('link', { name: 'Instrument Workspace' })).toHaveAttribute('href', '/stocks/stock-1');
 
     const body = await page.locator('body').innerText();
     expect(body).not.toMatch(/buy now|sell now|guaranteed|place order|execute order|live trade|financial advice|execution/i);

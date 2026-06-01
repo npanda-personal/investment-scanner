@@ -201,11 +201,9 @@ export function TodayReviewCandidateDetailPage() {
         <CardContent>
           <Typography variant="h6" gutterBottom>Drilldowns</Typography>
           <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>
-            <Link component={RouterLink} to={`/research/stocks/${candidate.instrumentId}`}>Research Hub stock view</Link>
-            <Link component={RouterLink} to="/strategy">Strategy diagnostics</Link>
-            <Link component={RouterLink} to={`/trade-plans/${candidate.instrumentId}`}>Trade-plan diagnostics</Link>
-            <Link component={RouterLink} to="/signals/quality">Signal Quality</Link>
-            <Link component={RouterLink} to="/backtests">Backtests</Link>
+            <Link component={RouterLink} to={`/stocks/${candidate.instrumentId}`}>Instrument Workspace</Link>
+            <Link component={RouterLink} to="/watchlists">Watchlists</Link>
+            <Link component={RouterLink} to="/alerts">Alerts</Link>
           </Stack>
         </CardContent>
       </Card>

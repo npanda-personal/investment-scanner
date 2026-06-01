@@ -149,8 +149,8 @@ const InstrumentDetailPage: React.FC = () => {
       <PageHeader
         title={instrument.symbol}
         subtitle={instrument.company_name}
-        backTo="/market-map"
-        backLabel="Back to market map"
+        backTo="/instrument-workspace"
+        backLabel="Instrument search"
         secondaryActions={
           <Button variant="outlined" onClick={() => navigate(`/research/stocks/${instrument.id}`)}>
             Research

@@ -2,6 +2,7 @@ import type { RouteObject } from 'react-router-dom';
 import { Navigate } from 'react-router-dom';
 import NavigationLayout from './NavigationLayout';
 import HomePage from './HomePage';
+import AdminHomePage from './AdminHomePage';
 import { marketIntelligenceRoutes } from '@/features/market-intelligence';
 import { marketDataFoundationRoutes } from '@/features/market-data-foundation';
 import UnifiedStockPage from '@/features/market-data-foundation/components/UnifiedStockPage';
@@ -30,7 +31,7 @@ import { pipelineOpsRoutes } from '@/features/pipeline-ops';
 import { signalPositionLedgerRoutes } from '@/features/signal-position-ledger';
 
 const userInstrumentRoutes: RouteObject[] = [
-  { path: 'stocks', element: <Navigate to="/market-map" replace /> },
+  { path: 'stocks', element: <Navigate to="/instrument-workspace" replace /> },
   { path: 'stocks/:id', element: <UnifiedStockPage /> },
 ];
 
@@ -89,6 +90,7 @@ export const appRoutes: RouteObject[] = [
           ...aiInvestmentCopilotRoutes,
           ...notificationsDeliveryRoutes,
           ...protectedAuthIdentityRoutes,
+          { path: 'admin', element: <AdminHomePage /> },
           ...prefixedAdminRoutes(operatorRoutes),
           ...operatorRoutes,
         ],

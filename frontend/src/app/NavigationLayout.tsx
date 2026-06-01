@@ -28,7 +28,7 @@ import Brightness7Icon from '@mui/icons-material/Brightness7';
 import { useThemeMode } from './ThemeContext';
 import { useAuthIdentity } from '@/features/auth-identity';
 import { MarketScopeSelector } from '@/shared/components/MarketScopeSelector';
-import { isNavItemActive, navGroups, resolveNavItem } from './navigationMetadata';
+import { getNavGroupsForPathname, isNavItemActive, resolveNavItem } from './navigationMetadata';
 
 const drawerWidth = 260;
 const collapsedWidth = 72;
@@ -43,6 +43,7 @@ export default function NavigationLayout() {
 
   const handleDrawerToggle = () => setOpen(!open);
   const activeLabel = resolveNavItem(location.pathname)?.label || 'Investment Scanner';
+  const currentNavGroups = getNavGroupsForPathname(location.pathname);
 
   const drawer = (
     <>
@@ -58,7 +59,7 @@ export default function NavigationLayout() {
       </Toolbar>
       <Divider />
       <List sx={{ px: 1, py: 1 }}>
-        {navGroups.map((group, groupIndex) => (
+        {currentNavGroups.map((group, groupIndex) => (
           <React.Fragment key={group.group}>
             {open && (
               <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 2, mt: groupIndex > 0 ? 1 : 0, mb: 0.5 }}>
@@ -89,7 +90,7 @@ export default function NavigationLayout() {
                 </ListItem>
               );
             })}
-            {groupIndex < navGroups.length - 1 && open && <Divider sx={{ my: 1, mx: 1 }} />}
+            {groupIndex < currentNavGroups.length - 1 && open && <Divider sx={{ my: 1, mx: 1 }} />}
           </React.Fragment>
         ))}
       </List>

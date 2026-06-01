@@ -3,483 +3,222 @@ import {
   Box,
   Button,
   Chip,
-  Divider,
-  Grid,
   LinearProgress,
-  Link as MuiLink,
   Paper,
   Stack,
+  Tab,
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableHead,
   TableRow,
-  ToggleButton,
-  ToggleButtonGroup,
+  Tabs,
   Typography,
 } from '@mui/material';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Link as RouterLink } from 'react-router-dom';
-import { useMarketScope } from '@/contexts/MarketScopeContext';
-import { PageHeader, StatusBadge } from '@/shared/components';
-import type { MarketMoverRange, MarketMoverRow } from '@/features/daily-overview-dashboard/types';
-import { fetchInstruments, type V1Instrument } from '@/features/market-data-foundation';
-import { fetchMarketMap } from '../api/marketIntelligenceService';
-import { useMarketIntelligenceSnapshot } from '../hooks/useMarketIntelligenceSnapshot';
-import type { MarketEnvironmentState, MarketIntelligenceSnapshot, MarketMapSummary, MarketMapTile } from '../types';
+import { useState, type ReactNode } from 'react';
+import { Link as RouterLink, useNavigate } from 'react-router-dom';
+import { InstrumentSearchSelect, PageHeader } from '@/shared/components';
+import type { V1Instrument } from '@/features/market-data-foundation';
+import {
+  fetchCompounderRadarSnapshot,
+  fetchEarningsIntelligenceSnapshot,
+  fetchInstrumentContextSnapshot,
+  fetchMarketPulseSnapshot,
+  fetchRiskRadarSnapshot,
+  fetchStockInterestRadarSnapshot,
+  fetchTraderSetupRadarSnapshot,
+} from '../api/marketIntelligenceService';
+import { useReadModelSnapshot } from '../hooks/useMarketIntelligenceSnapshot';
+import type {
+  CompounderSnapshot,
+  EarningsIntelligenceSnapshot,
+  InstrumentContextSnapshot,
+  MarketPulseSnapshot,
+  RiskRadarSnapshot,
+  SnapshotEnvelope,
+  StockInterestSnapshot,
+  TraderSetupSnapshot,
+} from '../types';
 
-const rangeOptions: MarketMoverRange[] = ['1D', '1W', '1M', '3M', '6M'];
+const stockInterestTabs = [
+  "Today's Top Interest",
+  'Upcoming Results',
+  'Result Winners',
+  'Growth Consistency',
+  'Growth Acceleration',
+  'Sector Leaders',
+  'Accumulation',
+  'Breakouts / Bases',
+  'Risk / Avoid',
+];
+
+const earningsTabs = ['Upcoming Results', 'Pre-Result Interest', 'Result Winners', 'Result Disappointments', 'Result Reaction History', 'Earnings Watchlist'];
+const compounderTabs = ['Consistent Growth', 'Quality + Growth', 'Growth + Momentum', 'Margin Expansion', 'Ownership Support'];
+const traderSetupTabs = ['Breakouts', 'Base Breakouts', 'Pullbacks', '52W Highs', 'Relative Strength Leaders', 'Low Volatility Squeeze', 'Delivery Expansion'];
+const riskTabs = ['Weak Sector Stocks', 'Breakdown Candidates', 'Poor Result Reaction', 'Low Liquidity', 'Stale Data', 'Portfolio Risk'];
 
 export function MarketPulsePage() {
-  const view = useMarketIntelligenceSnapshot();
-  const snapshot = view.snapshot;
-  const state = snapshot ? classifyEnvironment(snapshot) : 'UNAVAILABLE';
-  const reviewGroups = snapshot?.todayReview.value?.groups;
-  const candidateCount = (reviewGroups?.longReview.length ?? 0) + (reviewGroups?.shortReview.length ?? 0) + (reviewGroups?.exitRiskReview.length ?? 0);
-  const moverRange = snapshot?.marketMovers.value?.ranges.find((item) => item.range === '1D') ?? snapshot?.marketMovers.value?.ranges[0] ?? null;
-  const breadth = snapshot?.marketContext.value?.breadth ?? null;
-  const sectors = snapshot?.marketContext.value?.topSectors ?? [];
-  const weakSectors = snapshot?.marketContext.value?.weakSectors ?? [];
+  const view = useReadModelSnapshot(fetchMarketPulseSnapshot);
+  const snapshot = view.data?.snapshot ?? null;
 
   return (
-    <MarketPageShell
+    <SnapshotPageShell
       title="Market Pulse"
-      subtitle="Market environment from saved research evidence. This page is read-only and does not start data refresh work."
+      subtitle="Is the market healthy enough to take risk? This page presents only persisted Market Pulse snapshot fields."
       loading={view.loading}
       error={view.error}
-      snapshot={snapshot}
+      envelope={view.data}
+      missingTitle="Market Pulse backend not available yet."
     >
-      {snapshot && (
-        <Stack spacing={2}>
-          <EnvironmentBanner state={state} snapshot={snapshot} />
+      {snapshot && <MarketPulseSnapshotView snapshot={snapshot} />}
+    </SnapshotPageShell>
+  );
+}
 
-          <Grid container spacing={2}>
-            <Grid item xs={12} md={3}>
-              <MetricCard label="Review climate" value={labelize(state)} helper={environmentMessage(state)} />
-            </Grid>
-            <Grid item xs={12} md={3}>
-              <MetricCard label="Review candidates" value={formatNumber(candidateCount)} helper="Bullish, bearish, and exit-risk candidates from the latest Today Review snapshot." />
-            </Grid>
-            <Grid item xs={12} md={3}>
-              <MetricCard label="Trusted universe" value={formatNumber(snapshot.universeHealth.value?.counts.reviewReady ?? snapshot.todayReview.value?.run?.trustedUniverseCount ?? null)} helper="Data Quality gated stock count available for candidate review." />
-            </Grid>
-            <Grid item xs={12} md={3}>
-              <MetricCard label="Data trust" value={snapshot.universeHealth.value?.trustStatus ?? snapshot.todayReview.value?.run?.trustStatus ?? 'Unavailable'} helper={snapshot.universeHealth.value?.trustReasons?.[0] ?? 'Trust status is shown from persisted data readiness evidence.'} />
-            </Grid>
-          </Grid>
+export function StockInterestRadarPage() {
+  const view = useReadModelSnapshot(fetchStockInterestRadarSnapshot);
+  return (
+    <RadarPage
+      title="Stock Interest Radar"
+      subtitle="Which stocks deserve attention now? Rows are displayed in backend snapshot order."
+      tabs={stockInterestTabs}
+      envelope={view.data}
+      loading={view.loading}
+      error={view.error}
+      missingTitle="Stock Interest Radar backend not available yet."
+      renderTable={(rows) => <StockInterestTable rows={rows as StockInterestSnapshot[]} />}
+    />
+  );
+}
 
-          <Grid container spacing={2}>
-            <Grid item xs={12} lg={7}>
-              <SectionCard title="Index Tape" subtitle="Persisted index snapshot status">
-                <MissingEvidence
-                  title="Index context is not available yet"
-                  message="Nifty 50, Bank Nifty, sector-index, and broad-market index evidence still needs a saved source before it can appear here."
-                  source="NSE Indices"
-                  sourceUrl="https://www.nseindia.com/nse-indices"
-                />
-              </SectionCard>
-            </Grid>
-            <Grid item xs={12} lg={5}>
-              <SectionCard title="Breadth And Participation" subtitle="Market internal health">
-                {breadth ? (
-                  <Grid container spacing={1}>
-                    <Grid item xs={6}><InlineMetric label="Above SMA50" value={formatPercent(breadth.percentAboveSma50)} /></Grid>
-                    <Grid item xs={6}><InlineMetric label="Above SMA200" value={formatPercent(breadth.percentAboveSma200)} /></Grid>
-                    <Grid item xs={6}><InlineMetric label="A/D ratio" value={formatRatio(breadth.advanceDeclineRatio)} /></Grid>
-                    <Grid item xs={6}><InlineMetric label="Sample" value={formatNumber(breadth.instrumentCount)} /></Grid>
-                  </Grid>
-                ) : (
-                  <MissingEvidence
-                    title="Official breadth snapshot missing"
-                    message="Advance, decline, unchanged, and denominator counts are not saved yet. Available participation evidence is shown only when it exists in saved market context."
-                    source="NSE Advances/Declines"
-                    sourceUrl="https://www.nseindia.com/market-data/advance"
-                  />
-                )}
-              </SectionCard>
-            </Grid>
-          </Grid>
+export function EarningsIntelligencePage() {
+  const view = useReadModelSnapshot(fetchEarningsIntelligenceSnapshot);
+  return (
+    <RadarPage
+      title="Earnings Intelligence"
+      subtitle="Which result-related stocks deserve attention?"
+      tabs={earningsTabs}
+      envelope={view.data}
+      loading={view.loading}
+      error={view.error}
+      missingTitle="Earnings Intelligence backend not available yet."
+      renderTable={(rows) => <EarningsTable rows={rows as EarningsIntelligenceSnapshot[]} />}
+    />
+  );
+}
 
-          <Grid container spacing={2}>
-            <Grid item xs={12} lg={4}>
-              <SectionCard title="Sector Leadership" subtitle="Persisted sector context">
-                {sectors.length || weakSectors.length ? (
-                  <SectorList leading={sectors.map((item) => item.sector)} weak={weakSectors.map((item) => item.sector)} />
-                ) : (
-                  <MissingEvidence
-                    title="Sector rotation snapshot unavailable"
-                    message="Sector leadership appears when saved market context evidence is available."
-                    source="Market Context Intelligence"
-                  />
-                )}
-              </SectionCard>
-            </Grid>
-            <Grid item xs={12} lg={4}>
-              <SectionCard title="Institutional Flow" subtitle="FII/FPI and DII context">
-                <MissingEvidence
-                  title="FII/FPI and DII flow data is not available yet"
-                  message="FII/FPI and DII buy, sell, net, and rolling-flow regime labels are not available yet. This page shows context only, not recommendations."
-                  source="NSE FII/DII capital-market activity"
-                  sourceUrl="https://www.nseindia.com/reports/fii-dii/"
-                />
-              </SectionCard>
-            </Grid>
-            <Grid item xs={12} lg={4}>
-              <SectionCard title="Derivatives Sentiment" subtitle="Read-only derivatives context">
-                <MissingEvidence
-                  title="Derivatives context is not enabled for this scope yet"
-                  message="Option-chain, futures trend, PCR, OI change, strikes, and expiry context remain unavailable until this data domain is enabled and saved evidence exists."
-                  source="NSE data sharing policy list"
-                  sourceUrl="https://nsearchives.nseindia.com/web/sites/default/files/inline-files/Data%20list%20under%20NSE%20Data%20Sharing%20Policy%20for%20Research%20and%20Analysis_20250728.pdf"
-                />
-              </SectionCard>
-            </Grid>
-          </Grid>
+export function CompounderRadarPage() {
+  const view = useReadModelSnapshot(fetchCompounderRadarSnapshot);
+  return (
+    <RadarPage
+      title="Compounder Radar"
+      subtitle="Which companies show durable long-term growth? The page uses compounder candidates, not multibagger language."
+      tabs={compounderTabs}
+      envelope={view.data}
+      loading={view.loading}
+      error={view.error}
+      missingTitle="Compounder Radar backend not available yet."
+      renderTable={(rows) => <CompounderTable rows={rows as CompounderSnapshot[]} />}
+    />
+  );
+}
 
-          <Grid container spacing={2}>
-            <Grid item xs={12} lg={7}>
-              <SectionCard title="Price Movers" subtitle="Existing read-only mover evidence">
-                <MoverTable rows={[...(moverRange?.gainers ?? []).slice(0, 5), ...(moverRange?.losers ?? []).slice(0, 5)]} />
-              </SectionCard>
-            </Grid>
-            <Grid item xs={12} lg={5}>
-              <SectionCard title="Candidate Review Queue" subtitle="Persisted Today Review only">
-                <Stack spacing={1}>
-                  <InlineMetric label="Bullish review" value={formatNumber(reviewGroups?.longReview.length ?? 0)} />
-                  <InlineMetric label="Bearish / exit risk" value={formatNumber((reviewGroups?.shortReview.length ?? 0) + (reviewGroups?.exitRiskReview.length ?? 0))} />
-                  <InlineMetric label="Blocked or insufficient" value={formatNumber((reviewGroups?.blocked.length ?? 0) + (reviewGroups?.insufficientData.length ?? 0))} />
-                  <Button component={RouterLink} to="/today-review" variant="outlined" sx={{ alignSelf: 'flex-start' }}>
-                    Open Daily Review
-                  </Button>
-                </Stack>
-              </SectionCard>
-            </Grid>
-          </Grid>
+export function TraderSetupRadarPage() {
+  const view = useReadModelSnapshot(fetchTraderSetupRadarSnapshot);
+  return (
+    <RadarPage
+      title="Trader Setup Radar"
+      subtitle="Which setups are actionable for swing review? Timeframes are limited to 1D and above."
+      tabs={traderSetupTabs}
+      envelope={view.data}
+      loading={view.loading}
+      error={view.error}
+      missingTitle="Trader Setup Radar backend not available yet."
+      renderTable={(rows) => <TraderSetupTable rows={rows as TraderSetupSnapshot[]} />}
+    />
+  );
+}
+
+export function RiskRadarPage() {
+  const view = useReadModelSnapshot(fetchRiskRadarSnapshot);
+  return (
+    <RadarPage
+      title="Risk Radar"
+      subtitle="What should be avoided? Risk rows are displayed from persisted risk snapshots only."
+      tabs={riskTabs}
+      envelope={view.data}
+      loading={view.loading}
+      error={view.error}
+      missingTitle="Risk Radar backend not available yet."
+      renderTable={(rows) => <RiskTable rows={rows as RiskRadarSnapshot[]} />}
+    />
+  );
+}
+
+export function InstrumentWorkspaceLandingPage() {
+  const navigate = useNavigate();
+  const view = useReadModelSnapshot(fetchInstrumentContextSnapshot);
+
+  return (
+    <SnapshotPageShell
+      title="Instrument Workspace"
+      subtitle="Open a stock workspace and review backend-provided instrument context. Shared market-data production actions stay out of this trader workflow."
+      loading={view.loading}
+      error={view.error}
+      envelope={view.data}
+      missingTitle="Instrument Context backend not available yet."
+    >
+      <Paper variant="outlined" sx={{ p: 2 }}>
+        <Stack spacing={1.5}>
+          <Typography variant="h6">Open Instrument</Typography>
+          <InstrumentSearchSelect
+            value={null}
+            onChange={(instrument: V1Instrument | null) => {
+              if (instrument?.id) navigate(`/stocks/${instrument.id}`);
+            }}
+          />
+          <Typography variant="body2" color="text.secondary">
+            Search only opens existing local catalog entries. Shared data jobs stay outside this trader workflow.
+          </Typography>
         </Stack>
-      )}
-    </MarketPageShell>
+      </Paper>
+      {view.data?.snapshot && <InstrumentContextRail snapshot={view.data.snapshot} />}
+    </SnapshotPageShell>
   );
 }
 
-export function IndicesWorkspacePage() {
-  const view = useMarketIntelligenceSnapshot();
-  const indices = view.snapshot?.indices.value?.instruments ?? [];
-
+export function MarketIntelligenceCompatibilityPage({ title }: { title: string }) {
   return (
-    <MarketPageShell
-      title="Indices Workspace"
-      subtitle="Index context for Nifty, sector, broad-market, and approved regional/global indices. Constituent and contribution analytics appear after saved index evidence exists."
-      loading={view.loading}
-      error={view.error}
-      snapshot={view.snapshot}
-    >
-      {view.snapshot && (
-        <Grid container spacing={2}>
-          <Grid item xs={12} lg={8}>
-            <SectionCard title="Index Catalog" subtitle="Available INDEX instruments from the local catalog">
-              {indices.length ? (
-                <InstrumentTable rows={indices} emptyMessage="No index catalog rows for this scope." />
-              ) : (
-                <MissingEvidence
-                  title="No local index instruments found"
-                  message="Index rows may not be imported yet. This page will not import, sync, or repair catalog data from a user workflow."
-                  source="Local instrument catalog"
-                />
-              )}
-            </SectionCard>
-          </Grid>
-          <Grid item xs={12} lg={4}>
-            <SectionCard title="Index Context Gaps" subtitle="Data still needed for a fuller index view">
-              <GapList items={[
-                'constituents and weights',
-                'top contributors and detractors',
-                'index-level breadth',
-                'sector weights',
-                'watchlist and portfolio overlap',
-                'stock-vs-index relative strength',
-              ]} />
-            </SectionCard>
-          </Grid>
-        </Grid>
-      )}
-    </MarketPageShell>
+    <Box className="page-container page-container--hub">
+      <PageHeader
+        title={title}
+        subtitle="Compatibility route retained for localhost history. This page is not part of primary trader navigation."
+      />
+      <DataUnavailableState
+        title={`${title} read model is not available in the trader revamp.`}
+        message="Use the primary trader workflow pages for snapshot-based review. Backend dependencies are documented for future persisted read APIs."
+        warnings={['No fake rows are shown.']}
+      />
+    </Box>
   );
 }
 
-export function BreadthParticipationPage() {
-  const view = useMarketIntelligenceSnapshot();
-  const persistedBreadth = view.snapshot?.persistedBreadth.value ?? null;
-  const breadth = persistedBreadth?.breadth ?? null;
-  const health = view.snapshot?.universeHealth.value;
-  const breadthGaps = persistedBreadth?.gaps ?? [
-    'Official advances, declines, and unchanged counts are not persisted yet.',
-  ];
-
-  return (
-    <MarketPageShell
-      title="Breadth And Participation"
-      subtitle="Market internal health. Counts, denominator, freshness, and source limitations must be visible before a breadth signal is trusted."
-      loading={view.loading}
-      error={view.error}
-      snapshot={view.snapshot}
-    >
-      {view.snapshot && (
-        <Grid container spacing={2}>
-          <Grid item xs={12} md={3}><MetricCard label="A/D ratio" value={formatRatio(breadth?.advanceDeclineRatio)} helper="Official advance, decline, unchanged counts are not yet persisted." /></Grid>
-          <Grid item xs={12} md={3}><MetricCard label="Above SMA50" value={formatPercent(breadth?.percentAboveSma50)} helper={`SMA50 denominator: ${formatNumber(breadth?.sma50SampleCount ?? breadth?.instrumentCount ?? null)}`} /></Grid>
-          <Grid item xs={12} md={3}><MetricCard label="Above SMA200" value={formatPercent(breadth?.percentAboveSma200)} helper={`SMA200 denominator: ${formatNumber(breadth?.sma200SampleCount ?? breadth?.instrumentCount ?? null)}`} /></Grid>
-          <Grid item xs={12} md={3}><MetricCard label="Review-ready denominator" value={formatNumber(health?.counts.reviewReady ?? null)} helper={`Catalog: ${formatNumber(health?.counts.totalCatalogInstruments ?? null)}`} /></Grid>
-          <Grid item xs={12} lg={7}>
-            <SectionCard title="Breadth Evidence" subtitle="Saved participation evidence">
-              {persistedBreadth?.status === 'ready' && breadth ? (
-                <Stack spacing={1}>
-                  <InlineMetric label="Evidence basis" value="Saved market participation snapshot" />
-                  <InlineMetric label="Official counts" value="Official advance/decline counts not available yet" />
-                  <InlineMetric label="Snapshot time" value={formatDateTime(persistedBreadth.asOf)} />
-                  <GapList items={breadthGaps} />
-                </Stack>
-              ) : (
-                <MissingEvidence
-                  title="Saved participation snapshot is not available for this market."
-                  message="Official advances, declines, and unchanged counts are not available yet."
-                  source="NSE official advances/declines"
-                  sourceUrl="https://www.nseindia.com/market-data/advance"
-                />
-              )}
-            </SectionCard>
-          </Grid>
-          <Grid item xs={12} lg={5}>
-            <SectionCard title="Data Denominators" subtitle="Current local readiness evidence">
-              <Stack spacing={1}>
-                <InlineMetric label="Active instruments" value={formatNumber(health?.counts.activeInstruments ?? null)} />
-                <InlineMetric label="Price ready" value={formatNumber(health?.counts.priceReady ?? null)} />
-                <InlineMetric label="Context ready" value={formatNumber(health?.counts.contextReady ?? null)} />
-                <InlineMetric label="DQ trust" value={health?.trustStatus ?? 'Unavailable'} />
-              </Stack>
-            </SectionCard>
-          </Grid>
-        </Grid>
-      )}
-    </MarketPageShell>
-  );
-}
-
-export function InstitutionalFlowPage() {
-  return (
-    <ScopedMarketPageShell
-      title="Institutional Flow"
-      subtitle="Institutional flow context from FII/FPI and DII activity. This page must not imply a direct entry or exit recommendation."
-    >
-      <Grid container spacing={2}>
-        <Grid item xs={12} md={3}><MetricCard label="FII/FPI buy value" value="Unavailable" helper="Requires a saved institutional-flow snapshot." /></Grid>
-        <Grid item xs={12} md={3}><MetricCard label="FII/FPI sell value" value="Unavailable" helper="Requires a saved institutional-flow snapshot." /></Grid>
-        <Grid item xs={12} md={3}><MetricCard label="DII buy value" value="Unavailable" helper="Requires a saved institutional-flow snapshot." /></Grid>
-        <Grid item xs={12} md={3}><MetricCard label="DII sell value" value="Unavailable" helper="Requires a saved institutional-flow snapshot." /></Grid>
-        <Grid item xs={12} md={3}><MetricCard label="FII/FPI net flow" value="Unavailable" helper="Net flow appears after persisted buy and sell evidence exists." /></Grid>
-        <Grid item xs={12} md={3}><MetricCard label="DII net flow" value="Unavailable" helper="Net flow appears after persisted buy and sell evidence exists." /></Grid>
-        <Grid item xs={12} md={3}><MetricCard label="5-day net flow" value="Unavailable" helper="Rolling flow needs saved daily history." /></Grid>
-        <Grid item xs={12} md={3}><MetricCard label="20-day net flow" value="Unavailable" helper="Rolling flow needs saved daily history." /></Grid>
-        <Grid item xs={12} md={6}><MetricCard label="Index divergence" value="Unavailable" helper="Flow versus index movement needs persisted flow and index evidence." /></Grid>
-        <Grid item xs={12} md={6}><MetricCard label="Flow regime" value="Unavailable" helper="Regime labels need persisted FII/FPI and DII evidence." /></Grid>
-        <Grid item xs={12}>
-          <SectionCard title="Institutional Flow Evidence" subtitle="Saved institutional-flow snapshot status">
-            <MissingEvidence
-              title="FII/FPI and DII flow data is not available yet"
-              message="When available, this view should show buy, sell, net values, rolling flow, divergence versus index movement, and classification labels. Until then, no institutional-flow numbers are shown."
-              source="NSE FII/DII capital-market activity"
-              sourceUrl="https://www.nseindia.com/reports/fii-dii/"
-            />
-          </SectionCard>
-        </Grid>
-        <Grid item xs={12}>
-          <SectionCard title="Current Limitations" subtitle="What is intentionally not inferred">
-            <GapList items={[
-              'No persisted FII/FPI or DII source rows exist yet.',
-              'Smart Money price-volume context is not treated as institutional-flow evidence.',
-              'This page is read-only and does not update shared market data.',
-            ]} />
-          </SectionCard>
-        </Grid>
-      </Grid>
-    </ScopedMarketPageShell>
-  );
-}
-
-export function DerivativesContextPage() {
-  const view = useFnoUnderlyings();
-  const rows = view.rows;
-
-  return (
-    <ScopedMarketPageShell
-      title="Derivatives Context"
-      subtitle="Read-only derivatives market context. Options strategy recommendations and trading instructions are out of scope."
-      loading={view.loading}
-      error={view.error}
-    >
-      <Grid container spacing={2}>
-        <Grid item xs={12}>
-          <Alert severity="warning">
-            Derivatives context is not enabled for this scope yet. Existing F&O eligibility flags are catalog context only, not option-chain or futures evidence.
-          </Alert>
-        </Grid>
-        <Grid item xs={12} lg={7}>
-          <SectionCard title="F&O Eligible Underlyings" subtitle="Catalog eligibility only, not option-chain evidence">
-            {rows.length ? <InstrumentTable rows={rows} emptyMessage="No F&O eligible rows found." /> : (
-              <MissingEvidence
-                title="No F&O eligibility rows found"
-                message="F&O eligibility may not be imported for this scope, or the catalog has no eligible underlyings."
-                source="Local instrument catalog"
-              />
-            )}
-          </SectionCard>
-        </Grid>
-        <Grid item xs={12} lg={5}>
-          <SectionCard title="Unavailable Derivatives Evidence" subtitle="Shown only after persisted snapshots exist">
-            <GapList items={[
-              'Index futures trend',
-              'Option-chain summary',
-              'Put-call ratio',
-              'Open-interest change',
-              'Top strikes by OI',
-              'Top strikes by OI change',
-              'Expiry proximity',
-            ]} />
-          </SectionCard>
-        </Grid>
-        <Grid item xs={12}>
-          <SectionCard title="Current Limitations" subtitle="Catalog context only">
-            <GapList items={[
-              'F&O eligibility is not futures or options-chain evidence.',
-              'No PCR, OI, strike, expiry, or futures trend snapshot is persisted yet.',
-              'This page is read-only and does not update shared market data.',
-            ]} />
-          </SectionCard>
-        </Grid>
-      </Grid>
-    </ScopedMarketPageShell>
-  );
-}
-
-export function MarketMapPage() {
-  const [range, setRange] = useState<MarketMoverRange>('1D');
-  const view = useMarketMap(range);
-  const summary = view.summary;
-  const rows = summary?.tiles ?? [];
-
-  return (
-    <ScopedMarketPageShell
-      title="Market Map"
-      subtitle="Stock map by sector and stored price movement. This page uses read-only saved market data and does not start refresh work."
-      loading={view.loading}
-      error={view.error}
-    >
-      {summary && (
-        <Stack spacing={2}>
-          <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', md: 'center' }} gap={1}>
-            <ToggleButtonGroup
-              value={range}
-              exclusive
-              size="small"
-              onChange={(_event, value: MarketMoverRange | null) => value && setRange(value)}
-              sx={{ flexWrap: 'wrap', gap: 1 }}
-            >
-              {rangeOptions.map((item) => (
-                <ToggleButton key={item} value={item}>{item}</ToggleButton>
-              ))}
-            </ToggleButtonGroup>
-            <Stack direction="row" gap={1} flexWrap="wrap" useFlexGap>
-              <Button component={RouterLink} to="/watchlists" variant="outlined">Track in Watchlists</Button>
-              <Button component={RouterLink} to="/alerts" variant="outlined">Create Alert</Button>
-            </Stack>
-          </Stack>
-          <SectionCard title="Map Evidence" subtitle="Catalog plus stored daily price movement">
-            <Grid container spacing={1}>
-              <Grid item xs={12} md={3}><InlineMetric label="Range" value={summary.range} /></Grid>
-              <Grid item xs={12} md={3}><InlineMetric label="Rows" value={formatNumber(rows.length)} /></Grid>
-              <Grid item xs={12} md={3}><InlineMetric label="As of" value={formatDate(summary.asOf)} /></Grid>
-              <Grid item xs={12} md={3}><InlineMetric label="Groups" value={formatNumber(summary.groups.length)} /></Grid>
-            </Grid>
-          </SectionCard>
-          {summary.groups.length > 0 && (
-            <SectionCard title="Sector Groups" subtitle="Grouped only where sector metadata is present">
-              <Stack direction="row" gap={0.75} flexWrap="wrap" useFlexGap>
-                {summary.groups.map((group) => (
-                  <Chip
-                    key={group.key}
-                    label={`${group.label} ${formatPercent(group.avgReturnPercent)}`}
-                    variant="outlined"
-                    color={(group.avgReturnPercent ?? 0) >= 0 ? 'success' : 'warning'}
-                  />
-                ))}
-              </Stack>
-            </SectionCard>
-          )}
-          <Grid container spacing={1.25}>
-            {rows.map((row) => (
-              <Grid key={row.instrumentId} item xs={12} sm={6} md={4} lg={3}>
-                <Paper
-                  variant="outlined"
-                  component={RouterLink}
-                  to={`/stocks/${row.instrumentId}`}
-                  sx={{
-                    display: 'block',
-                    height: '100%',
-                    p: 1.5,
-                    color: 'inherit',
-                    textDecoration: 'none',
-                    borderLeft: '4px solid',
-                    borderLeftColor: toneForReturn(row.returnPercent),
-                    '&:hover': { bgcolor: 'action.hover' },
-                  }}
-                >
-                  <Stack spacing={1}>
-                    <Stack direction="row" justifyContent="space-between" gap={1}>
-                      <Typography variant="subtitle2" fontWeight={800} noWrap>{row.displaySymbol || row.symbol}</Typography>
-                      <Typography variant="body2" fontWeight={800} color={returnColor(row.returnPercent)}>{formatPercent(row.returnPercent)}</Typography>
-                    </Stack>
-                    <Typography variant="caption" color="text.secondary" noWrap>{row.companyName}</Typography>
-                    <Stack direction="row" gap={0.5} flexWrap="wrap" useFlexGap>
-                      <Chip size="small" label={row.sector || 'Sector missing'} variant="outlined" />
-                      <Chip size="small" label={fnoLabel(row.derivativesEligible)} variant="outlined" />
-                      <StatusBadge label={row.dataStatus || 'Price status unknown'} />
-                    </Stack>
-                  </Stack>
-                </Paper>
-              </Grid>
-            ))}
-          </Grid>
-          {rows.length === 0 && (
-            <MissingEvidence
-              title="No map rows available"
-              message={summary.gaps[0] || 'Market map needs catalog rows and stored price movement evidence for the selected scope.'}
-              source={`${summary.sourceLabels.catalog} and ${summary.sourceLabels.prices}`}
-            />
-          )}
-          {summary.gaps.length > 0 && rows.length > 0 && (
-            <SectionCard title="Missing Overlay Evidence" subtitle="Not inferred in this slice">
-              <GapList items={summary.gaps} />
-            </SectionCard>
-          )}
-        </Stack>
-      )}
-    </ScopedMarketPageShell>
-  );
-}
-
-function MarketPageShell({
+function SnapshotPageShell({
   title,
   subtitle,
   loading,
   error,
-  snapshot,
+  envelope,
+  missingTitle,
   children,
 }: {
   title: string;
   subtitle: string;
   loading: boolean;
   error: string | null;
-  snapshot: MarketIntelligenceSnapshot | null;
+  envelope: SnapshotEnvelope<unknown> | null;
+  missingTitle: string;
   children: ReactNode;
 }) {
   return (
@@ -487,328 +226,318 @@ function MarketPageShell({
       <PageHeader
         title={title}
         subtitle={subtitle}
-        badges={snapshot ? (
-          <Stack direction="row" gap={1} flexWrap="wrap" useFlexGap>
-            <Chip label={`${snapshot.scope.region} / ${snapshot.scope.assetType}`} color="primary" variant="outlined" size="small" />
-            <Chip label={`View loaded ${formatDateTime(snapshot.fetchedAt)}`} variant="outlined" size="small" />
-          </Stack>
-        ) : undefined}
+        badges={envelope ? <Chip label={`${envelope.scope.region} / ${envelope.scope.assetType}`} color="primary" variant="outlined" size="small" /> : undefined}
       />
       {loading && <LinearProgress sx={{ mb: 2 }} />}
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-      {!loading && !error && !snapshot && (
-        <Alert severity="warning">Market intelligence snapshot is unavailable for this scope.</Alert>
+      {!loading && !error && envelope?.availability !== 'READY' && (
+        <DataUnavailableState
+          title={missingTitle}
+          message={envelope?.message && envelope.message !== missingTitle ? envelope.message : 'Future persisted read API capability is required before this page can show snapshot rows.'}
+          warnings={envelope?.warnings ?? []}
+        />
       )}
-      {snapshot && <FreshnessStrip snapshot={snapshot} />}
       {children}
     </Box>
   );
 }
 
-function ScopedMarketPageShell({
+function RadarPage<T>({
   title,
   subtitle,
-  loading = false,
-  error = null,
-  children,
+  tabs,
+  envelope,
+  loading,
+  error,
+  missingTitle,
+  renderTable,
 }: {
   title: string;
   subtitle: string;
-  loading?: boolean;
-  error?: string | null;
-  children: ReactNode;
+  tabs: string[];
+  envelope: SnapshotEnvelope<T[]> | null;
+  loading: boolean;
+  error: string | null;
+  missingTitle: string;
+  renderTable: (rows: T[]) => ReactNode;
 }) {
-  const { scope } = useMarketScope();
+  const [activeTab, setActiveTab] = useState(tabs[0]);
+  const rows = envelope?.snapshot ?? [];
+  const filteredRows = rows.filter((row) => {
+    const category = typeof row === 'object' && row !== null && 'category' in row ? String((row as { category?: string }).category) : activeTab;
+    return category === activeTab;
+  });
+
   return (
-    <Box className="page-container page-container--hub">
-      <PageHeader
-        title={title}
-        subtitle={subtitle}
-        badges={(
-          <Stack direction="row" gap={1} flexWrap="wrap" useFlexGap>
-            <Chip label={`${scope.region} / ${scope.assetType}`} color="primary" variant="outlined" size="small" />
-          </Stack>
+    <SnapshotPageShell title={title} subtitle={subtitle} loading={loading} error={error} envelope={envelope} missingTitle={missingTitle}>
+      <Paper variant="outlined" sx={{ mb: 2 }}>
+        <Tabs value={activeTab} onChange={(_event, value) => setActiveTab(value)} variant="scrollable" scrollButtons="auto">
+          {tabs.map((tab) => <Tab key={tab} value={tab} label={tab} />)}
+        </Tabs>
+      </Paper>
+      {envelope?.availability === 'READY' && (
+        filteredRows.length > 0
+          ? renderTable(filteredRows)
+          : <EmptyState title="No persisted rows for this scope/date." message={`No ${activeTab} rows were present in the backend snapshot.`} />
+      )}
+    </SnapshotPageShell>
+  );
+}
+
+function MarketPulseSnapshotView({ snapshot }: { snapshot: MarketPulseSnapshot }) {
+  return (
+    <Stack spacing={2}>
+      <SectionHeader title="Market Health" subtitle="Displayed exactly as provided by the Market Pulse read model." />
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(4, 1fr)' }, gap: 2 }}>
+        <ScoreCard label="Health Label" value={snapshot.marketHealthLabel} />
+        <ScoreCard label="Health Score" value={formatOptional(snapshot.marketHealthScore)} />
+        <ScoreCard label="Data Through" value={formatDate(snapshot.dataThroughDate)} />
+        <ScoreCard label="Candidate Count" value={formatOptional(snapshot.candidateCount)} />
+      </Box>
+      <SectionPanel title="Top 5 Indices">
+        {snapshot.topIndices.length === 0 ? <EmptyState title="No index rows in snapshot." /> : (
+          <TableContainer>
+            <Table size="small">
+              <TableHead><TableRow><TableCell>Index</TableCell><TableCell align="right">Value</TableCell><TableCell align="right">Move</TableCell><TableCell>Freshness</TableCell></TableRow></TableHead>
+              <TableBody>
+                {snapshot.topIndices.slice(0, 5).map((row) => (
+                  <TableRow key={row.symbol}>
+                    <TableCell>{row.label || row.symbol}</TableCell>
+                    <TableCell align="right">{formatOptional(row.value)}</TableCell>
+                    <TableCell align="right">{formatPercent(row.changePercent)}</TableCell>
+                    <TableCell>{row.freshness || 'Unavailable'}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
         )}
-      />
-      {loading && <LinearProgress sx={{ mb: 2 }} />}
-      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-      {children}
+      </SectionPanel>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: 'repeat(2, 1fr)' }, gap: 2 }}>
+        <SectionPanel title="Strong Sectors"><TagList values={snapshot.strongSectors} emptyLabel="No strong sectors in snapshot." /></SectionPanel>
+        <SectionPanel title="Weak Sectors"><TagList values={snapshot.weakSectors} emptyLabel="No weak sectors in snapshot." tone="warning" /></SectionPanel>
+        <SectionPanel title="Breadth Summary"><Typography>{snapshot.breadthSummary || 'Unavailable'}</Typography></SectionPanel>
+        <SectionPanel title="Delivery Participation Summary"><Typography>{snapshot.deliverySummary || 'Unavailable'}</Typography></SectionPanel>
+      </Box>
+      {snapshot.warnings.length > 0 && (
+        <SectionPanel title="Missing Data Warnings">
+          <Stack spacing={1}>{snapshot.warnings.map((warning) => <Alert key={warning} severity="warning">{warning}</Alert>)}</Stack>
+        </SectionPanel>
+      )}
+    </Stack>
+  );
+}
+
+function StockInterestTable({ rows }: { rows: StockInterestSnapshot[] }) {
+  return (
+    <RankingTable
+      rows={rows}
+      columns={['Symbol', 'Company', 'Sector', 'Interest Score', 'Direction', 'Reasons', 'Risks', 'Freshness', 'Returns', 'Workspace']}
+      renderRow={(row) => [
+        row.symbol,
+        row.company,
+        row.sector || 'Unavailable',
+        formatOptional(row.score),
+        row.direction,
+        <ReasonTags key="reasons" tags={row.reasonTags} />,
+        <RiskTags key="risks" tags={row.riskTags} />,
+        row.freshness || 'Unavailable',
+        row.returns || 'Unavailable',
+        <Button key="workspace" size="small" component={RouterLink} to={`/stocks/${encodeURIComponent(row.symbol)}`}>Open</Button>,
+      ]}
+    />
+  );
+}
+
+function EarningsTable({ rows }: { rows: EarningsIntelligenceSnapshot[] }) {
+  return (
+    <RankingTable
+      rows={rows}
+      columns={['Symbol', 'Result Date', 'Revenue Growth', 'Profit Growth', 'EPS Growth', 'Margin Trend', 'Consistency', 'Acceleration', 'Reasons', 'Risks']}
+      renderRow={(row) => [
+        row.symbol,
+        row.resultDate || 'Unavailable',
+        formatPercent(row.revenueGrowth),
+        formatPercent(row.profitGrowth),
+        formatPercent(row.epsGrowth),
+        row.marginTrend || 'Unavailable',
+        formatOptional(row.consistencyScore),
+        formatOptional(row.accelerationScore),
+        <ReasonTags key="reasons" tags={row.reasonTags} />,
+        <RiskTags key="risks" tags={row.riskTags} />,
+      ]}
+    />
+  );
+}
+
+function CompounderTable({ rows }: { rows: CompounderSnapshot[] }) {
+  return (
+    <RankingTable
+      rows={rows}
+      columns={['Symbol', 'Compounder Score', 'Growth', 'Quality', 'Trend', 'Reasons', 'Risks', 'Freshness']}
+      renderRow={(row) => [
+        row.symbol,
+        formatOptional(row.compounderScore),
+        formatOptional(row.growthScore),
+        formatOptional(row.qualityScore),
+        formatOptional(row.trendScore),
+        <ReasonTags key="reasons" tags={row.reasonTags} />,
+        <RiskTags key="risks" tags={row.riskTags} />,
+        row.freshness || 'Unavailable',
+      ]}
+    />
+  );
+}
+
+function TraderSetupTable({ rows }: { rows: TraderSetupSnapshot[] }) {
+  return (
+    <RankingTable
+      rows={rows}
+      columns={['Symbol', 'Setup Type', 'Setup Score', 'Timeframe', 'Reasons', 'Risks', 'Freshness']}
+      renderRow={(row) => [
+        row.symbol,
+        row.setupType,
+        formatOptional(row.setupScore),
+        row.timeframe,
+        <ReasonTags key="reasons" tags={row.reasonTags} />,
+        <RiskTags key="risks" tags={row.riskTags} />,
+        row.freshness || 'Unavailable',
+      ]}
+    />
+  );
+}
+
+function RiskTable({ rows }: { rows: RiskRadarSnapshot[] }) {
+  return (
+    <RankingTable
+      rows={rows}
+      columns={['Symbol', 'Risk Score', 'Risk Category', 'Reasons', 'Freshness']}
+      renderRow={(row) => [
+        row.symbol,
+        formatOptional(row.riskScore),
+        row.riskCategory,
+        <ReasonTags key="reasons" tags={row.reasonTags} />,
+        row.freshness || 'Unavailable',
+      ]}
+    />
+  );
+}
+
+function InstrumentContextRail({ snapshot }: { snapshot: InstrumentContextSnapshot }) {
+  return (
+    <SectionPanel title="Instrument Context Snapshot">
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(4, 1fr)' }, gap: 1.5 }}>
+        <ScoreCard label="Market Pulse State" value={snapshot.marketState} />
+        <ScoreCard label="Sector State" value={snapshot.sectorState} />
+        <ScoreCard label="Relative Strength" value={snapshot.relativeStrength} />
+        <ScoreCard label="Earnings Status" value={snapshot.earningsStatus} />
+        <ScoreCard label="Compounder Status" value={snapshot.compounderStatus} />
+        <ScoreCard label="Setup Status" value={snapshot.setupStatus} />
+        <ScoreCard label="Risk Status" value={snapshot.riskStatus} />
+        <ScoreCard label="Freshness" value={snapshot.freshness.label} />
+      </Box>
+    </SectionPanel>
+  );
+}
+
+function RankingTable<T>({ rows, columns, renderRow }: { rows: T[]; columns: string[]; renderRow: (row: T) => ReactNode[] }) {
+  return (
+    <TableContainer component={Paper} variant="outlined">
+      <Table size="small">
+        <TableHead>
+          <TableRow>{columns.map((column) => <TableCell key={column}>{column}</TableCell>)}</TableRow>
+        </TableHead>
+        <TableBody>
+          {rows.map((row, rowIndex) => (
+            <TableRow key={rowIndex}>
+              {renderRow(row).map((cell, cellIndex) => <TableCell key={`${rowIndex}:${cellIndex}`}>{cell}</TableCell>)}
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </TableContainer>
+  );
+}
+
+function ScoreCard({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <Paper variant="outlined" sx={{ p: 2 }}>
+      <Typography variant="caption" color="text.secondary">{label}</Typography>
+      <Typography variant="h6" fontWeight={800}>{value}</Typography>
+    </Paper>
+  );
+}
+
+function HealthBadge({ label }: { label: string }) {
+  return <Chip label={label} color={label.toLowerCase().includes('risk') ? 'warning' : 'primary'} variant="outlined" />;
+}
+
+function ReasonTags({ tags }: { tags: string[] }) {
+  return <TagList values={tags} emptyLabel="No reasons in snapshot." />;
+}
+
+function RiskTags({ tags }: { tags: string[] }) {
+  return <TagList values={tags} emptyLabel="No risks in snapshot." tone="warning" />;
+}
+
+function TagList({ values, emptyLabel, tone = 'default' }: { values: string[]; emptyLabel: string; tone?: 'default' | 'warning' }) {
+  if (values.length === 0) return <Typography variant="body2" color="text.secondary">{emptyLabel}</Typography>;
+  return (
+    <Stack direction="row" gap={0.75} flexWrap="wrap" useFlexGap>
+      {values.map((value) => <HealthBadge key={value} label={value} />)}
+      {tone === 'warning' && null}
+    </Stack>
+  );
+}
+
+function EmptyState({ title, message }: { title: string; message?: string }) {
+  return (
+    <Alert severity="info">
+      <Stack spacing={0.5}>
+        <Typography fontWeight={800}>{title}</Typography>
+        {message && <Typography variant="body2">{message}</Typography>}
+      </Stack>
+    </Alert>
+  );
+}
+
+function DataUnavailableState({ title, message, warnings }: { title: string; message: string; warnings: string[] }) {
+  return (
+    <Alert severity="info" sx={{ mb: 2 }}>
+      <Stack spacing={0.75}>
+        <Typography fontWeight={800}>{title}</Typography>
+        <Typography variant="body2">{message}</Typography>
+        <Typography variant="body2">No fake rows are shown.</Typography>
+        {warnings.map((warning) => <Typography key={warning} variant="caption" color="text.secondary">{warning}</Typography>)}
+      </Stack>
+    </Alert>
+  );
+}
+
+function SectionHeader({ title, subtitle }: { title: string; subtitle?: string }) {
+  return (
+    <Box>
+      <Typography variant="h6" fontWeight={800}>{title}</Typography>
+      {subtitle && <Typography color="text.secondary">{subtitle}</Typography>}
     </Box>
   );
 }
 
-function useFnoUnderlyings() {
-  const { scope } = useMarketScope();
-  const requestRef = useRef(0);
-  const [rows, setRows] = useState<V1Instrument[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const requestId = requestRef.current + 1;
-    requestRef.current = requestId;
-    setLoading(true);
-    setError(null);
-
-    fetchInstruments({ region: scope.region, assetType: scope.assetType, derivativesEligible: true, pageSize: 75 })
-      .then((result) => {
-        if (requestRef.current === requestId) setRows(result.instruments);
-      })
-      .catch((caught) => {
-        if (requestRef.current !== requestId) return;
-        setRows([]);
-        setError(toErrorMessage(caught));
-      })
-      .finally(() => {
-        if (requestRef.current === requestId) setLoading(false);
-      });
-  }, [scope]);
-
-  return { rows, loading, error };
-}
-
-function useMarketMap(range: MarketMoverRange) {
-  const { scope } = useMarketScope();
-  const requestRef = useRef(0);
-  const [summary, setSummary] = useState<MarketMapSummary | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const requestId = requestRef.current + 1;
-    requestRef.current = requestId;
-    setLoading(true);
-    setError(null);
-
-    fetchMarketMap(scope, range, 60)
-      .then((result) => {
-        if (requestRef.current === requestId) setSummary(result);
-      })
-      .catch((caught) => {
-        if (requestRef.current !== requestId) return;
-        setSummary(null);
-        setError(toErrorMessage(caught));
-      })
-      .finally(() => {
-        if (requestRef.current === requestId) setLoading(false);
-      });
-  }, [scope, range]);
-
-  return { summary, loading, error };
-}
-
-function FreshnessStrip({ snapshot }: { snapshot: MarketIntelligenceSnapshot }) {
-  const resources = [
-    snapshot.todayReview,
-    snapshot.marketMovers,
-    snapshot.universeHealth,
-    snapshot.marketContext,
-  ];
+function SectionPanel({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <Paper variant="outlined" sx={{ p: 1.5, mb: 2 }}>
-      <Stack direction="row" gap={1} flexWrap="wrap" useFlexGap>
-        {resources.map((resource) => (
-          <Chip
-            key={resource.source}
-            size="small"
-            color={resource.status === 'ready' ? 'success' : 'warning'}
-            variant="outlined"
-            label={`${resource.source}: ${resource.asOf ? formatDateTime(resource.asOf) : resource.status}`}
-          />
-        ))}
-      </Stack>
-    </Paper>
-  );
-}
-
-function EnvironmentBanner({ state, snapshot }: { state: MarketEnvironmentState; snapshot: MarketIntelligenceSnapshot }) {
-  return (
-    <Paper variant="outlined" sx={{ p: 2, borderLeft: '6px solid', borderLeftColor: stateColor(state) }}>
-      <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" gap={2}>
-        <Box>
-          <Typography variant="h5" fontWeight={800}>Market is {labelize(state)}</Typography>
-          <Typography color="text.secondary" sx={{ mt: 0.5 }}>{environmentMessage(state)}</Typography>
-        </Box>
-        <Stack direction="row" gap={1} flexWrap="wrap" useFlexGap alignItems="center">
-          <StatusBadge label={snapshot.universeHealth.value?.trustStatus ?? 'DQ unavailable'} />
-          <StatusBadge label={snapshot.todayReview.value?.run?.reviewUniverseMode ?? 'Review mode unavailable'} />
-          <StatusBadge label={snapshot.marketContext.status === 'ready' ? 'Market context ready' : 'Market context gap'} />
-        </Stack>
-      </Stack>
-    </Paper>
-  );
-}
-
-function SectionCard({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
-  return (
-    <Paper variant="outlined" sx={{ p: 2, height: '100%' }}>
-      <Stack spacing={1.5}>
-        <Box>
-          <Typography variant="h6" fontWeight={800}>{title}</Typography>
-          {subtitle && <Typography variant="body2" color="text.secondary">{subtitle}</Typography>}
-        </Box>
+    <Paper variant="outlined" sx={{ p: 2 }}>
+      <Stack spacing={1.25}>
+        <SectionHeader title={title} />
         {children}
       </Stack>
     </Paper>
   );
 }
 
-function MetricCard({ label, value, helper }: { label: string; value: string; helper?: string }) {
-  return (
-    <Paper variant="outlined" sx={{ p: 2, height: '100%' }}>
-      <Typography variant="caption" color="text.secondary">{label}</Typography>
-      <Typography variant="h5" fontWeight={800} sx={{ mt: 0.5 }}>{value}</Typography>
-      {helper && <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75 }}>{helper}</Typography>}
-    </Paper>
-  );
-}
-
-function InlineMetric({ label, value }: { label: string; value: string }) {
-  return (
-    <Stack direction="row" justifyContent="space-between" gap={2}>
-      <Typography variant="body2" color="text.secondary">{label}</Typography>
-      <Typography variant="body2" fontWeight={800}>{value}</Typography>
-    </Stack>
-  );
-}
-
-function MissingEvidence({ title, message, source, sourceUrl }: { title: string; message: string; source: string; sourceUrl?: string }) {
-  return (
-    <Alert severity="info">
-      <Stack spacing={0.75}>
-        <Typography variant="body2" fontWeight={800}>{title}</Typography>
-        <Typography variant="body2">{message}</Typography>
-        <Typography variant="caption" color="text.secondary">
-          Source basis: {sourceUrl ? <MuiLink href={sourceUrl} target="_blank" rel="noreferrer">{source}</MuiLink> : source}
-        </Typography>
-      </Stack>
-    </Alert>
-  );
-}
-
-function GapList({ items }: { items: string[] }) {
-  return (
-    <Stack divider={<Divider flexItem />} spacing={0.75}>
-      {items.map((item) => (
-        <Typography key={item} variant="body2">{item}</Typography>
-      ))}
-    </Stack>
-  );
-}
-
-function SectorList({ leading, weak }: { leading: string[]; weak: string[] }) {
-  return (
-    <Stack spacing={1}>
-      <Typography variant="subtitle2">Leading</Typography>
-      <Stack direction="row" gap={0.75} flexWrap="wrap" useFlexGap>
-        {leading.slice(0, 6).map((sector) => <Chip key={sector} size="small" label={sector} color="success" variant="outlined" />)}
-      </Stack>
-      <Typography variant="subtitle2">Weak</Typography>
-      <Stack direction="row" gap={0.75} flexWrap="wrap" useFlexGap>
-        {weak.slice(0, 6).map((sector) => <Chip key={sector} size="small" label={sector} color="warning" variant="outlined" />)}
-      </Stack>
-    </Stack>
-  );
-}
-
-function MoverTable({ rows }: { rows: MarketMoverRow[] }) {
-  if (rows.length === 0) {
-    return (
-      <MissingEvidence
-        title="Mover snapshot unavailable"
-        message="No market mover rows were returned for this scope."
-        source="Market Data Foundation movers"
-      />
-    );
-  }
-
-  return (
-    <TableContainer sx={{ maxHeight: 360 }}>
-      <Table size="small" stickyHeader>
-        <TableHead>
-          <TableRow>
-            <TableCell>Symbol</TableCell>
-            <TableCell>Sector</TableCell>
-            <TableCell align="right">Return</TableCell>
-            <TableCell>Latest</TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {rows.map((row) => (
-            <TableRow key={`${row.instrumentId}-${row.returnPercent}`} hover>
-              <TableCell>
-                <Button component={RouterLink} to={`/stocks/${row.instrumentId}`} size="small">{row.symbol}</Button>
-              </TableCell>
-              <TableCell>{row.sector || 'N/A'}</TableCell>
-              <TableCell align="right">
-                <Typography color={returnColor(row.returnPercent)} fontWeight={800}>{formatPercent(row.returnPercent)}</Typography>
-              </TableCell>
-              <TableCell>{formatDate(row.latestDate)}</TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </TableContainer>
-  );
-}
-
-function InstrumentTable({ rows, emptyMessage }: { rows: V1Instrument[]; emptyMessage: string }) {
-  if (rows.length === 0) return <Alert severity="info">{emptyMessage}</Alert>;
-
-  return (
-    <TableContainer sx={{ maxHeight: 460 }}>
-      <Table size="small" stickyHeader>
-        <TableHead>
-          <TableRow>
-            <TableCell>Symbol</TableCell>
-            <TableCell>Name</TableCell>
-            <TableCell>Segment</TableCell>
-            <TableCell>Sector</TableCell>
-            <TableCell>DQ</TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {rows.map((row) => (
-            <TableRow key={row.id} hover>
-              <TableCell>
-                <Button component={RouterLink} to={`/stocks/${row.id}`} size="small">{row.display_symbol || row.symbol}</Button>
-              </TableCell>
-              <TableCell>{row.company_name}</TableCell>
-              <TableCell>{row.instrument_segment}</TableCell>
-              <TableCell>{row.sector || 'N/A'}</TableCell>
-              <TableCell><StatusBadge label={row.data_status} /></TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </TableContainer>
-  );
-}
-
-function classifyEnvironment(snapshot: MarketIntelligenceSnapshot): MarketEnvironmentState {
-  const health = snapshot.universeHealth.value;
-  const breadth = snapshot.marketContext.value?.breadth;
-  const reviewMode = snapshot.todayReview.value?.run?.reviewUniverseMode;
-  if (!snapshot.todayReview.value?.run && !health && !snapshot.marketContext.value) return 'UNAVAILABLE';
-  if (health?.trustStatus === 'NOT_TRUSTWORTHY' || reviewMode === 'NO_REVIEW') return 'BLOCKED';
-  if (!snapshot.marketContext.value) return 'UNAVAILABLE';
-  if (breadth?.percentAboveSma50 !== null && breadth?.percentAboveSma50 !== undefined && breadth.percentAboveSma50 < 0.35) return 'RISKY';
-  if (breadth?.advanceDeclineRatio !== null && breadth?.advanceDeclineRatio !== undefined && breadth.advanceDeclineRatio < 0.9) return 'NARROW';
-  if (health?.trustStatus === 'OK' || snapshot.todayReview.value?.run?.trustStatus === 'OK') return 'SUPPORTIVE';
-  return 'NARROW';
-}
-
-function environmentMessage(state: MarketEnvironmentState) {
-  if (state === 'SUPPORTIVE') return 'Persisted evidence is sufficient for candidate review. This is research context only.';
-  if (state === 'NARROW') return 'Candidate review may be selective because participation evidence is limited or incomplete.';
-  if (state === 'RISKY') return 'Market internals or data evidence indicate elevated review risk.';
-  if (state === 'BLOCKED') return 'Trusted data or review-universe evidence blocks reliable candidate review.';
-  return 'Persisted market evidence is unavailable for this scope.';
-}
-
-function formatNumber(value: number | null | undefined) {
-  if (typeof value !== 'number' || Number.isNaN(value)) return 'Unavailable';
-  return new Intl.NumberFormat().format(value);
+function formatOptional(value: number | string | null | undefined) {
+  if (value === null || value === undefined || value === '') return 'Unavailable';
+  if (typeof value === 'number') return new Intl.NumberFormat().format(value);
+  return value;
 }
 
 function formatPercent(value: number | null | undefined) {
@@ -816,53 +545,8 @@ function formatPercent(value: number | null | undefined) {
   return `${value >= 0 ? '+' : ''}${(value * 100).toFixed(1)}%`;
 }
 
-function formatRatio(value: number | null | undefined) {
-  if (typeof value !== 'number' || Number.isNaN(value)) return 'Unavailable';
-  return value.toFixed(2);
-}
-
-function formatDateTime(value: string | null | undefined) {
-  if (!value) return 'Unavailable';
-  return new Date(value).toLocaleString();
-}
-
 function formatDate(value: string | null | undefined) {
   if (!value) return 'Unavailable';
-  return new Date(value).toLocaleDateString();
-}
-
-function labelize(value: string) {
-  return value.toLowerCase().split('_').map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(' ');
-}
-
-function stateColor(state: MarketEnvironmentState) {
-  if (state === 'SUPPORTIVE') return 'success.main';
-  if (state === 'NARROW') return 'warning.main';
-  if (state === 'RISKY' || state === 'BLOCKED') return 'error.main';
-  return 'divider';
-}
-
-function returnColor(value: number | null) {
-  if (typeof value !== 'number') return 'text.secondary';
-  if (value > 0) return 'success.main';
-  if (value < 0) return 'error.main';
-  return 'text.secondary';
-}
-
-function toneForReturn(value: number | null) {
-  if (typeof value !== 'number') return 'divider';
-  if (value > 0) return 'success.main';
-  if (value < 0) return 'error.main';
-  return 'divider';
-}
-
-function toErrorMessage(error: unknown) {
-  if (error instanceof Error) return error.message;
-  return 'Market evidence is unavailable.';
-}
-
-function fnoLabel(value: MarketMapTile['derivativesEligible']) {
-  if (value === true) return 'F&O';
-  if (value === false) return 'Cash';
-  return 'F&O unknown';
+  const timestamp = new Date(value).getTime();
+  return Number.isFinite(timestamp) ? new Date(value).toLocaleDateString() : value;
 }

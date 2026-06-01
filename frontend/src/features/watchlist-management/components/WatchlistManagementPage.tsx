@@ -149,6 +149,18 @@ const WatchlistManagementPage: React.FC = () => {
       {(error || formError) && <Alert severity="error" sx={{ mb: 2 }}>{error || formError}</Alert>}
 
       <Paper sx={{ p: 2, mb: 3 }}>
+        <Typography variant="h6" sx={{ mb: 1 }}>Watchlist Intelligence Overlays</Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+          Watchlist intelligence read models are not available yet. These overlays will display persisted backend snapshots only when supported.
+        </Typography>
+        <Stack direction="row" gap={1} flexWrap="wrap" useFlexGap>
+          {['Upcoming Result', 'Radar Membership', 'Risk Membership', 'Sector State', 'Freshness'].map((item) => (
+            <Chip key={item} label={item} variant="outlined" />
+          ))}
+        </Stack>
+      </Paper>
+
+      <Paper sx={{ p: 2, mb: 3 }}>
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={3} alignItems="flex-start">
           <Box sx={{ flex: 1, width: '100%' }}>
             <Typography variant="subtitle2" sx={{ mb: 1 }}>Select Watchlist</Typography>

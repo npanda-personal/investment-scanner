@@ -3,6 +3,8 @@ import { useSearchParams } from 'react-router-dom';
 import InstrumentDetailPage from './InstrumentDetailPage';
 import StockResearchWorkbenchPage from '@/features/stock-research-workbench';
 import { PageHeader } from '@/shared/components';
+import { fetchInstrumentContextSnapshot } from '@/features/market-intelligence/api/marketIntelligenceService';
+import { useReadModelSnapshot } from '@/features/market-intelligence/hooks/useMarketIntelligenceSnapshot';
 
 const tabs = [
   { value: 'overview', label: 'Overview' },
@@ -24,8 +26,8 @@ export default function UnifiedStockPage() {
       <PageHeader
         title="Instrument Workspace"
         subtitle="Read-only instrument evidence, market context gaps, personal research workflow links, and source freshness."
-        backTo="/market-map"
-        backLabel="Back to market map"
+        backTo="/instrument-workspace"
+        backLabel="Instrument search"
       />
       <Paper sx={{ mb: 2 }}>
         <Tabs
@@ -61,6 +63,9 @@ export default function UnifiedStockPage() {
 }
 
 function MarketContextRail() {
+  const { data, loading } = useReadModelSnapshot(fetchInstrumentContextSnapshot);
+  const snapshot = data?.snapshot ?? null;
+
   return (
     <Stack spacing={2}>
       <Paper variant="outlined" sx={{ p: 2 }}>
@@ -71,17 +76,25 @@ function MarketContextRail() {
       </Paper>
       <Paper variant="outlined" sx={{ p: 2 }}>
         <Stack spacing={1}>
-          <Typography variant="subtitle2" fontWeight={800}>Index and sector context</Typography>
-          <Chip label="Index membership: missing" variant="outlined" />
-          <Chip label="Stock vs index strength: missing" variant="outlined" />
-          <Chip label="Sector breadth: missing" variant="outlined" />
+          <Typography variant="subtitle2" fontWeight={800}>Instrument context snapshot</Typography>
+          {loading && <Typography variant="body2" color="text.secondary">Loading context snapshot.</Typography>}
+          {!loading && !snapshot && <Alert severity="info">Instrument Context backend not available yet. No fake rows are shown.</Alert>}
+          <Chip label={`Market Pulse State: ${snapshot?.marketState || 'Unavailable'}`} variant="outlined" />
+          <Chip label={`Sector State: ${snapshot?.sectorState || 'Unavailable'}`} variant="outlined" />
+          <Chip label={`Relative Strength: ${snapshot?.relativeStrength || 'Unavailable'}`} variant="outlined" />
+          <Chip label={`Earnings Status: ${snapshot?.earningsStatus || 'Unavailable'}`} variant="outlined" />
+          <Chip label={`Compounder Status: ${snapshot?.compounderStatus || 'Unavailable'}`} variant="outlined" />
+          <Chip label={`Setup Status: ${snapshot?.setupStatus || 'Unavailable'}`} variant="outlined" />
+          <Chip label={`Risk Status: ${snapshot?.riskStatus || 'Unavailable'}`} variant="outlined" />
+          <Chip label={`Freshness: ${snapshot?.freshness?.label || 'Unavailable'}`} variant="outlined" />
         </Stack>
       </Paper>
       <Paper variant="outlined" sx={{ p: 2 }}>
         <Stack spacing={1}>
-          <Typography variant="subtitle2" fontWeight={800}>Institutional and derivatives backdrop</Typography>
-          <Chip label="FII/DII backdrop: missing" variant="outlined" />
-          <Chip label="F&O context: approval required" color="warning" variant="outlined" />
+          <Typography variant="subtitle2" fontWeight={800}>Backend dependency</Typography>
+          <Typography variant="body2" color="text.secondary">
+            The InstrumentContextSnapshot read API is missing. This rail does not infer context from local page data.
+          </Typography>
         </Stack>
       </Paper>
       <Alert severity="info">

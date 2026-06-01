@@ -112,6 +112,7 @@ export function TodayReviewPage() {
         <>
           <RunStatusPanel run={run} />
           <CoveragePanel run={run} />
+          <DailyReviewRevampPanel />
           {run.warnings.length > 0 && (
             <Alert severity={run.status === 'PARTIAL' ? 'warning' : 'info'}>
               {run.warnings.join(' ')}
@@ -160,6 +161,26 @@ export function TodayReviewPage() {
       )}
       </Stack>
     </Box>
+  );
+}
+
+function DailyReviewRevampPanel() {
+  return (
+    <Card variant="outlined">
+      <CardContent>
+        <Stack spacing={1.25}>
+          <Typography variant="h6">Radar Context</Typography>
+          <Typography variant="body2" color="text.secondary">
+            Market Pulse Context, Source Radar, Score, Reasons, Risks, Sector State, and Freshness will display persisted read-model fields when backend support exists. This page does not duplicate Market Pulse or recalculate intelligence.
+          </Typography>
+          <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+            {['Market Pulse Context', 'Source Radar', 'Score', 'Reasons', 'Risks', 'Sector State', 'Freshness'].map((item) => (
+              <Chip key={item} label={`${item}: unavailable`} variant="outlined" />
+            ))}
+          </Stack>
+        </Stack>
+      </CardContent>
+    </Card>
   );
 }
 

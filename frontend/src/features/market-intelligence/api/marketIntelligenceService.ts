@@ -1,141 +1,77 @@
-import axios from 'axios';
-import { fetchDailyOverviewMarketMovers, fetchDailyOverviewTodayReview } from '@/features/daily-overview-dashboard/api/dailyOverviewDashboardApi';
-import { fetchPersistedMarketBreadth, fetchPersistedMarketContextSummary, type MarketContextSummary } from '@/features/market-context-intelligence';
-import { fetchInstruments, fetchMarketDataUniverseHealth } from '@/features/market-data-foundation';
 import type { MarketScope } from '@/contexts/MarketScopeContext';
-import type { MarketMapSummary, MarketIntelligenceSnapshot, SnapshotResource } from '../types';
+import type {
+  CompounderSnapshot,
+  EarningsIntelligenceSnapshot,
+  InstrumentContextSnapshot,
+  MarketIntelligenceFixtureMap,
+  MarketPulseSnapshot,
+  RiskRadarSnapshot,
+  SnapshotEnvelope,
+  StockInterestSnapshot,
+  TraderSetupSnapshot,
+} from '../types';
 
-const API_BASE = '/api';
+function fixtureMap(): MarketIntelligenceFixtureMap {
+  if (!import.meta.env.DEV || typeof window === 'undefined') return {};
+  return window.__marketIntelligenceReadModelFixtures ?? {};
+}
 
-const SOURCE_URLS = {
-  fiiDii: 'https://www.nseindia.com/reports/fii-dii/',
-  advanceDecline: 'https://www.nseindia.com/market-data/advance',
-  indices: 'https://www.nseindia.com/nse-indices',
-  dataSharing: 'https://nsearchives.nseindia.com/web/sites/default/files/inline-files/Data%20list%20under%20NSE%20Data%20Sharing%20Policy%20for%20Research%20and%20Analysis_20250728.pdf',
-} as const;
-
-export async function fetchMarketIntelligenceSnapshot(scope: MarketScope): Promise<MarketIntelligenceSnapshot> {
-  const scopeParams = { region: scope.region, assetType: scope.assetType };
-  const [
-    todayReview,
-    persistedMarketContext,
-    persistedBreadth,
-    marketMovers,
-    universeHealth,
-    indices,
-    fnoUnderlyings,
-    mapInstruments,
-  ] = await Promise.allSettled([
-    fetchDailyOverviewTodayReview(scopeParams),
-    fetchPersistedMarketContextSummary({ region: scope.region }),
-    fetchPersistedMarketBreadth({ region: scope.region }),
-    fetchDailyOverviewMarketMovers({ ...scopeParams, range: '1D' }),
-    fetchMarketDataUniverseHealth(scopeParams),
-    fetchInstruments({ region: scope.region, assetType: 'INDEX', pageSize: 75 }),
-    fetchInstruments({ ...scopeParams, derivativesEligible: true, pageSize: 75 }),
-    fetchInstruments({ ...scopeParams, pageSize: 120 }),
-  ]);
-
-  const fetchedAt = new Date().toISOString();
+function unavailable<T>(scope: MarketScope, message: string): SnapshotEnvelope<T> {
   return {
+    availability: 'BACKEND_UNAVAILABLE',
     scope,
-    fetchedAt,
-    marketContext: settlePersistedMarketContext(persistedMarketContext),
-    persistedMarketContext: settle(persistedMarketContext, 'Market context evidence', valueTimestamp(persistedMarketContext, (value) => value.asOf), undefined),
-    persistedBreadth: settle(persistedBreadth, 'Persisted Market Context breadth', valueTimestamp(persistedBreadth, (value) => value.asOf), SOURCE_URLS.advanceDecline),
-    todayReview: settle(todayReview, 'Today Review latest snapshot', valueTimestamp(todayReview, (value) => value.run?.updatedAt || value.run?.finishedAt || value.run?.dataThroughDate || null)),
-    marketMovers: settle(marketMovers, 'Market Data Foundation movers', valueTimestamp(marketMovers, (value) => value.generatedAt)),
-    universeHealth: settle(universeHealth, 'Market Data Foundation universe health', valueTimestamp(universeHealth, (value) => value.generatedAt)),
-    indices: settle(indices, 'NSE index catalog snapshot', null, SOURCE_URLS.indices),
-    fnoUnderlyings: settle(fnoUnderlyings, 'F&O underlying catalog flag', null, SOURCE_URLS.dataSharing),
-    mapInstruments: settle(mapInstruments, 'Instrument catalog evidence', null),
+    snapshot: null,
+    message,
+    warnings: ['Future persisted read API capability is required.'],
   };
 }
 
-export async function fetchMarketMap(scope: MarketScope, range = '1D', limit = 60): Promise<MarketMapSummary> {
-  const response = await axios.get<MarketMapSummary>(`${API_BASE}/v1/market-data/market-map`, {
-    params: {
-      region: scope.region,
-      assetType: scope.assetType,
-      range,
-      limit,
-    },
-  });
-  return response.data;
-}
-
-function settlePersistedMarketContext(result: PromiseSettledResult<Awaited<ReturnType<typeof fetchPersistedMarketContextSummary>>>): SnapshotResource<MarketContextSummary> {
-  if (result.status === 'fulfilled' && result.value.status === 'ready' && result.value.summary) {
-    return {
-      value: result.value.summary,
-      status: 'ready',
-      error: null,
-      source: 'Market context evidence',
-      asOf: result.value.asOf,
-    };
-  }
-
-  if (result.status === 'fulfilled') {
-    return {
-      value: null,
-      status: 'missing',
-      error: result.value.message || 'Saved market context is not available yet.',
-      source: 'Market context evidence',
-      asOf: result.value.asOf,
-    };
-  }
-
+function rowsEnvelope<T>(scope: MarketScope, rows: T[] | undefined, message: string): SnapshotEnvelope<T[]> {
+  if (!rows) return unavailable<T[]>(scope, message);
   return {
-    value: null,
-    status: 'missing',
-    error: toErrorMessage(result.reason),
-    source: 'Market context evidence',
-    asOf: null,
+    availability: rows.length > 0 ? 'READY' : 'EMPTY',
+    scope,
+    snapshot: rows,
+    message: rows.length > 0 ? 'Persisted snapshot rows loaded.' : 'No persisted rows for this scope/date.',
+    warnings: rows.length > 0 ? [] : ['No fake rows are shown.'],
   };
 }
 
-function settle<T>(
-  result: PromiseSettledResult<T>,
-  source: string,
-  asOf: string | null,
-  sourceUrl?: string,
-): SnapshotResource<T> {
-  if (result.status === 'fulfilled') {
-    return {
-      value: result.value,
-      status: 'ready',
-      error: null,
-      source,
-      sourceUrl,
-      asOf,
-    };
-  }
-
+function snapshotEnvelope<T>(scope: MarketScope, snapshot: T | undefined, message: string): SnapshotEnvelope<T> {
+  if (!snapshot) return unavailable<T>(scope, message);
   return {
-    value: null,
-    status: 'missing',
-    error: toErrorMessage(result.reason),
-    source,
-    sourceUrl,
-    asOf: null,
+    availability: 'READY',
+    scope,
+    snapshot,
+    message: 'Persisted snapshot loaded.',
+    warnings: [],
   };
 }
 
-function valueTimestamp<T>(result: PromiseSettledResult<T>, picker: (value: T) => string | null | undefined) {
-  if (result.status !== 'fulfilled') return null;
-  return normalizeTimestamp(picker(result.value));
+export async function fetchMarketPulseSnapshot(scope: MarketScope): Promise<SnapshotEnvelope<MarketPulseSnapshot>> {
+  return snapshotEnvelope(scope, fixtureMap().marketPulse, 'Market Pulse backend not available yet.');
 }
 
-function normalizeTimestamp(value: string | null | undefined) {
-  if (!value) return null;
-  const timestamp = new Date(value).getTime();
-  return Number.isFinite(timestamp) ? value : null;
+export async function fetchStockInterestRadarSnapshot(scope: MarketScope): Promise<SnapshotEnvelope<StockInterestSnapshot[]>> {
+  return rowsEnvelope(scope, fixtureMap().stockInterest, 'Stock Interest Radar backend not available yet.');
 }
 
-function toErrorMessage(error: unknown) {
-  if (typeof error === 'object' && error !== null) {
-    const candidate = error as { response?: { data?: { error?: string; message?: string } }; message?: string };
-    return candidate.response?.data?.error || candidate.response?.data?.message || candidate.message || 'Snapshot unavailable.';
-  }
-  return 'Snapshot unavailable.';
+export async function fetchEarningsIntelligenceSnapshot(scope: MarketScope): Promise<SnapshotEnvelope<EarningsIntelligenceSnapshot[]>> {
+  return rowsEnvelope(scope, fixtureMap().earningsIntelligence, 'Earnings Intelligence backend not available yet.');
+}
+
+export async function fetchCompounderRadarSnapshot(scope: MarketScope): Promise<SnapshotEnvelope<CompounderSnapshot[]>> {
+  return rowsEnvelope(scope, fixtureMap().compounderRadar, 'Compounder Radar backend not available yet.');
+}
+
+export async function fetchTraderSetupRadarSnapshot(scope: MarketScope): Promise<SnapshotEnvelope<TraderSetupSnapshot[]>> {
+  return rowsEnvelope(scope, fixtureMap().traderSetupRadar, 'Trader Setup Radar backend not available yet.');
+}
+
+export async function fetchRiskRadarSnapshot(scope: MarketScope): Promise<SnapshotEnvelope<RiskRadarSnapshot[]>> {
+  return rowsEnvelope(scope, fixtureMap().riskRadar, 'Risk Radar backend not available yet.');
+}
+
+export async function fetchInstrumentContextSnapshot(scope: MarketScope): Promise<SnapshotEnvelope<InstrumentContextSnapshot>> {
+  return snapshotEnvelope(scope, fixtureMap().instrumentContext, 'Instrument Context backend not available yet.');
 }

@@ -1,11 +1,46 @@
-import { expect, test, type Page, type Route } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { visitAuthenticated } from './support/auth';
 
-async function mockAuthenticatedUser(page: Page) {
-  await page.addInitScript(() => {
+const traderNavLabels = [
+  'Market Pulse',
+  'Stock Interest Radar',
+  'Earnings Intelligence',
+  'Compounder Radar',
+  'Trader Setup Radar',
+  'Risk Radar',
+  'Watchlists',
+  'Portfolios',
+  'Alerts',
+  'Instrument Workspace',
+];
+
+const hiddenTraderLabels = [
+  'Market Map',
+  'Breadth',
+  'Institutional Flow',
+  'Derivatives Context',
+  'Research Workbench',
+  'Research Hub',
+  'Data Ingestion',
+  'Provider Validation',
+  'Backfill',
+  'Repair',
+  'Signal Generation',
+  'Strategy Evaluation',
+  'Pipeline Controls',
+  'Pipeline Ops',
+  'Market Data Ops',
+  'Admin / Data Ops',
+];
+
+async function mockAuthenticatedUser(page: Page, fixtures?: Record<string, unknown>) {
+  await page.addInitScript((nextFixtures) => {
     window.localStorage.setItem('investment_scanner_auth_token', 'playwright-market-intelligence-token');
     window.localStorage.setItem('market_scope', JSON.stringify({ region: 'IN', assetType: 'STOCK' }));
-  });
+    if (nextFixtures) {
+      (window as unknown as { __marketIntelligenceReadModelFixtures?: Record<string, unknown> }).__marketIntelligenceReadModelFixtures = nextFixtures;
+    }
+  }, fixtures);
   await page.route('**/api/v1/auth/me', async (route) => {
     await route.fulfill({
       json: {
@@ -17,525 +52,136 @@ async function mockAuthenticatedUser(page: Page) {
   });
 }
 
-function persistedMarketContextPayload() {
-  return {
-    status: 'ready',
-    scope: { region: 'IN' },
-    asOf: '2026-05-27T05:15:00.000Z',
-    materialized: false,
-    summary: {
-      regime: { regime: 'RISK_ON', score: 74, explanation: 'Participation is supportive.', updatedAt: '2026-05-27T05:15:00.000Z', dataStatus: 'COMPLETE' },
-      topSectors: [
-        { sector: 'Financial Services', return1M: 0.04, return3M: 0.09, return6M: 0.14, relativeStrengthScore: 78, instrumentCount: 24, bullishSignalCount: 8, bearishSignalCount: 1, leadershipStatus: 'LEADING' },
-      ],
-      weakSectors: [
-        { sector: 'Utilities', return1M: -0.02, return3M: 0.01, return6M: 0.03, relativeStrengthScore: 42, instrumentCount: 10, bullishSignalCount: 1, bearishSignalCount: 4, leadershipStatus: 'LAGGING' },
-      ],
-      breadth: {
-        percentAboveSma50: 0.62,
-        percentAboveSma200: 0.54,
-        sma50SampleCount: 220,
-        sma200SampleCount: 180,
-        advanceDeclineRatio: 1.35,
-        newHigh52WeekCount: 18,
-        newLow52WeekCount: 4,
-        bullishSignalCount: 34,
-        bearishSignalCount: 12,
-        instrumentCount: 240,
-        dataStatus: 'COMPLETE',
-      },
-      countryStrength: [],
-      macro: { interestRateProxy: null, inflationProxy: null, usdStrengthProxy: null, commodityProxy: null, macroStatus: 'UNKNOWN', dataStatus: 'MISSING', explanation: 'Macro providers are not configured yet.' },
-      explanation: ['Participation is supportive.'],
-      updatedAt: '2026-05-27T05:15:00.000Z',
-      dataStatus: 'COMPLETE',
-    },
-  };
-}
-
-function missingPersistedMarketContextPayload() {
-  return {
-    status: 'missing',
-    scope: { region: 'IN' },
-    asOf: null,
-    materialized: false,
-    summary: null,
-    message: 'Saved market context is not available yet.',
-  };
-}
-
-function persistedBreadthPayload() {
-  return {
-    status: 'ready',
-    scope: { region: 'IN' },
-    asOf: '2026-05-27T05:15:00.000Z',
-    materialized: false,
-    sourceLabels: {
-      savedBreadth: 'Persisted Market Context breadth',
-      officialAdvancesDeclines: 'NSE official advances/declines not persisted',
-    },
-    gaps: [
-      'Official advances are not persisted yet.',
-      'Official declines are not persisted yet.',
-      'Official unchanged counts are not persisted yet.',
-    ],
-    breadth: {
-      percentAboveSma50: 0.62,
-      percentAboveSma200: 0.54,
-      sma50SampleCount: 220,
-      sma200SampleCount: 180,
-      advanceDeclineRatio: 1.35,
-      newHigh52WeekCount: 18,
-      newLow52WeekCount: 4,
-      bullishSignalCount: 34,
-      bearishSignalCount: 12,
-      instrumentCount: 240,
-      officialAdvanceCount: null,
-      officialDeclineCount: null,
-      officialUnchangedCount: null,
-      dataStatus: 'COMPLETE',
-    },
-  };
-}
-
-function missingPersistedBreadthPayload() {
-  return {
-    status: 'missing',
-    scope: { region: 'IN' },
-    asOf: null,
-    materialized: false,
-    sourceLabels: {
-      savedBreadth: 'Persisted Market Context breadth',
-      officialAdvancesDeclines: 'NSE official advances/declines not persisted',
-    },
-    gaps: [
-      'Saved breadth is not available for this scope.',
-      'Official advances, declines, and unchanged counts are not persisted yet.',
-    ],
-    breadth: null,
-  };
-}
-
-function todayReviewPayload() {
-  return {
-    run: {
-      id: 'today-run-1',
-      runDate: '2026-05-27T00:00:00.000Z',
-      region: 'IN',
-      assetType: 'STOCK',
-      status: 'COMPLETED',
-      trustStatus: 'OK',
-      dataThroughDate: '2026-05-27T00:00:00.000Z',
-      startedAt: '2026-05-27T05:00:00.000Z',
-      finishedAt: '2026-05-27T05:05:00.000Z',
-      warnings: [],
-      candidateCounts: { LONG_REVIEW: 1 },
-      sourceSnapshot: {},
-      reviewUniverseMode: 'FULL_REVIEW',
-      trustedUniverseCount: 144,
-      catalogCount: 300,
-      createdAt: '2026-05-27T05:00:00.000Z',
-      updatedAt: '2026-05-27T05:05:00.000Z',
-      candidates: [],
-    },
-    groups: { longReview: [], shortReview: [], exitRiskReview: [], watchOnly: [], blocked: [], avoid: [], insufficientData: [], unproven: [] },
-    scope: { region: 'IN', assetType: 'STOCK' },
-  };
-}
-
-function moversPayload() {
-  return {
-    scope: { region: 'IN', assetType: 'STOCK' },
-    generatedAt: '2026-05-27T05:00:00.000Z',
-    ranges: [{
-      range: '1D',
-      gainers: [{ instrumentId: 'stock-1', symbol: 'ALPHA', companyName: 'Alpha Ltd', sector: 'Financial Services', latestDate: '2026-05-27', latestClose: 120, baseDate: '2026-05-26', baseClose: 115, returnPercent: 0.043 }],
-      losers: [{ instrumentId: 'stock-2', symbol: 'BETA', companyName: 'Beta Ltd', sector: 'Utilities', latestDate: '2026-05-27', latestClose: 85, baseDate: '2026-05-26', baseClose: 88, returnPercent: -0.034 }],
-      warnings: [],
-    }],
-  };
-}
-
-function universeHealthPayload() {
-  return {
-    scope: { region: 'IN', assetType: 'STOCK' },
-    generatedAt: '2026-05-27T05:10:00.000Z',
-    counts: { reviewReady: 144, totalCatalogInstruments: 300, activeInstruments: 250, priceReady: 180, contextReady: 160, byUniverseState: {}, readiness: { priceReady: 180, contextReady: 160, reviewReady: 144 } },
-    coverage: { priceCoveragePercentage: 90, metadataCoveragePercentage: 88, reviewReadyPercentage: 48 },
-    topBlockers: [],
-    warnings: [],
-    trustStatus: 'OK',
-    trustReasons: ['Trusted baseline ready.'],
-    universeSignoff: { status: 'PASS', minReviewReadyRequired: 100, reviewReadyActual: 144, blockers: [], nextAction: null, downstreamAllowed: true },
-  };
-}
-
-function instrumentsPayload(assetType: string) {
-  return {
-    instruments: [{
-      id: assetType === 'INDEX' ? 'index-1' : 'stock-1',
-      symbol: assetType === 'INDEX' ? 'NIFTY 50' : 'ALPHA',
-      company_name: assetType === 'INDEX' ? 'Nifty 50 Index' : 'Alpha Ltd',
-      display_symbol: assetType === 'INDEX' ? 'NIFTY 50' : 'ALPHA',
-      exchange: 'NSE',
-      country: 'IN',
-      region: 'IN',
-      sector: assetType === 'INDEX' ? null : 'Financial Services',
-      industry: null,
-      currency: 'INR',
-      market_cap: 100000,
-      asset_type: assetType,
-      instrument_segment: assetType,
-      derivatives_eligible: assetType !== 'INDEX',
-      is_active: true,
-      is_delisted: false,
-      ipo_date: null,
-      isin: null,
-      source: 'LOCAL_TEST',
-      ingestion_timestamp: '2026-05-27T05:00:00.000Z',
-      last_updated_timestamp: '2026-05-27T05:00:00.000Z',
-      data_status: 'COMPLETE',
-    }],
-    pagination: { page: 1, pageSize: 75, total: 1, totalPages: 1 },
-  };
-}
-
-function fnoUnderlyingsPayload() {
-  return {
-    instruments: [{
-      id: 'stock-fno-1',
-      symbol: 'FNOALPHA',
-      company_name: 'FNO Alpha Ltd',
-      display_symbol: 'FNOALPHA',
-      exchange: 'NSE',
-      country: 'IN',
-      region: 'IN',
-      sector: 'Financial Services',
-      industry: null,
-      currency: 'INR',
-      market_cap: 100000,
-      asset_type: 'STOCK',
-      instrument_segment: 'CASH',
-      derivatives_eligible: true,
-      is_active: true,
-      is_delisted: false,
-      ipo_date: null,
-      isin: null,
-      source: 'LOCAL_TEST',
-      ingestion_timestamp: '2026-05-27T05:00:00.000Z',
-      last_updated_timestamp: '2026-05-27T05:00:00.000Z',
-      data_status: 'COMPLETE',
-    }],
-    pagination: { page: 1, pageSize: 75, total: 1, totalPages: 1 },
-  };
-}
-
-function marketMapPayload() {
-  return {
-    status: 'ready',
-    scope: { region: 'IN', assetType: 'STOCK' },
-    asOf: '2026-05-27T00:00:00.000Z',
-    range: '1D',
-    materialized: false,
-    sourceLabels: {
-      catalog: 'Market Data Foundation stock catalog',
-      prices: 'Stored daily price history',
-    },
-    warnings: ['Map returns are based on stored daily candles for the selected range.'],
-    gaps: ['Additional stock overlays require later saved evidence before they can appear here.'],
-    groups: [
-      { key: 'Financial Services', label: 'Financial Services', tileCount: 1, avgReturnPercent: 0.043 },
-      { key: 'Utilities', label: 'Utilities', tileCount: 1, avgReturnPercent: -0.034 },
-    ],
-    tiles: [
-      {
-        instrumentId: 'stock-1',
-        symbol: 'ALPHA',
-        displaySymbol: 'ALPHA',
-        companyName: 'Alpha Ltd',
-        sector: 'Financial Services',
-        derivativesEligible: null,
-        dataStatus: 'COMPLETE',
-        returnPercent: 0.043,
-      },
-      {
-        instrumentId: 'stock-2',
-        symbol: 'BETA',
-        displaySymbol: 'BETA',
-        companyName: 'Beta Ltd',
-        sector: 'Utilities',
-        derivativesEligible: null,
-        dataStatus: 'COMPLETE',
-        returnPercent: -0.034,
-      },
-    ],
-  };
-}
-
-function missingMarketMapPayload() {
-  return {
-    status: 'missing',
-    scope: { region: 'IN', assetType: 'STOCK' },
-    asOf: null,
-    range: '1D',
-    materialized: false,
-    sourceLabels: {
-      catalog: 'Market Data Foundation stock catalog',
-      prices: 'Stored daily price history',
-    },
-    warnings: [],
-    gaps: [
-      'Market map needs catalog rows and stored price movement evidence for the selected scope.',
-      'Additional stock overlays require later saved evidence before they can appear here.',
-    ],
-    groups: [],
-    tiles: [],
-  };
-}
-
-async function fulfillMarketReads(route: Route, persistedMarketContext = persistedMarketContextPayload(), persistedBreadth = persistedBreadthPayload()) {
-  const url = new URL(route.request().url());
-  if (url.pathname.includes('/market-context/persisted-breadth')) return route.fulfill({ json: persistedBreadth });
-  if (url.pathname.includes('/market-context/persisted-summary')) return route.fulfill({ json: persistedMarketContext });
-  if (url.pathname.includes('/today-review/latest')) return route.fulfill({ json: todayReviewPayload() });
-  if (url.pathname.includes('/market-data/movers')) return route.fulfill({ json: moversPayload() });
-  if (url.pathname.includes('/market-data/universe/health')) return route.fulfill({ json: universeHealthPayload() });
-  if (url.pathname.includes('/v1/instruments')) return route.fulfill({ json: instrumentsPayload(url.searchParams.get('assetType') || 'STOCK') });
-  return route.continue();
-}
-
-async function setupMarketPage(page: Page, options: {
-  persistedMarketContext?: ReturnType<typeof persistedMarketContextPayload> | ReturnType<typeof missingPersistedMarketContextPayload>;
-  persistedBreadth?: ReturnType<typeof persistedBreadthPayload> | ReturnType<typeof missingPersistedBreadthPayload>;
-} = {}) {
+async function setupReadOnlyPage(page: Page, fixtures?: Record<string, unknown>) {
   const apiRequests: string[] = [];
-  const persistedMarketContext = options.persistedMarketContext ?? persistedMarketContextPayload();
-  const persistedBreadth = options.persistedBreadth ?? persistedBreadthPayload();
-  await mockAuthenticatedUser(page);
+  await mockAuthenticatedUser(page, fixtures);
   page.on('request', (request) => {
     const url = new URL(request.url());
-    if (url.pathname.includes('/api/')) apiRequests.push(`${request.method()} ${url.pathname}`);
+    if (url.pathname.startsWith('/api/')) apiRequests.push(`${request.method()} ${url.pathname}${url.search}`);
   });
-  await page.route('**/api/v1/market-context/persisted-breadth**', (route) => fulfillMarketReads(route, persistedMarketContext, persistedBreadth));
-  await page.route('**/api/v1/market-context/persisted-summary**', (route) => fulfillMarketReads(route, persistedMarketContext, persistedBreadth));
-  await page.route('**/api/v1/today-review/latest**', (route) => fulfillMarketReads(route, persistedMarketContext, persistedBreadth));
-  await page.route('**/api/v1/market-data/movers**', (route) => fulfillMarketReads(route, persistedMarketContext, persistedBreadth));
-  await page.route('**/api/v1/market-data/universe/health**', (route) => fulfillMarketReads(route, persistedMarketContext, persistedBreadth));
-  await page.route('**/api/v1/instruments**', (route) => fulfillMarketReads(route, persistedMarketContext, persistedBreadth));
-  await page.route('**/api/v1/market-context/summary**', async (route) => {
-    throw new Error(`Trader page must not call materializing summary: ${route.request().url()}`);
-  });
-  await page.route('**/api/v1/market-context/breadth**', async (route) => {
-    throw new Error(`Trader page must not call materializing breadth: ${route.request().url()}`);
+  await page.route('**/api/v1/**', async (route) => {
+    const url = new URL(route.request().url());
+    if (url.pathname === '/api/v1/auth/me') return route.fallback();
+    throw new Error(`Trader read-model page must not call backend APIs while read models are unavailable: ${route.request().method()} ${route.request().url()}`);
   });
   return apiRequests;
 }
 
-async function setupScopedMarketPage(page: Page) {
-  const apiRequests: string[] = [];
-  await mockAuthenticatedUser(page);
-  page.on('request', (request) => {
-    const url = new URL(request.url());
-    if (url.pathname.includes('/api/v1/')) apiRequests.push(`${request.method()} ${url.pathname}${url.search}`);
-  });
-  await page.route('**/api/v1/instruments**', (route) => route.fulfill({ json: fnoUnderlyingsPayload() }));
-  await page.route('**/api/v1/market-context/summary**', async (route) => {
-    throw new Error(`Trader page must not call materializing summary: ${route.request().url()}`);
-  });
-  await page.route('**/api/v1/market-context/breadth**', async (route) => {
-    throw new Error(`Trader page must not call materializing breadth: ${route.request().url()}`);
-  });
-  return apiRequests;
-}
+async function expectNoSharedMutationsOrOperatorControls(page: Page, apiRequests: string[]) {
+  const prohibitedRequest = /(sync|repair|backfill|import|generate|evaluate|calibrat|pipeline|provider|refresh|run)/i;
+  expect(apiRequests.filter((item) => !item.includes('/api/v1/auth/me')).filter((item) => /^(POST|PATCH|DELETE) /.test(item))).toEqual([]);
+  expect(apiRequests.filter((item) => prohibitedRequest.test(item))).toEqual([]);
 
-async function setupMarketMapPage(page: Page, payload = marketMapPayload()) {
-  const apiRequests: string[] = [];
-  await mockAuthenticatedUser(page);
-  page.on('request', (request) => {
-    const url = new URL(request.url());
-    if (url.pathname.includes('/api/v1/')) apiRequests.push(`${request.method()} ${url.pathname}${url.search}`);
-  });
-  await page.route('**/api/v1/market-data/market-map**', (route) => route.fulfill({ json: payload }));
-  for (const blockedPath of [
-    '**/api/v1/today-review/latest**',
-    '**/api/v1/market-data/universe/health**',
-    '**/api/v1/market-context/persisted-summary**',
-    '**/api/v1/market-context/persisted-breadth**',
-    '**/api/v1/market-context/summary**',
-    '**/api/v1/market-context/breadth**',
-    '**/api/v1/instruments**',
-  ]) {
-    await page.route(blockedPath, async (route) => {
-      throw new Error(`Market Map must not use broad snapshot fanout: ${route.request().url()}`);
-    });
-  }
-  return apiRequests;
-}
-
-async function expectNoSharedWritesOrDeveloperCopy(page: Page, apiRequests: string[]) {
-  expect(apiRequests.some((item) => item.includes('/market-context/summary'))).toBe(false);
-  expect(apiRequests.some((item) => /^(POST|PATCH|DELETE) /.test(item))).toBe(false);
-  expect(apiRequests.some((item) => /\/(?:provider|live|materializ|write|sync|repair|backfill|import|generate|evaluate|calibrat|run)(?:\/|\?|$|-)/i.test(item))).toBe(false);
   const main = await page.locator('main').innerText();
-  expect(main).not.toMatch(/persisted-only|materializ|not wired|endpoint|read model|shared analysis pipeline|downstream|implementation|IndexContextSnapshot|BreadthSnapshot|InstitutionalFlowSnapshot|DerivativesContextSnapshot|Product Owner approval/i);
-  expect(main).not.toMatch(/operator|data ops|ops dashboard|bulk pipeline|pipeline dashboard|manual trigger|run pipeline|sync catalog|sync market data|shared refresh/i);
-  expect(main).not.toMatch(/buy now|sell now|guaranteed|price target|profit target|financial advice|option strategy recommendation|buy signal|sell signal|must buy|must sell|broker|order/i);
+  expect(main).not.toMatch(/buy now|sell now|guaranteed|profit target|price target|financial advice|must buy|must sell|broker order/i);
+  expect(main).not.toMatch(/import|sync|repair|backfill|generate|evaluate|calibrate|run pipeline|provider validation|pipeline control/i);
 }
 
-test.describe('Market Intelligence user pages', () => {
-  test('Market Pulse uses persisted market-context read and never calls materializing summary', async ({ page }) => {
-    const apiRequests = await setupMarketPage(page);
+test.describe('Market Intelligence read-model pages', () => {
+  test('primary trader navigation is the required workflow set only', async ({ page }) => {
+    await setupReadOnlyPage(page);
 
     await visitAuthenticated(page, '/market-pulse');
 
-    await expect(page.getByRole('heading', { name: 'Market Pulse' }).first()).toBeVisible();
-    await expect(page.getByRole('cell', { name: 'Financial Services' })).toBeVisible();
-    await expect.poll(() => apiRequests.some((item) => item.includes('/market-context/persisted-summary'))).toBe(true);
-    await expectNoSharedWritesOrDeveloperCopy(page, apiRequests);
+    const drawerLinks = page.locator('.MuiDrawer-paper a[href]');
+    await expect(drawerLinks).toHaveCount(traderNavLabels.length);
+    await expect(drawerLinks).toHaveText(traderNavLabels);
+
+    for (const label of hiddenTraderLabels) {
+      await expect(page.locator('.MuiDrawer-paper').getByText(label, { exact: true })).toHaveCount(0);
+    }
   });
 
-  test('Market Pulse shows an honest gap when persisted market context is missing', async ({ page }) => {
-    const apiRequests = await setupMarketPage(page, { persistedMarketContext: missingPersistedMarketContextPayload() });
+  test('required pages show honest missing-backend states without side-effect calls', async ({ page }) => {
+    const apiRequests = await setupReadOnlyPage(page);
+    const routes = [
+      ['/market-pulse', 'Market Pulse', 'Market Pulse backend not available yet.'],
+      ['/stock-interest-radar', 'Stock Interest Radar', 'Stock Interest Radar backend not available yet.'],
+      ['/earnings-intelligence', 'Earnings Intelligence', 'Earnings Intelligence backend not available yet.'],
+      ['/compounder-radar', 'Compounder Radar', 'Compounder Radar backend not available yet.'],
+      ['/trader-setup-radar', 'Trader Setup Radar', 'Trader Setup Radar backend not available yet.'],
+      ['/risk-radar', 'Risk Radar', 'Risk Radar backend not available yet.'],
+      ['/instrument-workspace', 'Instrument Workspace', 'Instrument Context backend not available yet.'],
+    ];
+
+    for (const [path, heading, missingText] of routes) {
+      await visitAuthenticated(page, path);
+      await expect(page.getByRole('heading', { name: heading }).first()).toBeVisible();
+      await expect(page.getByText(missingText)).toBeVisible();
+      await expect(page.getByText('No fake rows are shown.')).toBeVisible();
+      await expectNoSharedMutationsOrOperatorControls(page, apiRequests);
+    }
+  });
+
+  test('Market Pulse renders backend-provided labels without recalculating intelligence', async ({ page }) => {
+    const apiRequests = await setupReadOnlyPage(page, {
+      marketPulse: {
+        snapshotDate: '2026-06-01',
+        dataThroughDate: '2026-05-31',
+        generatedAt: '2026-06-01T05:45:00.000Z',
+        status: 'READY',
+        marketHealthScore: 95,
+        marketHealthLabel: 'Fragile',
+        topIndices: [{ symbol: 'NIFTY 50', label: 'Nifty 50', value: 22900, changePercent: 0.012, freshness: 'Fresh' }],
+        strongSectors: ['Energy'],
+        weakSectors: ['Financial Services'],
+        breadthSummary: 'Backend says breadth is narrow.',
+        deliverySummary: 'Backend says delivery participation is light.',
+        candidateCount: 3,
+        warnings: ['Backend warning is displayed verbatim.'],
+      },
+    });
 
     await visitAuthenticated(page, '/market-pulse');
 
-    await expect(page.getByRole('heading', { name: 'Market Pulse' }).first()).toBeVisible();
-    await expect(page.getByText('Market is Unavailable')).toBeVisible();
-    await expect(page.getByText('Persisted market evidence is unavailable for this scope.').first()).toBeVisible();
-    await expect(page.getByText('Market context evidence: missing')).toBeVisible();
-    await expect(page.getByText('Sector rotation snapshot unavailable')).toBeVisible();
-    await expect.poll(() => apiRequests.some((item) => item.includes('/market-context/persisted-summary'))).toBe(true);
-    await expectNoSharedWritesOrDeveloperCopy(page, apiRequests);
+    await expect(page.getByText('Fragile').first()).toBeVisible();
+    await expect(page.getByText('95').first()).toBeVisible();
+    await expect(page.getByText('Backend says breadth is narrow.')).toBeVisible();
+    await expect(page.getByText('Backend warning is displayed verbatim.')).toBeVisible();
+    await expectNoSharedMutationsOrOperatorControls(page, apiRequests);
   });
 
-  test('Indices Workspace renders source or missing state without shared writes', async ({ page }) => {
-    const apiRequests = await setupMarketPage(page);
+  test('radar pages preserve backend row order and tags instead of sorting by score', async ({ page }) => {
+    const apiRequests = await setupReadOnlyPage(page, {
+      stockInterest: [
+        {
+          snapshotDate: '2026-06-01',
+          generatedAt: '2026-06-01T05:45:00.000Z',
+          score: 12,
+          symbol: 'LOWFIRST',
+          company: 'Low First Ltd',
+          sector: 'Industrials',
+          category: "Today's Top Interest",
+          direction: 'Watch',
+          reasonTags: ['backend-order-first'],
+          riskTags: ['thin-history'],
+          freshness: 'Fresh',
+          returns: '1D +0.2%',
+        },
+        {
+          snapshotDate: '2026-06-01',
+          generatedAt: '2026-06-01T05:45:00.000Z',
+          score: 98,
+          symbol: 'HIGHSECOND',
+          company: 'High Second Ltd',
+          sector: 'Financial Services',
+          category: "Today's Top Interest",
+          direction: 'Bullish trigger',
+          reasonTags: ['backend-order-second'],
+          riskTags: ['event-risk'],
+          freshness: 'Fresh',
+          returns: '1D +4.2%',
+        },
+      ],
+    });
 
-    await visitAuthenticated(page, '/indices');
+    await visitAuthenticated(page, '/stock-interest-radar');
 
-    await expect(page.getByRole('heading', { name: 'Indices Workspace' }).first()).toBeVisible();
-    await expect(page.getByText('NIFTY 50').first()).toBeVisible();
-    await expect(page.getByText('Index Catalog')).toBeVisible();
-    await expect(page.getByText('Index Context Gaps')).toBeVisible();
-    await expect(page.getByText('constituents and weights')).toBeVisible();
-    await expect(page.getByText('top contributors and detractors')).toBeVisible();
-    const body = await page.locator('body').innerText();
-    expect(body).not.toMatch(/constituents available|weights available|contributors available|constituent weights loaded|top contributors loaded/i);
-    await expectNoSharedWritesOrDeveloperCopy(page, apiRequests);
-  });
-
-  test('Breadth And Participation renders denominator-aware breadth context', async ({ page }) => {
-    const apiRequests = await setupMarketPage(page);
-
-    await visitAuthenticated(page, '/breadth');
-
-    await expect(page.getByRole('heading', { name: 'Breadth And Participation' }).first()).toBeVisible();
-    await expect(page.getByText('Saved market participation snapshot')).toBeVisible();
-    await expect(page.getByText('Official advance/decline counts not available yet')).toBeVisible();
-    await expect(page.getByText('SMA50 denominator: 220')).toBeVisible();
-    await expect(page.getByText('SMA200 denominator: 180')).toBeVisible();
-    await expect(page.getByText('Official advances are not persisted yet.')).toBeVisible();
-    await expect(page.getByText('Official declines are not persisted yet.')).toBeVisible();
-    await expect(page.getByText('Official unchanged counts are not persisted yet.')).toBeVisible();
-    await expect.poll(() => apiRequests.some((item) => item.includes('/market-context/persisted-breadth'))).toBe(true);
-    expect(apiRequests.some((item) => item.includes('/market-context/breadth'))).toBe(false);
-    const body = await page.locator('body').innerText();
-    expect(body).not.toMatch(/official advances:\s*\d+|official declines:\s*\d+|official unchanged:\s*\d+/i);
-    expect(body).not.toMatch(/official advance\/decline ratio\s*1\.35/i);
-    await expectNoSharedWritesOrDeveloperCopy(page, apiRequests);
-  });
-
-  test('Breadth And Participation shows honest gap when saved breadth is missing', async ({ page }) => {
-    const apiRequests = await setupMarketPage(page, { persistedBreadth: missingPersistedBreadthPayload() });
-
-    await visitAuthenticated(page, '/breadth');
-
-    await expect(page.getByRole('heading', { name: 'Breadth And Participation' }).first()).toBeVisible();
-    await expect(page.getByText('Saved participation snapshot is not available for this market.')).toBeVisible();
-    await expect(page.getByText('Official advances, declines, and unchanged counts are not available yet.')).toBeVisible();
-    await expect(page.getByText('NSE official advances/declines')).toBeVisible();
-    await expect.poll(() => apiRequests.some((item) => item.includes('/market-context/persisted-breadth'))).toBe(true);
-    const body = await page.locator('body').innerText();
-    expect(body).not.toMatch(/official advances:\s*\d+|official declines:\s*\d+|official unchanged:\s*\d+/i);
-    await expectNoSharedWritesOrDeveloperCopy(page, apiRequests);
-  });
-
-  test('Institutional Flow shows unavailable state without recommendation language', async ({ page }) => {
-    const apiRequests = await setupScopedMarketPage(page);
-
-    await visitAuthenticated(page, '/institutional-flow');
-
-    await expect(page.getByRole('heading', { name: 'Institutional Flow' }).first()).toBeVisible();
-    await expect(page.getByText('Institutional flow context from FII/FPI and DII activity.')).toBeVisible();
-    await expect(page.getByText('FII/FPI and DII flow data is not available yet')).toBeVisible();
-    await expect(page.getByText('FII/FPI buy value')).toBeVisible();
-    await expect(page.getByText('FII/FPI sell value')).toBeVisible();
-    await expect(page.getByText('DII buy value')).toBeVisible();
-    await expect(page.getByText('DII sell value')).toBeVisible();
-    await expect(page.getByText('5-day net flow')).toBeVisible();
-    await expect(page.getByText('20-day net flow')).toBeVisible();
-    await expect(page.getByText('Index divergence')).toBeVisible();
-    await expect(page.getByText('Flow regime')).toBeVisible();
-    await expect.poll(() => apiRequests.length > 0).toBe(true);
-    expect(apiRequests.every((item) => item.includes('/api/v1/auth/me'))).toBe(true);
-    const main = await page.locator('main').innerText();
-    expect(main).not.toMatch(/FII_ACCUMULATION|FII_DISTRIBUTION|DII_SUPPORT|DII_WITHDRAWAL|MIXED_INSTITUTIONAL_FLOW/i);
-    expect(main).not.toMatch(/₹\s*\d|Rs\.?\s*\d|\b\d+(?:\.\d+)?\s*cr\b/i);
-    await expectNoSharedWritesOrDeveloperCopy(page, apiRequests);
-  });
-
-  test('Derivatives Context stays unavailable and read-only until enabled', async ({ page }) => {
-    const apiRequests = await setupScopedMarketPage(page);
-
-    await visitAuthenticated(page, '/derivatives-context');
-
-    await expect(page.getByRole('heading', { name: 'Derivatives Context' }).first()).toBeVisible();
-    await expect(page.getByText('Derivatives context is not enabled for this scope yet')).toBeVisible();
-    await expect(page.getByText('Options strategy recommendations and trading instructions are out of scope.')).toBeVisible();
-    await expect(page.getByText('FNOALPHA')).toBeVisible();
-    await expect(page.getByText('Catalog eligibility only')).toBeVisible();
-    await expect(page.getByText('Index futures trend')).toBeVisible();
-    await expect(page.getByText('Option-chain summary')).toBeVisible();
-    await expect(page.getByText('Put-call ratio')).toBeVisible();
-    await expect(page.getByText('Open-interest change')).toBeVisible();
-    await expect(page.getByText('Top strikes by OI', { exact: true })).toBeVisible();
-    await expect(page.getByText('Top strikes by OI change')).toBeVisible();
-    await expect(page.getByText('Expiry proximity')).toBeVisible();
-    await expect.poll(() => apiRequests.some((item) => item.includes('/api/v1/instruments') && item.includes('derivativesEligible=true'))).toBe(true);
-    expect(apiRequests.filter((item) => item.includes('/api/v1/') && !item.includes('/api/v1/auth/me') && !item.includes('/api/v1/instruments'))).toEqual([]);
-    const main = await page.locator('main').innerText();
-    expect(main).not.toMatch(/buy call|sell put|write option|long call|short straddle|option trade|supportive derivatives|bullish PCR|bearish PCR/i);
-    await expectNoSharedWritesOrDeveloperCopy(page, apiRequests);
-  });
-
-  test('Market Map loads only narrow read-only evidence on page load and blocks broad market-intelligence fanout', async ({ page }) => {
-    const apiRequests = await setupMarketMapPage(page);
-
-    await visitAuthenticated(page, '/market-map');
-
-    await expect(page.getByRole('heading', { name: 'Market Map' }).first()).toBeVisible();
-    await expect(page.getByText('Stock map by sector and stored price movement.')).toBeVisible();
-    await expect(page.getByText('Financial Services').first()).toBeVisible();
-    await expect(page.getByText('ALPHA').first()).toBeVisible();
-    await expect(page.getByText('Alpha Ltd').first()).toBeVisible();
-    await expect(page.getByText('+4.3%').first()).toBeVisible();
-    await expect(page.locator('a[href="/stocks/stock-1"]').first()).toBeVisible();
-    await expect.poll(() => apiRequests.some((item) => item.includes('/api/v1/market-data/market-map') && item.includes('region=IN') && item.includes('assetType=STOCK') && item.includes('range=1D'))).toBe(true);
-    expect(apiRequests.filter((item) => item.includes('/api/v1/') && !item.includes('/api/v1/auth/me') && !item.includes('/api/v1/market-data/market-map'))).toEqual([]);
-    const main = await page.locator('main').innerText();
-    expect(main).not.toMatch(/trigger density|smart-money status|portfolio overlay|watchlist overlay|market-cap mode/i);
-    await expectNoSharedWritesOrDeveloperCopy(page, apiRequests);
-  });
-
-  test('Market Map shows a domain-specific empty state from narrow read-only evidence without broad fanout', async ({ page }) => {
-    const apiRequests = await setupMarketMapPage(page, missingMarketMapPayload());
-
-    await visitAuthenticated(page, '/market-map');
-
-    await expect(page.getByRole('heading', { name: 'Market Map' }).first()).toBeVisible();
-    await expect(page.getByText('No map rows available')).toBeVisible();
-    await expect(page.getByText('Market map needs catalog rows and stored price movement evidence for the selected scope.')).toBeVisible();
-    await expect.poll(() => apiRequests.some((item) => item.includes('/api/v1/market-data/market-map'))).toBe(true);
-    await expectNoSharedWritesOrDeveloperCopy(page, apiRequests);
+    const rows = page.locator('tbody tr');
+    await expect(rows.nth(0)).toContainText('LOWFIRST');
+    await expect(rows.nth(1)).toContainText('HIGHSECOND');
+    await expect(page.getByText('backend-order-first')).toBeVisible();
+    await expect(page.getByText('event-risk')).toBeVisible();
+    await expectNoSharedMutationsOrOperatorControls(page, apiRequests);
   });
 });

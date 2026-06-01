@@ -222,7 +222,7 @@ const PortfolioManagementPage: React.FC = () => {
   return (
     <Box sx={{ p: 3, maxWidth: 1500, mx: 'auto' }}>
       <PageHeader
-        title="Portfolio Management"
+        title="Portfolios"
         subtitle="Manual portfolios, holdings, valuation, allocation, and transaction tracking."
         badges={
           <Stack direction="row" spacing={1}>
@@ -233,6 +233,18 @@ const PortfolioManagementPage: React.FC = () => {
       />
 
       {(error || formError) && <Alert severity="error" sx={{ mb: 2 }}>{error || formError}</Alert>}
+
+      <Paper sx={{ p: 2, mb: 3 }}>
+        <Typography variant="h6" sx={{ mb: 1 }}>Portfolio Intelligence Overlays</Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+          Portfolio intelligence read models are not available yet. These overlays will display persisted backend snapshots only when supported.
+        </Typography>
+        <Stack direction="row" gap={1} flexWrap="wrap" useFlexGap>
+          {['Sector Exposure', 'Weak Sector Exposure', 'Upcoming Result Exposure', 'Risk Exposure', 'Freshness'].map((item) => (
+            <Chip key={item} label={item} variant="outlined" />
+          ))}
+        </Stack>
+      </Paper>
 
       <Paper sx={{ p: 2, mb: 3 }}>
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={3} alignItems="flex-start">

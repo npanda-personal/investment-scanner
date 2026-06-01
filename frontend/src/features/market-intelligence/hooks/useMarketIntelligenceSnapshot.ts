@@ -1,12 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
-import { fetchMarketIntelligenceSnapshot } from '../api/marketIntelligenceService';
-import type { MarketIntelligenceSnapshot } from '../types';
+import type { SnapshotEnvelope } from '../types';
 
-export function useMarketIntelligenceSnapshot() {
+export function useReadModelSnapshot<T>(loader: (scope: ReturnType<typeof useMarketScope>['scope']) => Promise<SnapshotEnvelope<T>>) {
   const { scope } = useMarketScope();
   const requestRef = useRef(0);
-  const [snapshot, setSnapshot] = useState<MarketIntelligenceSnapshot | null>(null);
+  const [data, setData] = useState<SnapshotEnvelope<T> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -16,19 +15,19 @@ export function useMarketIntelligenceSnapshot() {
     setLoading(true);
     setError(null);
 
-    fetchMarketIntelligenceSnapshot(scope)
+    loader(scope)
       .then((next) => {
-        if (requestRef.current === requestId) setSnapshot(next);
+        if (requestRef.current === requestId) setData(next);
       })
       .catch((caught) => {
         if (requestRef.current !== requestId) return;
-        const message = caught instanceof Error ? caught.message : 'Market intelligence snapshot unavailable.';
-        setError(message);
+        setData(null);
+        setError(caught instanceof Error ? caught.message : 'Read model snapshot unavailable.');
       })
       .finally(() => {
         if (requestRef.current === requestId) setLoading(false);
       });
-  }, [scope]);
+  }, [loader, scope]);
 
-  return { scope, snapshot, loading, error };
+  return { scope, data, loading, error };
 }
