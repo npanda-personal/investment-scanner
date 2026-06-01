@@ -242,9 +242,14 @@ const CATALOG_SYNC_DEFAULTS = {
 
 const activeCatalogSyncStatuses: MarketDataCatalogSyncRunStatus[] = ['PENDING', 'RUNNING'];
 const terminalCatalogSyncStatuses: MarketDataCatalogSyncRunStatus[] = ['PARTIAL', 'COMPLETED', 'FAILED', 'CANCELED'];
+const activeHistoricalBackfillStatuses = ['PENDING', 'RUNNING'];
+const storedHistoricalBackfillStatuses = ['PENDING', 'RUNNING', 'BLOCKED', 'PARTIAL', 'FAILED'];
+const historicalBackfillStorageKeyPrefix = 'market_data_historical_backfill_run';
 
 const isCatalogSyncActive = (status?: MarketDataCatalogSyncRunStatus) => Boolean(status && activeCatalogSyncStatuses.includes(status));
 const isCatalogSyncTerminal = (status?: MarketDataCatalogSyncRunStatus) => Boolean(status && terminalCatalogSyncStatuses.includes(status));
+const isHistoricalBackfillActive = (status?: string | null) => Boolean(status && activeHistoricalBackfillStatuses.includes(status));
+const shouldStoreHistoricalBackfillRun = (status?: string | null) => Boolean(status && storedHistoricalBackfillStatuses.includes(status));
 const countValue = (value?: number) => value ?? 0;
 const formatCount = (value?: number) => new Intl.NumberFormat().format(countValue(value));
 
@@ -257,6 +262,30 @@ const formatCatalogSyncSummary = (run: MarketDataCatalogSyncRunResponse) => {
     ? ' Universe coverage is incomplete; more eligible instruments remain.'
     : '';
   return `Catalog sync ${run.status} for ${scope}: processed ${processed} of ${total}, succeeded ${formatCount(run.succeededCount)}, failed ${formatCount(run.failedCount)}, skipped ${formatCount(run.skippedCount)}, no-op ${formatCount(run.noOpCount)}.${coverageNote}`;
+};
+
+const readStoredHistoricalBackfillRunId = (storageKey: string) => {
+  try {
+    return window.localStorage.getItem(storageKey);
+  } catch {
+    return null;
+  }
+};
+
+const storeHistoricalBackfillRunId = (storageKey: string, runId: string) => {
+  try {
+    window.localStorage.setItem(storageKey, runId);
+  } catch {
+    // Local storage may be unavailable in constrained browser contexts.
+  }
+};
+
+const clearStoredHistoricalBackfillRunId = (storageKey: string) => {
+  try {
+    window.localStorage.removeItem(storageKey);
+  } catch {
+    // Local storage may be unavailable in constrained browser contexts.
+  }
 };
 
 const MarketDataFoundationPage: React.FC = () => {
@@ -340,6 +369,11 @@ const MarketDataFoundationPage: React.FC = () => {
       endDate: historicalEndDate > latestSelectableBackfillDate ? latestSelectableBackfillDate : historicalEndDate,
     };
   }, [historicalBackfillInputMode, historicalBackfillYear, historicalEndDate, historicalStartDate, latestSelectableBackfillDate]);
+  const historicalBackfillStorageKey = useMemo(() => {
+    const region = normalizeMarketForApi(scope.region) || scope.region || 'GLOBAL';
+    const storedAssetType = normalizeAssetTypeForMarketDataApi(assetType.trim() || scope.assetType) || 'STOCK';
+    return `${historicalBackfillStorageKeyPrefix}:${region}:${storedAssetType}`;
+  }, [assetType, scope.assetType, scope.region]);
 
   const loadInstruments = useCallback(async () => {
     setLoading(true);
@@ -437,6 +471,48 @@ const MarketDataFoundationPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    const storedRunId = readStoredHistoricalBackfillRunId(historicalBackfillStorageKey);
+    if (!storedRunId) return undefined;
+
+    let canceled = false;
+    setHistoricalBackfillRunning(true);
+    fetchExchangeHistoricalBackfillRun(storedRunId)
+      .then((result) => {
+        if (canceled) return;
+        if (shouldStoreHistoricalBackfillRun(result.status)) {
+          setHistoricalBackfillResult(result);
+          setActiveTab('import');
+        } else {
+          clearStoredHistoricalBackfillRunId(historicalBackfillStorageKey);
+        }
+      })
+      .catch((err: any) => {
+        if (canceled) return;
+        if (err.response?.status === 404) {
+          clearStoredHistoricalBackfillRunId(historicalBackfillStorageKey);
+          return;
+        }
+        setError(err.response?.data?.error || err.response?.data?.message || err.message || 'Historical exchange backfill status restore failed');
+      })
+      .finally(() => {
+        if (!canceled) setHistoricalBackfillRunning(false);
+      });
+
+    return () => {
+      canceled = true;
+    };
+  }, [historicalBackfillStorageKey]);
+
+  useEffect(() => {
+    if (!historicalBackfillResult?.runId) return;
+    if (shouldStoreHistoricalBackfillRun(historicalBackfillResult.status)) {
+      storeHistoricalBackfillRunId(historicalBackfillStorageKey, historicalBackfillResult.runId);
+    } else {
+      clearStoredHistoricalBackfillRunId(historicalBackfillStorageKey);
+    }
+  }, [historicalBackfillResult?.runId, historicalBackfillResult?.status, historicalBackfillStorageKey]);
+
+  useEffect(() => {
     void refreshBackgroundServices();
   }, [refreshBackgroundServices]);
 
@@ -447,7 +523,7 @@ const MarketDataFoundationPage: React.FC = () => {
   }, [activeTab, loadSourceImports]);
 
   useEffect(() => {
-    if (activeTab !== 'import' || !['PENDING', 'RUNNING'].includes(historicalBackfillResult?.status || '')) return undefined;
+    if (activeTab !== 'import' || !isHistoricalBackfillActive(historicalBackfillResult?.status)) return undefined;
     const interval = window.setInterval(() => {
       void loadSourceImports();
     }, 10_000);
@@ -461,16 +537,16 @@ const MarketDataFoundationPage: React.FC = () => {
     if (
       activeTab === 'import'
       && previousStatus
-      && ['PENDING', 'RUNNING'].includes(previousStatus)
+      && isHistoricalBackfillActive(previousStatus)
       && currentStatus
-      && !['PENDING', 'RUNNING'].includes(currentStatus)
+      && !isHistoricalBackfillActive(currentStatus)
     ) {
       void loadSourceImports();
     }
   }, [activeTab, historicalBackfillResult?.status, loadSourceImports]);
 
   useEffect(() => {
-    if (!historicalBackfillResult?.runId || !['PENDING', 'RUNNING'].includes(historicalBackfillResult.status)) return undefined;
+    if (!historicalBackfillResult?.runId || !isHistoricalBackfillActive(historicalBackfillResult.status)) return undefined;
     const interval = window.setInterval(() => {
       void loadHistoricalBackfillRun(historicalBackfillResult.runId);
     }, 2500);
@@ -998,7 +1074,7 @@ const MarketDataFoundationPage: React.FC = () => {
     : `No instruments found for ${scopeLabel}.`;
   const catalogSyncActive = catalogSyncStarting || isCatalogSyncActive(catalogSyncRun?.status);
   const schedulerActive = schedulerStatus?.activeRun === true;
-  const historicalBackfillActive = historicalBackfillRunning || ['PENDING', 'RUNNING'].includes(historicalBackfillResult?.status || '');
+  const historicalBackfillActive = historicalBackfillRunning || isHistoricalBackfillActive(historicalBackfillResult?.status);
   const operatorBackgroundActive = catalogSyncActive || historicalBackfillActive || manualFundamentalRunning || schedulerActive;
   const catalogSyncTotal = catalogSyncRun?.totalCount ?? 0;
   const catalogSyncProcessed = catalogSyncRun?.processedCount ?? 0;

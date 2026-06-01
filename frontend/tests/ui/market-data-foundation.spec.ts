@@ -497,6 +497,133 @@ test.describe('Market Data Foundation UI', () => {
     await expect.poll(() => cancelCount).toBe(1);
   });
 
+  test('restores in-progress historical backfill progress after page refresh', async ({ page }) => {
+    await page.addInitScript(() => {
+      window.localStorage.setItem('market_data_historical_backfill_run:IN:STOCK', 'hist-run-refresh');
+    });
+    await mockCatalogPageShell(page);
+    await page.route('**/api/v1/market-data/scheduler/status', async (route) => {
+      await route.fulfill({ json: { enabled: false, activeRun: false, lastRunAt: null, regionStatuses: [] } });
+    });
+    await page.route('**/api/v1/market-data/source-file-imports**', async (route) => {
+      await route.fulfill({ json: { count: 0, imports: [] } });
+    });
+
+    let statusRequestCount = 0;
+    let postRequestCount = 0;
+    await page.route('**/api/v1/market-data/exchange-files/historical-backfill/runs**', async (route) => {
+      if (route.request().method() === 'POST') {
+        postRequestCount += 1;
+      }
+      statusRequestCount += 1;
+      await route.fulfill({
+        json: {
+          runId: 'hist-run-refresh',
+          status: 'RUNNING',
+          source: 'NSE',
+          segment: 'CM',
+          region: 'IN',
+          assetType: 'STOCK',
+          startDate: '2026-05-20',
+          endDate: '2026-05-24',
+          maxDates: null,
+          workerCount: 3,
+          maxWorkers: 5,
+          maxRetries: 2,
+          totalDates: 5,
+          pending: 2,
+          running: 2,
+          completed: 1,
+          skipped: 0,
+          failed: 0,
+          notAvailable: 0,
+          retryCount: 0,
+          currentWorkers: 2,
+          rowsRead: 120,
+          rowsParsed: 118,
+          rowsInserted: 40,
+          rowsUpdated: 30,
+          rowsNoOp: 48,
+          rowsSkipped: 0,
+          bseFills: 3,
+          progressPercent: 42,
+          estimatedRemainingMs: 90000,
+          startedAt: '2026-05-25T09:30:00.000Z',
+          completedAt: null,
+          warnings: [],
+          errors: [],
+          jobs: [
+            {
+              id: 'hist-job-2026-05-20',
+              tradingDate: '2026-05-20',
+              dateRange: '2026-05-20',
+              status: 'COMPLETED',
+              source: 'NSE+BSE',
+              rowsImported: 118,
+              rowsInserted: 40,
+              rowsUpdated: 30,
+              rowsNoOp: 48,
+              rowsSkipped: 0,
+              bseFills: 3,
+              error: null,
+              retryCount: 0,
+              startedAt: '2026-05-25T09:30:01.000Z',
+              completedAt: '2026-05-25T09:30:03.000Z',
+              sourceFileImportId: 'source-nse-cm',
+            },
+            {
+              id: 'hist-job-2026-05-21',
+              tradingDate: '2026-05-21',
+              dateRange: '2026-05-21',
+              status: 'RUNNING',
+              source: 'NSE+BSE',
+              rowsImported: 0,
+              rowsInserted: 0,
+              rowsUpdated: 0,
+              rowsNoOp: 0,
+              rowsSkipped: 0,
+              bseFills: 0,
+              error: null,
+              retryCount: 0,
+              startedAt: '2026-05-25T09:30:04.000Z',
+              completedAt: null,
+              sourceFileImportId: null,
+            },
+            {
+              id: 'hist-job-2026-05-22',
+              tradingDate: '2026-05-22',
+              dateRange: '2026-05-22',
+              status: 'RUNNING',
+              source: 'NSE+BSE',
+              rowsImported: 0,
+              rowsInserted: 0,
+              rowsUpdated: 0,
+              rowsNoOp: 0,
+              rowsSkipped: 0,
+              bseFills: 0,
+              error: null,
+              retryCount: 0,
+              startedAt: '2026-05-25T09:30:05.000Z',
+              completedAt: null,
+              sourceFileImportId: null,
+            },
+          ],
+        },
+      });
+    });
+
+    await visitModule(page, '/market-data-foundation', 'Market Data Foundation');
+
+    await expect(page.getByText('Historical Exchange Candle Backfill')).toBeVisible();
+    await expect(page.getByText('Historical Backfill Run')).toBeVisible();
+    await expect(page.getByText('Run hist-run-refresh')).toBeVisible();
+    await expect(page.getByText('2 active / 3 configured')).toBeVisible();
+    await expect(page.getByText('42%')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Run Backfill' })).toBeDisabled();
+    await expect.poll(() => statusRequestCount).toBeGreaterThanOrEqual(1);
+    expect(postRequestCount).toBe(0);
+  });
+
   test('configured catalog import sends safe source mode without running a real import', async ({ page }) => {
     let importPayload: any = null;
     await page.route('**/api/v1/market-data/catalog/import', async (route) => {
