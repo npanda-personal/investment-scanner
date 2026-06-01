@@ -94,6 +94,8 @@ model Stock {
   signalPositionLedgerEntries   SignalPositionLedgerEntry[]
   exchangeIdentities            InstrumentExchangeIdentity[]
   deliverySnapshots             MarketDeliverySnapshot[]
+  stockInterestSnapshots         StockInterestSnapshot[]
+  earningsIntelligenceSnapshots EarningsIntelligenceSnapshot[]
 
   @@index([region, assetType, symbol], map: "stocks_region_assetType_symbol_idx")
   @@index([region, assetType, providerSupportStatus, isActive, isDelisted], map: "stocks_region_assetType_providerSupport_active_delisted_idx")
@@ -171,6 +173,70 @@ model MarketDeliverySnapshot {
   @@index([tradingDate, exchange])
   @@index([sourceFileImportId])
   @@map("market_delivery_snapshots")
+}
+
+model EarningsIntelligenceSnapshot {
+  id                 String   @id @default(cuid())
+  snapshotDate       DateTime
+  dataThroughDate    DateTime?
+  stockId            String
+  stock              Stock    @relation(fields: [stockId], references: [id], onDelete: Cascade)
+  symbol             String
+  scopeRegion        String
+  scopeAssetType     String
+  resultDate         DateTime?
+  resultDateSource   String   @default("UNKNOWN")
+  daysToResult       Int?
+  revenueGrowth      Float?
+  profitGrowth       Float?
+  epsGrowth          Float?
+  marginTrend        Float?
+  consistencyScore   Float
+  accelerationScore  Float
+  reasonTags         Json     @default("[]")
+  riskTags           Json     @default("[]")
+  freshness          String
+  categories         Json     @default("[]")
+  calculationVersion String   @default("earnings-intelligence-v1")
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@unique([snapshotDate, scopeRegion, scopeAssetType, symbol], map: "earnings_intel_snapshot_scope_symbol_key")
+  @@index([scopeRegion, scopeAssetType, snapshotDate], map: "earnings_intel_snapshot_scope_date_idx")
+  @@index([scopeRegion, scopeAssetType, resultDate], map: "earnings_intel_snapshot_result_date_idx")
+  @@index([stockId, snapshotDate], map: "earnings_intel_snapshot_stock_date_idx")
+  @@map("earnings_intelligence_snapshots")
+}
+
+model StockInterestSnapshot {
+  id                 String   @id @default(cuid())
+  snapshotDate       DateTime
+  dataThroughDate    DateTime?
+  generatedAt        DateTime @default(now())
+  stockId            String
+  stock              Stock    @relation(fields: [stockId], references: [id], onDelete: Cascade)
+  symbol             String
+  company            String
+  sector             String?
+  scopeRegion        String   @default("IN")
+  scopeAssetType     String   @default("STOCK")
+  timeframe          String   @default("1d")
+  category           String
+  score              Float
+  direction          String
+  reasonTags         Json     @default("[]")
+  riskTags           Json     @default("[]")
+  freshness          String
+  warnings           Json     @default("[]")
+  calculationVersion String   @default("stock-interest-v1")
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@unique([snapshotDate, scopeRegion, scopeAssetType, timeframe, category, symbol], map: "stock_interest_snapshot_scope_category_symbol_key")
+  @@index([scopeRegion, scopeAssetType, timeframe, snapshotDate], map: "stock_interest_snapshot_scope_date_idx")
+  @@index([scopeRegion, scopeAssetType, category, score], map: "stock_interest_snapshot_scope_category_score_idx")
+  @@index([stockId, snapshotDate], map: "stock_interest_snapshot_stock_date_idx")
+  @@map("stock_interest_snapshots")
 }
 
 model MarketDataRepairAttempt {
@@ -695,6 +761,40 @@ model MarketContextSnapshot {
   @@map("market_context_snapshots")
 }
 
+model MarketPulseSnapshot {
+  id                           String   @id @default(cuid())
+  snapshotDate                 DateTime
+  dataThroughDate              DateTime
+  generatedAt                  DateTime @default(now())
+  region                       String   @default("IN")
+  assetType                    String   @default("STOCK")
+  timeframe                    String   @default("1d")
+  status                       String
+  marketHealthScore            Float
+  marketHealthLabel            String
+  indexTrendScore              Float
+  sectorStrengthScore          Float
+  breadthScore                 Float
+  deliveryParticipationScore   Float
+  dataFreshnessScore           Float
+  topIndicesJson               Json     @default("[]")
+  strongSectorsJson            Json     @default("[]")
+  weakSectorsJson              Json     @default("[]")
+  breadthSummaryJson           Json     @default("{}")
+  deliverySummaryJson          Json     @default("{}")
+  candidateCount               Int      @default(0)
+  warningsJson                 Json     @default("[]")
+  sourceSummaryJson            Json     @default("{}")
+  pipelineRunId                String?
+  createdAt                    DateTime @default(now())
+  updatedAt                    DateTime @updatedAt
+
+  @@unique([snapshotDate, region, assetType, timeframe])
+  @@index([region, assetType, timeframe, snapshotDate])
+  @@index([status, generatedAt])
+  @@map("market_pulse_snapshots")
+}
+
 model SectorContextSnapshot {
   id                    String   @id @default(cuid())
   snapshotDate          DateTime
@@ -717,6 +817,32 @@ model SectorContextSnapshot {
   @@index([snapshotDate])
   @@index([sector])
   @@map("sector_context_snapshots")
+}
+
+model SectorSnapshot {
+  id             String   @id @default(cuid())
+  snapshotDate   DateTime
+  dataThroughDate DateTime
+  scopeRegion    String   @default("IN")
+  scopeAssetType String   @default("STOCK")
+  sector         String
+  classification String
+  sectorScore    Int
+  return1W       Float?
+  return1M       Float?
+  return3M       Float?
+  trendScore     Int
+  reasonTags     Json     @default("[]")
+  warnings       Json     @default("[]")
+  source         String   @default("sector-intelligence")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([snapshotDate, scopeRegion, scopeAssetType, sector])
+  @@index([scopeRegion, scopeAssetType, snapshotDate])
+  @@index([scopeRegion, scopeAssetType, dataThroughDate])
+  @@index([classification, sectorScore])
+  @@map("sector_snapshots")
 }
 
 model CountryContextSnapshot {

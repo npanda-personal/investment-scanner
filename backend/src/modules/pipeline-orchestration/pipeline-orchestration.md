@@ -85,7 +85,7 @@ First safe command slice adds:
 
 Safety contract for this slice:
 
-- only `DATA_QUALITY_EVALUATE_SCOPE` is executable;
+- executable commands are explicitly allowlisted in the command catalog;
 - all other command rows are `DEFERRED` or `FORBIDDEN` with explicit reasons;
 - command requests must use `runMode=single_batch`;
 - `batchSize` must be `1..100` and `offset` must be non-negative;
@@ -99,6 +99,10 @@ Safety contract for this slice:
 First executable adapter path:
 
 - `DataQualityEngineService.evaluate({ region, assetType, batchSize, offset })`
+- `MarketContextIntelligenceService.refreshSectorSnapshots({ region, assetType, dataThroughDate })` for `SECTOR_INTELLIGENCE_REFRESH`.
+- `MarketPulseSnapshotService.refreshSnapshot({ region, assetType, timeframe, pipelineRunId })` for `MARKET_PULSE_REFRESH`.
+
+`MARKET_PULSE_REFRESH` is a DB-only materialization command. It reads persisted price, index, sector index, delivery, stock-universe, and source-import rows; it does not call market-data ingestion, backfill, repair, external providers, signal generation, or frontend code. The stage writes a single `MARKET_PULSE` ledger row and upserts one `MarketPulseSnapshot` for the current snapshot date and scope.
 
 Out of scope:
 
@@ -191,6 +195,8 @@ After scheduled `SIGNAL_CALIBRATION` completes, the scheduler-only chain now con
 5. `STRATEGY_DECISION`
 6. `RESEARCH_PROJECTION`
 7. `TODAY_REVIEW`
+8. `SIGNAL_POSITION_LEDGER`
+9. `SECTOR_INTELLIGENCE_REFRESH`
 
 Rules:
 
@@ -206,6 +212,7 @@ Rules:
 - `STRATEGY_DECISION` evaluates all explicit changed instrument ids and consumes persisted calibration, data quality, smart-money, market context, and local price windows;
 - `RESEARCH_PROJECTION` runs the Research Hub overview as a projection/evidence stage;
 - `TODAY_REVIEW` publishes the daily review with compatibility risk-snapshot generation disabled for the scheduled path;
+- `SECTOR_INTELLIGENCE_REFRESH` writes persisted `SectorSnapshot` rows from saved sector index catalog rows, `PriceTick`, and `LatestPrice` only;
 - non-completed upstream states stop only the affected downstream branch unless the stage explicitly allows partial evidence to continue;
 - manual commands for these stages remain `DEFERRED` or `FORBIDDEN` until separate command contracts approve safe user-triggered execution.
 

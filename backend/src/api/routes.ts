@@ -27,6 +27,8 @@ import { tradePlanRiskModule } from '../modules/trade-plan-risk-engine';
 import { todayTradeReviewRouter } from '../modules/today-trade-review';
 import { pipelineOrchestrationRouter } from '../modules/pipeline-orchestration';
 import { signalPositionLedgerRouter } from '../modules/signal-position-ledger';
+import { earningsIntelligenceRouter } from '../modules/earnings-intelligence';
+import { marketIntelligenceRouter } from '../modules/market-intelligence';
 
 export interface ApiModule {
   path: string;
@@ -40,6 +42,8 @@ export const apiModules: ApiModule[] = [
   { path: '/api/v1', router: signalGenerationEngineRouter },
   { path: '/api/v1', router: strategyFrameworkRouter },
   { path: '/api/v1', router: pipelineOrchestrationRouter },
+  { path: '/api/v1', router: earningsIntelligenceRouter },
+  { path: '/api/v1', router: marketIntelligenceRouter },
   { path: '/api/v1', router: portfolioManagementRouter },
   { path: '/api/v1', router: portfolioIntelligenceRouter },
   { path: '/api/v1', router: watchlistManagementRouter },

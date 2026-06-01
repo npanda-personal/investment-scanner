@@ -1,0 +1,187 @@
+/// <reference types="@types/jest" />
+import { PipelineOrchestrationService } from '../../../src/modules/pipeline-orchestration';
+
+const stageRecord = (overrides: Record<string, unknown> = {}) => ({
+  id: 'stage-stock-interest',
+  pipelineRunId: 'run-stock-interest',
+  stageKey: 'STOCK_INTEREST_REFRESH',
+  stageOrder: 16,
+  status: 'RUNNING',
+  idempotencyKey: 'stage-key',
+  region: 'IN',
+  assetType: 'STOCK',
+  timeframe: '1d',
+  dataThroughDate: null,
+  inputFingerprint: null,
+  outputFingerprint: null,
+  changedInstrumentCount: 0,
+  batchSize: 25,
+  offset: 0,
+  nextOffset: 0,
+  hasMore: false,
+  totalCount: 1,
+  processedCount: 0,
+  succeededCount: 0,
+  partialCount: 0,
+  failedCount: 0,
+  skippedCount: 0,
+  unchangedCount: 0,
+  attemptCount: 1,
+  cacheKey: null,
+  cacheStatus: 'UNKNOWN',
+  cacheExpiresAt: null,
+  leaseOwner: 'manual-command:STOCK_INTEREST_REFRESH:test',
+  leaseExpiresAt: '2026-06-01T06:10:00.000Z',
+  startedAt: '2026-06-01T06:00:00.000Z',
+  completedAt: null,
+  durationMs: null,
+  warnings: [],
+  errors: [],
+  metadata: null,
+  createdAt: '2026-06-01T06:00:00.000Z',
+  updatedAt: '2026-06-01T06:00:00.000Z',
+  ...overrides,
+});
+
+describe('STOCK_INTEREST_REFRESH pipeline command', () => {
+  it('executes Stock Interest refresh and records persisted snapshot generation counts', async () => {
+    const run = {
+      id: 'run-stock-interest',
+      pipelineKey: 'market-intelligence',
+      region: 'IN',
+      assetType: 'STOCK',
+      timeframe: '1d',
+      triggerType: 'manual',
+      status: 'RUNNING',
+      idempotencyKey: 'stock-interest-run-key',
+      dataThroughDate: null,
+      sourceFingerprint: null,
+      changedInstrumentCount: 0,
+      totalCount: 0,
+      processedCount: 0,
+      succeededCount: 0,
+      partialCount: 0,
+      failedCount: 0,
+      skippedCount: 0,
+      unchangedCount: 0,
+      warnings: [],
+      errors: [],
+      metadata: null,
+      startedAt: '2026-06-01T06:00:00.000Z',
+      completedAt: null,
+      durationMs: null,
+      createdAt: '2026-06-01T06:00:00.000Z',
+      updatedAt: '2026-06-01T06:00:00.000Z',
+    };
+    const stage = stageRecord();
+    const repository = {
+      findActiveRun: jest.fn().mockResolvedValue(null),
+      acquireStageLease: jest.fn()
+        .mockResolvedValueOnce({ acquired: false, reason: 'STAGE_NOT_FOUND', stage: null })
+        .mockResolvedValueOnce({ acquired: true, reason: 'ACQUIRED', stage }),
+      upsertRun: jest.fn().mockResolvedValue(run),
+      upsertStage: jest.fn().mockResolvedValue(stage),
+      completeStage: jest.fn(async (input) => ({
+        ...stage,
+        status: input.status,
+        totalCount: input.totalCount,
+        processedCount: input.processedCount,
+        succeededCount: input.succeededCount,
+        partialCount: input.partialCount,
+        failedCount: input.failedCount,
+        skippedCount: input.skippedCount,
+        unchangedCount: input.unchangedCount,
+        nextOffset: input.nextOffset,
+        hasMore: input.hasMore,
+        warnings: input.warnings,
+        errors: input.errors,
+        metadata: input.metadata,
+        completedAt: input.completedAt.toISOString(),
+        durationMs: input.durationMs,
+        leaseOwner: null,
+        leaseExpiresAt: null,
+      })),
+      completeRun: jest.fn().mockResolvedValue({ ...run, status: 'COMPLETED' }),
+    };
+    const stockInterestService = {
+      refreshSnapshots: jest.fn().mockResolvedValue({
+        status: 'COMPLETED',
+        snapshotDate: '2026-06-01',
+        dataThroughDate: '2026-05-29',
+        generatedAt: '2026-06-01T06:00:00.000Z',
+        totalCount: 21,
+        processedCount: 21,
+        succeededCount: 21,
+        failedCount: 0,
+        skippedCount: 0,
+        unchangedCount: 0,
+        warnings: [],
+        errors: [],
+        categories: {
+          TODAY_TOP_INTEREST: 3,
+          GROWTH_CONSISTENCY: 3,
+          GROWTH_ACCELERATION: 3,
+          SECTOR_LEADERS: 3,
+          ACCUMULATION: 3,
+          BREAKOUTS: 3,
+          RISK_AVOID: 3,
+        },
+      }),
+    };
+    const service = new PipelineOrchestrationService(
+      repository as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      stockInterestService as any
+    );
+
+    const result = await service.executeCommand({
+      commandKey: 'STOCK_INTEREST_REFRESH',
+      region: 'IN',
+      assetType: 'STOCK',
+      timeframe: '1d',
+      pipelineKey: 'market-intelligence',
+      runMode: 'single_batch',
+      batchSize: 25,
+      offset: 0,
+      idempotencyKey: 'stock-interest-1',
+      force: false,
+    }, { requestedByUserId: 'local-manual-operator' }, new Date('2026-06-01T06:00:00.000Z'));
+
+    expect(stockInterestService.refreshSnapshots).toHaveBeenCalledWith(expect.objectContaining({
+      region: 'IN',
+      assetType: 'STOCK',
+      timeframe: '1d',
+      pipelineRunId: 'run-stock-interest',
+    }));
+    expect(repository.completeStage).toHaveBeenCalledWith(expect.objectContaining({
+      status: 'COMPLETED',
+      totalCount: 21,
+      processedCount: 21,
+      succeededCount: 21,
+      failedCount: 0,
+      metadata: expect.objectContaining({
+        adapter: 'StockInterestSnapshotService.refreshSnapshots',
+      }),
+    }));
+    expect(result).toMatchObject({
+      commandKey: 'STOCK_INTEREST_REFRESH',
+      stageKey: 'STOCK_INTEREST_REFRESH',
+      status: 'COMPLETED',
+      pipelineRunId: 'run-stock-interest',
+      stageRunId: 'stage-stock-interest',
+    });
+  });
+});

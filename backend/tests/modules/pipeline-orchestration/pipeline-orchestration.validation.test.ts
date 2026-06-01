@@ -92,6 +92,73 @@ describe('pipeline orchestration validation', () => {
     })).toThrow('force=true is not allowed for manual commands');
   });
 
+  it('parses the Market Pulse refresh command as a supported manual command', () => {
+    expect(parsePipelineCommandRequest({
+      commandKey: 'MARKET_PULSE_REFRESH',
+      region: 'in',
+      assetType: 'stock',
+      runMode: 'single_batch',
+      idempotencyKey: 'pulse-1',
+    })).toEqual(expect.objectContaining({
+      commandKey: 'MARKET_PULSE_REFRESH',
+      region: 'IN',
+      assetType: 'STOCK',
+      timeframe: '1d',
+      pipelineKey: 'market-intelligence',
+      runMode: 'single_batch',
+      batchSize: 25,
+      offset: 0,
+      idempotencyKey: 'pulse-1',
+      force: false,
+    }));
+  });
+
+  it('parses the Sector Intelligence refresh command as a supported manual command', () => {
+    expect(parsePipelineCommandRequest({
+      commandKey: 'SECTOR_INTELLIGENCE_REFRESH',
+      region: 'in',
+      assetType: 'stock',
+      runMode: 'single_batch',
+      idempotencyKey: 'sector-1',
+      params: { dataThroughDate: '2026-05-29' },
+    })).toEqual(expect.objectContaining({
+      commandKey: 'SECTOR_INTELLIGENCE_REFRESH',
+      region: 'IN',
+      assetType: 'STOCK',
+      timeframe: '1d',
+      pipelineKey: 'market-intelligence',
+      runMode: 'single_batch',
+      batchSize: 25,
+      offset: 0,
+      idempotencyKey: 'sector-1',
+      params: { dataThroughDate: '2026-05-29' },
+      force: false,
+    }));
+  });
+
+  it('parses the Earnings Intelligence refresh command as a supported manual command', () => {
+    expect(parsePipelineCommandRequest({
+      commandKey: 'EARNINGS_INTELLIGENCE_REFRESH',
+      region: 'in',
+      assetType: 'stock',
+      runMode: 'single_batch',
+      idempotencyKey: 'earnings-1',
+      params: { snapshotDate: '2026-06-01', dataThroughDate: '2026-05-31' },
+    })).toEqual(expect.objectContaining({
+      commandKey: 'EARNINGS_INTELLIGENCE_REFRESH',
+      region: 'IN',
+      assetType: 'STOCK',
+      timeframe: '1d',
+      pipelineKey: 'market-intelligence',
+      runMode: 'single_batch',
+      batchSize: 25,
+      offset: 0,
+      idempotencyKey: 'earnings-1',
+      params: { snapshotDate: '2026-06-01', dataThroughDate: '2026-05-31' },
+      force: false,
+    }));
+  });
+
   it('parses exchange reset command params for historical backfill, manual fundamentals, and retry', () => {
     expect(parsePipelineCommandRequest({
       commandKey: 'MARKET_DATA_HISTORICAL_EXCHANGE_BACKFILL',

@@ -1,8 +1,12 @@
 import type { Request, Response } from 'express';
 import { MarketContextIntelligenceService } from './market-context-intelligence.service';
+import { MarketPulseSnapshotService } from './market-pulse-snapshot.service';
 
 export class MarketContextIntelligenceController {
-  constructor(private readonly service = new MarketContextIntelligenceService()) {}
+  constructor(
+    private readonly service = new MarketContextIntelligenceService(),
+    private readonly marketPulseService = new MarketPulseSnapshotService()
+  ) {}
 
   summary = async (req: Request, res: Response) => this.respond(res, () => this.service.summary({ region: this.region(req) }));
 
@@ -35,6 +39,33 @@ export class MarketContextIntelligenceController {
     return this.respond(res, () => this.service.latestPersistedBreadth(region));
   };
 
+  marketPulse = async (req: Request, res: Response) => {
+    res.setHeader('Cache-Control', 'no-store');
+    return this.respond(res, () => this.marketPulseService.latestSnapshot({
+      region: this.region(req) || 'IN',
+      assetType: this.assetType(req) || 'STOCK',
+      timeframe: this.timeframe(req) || '1d',
+    }));
+  };
+
+  marketPulseHistory = async (req: Request, res: Response) => {
+    res.setHeader('Cache-Control', 'no-store');
+    return this.respond(res, () => this.marketPulseService.snapshotHistory({
+      region: this.region(req) || 'IN',
+      assetType: this.assetType(req) || 'STOCK',
+      timeframe: this.timeframe(req) || '1d',
+      limit: this.limit(req),
+    }));
+  };
+
+  sectorSnapshots = async (req: Request, res: Response) => {
+    res.setHeader('Cache-Control', 'no-store');
+    return this.respond(res, () => this.service.latestSectorIntelligenceSnapshot({
+      region: this.region(req),
+      assetType: this.assetType(req),
+    }));
+  };
+
   run = async (req: Request, res: Response) => this.respond(res, () => this.service.run(this.region(req)));
 
   regime = async (req: Request, res: Response) => this.respond(res, () => this.service.regime(this.region(req)));
@@ -46,6 +77,20 @@ export class MarketContextIntelligenceController {
 
   private region(req: Request): string | undefined {
     return typeof req.query.region === 'string' ? req.query.region.trim() || undefined : undefined;
+  }
+
+  private assetType(req: Request): string | undefined {
+    return typeof req.query.assetType === 'string' ? req.query.assetType.trim() || undefined : undefined;
+  }
+
+  private timeframe(req: Request): string | undefined {
+    return typeof req.query.timeframe === 'string' ? req.query.timeframe.trim() || undefined : undefined;
+  }
+
+  private limit(req: Request): number | undefined {
+    const raw = typeof req.query.limit === 'string' ? Number(req.query.limit) : undefined;
+    if (!Number.isInteger(raw) || raw === undefined || raw <= 0) return undefined;
+    return Math.min(raw, 100);
   }
 
   private async respond(res: Response, fn: () => Promise<unknown> | unknown) {
