@@ -290,6 +290,9 @@ export type PipelineCommandKey =
   | 'TODAY_REVIEW_PUBLISH'
   | 'SIGNAL_POSITION_LEDGER_REFRESH'
   | 'PIPELINE_RUN_ALL'
+  | 'MARKET_DATA_HISTORICAL_EXCHANGE_BACKFILL'
+  | 'MARKET_DATA_MANUAL_VERIFIED_FUNDAMENTALS_IMPORT'
+  | 'PIPELINE_RETRY_FAILED_STAGE'
   | 'PIPELINE_DRAIN_ALL_BATCHES'
   | 'PIPELINE_CANCEL_ACTIVE';
 
@@ -343,6 +346,7 @@ export interface PipelineCommandRequest {
   offset: number;
   idempotencyKey: string;
   reason?: string;
+  params?: Record<string, unknown>;
   force: false;
 }
 
@@ -633,7 +637,12 @@ export interface MarketDataStageSnapshotRequest {
   timeframe: '1d';
   pipelineKey: 'market-intelligence';
   triggerType: 'scheduled' | 'startup' | 'backfill' | 'manual';
-  operation: 'INCREMENTAL_EOD_LOAD' | 'PRICE_BACKFILL' | 'CATALOG_SYNC';
+  operation:
+    | 'INCREMENTAL_EOD_LOAD'
+    | 'PRICE_BACKFILL'
+    | 'CATALOG_SYNC'
+    | 'HISTORICAL_EXCHANGE_BACKFILL'
+    | 'MANUAL_VERIFIED_FUNDAMENTALS_IMPORT';
   runId: string;
   status: PipelineStageStatus | 'CANCELED';
   dataThroughDate?: string | null;

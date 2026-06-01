@@ -72,6 +72,168 @@ const buildStoredZip = (fileName: string, text: string): Buffer => {
   return Buffer.concat([local, name, data, central, name, eocd]);
 };
 
+class FakeHistoricalBackfillPrisma {
+  runs: any[] = [];
+  stages: any[] = [];
+  private runSequence = 0;
+  private stageSequence = 0;
+
+  pipelineRun = {
+    create: jest.fn(async ({ data }: any) => {
+      const now = new Date('2026-05-25T03:00:00.000Z');
+      const run = {
+        id: `run-${++this.runSequence}`,
+        changedInstrumentCount: 0,
+        partialCount: 0,
+        dataThroughDate: null,
+        sourceFingerprint: null,
+        completedAt: null,
+        durationMs: null,
+        createdAt: now,
+        updatedAt: now,
+        ...data,
+      };
+      this.runs.push(run);
+      return { ...run };
+    }),
+    findUnique: jest.fn(async ({ where, include }: any) => {
+      const run = this.runs.find((item) => item.id === where.id || item.idempotencyKey === where.idempotencyKey);
+      if (!run) return null;
+      const output = { ...run };
+      if (include?.stages) {
+        output.stages = this.stages
+          .filter((stage) => stage.pipelineRunId === run.id)
+          .map((stage) => ({ ...stage }))
+          .sort((a, b) => {
+            const aDate = a.dataThroughDate ? new Date(a.dataThroughDate).getTime() : 0;
+            const bDate = b.dataThroughDate ? new Date(b.dataThroughDate).getTime() : 0;
+            if (aDate !== bDate) return aDate - bDate;
+            return Number(a.stageOrder || 0) - Number(b.stageOrder || 0);
+          });
+      }
+      return output;
+    }),
+    update: jest.fn(async ({ where, data }: any) => {
+      const index = this.runs.findIndex((item) => item.id === where.id || item.idempotencyKey === where.idempotencyKey);
+      if (index < 0) throw new Error('run not found');
+      this.runs[index] = { ...this.runs[index], ...data, updatedAt: new Date() };
+      return { ...this.runs[index] };
+    }),
+  };
+
+  pipelineStageRun = {
+    createMany: jest.fn(async ({ data }: any) => {
+      for (const item of data) {
+        if (this.stages.some((stage) => stage.pipelineRunId === item.pipelineRunId && stage.stageKey === item.stageKey)) continue;
+        const now = new Date('2026-05-25T03:00:00.000Z');
+        this.stages.push({
+          id: `stage-${++this.stageSequence}`,
+          changedInstrumentCount: 0,
+          partialCount: 0,
+          attemptCount: 0,
+          cacheKey: null,
+          cacheStatus: 'BYPASS',
+          cacheExpiresAt: null,
+          leaseOwner: null,
+          leaseExpiresAt: null,
+          startedAt: null,
+          durationMs: null,
+          createdAt: now,
+          updatedAt: now,
+          ...item,
+        });
+      }
+      return { count: data.length };
+    }),
+    findMany: jest.fn(async ({ where, orderBy, take }: any = {}) => {
+      let result = this.stages.filter((stage) => this.matchesWhere(stage, where));
+      if (orderBy) {
+        result = [...result].sort((a, b) => {
+          const aDate = a.dataThroughDate ? new Date(a.dataThroughDate).getTime() : 0;
+          const bDate = b.dataThroughDate ? new Date(b.dataThroughDate).getTime() : 0;
+          if (aDate !== bDate) return aDate - bDate;
+          return Number(a.stageOrder || 0) - Number(b.stageOrder || 0);
+        });
+      }
+      if (take !== undefined) result = result.slice(0, take);
+      return result.map((stage) => ({ ...stage }));
+    }),
+    findUnique: jest.fn(async ({ where }: any) => {
+      const stage = this.stages.find((item) => item.id === where.id || item.idempotencyKey === where.idempotencyKey);
+      return stage ? { ...stage } : null;
+    }),
+    update: jest.fn(async ({ where, data }: any) => {
+      const index = this.stages.findIndex((item) => item.id === where.id || item.idempotencyKey === where.idempotencyKey);
+      if (index < 0) throw new Error('stage not found');
+      this.stages[index] = this.applyData(this.stages[index], data);
+      return { ...this.stages[index] };
+    }),
+    updateMany: jest.fn(async ({ where, data }: any) => {
+      let count = 0;
+      this.stages = this.stages.map((stage) => {
+        if (!this.matchesWhere(stage, where)) return stage;
+        count += 1;
+        return this.applyData(stage, data);
+      });
+      return { count };
+    }),
+  };
+
+  private applyData(row: any, data: any) {
+    const next = { ...row };
+    for (const [key, value] of Object.entries(data || {})) {
+      if (value && typeof value === 'object' && 'increment' in (value as any)) {
+        next[key] = Number(next[key] || 0) + Number((value as any).increment || 0);
+      } else {
+        next[key] = value;
+      }
+    }
+    next.updatedAt = new Date();
+    return next;
+  }
+
+  private matchesWhere(row: any, where: any): boolean {
+    if (!where) return true;
+    return Object.entries(where).every(([key, value]) => {
+      if (key === 'OR') return Array.isArray(value) && value.some((condition) => this.matchesWhere(row, condition));
+      if (value && typeof value === 'object' && !Array.isArray(value)) {
+        const typed = value as any;
+        if ('in' in typed) return typed.in.includes(row[key]);
+        if ('lt' in typed) {
+          const rowValue = row[key] instanceof Date ? row[key].getTime() : row[key] ? new Date(row[key]).getTime() : Number.POSITIVE_INFINITY;
+          return rowValue < new Date(typed.lt).getTime();
+        }
+        return this.matchesWhere(row[key], value);
+      }
+      return row[key] === value;
+    });
+  }
+}
+
+const nseImportSummary = (tradingDate: string, overrides: Record<string, unknown> = {}) => ({
+  status: 'COMPLETED',
+  source: 'NSE',
+  segment: 'CM',
+  tradingDate,
+  rowsRead: 2,
+  rowsParsed: 2,
+  rowsInserted: 1,
+  rowsUpdated: 0,
+  rowsNoOp: 1,
+  rowsSkipped: 0,
+  warningCount: 0,
+  warnings: [],
+  errors: [],
+  sourceFileImportId: `source-${tradingDate}`,
+  ...overrides,
+});
+
+const mockOfficialNseTradingHolidays = (
+  service: MarketDataFoundationService,
+  holidays: Array<[string, string]> = []
+) => jest.spyOn(service as any, 'nseCmTradingHolidayDatesForRange')
+  .mockResolvedValue(new Map(holidays));
+
 describe('MarketDataFoundationService syncV1', () => {
   it('fails closed for legacy provider search, fundamentals, corporate actions, and historical fetches', async () => {
     const provider = {
@@ -284,113 +446,368 @@ describe('MarketDataFoundationService syncV1', () => {
     expect(repository.storeHistoricalBulk).not.toHaveBeenCalled();
   });
 
-  it('runs exchange historical backfill date-first and skips already completed source-file dates', async () => {
+  it('creates a persisted historical exchange backfill run and skips already imported dates', async () => {
+    const prisma = new FakeHistoricalBackfillPrisma();
+    const completedDates = new Set(['2026-05-27']);
     const repository = {
-      listCompletedSourceFileImportDates: jest.fn().mockResolvedValue([
-        new Date('2026-05-27T00:00:00.000Z'),
-      ]),
-      listExchangeIdentitiesMissingPriceHistory: jest.fn().mockResolvedValue([
-        { exchangeSymbol: 'RELIANCE', stock: { symbol: 'RELIANCE' } },
-      ]),
+      prisma,
+      listCompletedSourceFileImportDates: jest.fn(async ({ startDate, endDate }: any) => {
+        const start = new Date(startDate).getTime();
+        const end = new Date(endDate).getTime();
+        return [...completedDates]
+          .map((date) => new Date(`${date}T00:00:00.000Z`))
+          .filter((date) => date.getTime() >= start && date.getTime() <= end);
+      }),
     };
     const service = new MarketDataFoundationService(repository as any, {
       inferRegion: jest.fn().mockReturnValue({ region: 'IN', exchange: 'NSE' }),
     } as any);
-    jest.spyOn(service as any, 'importNseCmUdiffDaily')
-      .mockResolvedValueOnce({
-        status: 'COMPLETED',
-        source: 'NSE',
-        segment: 'CM',
-        tradingDate: '2026-05-26',
-        rowsRead: 2,
-        rowsParsed: 2,
-        rowsInserted: 2,
-        rowsUpdated: 0,
-        rowsNoOp: 0,
-        rowsSkipped: 0,
-        warningCount: 0,
-        warnings: [],
-        errors: [],
-      })
-      .mockResolvedValueOnce({
-        status: 'COMPLETED',
-        source: 'NSE',
-        segment: 'CM',
-        tradingDate: '2026-05-28',
-        rowsRead: 2,
-        rowsParsed: 2,
-        rowsInserted: 0,
-        rowsUpdated: 1,
-        rowsNoOp: 1,
-        rowsSkipped: 0,
-        warningCount: 0,
-        warnings: [],
-        errors: [],
-      });
+    mockOfficialNseTradingHolidays(service);
+    jest.spyOn(service as any, 'sleep').mockResolvedValue(undefined);
+    jest.spyOn(service as any, 'importNseCmUdiffDaily').mockImplementation(async ({ tradingDate }: any) => {
+      const key = (service as any).exchangeDateKey(tradingDate);
+      return nseImportSummary(key, key === '2026-05-26'
+        ? { rowsInserted: 2, rowsNoOp: 0 }
+        : { rowsInserted: 0, rowsUpdated: 1, rowsNoOp: 1 });
+    });
 
-    const result = await (service as any).runExchangeHistoricalBackfill({
+    const started = await (service as any).startExchangeHistoricalBackfillRun({
       region: 'IN',
       assetType: 'STOCK',
       startDate: '2026-05-26',
       endDate: '2026-05-28',
       maxDates: 10,
+      workerCount: 3,
+      downloadDelayMs: 0,
+      jitterMs: 0,
+      autoStart: false,
     });
 
+    expect(started).toMatchObject({
+      status: 'RUNNING',
+      totalDates: 3,
+      pending: 2,
+      skipped: 1,
+      workerCount: 3,
+      progressPercent: 33.3,
+    });
+
+    await (service as any).processExchangeHistoricalBackfillRun(started.runId);
+
+    const result = await (service as any).getExchangeHistoricalBackfillRun(started.runId);
+    const importedDates = (service as any).importNseCmUdiffDaily.mock.calls
+      .map(([input]: any[]) => (service as any).exchangeDateKey(input.tradingDate));
+    expect(new Set(importedDates)).toEqual(new Set(['2026-05-26', '2026-05-28']));
+    expect(importedDates).toHaveLength(2);
+    expect((service as any).importNseCmUdiffDaily.mock.calls.every(([input]: any[]) => input.skipLatestPriceUpdate === true)).toBe(true);
     expect(result).toMatchObject({
       status: 'COMPLETED',
-      source: 'NSE',
-      segment: 'CM',
-      startDate: '2026-05-26',
-      endDate: '2026-05-28',
-      datesAttempted: 2,
-      datesSkippedAlreadyImported: 1,
-      queuedInstrumentCount: 1,
+      totalDates: 3,
+      completed: 2,
+      skipped: 1,
+      failed: 0,
       rowsInserted: 2,
       rowsUpdated: 1,
       rowsNoOp: 1,
-      hasMore: false,
+      progressPercent: 100,
     });
-    expect((service as any).importNseCmUdiffDaily).toHaveBeenNthCalledWith(1, { tradingDate: new Date('2026-05-26T00:00:00.000Z') });
-    expect((service as any).importNseCmUdiffDaily).toHaveBeenNthCalledWith(2, { tradingDate: new Date('2026-05-28T00:00:00.000Z') });
+    expect(result.jobs.map((job: any) => job.status)).toEqual([
+      'COMPLETED',
+      'SKIPPED_ALREADY_IMPORTED',
+      'COMPLETED',
+    ]);
   });
 
-  it('bounds exchange historical backfill runs and exposes the next date for resume', async () => {
-    const repository = {
+  it('skips official NSE CM trading holidays before queuing historical backfill date jobs', async () => {
+    const prisma = new FakeHistoricalBackfillPrisma();
+    const service = new MarketDataFoundationService({
+      prisma,
       listCompletedSourceFileImportDates: jest.fn().mockResolvedValue([]),
-      listExchangeIdentitiesMissingPriceHistory: jest.fn().mockResolvedValue([]),
-    };
-    const service = new MarketDataFoundationService(repository as any, {
-      inferRegion: jest.fn().mockReturnValue({ region: 'IN', exchange: 'NSE' }),
-    } as any);
-    jest.spyOn(service as any, 'importNseCmUdiffDaily').mockResolvedValue({
-      status: 'COMPLETED',
-      source: 'NSE',
-      segment: 'CM',
-      tradingDate: '2026-05-26',
-      rowsRead: 1,
-      rowsParsed: 1,
-      rowsInserted: 1,
-      rowsUpdated: 0,
-      rowsNoOp: 0,
-      rowsSkipped: 0,
-      warningCount: 0,
-      warnings: [],
-      errors: [],
+    } as any, {} as any);
+    const holidaySpy = mockOfficialNseTradingHolidays(service, [
+      ['2025-03-14', 'Holi'],
+    ]);
+    jest.spyOn(service as any, 'startHistoricalBackfillWorkers').mockImplementation(() => undefined);
+
+    const run = await (service as any).startExchangeHistoricalBackfillRun({
+      startDate: '2025-03-10',
+      endDate: '2025-03-17',
+      autoStart: false,
     });
 
-    const result = await (service as any).runExchangeHistoricalBackfill({
+    expect(holidaySpy).toHaveBeenCalled();
+    expect(run.jobs.map((job: any) => job.tradingDate)).toEqual([
+      '2025-03-10',
+      '2025-03-11',
+      '2025-03-12',
+      '2025-03-13',
+      '2025-03-17',
+    ]);
+    expect(run.totalDates).toBe(5);
+    expect(run.warnings.join(' ')).toContain('official NSE CM trading holiday');
+    expect(prisma.runs[0].metadata).toMatchObject({
+      skippedOfficialHolidayDates: 1,
+      officialHolidayCalendarSource: 'https://www.nseindia.com/api/holiday-master?type=trading&year={year}',
+    });
+  });
+
+  it('parses official NSE holiday-master CM rows into ISO trading holiday dates', async () => {
+    const service = new MarketDataFoundationService({} as any, {} as any);
+    const downloadSpy = jest.spyOn(service as any, 'downloadOfficialExchangeJson').mockResolvedValue({
+      CM: [
+        { tradingDate: '14-Mar-2025', description: 'Holi' },
+        { tradingDate: '25-Dec-2025', description: 'Christmas' },
+      ],
+      FO: [
+        { tradingDate: '01-Jan-2025', description: 'Not used for CM' },
+      ],
+    });
+
+    const holidays = await (service as any).fetchOfficialNseTradingHolidayDatesForYear(
+      2025,
+      'https://www.nseindia.com/api/holiday-master?type=trading&year=2025'
+    );
+
+    expect(downloadSpy).toHaveBeenCalledWith('https://www.nseindia.com/api/holiday-master?type=trading&year=2025');
+    expect([...holidays.entries()]).toEqual([
+      ['2025-03-14', 'Holi'],
+      ['2025-12-25', 'Christmas'],
+    ]);
+  });
+
+  it('defaults historical backfill to three workers and caps worker count at five', async () => {
+    const defaultPrisma = new FakeHistoricalBackfillPrisma();
+    const defaultService = new MarketDataFoundationService({
+      prisma: defaultPrisma,
+      listCompletedSourceFileImportDates: jest.fn().mockResolvedValue([]),
+    } as any, {} as any);
+    mockOfficialNseTradingHolidays(defaultService);
+    jest.spyOn(defaultService as any, 'startHistoricalBackfillWorkers').mockImplementation(() => undefined);
+
+    const defaultRun = await (defaultService as any).startExchangeHistoricalBackfillRun({
       startDate: '2026-05-26',
-      endDate: '2026-05-29',
-      maxDates: 2,
+      endDate: '2026-05-26',
+      autoStart: false,
+    });
+    expect(defaultRun.workerCount).toBe(3);
+
+    const cappedPrisma = new FakeHistoricalBackfillPrisma();
+    const cappedService = new MarketDataFoundationService({
+      prisma: cappedPrisma,
+      listCompletedSourceFileImportDates: jest.fn().mockResolvedValue([]),
+    } as any, {} as any);
+    mockOfficialNseTradingHolidays(cappedService);
+    jest.spyOn(cappedService as any, 'startHistoricalBackfillWorkers').mockImplementation(() => undefined);
+
+    const cappedRun = await (cappedService as any).startExchangeHistoricalBackfillRun({
+      startDate: '2026-05-26',
+      endDate: '2026-05-26',
+      workerCount: 99,
+      autoStart: false,
+    });
+    expect(cappedRun.workerCount).toBe(5);
+  });
+
+  it('caps historical backfill end date to the latest completed exchange date and rejects fully future ranges', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-06-01T12:00:00.000Z'));
+    try {
+      const latestCompleted = latestCompletedTradingDateForRegion('IN');
+      const prisma = new FakeHistoricalBackfillPrisma();
+      const service = new MarketDataFoundationService({
+        prisma,
+        listCompletedSourceFileImportDates: jest.fn().mockResolvedValue([]),
+      } as any, {} as any);
+      mockOfficialNseTradingHolidays(service);
+      jest.spyOn(service as any, 'startHistoricalBackfillWorkers').mockImplementation(() => undefined);
+
+      const cappedRun = await (service as any).startExchangeHistoricalBackfillRun({
+        startDate: '2026-05-29',
+        endDate: '2026-12-31',
+        autoStart: false,
+      });
+
+      expect(cappedRun.endDate).toBe(latestCompleted);
+      expect(cappedRun.warnings.join(' ')).toContain('capped to latest completed trading date');
+      await expect((service as any).startExchangeHistoricalBackfillRun({
+        startDate: '2026-06-02',
+        endDate: '2026-06-05',
+        autoStart: false,
+      })).rejects.toThrow(/cannot start after the latest completed trading date/);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('retries only failed and not-available historical backfill jobs', async () => {
+    const prisma = new FakeHistoricalBackfillPrisma();
+    const service = new MarketDataFoundationService({
+      prisma,
+      listCompletedSourceFileImportDates: jest.fn().mockResolvedValue([]),
+    } as any, {} as any);
+    mockOfficialNseTradingHolidays(service);
+    jest.spyOn(service as any, 'startHistoricalBackfillWorkers').mockImplementation(() => undefined);
+
+    const run = await (service as any).startExchangeHistoricalBackfillRun({
+      startDate: '2026-05-26',
+      endDate: '2026-05-28',
+      autoStart: false,
+    });
+    prisma.stages[0] = {
+      ...prisma.stages[0],
+      status: 'COMPLETED',
+      attemptCount: 1,
+      metadata: { ...prisma.stages[0].metadata, jobStatus: 'COMPLETED' },
+    };
+    prisma.stages[1] = {
+      ...prisma.stages[1],
+      status: 'FAILED',
+      attemptCount: 1,
+      errors: ['HTTP 500'],
+      metadata: { ...prisma.stages[1].metadata, jobStatus: 'FAILED', lastError: 'HTTP 500' },
+    };
+    prisma.stages[2] = {
+      ...prisma.stages[2],
+      status: 'SKIPPED',
+      attemptCount: 1,
+      errors: ['HTTP 404'],
+      metadata: { ...prisma.stages[2].metadata, jobStatus: 'NOT_AVAILABLE', lastError: 'HTTP 404' },
+    };
+
+    const retry = await (service as any).retryFailedExchangeHistoricalBackfillRun(run.runId, { maxRetries: 2 });
+
+    expect(retry.pending).toBe(2);
+    expect(retry.completed).toBe(1);
+    expect(retry.jobs.find((job: any) => job.tradingDate === '2026-05-26')).toMatchObject({ status: 'COMPLETED' });
+    expect(retry.jobs.find((job: any) => job.tradingDate === '2026-05-27')).toMatchObject({ status: 'PENDING', retryCount: 1 });
+    expect(retry.jobs.find((job: any) => job.tradingDate === '2026-05-28')).toMatchObject({ status: 'PENDING', retryCount: 1 });
+  });
+
+  it('marks stale running historical backfill jobs retryable during resume', async () => {
+    const prisma = new FakeHistoricalBackfillPrisma();
+    const service = new MarketDataFoundationService({
+      prisma,
+      listCompletedSourceFileImportDates: jest.fn().mockResolvedValue([]),
+    } as any, {} as any);
+    mockOfficialNseTradingHolidays(service);
+    jest.spyOn(service as any, 'startHistoricalBackfillWorkers').mockImplementation(() => undefined);
+
+    const run = await (service as any).startExchangeHistoricalBackfillRun({
+      startDate: '2026-05-26',
+      endDate: '2026-05-27',
+      staleJobTimeoutMs: 60_000,
+      autoStart: false,
+    });
+    prisma.stages[0] = {
+      ...prisma.stages[0],
+      status: 'RUNNING',
+      leaseExpiresAt: new Date('2026-05-25T01:00:00.000Z'),
+      updatedAt: new Date('2026-05-25T01:00:00.000Z'),
+      metadata: { ...prisma.stages[0].metadata, jobStatus: 'RUNNING' },
+    };
+
+    const resumed = await (service as any).resumeExchangeHistoricalBackfillRun(run.runId);
+
+    expect(resumed.status).toBe('RUNNING');
+    expect(resumed.pending).toBe(2);
+    expect(resumed.jobs.find((job: any) => job.tradingDate === '2026-05-26')).toMatchObject({
+      status: 'STALE_RETRYABLE',
+      error: 'Previous worker lease became stale before completion.',
+    });
+  });
+
+  it('pauses historical backfill before claiming new dates when memory crosses the stop threshold', async () => {
+    const prisma = new FakeHistoricalBackfillPrisma();
+    const service = new MarketDataFoundationService({
+      prisma,
+      listCompletedSourceFileImportDates: jest.fn().mockResolvedValue([]),
+    } as any, {} as any);
+    mockOfficialNseTradingHolidays(service);
+    jest.spyOn(service as any, 'currentMemoryUtilizationPercent').mockReturnValue(96);
+    jest.spyOn(service as any, 'importNseCmUdiffDaily').mockResolvedValue(nseImportSummary('2026-05-26'));
+
+    const run = await (service as any).startExchangeHistoricalBackfillRun({
+      startDate: '2026-05-26',
+      endDate: '2026-05-27',
+      workerCount: 2,
+      autoStart: false,
+    });
+    await (service as any).processExchangeHistoricalBackfillRun(run.runId);
+
+    const blocked = await (service as any).getExchangeHistoricalBackfillRun(run.runId);
+    expect(blocked.status).toBe('BLOCKED');
+    expect(blocked.pending).toBe(2);
+    expect((service as any).importNseCmUdiffDaily).not.toHaveBeenCalled();
+    expect(blocked.warnings.join(' ')).toContain('95% stop threshold');
+  });
+
+  it('runs BSE as fill-only enrichment after an NSE backfill date succeeds', async () => {
+    const prisma = new FakeHistoricalBackfillPrisma();
+    const service = new MarketDataFoundationService({
+      prisma,
+      listCompletedSourceFileImportDates: jest.fn().mockResolvedValue([]),
+    } as any, {} as any);
+    mockOfficialNseTradingHolidays(service);
+    jest.spyOn(service as any, 'sleep').mockResolvedValue(undefined);
+    jest.spyOn(service as any, 'importNseCmUdiffDaily').mockResolvedValue(nseImportSummary('2026-05-26', {
+      rowsInserted: 1,
+      rowsNoOp: 0,
+    }));
+    const bseSpy = jest.spyOn(service as any, 'importBseCmBackupDaily').mockResolvedValue({
+      ...nseImportSummary('2026-05-26', {
+        source: 'BSE',
+        sourceFileImportId: 'bse-source-2026-05-26',
+        rowsRead: 1,
+        rowsParsed: 1,
+        rowsInserted: 1,
+        rowsUpdated: 0,
+        rowsNoOp: 0,
+      }),
+      source: 'BSE',
     });
 
-    expect(result).toMatchObject({
-      status: 'PARTIAL',
-      datesAttempted: 2,
-      hasMore: true,
-      nextStartDate: '2026-05-28',
+    const run = await (service as any).startExchangeHistoricalBackfillRun({
+      startDate: '2026-05-26',
+      endDate: '2026-05-26',
+      includeBseFill: true,
+      downloadDelayMs: 0,
+      jitterMs: 0,
+      autoStart: false,
     });
-    expect((service as any).importNseCmUdiffDaily).toHaveBeenCalledTimes(2);
+    await (service as any).processExchangeHistoricalBackfillRun(run.runId);
+
+    const result = await (service as any).getExchangeHistoricalBackfillRun(run.runId);
+    expect(bseSpy).toHaveBeenCalledWith({ tradingDate: new Date('2026-05-26T00:00:00.000Z'), skipLatestPriceUpdate: true });
+    expect(result).toMatchObject({
+      status: 'COMPLETED',
+      completed: 1,
+      bseFills: 1,
+      rowsInserted: 2,
+    });
+    expect(result.jobs[0]).toMatchObject({
+      source: 'NSE+BSE',
+      bseFills: 1,
+      sourceFileImportId: 'source-2026-05-26',
+    });
+  });
+
+  it('cancels pending historical backfill dates without starting new jobs', async () => {
+    const prisma = new FakeHistoricalBackfillPrisma();
+    const service = new MarketDataFoundationService({
+      prisma,
+      listCompletedSourceFileImportDates: jest.fn().mockResolvedValue([]),
+    } as any, {} as any);
+    mockOfficialNseTradingHolidays(service);
+
+    const run = await (service as any).startExchangeHistoricalBackfillRun({
+      startDate: '2026-05-26',
+      endDate: '2026-05-27',
+      autoStart: false,
+    });
+    const cancelled = await (service as any).cancelExchangeHistoricalBackfillRun(run.runId);
+
+    expect(cancelled.status).toBe('CANCELLED');
+    expect(cancelled.skipped).toBe(2);
+    expect(cancelled.jobs.every((job: any) => job.status === 'CANCELLED')).toBe(true);
   });
 
   it('uses the NSE CM UDiFF import path for scheduled daily IN/STOCK syncs', async () => {
@@ -461,7 +878,7 @@ describe('MarketDataFoundationService syncV1', () => {
       rowsInserted: 1,
       rowsNoOp: 1,
       changedInstrumentIds: ['reliance-id'],
-      downstreamInstrumentIds: ['reliance-id', 'tcs-id'],
+      downstreamInstrumentIds: ['reliance-id'],
       changedInstrumentCount: 1,
       dqStageEligible: true,
       sourceFingerprint: 'source-fingerprint-1',
@@ -477,6 +894,74 @@ describe('MarketDataFoundationService syncV1', () => {
       tradingDate: '2026-05-27',
       status: 'SYNCED',
     }));
+  });
+
+  it('does not trigger downstream work when an exchange-file rerun is all no-op rows', async () => {
+    const repository = {
+      getSyncState: jest.fn().mockResolvedValue({
+        status: 'SYNCED',
+        tradingDate: new Date('2026-05-27T00:00:00.000Z'),
+        nextEligibleSyncAt: new Date('2026-05-27T18:00:00.000Z'),
+      }),
+      countStaleCatalogSyncTasks: jest.fn().mockResolvedValue(2),
+      latestStoredTradingDateForRegion: jest.fn().mockResolvedValue(new Date('2026-05-27T00:00:00.000Z')),
+      upsertSyncState: jest.fn().mockResolvedValue({}),
+      upsertSourceFileImport: jest.fn(),
+      storeHistoricalBulk: jest.fn(),
+      listActiveStockSyncTasks: jest.fn().mockResolvedValue([
+        { id: 'reliance-id', symbol: 'RELIANCE', sourceSymbol: 'RELIANCE', displaySymbol: 'RELIANCE', exchange: 'NSE' },
+        { id: 'tcs-id', symbol: 'TCS', sourceSymbol: 'TCS', displaySymbol: 'TCS', exchange: 'NSE' },
+      ]),
+      updateStockLoadTimestampBySymbols: jest.fn().mockResolvedValue(undefined),
+    };
+    const service = new MarketDataFoundationService(repository as any, {
+      inferRegion: jest.fn().mockReturnValue({ region: 'IN', exchange: 'NSE' }),
+    } as any);
+    jest.spyOn(service as any, 'evaluateSyncFreshnessGate').mockResolvedValue({
+      shouldSkip: false,
+      reason: 'DUE',
+      message: 'Sync due',
+    });
+    jest.spyOn(service, 'importNseCmUdiffDaily').mockResolvedValue({
+      status: 'COMPLETED',
+      source: 'NSE',
+      segment: 'CM',
+      tradingDate: '2026-05-27',
+      sourceName: 'NSE_UDIFF_CM_BHAVCOPY',
+      fileName: 'BhavCopy_NSE_CM_0_0_0_20260527_F_0000.csv.zip',
+      fileUrl: 'https://nsearchives.nseindia.com/content/cm/BhavCopy_NSE_CM_0_0_0_20260527_F_0000.csv.zip',
+      sourceFileImportId: 'import-1',
+      sourceFingerprint: 'source-fingerprint-1',
+      rowsRead: 2,
+      rowsParsed: 2,
+      rowsInserted: 0,
+      rowsUpdated: 0,
+      rowsNoOp: 2,
+      rowsSkipped: 0,
+      warningCount: 0,
+      warnings: [],
+      errors: [],
+      changedSymbols: [],
+      downstreamSymbols: ['RELIANCE', 'TCS'],
+    } as any);
+
+    const summary = await service.syncScheduledRegion('IN', {
+      assetType: 'STOCK',
+      now: new Date('2026-05-27T18:00:00.000Z'),
+      skipWeekends: false,
+    });
+
+    expect(summary).toMatchObject({
+      rowsNoOp: 2,
+      changedInstrumentIds: [],
+      downstreamInstrumentIds: [],
+      changedInstrumentCount: 0,
+      dqStageEligible: false,
+      officialEodBulk: {
+        matchedInstruments: 2,
+      },
+    });
+    expect(repository.updateStockLoadTimestampBySymbols).toHaveBeenCalledWith(['RELIANCE', 'TCS']);
   });
 
   it('imports BSE backup candles only through explicit exchange identity matches and missing NSE candles', async () => {
@@ -575,6 +1060,62 @@ describe('MarketDataFoundationService syncV1', () => {
       rowsSkipped: 1,
       changedSymbols: [],
       downstreamSymbols: [],
+    });
+  });
+
+  it('imports BSE backup candles by exact persisted stock symbol when no BSE identity exists', async () => {
+    const csvText = [
+      'TradDt,Sgmt,Src,FinInstrmTp,TckrSymb,SctySrs,OpnPric,HghPric,LwPric,ClsPric,TtlTradgVol',
+      '2026-05-27,CM,BSE,STK,RELIANCE,A,1400,1420,1390,1410,1000',
+      '2026-05-27,CM,BSE,STK,UNMATCHED,A,100,101,99,100.5,200',
+    ].join('\n');
+    const repository = {
+      findSourceFileImportByKey: jest.fn().mockResolvedValue(null),
+      upsertSourceFileImport: jest.fn()
+        .mockResolvedValueOnce({ id: 'bse-import-symbol-1', status: 'PENDING' })
+        .mockResolvedValueOnce({ id: 'bse-import-symbol-1', status: 'COMPLETED' }),
+      findExchangeIdentitiesForExchangeSymbols: jest.fn().mockResolvedValue([]),
+      findStocksBySymbolsInScope: jest.fn().mockResolvedValue([
+        { id: 'stock-reliance', symbol: 'RELIANCE', sourceSymbol: 'RELIANCE', displaySymbol: 'RELIANCE' },
+      ]),
+      filterPricesMissingPrimaryExchangeCandles: jest.fn().mockImplementation(async (prices: any[]) => prices),
+      storeHistoricalBulk: jest.fn().mockResolvedValue({
+        rowsReceived: 1,
+        rowsInserted: 1,
+        rowsUpdated: 0,
+        rowsSkipped: 0,
+        rowsNoOp: 0,
+        warningCount: 0,
+        warnings: [],
+        summaryBySymbol: new Map([
+          ['RELIANCE', { rowsReceived: 1, rowsInserted: 1, rowsUpdated: 0, rowsSkipped: 0, rowsNoOp: 0, warningCount: 0, warnings: [] }],
+        ]),
+      }),
+    };
+    const service = new MarketDataFoundationService(repository as any, {
+      inferRegion: jest.fn().mockReturnValue({ region: 'IN', exchange: 'BSE' }),
+    } as any);
+
+    const result = await (service as any).importBseCmBackupDaily({
+      tradingDate: '2026-05-27',
+      csvText,
+      fileName: 'BhavCopy_BSE_CM_0_0_0_20260527_F_0000.csv',
+      fileUrl: 'local-bse-symbol-fixture.csv',
+    });
+
+    expect(repository.findExchangeIdentitiesForExchangeSymbols).toHaveBeenCalledWith('BSE', ['RELIANCE', 'UNMATCHED']);
+    expect(repository.findStocksBySymbolsInScope).toHaveBeenCalledWith(['RELIANCE', 'UNMATCHED'], { region: 'IN', assetType: 'STOCK' });
+    expect(repository.storeHistoricalBulk).toHaveBeenCalledWith(
+      [expect.objectContaining({ symbol: 'RELIANCE', source: 'BSE_UDIFF_CM_BHAVCOPY' })],
+      expect.any(Function),
+      expect.any(Map),
+      { sourceFileImportId: 'bse-import-symbol-1' }
+    );
+    expect(result).toMatchObject({
+      status: 'COMPLETED',
+      rowsInserted: 1,
+      rowsSkipped: 1,
+      changedSymbols: ['RELIANCE'],
     });
   });
 
@@ -1974,7 +2515,7 @@ describe('MarketDataFoundationService syncV1', () => {
     });
   });
 
-  it('backfills provider validation status when requested', async () => {
+  it('ignores provider validation during catalog metadata backfill when legacy flag is requested', async () => {
     const repository = {
       listStocksForCatalogBackfill: jest.fn().mockResolvedValue({
         total: 2,
@@ -1995,16 +2536,17 @@ describe('MarketDataFoundationService syncV1', () => {
 
     const result = await service.backfillCatalogMetadata({ region: 'IN', batchSize: 1, validateProvider: true, workerConcurrency: 1 });
 
-    expect(repository.updateProviderSupportStatus).toHaveBeenCalledWith('ABB', 'SUPPORTED', undefined);
-    expect(repository.updateProviderSupportStatus).toHaveBeenCalledWith('BAD', 'UNSUPPORTED', 'not found');
+    expect(provider.validateProviderSymbol).not.toHaveBeenCalled();
+    expect(repository.updateProviderSupportStatus).not.toHaveBeenCalled();
     expect(result).toMatchObject({
       processedCount: 2,
-      validated: 2,
-      providerUnsupported: 1,
+      validated: 0,
+      providerUnsupported: 0,
       batchSize: 1,
       nextOffset: 1,
       hasMore: true,
     });
+    expect(result.warnings).toContain('Provider validation is disabled for NSE/BSE-only market data; catalog rows were imported without provider fallback checks.');
   });
 
   it('marks F&O underlyings as derivatives eligible without creating fake FUTURE rows', async () => {
@@ -2413,7 +2955,7 @@ describe('MarketDataFoundationService syncV1', () => {
     });
   });
 
-  it('imports index seed rows and records provider validation status', async () => {
+  it('imports index seed rows while ignoring legacy provider validation requests', async () => {
     const upsertCatalogInstrument = jest.fn().mockResolvedValue({ action: 'inserted', stock: {} });
     const updateProviderSupportStatus = jest.fn().mockResolvedValue({});
     const provider = {
@@ -2439,13 +2981,15 @@ describe('MarketDataFoundationService syncV1', () => {
       instrumentSegment: 'INDEX',
       catalogSource: 'NSE_INDEX_SEED',
     }));
-    expect(updateProviderSupportStatus).toHaveBeenCalledWith('^NSEBANK', 'UNSUPPORTED', 'not found');
+    expect(provider.validateProviderSymbol).not.toHaveBeenCalled();
+    expect(updateProviderSupportStatus).not.toHaveBeenCalled();
     expect(result).toMatchObject({
       sourceRows: 3,
       inserted: 3,
-      providerValidated: 3,
-      providerUnsupported: 1,
+      providerValidated: 0,
+      providerUnsupported: 0,
     });
+    expect(result.warnings).toContain('Provider validation is disabled for NSE/BSE-only market data; catalog rows were imported without provider fallback checks.');
   });
 
 
@@ -2547,10 +3091,55 @@ describe('MarketDataFoundationService syncV1', () => {
     }
   });
 
+  it('records a failed NSE UDiFF import instead of throwing when the official startup file is unavailable', async () => {
+    const previousFetch = global.fetch;
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 404,
+      headers: { get: () => null },
+      arrayBuffer: async () => Buffer.from('').buffer,
+    }) as any;
+    const repository = {
+      findSourceFileImportByKey: jest.fn().mockResolvedValue(null),
+      upsertSourceFileImport: jest.fn().mockResolvedValue({ id: 'nse-failed-import-1', status: 'FAILED' }),
+      storeHistoricalBulk: jest.fn(),
+    };
+    const service = new MarketDataFoundationService(repository as any, {} as any);
+
+    try {
+      const result = await service.importNseCmUdiffDaily({ tradingDate: '2026-06-01' });
+
+      expect(result).toMatchObject({
+        status: 'FAILED',
+        source: 'NSE',
+        segment: 'CM',
+        tradingDate: '2026-06-01',
+        sourceFileImportId: 'nse-failed-import-1',
+        rowsRead: 0,
+        rowsParsed: 0,
+        rowsInserted: 0,
+        rowsSkipped: 0,
+        errors: ['HTTP 404'],
+      });
+      expect(repository.upsertSourceFileImport).toHaveBeenCalledWith(expect.objectContaining({
+        source: 'NSE',
+        segment: 'CM',
+        status: 'FAILED',
+        rowsRaw: 0,
+        rowsAccepted: 0,
+        rowsRejected: 0,
+        errorMessage: 'HTTP 404',
+      }));
+      expect(repository.storeHistoricalBulk).not.toHaveBeenCalled();
+    } finally {
+      global.fetch = previousFetch;
+    }
+  });
 
 
 
-  it('skips recently synced catalog before provider workers are started', async () => {
+
+  it('fails closed for legacy catalog syncAll without provider workers or repository scans', async () => {
     const lastCheckedAt = new Date(Date.now() - 5 * 60_000).toISOString();
     const repository = {
       listActiveStockSyncTasks: jest.fn().mockResolvedValue([{ id: 'stock-1', symbol: 'AAPL', lastSuccessfulDataLoadTimestamp: null }]),
@@ -2566,12 +3155,14 @@ describe('MarketDataFoundationService syncV1', () => {
     const result = await service.syncAll(1, 1, 0, { region: 'GLOBAL', assetType: 'STOCK' });
 
     expect(result).toMatchObject({
-      success: true,
+      success: false,
       noNewData: true,
-      message: 'No new data to ingest. Catalog was synced recently.',
-      providerFetchSkippedCount: 1,
-      skippedReasonCounts: { RECENTLY_SYNCED: 1 },
+      message: expect.stringContaining('External Yahoo/yfinance and Angel One provider paths are disabled'),
+      providerFetchSkippedCount: 0,
+      skippedReasonCounts: { EXTERNAL_PROVIDER_DISABLED_NSE_BSE_ONLY: 1 },
     });
+    expect(repository.listActiveStockSyncTasks).not.toHaveBeenCalled();
+    expect(repository.getSyncState).not.toHaveBeenCalled();
   });
 
   it('starts catalog sync runs quickly with hard caps and no immediate provider loop', async () => {
@@ -5993,9 +6584,11 @@ describe('MarketDataFoundationService operational repair run', () => {
     expect(calls).toEqual([
       'VALIDATE_PROVIDERS',
       'CATALOG_IDENTITY_REPAIR',
-      'PROVIDER_BUSINESS_METADATA_REPAIR',
-      'BACKFILL_PRICES',
     ]);
+    expect(result.actions.find((action) => action.action === 'PROVIDER_BUSINESS_METADATA_REPAIR')?.warnings.join(' '))
+      .toContain('EXTERNAL_PROVIDER_DISABLED_NSE_BSE_ONLY');
+    expect(result.actions.find((action) => action.action === 'BACKFILL_PRICES')?.warnings.join(' '))
+      .toContain('EXTERNAL_PROVIDER_DISABLED_NSE_BSE_ONLY');
     expect(result.status).toBe('PARTIAL');
     expect(repository.createRepairRun).toHaveBeenCalledWith(expect.objectContaining({
       status: 'RUNNING',
@@ -6007,7 +6600,7 @@ describe('MarketDataFoundationService operational repair run', () => {
     }));
   });
 
-  it('passes worker concurrency through operational provider business metadata repair runs', async () => {
+  it('blocks operational provider business metadata repair runs under the NSE/BSE-only policy', async () => {
     const repository = {
       createRepairRun: jest.fn().mockResolvedValue({ id: 'run-provider-metadata' }),
       updateRepairRun: jest.fn().mockResolvedValue({}),
@@ -6038,7 +6631,7 @@ describe('MarketDataFoundationService operational repair run', () => {
       providerBusinessMetadataRepaired: 1,
     }));
 
-    await service.repairRun({
+    const result = await service.repairRun({
       region: 'IN',
       assetType: 'STOCK',
       actions: ['PROVIDER_BUSINESS_METADATA_REPAIR'],
@@ -6046,15 +6639,12 @@ describe('MarketDataFoundationService operational repair run', () => {
       workerConcurrency: 5,
     });
 
-    expect(repairSpy).toHaveBeenCalledWith(expect.objectContaining({
-      region: 'IN',
-      assetType: 'STOCK',
-      batchSize: 50,
-      workerConcurrency: 5,
-    }));
+    expect(repairSpy).not.toHaveBeenCalled();
+    expect(result.actions[0]).toMatchObject({ action: 'PROVIDER_BUSINESS_METADATA_REPAIR', batchesExecuted: 1 });
+    expect(result.actions[0].warnings.join(' ')).toContain('EXTERNAL_PROVIDER_DISABLED_NSE_BSE_ONLY');
   });
 
-  it('defaults repair-run price backfill to non-forced unless force or fullReload is explicit', async () => {
+  it('blocks repair-run provider price backfill under the NSE/BSE-only policy', async () => {
     const repository = {
       createRepairRun: jest.fn().mockResolvedValue({ id: 'run-backfill-force' }),
       updateRepairRun: jest.fn().mockResolvedValue({}),
@@ -6077,13 +6667,14 @@ describe('MarketDataFoundationService operational repair run', () => {
       priceRowsReceived: 1,
     }));
 
-    await service.repairRun({ region: 'IN', assetType: 'STOCK', actions: ['BACKFILL_PRICES'], batchSize: 50 });
-    await service.repairRun({ region: 'IN', assetType: 'STOCK', actions: ['BACKFILL_PRICES'], batchSize: 50, force: true });
-    await service.repairRun({ region: 'IN', assetType: 'STOCK', actions: ['BACKFILL_PRICES'], batchSize: 50, fullReload: true });
+    const first = await service.repairRun({ region: 'IN', assetType: 'STOCK', actions: ['BACKFILL_PRICES'], batchSize: 50 });
+    const second = await service.repairRun({ region: 'IN', assetType: 'STOCK', actions: ['BACKFILL_PRICES'], batchSize: 50, force: true });
+    const third = await service.repairRun({ region: 'IN', assetType: 'STOCK', actions: ['BACKFILL_PRICES'], batchSize: 50, fullReload: true });
 
-    expect(backfillSpy.mock.calls[0][0]).toMatchObject({ force: false, fullReload: undefined });
-    expect(backfillSpy.mock.calls[1][0]).toMatchObject({ force: true, fullReload: undefined });
-    expect(backfillSpy.mock.calls[2][0]).toMatchObject({ force: true, fullReload: true });
+    expect(backfillSpy).not.toHaveBeenCalled();
+    expect(first.actions[0].warnings.join(' ')).toContain('EXTERNAL_PROVIDER_DISABLED_NSE_BSE_ONLY');
+    expect(second.actions[0].warnings.join(' ')).toContain('EXTERNAL_PROVIDER_DISABLED_NSE_BSE_ONLY');
+    expect(third.actions[0].warnings.join(' ')).toContain('EXTERNAL_PROVIDER_DISABLED_NSE_BSE_ONLY');
   });
 
   it('drain mode executes actions in dependency order as queues clear', async () => {
@@ -6142,9 +6733,11 @@ describe('MarketDataFoundationService operational repair run', () => {
     expect(calls).toEqual([
       'VALIDATE_PROVIDERS',
       'CATALOG_IDENTITY_REPAIR',
-      'PROVIDER_BUSINESS_METADATA_REPAIR',
-      'BACKFILL_PRICES',
     ]);
+    expect(result.actions.find((action) => action.action === 'PROVIDER_BUSINESS_METADATA_REPAIR')?.warnings.join(' '))
+      .toContain('EXTERNAL_PROVIDER_DISABLED_NSE_BSE_ONLY');
+    expect(result.actions.find((action) => action.action === 'BACKFILL_PRICES')?.warnings.join(' '))
+      .toContain('EXTERNAL_PROVIDER_DISABLED_NSE_BSE_ONLY');
     expect(result.status).toBe('COMPLETED');
     expect(result.anotherRunNeeded).toBe(false);
   });

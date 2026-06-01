@@ -38,8 +38,33 @@ import {
 import { PageHeader } from '@/shared/components';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
 
-const formatDate = (value: string) => new Date(value).toLocaleDateString();
-const formatDateTime = (value: string) => new Date(value).toLocaleString();
+type ChipColor = 'default' | 'success' | 'warning' | 'error' | 'info';
+
+const formatDate = (value: string) => {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString();
+};
+const formatDateTime = (value: string) => {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+};
+const formatOptionalDate = (value: string | null | undefined) => value ? formatDate(value) : 'Unavailable';
+const formatOptionalDateTime = (value: string | null | undefined) => value ? formatDateTime(value) : 'Unavailable';
+const formatStatusLabel = (value: string | null | undefined) => {
+  if (!value) return 'Unknown';
+  return value
+    .replace(/[_-]/g, ' ')
+    .toLowerCase()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+};
+const statusChipColor = (value: string | null | undefined): ChipColor => {
+  if (!value) return 'default';
+  const normalized = value.toUpperCase();
+  if (['COMPLETE', 'READY', 'PRICE_READY', 'REVIEW_READY'].includes(normalized)) return 'success';
+  if (['ERROR', 'MISSING', 'MISSING_LATEST_PRICE', 'STALE_LATEST_PRICE', 'INADEQUATE_HISTORY'].includes(normalized)) return 'error';
+  if (['PARTIAL', 'DELAYED', 'MARKET_CALENDAR_UNCERTAIN', 'MISSING_RECENT_VOLUME'].includes(normalized)) return 'warning';
+  return 'info';
+};
 const formatNumber = (value: number | string | null | undefined) => {
   if (value === null || value === undefined || value === '') return 'N/A';
   const numeric = Number(value);
@@ -94,6 +119,14 @@ const InstrumentDetailPage: React.FC = () => {
         close: price.close,
       }));
   }, [prices]);
+
+  const latestPriceRecord = latest?.latest ?? null;
+  const dataThrough = instrument?.stored_data_through_date || latestPriceRecord?.date || instrument?.latest_price_date || null;
+  const expectedThrough = instrument?.expected_latest_trading_date || instrument?.required_history_end_date || null;
+  const latestUpdatedAt = latestPriceRecord?.last_updated_timestamp || prices?.last_updated_timestamp || instrument?.last_updated_timestamp || null;
+  const persistedSource = latestPriceRecord?.source || prices?.source || instrument?.source || 'Unknown';
+  const sourceStatus = latestPriceRecord?.data_status || latest?.data_status || prices?.data_status || instrument?.data_status || null;
+  const freshnessStatus = instrument?.price_readiness || (dataThrough ? sourceStatus : 'MISSING_LATEST_PRICE');
 
   if (loading) {
     return (
@@ -150,6 +183,22 @@ const InstrumentDetailPage: React.FC = () => {
           <Typography variant="body2">Updated: {formatDateTime(instrument.last_updated_timestamp)}</Typography>
         </Paper>
       </Box>
+
+      <Paper sx={{ p: 2, mb: 3 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+          <Box>
+            <Typography variant="overline" color="text.secondary">Persisted Evidence</Typography>
+            <Typography variant="h6">Data through: {formatOptionalDate(dataThrough)}</Typography>
+            <Typography variant="body2" color="text.secondary">Expected latest session: {formatOptionalDate(expectedThrough)}</Typography>
+            <Typography variant="body2" color="text.secondary">Last persisted update: {formatOptionalDateTime(latestUpdatedAt)}</Typography>
+          </Box>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, justifyContent: { xs: 'flex-start', md: 'flex-end' } }}>
+            <Chip label={`Freshness: ${formatStatusLabel(freshnessStatus)}`} size="small" color={statusChipColor(freshnessStatus)} variant="outlined" />
+            <Chip label={`Source: ${formatStatusLabel(persistedSource)}`} size="small" variant="outlined" />
+            <Chip label={`Source status: ${formatStatusLabel(sourceStatus)}`} size="small" color={statusChipColor(sourceStatus)} variant="outlined" />
+          </Box>
+        </Box>
+      </Paper>
 
       <Paper sx={{ p: 2, mb: 3 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
@@ -226,71 +275,97 @@ const InstrumentDetailPage: React.FC = () => {
   );
 };
 
-const TableSection: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
-  <Paper sx={{ mb: 3 }}>
-    <Box sx={{ p: 2 }}>
-      <Typography variant="h6">{title}</Typography>
-    </Box>
-    <TableContainer>
-      <Table size="small">
-        <TableHead>
-          <TableRow>
-            {title === 'Price Table' && (
-              <>
-                <TableCell>Date</TableCell>
-                <TableCell align="right">Open</TableCell>
-                <TableCell align="right">High</TableCell>
-                <TableCell align="right">Low</TableCell>
-                <TableCell align="right">Close</TableCell>
-                <TableCell align="right">Adjusted Close</TableCell>
-                <TableCell align="right">Volume</TableCell>
-                <TableCell>Source</TableCell>
-              </>
-            )}
-            {title === 'Fundamentals' && (
-              <>
-                <TableCell>Period</TableCell>
-                <TableCell>Period End</TableCell>
-                <TableCell align="right">Revenue</TableCell>
-                <TableCell align="right">EPS</TableCell>
-                <TableCell align="right">Net Income</TableCell>
-                <TableCell align="right">PE Ratio</TableCell>
-                <TableCell align="right">Dividend Yield</TableCell>
-                <TableCell align="right">Shares</TableCell>
-                <TableCell align="right">Market Cap</TableCell>
-                <TableCell>Currency</TableCell>
-                <TableCell>Source</TableCell>
-                <TableCell>Status</TableCell>
-              </>
-            )}
-            {title === 'Corporate Actions' && (
-              <>
-                <TableCell>Type</TableCell>
-                <TableCell>Effective Date</TableCell>
-                <TableCell>Declared Date</TableCell>
-                <TableCell>Payment Date</TableCell>
-                <TableCell>Value</TableCell>
-                <TableCell>Ratio</TableCell>
-                <TableCell>Amount</TableCell>
-                <TableCell>Currency</TableCell>
-                <TableCell>Source</TableCell>
-                <TableCell>Status</TableCell>
-              </>
-            )}
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {React.Children.count(children) > 0 ? children : (
+const tableSectionLayout = (title: string) => {
+  if (title === 'Fundamentals') return { columnCount: 12, minWidth: 1260 };
+  if (title === 'Corporate Actions') return { columnCount: 10, minWidth: 1080 };
+  return { columnCount: 8, minWidth: 900 };
+};
+
+const TableSection: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => {
+  const layout = tableSectionLayout(title);
+  return (
+    <Paper sx={{ mb: 3, overflow: 'hidden' }}>
+      <Box sx={{ p: 2 }}>
+        <Typography variant="h6">{title}</Typography>
+      </Box>
+      <TableContainer sx={{ maxWidth: '100%', overflowX: 'auto' }}>
+        <Table
+          size="small"
+          sx={{
+            minWidth: layout.minWidth,
+            tableLayout: 'fixed',
+            '& .MuiTableCell-root': {
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              verticalAlign: 'middle',
+            },
+            '& .MuiTableCell-head': {
+              color: 'text.secondary',
+              fontSize: 12,
+              fontWeight: 700,
+            },
+          }}
+        >
+          <TableHead>
             <TableRow>
-              <TableCell colSpan={8} align="center" sx={{ py: 3 }}>
-                <Typography color="text.secondary">No data available.</Typography>
-              </TableCell>
+              {title === 'Price Table' && (
+                <>
+                  <TableCell sx={{ width: 128 }}>Date</TableCell>
+                  <TableCell sx={{ width: 110 }} align="right">Open</TableCell>
+                  <TableCell sx={{ width: 110 }} align="right">High</TableCell>
+                  <TableCell sx={{ width: 110 }} align="right">Low</TableCell>
+                  <TableCell sx={{ width: 110 }} align="right">Close</TableCell>
+                  <TableCell sx={{ width: 140 }} align="right">Adjusted Close</TableCell>
+                  <TableCell sx={{ width: 130 }} align="right">Volume</TableCell>
+                  <TableCell sx={{ width: 162 }}>Source</TableCell>
+                </>
+              )}
+              {title === 'Fundamentals' && (
+                <>
+                  <TableCell sx={{ width: 110 }}>Period</TableCell>
+                  <TableCell sx={{ width: 130 }}>Period End</TableCell>
+                  <TableCell sx={{ width: 120 }} align="right">Revenue</TableCell>
+                  <TableCell sx={{ width: 90 }} align="right">EPS</TableCell>
+                  <TableCell sx={{ width: 126 }} align="right">Net Income</TableCell>
+                  <TableCell sx={{ width: 104 }} align="right">PE Ratio</TableCell>
+                  <TableCell sx={{ width: 136 }} align="right">Dividend Yield</TableCell>
+                  <TableCell sx={{ width: 110 }} align="right">Shares</TableCell>
+                  <TableCell sx={{ width: 132 }} align="right">Market Cap</TableCell>
+                  <TableCell sx={{ width: 96 }}>Currency</TableCell>
+                  <TableCell sx={{ width: 156 }}>Source</TableCell>
+                  <TableCell sx={{ width: 150 }}>Status</TableCell>
+                </>
+              )}
+              {title === 'Corporate Actions' && (
+                <>
+                  <TableCell sx={{ width: 136 }}>Type</TableCell>
+                  <TableCell sx={{ width: 130 }}>Effective Date</TableCell>
+                  <TableCell sx={{ width: 130 }}>Declared Date</TableCell>
+                  <TableCell sx={{ width: 130 }}>Payment Date</TableCell>
+                  <TableCell sx={{ width: 110 }}>Value</TableCell>
+                  <TableCell sx={{ width: 110 }}>Ratio</TableCell>
+                  <TableCell sx={{ width: 110 }}>Amount</TableCell>
+                  <TableCell sx={{ width: 96 }}>Currency</TableCell>
+                  <TableCell sx={{ width: 156 }}>Source</TableCell>
+                  <TableCell sx={{ width: 152 }}>Status</TableCell>
+                </>
+              )}
             </TableRow>
-          )}
-        </TableBody>
-      </Table>
-    </TableContainer>
-  </Paper>
-);
+          </TableHead>
+          <TableBody>
+            {React.Children.count(children) > 0 ? children : (
+              <TableRow>
+                <TableCell colSpan={layout.columnCount} align="center" sx={{ py: 3 }}>
+                  <Typography color="text.secondary">No data available.</Typography>
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
+    </Paper>
+  );
+};
 
 export default InstrumentDetailPage;

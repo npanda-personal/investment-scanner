@@ -64,6 +64,7 @@ type HistoricalBulkStoreSummary = SyncSummary & {
 };
 type HistoricalStoreOptions = {
   sourceFileImportId?: string | null;
+  skipLatestPriceUpdate?: boolean;
 };
 type SourceFileImportInput = {
   source: string;
@@ -193,6 +194,8 @@ export class MarketDataFoundationRepository {
     startDate?: Date;
     endDate?: Date;
     limit?: number;
+    sortBy?: 'importedAt' | 'tradingDate';
+    sortDirection?: 'asc' | 'desc';
   } = {}) {
     const where: any = {};
     if (input.source) where.source = input.source.trim().toUpperCase();
@@ -204,9 +207,14 @@ export class MarketDataFoundationRepository {
       if (input.endDate) where.tradingDate.lte = this.normalizeUtcDay(input.endDate);
     }
     const take = Math.max(1, Math.min(input.limit || 50, 200));
+    const sortBy = input.sortBy === 'tradingDate' ? 'tradingDate' : 'importedAt';
+    const sortDirection = input.sortDirection === 'asc' ? 'asc' : 'desc';
+    const secondarySort = sortBy === 'importedAt'
+      ? [{ tradingDate: sortDirection }, { updatedAt: sortDirection }]
+      : [{ importedAt: sortDirection }, { updatedAt: sortDirection }];
     return (this.prisma as any).sourceFileImport.findMany({
       where,
-      orderBy: [{ tradingDate: 'desc' }, { updatedAt: 'desc' }],
+      orderBy: [{ [sortBy]: sortDirection }, ...secondarySort],
       take,
       select: {
         id: true,
@@ -2443,28 +2451,30 @@ export class MarketDataFoundationRepository {
         }));
       }
 
-      const latestEntries = Array.from(latestBySymbol.entries());
-      for (let i = 0; i < latestEntries.length; i += 500) {
-        const batch = latestEntries.slice(i, i + 500);
-        await Promise.all(batch.map(([symbol, latest]) => {
-          const regionInfo = regionInfoBySymbol.get(symbol) ?? inferRegion(symbol);
-          return tx.latestPrice.upsert({
-            where: { symbol },
-            update: {
-              region: regionInfo.region,
-              price: new Prisma.Decimal(latest.close),
-              timestamp: latest.date,
-              updatedAt: new Date(),
-            },
-            create: {
-              symbol,
-              region: regionInfo.region,
-              price: new Prisma.Decimal(latest.close),
-              timestamp: latest.date,
-              updatedAt: new Date(),
-            },
-          });
-        }));
+      if (options.skipLatestPriceUpdate !== true) {
+        const latestEntries = Array.from(latestBySymbol.entries());
+        for (let i = 0; i < latestEntries.length; i += 500) {
+          const batch = latestEntries.slice(i, i + 500);
+          await Promise.all(batch.map(([symbol, latest]) => {
+            const regionInfo = regionInfoBySymbol.get(symbol) ?? inferRegion(symbol);
+            return tx.latestPrice.upsert({
+              where: { symbol },
+              update: {
+                region: regionInfo.region,
+                price: new Prisma.Decimal(latest.close),
+                timestamp: latest.date,
+                updatedAt: new Date(),
+              },
+              create: {
+                symbol,
+                region: regionInfo.region,
+                price: new Prisma.Decimal(latest.close),
+                timestamp: latest.date,
+                updatedAt: new Date(),
+              },
+            });
+          }));
+        }
       }
     }, {
       maxWait: 30000,

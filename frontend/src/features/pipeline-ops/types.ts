@@ -103,6 +103,9 @@ export type PipelineCommandKey =
   | 'TODAY_REVIEW_PUBLISH'
   | 'SIGNAL_POSITION_LEDGER_REFRESH'
   | 'PIPELINE_RUN_ALL'
+  | 'MARKET_DATA_HISTORICAL_EXCHANGE_BACKFILL'
+  | 'MARKET_DATA_MANUAL_VERIFIED_FUNDAMENTALS_IMPORT'
+  | 'PIPELINE_RETRY_FAILED_STAGE'
   | 'PIPELINE_DRAIN_ALL_BATCHES'
   | 'PIPELINE_CANCEL_ACTIVE';
 
@@ -135,7 +138,7 @@ export interface PipelineCommandCatalogItem {
   maxBatchSize: number;
   providerAccess: 'NONE' | 'FORBIDDEN' | 'APPROVED';
   schedulerAccess: 'NONE' | 'FORBIDDEN';
-  downstreamFanout: 'NONE' | 'FORBIDDEN';
+  downstreamFanout: 'NONE' | 'FORBIDDEN' | 'APPROVED';
 }
 
 export interface PipelineCommandCatalogResponse {
@@ -155,6 +158,7 @@ export interface PipelineCommandRequest {
   offset?: number;
   idempotencyKey: string;
   reason?: string;
+  params?: Record<string, unknown>;
   force?: false;
 }
 

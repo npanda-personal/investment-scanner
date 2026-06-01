@@ -1,6 +1,5 @@
 import type { Request, Response } from 'express';
 import { MarketDataFoundationService } from './market-data-foundation.service';
-import { validateRequiredString } from './market-data-foundation.validation';
 import { normalizeMarketRegion } from '../../shared/utils/market-scope';
 import { getMarketDataFoundationScheduler } from './market-data-foundation.scheduler';
 
@@ -22,10 +21,6 @@ export class MarketDataFoundationController {
       path: req.originalUrl,
     });
     return { region, assetType };
-  }
-
-  private isProviderDisabled(error: unknown): boolean {
-    return Boolean(error && typeof error === 'object' && (error as any).code === 'EXTERNAL_PROVIDER_DISABLED_NSE_BSE_ONLY');
   }
 
   private errorMessage(error: unknown, fallback: string): string {
@@ -124,6 +119,8 @@ export class MarketDataFoundationController {
         startDate: typeof req.query.startDate === 'string' ? req.query.startDate : undefined,
         endDate: typeof req.query.endDate === 'string' ? req.query.endDate : undefined,
         limit: this.numberParam(req, 'limit'),
+        sortBy: typeof req.query.sortBy === 'string' ? req.query.sortBy : undefined,
+        sortDirection: typeof req.query.sortDirection === 'string' ? req.query.sortDirection : undefined,
       }));
     } catch (error) {
       console.error('Error listing source file imports:', error);
@@ -240,18 +237,84 @@ export class MarketDataFoundationController {
         return res.status(400).json({ error: 'startDate and endDate are required' });
       }
       const maxDatesValue = req.body?.maxDates ?? req.query.maxDates;
-      const result = await this.service.runExchangeHistoricalBackfill({
+      const workerCountValue = req.body?.workerCount ?? req.query.workerCount;
+      const maxRetriesValue = req.body?.maxRetries ?? req.query.maxRetries;
+      const result = await this.service.startExchangeHistoricalBackfillRun({
         region: typeof req.body?.region === 'string' ? req.body.region : typeof req.query.region === 'string' ? req.query.region : undefined,
         assetType: typeof req.body?.assetType === 'string' ? req.body.assetType : typeof req.query.assetType === 'string' ? req.query.assetType : undefined,
         startDate: String(startDate),
         endDate: String(endDate),
         maxDates: maxDatesValue === undefined ? undefined : Number(maxDatesValue),
+        workerCount: workerCountValue === undefined ? undefined : Number(workerCountValue),
+        maxRetries: maxRetriesValue === undefined ? undefined : Number(maxRetriesValue),
         includeBseFill: req.body?.includeBseFill === true || req.query.includeBseFill === 'true',
       });
-      return res.status(result.status === 'FAILED' ? 500 : 200).json(result);
+      return res.status(202).json(result);
     } catch (error) {
       console.error('Error running exchange historical backfill:', error);
       return res.status(500).json({ error: this.errorMessage(error, 'Exchange historical backfill failed') });
+    }
+  };
+
+  startExchangeHistoricalBackfillRun = async (req: Request, res: Response) => {
+    try {
+      const startDate = req.body?.startDate || req.query.startDate;
+      const endDate = req.body?.endDate || req.query.endDate;
+      if (!startDate || !endDate) {
+        return res.status(400).json({ error: 'startDate and endDate are required' });
+      }
+      const result = await this.service.startExchangeHistoricalBackfillRun({
+        region: typeof req.body?.region === 'string' ? req.body.region : typeof req.query.region === 'string' ? req.query.region : undefined,
+        assetType: typeof req.body?.assetType === 'string' ? req.body.assetType : typeof req.query.assetType === 'string' ? req.query.assetType : undefined,
+        startDate: String(startDate),
+        endDate: String(endDate),
+        maxDates: req.body?.maxDates === undefined ? undefined : Number(req.body.maxDates),
+        workerCount: req.body?.workerCount === undefined ? undefined : Number(req.body.workerCount),
+        maxRetries: req.body?.maxRetries === undefined ? undefined : Number(req.body.maxRetries),
+        includeBseFill: req.body?.includeBseFill === true,
+      });
+      return res.status(202).json(result);
+    } catch (error) {
+      console.error('Error starting exchange historical backfill:', error);
+      return res.status(500).json({ error: this.errorMessage(error, 'Exchange historical backfill start failed') });
+    }
+  };
+
+  getExchangeHistoricalBackfillRun = async (req: Request, res: Response) => {
+    try {
+      return res.json(await this.service.getExchangeHistoricalBackfillRun(this.getParam(req.params.runId)));
+    } catch (error) {
+      console.error('Error reading exchange historical backfill:', error);
+      return res.status(404).json({ error: this.errorMessage(error, 'Exchange historical backfill run not found') });
+    }
+  };
+
+  resumeExchangeHistoricalBackfillRun = async (req: Request, res: Response) => {
+    try {
+      return res.status(202).json(await this.service.resumeExchangeHistoricalBackfillRun(this.getParam(req.params.runId)));
+    } catch (error) {
+      console.error('Error resuming exchange historical backfill:', error);
+      return res.status(404).json({ error: this.errorMessage(error, 'Exchange historical backfill resume failed') });
+    }
+  };
+
+  retryFailedExchangeHistoricalBackfillRun = async (req: Request, res: Response) => {
+    try {
+      return res.status(202).json(await this.service.retryFailedExchangeHistoricalBackfillRun(this.getParam(req.params.runId), {
+        maxRetries: req.body?.maxRetries === undefined ? undefined : Number(req.body.maxRetries),
+      }));
+    } catch (error) {
+      console.error('Error retrying exchange historical backfill:', error);
+      return res.status(404).json({ error: this.errorMessage(error, 'Exchange historical backfill retry failed') });
+    }
+  };
+
+  cancelExchangeHistoricalBackfillRun = async (req: Request, res: Response) => {
+    try {
+      return res.json(await this.service.cancelExchangeHistoricalBackfillRun(this.getParam(req.params.runId)));
+    } catch (error) {
+      console.error('Error canceling exchange historical backfill:', error);
+      return res.status(404).json({ error: this.errorMessage(error, 'Exchange historical backfill cancel failed') });
     }
   };
 
@@ -282,17 +345,8 @@ export class MarketDataFoundationController {
   };
 
   yahooSearch = async (req: Request, res: Response) => {
-    try {
-      const query = req.query.q as string;
-      if (!query || query.trim().length === 0) {
-        return res.status(400).json({ error: 'Missing search query' });
-      }
-      const results = await this.service.yahooSearch(query);
-      return res.json(results);
-    } catch (error) {
-      console.error('Error in Yahoo search:', error);
-      return res.status(this.isProviderDisabled(error) ? 410 : 500).json({ error: this.errorMessage(error, 'Failed to search Yahoo Finance') });
-    }
+    void req;
+    return this.providerDisabledResponse(res, 'Yahoo Finance search');
   };
 
   getStock = async (req: Request, res: Response) => {
@@ -314,7 +368,7 @@ export class MarketDataFoundationController {
       if (!symbol || !name || !region) {
         return res.status(400).json({ error: 'Missing required fields: symbol, name, region' });
       }
-      const stock = await this.service.create({ symbol, name, region, exchange });
+      const stock = await this.service.create({ symbol, name, region, exchange }, false);
       return res.status(201).json(stock);
     } catch (error: any) {
       console.error('Error creating stock:', error);
@@ -377,100 +431,28 @@ export class MarketDataFoundationController {
   };
 
   startStockCatalogSyncRun = async (req: Request, res: Response) => {
-    try {
-      const { region, assetType } = this.getMarketFilter(req);
-      const result = await this.service.startCatalogSyncRun({
-        region: region || req.body?.region,
-        assetType: assetType || req.body?.assetType || req.body?.asset_type,
-        batchSize: this.numberParam(req, 'batchSize'),
-        workerCount: this.numberParam(req, 'workerCount'),
-        workerConcurrency: this.numberParam(req, 'workerConcurrency'),
-        delayBetweenBatchesMs: this.numberParam(req, 'delayBetweenBatchesMs'),
-        maxBatches: this.numberParam(req, 'maxBatches'),
-        force: this.parseOptionalBoolean(req.query.force ?? req.body?.force),
-        fullReload: this.parseOptionalBoolean(req.query.fullReload ?? req.body?.fullReload),
-      });
-      return res.status(202).json(result);
-    } catch (error: any) {
-      console.error('Error starting catalog sync run:', error);
-      return res.status(500).json({
-        success: false,
-        message: `Catalog sync run failed to start: ${error.message}`,
-      });
-    }
+    void req;
+    return this.providerDisabledResponse(res, 'Legacy provider catalog sync run');
   };
 
   getStockCatalogSyncRun = async (req: Request, res: Response) => {
-    try {
-      const runId = this.getParam(req.params.runId);
-      const result = this.service.getCatalogSyncRun(runId);
-      if (!result) {
-        return res.status(404).json({
-          success: false,
-          code: 'RUN_NOT_FOUND',
-          message: 'Catalog sync run was not found. It may have expired or the server restarted.',
-        });
-      }
-      return res.json(result);
-    } catch (error: any) {
-      console.error('Error reading catalog sync run:', error);
-      return res.status(500).json({
-        success: false,
-        message: `Catalog sync run lookup failed: ${error.message}`,
-      });
-    }
+    void req;
+    return this.providerDisabledResponse(res, 'Legacy provider catalog sync run status');
   };
 
   cancelStockCatalogSyncRun = async (req: Request, res: Response) => {
-    try {
-      const runId = this.getParam(req.params.runId);
-      const result = this.service.cancelCatalogSyncRun(runId);
-      if (!result) {
-        return res.status(404).json({
-          success: false,
-          code: 'RUN_NOT_FOUND',
-          message: 'Catalog sync run was not found. It may have expired or the server restarted.',
-        });
-      }
-      return res.json(result);
-    } catch (error: any) {
-      console.error('Error canceling catalog sync run:', error);
-      return res.status(500).json({
-        success: false,
-        message: `Catalog sync run cancellation failed: ${error.message}`,
-      });
-    }
+    void req;
+    return this.providerDisabledResponse(res, 'Legacy provider catalog sync run cancel');
   };
 
   searchMarketData = async (req: Request, res: Response) => {
-    const { q } = req.query;
-    if (!q || typeof q !== 'string') {
-      return res.status(400).json({ error: 'Missing or invalid query parameter "q"' });
-    }
-
-    try {
-      const results = await this.service.searchProvider(q);
-      return res.json(results);
-    } catch (error) {
-      console.error('Search error:', error);
-      return res.status(500).json({ error: 'Failed to perform external search' });
-    }
+    void req;
+    return this.providerDisabledResponse(res, 'External provider search');
   };
 
   ingestSymbol = async (req: Request, res: Response) => {
-    const { symbol } = req.body;
-    this.getMarketFilter(req);
-    if (!symbol || typeof symbol !== 'string') {
-      return res.status(400).json({ error: 'Missing or invalid symbol' });
-    }
-
-    try {
-      await this.service.ingestSymbol(symbol);
-      return res.json({ success: true, message: `Ingestion completed for ${symbol}` });
-    } catch (error) {
-      console.error('Ingestion error:', error);
-      return res.status(500).json({ error: 'Failed to ingest data', details: (error as Error).message });
-    }
+    void req;
+    return this.providerDisabledResponse(res, 'Legacy provider ingestion');
   };
 
   listPrices = async (req: Request, res: Response) => {
@@ -491,35 +473,13 @@ export class MarketDataFoundationController {
   };
 
   getFundamentals = async (req: Request, res: Response) => {
-    const symbol = this.getParam(req.params.symbol);
-    const validationError = validateRequiredString(symbol, 'symbol');
-    if (validationError) {
-      return res.status(400).json({ error: validationError });
-    }
-
-    try {
-      const fundamentals = await this.service.fetchCoreFundamentals(symbol);
-      return res.json(fundamentals);
-    } catch (error) {
-      console.error('Error fetching fundamentals:', error);
-      return res.status(500).json({ error: 'Failed to fetch fundamentals' });
-    }
+    void req;
+    return this.providerDisabledResponse(res, 'Legacy provider fundamentals fetch');
   };
 
   getCorporateActions = async (req: Request, res: Response) => {
-    const symbol = this.getParam(req.params.symbol);
-    const validationError = validateRequiredString(symbol, 'symbol');
-    if (validationError) {
-      return res.status(400).json({ error: validationError });
-    }
-
-    try {
-      const actions = await this.service.fetchCorporateActions(symbol);
-      return res.json({ symbol, actions });
-    } catch (error) {
-      console.error('Error fetching corporate actions:', error);
-      return res.status(500).json({ error: 'Failed to fetch corporate actions' });
-    }
+    void req;
+    return this.providerDisabledResponse(res, 'Legacy provider corporate-actions fetch');
   };
 
   health = async (req: Request, res: Response) => {

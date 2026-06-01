@@ -69,6 +69,9 @@ export type {
   MarketDataManualMetadataTemplate,
   ExchangeHistoricalBackfillRequest,
   ExchangeHistoricalBackfillResponse,
+  ExchangeHistoricalBackfillJobRecord,
+  ExchangeHistoricalBackfillJobStatus,
+  ExchangeHistoricalBackfillRunStatus,
   ManualVerifiedFundamentalImportRequest,
   MarketDataStockMissingDataDiagnostics,
   MarketDataUniverseHealth,
@@ -294,6 +297,8 @@ export async function fetchSourceFileImports(options: {
   startDate?: string;
   endDate?: string;
   limit?: number;
+  sortBy?: 'importedAt' | 'tradingDate';
+  sortDirection?: 'asc' | 'desc';
 } = {}): Promise<MarketDataSourceFileImportsResponse> {
   const response = await axios.get<MarketDataSourceFileImportsResponse>(
     `${API_BASE}/v1/market-data/source-file-imports`,
@@ -304,12 +309,53 @@ export async function fetchSourceFileImports(options: {
 
 export async function runExchangeHistoricalBackfill(data: ExchangeHistoricalBackfillRequest): Promise<ExchangeHistoricalBackfillResponse> {
   const response = await axios.post<ExchangeHistoricalBackfillResponse>(
-    `${API_BASE}/v1/market-data/exchange-files/historical-backfill`,
+    `${API_BASE}/v1/market-data/exchange-files/historical-backfill/runs`,
     {
       ...data,
       region: normalizeMarketForApi(data.region) || 'IN',
       assetType: normalizeAssetTypeForMarketDataApi(data.assetType) || 'STOCK',
     }
+  );
+  return response.data;
+}
+
+export async function startExchangeHistoricalBackfillRun(data: ExchangeHistoricalBackfillRequest): Promise<ExchangeHistoricalBackfillResponse> {
+  const response = await axios.post<ExchangeHistoricalBackfillResponse>(
+    `${API_BASE}/v1/market-data/exchange-files/historical-backfill/runs`,
+    {
+      ...data,
+      region: normalizeMarketForApi(data.region) || 'IN',
+      assetType: normalizeAssetTypeForMarketDataApi(data.assetType) || 'STOCK',
+    }
+  );
+  return response.data;
+}
+
+export async function fetchExchangeHistoricalBackfillRun(runId: string): Promise<ExchangeHistoricalBackfillResponse> {
+  const response = await axios.get<ExchangeHistoricalBackfillResponse>(
+    `${API_BASE}/v1/market-data/exchange-files/historical-backfill/runs/${encodeURIComponent(runId)}`
+  );
+  return response.data;
+}
+
+export async function resumeExchangeHistoricalBackfillRun(runId: string): Promise<ExchangeHistoricalBackfillResponse> {
+  const response = await axios.post<ExchangeHistoricalBackfillResponse>(
+    `${API_BASE}/v1/market-data/exchange-files/historical-backfill/runs/${encodeURIComponent(runId)}/resume`
+  );
+  return response.data;
+}
+
+export async function retryFailedExchangeHistoricalBackfillRun(runId: string, maxRetries?: number): Promise<ExchangeHistoricalBackfillResponse> {
+  const response = await axios.post<ExchangeHistoricalBackfillResponse>(
+    `${API_BASE}/v1/market-data/exchange-files/historical-backfill/runs/${encodeURIComponent(runId)}/retry-failed`,
+    maxRetries === undefined ? {} : { maxRetries }
+  );
+  return response.data;
+}
+
+export async function cancelExchangeHistoricalBackfillRun(runId: string): Promise<ExchangeHistoricalBackfillResponse> {
+  const response = await axios.post<ExchangeHistoricalBackfillResponse>(
+    `${API_BASE}/v1/market-data/exchange-files/historical-backfill/runs/${encodeURIComponent(runId)}/cancel`
   );
   return response.data;
 }

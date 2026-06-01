@@ -596,6 +596,7 @@ function CandidateTable({ candidates }: { candidates: TodayReviewCandidate[] }) 
       render: (candidate) => <EllipsisCell fullText={blockerLabel(candidate)} />,
     },
   ], []);
+  const tableMinWidth = useMemo(() => columns.reduce((total, column) => total + column.width, 0), [columns]);
 
   const sortedCandidates = useMemo(() => {
     const column = columns.find((item) => item.id === sortBy) || columns[0];
@@ -764,7 +765,7 @@ function CandidateTable({ candidates }: { candidates: TodayReviewCandidate[] }) 
           aria-label="Today review candidates"
           sx={{
             tableLayout: 'fixed',
-            minWidth: 2860,
+            minWidth: tableMinWidth,
             '& .MuiTableCell-head': {
               bgcolor: 'background.paper',
               borderBottom: '1px solid',

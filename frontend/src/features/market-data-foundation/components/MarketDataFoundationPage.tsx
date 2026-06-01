@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Alert,
@@ -8,11 +8,16 @@ import {
   CircularProgress,
   Divider,
   Drawer,
+  FormControl,
+  FormControlLabel,
+  FormLabel,
   IconButton,
   InputAdornment,
   LinearProgress,
   MenuItem,
   Paper,
+  Radio,
+  RadioGroup,
   Stack,
   Tab,
   Tabs,
@@ -34,9 +39,13 @@ import {
   fetchInstruments,
   fetchMarketDataSchedulerStatus,
   fetchSourceFileImports,
+  fetchExchangeHistoricalBackfillRun,
   importManualVerifiedFundamental,
   importCatalog,
   runExchangeHistoricalBackfill,
+  resumeExchangeHistoricalBackfillRun,
+  retryFailedExchangeHistoricalBackfillRun,
+  cancelExchangeHistoricalBackfillRun,
   startCatalogSyncRun,
   type MarketDataCatalogSyncRunResponse,
   type MarketDataCatalogSyncRunStatus,
@@ -48,6 +57,7 @@ import {
   type V1Instrument,
 } from '../api/marketDataFoundationService';
 import MarketDataStatusPanel from './MarketDataStatusPanel';
+import { HistoricalBackfillRunEvidence, SourceFileImportEvidence } from './MarketDataOpsEvidence';
 import { DataTable, FilterBar, PageHeader, StatusBadge, type DataTableColumn, type SortDirection } from '@/shared/components';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
 import { normalizeAssetTypeForMarketDataApi, normalizeMarketForApi } from '../api/marketScopeApi';
@@ -78,7 +88,10 @@ type BatchProgressState = {
 };
 
 type CatalogTab = 'catalog' | 'import' | 'health';
+type BackfillInputMode = 'DATE_RANGE' | 'YEAR';
 type ManualFundamentalField = 'revenue' | 'eps' | 'netIncome' | 'peRatio' | 'marketCap';
+type SourceFileImportSortBy = 'importedAt' | 'tradingDate';
+type SourceFileImportSortDirection = 'asc' | 'desc';
 
 type FilterPreset = {
   id: string;
@@ -268,10 +281,10 @@ const MarketDataFoundationPage: React.FC = () => {
   const [catalogCsv, setCatalogCsv] = useState('');
   const [importingCatalog, setImportingCatalog] = useState(false);
   const [backfillingCatalog, setBackfillingCatalog] = useState(false);
+  const [historicalBackfillInputMode, setHistoricalBackfillInputMode] = useState<BackfillInputMode>('DATE_RANGE');
   const [historicalStartDate, setHistoricalStartDate] = useState('');
   const [historicalEndDate, setHistoricalEndDate] = useState('');
-  const [historicalMaxDates, setHistoricalMaxDates] = useState('5');
-  const [historicalIncludeBse, setHistoricalIncludeBse] = useState(false);
+  const [historicalBackfillYear, setHistoricalBackfillYear] = useState(String(new Date().getFullYear() - 1));
   const [historicalBackfillRunning, setHistoricalBackfillRunning] = useState(false);
   const [historicalBackfillResult, setHistoricalBackfillResult] = useState<ExchangeHistoricalBackfillResponse | null>(null);
   const [manualFundamental, setManualFundamental] = useState({
@@ -290,6 +303,9 @@ const MarketDataFoundationPage: React.FC = () => {
   const [manualFundamentalRunning, setManualFundamentalRunning] = useState(false);
   const [sourceImports, setSourceImports] = useState<MarketDataSourceFileImportRecord[]>([]);
   const [sourceImportsLoading, setSourceImportsLoading] = useState(false);
+  const [sourceImportsLoaded, setSourceImportsLoaded] = useState(false);
+  const [sourceImportSortBy, setSourceImportSortBy] = useState<SourceFileImportSortBy>('importedAt');
+  const [sourceImportSortDirection, setSourceImportSortDirection] = useState<SourceFileImportSortDirection>('desc');
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(25);
   const [sortBy, setSortBy] = useState('symbol');
@@ -304,7 +320,26 @@ const MarketDataFoundationPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [batchProgress, setBatchProgress] = useState<BatchProgressState | null>(null);
+  const previousHistoricalBackfillStatusRef = useRef<string | null>(null);
   const normalizedMarket = normalizeMarketForApi(scope.region);
+  const latestSelectableBackfillDate = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const historicalBackfillYearOptions = useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    return Array.from({ length: 16 }, (_item, index) => String(currentYear - index));
+  }, []);
+  const selectedHistoricalBackfillRange = useMemo(() => {
+    if (historicalBackfillInputMode === 'YEAR') {
+      const yearEndDate = `${historicalBackfillYear}-12-31`;
+      return {
+        startDate: `${historicalBackfillYear}-01-01`,
+        endDate: yearEndDate > latestSelectableBackfillDate ? latestSelectableBackfillDate : yearEndDate,
+      };
+    }
+    return {
+      startDate: historicalStartDate,
+      endDate: historicalEndDate > latestSelectableBackfillDate ? latestSelectableBackfillDate : historicalEndDate,
+    };
+  }, [historicalBackfillInputMode, historicalBackfillYear, historicalEndDate, historicalStartDate, latestSelectableBackfillDate]);
 
   const loadInstruments = useCallback(async () => {
     setLoading(true);
@@ -364,23 +399,83 @@ const MarketDataFoundationPage: React.FC = () => {
   const loadSourceImports = useCallback(async () => {
     setSourceImportsLoading(true);
     try {
-      const result = await fetchSourceFileImports({ limit: 20 });
-      setSourceImports(result.imports);
+      const result = await fetchSourceFileImports({
+        limit: 10,
+        sortBy: sourceImportSortBy,
+        sortDirection: sourceImportSortDirection,
+      });
+      setSourceImports(result.imports.slice(0, 10));
     } catch {
       setSourceImports([]);
     } finally {
+      setSourceImportsLoaded(true);
       setSourceImportsLoading(false);
+    }
+  }, [sourceImportSortBy, sourceImportSortDirection]);
+
+  const handleSourceImportSortChange = useCallback((nextSortBy: SourceFileImportSortBy) => {
+    if (sourceImportSortBy === nextSortBy) {
+      setSourceImportSortDirection((current) => (current === 'desc' ? 'asc' : 'desc'));
+      return;
+    }
+    setSourceImportSortBy(nextSortBy);
+    setSourceImportSortDirection('desc');
+  }, [sourceImportSortBy]);
+
+  const loadHistoricalBackfillRun = useCallback(async (runId: string) => {
+    setHistoricalBackfillRunning(true);
+    try {
+      const result = await fetchExchangeHistoricalBackfillRun(runId);
+      setHistoricalBackfillResult(result);
+      return result;
+    } catch (err: any) {
+      setError(err.response?.data?.error || err.response?.data?.message || err.message || 'Historical exchange backfill status failed');
+      return null;
+    } finally {
+      setHistoricalBackfillRunning(false);
     }
   }, []);
 
   useEffect(() => {
     void refreshBackgroundServices();
+  }, [refreshBackgroundServices]);
+
+  useEffect(() => {
+    if (activeTab !== 'import') return undefined;
     void loadSourceImports();
+    return undefined;
+  }, [activeTab, loadSourceImports]);
+
+  useEffect(() => {
+    if (activeTab !== 'import' || !['PENDING', 'RUNNING'].includes(historicalBackfillResult?.status || '')) return undefined;
     const interval = window.setInterval(() => {
-      void refreshBackgroundServices();
-    }, 5000);
+      void loadSourceImports();
+    }, 10_000);
     return () => window.clearInterval(interval);
-  }, [refreshBackgroundServices, loadSourceImports]);
+  }, [activeTab, historicalBackfillResult?.status, loadSourceImports]);
+
+  useEffect(() => {
+    const previousStatus = previousHistoricalBackfillStatusRef.current;
+    const currentStatus = historicalBackfillResult?.status || null;
+    previousHistoricalBackfillStatusRef.current = currentStatus;
+    if (
+      activeTab === 'import'
+      && previousStatus
+      && ['PENDING', 'RUNNING'].includes(previousStatus)
+      && currentStatus
+      && !['PENDING', 'RUNNING'].includes(currentStatus)
+    ) {
+      void loadSourceImports();
+    }
+  }, [activeTab, historicalBackfillResult?.status, loadSourceImports]);
+
+  useEffect(() => {
+    if (!historicalBackfillResult?.runId || !['PENDING', 'RUNNING'].includes(historicalBackfillResult.status)) return undefined;
+    const interval = window.setInterval(() => {
+      void loadHistoricalBackfillRun(historicalBackfillResult.runId);
+    }, 2500);
+    return () => window.clearInterval(interval);
+  }, [historicalBackfillResult?.runId, historicalBackfillResult?.status, loadHistoricalBackfillRun]);
 
   useEffect(() => {
     const source = catalogSources.find((item) => item.catalogSource === importSource);
@@ -645,7 +740,7 @@ const MarketDataFoundationPage: React.FC = () => {
   };
 
   const handleHistoricalBackfill = async () => {
-    if (!historicalStartDate || !historicalEndDate) {
+    if (!selectedHistoricalBackfillRange.startDate || !selectedHistoricalBackfillRange.endDate) {
       setError('Historical exchange backfill requires start and end dates.');
       return;
     }
@@ -657,16 +752,57 @@ const MarketDataFoundationPage: React.FC = () => {
       const result = await runExchangeHistoricalBackfill({
         region: scope.region,
         assetType: assetType.trim() || scope.assetType || 'STOCK',
-        startDate: historicalStartDate,
-        endDate: historicalEndDate,
-        maxDates: Number(historicalMaxDates) || undefined,
-        includeBseFill: historicalIncludeBse,
+        startDate: selectedHistoricalBackfillRange.startDate,
+        endDate: selectedHistoricalBackfillRange.endDate,
+        includeBseFill: true,
       });
       setHistoricalBackfillResult(result);
-      setSuccess(`Historical exchange backfill ${result.status}: attempted ${formatCount(result.datesAttempted)} dates, inserted ${formatCount(result.rowsInserted)}, updated ${formatCount(result.rowsUpdated)}, no-op ${formatCount(result.rowsNoOp)}.`);
-      await Promise.all([loadInstruments(), loadSourceImports()]);
+      setSuccess(`Historical exchange backfill ${result.status}: ${formatCount(result.totalDates)} dates queued with ${formatCount(result.workerCount)} parallel workers.`);
+      await loadInstruments();
     } catch (err: any) {
       setError(err.response?.data?.error || err.response?.data?.message || err.message || 'Historical exchange backfill failed');
+    } finally {
+      setHistoricalBackfillRunning(false);
+    }
+  };
+
+  const handleResumeHistoricalBackfill = async () => {
+    if (!historicalBackfillResult) return;
+    setHistoricalBackfillRunning(true);
+    setError(null);
+    try {
+      const result = await resumeExchangeHistoricalBackfillRun(historicalBackfillResult.runId);
+      setHistoricalBackfillResult(result);
+    } catch (err: any) {
+      setError(err.response?.data?.error || err.response?.data?.message || err.message || 'Historical exchange backfill resume failed');
+    } finally {
+      setHistoricalBackfillRunning(false);
+    }
+  };
+
+  const handleRetryHistoricalBackfill = async () => {
+    if (!historicalBackfillResult) return;
+    setHistoricalBackfillRunning(true);
+    setError(null);
+    try {
+      const result = await retryFailedExchangeHistoricalBackfillRun(historicalBackfillResult.runId);
+      setHistoricalBackfillResult(result);
+    } catch (err: any) {
+      setError(err.response?.data?.error || err.response?.data?.message || err.message || 'Historical exchange backfill retry failed');
+    } finally {
+      setHistoricalBackfillRunning(false);
+    }
+  };
+
+  const handleCancelHistoricalBackfill = async () => {
+    if (!historicalBackfillResult) return;
+    setHistoricalBackfillRunning(true);
+    setError(null);
+    try {
+      const result = await cancelExchangeHistoricalBackfillRun(historicalBackfillResult.runId);
+      setHistoricalBackfillResult(result);
+    } catch (err: any) {
+      setError(err.response?.data?.error || err.response?.data?.message || err.message || 'Historical exchange backfill cancel failed');
     } finally {
       setHistoricalBackfillRunning(false);
     }
@@ -862,7 +998,8 @@ const MarketDataFoundationPage: React.FC = () => {
     : `No instruments found for ${scopeLabel}.`;
   const catalogSyncActive = catalogSyncStarting || isCatalogSyncActive(catalogSyncRun?.status);
   const schedulerActive = schedulerStatus?.activeRun === true;
-  const operatorBackgroundActive = catalogSyncActive || historicalBackfillRunning || manualFundamentalRunning || schedulerActive;
+  const historicalBackfillActive = historicalBackfillRunning || ['PENDING', 'RUNNING'].includes(historicalBackfillResult?.status || '');
+  const operatorBackgroundActive = catalogSyncActive || historicalBackfillActive || manualFundamentalRunning || schedulerActive;
   const catalogSyncTotal = catalogSyncRun?.totalCount ?? 0;
   const catalogSyncProcessed = catalogSyncRun?.processedCount ?? 0;
   const catalogSyncPercent = catalogSyncRun?.percentComplete ?? (catalogSyncTotal > 0 ? (catalogSyncProcessed / catalogSyncTotal) * 100 : 0);
@@ -875,23 +1012,11 @@ const MarketDataFoundationPage: React.FC = () => {
     <Box className="page-container page-container--workspace" sx={{ minWidth: 0 }}>
       <PageHeader
         title="Market Data Foundation"
-        subtitle="Explore instruments, prices, fundamentals, corporate actions, and manual data sync status."
+        subtitle="Explore instruments, exchange-file evidence, persisted prices, fundamentals, corporate actions, and data health."
         primaryAction={
           <Button variant="contained" startIcon={<AddIcon />} onClick={() => navigate('/market-data-foundation/add')}>
             Add Instrument
           </Button>
-        }
-        secondaryActions={
-          <>
-          <Button
-            variant="outlined"
-            startIcon={catalogSyncActive ? <CircularProgress size={18} /> : <SyncIcon />}
-            onClick={() => void handleCatalogSync()}
-            disabled={operatorBackgroundActive}
-          >
-            {catalogSyncActive ? 'Syncing Catalog...' : operatorBackgroundActive ? 'Data Load Running' : 'Sync Catalog'}
-          </Button>
-          </>
         }
       />
 
@@ -1112,38 +1237,72 @@ const MarketDataFoundationPage: React.FC = () => {
           <Divider />
           <Box>
             <Typography variant="subtitle2" gutterBottom>Historical Exchange Candle Backfill</Typography>
-            <Stack
-              direction={{ xs: 'column', md: 'row' }}
-              spacing={1}
-              alignItems={{ xs: 'stretch', md: 'center' }}
-              useFlexGap
-              flexWrap="wrap"
-            >
-              <TextField size="small" type="date" label="Start Date" value={historicalStartDate} onChange={(event) => setHistoricalStartDate(event.target.value)} InputLabelProps={{ shrink: true }} />
-              <TextField size="small" type="date" label="End Date" value={historicalEndDate} onChange={(event) => setHistoricalEndDate(event.target.value)} InputLabelProps={{ shrink: true }} />
-              <TextField size="small" label="Max Dates" value={historicalMaxDates} onChange={(event) => setHistoricalMaxDates(event.target.value.replace(/\D/g, ''))} sx={{ maxWidth: { md: 140 } }} />
-              <TextField select size="small" label="BSE Fill" value={historicalIncludeBse ? 'true' : 'false'} onChange={(event) => setHistoricalIncludeBse(event.target.value === 'true')} sx={{ maxWidth: { md: 160 } }}>
-                <MenuItem value="false">NSE only</MenuItem>
-                <MenuItem value="true">Fill NSE gaps</MenuItem>
-              </TextField>
+            <Stack spacing={1.25}>
+              <FormControl>
+                <FormLabel id="market-data-historical-backfill-mode-label">Backfill mode</FormLabel>
+                <RadioGroup
+                  row
+                  aria-labelledby="market-data-historical-backfill-mode-label"
+                  value={historicalBackfillInputMode}
+                  onChange={(event) => setHistoricalBackfillInputMode(event.target.value as BackfillInputMode)}
+                >
+                  <FormControlLabel value="DATE_RANGE" control={<Radio size="small" />} label="Date range" />
+                  <FormControlLabel value="YEAR" control={<Radio size="small" />} label="By year" />
+                </RadioGroup>
+              </FormControl>
+              <Box
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: {
+                    xs: '1fr',
+                    md: historicalBackfillInputMode === 'YEAR'
+                      ? 'minmax(180px, 240px) auto'
+                      : 'minmax(180px, 240px) minmax(180px, 240px) auto',
+                  },
+                  gap: 1,
+                  alignItems: 'center',
+                }}
+              >
+              {historicalBackfillInputMode === 'YEAR' ? (
+                <TextField
+                  select
+                  size="small"
+                  label="Year"
+                  value={historicalBackfillYear}
+                  onChange={(event) => setHistoricalBackfillYear(event.target.value)}
+                  fullWidth
+                >
+                  {historicalBackfillYearOptions.map((year) => (
+                    <MenuItem key={year} value={year}>{year}</MenuItem>
+                  ))}
+                </TextField>
+              ) : (
+                <>
+                  <TextField size="small" type="date" label="Start Date" value={historicalStartDate} onChange={(event) => setHistoricalStartDate(event.target.value)} InputLabelProps={{ shrink: true }} inputProps={{ max: latestSelectableBackfillDate }} fullWidth />
+                  <TextField size="small" type="date" label="End Date" value={historicalEndDate} onChange={(event) => setHistoricalEndDate(event.target.value)} InputLabelProps={{ shrink: true }} inputProps={{ max: latestSelectableBackfillDate }} fullWidth />
+                </>
+              )}
               <Button
                 variant="contained"
                 startIcon={historicalBackfillRunning ? <CircularProgress size={18} /> : <SyncIcon />}
                 onClick={() => void handleHistoricalBackfill()}
-                disabled={operatorBackgroundActive || historicalBackfillRunning}
+                disabled={operatorBackgroundActive || historicalBackfillRunning || !selectedHistoricalBackfillRange.startDate || !selectedHistoricalBackfillRange.endDate}
+                sx={{ height: 40, whiteSpace: 'nowrap', width: 'fit-content', justifySelf: 'start', minWidth: 132 }}
               >
-                {historicalBackfillRunning ? 'Running...' : 'Run Backfill'}
+                {historicalBackfillRunning ? 'Starting...' : 'Run Backfill'}
               </Button>
+              </Box>
             </Stack>
             {historicalBackfillResult && (
-              <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" sx={{ mt: 1 }}>
-                <Chip size="small" label={`Status ${historicalBackfillResult.status}`} color={historicalBackfillResult.status === 'FAILED' ? 'error' : historicalBackfillResult.status === 'PARTIAL' ? 'warning' : 'success'} />
-                <Chip size="small" label={`Dates ${formatCount(historicalBackfillResult.datesAttempted)}`} />
-                <Chip size="small" label={`Inserted ${formatCount(historicalBackfillResult.rowsInserted)}`} />
-                <Chip size="small" label={`Updated ${formatCount(historicalBackfillResult.rowsUpdated)}`} />
-                <Chip size="small" label={`No-op ${formatCount(historicalBackfillResult.rowsNoOp)}`} />
-                {historicalBackfillResult.nextStartDate && <Chip size="small" label={`Resume ${historicalBackfillResult.nextStartDate}`} />}
-              </Stack>
+              <Box sx={{ mt: 1.5 }}>
+                <HistoricalBackfillRunEvidence
+                  run={historicalBackfillResult}
+                  loading={historicalBackfillRunning}
+                  onResume={() => void handleResumeHistoricalBackfill()}
+                  onRetry={() => void handleRetryHistoricalBackfill()}
+                  onCancel={() => void handleCancelHistoricalBackfill()}
+                />
+              </Box>
             )}
           </Box>
           <Divider />
@@ -1182,33 +1341,26 @@ const MarketDataFoundationPage: React.FC = () => {
           <Divider />
           <Box>
             <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
-              <Typography variant="subtitle2">Source File Evidence</Typography>
+              <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0 }}>
+                <Typography variant="subtitle2">Source File Evidence</Typography>
+                <Chip size="small" label="Latest 10" variant="outlined" />
+              </Stack>
               <Button size="small" startIcon={sourceImportsLoading ? <CircularProgress size={16} /> : <RefreshIcon />} onClick={() => void loadSourceImports()} disabled={sourceImportsLoading}>
                 Refresh Evidence
               </Button>
             </Stack>
-            <Stack spacing={1}>
-              {sourceImports.length === 0 && (
-                <Typography variant="body2" color="text.secondary">No source file import evidence available yet.</Typography>
-              )}
-              {sourceImports.map((item) => (
-                <Paper key={item.id} variant="outlined" sx={{ p: 1.25 }}>
-                  <Stack direction={{ xs: 'column', md: 'row' }} spacing={1} justifyContent="space-between">
-                    <Box>
-                      <Typography variant="body2" fontWeight={700}>{item.source} {item.segment} - {item.tradingDate || 'unknown date'}</Typography>
-                      <Typography variant="caption" color="text.secondary">{item.fileName}</Typography>
-                    </Box>
-                    <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-                      <Chip size="small" label={item.status} color={item.status === 'FAILED' ? 'error' : item.status === 'COMPLETED' ? 'success' : 'warning'} />
-                      <Chip size="small" label={`Accepted ${formatCount(item.rowsAccepted)}`} />
-                      <Chip size="small" label={`Rejected ${formatCount(item.rowsRejected)}`} />
-                      <Chip size="small" label={`Raw ${formatCount(item.rowsRaw)}`} />
-                    </Stack>
-                  </Stack>
-                  {item.errorMessage && <Typography variant="caption" color="error">{item.errorMessage}</Typography>}
-                </Paper>
-              ))}
-            </Stack>
+            {sourceImportsLoaded ? (
+              <SourceFileImportEvidence
+                imports={sourceImports}
+                sortBy={sourceImportSortBy}
+                sortDirection={sourceImportSortDirection}
+                onSortChange={handleSourceImportSortChange}
+              />
+            ) : (
+              <Paper variant="outlined" sx={{ p: 1.5 }}>
+                <Typography variant="body2" color="text.secondary">Refresh Evidence loads the latest SourceFileImport records.</Typography>
+              </Paper>
+            )}
           </Box>
         </Stack>
       </Paper>

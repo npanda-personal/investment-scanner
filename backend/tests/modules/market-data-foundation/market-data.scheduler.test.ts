@@ -6,8 +6,9 @@ import {
 } from '../../../src/modules/market-data-foundation';
 
 describe('MarketDataFoundationScheduler', () => {
-  it('defaults to daily startup catch-up while keeping provider backfill disabled unless explicitly opted in', async () => {
+  it('defaults to daily startup catch-up while ignoring legacy Angel provider scheduler flags', async () => {
     expect(readMarketDataSchedulerConfig({ ANGEL_ONE_ENABLE_MARKET_DATA: 'true' } as any)).toMatchObject({
+      enabled: false,
       intervalMinutes: 1440,
       runOnStartup: true,
     });

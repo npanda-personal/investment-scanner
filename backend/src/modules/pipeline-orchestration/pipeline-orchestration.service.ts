@@ -124,6 +124,9 @@ const PIPELINE_COMMAND_POLICIES: PipelineCommandPolicy[] = [
   commandPolicy('TODAY_REVIEW_PUBLISH', 'TODAY_REVIEW', 12, 'Today Review', 'Today review publish', 'FORBIDDEN', 'Manual command remains forbidden; scheduler-only publication is active with compatibility generation disabled.'),
   commandPolicy('SIGNAL_POSITION_LEDGER_REFRESH', 'SIGNAL_POSITION_LEDGER', 13, 'Signal Position Ledger', 'Materialized ledger refresh', 'DEFERRED', 'Manual command remains module-owned; scheduler-only materialization is active.'),
   commandPolicy('PIPELINE_RUN_ALL', 'MARKET_DATA', 1, 'Pipeline', 'Run daily market pipeline', 'ENABLED', null),
+  commandPolicy('MARKET_DATA_HISTORICAL_EXCHANGE_BACKFILL', 'MARKET_DATA', 1, 'Market Data', 'Historical exchange candle backfill', 'ENABLED', null),
+  commandPolicy('MARKET_DATA_MANUAL_VERIFIED_FUNDAMENTALS_IMPORT', 'MARKET_DATA', 1, 'Market Data', 'Manual verified fundamentals import', 'ENABLED', null),
+  commandPolicy('PIPELINE_RETRY_FAILED_STAGE', 'PIPELINE', 14, 'Pipeline', 'Retry failed stage or run', 'ENABLED', null),
   commandPolicy('PIPELINE_DRAIN_ALL_BATCHES', 'PIPELINE', 14, 'Pipeline', 'Drain all batches', 'FORBIDDEN', 'First slice allows one batch per request only.'),
   commandPolicy('PIPELINE_CANCEL_ACTIVE', 'PIPELINE', 14, 'Pipeline', 'Cancel active run', 'FORBIDDEN', 'No background worker cancellation contract exists for this slice.'),
 ];
@@ -265,6 +268,18 @@ export class PipelineOrchestrationService {
 
     if (request.commandKey === 'PIPELINE_RUN_ALL') {
       return this.executeDailyPipelineCommand(request, context, policy, now);
+    }
+
+    if (request.commandKey === 'MARKET_DATA_HISTORICAL_EXCHANGE_BACKFILL') {
+      return this.executeHistoricalExchangeBackfillCommand(request, context, policy, now);
+    }
+
+    if (request.commandKey === 'MARKET_DATA_MANUAL_VERIFIED_FUNDAMENTALS_IMPORT') {
+      return this.executeManualVerifiedFundamentalsCommand(request, context, policy, now);
+    }
+
+    if (request.commandKey === 'PIPELINE_RETRY_FAILED_STAGE') {
+      return this.executeRetryFailedStageCommand(request, context, policy, now);
     }
 
     const serverIdempotencyKey = this.commandIdempotencyKey(request);
@@ -692,6 +707,434 @@ export class PipelineOrchestrationService {
         'FAILED'
       );
     }
+  }
+
+  private async executeHistoricalExchangeBackfillCommand(
+    request: PipelineCommandRequest,
+    context: PipelineCommandExecutionContext,
+    policy: PipelineCommandPolicy,
+    now: Date
+  ): Promise<PipelineCommandResponse> {
+    this.assertMarketIntelligence1d(request, 'MARKET_DATA_HISTORICAL_EXCHANGE_BACKFILL');
+    const params = this.commandParams(request);
+    const startDate = this.requiredStringParam(params, 'startDate');
+    const endDate = this.requiredStringParam(params, 'endDate');
+    const maxDates = this.optionalNumberParam(params, 'maxDates');
+    const workerCount = this.optionalNumberParam(params, 'workerCount');
+    const maxRetries = this.optionalNumberParam(params, 'maxRetries');
+    const includeBseFill = this.optionalBooleanParam(params, 'includeBseFill') ?? false;
+    const commandIdempotencyKey = this.commandIdempotencyKey(request);
+    const commandRunId = this.marketDataCommandRunId('manual-historical-exchange-backfill', commandIdempotencyKey);
+    const startedAt = now.toISOString();
+
+    await this.recordMarketDataStageSnapshot({
+      region: request.region,
+      assetType: request.assetType,
+      timeframe: '1d',
+      pipelineKey: 'market-intelligence',
+      triggerType: 'backfill',
+      operation: 'HISTORICAL_EXCHANGE_BACKFILL',
+      runId: commandRunId,
+      status: 'RUNNING',
+      dataThroughDate: null,
+      totalCount: 0,
+      processedCount: 0,
+      succeededCount: 0,
+      failedCount: 0,
+      skippedCount: 0,
+      unchangedCount: 0,
+      changedInstrumentIds: [],
+      downstreamInstrumentIds: [],
+      batchSize: request.batchSize,
+      nextOffset: 0,
+      hasMore: false,
+      startedAt,
+      completedAt: null,
+      warnings: [],
+      errors: [],
+      metadata: {
+        commandKey: request.commandKey,
+        commandIdempotencyKey,
+        requestedByUserId: context.requestedByUserId,
+        runMode: request.runMode,
+        params: { startDate, endDate, ...(maxDates ? { maxDates } : {}), ...(workerCount ? { workerCount } : {}), ...(maxRetries !== null ? { maxRetries } : {}), includeBseFill },
+        ...(request.reason ? { reason: request.reason } : {}),
+      },
+    });
+
+    try {
+      const summary = await this.marketDataService.runExchangeHistoricalBackfill({
+        region: request.region,
+        assetType: request.assetType,
+        startDate,
+        endDate,
+        ...(maxDates ? { maxDates } : {}),
+        ...(workerCount ? { workerCount } : {}),
+        ...(maxRetries !== null ? { maxRetries } : {}),
+        includeBseFill,
+      });
+      const status = this.marketDataCommandStageStatus((summary as any).status);
+      const completedAt = new Date();
+      const dataThroughDate = this.historicalBackfillDataThroughDate(summary);
+      const rowsRead = Math.max(0, Number((summary as any).rowsRead || 0));
+      const rowsParsed = Math.max(0, Number((summary as any).rowsParsed || 0));
+      const rowsInserted = Math.max(0, Number((summary as any).rowsInserted || 0));
+      const rowsUpdated = Math.max(0, Number((summary as any).rowsUpdated || 0));
+      const rowsNoOp = Math.max(0, Number((summary as any).rowsNoOp || 0));
+      const rowSkippedCount = Math.max(0, Number((summary as any).rowsSkipped || 0));
+      const totalDates = Math.max(0, Number((summary as any).totalDates || 0));
+      const completedDates = Math.max(0, Number((summary as any).completed || 0));
+      const skippedDates = Math.max(0, Number((summary as any).skipped || 0));
+      const failedDates = Math.max(0, Number((summary as any).failed || 0));
+      const notAvailableDates = Math.max(0, Number((summary as any).notAvailable || 0));
+      const pendingDates = Math.max(0, Number((summary as any).pending || 0));
+      const runningDates = Math.max(0, Number((summary as any).running || 0));
+      const processedDates = completedDates + skippedDates + failedDates + notAvailableDates;
+      const jobs = Array.isArray((summary as any).jobs) ? (summary as any).jobs : [];
+
+      const completedStage = await this.recordMarketDataStageSnapshot({
+        region: request.region,
+        assetType: request.assetType,
+        timeframe: '1d',
+        pipelineKey: 'market-intelligence',
+        triggerType: 'backfill',
+        operation: 'HISTORICAL_EXCHANGE_BACKFILL',
+        runId: commandRunId,
+        status,
+        dataThroughDate,
+        totalCount: totalDates,
+        processedCount: processedDates,
+        succeededCount: completedDates,
+        failedCount: failedDates,
+        skippedCount: skippedDates + notAvailableDates,
+        unchangedCount: rowsNoOp,
+        changedInstrumentIds: [],
+        downstreamInstrumentIds: [],
+        batchSize: request.batchSize,
+        nextOffset: pendingDates > 0 || runningDates > 0 ? request.offset : null,
+        hasMore: pendingDates > 0 || runningDates > 0,
+        startedAt,
+        completedAt: completedAt.toISOString(),
+        warnings: this.toStringArray((summary as any).warnings),
+        errors: this.toStringArray((summary as any).errors),
+        metadata: {
+          commandKey: request.commandKey,
+          commandIdempotencyKey,
+          requestedByUserId: context.requestedByUserId,
+          runMode: request.runMode,
+          adapter: 'MarketDataFoundationService.runExchangeHistoricalBackfill',
+          params: { startDate, endDate, ...(maxDates ? { maxDates } : {}), ...(workerCount ? { workerCount } : {}), ...(maxRetries !== null ? { maxRetries } : {}), includeBseFill },
+          source: (summary as any).source,
+          segment: (summary as any).segment,
+          startDate: (summary as any).startDate,
+          endDate: (summary as any).endDate,
+          backfillRunId: (summary as any).runId,
+          workerCount: Number((summary as any).workerCount || workerCount || 0),
+          maxWorkers: Number((summary as any).maxWorkers || 5),
+          maxRetries: Number((summary as any).maxRetries || maxRetries || 0),
+          totalDates,
+          completedDates,
+          skippedDates,
+          failedDates,
+          notAvailableDates,
+          pendingDates,
+          runningDates,
+          progressPercent: Number((summary as any).progressPercent || 0),
+          currentWorkers: Number((summary as any).currentWorkers || 0),
+          retryCount: Number((summary as any).retryCount || 0),
+          rowsRead,
+          rowsParsed,
+          rowsInserted,
+          rowsUpdated,
+          rowsNoOp,
+          rowsSkipped: rowSkippedCount,
+          bseFills: Number((summary as any).bseFills || 0),
+          jobs: jobs.slice(0, 100),
+          ...(request.reason ? { reason: request.reason } : {}),
+        },
+      });
+
+      return this.responseFromStage(
+        request,
+        policy,
+        commandIdempotencyKey,
+        completedStage,
+        { acquired: true, reason: 'ACQUIRED', stage: completedStage },
+        this.commandStatusFromStageStatus(status)
+      );
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Historical exchange backfill command failed';
+      const failedAt = new Date();
+      const failedStage = await this.recordMarketDataStageSnapshot({
+        region: request.region,
+        assetType: request.assetType,
+        timeframe: '1d',
+        pipelineKey: 'market-intelligence',
+        triggerType: 'backfill',
+        operation: 'HISTORICAL_EXCHANGE_BACKFILL',
+        runId: commandRunId,
+        status: 'FAILED',
+        dataThroughDate: null,
+        totalCount: 1,
+        processedCount: 0,
+        succeededCount: 0,
+        failedCount: 1,
+        skippedCount: 0,
+        unchangedCount: 0,
+        changedInstrumentIds: [],
+        downstreamInstrumentIds: [],
+        batchSize: request.batchSize,
+        nextOffset: null,
+        hasMore: false,
+        startedAt,
+        completedAt: failedAt.toISOString(),
+        warnings: [],
+        errors: [errorMessage],
+        metadata: {
+          commandKey: request.commandKey,
+          commandIdempotencyKey,
+          requestedByUserId: context.requestedByUserId,
+          adapter: 'MarketDataFoundationService.runExchangeHistoricalBackfill',
+          params: { startDate, endDate, ...(maxDates ? { maxDates } : {}), ...(workerCount ? { workerCount } : {}), ...(maxRetries !== null ? { maxRetries } : {}), includeBseFill },
+          error: errorMessage,
+          ...(request.reason ? { reason: request.reason } : {}),
+        },
+      });
+      return this.responseFromStage(
+        request,
+        policy,
+        commandIdempotencyKey,
+        failedStage,
+        { acquired: true, reason: 'ACQUIRED', stage: failedStage },
+        'FAILED'
+      );
+    }
+  }
+
+  private async executeManualVerifiedFundamentalsCommand(
+    request: PipelineCommandRequest,
+    context: PipelineCommandExecutionContext,
+    policy: PipelineCommandPolicy,
+    now: Date
+  ): Promise<PipelineCommandResponse> {
+    this.assertMarketIntelligence1d(request, 'MARKET_DATA_MANUAL_VERIFIED_FUNDAMENTALS_IMPORT');
+    const params = this.commandParams(request);
+    const stockId = this.requiredStringParam(params, 'stockId');
+    const periodType = this.requiredStringParam(params, 'periodType');
+    const periodEndDate = this.requiredStringParam(params, 'periodEndDate');
+    const commandIdempotencyKey = this.commandIdempotencyKey(request);
+    const commandRunId = this.marketDataCommandRunId('manual-verified-fundamentals', commandIdempotencyKey);
+    const startedAt = now.toISOString();
+    const manualInput = {
+      stockId,
+      region: request.region,
+      assetType: request.assetType,
+      periodType,
+      periodEndDate,
+      revenue: this.optionalNumberParam(params, 'revenue') ?? null,
+      eps: this.optionalNumberParam(params, 'eps') ?? null,
+      netIncome: this.optionalNumberParam(params, 'netIncome') ?? null,
+      peRatio: this.optionalNumberParam(params, 'peRatio') ?? null,
+      marketCap: this.optionalNumberParam(params, 'marketCap') ?? null,
+      sourceNote: this.optionalStringParam(params, 'sourceNote') ?? null,
+      sourceUrl: this.optionalStringParam(params, 'sourceUrl') ?? null,
+      validatedBy: this.optionalStringParam(params, 'validatedBy') ?? context.requestedByUserId,
+      validatedAt: this.optionalStringParam(params, 'validatedAt') ?? null,
+      currency: this.optionalStringParam(params, 'currency') ?? null,
+    };
+
+    await this.recordMarketDataStageSnapshot({
+      region: request.region,
+      assetType: request.assetType,
+      timeframe: '1d',
+      pipelineKey: 'market-intelligence',
+      triggerType: 'manual',
+      operation: 'MANUAL_VERIFIED_FUNDAMENTALS_IMPORT',
+      runId: commandRunId,
+      status: 'RUNNING',
+      dataThroughDate: periodEndDate,
+      totalCount: 1,
+      processedCount: 0,
+      succeededCount: 0,
+      failedCount: 0,
+      skippedCount: 0,
+      unchangedCount: 0,
+      changedInstrumentIds: [],
+      downstreamInstrumentIds: [],
+      batchSize: 1,
+      nextOffset: 0,
+      hasMore: false,
+      startedAt,
+      completedAt: null,
+      warnings: [],
+      errors: [],
+      metadata: {
+        commandKey: request.commandKey,
+        commandIdempotencyKey,
+        requestedByUserId: context.requestedByUserId,
+        runMode: request.runMode,
+        params: manualInput,
+        evidenceStatus: 'PENDING_VERIFICATION_WRITE',
+        ...(request.reason ? { reason: request.reason } : {}),
+      },
+    });
+
+    try {
+      const result = await this.marketDataService.importManualVerifiedFundamental(manualInput);
+      const completedAt = new Date();
+      const completedStage = await this.recordMarketDataStageSnapshot({
+        region: request.region,
+        assetType: request.assetType,
+        timeframe: '1d',
+        pipelineKey: 'market-intelligence',
+        triggerType: 'manual',
+        operation: 'MANUAL_VERIFIED_FUNDAMENTALS_IMPORT',
+        runId: commandRunId,
+        status: 'COMPLETED',
+        dataThroughDate: periodEndDate,
+        totalCount: 1,
+        processedCount: 1,
+        succeededCount: 1,
+        failedCount: 0,
+        skippedCount: 0,
+        unchangedCount: 0,
+        changedInstrumentIds: [],
+        downstreamInstrumentIds: [],
+        batchSize: 1,
+        nextOffset: null,
+        hasMore: false,
+        startedAt,
+        completedAt: completedAt.toISOString(),
+        warnings: [],
+        errors: [],
+        metadata: {
+          commandKey: request.commandKey,
+          commandIdempotencyKey,
+          requestedByUserId: context.requestedByUserId,
+          runMode: request.runMode,
+          adapter: 'MarketDataFoundationService.importManualVerifiedFundamental',
+          params: manualInput,
+          evidenceStatus: 'VERIFIED',
+          id: (result as any).id || null,
+          source: (result as any).source || 'MANUAL_VERIFIED',
+          stockId: (result as any).stockId || stockId,
+          symbol: (result as any).symbol || null,
+          periodType: (result as any).periodType || periodType,
+          periodEndDate: (result as any).periodEndDate || periodEndDate,
+          validatedAt: (result as any).validatedAt || manualInput.validatedAt,
+          ...(request.reason ? { reason: request.reason } : {}),
+        },
+      });
+      return this.responseFromStage(
+        request,
+        policy,
+        commandIdempotencyKey,
+        completedStage,
+        { acquired: true, reason: 'ACQUIRED', stage: completedStage },
+        'COMPLETED'
+      );
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Manual verified fundamentals import failed';
+      const failedAt = new Date();
+      const failedStage = await this.recordMarketDataStageSnapshot({
+        region: request.region,
+        assetType: request.assetType,
+        timeframe: '1d',
+        pipelineKey: 'market-intelligence',
+        triggerType: 'manual',
+        operation: 'MANUAL_VERIFIED_FUNDAMENTALS_IMPORT',
+        runId: commandRunId,
+        status: 'FAILED',
+        dataThroughDate: periodEndDate,
+        totalCount: 1,
+        processedCount: 0,
+        succeededCount: 0,
+        failedCount: 1,
+        skippedCount: 0,
+        unchangedCount: 0,
+        changedInstrumentIds: [],
+        downstreamInstrumentIds: [],
+        batchSize: 1,
+        nextOffset: null,
+        hasMore: false,
+        startedAt,
+        completedAt: failedAt.toISOString(),
+        warnings: [],
+        errors: [errorMessage],
+        metadata: {
+          commandKey: request.commandKey,
+          commandIdempotencyKey,
+          requestedByUserId: context.requestedByUserId,
+          adapter: 'MarketDataFoundationService.importManualVerifiedFundamental',
+          params: manualInput,
+          evidenceStatus: 'FAILED',
+          error: errorMessage,
+          ...(request.reason ? { reason: request.reason } : {}),
+        },
+      });
+      return this.responseFromStage(
+        request,
+        policy,
+        commandIdempotencyKey,
+        failedStage,
+        { acquired: true, reason: 'ACQUIRED', stage: failedStage },
+        'FAILED'
+      );
+    }
+  }
+
+  private async executeRetryFailedStageCommand(
+    request: PipelineCommandRequest,
+    context: PipelineCommandExecutionContext,
+    policy: PipelineCommandPolicy,
+    now: Date
+  ): Promise<PipelineCommandResponse> {
+    this.assertMarketIntelligence1d(request, 'PIPELINE_RETRY_FAILED_STAGE');
+    const params = this.commandParams(request);
+    let retryCommandKey = this.optionalStringParam(params, 'retryCommandKey') as PipelineCommandKey | null;
+    let retryParams = this.optionalObjectParam(params, 'retryParams');
+    let retryReason = request.reason || 'Manual retry from Pipeline Ops';
+
+    if (!retryCommandKey) {
+      const stages = typeof (this.repository as any).latestStages === 'function'
+        ? await this.repository.latestStages({
+          region: request.region,
+          assetType: request.assetType,
+          timeframe: request.timeframe,
+          pipelineKey: request.pipelineKey,
+          limit: 25,
+        })
+        : [];
+      const failedStage = stages.find((stage: PipelineStageRunRecord) => String(stage.status).toUpperCase() === 'FAILED');
+      retryCommandKey = this.commandKeyFromStageMetadata(failedStage?.metadata);
+      retryParams = this.optionalObjectParam(failedStage?.metadata || {}, 'params') || retryParams;
+      retryReason = request.reason || `Retry failed stage ${failedStage?.id || 'unknown'}`;
+    }
+
+    if (!retryCommandKey || retryCommandKey === 'PIPELINE_RETRY_FAILED_STAGE') {
+      throw new PipelineCommandError(
+        422,
+        'No failed stage with retryable command metadata was found',
+        this.blockedCommandResponse(request, policy, 'No failed stage with retryable command metadata was found')
+      );
+    }
+
+    const targetPolicy = PIPELINE_COMMAND_POLICY_MAP.get(retryCommandKey);
+    if (!targetPolicy || targetPolicy.availability !== 'ENABLED') {
+      throw new PipelineCommandError(
+        422,
+        `${retryCommandKey} is not retryable from Pipeline Ops`,
+        this.blockedCommandResponse(request, policy, `${retryCommandKey} is not retryable from Pipeline Ops`)
+      );
+    }
+
+    return this.executeCommand({
+      ...request,
+      commandKey: retryCommandKey,
+      idempotencyKey: `${request.idempotencyKey.trim()}:retry:${retryCommandKey}`,
+      reason: retryReason,
+      params: retryParams || undefined,
+    }, context, now);
   }
 
   async runScheduledDataQualityStage(
@@ -2755,6 +3198,95 @@ export class PipelineOrchestrationService {
     ].join(':');
   }
 
+  private assertMarketIntelligence1d(request: PipelineCommandRequest, commandKey: PipelineCommandKey) {
+    if (request.timeframe !== '1d' || request.pipelineKey !== 'market-intelligence') {
+      throw new PipelineCommandError(400, `${commandKey} supports only the market-intelligence 1d pipeline`);
+    }
+  }
+
+  private commandParams(request: PipelineCommandRequest): Record<string, unknown> {
+    return request.params && typeof request.params === 'object' && !Array.isArray(request.params)
+      ? request.params
+      : {};
+  }
+
+  private requiredStringParam(params: Record<string, unknown>, key: string): string {
+    const value = this.optionalStringParam(params, key);
+    if (!value) throw new PipelineCommandError(400, `${key} is required`);
+    return value;
+  }
+
+  private optionalStringParam(params: Record<string, unknown>, key: string): string | null {
+    const value = params[key];
+    if (value === undefined || value === null) return null;
+    const text = String(value).trim();
+    return text ? text : null;
+  }
+
+  private optionalNumberParam(params: Record<string, unknown>, key: string): number | null {
+    const value = params[key];
+    if (value === undefined || value === null || value === '') return null;
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) throw new PipelineCommandError(400, `${key} must be a number`);
+    return parsed;
+  }
+
+  private optionalBooleanParam(params: Record<string, unknown>, key: string): boolean | null {
+    const value = params[key];
+    if (value === undefined || value === null || value === '') return null;
+    if (typeof value === 'boolean') return value;
+    const normalized = String(value).trim().toLowerCase();
+    if (['true', '1', 'yes'].includes(normalized)) return true;
+    if (['false', '0', 'no'].includes(normalized)) return false;
+    throw new PipelineCommandError(400, `${key} must be a boolean`);
+  }
+
+  private optionalObjectParam(params: Record<string, unknown>, key: string): Record<string, unknown> | null {
+    const value = params[key];
+    if (!value) return null;
+    if (typeof value !== 'object' || Array.isArray(value)) {
+      throw new PipelineCommandError(400, `${key} must be an object`);
+    }
+    return value as Record<string, unknown>;
+  }
+
+  private marketDataCommandRunId(prefix: string, commandIdempotencyKey: string): string {
+    return `${prefix}-${createHash('sha256').update(commandIdempotencyKey).digest('hex').slice(0, 16)}`;
+  }
+
+  private marketDataCommandStageStatus(value: unknown): PipelineStageStatus {
+    const status = String(value || '').toUpperCase();
+    if (status === 'PENDING' || status === 'RUNNING' || status === 'COMPLETED' || status === 'PARTIAL' || status === 'FAILED' || status === 'SKIPPED' || status === 'BLOCKED') {
+      return status as PipelineStageStatus;
+    }
+    if (status === 'CANCELLED' || status === 'CANCELED') return 'SKIPPED';
+    return 'FAILED';
+  }
+
+  private historicalBackfillDataThroughDate(summary: unknown): string | null {
+    if (!summary || typeof summary !== 'object') return null;
+    const jobs = Array.isArray((summary as any).jobs) ? (summary as any).jobs : [];
+    const completedJobs = jobs
+      .filter((job: any) => ['COMPLETED', 'SKIPPED_ALREADY_IMPORTED', 'NOT_AVAILABLE', 'FAILED'].includes(String(job?.status || '').toUpperCase()))
+      .map((job: any) => String(job?.tradingDate || '').slice(0, 10))
+      .filter(Boolean)
+      .sort();
+    if (completedJobs.length) return completedJobs[completedJobs.length - 1];
+    const attemptedDates = Array.isArray((summary as any).attemptedDates) ? (summary as any).attemptedDates : [];
+    const sortedAttempted = attemptedDates.map(String).filter(Boolean).sort();
+    const lastAttempted = sortedAttempted.length ? sortedAttempted[sortedAttempted.length - 1] : null;
+    if (lastAttempted) return lastAttempted;
+    const skippedDates = Array.isArray((summary as any).skippedDates) ? (summary as any).skippedDates : [];
+    const sortedSkipped = skippedDates.map(String).filter(Boolean).sort();
+    return sortedSkipped.length ? sortedSkipped[sortedSkipped.length - 1] : null;
+  }
+
+  private commandKeyFromStageMetadata(metadata: Record<string, unknown> | null | undefined): PipelineCommandKey | null {
+    const commandKey = String(metadata?.commandKey || '').trim().toUpperCase();
+    if (!commandKey || !PIPELINE_COMMAND_POLICY_MAP.has(commandKey as PipelineCommandKey)) return null;
+    return commandKey as PipelineCommandKey;
+  }
+
   private blockedCommandResponse(request: PipelineCommandRequest, policy: PipelineCommandPolicy, reason: string): PipelineCommandResponse {
     return {
       commandId: `${request.commandKey}:${request.region}:${request.assetType}:${request.timeframe}:${request.pipelineKey}`,
@@ -4342,8 +4874,8 @@ function commandPolicy(
   availability: PipelineCommandAvailability,
   disabledReason: string | null
 ): PipelineCommandPolicy {
-  const providerAccess = commandKey === 'PIPELINE_RUN_ALL'
-    ? 'APPROVED'
+  const providerAccess = availability === 'ENABLED'
+    ? 'NONE'
     : commandKey.startsWith('MARKET_DATA_')
       ? 'FORBIDDEN'
       : 'NONE';

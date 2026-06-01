@@ -1,49 +1,26 @@
 import { PrismaClient } from '@prisma/client';
-import { MarketDataFoundationRepository } from './market-data-foundation.repository';
-import { MarketDataFoundationService } from './market-data-foundation.service';
 import type { StockSyncTask, WorkerResult } from './market-data-foundation.types';
 
 export class StockSyncWorker {
   private workerId: number;
   private prisma: PrismaClient;
-  private marketDataService: MarketDataFoundationService;
   private concurrency: number;
 
   constructor(workerId: number, concurrency: number = 3) {
     this.workerId = workerId;
     this.prisma = new PrismaClient();
-    this.marketDataService = new MarketDataFoundationService(
-      new MarketDataFoundationRepository(this.prisma)
-    );
     this.concurrency = concurrency;
   }
 
   async processTask(task: StockSyncTask, options: { force?: boolean; skipFreshnessGate?: boolean } = {}): Promise<WorkerResult> {
-    try {
-      const summary = await this.marketDataService.ingestSymbol(task.symbol, undefined, new Date(), options.force === true, {
-        force: options.force,
-        skipFreshnessGate: options.skipFreshnessGate,
-      });
-
-      return {
-        symbol: task.symbol,
-        success: true,
-        message: summary.noNewData
-          ? `No new data to ingest: ${summary.skippedReasons?.join(', ') || 'skipped'}`
-          : `Sync completed: ${summary.rowsInserted} inserted, ${summary.rowsUpdated} updated, ${summary.rowsSkipped} skipped`,
-        timestamp: new Date().toISOString(),
-        workerId: this.workerId
-      };
-    } catch (error: any) {
-      console.error(`[Worker ${this.workerId}] Failed to sync ${task.symbol}:`, error.message);
-      return {
-        symbol: task.symbol,
-        success: false,
-        message: error.message,
-        timestamp: new Date().toISOString(),
-        workerId: this.workerId
-      };
-    }
+    void options;
+    return {
+      symbol: task.symbol,
+      success: false,
+      message: 'Legacy provider ingestion workers are disabled for NSE/BSE-only market data. Use exchange-file imports or Pipeline Ops.',
+      timestamp: new Date().toISOString(),
+      workerId: this.workerId
+    };
   }
 
   async processTasks(tasks: StockSyncTask[], options: { force?: boolean; skipFreshnessGate?: boolean } = {}): Promise<WorkerResult[]> {

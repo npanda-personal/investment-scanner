@@ -1,10 +1,6 @@
-import { MarketDataFoundationRepository } from './market-data-foundation.repository';
-import { MarketDataFoundationService } from './market-data-foundation.service';
-import defaultPrisma from '../../db/prisma';
-
 /**
  * Enqueue a stock ingestion job with optional delay.
- * Since Redis is not available, we run ingestion synchronously after delay.
+ * Legacy provider ingestion is disabled for the NSE/BSE-only reset.
  * @param symbol Stock symbol
  * @param startDate Start date for historical data (default: 15 years ago)
  * @param endDate End date (default: today)
@@ -16,21 +12,16 @@ export async function enqueueIngestionJob(
   endDate?: Date,
   delayMs: number = 1000
 ) {
-  console.warn(`Redis unavailable, running ingestion synchronously for ${symbol} after ${delayMs}ms`);
-  const marketDataService = new MarketDataFoundationService(
-    new MarketDataFoundationRepository(defaultPrisma)
-  );
-  // Use setTimeout to simulate background job with throttling
-  setTimeout(async () => {
-    try {
-      await marketDataService.ingestSymbol(symbol, startDate, endDate);
-      console.log(`Synchronous ingestion completed for ${symbol}`);
-    } catch (error) {
-      console.error(`Synchronous ingestion failed for ${symbol}:`, error);
-    }
-  }, delayMs);
-  // Return a dummy job object
-  return { id: 'sync-' + Date.now(), symbol };
+  void startDate;
+  void endDate;
+  void delayMs;
+  console.warn(`Legacy provider ingestion queue is disabled for ${symbol}; use NSE/BSE exchange-file imports.`);
+  return {
+    id: 'provider-ingestion-disabled-' + Date.now(),
+    symbol,
+    status: 'disabled',
+    code: 'EXTERNAL_PROVIDER_DISABLED_NSE_BSE_ONLY',
+  };
 }
 
 // Dummy exports for compatibility

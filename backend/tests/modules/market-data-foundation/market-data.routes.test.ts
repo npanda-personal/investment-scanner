@@ -29,6 +29,11 @@ const controller = {
   importNseFoUdiffDaily: jest.fn(),
   importNseDeliveryDaily: jest.fn(),
   runExchangeHistoricalBackfill: jest.fn(),
+  startExchangeHistoricalBackfillRun: jest.fn(),
+  getExchangeHistoricalBackfillRun: jest.fn(),
+  resumeExchangeHistoricalBackfillRun: jest.fn(),
+  retryFailedExchangeHistoricalBackfillRun: jest.fn(),
+  cancelExchangeHistoricalBackfillRun: jest.fn(),
   manualMetadataTemplate: jest.fn(),
   validateProviders: jest.fn(),
   repairCatalogIdentity: jest.fn(),
@@ -107,6 +112,11 @@ describe('market data routers', () => {
         'POST /market-data/exchange-files/nse-fo-udiff/import',
         'POST /market-data/exchange-files/nse-delivery/import',
         'POST /market-data/exchange-files/historical-backfill',
+        'POST /market-data/exchange-files/historical-backfill/runs',
+        'GET /market-data/exchange-files/historical-backfill/runs/:runId',
+        'POST /market-data/exchange-files/historical-backfill/runs/:runId/resume',
+        'POST /market-data/exchange-files/historical-backfill/runs/:runId/retry-failed',
+        'POST /market-data/exchange-files/historical-backfill/runs/:runId/cancel',
         'GET /market-data/metadata/manual-template',
         'POST /market-data/provider/validate',
         'POST /market-data/catalog/identity/repair',
@@ -240,12 +250,14 @@ describe('market data exchange-file controller', () => {
     expect(res.status).toHaveBeenCalledWith(200);
   });
 
-  it('passes bounded historical backfill requests to the exchange backfill service path', async () => {
+  it('routes legacy historical backfill requests to the worker-backed run path', async () => {
     const service = {
-      runExchangeHistoricalBackfill: jest.fn().mockResolvedValue({
-        status: 'PARTIAL',
-        datesAttempted: 2,
-        nextStartDate: '2026-05-28',
+      startExchangeHistoricalBackfillRun: jest.fn().mockResolvedValue({
+        runId: 'run-1',
+        status: 'RUNNING',
+        totalDates: 2,
+        pending: 2,
+        workerCount: 3,
       }),
     };
     const controller = new MarketDataFoundationController(service as any);
@@ -257,6 +269,8 @@ describe('market data exchange-file controller', () => {
         startDate: '2026-05-26',
         endDate: '2026-05-29',
         maxDates: 2,
+        workerCount: 3,
+        maxRetries: 4,
         includeBseFill: true,
       },
     };
@@ -267,19 +281,71 @@ describe('market data exchange-file controller', () => {
 
     await controller.runExchangeHistoricalBackfill(req as any, res as any);
 
-    expect(service.runExchangeHistoricalBackfill).toHaveBeenCalledWith({
+    expect(service.startExchangeHistoricalBackfillRun).toHaveBeenCalledWith({
       region: 'IN',
       assetType: 'STOCK',
       startDate: '2026-05-26',
       endDate: '2026-05-29',
       maxDates: 2,
+      workerCount: 3,
+      maxRetries: 4,
       includeBseFill: true,
     });
-    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.status).toHaveBeenCalledWith(202);
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
-      status: 'PARTIAL',
-      nextStartDate: '2026-05-28',
+      runId: 'run-1',
+      status: 'RUNNING',
+      workerCount: 3,
     }));
+  });
+
+  it('exposes start, status, resume, retry, and cancel for historical backfill runs', async () => {
+    const response = { runId: 'run-hist-1', status: 'RUNNING' };
+    const service = {
+      startExchangeHistoricalBackfillRun: jest.fn().mockResolvedValue(response),
+      getExchangeHistoricalBackfillRun: jest.fn().mockResolvedValue(response),
+      resumeExchangeHistoricalBackfillRun: jest.fn().mockResolvedValue(response),
+      retryFailedExchangeHistoricalBackfillRun: jest.fn().mockResolvedValue(response),
+      cancelExchangeHistoricalBackfillRun: jest.fn().mockResolvedValue({ ...response, status: 'CANCELLED' }),
+    };
+    const controller = new MarketDataFoundationController(service as any);
+    const res = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn(),
+    };
+
+    await controller.startExchangeHistoricalBackfillRun({
+      query: {},
+      body: {
+        startDate: '2026-05-26',
+        endDate: '2026-05-29',
+        workerCount: 4,
+        maxRetries: 3,
+        includeBseFill: true,
+      },
+    } as any, res as any);
+    await controller.getExchangeHistoricalBackfillRun({ params: { runId: 'run-hist-1' } } as any, res as any);
+    await controller.resumeExchangeHistoricalBackfillRun({ params: { runId: 'run-hist-1' } } as any, res as any);
+    await controller.retryFailedExchangeHistoricalBackfillRun({
+      params: { runId: 'run-hist-1' },
+      body: { maxRetries: 3 },
+    } as any, res as any);
+    await controller.cancelExchangeHistoricalBackfillRun({ params: { runId: 'run-hist-1' } } as any, res as any);
+
+    expect(service.startExchangeHistoricalBackfillRun).toHaveBeenCalledWith(expect.objectContaining({
+      startDate: '2026-05-26',
+      endDate: '2026-05-29',
+      workerCount: 4,
+      maxRetries: 3,
+      includeBseFill: true,
+    }));
+    expect(service.getExchangeHistoricalBackfillRun).toHaveBeenCalledWith('run-hist-1');
+    expect(service.resumeExchangeHistoricalBackfillRun).toHaveBeenCalledWith('run-hist-1');
+    expect(service.retryFailedExchangeHistoricalBackfillRun).toHaveBeenCalledWith('run-hist-1', { maxRetries: 3 });
+    expect(service.cancelExchangeHistoricalBackfillRun).toHaveBeenCalledWith('run-hist-1');
+    expect(res.status).toHaveBeenNthCalledWith(1, 202);
+    expect(res.status).toHaveBeenNthCalledWith(2, 202);
+    expect(res.status).toHaveBeenNthCalledWith(3, 202);
   });
 });
 
@@ -348,6 +414,65 @@ describe('market data controller', () => {
     expect(service.backfillPrices).not.toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(410);
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      code: 'EXTERNAL_PROVIDER_DISABLED_NSE_BSE_ONLY',
+    }));
+  });
+
+  it('blocks legacy provider fundamentals and corporate-action symbol endpoints with 410 guidance', async () => {
+    const service = {
+      fetchCoreFundamentals: jest.fn(),
+      fetchCorporateActions: jest.fn(),
+    };
+    const controller = new MarketDataFoundationController(service as any);
+    const res = {
+      json: jest.fn(),
+      status: jest.fn().mockReturnThis(),
+    } as any;
+
+    await controller.getFundamentals({ params: { symbol: 'RELIANCE' }, originalUrl: '/api/v1/market-data/data/fundamentals/RELIANCE' } as any, res);
+    await controller.getCorporateActions({ params: { symbol: 'RELIANCE' }, originalUrl: '/api/v1/market-data/data/corporate-actions/RELIANCE' } as any, res);
+
+    expect(service.fetchCoreFundamentals).not.toHaveBeenCalled();
+    expect(service.fetchCorporateActions).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenNthCalledWith(1, 410);
+    expect(res.status).toHaveBeenNthCalledWith(2, 410);
+    expect(res.json).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      code: 'EXTERNAL_PROVIDER_DISABLED_NSE_BSE_ONLY',
+    }));
+    expect(res.json).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      code: 'EXTERNAL_PROVIDER_DISABLED_NSE_BSE_ONLY',
+    }));
+  });
+
+  it('blocks legacy provider catalog sync run endpoints with 410 guidance', async () => {
+    const service = {
+      startCatalogSyncRun: jest.fn(),
+      getCatalogSyncRun: jest.fn(),
+      cancelCatalogSyncRun: jest.fn(),
+    };
+    const controller = new MarketDataFoundationController(service as any);
+    const res = {
+      json: jest.fn(),
+      status: jest.fn().mockReturnThis(),
+    } as any;
+
+    await controller.startStockCatalogSyncRun({ body: { region: 'IN', assetType: 'STOCK' }, originalUrl: '/api/market-data-foundation/stocks/sync-runs' } as any, res);
+    await controller.getStockCatalogSyncRun({ params: { runId: 'catalog-sync-1' }, originalUrl: '/api/market-data-foundation/stocks/sync-runs/catalog-sync-1' } as any, res);
+    await controller.cancelStockCatalogSyncRun({ params: { runId: 'catalog-sync-1' }, originalUrl: '/api/market-data-foundation/stocks/sync-runs/catalog-sync-1/cancel' } as any, res);
+
+    expect(service.startCatalogSyncRun).not.toHaveBeenCalled();
+    expect(service.getCatalogSyncRun).not.toHaveBeenCalled();
+    expect(service.cancelCatalogSyncRun).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenNthCalledWith(1, 410);
+    expect(res.status).toHaveBeenNthCalledWith(2, 410);
+    expect(res.status).toHaveBeenNthCalledWith(3, 410);
+    expect(res.json).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      code: 'EXTERNAL_PROVIDER_DISABLED_NSE_BSE_ONLY',
+    }));
+    expect(res.json).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      code: 'EXTERNAL_PROVIDER_DISABLED_NSE_BSE_ONLY',
+    }));
+    expect(res.json).toHaveBeenNthCalledWith(3, expect.objectContaining({
       code: 'EXTERNAL_PROVIDER_DISABLED_NSE_BSE_ONLY',
     }));
   });
@@ -459,6 +584,8 @@ describe('market data controller', () => {
         startDate: '2026-05-01',
         endDate: '2026-05-31',
         limit: '10',
+        sortBy: 'importedAt',
+        sortDirection: 'desc',
       },
     } as any;
     const res = {
@@ -475,6 +602,8 @@ describe('market data controller', () => {
       startDate: '2026-05-01',
       endDate: '2026-05-31',
       limit: 10,
+      sortBy: 'importedAt',
+      sortDirection: 'desc',
     });
     expect(res.json).toHaveBeenCalledWith({ count: 1, imports: [{ id: 'import-1' }] });
   });

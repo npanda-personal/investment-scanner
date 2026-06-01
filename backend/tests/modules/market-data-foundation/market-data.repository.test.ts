@@ -108,6 +108,42 @@ describe('MarketDataFoundationRepository', () => {
     }));
   });
 
+  it('sorts source-file import evidence server-side before applying the latest-10 limit', async () => {
+    const findMany = jest.fn().mockResolvedValue([]);
+    const prisma = {
+      sourceFileImport: { findMany },
+    };
+    const repository = new MarketDataFoundationRepository(prisma as any);
+
+    await (repository as any).listSourceFileImports({
+      source: 'NSE',
+      segment: 'CM',
+      limit: 10,
+      sortBy: 'importedAt',
+      sortDirection: 'desc',
+    });
+
+    expect(findMany).toHaveBeenLastCalledWith(expect.objectContaining({
+      where: {
+        source: 'NSE',
+        segment: 'CM',
+      },
+      orderBy: [{ importedAt: 'desc' }, { tradingDate: 'desc' }, { updatedAt: 'desc' }],
+      take: 10,
+    }));
+
+    await (repository as any).listSourceFileImports({
+      limit: 10,
+      sortBy: 'tradingDate',
+      sortDirection: 'asc',
+    });
+
+    expect(findMany).toHaveBeenLastCalledWith(expect.objectContaining({
+      orderBy: [{ tradingDate: 'asc' }, { importedAt: 'asc' }, { updatedAt: 'asc' }],
+      take: 10,
+    }));
+  });
+
   it('stores exchange-file candles with source file provenance and latest price in bulk', async () => {
     const createMany = jest.fn().mockResolvedValue({ count: 1 });
     const upsert = jest.fn().mockResolvedValue({});

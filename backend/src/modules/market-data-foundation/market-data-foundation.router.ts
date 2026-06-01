@@ -75,6 +75,11 @@ export const createMarketDataV1Router = (
   router.post('/market-data/exchange-files/nse-fo-udiff/import', controller.importNseFoUdiffDaily);
   router.post('/market-data/exchange-files/nse-delivery/import', controller.importNseDeliveryDaily);
   router.post('/market-data/exchange-files/historical-backfill', controller.runExchangeHistoricalBackfill);
+  router.post('/market-data/exchange-files/historical-backfill/runs', controller.startExchangeHistoricalBackfillRun);
+  router.get('/market-data/exchange-files/historical-backfill/runs/:runId', controller.getExchangeHistoricalBackfillRun);
+  router.post('/market-data/exchange-files/historical-backfill/runs/:runId/resume', controller.resumeExchangeHistoricalBackfillRun);
+  router.post('/market-data/exchange-files/historical-backfill/runs/:runId/retry-failed', controller.retryFailedExchangeHistoricalBackfillRun);
+  router.post('/market-data/exchange-files/historical-backfill/runs/:runId/cancel', controller.cancelExchangeHistoricalBackfillRun);
   router.get('/market-data/metadata/manual-template', controller.manualMetadataTemplate);
   router.post('/market-data/provider/validate', controller.validateProviders);
   router.post('/market-data/catalog/identity/repair', controller.repairCatalogIdentity);

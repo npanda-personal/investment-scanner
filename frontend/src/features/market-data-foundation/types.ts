@@ -1321,32 +1321,83 @@ export interface ExchangeHistoricalBackfillRequest {
   startDate: string;
   endDate: string;
   maxDates?: number;
+  workerCount?: number;
+  maxRetries?: number;
   includeBseFill?: boolean;
 }
 
+export type ExchangeHistoricalBackfillRunStatus = 'PENDING' | 'RUNNING' | 'COMPLETED' | 'PARTIAL' | 'FAILED' | 'CANCELLED' | 'BLOCKED';
+export type ExchangeHistoricalBackfillJobStatus =
+  | 'PENDING'
+  | 'RUNNING'
+  | 'COMPLETED'
+  | 'SKIPPED_ALREADY_IMPORTED'
+  | 'SKIPPED_NON_TRADING'
+  | 'FAILED'
+  | 'NOT_AVAILABLE'
+  | 'STALE_RETRYABLE'
+  | 'CANCELLED';
+
+export interface ExchangeHistoricalBackfillJobRecord {
+  id: string;
+  tradingDate: string;
+  dateRange: string;
+  status: ExchangeHistoricalBackfillJobStatus;
+  source: 'NSE' | 'NSE+BSE';
+  rowsImported: number;
+  rowsInserted: number;
+  rowsUpdated: number;
+  rowsNoOp: number;
+  rowsSkipped: number;
+  bseFills: number;
+  error: string | null;
+  retryCount: number;
+  startedAt: string | null;
+  completedAt: string | null;
+  sourceFileImportId: string | null;
+}
+
 export interface ExchangeHistoricalBackfillResponse {
-  status: 'COMPLETED' | 'PARTIAL' | 'FAILED';
+  runId: string;
+  status: ExchangeHistoricalBackfillRunStatus;
   source: 'NSE';
   segment: 'CM';
   region: string;
   assetType: string;
   startDate: string;
   endDate: string;
-  datesAttempted: number;
-  datesSkippedAlreadyImported: number;
-  queuedInstrumentCount: number;
+  maxDates: number | null;
+  workerCount: number;
+  maxWorkers: number;
+  maxRetries: number;
+  totalDates: number;
+  pending: number;
+  running: number;
+  completed: number;
+  skipped: number;
+  failed: number;
+  notAvailable: number;
+  datesAttempted?: number;
+  datesSkippedAlreadyImported?: number;
+  queuedInstrumentCount?: number;
+  hasMore?: boolean;
+  nextStartDate?: string | null;
+  retryCount: number;
+  currentWorkers: number;
   rowsRead: number;
   rowsParsed: number;
   rowsInserted: number;
   rowsUpdated: number;
   rowsNoOp: number;
   rowsSkipped: number;
-  warningCount: number;
+  bseFills: number;
+  progressPercent: number;
+  estimatedRemainingMs: number | null;
+  startedAt: string | null;
+  completedAt: string | null;
   warnings: string[];
   errors: string[];
-  hasMore: boolean;
-  nextStartDate: string | null;
-  bseFill?: unknown;
+  jobs: ExchangeHistoricalBackfillJobRecord[];
 }
 
 export interface ManualVerifiedFundamentalImportRequest {

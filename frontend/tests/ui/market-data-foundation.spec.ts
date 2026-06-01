@@ -189,7 +189,7 @@ test.describe('Market Data Foundation UI', () => {
   });
   test('catalog table exposes scoped instrument fields and compact filters', async ({ page }) => {
     await visitModule(page, '/market-data-foundation', 'Market Data Foundation');
-    await expect(page.getByRole('button', { name: 'Sync Catalog' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Sync Catalog' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Add Instrument' })).toBeVisible();
     await expect(page.getByText('Asset Type').first()).toBeVisible();
     await expect(page.getByText('Segment/Class').first()).toBeVisible();
@@ -198,238 +198,303 @@ test.describe('Market Data Foundation UI', () => {
     await expect(page.getByText('No configured URL for this source')).toHaveCount(0);
   });
 
-  test('sync catalog starts a run, shows progress, and never posts sync-all', async ({ page }) => {
-    await mockCatalogPageShell(page);
-    let startPayload: any = null;
-    let syncAllPosted = false;
-    let schedulerRefreshCount = 0;
-    let pollCount = 0;
-
-    await page.route('**/api/market-data-foundation/stocks/sync-all**', async (route) => {
-      if (route.request().method() === 'POST') syncAllPosted = true;
-      await route.fulfill({ status: 500, json: { success: false, message: 'Legacy sync-all should not be called.' } });
-    });
-    await page.route('**/api/market-data-foundation/stocks/sync-runs', async (route) => {
-      startPayload = route.request().postDataJSON();
-      await new Promise((resolve) => setTimeout(resolve, 250));
-      await route.fulfill({
-        status: 202,
-        json: catalogSyncStatus({ runId: 'catalog-sync-progress', message: 'Catalog sync started.' }),
-      });
-    });
-    await page.route('**/api/market-data-foundation/stocks/sync-runs/catalog-sync-progress', async (route) => {
-      pollCount += 1;
-      await route.fulfill({
-        json: pollCount === 1
-          ? catalogSyncStatus({
-              runId: 'catalog-sync-progress',
-              processedCount: 25,
-              succeededCount: 22,
-              failedCount: 1,
-              skippedCount: 2,
-              noOpCount: 5,
-              rowsInserted: 40,
-              rowsUpdated: 4,
-              rowsSkipped: 8,
-              warningCount: 1,
-              currentBatchNumber: 1,
-              batchesExecuted: 1,
-              percentComplete: 25,
-              message: 'Processing batch 1 of 4.',
-            })
-          : catalogSyncStatus({
-              runId: 'catalog-sync-progress',
-              status: 'COMPLETED',
-              processedCount: 100,
-              succeededCount: 95,
-              failedCount: 1,
-              skippedCount: 4,
-              noOpCount: 12,
-              rowsInserted: 120,
-              rowsUpdated: 9,
-              rowsSkipped: 18,
-              warningCount: 1,
-              currentBatchNumber: 4,
-              batchesExecuted: 4,
-              hasMore: false,
-              percentComplete: 100,
-              completedAt: '2026-05-13T10:16:00.000Z',
-              message: 'Catalog sync completed.',
-            }),
-      });
-    });
-    await page.route('**/api/v1/market-data/scheduler/status', async (route) => {
-      schedulerRefreshCount += 1;
-      await route.fulfill({
-        json: {
-          enabled: false,
-          intervalMinutes: 15,
-          regions: ['IN'],
-          assetType: 'STOCK',
-          activeRun: false,
-          lastRunAt: null,
-          nextSuggestedRunAt: null,
-          regionStatuses: [],
-        },
-      });
-    });
-
-    await visitModule(page, '/market-data-foundation', 'Market Data Foundation');
-    await page.getByRole('button', { name: 'Sync Catalog' }).click();
-
-    await expect(page.getByRole('button', { name: 'Syncing Catalog...' })).toBeDisabled();
-    await expect(page.getByRole('progressbar', { name: 'Catalog sync progress' })).toBeVisible();
-    await expect(page.getByText('Scope: IN/STOCK; status PENDING')).toBeVisible();
-    await expect.poll(() => startPayload).toMatchObject({
-      region: 'IN',
-      assetType: 'STOCK',
-      batchSize: 25,
-      workerCount: 1,
-      workerConcurrency: 2,
-      delayBetweenBatchesMs: 3000,
-      maxBatches: 20,
-    });
-    await expect(page.getByText('Processed 25 / 100')).toBeVisible();
-    await expect(page.getByText('Rows inserted 40')).toBeVisible();
-    await expect(page.locator('.MuiChip-label').filter({ hasText: /^Batch 1 of 4$/ })).toBeVisible();
-    await expect(page.getByText('Catalog sync COMPLETED for IN/STOCK: processed 100 of 100')).toBeVisible();
-    expect(syncAllPosted).toBe(false);
-    expect(schedulerRefreshCount).toBeGreaterThan(0);
-  });
-
-  test('partial catalog sync offers continue for the same scope', async ({ page }) => {
-    await mockCatalogPageShell(page);
-    const startPayloads: any[] = [];
-    let pollCount = 0;
-
-    await page.route('**/api/market-data-foundation/stocks/sync-all**', async (route) => {
-      await route.fulfill({ status: 500, json: { success: false, message: 'Legacy sync-all should not be called.' } });
-    });
-    await page.route('**/api/market-data-foundation/stocks/sync-runs', async (route) => {
-      const payload = route.request().postDataJSON();
-      startPayloads.push(payload);
-      await route.fulfill({
-        status: 202,
-        json: catalogSyncStatus({
-          runId: startPayloads.length === 1 ? 'catalog-sync-partial' : 'catalog-sync-continued',
-          region: payload.region,
-          assetType: payload.assetType,
-          message: 'Catalog sync started.',
-        }),
-      });
-    });
-    await page.route('**/api/market-data-foundation/stocks/sync-runs/catalog-sync-partial', async (route) => {
-      pollCount += 1;
-      await route.fulfill({
-        json: catalogSyncStatus({
-          runId: 'catalog-sync-partial',
-          status: pollCount === 1 ? 'PARTIAL' : 'RUNNING',
-          processedCount: 50,
-          succeededCount: 48,
-          failedCount: 1,
-          skippedCount: 1,
-          rowsInserted: 80,
-          rowsUpdated: 6,
-          rowsSkipped: 3,
-          currentBatchNumber: 2,
-          batchesExecuted: 2,
-          hasMore: true,
-          percentComplete: 50,
-          completedAt: '2026-05-13T10:18:00.000Z',
-          message: 'Max batches reached; more rows remain.',
-        }),
-      });
-    });
-    await page.route('**/api/v1/market-data/scheduler/status', async (route) => {
-      await route.fulfill({
-        json: {
-          enabled: false,
-          intervalMinutes: 15,
-          regions: ['IN'],
-          assetType: 'STOCK',
-          activeRun: false,
-          lastRunAt: null,
-          nextSuggestedRunAt: null,
-          regionStatuses: [],
-        },
-      });
-    });
-
-    await visitModule(page, '/market-data-foundation', 'Market Data Foundation');
-    await page.getByRole('button', { name: 'Sync Catalog' }).click();
-
-    await expect(page.getByText('Catalog sync PARTIAL for IN/STOCK: processed 50 of 100')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Continue catalog sync' })).toBeVisible();
-    await page.getByRole('button', { name: 'Continue catalog sync' }).click();
-    await expect.poll(() => startPayloads.length).toBe(2);
-    expect(startPayloads[1]).toMatchObject({
-      region: 'IN',
-      assetType: 'STOCK',
-      batchSize: 25,
-      workerCount: 1,
-      workerConcurrency: 2,
-    });
-  });
-
-  test('active catalog sync can be canceled', async ({ page }) => {
-    await mockCatalogPageShell(page);
-    let cancelPosted = false;
-
-    await page.route('**/api/market-data-foundation/stocks/sync-runs', async (route) => {
-      await route.fulfill({
-        status: 202,
-        json: catalogSyncStatus({ runId: 'catalog-sync-cancel', processedCount: 10, percentComplete: 10 }),
-      });
-    });
-    await page.route('**/api/market-data-foundation/stocks/sync-runs/catalog-sync-cancel/cancel', async (route) => {
-      cancelPosted = route.request().method() === 'POST';
-      await route.fulfill({
-        json: catalogSyncStatus({
-          runId: 'catalog-sync-cancel',
-          status: 'PARTIAL',
-          processedCount: 10,
-          succeededCount: 9,
-          skippedCount: 1,
-          hasMore: true,
-          percentComplete: 10,
-          completedAt: '2026-05-13T10:19:00.000Z',
-          message: 'Cancellation requested. The current batch will finish before the run stops.',
-        }),
-      });
-    });
-    await page.route('**/api/market-data-foundation/stocks/sync-runs/catalog-sync-cancel', async (route) => {
-      await route.fulfill({ json: catalogSyncStatus({ runId: 'catalog-sync-cancel', processedCount: 10, percentComplete: 10 }) });
-    });
-    await page.route('**/api/v1/market-data/scheduler/status', async (route) => {
-      await route.fulfill({
-        json: {
-          enabled: false,
-          intervalMinutes: 15,
-          regions: ['IN'],
-          assetType: 'STOCK',
-          activeRun: false,
-          lastRunAt: null,
-          nextSuggestedRunAt: null,
-          regionStatuses: [],
-        },
-      });
-    });
-
-    await visitModule(page, '/market-data-foundation', 'Market Data Foundation');
-    await page.getByRole('button', { name: 'Sync Catalog' }).click();
-    await page.getByRole('button', { name: 'Cancel catalog sync' }).click();
-
-    await expect.poll(() => cancelPosted).toBe(true);
-    await expect(page.getByText('status PARTIAL')).toBeVisible();
-    await expect(page.locator('p').filter({ hasText: /^Cancellation requested\. The current batch will finish before the run stops\.$/ })).toBeVisible();
-  });
-
   test('import and backfill panel exposes usable catalog actions', async ({ page }) => {
     await visitModule(page, '/market-data-foundation', 'Market Data Foundation');
     await page.getByRole('tab', { name: 'Import & Backfill' }).click();
     await expect(page.getByRole('button', { name: 'Import Catalog' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Backfill Metadata' })).toBeVisible();
     await expect(page.getByText('NSE Equity Securities')).toBeVisible();
+  });
+
+  test('Market Data Ops owns historical backfill workers and source-file evidence', async ({ page }) => {
+    let backfillPayload: any = null;
+    let resumeCount = 0;
+    let retryCount = 0;
+    let cancelCount = 0;
+    let sourceImportRequestCount = 0;
+    let sourceImportRequestUrl = '';
+    let schedulerStatusRequestCount = 0;
+    let backfillStatusRequestCount = 0;
+    let currentBackfillStatus = 'PARTIAL';
+
+    await mockCatalogPageShell(page, [
+      {
+        catalogSource: 'NSE_EQUITY_SECURITIES',
+        displayName: 'NSE Equity Securities',
+        enabled: true,
+        region: 'IN',
+        assetType: 'STOCK',
+        segmentClass: 'CASH',
+        fileType: 'csv',
+        parserType: 'NSE_EQUITY_SECURITIES',
+        importModes: ['CONFIGURED_URL'],
+        urlConfigured: true,
+        urlSource: 'DEFAULT',
+        supportsManualCsv: true,
+        supportsConfiguredUrl: true,
+        supportsInternalSeed: false,
+        lastImportedAt: null,
+      },
+    ]);
+    await page.route('**/api/v1/market-data/scheduler/status', async (route) => {
+      schedulerStatusRequestCount += 1;
+      await route.fulfill({ json: { enabled: false, activeRun: false, lastRunAt: null, regionStatuses: [] } });
+    });
+    await page.route('**/api/v1/market-data/source-file-imports**', async (route) => {
+      sourceImportRequestCount += 1;
+      sourceImportRequestUrl = route.request().url();
+      await route.fulfill({
+        json: {
+          count: 1,
+          imports: [{
+            id: 'source-nse-cm',
+            source: 'NSE',
+            segment: 'CM',
+            tradingDate: '2026-05-22T00:00:00.000Z',
+            fileName: 'NSE_UdIFF_CM_2026-05-22_extra_long_exchange_filename_that_must_not_expand_the_page_table.csv',
+            fileUrl: null,
+            fileHash: 'hash-nse-cm',
+            fileSize: 1024,
+            status: 'COMPLETED',
+            rowsRaw: 3,
+            rowsAccepted: 3,
+            rowsRejected: 0,
+            parserVersion: 'udiff-v1',
+            importedAt: '2026-05-25T08:20:00.000Z',
+            errorMessage: null,
+            createdAt: '2026-05-25T08:20:00.000Z',
+            updatedAt: '2026-05-25T08:20:00.000Z',
+          }],
+        },
+      });
+    });
+
+    const completedBackfillJobs = [
+        {
+          id: 'hist-job-2026-05-20',
+          tradingDate: '2026-05-20',
+          dateRange: '2026-05-20',
+          status: 'COMPLETED',
+          source: 'NSE+BSE',
+          rowsImported: 10,
+          rowsInserted: 5,
+          rowsUpdated: 2,
+          rowsNoOp: 3,
+          rowsSkipped: 0,
+          bseFills: 1,
+          error: null,
+          retryCount: 0,
+          startedAt: '2026-05-25T09:30:01.000Z',
+          completedAt: '2026-05-25T09:30:03.000Z',
+          sourceFileImportId: 'source-nse-cm',
+        },
+        {
+          id: 'hist-job-2026-05-21',
+          tradingDate: '2026-05-21',
+          dateRange: '2026-05-21',
+          status: 'NOT_AVAILABLE',
+          source: 'NSE+BSE',
+          rowsImported: 0,
+          rowsInserted: 0,
+          rowsUpdated: 0,
+          rowsNoOp: 0,
+          rowsSkipped: 8,
+          bseFills: 0,
+          error: 'HTTP 404',
+          retryCount: 1,
+          startedAt: '2026-05-25T09:30:04.000Z',
+          completedAt: '2026-05-25T09:30:05.000Z',
+          sourceFileImportId: null,
+        },
+    ];
+    const runningBackfillJobs = [
+      '2026-05-23',
+      '2026-05-24',
+      '2026-05-25',
+    ].map((date) => ({
+      id: `hist-job-${date}`,
+      tradingDate: date,
+      dateRange: date,
+      status: 'RUNNING',
+      source: 'NSE+BSE',
+      rowsImported: 0,
+      rowsInserted: 0,
+      rowsUpdated: 0,
+      rowsNoOp: 0,
+      rowsSkipped: 0,
+      bseFills: 0,
+      error: null,
+      retryCount: 0,
+      startedAt: '2026-05-25T09:30:06.000Z',
+      completedAt: null,
+      sourceFileImportId: null,
+    }));
+    const backfillResponse = (status = 'PARTIAL') => {
+      const running = status === 'RUNNING';
+      return {
+        runId: 'hist-run-1',
+        status,
+        source: 'NSE',
+        segment: 'CM',
+        region: 'IN',
+        assetType: 'STOCK',
+        startDate: backfillPayload?.startDate || '2026-05-20',
+        endDate: backfillPayload?.endDate || '2026-05-22',
+        maxDates: null,
+        workerCount: 3,
+        maxWorkers: 5,
+        maxRetries: 2,
+        totalDates: running ? 4 : 3,
+        pending: 0,
+        running: running ? 3 : 0,
+        completed: running ? 0 : 2,
+        skipped: 0,
+        failed: 0,
+        notAvailable: 1,
+        retryCount: 1,
+        currentWorkers: running ? 3 : 0,
+        rowsRead: running ? 0 : 20,
+        rowsParsed: running ? 0 : 18,
+        rowsInserted: running ? 0 : 5,
+        rowsUpdated: running ? 0 : 2,
+        rowsNoOp: running ? 0 : 3,
+        rowsSkipped: running ? 0 : 8,
+        bseFills: running ? 0 : 1,
+        progressPercent: running ? 25 : 100,
+        estimatedRemainingMs: running ? 12000 : null,
+        startedAt: '2026-05-25T09:30:00.000Z',
+        completedAt: running ? null : '2026-05-25T09:31:00.000Z',
+        warnings: ['HTTP 404'],
+        errors: [],
+        jobs: running ? [...runningBackfillJobs, completedBackfillJobs[1]] : completedBackfillJobs,
+      };
+    };
+
+    await page.route('**/api/v1/market-data/exchange-files/historical-backfill/runs**', async (route) => {
+      const url = route.request().url();
+      const method = route.request().method();
+      if (method === 'POST' && url.endsWith('/historical-backfill/runs')) {
+        backfillPayload = route.request().postDataJSON();
+        currentBackfillStatus = 'PARTIAL';
+        await route.fulfill({ json: backfillResponse() });
+        return;
+      }
+      if (method === 'POST' && url.endsWith('/resume')) {
+        resumeCount += 1;
+        currentBackfillStatus = 'RUNNING';
+        await route.fulfill({ json: backfillResponse('RUNNING') });
+        return;
+      }
+      if (method === 'POST' && url.endsWith('/retry-failed')) {
+        retryCount += 1;
+        currentBackfillStatus = 'RUNNING';
+        await route.fulfill({ json: backfillResponse('RUNNING') });
+        return;
+      }
+      if (method === 'POST' && url.endsWith('/cancel')) {
+        cancelCount += 1;
+        currentBackfillStatus = 'CANCELLED';
+        await route.fulfill({ json: backfillResponse('CANCELLED') });
+        return;
+      }
+      if (method === 'GET') {
+        backfillStatusRequestCount += 1;
+        await route.fulfill({ json: backfillResponse(currentBackfillStatus) });
+        return;
+      }
+      await route.fulfill({ json: backfillResponse(currentBackfillStatus) });
+    });
+
+    await visitModule(page, '/market-data-foundation', 'Market Data Foundation');
+    await page.getByRole('tab', { name: 'Import & Backfill' }).click();
+
+    await expect(page.getByText('Historical Exchange Candle Backfill')).toBeVisible();
+    await expect(page.getByText('Latest 10')).toBeVisible();
+    await expect.poll(() => sourceImportRequestCount).toBeGreaterThanOrEqual(1);
+    expect(new URL(sourceImportRequestUrl).searchParams.get('limit')).toBe('10');
+    expect(new URL(sourceImportRequestUrl).searchParams.get('sortBy')).toBe('importedAt');
+    expect(new URL(sourceImportRequestUrl).searchParams.get('sortDirection')).toBe('desc');
+
+    const countBeforeTradingDateSort = sourceImportRequestCount;
+    await page.getByText('Trading Date').click();
+    await expect.poll(() => sourceImportRequestCount).toBeGreaterThan(countBeforeTradingDateSort);
+    expect(new URL(sourceImportRequestUrl).searchParams.get('sortBy')).toBe('tradingDate');
+    expect(new URL(sourceImportRequestUrl).searchParams.get('sortDirection')).toBe('desc');
+
+    const countBeforeImportedSort = sourceImportRequestCount;
+    await page.getByText('Imported').click();
+    await expect.poll(() => sourceImportRequestCount).toBeGreaterThan(countBeforeImportedSort);
+    expect(new URL(sourceImportRequestUrl).searchParams.get('sortBy')).toBe('importedAt');
+    expect(new URL(sourceImportRequestUrl).searchParams.get('sortDirection')).toBe('desc');
+    const countAfterInitialEvidenceLoad = sourceImportRequestCount;
+    const statusPollCountAfterInitialLoad = schedulerStatusRequestCount;
+    await expect(page.getByLabel('Date range')).toBeChecked();
+    await expect(page.getByLabel('By year')).toBeVisible();
+    await expect(page.getByLabel('Max dates')).toHaveCount(0);
+    await expect(page.getByLabel('Worker count')).toHaveCount(0);
+    await expect(page.getByLabel('Max retries')).toHaveCount(0);
+
+    await page.getByLabel('Start Date').fill('2026-05-20');
+    await page.getByLabel('End Date').fill('2026-05-22');
+    await page.getByRole('button', { name: 'Run Backfill' }).click();
+    await expect.poll(() => backfillPayload).toMatchObject({
+      region: 'IN',
+      assetType: 'STOCK',
+      startDate: '2026-05-20',
+      endDate: '2026-05-22',
+      includeBseFill: true,
+    });
+    expect(backfillPayload).not.toHaveProperty('maxDates');
+    expect(backfillPayload).not.toHaveProperty('workerCount');
+    expect(backfillPayload).not.toHaveProperty('maxRetries');
+
+    await expect(page.getByText('Historical Backfill Run')).toBeVisible();
+    await expect(page.getByText('0 active / 3 configured')).toBeVisible();
+    await expect(page.getByText('Needs attention: Official exchange file is not available for one or more dates.')).toBeVisible();
+    await expect(page.getByLabel('Historical backfill date jobs')).toHaveCount(0);
+    await expect(page.getByText('HTTP 404')).toHaveCount(0);
+    expect(sourceImportRequestCount).toBeGreaterThanOrEqual(countAfterInitialEvidenceLoad);
+
+    backfillPayload = null;
+    await page.getByLabel('By year').check();
+    await page.getByRole('combobox', { name: 'Year' }).click();
+    await page.getByRole('option', { name: '2025' }).click();
+    await page.getByRole('button', { name: 'Run Backfill' }).click();
+    await expect.poll(() => backfillPayload).toMatchObject({
+      startDate: '2025-01-01',
+      endDate: '2025-12-31',
+    });
+    expect(sourceImportRequestCount).toBeGreaterThanOrEqual(countAfterInitialEvidenceLoad);
+
+    const countBeforeManualEvidenceRefresh = sourceImportRequestCount;
+    await page.getByRole('button', { name: 'Refresh Evidence' }).click();
+    await expect.poll(() => sourceImportRequestCount).toBeGreaterThan(countBeforeManualEvidenceRefresh);
+    expect(new URL(sourceImportRequestUrl).searchParams.get('limit')).toBe('10');
+    const countBeforeAutoEvidenceRefresh = sourceImportRequestCount;
+    await page.waitForTimeout(10_500);
+    expect(sourceImportRequestCount).toBe(countBeforeAutoEvidenceRefresh);
+    expect(backfillStatusRequestCount).toBe(0);
+    expect(schedulerStatusRequestCount).toBe(statusPollCountAfterInitialLoad);
+    await page.getByRole('button', { name: 'View SourceFileImport details source-nse-cm' }).click();
+    const sourceFileDialog = page.getByRole('dialog', { name: 'SourceFileImport Details' });
+    await expect(sourceFileDialog).toBeVisible();
+    await expect(sourceFileDialog.getByText('hash-nse-cm')).toBeVisible();
+    await expect(sourceFileDialog.getByText('NSE_UdIFF_CM_2026-05-22_extra_long_exchange_filename_that_must_not_expand_the_page_table.csv')).toBeVisible();
+    await page.getByRole('button', { name: 'Close SourceFileImport details' }).click();
+
+    const runControls = page.getByLabel('Historical backfill run controls');
+    await runControls.getByRole('button', { name: 'Resume Backfill' }).click();
+    await expect.poll(() => resumeCount).toBe(1);
+    await expect(page.getByText('3 active / 3 configured')).toBeVisible();
+    await expect(page.getByText('2026-05-23, 2026-05-24, 2026-05-25')).toBeVisible();
+    const countBeforeActiveEvidenceRefresh = sourceImportRequestCount;
+    await page.waitForTimeout(10_500);
+    await expect.poll(() => sourceImportRequestCount).toBeGreaterThan(countBeforeActiveEvidenceRefresh);
+    expect(backfillStatusRequestCount).toBeGreaterThan(0);
+    await runControls.getByRole('button', { name: 'Retry Failed Dates' }).click();
+    await expect.poll(() => retryCount).toBe(1);
+    await runControls.getByRole('button', { name: 'Cancel Backfill' }).click();
+    await expect.poll(() => cancelCount).toBe(1);
   });
 
   test('configured catalog import sends safe source mode without running a real import', async ({ page }) => {

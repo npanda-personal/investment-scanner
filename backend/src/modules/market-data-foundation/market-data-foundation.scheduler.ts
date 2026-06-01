@@ -330,7 +330,7 @@ export function readMarketDataSchedulerConfig(env = process.env): MarketDataSche
     .map((region) => String(region));
 
   return {
-    enabled: parseBoolean(env.MARKET_DATA_SCHEDULER_ENABLED, parseBoolean(env.ANGEL_ONE_ENABLE_MARKET_DATA, false)),
+    enabled: parseBoolean(env.MARKET_DATA_SCHEDULER_ENABLED, false),
     intervalMinutes: Math.max(parseNumber(env.MARKET_DATA_SCHEDULER_INTERVAL_MINUTES, 1440), 1440),
     regions: rawRegions.length > 0 ? rawRegions : ['IN'],
     assetType: (env.MARKET_DATA_SCHEDULER_ASSET_TYPE || 'STOCK').trim().toUpperCase(),

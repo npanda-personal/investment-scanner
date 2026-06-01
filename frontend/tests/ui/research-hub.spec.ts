@@ -175,4 +175,25 @@ test.describe('Research Hub UI', () => {
     await expect(page.locator('a[href="/breadth"]').first()).toBeVisible();
     await expect(page.locator('a[href="/institutional-flow"]').first()).toBeVisible();
   });
+
+  test('renders research ideas from persisted reads without triggering import or generation workflows', async ({ page }) => {
+    const forbiddenRequests: string[] = [];
+    page.on('request', (request) => {
+      const url = new URL(request.url());
+      if (!url.pathname.includes('/api/v1/')) return;
+      const isMutation = request.method() !== 'GET';
+      const isWorkflowEndpoint = /import|generate|generation|backfill|sync|repair|evaluate|evaluation|calibrate|calibration|run/i.test(url.pathname);
+      if (isMutation || isWorkflowEndpoint) {
+        forbiddenRequests.push(`${request.method()} ${url.pathname}`);
+      }
+    });
+    await page.route('**/api/v1/research/overview**', async (route) => {
+      await route.fulfill({ json: researchOverviewPayload() });
+    });
+
+    await visitModule(page, '/research', 'Research Command Center');
+    await expect(page.getByRole('heading', { name: 'Review Candidates' })).toBeVisible();
+
+    expect(forbiddenRequests).toEqual([]);
+  });
 });

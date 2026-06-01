@@ -1,4 +1,12 @@
-import { Alert, Box, Button, FormControlLabel, Stack, Switch } from '@mui/material';
+import { useCallback, useEffect, useState } from 'react';
+import {
+  Alert,
+  Box,
+  Button,
+  FormControlLabel,
+  Stack,
+  Switch,
+} from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import { PageHeader } from '@/shared/components';
@@ -6,7 +14,6 @@ import { useMarketScope } from '@/contexts/MarketScopeContext';
 import { usePipelineStatus } from '../hooks/usePipelineStatus';
 import { PipelineOpsTable } from './PipelineOpsTable';
 import { PipelineStatusStrip } from './PipelineStatusStrip';
-import { useCallback, useEffect, useState } from 'react';
 import { executePipelineCommand, fetchPipelineCommandCatalog } from '../api/pipelineOpsService';
 import type { PipelineCommandCatalogResponse, PipelineCommandKey } from '../types';
 
@@ -44,18 +51,18 @@ export default function PipelineOpsPage() {
     void loadCatalog();
   }, [loadCatalog]);
 
-  const handleTriggerCommand = useCallback(async (commandKey: PipelineCommandKey) => {
+  const handleDailyPipeline = useCallback(async () => {
     setCommandError(null);
-    setCommandPendingKey(commandKey);
+    setCommandPendingKey('PIPELINE_RUN_ALL');
     try {
       await executePipelineCommand({
-        commandKey,
+        commandKey: 'PIPELINE_RUN_ALL',
         region: scope.region,
         assetType: scope.assetType,
         timeframe: '1d',
         pipelineKey: 'market-intelligence',
         runMode: 'single_batch',
-        batchSize: commandKey === 'PIPELINE_RUN_ALL' ? 100 : 25,
+        batchSize: 100,
         offset: 0,
         idempotencyKey: crypto.randomUUID(),
         force: false,
@@ -64,7 +71,7 @@ export default function PipelineOpsPage() {
     } catch (err: any) {
       const payloadMessage = typeof err?.response?.data?.error === 'string' ? err.response.data.error : null;
       const structuredErrors = Array.isArray(err?.response?.data?.errors) ? err.response.data.errors.join(' | ') : null;
-      setCommandError(structuredErrors || payloadMessage || (err instanceof Error ? err.message : 'Failed to execute pipeline command'));
+      setCommandError(structuredErrors || payloadMessage || (err instanceof Error ? err.message : 'Failed to run daily pipeline'));
     } finally {
       setCommandPendingKey(null);
     }
@@ -73,15 +80,15 @@ export default function PipelineOpsPage() {
   return (
     <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 1440, mx: 'auto' }}>
       <PageHeader
-        title="Bulk Pipeline Dashboard"
-        subtitle="Monitoring and OPS for backend data load, processing stages, progress, and approved manual triggers."
+        title="Daily Pipeline Ops"
+        subtitle="Run and monitor the daily market-intelligence pipeline. Market-data backfill and source-file operations live in Market Data Ops."
         primaryAction={
           <Stack direction="row" spacing={1}>
             <Button
               variant="contained"
               startIcon={<PlayArrowIcon />}
-              onClick={() => void handleTriggerCommand('PIPELINE_RUN_ALL')}
-              disabled={!dailyPipelineEnabled || commandPendingKey !== null}
+              onClick={() => void handleDailyPipeline()}
+              disabled={!dailyPipelineEnabled || catalogLoading || commandPendingKey !== null}
             >
               {commandPendingKey === 'PIPELINE_RUN_ALL' ? 'Running Pipeline' : 'Run Daily Pipeline'}
             </Button>
@@ -102,6 +109,9 @@ export default function PipelineOpsPage() {
         {error && <Alert severity="error">{error}</Alert>}
         {catalogError && <Alert severity="error">{catalogError}</Alert>}
         {commandError && <Alert severity="error">{commandError}</Alert>}
+        {!dailyPipelineEnabled && !catalogLoading && dailyPipelineCommand?.disabledReason && (
+          <Alert severity="warning">{dailyPipelineCommand.disabledReason}</Alert>
+        )}
         <PipelineStatusStrip
           activeRun={data?.activeRun || null}
           lastRun={data?.lastRun || null}
@@ -112,14 +122,7 @@ export default function PipelineOpsPage() {
         {!loading && !data?.activeRun && !data?.lastRun && data?.stages.length === 0 && (
           <Alert severity="info">No pipeline run evidence yet for this scope.</Alert>
         )}
-        <PipelineOpsTable
-          snapshot={data}
-          activeOnly={activeOnly}
-          catalog={catalog}
-          catalogLoading={catalogLoading}
-          commandPendingKey={commandPendingKey}
-          onTriggerCommand={handleTriggerCommand}
-        />
+        <PipelineOpsTable snapshot={data} activeOnly={activeOnly} />
       </Stack>
     </Box>
   );

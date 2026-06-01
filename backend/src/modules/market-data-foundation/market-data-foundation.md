@@ -34,10 +34,16 @@ The second slice adds the first source-file-backed import path:
 - `POST /api/v1/market-data/exchange-files/nse-index-eod/import` imports NSE index or sector-index daily rows.
 - `POST /api/v1/market-data/exchange-files/nse-fo-udiff/import` imports NSE F&O enrichment evidence into existing derivatives-eligibility catalog fields.
 - `POST /api/v1/market-data/exchange-files/nse-delivery/import` imports NSE delivery evidence into persisted per-instrument delivery snapshots.
-- `POST /api/v1/market-data/exchange-files/historical-backfill` runs a bounded NSE/BSE-only historical candle backfill by trading date.
+- `POST /api/v1/market-data/exchange-files/historical-backfill` starts a persisted NSE/BSE-only historical candle backfill run by trading date.
+- `POST /api/v1/market-data/exchange-files/historical-backfill/runs` starts a worker-backed historical run with configurable `workerCount` (default 3, max 5), retry bounds, BSE fill-only mode, and date/chunk job persistence.
+- `GET /api/v1/market-data/exchange-files/historical-backfill/runs/:runId` reads run progress, counts, active workers, row totals, and per-date job evidence.
+- `POST /api/v1/market-data/exchange-files/historical-backfill/runs/:runId/resume` resumes pending, failed, and stale date jobs without re-importing completed dates.
+- `POST /api/v1/market-data/exchange-files/historical-backfill/runs/:runId/retry-failed` retries only failed, not-available, or stale date jobs.
+- `POST /api/v1/market-data/exchange-files/historical-backfill/runs/:runId/cancel` stops starting new jobs and marks pending dates cancelled.
 - `POST /api/v1/market-data/fundamentals/manual-verified-import` imports operator-verified fundamentals without scraping.
 - Imported NSE CM candles are stored under canonical exchange symbols without `.NS` / `.BO` suffixes.
 - Each imported candle receives `PriceTick.sourceFileImportId` provenance.
+- `GET /api/v1/market-data/source-file-imports` defaults to latest imported evidence by `importedAt desc`; operators can request server-side sorting by `importedAt` or `tradingDate` before the latest-10 UI limit is applied.
 - Duplicate completed source-file imports are skipped by `source`, `segment`, `tradingDate`, and `fileHash`.
 - Scheduled IN/STOCK market-data sync now uses the same NSE CM UDiFF source-file import path when the repository supports the source-file ledger.
 - Scheduled downstream eligibility is derived from imported symbols mapped back to active instruments, not from a provider fetch loop.
@@ -46,7 +52,7 @@ The second slice adds the first source-file-backed import path:
 - F&O enrichment uses the source-file ledger and the existing F&O-underlying catalog path. It marks stock/index underlyings as `derivativesEligible=true` and does not create fake futures instruments or call providers.
 - Delivery enrichment uses `MarketDeliverySnapshot` with `SourceFileImport` provenance. Rows are matched by scoped exchange symbols only, store traded quantity, deliverable quantity, and delivery percent, and do not call provider or broker APIs.
 - Manual fundamentals store explicit validation evidence (`sourceNote`, `sourceUrl`, `validatedBy`, `validatedAt`) and use `MANUAL_VERIFIED` source only.
-- Historical candle backfill is date-first, not stock-first. It recomputes its queue from `SourceFileImport`, skips dates with completed NSE CM imports, retries dates with missing/failed/pending imports, and imports candles through the same NSE CM UDiFF path as the daily scheduler.
+- Historical candle backfill is date-first, not stock-first. It persists one `PipelineRun` for the requested range and one `PipelineStageRun` per date job, skips dates with completed NSE CM imports, leases each date to one worker at a time, pauses at the AGENTS.md memory stop threshold, retries failed/not-available/stale jobs only, and imports candles through the same NSE CM UDiFF path as the daily scheduler.
 - Historical backfill is bounded by `maxDates`, returns `nextStartDate` when more work remains, and reports attempted, skipped, failed, accepted, rejected, inserted, updated, and no-op counts. It does not write fundamentals, corporate actions, FX, provider metadata, portfolios, watchlists, alerts, or notes.
 - BSE historical fill remains explicit per-date backup import work until a durable BSE file-discovery source is configured; BSE rows still require explicit exchange identity matching and cannot override existing NSE primary candles.
 

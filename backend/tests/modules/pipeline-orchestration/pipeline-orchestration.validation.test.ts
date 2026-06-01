@@ -92,6 +92,83 @@ describe('pipeline orchestration validation', () => {
     })).toThrow('force=true is not allowed for manual commands');
   });
 
+  it('parses exchange reset command params for historical backfill, manual fundamentals, and retry', () => {
+    expect(parsePipelineCommandRequest({
+      commandKey: 'MARKET_DATA_HISTORICAL_EXCHANGE_BACKFILL',
+      region: 'in',
+      assetType: 'stock',
+      runMode: 'single_batch',
+      idempotencyKey: 'hist-1',
+      params: {
+        startDate: '2026-05-20',
+        endDate: '2026-05-22',
+        maxDates: 2,
+        workerCount: 3,
+        maxRetries: 2,
+        includeBseFill: true,
+      },
+    })).toEqual(expect.objectContaining({
+      commandKey: 'MARKET_DATA_HISTORICAL_EXCHANGE_BACKFILL',
+      region: 'IN',
+      assetType: 'STOCK',
+      params: {
+        startDate: '2026-05-20',
+        endDate: '2026-05-22',
+        maxDates: 2,
+        workerCount: 3,
+        maxRetries: 2,
+        includeBseFill: true,
+      },
+    }));
+
+    expect(parsePipelineCommandRequest({
+      commandKey: 'MARKET_DATA_MANUAL_VERIFIED_FUNDAMENTALS_IMPORT',
+      runMode: 'single_batch',
+      idempotencyKey: 'fund-1',
+      params: {
+        stockId: 'stock-1',
+        periodType: 'ANNUAL',
+        periodEndDate: '2026-03-31',
+        marketCap: 1000000,
+        sourceNote: 'NSE/BSE official filing',
+        validatedBy: 'operator',
+      },
+    })).toEqual(expect.objectContaining({
+      commandKey: 'MARKET_DATA_MANUAL_VERIFIED_FUNDAMENTALS_IMPORT',
+      params: expect.objectContaining({
+        stockId: 'stock-1',
+        periodType: 'ANNUAL',
+        periodEndDate: '2026-03-31',
+      }),
+    }));
+
+    expect(parsePipelineCommandRequest({
+      commandKey: 'PIPELINE_RETRY_FAILED_STAGE',
+      runMode: 'single_batch',
+      idempotencyKey: 'retry-1',
+      params: {
+        retryCommandKey: 'MARKET_DATA_HISTORICAL_EXCHANGE_BACKFILL',
+        retryParams: {
+          startDate: '2026-05-22',
+          endDate: '2026-05-22',
+          maxDates: 1,
+        },
+      },
+    })).toEqual(expect.objectContaining({
+      commandKey: 'PIPELINE_RETRY_FAILED_STAGE',
+      params: expect.objectContaining({
+        retryCommandKey: 'MARKET_DATA_HISTORICAL_EXCHANGE_BACKFILL',
+      }),
+    }));
+
+    expect(() => parsePipelineCommandRequest({
+      commandKey: 'PIPELINE_RETRY_FAILED_STAGE',
+      runMode: 'single_batch',
+      idempotencyKey: 'retry-2',
+      params: ['bad'],
+    })).toThrow('params must be an object when provided');
+  });
+
   it('rejects unsupported command keys, bad run mode, and bounds violations', () => {
     expect(() => parsePipelineCommandRequest({
       commandKey: 'NOT_REAL',

@@ -26,6 +26,9 @@ const SUPPORTED_COMMAND_KEYS: PipelineCommandKey[] = [
   'RESEARCH_PROJECTION_REFRESH',
   'TODAY_REVIEW_PUBLISH',
   'PIPELINE_RUN_ALL',
+  'MARKET_DATA_HISTORICAL_EXCHANGE_BACKFILL',
+  'MARKET_DATA_MANUAL_VERIFIED_FUNDAMENTALS_IMPORT',
+  'PIPELINE_RETRY_FAILED_STAGE',
   'PIPELINE_DRAIN_ALL_BATCHES',
   'PIPELINE_CANCEL_ACTIVE',
 ];
@@ -63,6 +66,7 @@ export function parsePipelineCommandRequest(input: Record<string, unknown>): Pip
     offset: parseOffset(first(input.offset)),
     idempotencyKey: String(first(input.idempotencyKey) ?? '').trim(),
     reason: parseOptionalText(first(input.reason)),
+    params: parseOptionalParams(input.params),
     force: parseForceFlag(first(input.force)),
   };
 }
@@ -128,6 +132,14 @@ function parseOffset(value: unknown): number {
 function parseOptionalText(value: unknown): string | undefined {
   const text = String(value ?? '').trim();
   return text.length > 0 ? text : undefined;
+}
+
+function parseOptionalParams(value: unknown): Record<string, unknown> | undefined {
+  if (value === undefined || value === null || value === '') return undefined;
+  if (typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('params must be an object when provided');
+  }
+  return { ...(value as Record<string, unknown>) };
 }
 
 function parseForceFlag(value: unknown): false {

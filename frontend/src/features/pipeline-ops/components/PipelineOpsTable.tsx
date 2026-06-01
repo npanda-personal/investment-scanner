@@ -2,7 +2,6 @@ import { Fragment, useMemo, useState } from 'react';
 import {
   Alert,
   Box,
-  Button,
   Chip,
   Collapse,
   IconButton,
@@ -24,9 +23,6 @@ import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import { Link as RouterLink } from 'react-router-dom';
 import { StatusBadge } from '@/shared/components';
 import type {
-  PipelineCommandCatalogItem,
-  PipelineCommandCatalogResponse,
-  PipelineCommandKey,
   PipelineStatusSnapshot,
   PipelineStatusStage,
   PipelineStatusStageGroup,
@@ -62,40 +58,31 @@ type PipelineOpsRow = OperationDefinition & PipelineStatusStageGroup;
 type PipelineOpsTableProps = {
   snapshot: PipelineStatusSnapshot | null;
   activeOnly: boolean;
-  catalog: PipelineCommandCatalogResponse | null;
-  catalogLoading: boolean;
-  commandPendingKey: PipelineCommandKey | null;
-  onTriggerCommand: (commandKey: PipelineCommandKey) => Promise<void>;
 };
 
 const ACTIVE_STATUSES = new Set(['PENDING', 'RUNNING']);
+const clippedTextSx = {
+  maxWidth: '100%',
+  minWidth: 0,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+} as const;
 
 export function PipelineOpsTable({
   snapshot,
   activeOnly,
-  catalog,
-  catalogLoading,
-  commandPendingKey,
-  onTriggerCommand,
 }: PipelineOpsTableProps) {
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
   const rows = useMemo(() => {
     const stageMap = new Map((snapshot?.stages || []).map((stage) => [stage.stageKey, stage]));
-    const commandMap = new Map<string, PipelineCommandCatalogItem>();
-    for (const command of catalog?.commands || []) {
-      const current = commandMap.get(command.stageKey);
-      if (!current || command.availability === 'ENABLED') commandMap.set(command.stageKey, command);
-      if (command.commandKey === 'PIPELINE_RUN_ALL') commandMap.set('MARKET_DATA', command);
-      if (command.commandKey === 'DATA_QUALITY_EVALUATE_SCOPE') commandMap.set(command.stageKey, command);
-    }
     const catalogRows = OPERATION_CATALOG.map((operation) => ({
       ...operation,
       ...(stageMap.get(operation.stageKey) || {
         activeStage: null,
         lastStage: null,
       }),
-      command: commandMap.get(operation.stageKey) || null,
     }));
     const unknownRows = (snapshot?.stages || [])
       .filter((stage) => !OPERATION_CATALOG.some((operation) => operation.stageKey === stage.stageKey))
@@ -107,12 +94,11 @@ export function PipelineOpsTable({
         sourcePath: '/pipeline-ops',
         activeStage: stage.activeStage,
         lastStage: stage.lastStage,
-        command: commandMap.get(stage.stageKey) || null,
       }));
-    const allRows: Array<PipelineOpsRow & { command: PipelineCommandCatalogItem | null }> = [...catalogRows, ...unknownRows]
+    const allRows: PipelineOpsRow[] = [...catalogRows, ...unknownRows]
       .sort((a, b) => a.stageOrder - b.stageOrder || a.stageKey.localeCompare(b.stageKey));
     return activeOnly ? allRows.filter((row) => row.activeStage && ACTIVE_STATUSES.has(row.activeStage.status)) : allRows;
-  }, [activeOnly, catalog?.commands, snapshot]);
+  }, [activeOnly, snapshot]);
 
   const toggleRow = (stageKey: string) => {
     setExpandedRows((current) => {
@@ -130,31 +116,41 @@ export function PipelineOpsTable({
   }
 
   return (
-    <TableContainer sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, bgcolor: 'background.paper' }}>
-      <Table size="small" aria-label="pipeline operations">
+    <TableContainer sx={{ maxWidth: '100%', overflowX: 'auto', border: '1px solid', borderColor: 'divider', borderRadius: 1, bgcolor: 'background.paper' }}>
+      <Table
+        size="small"
+        aria-label="pipeline operations"
+        sx={{
+          minWidth: 1320,
+          tableLayout: 'fixed',
+          '& .MuiTableCell-root': {
+            verticalAlign: 'top',
+            overflow: 'hidden',
+          },
+          '& .MuiTableCell-head': {
+            color: 'text.secondary',
+            fontSize: 12,
+            fontWeight: 700,
+            whiteSpace: 'nowrap',
+          },
+        }}
+      >
         <TableHead>
           <TableRow>
-            <TableCell width={44} />
-            <TableCell>Module</TableCell>
-            <TableCell>Operation</TableCell>
-            <TableCell>Status</TableCell>
-            <TableCell sx={{ minWidth: 170 }}>Progress</TableCell>
-            <TableCell>Last Run</TableCell>
-            <TableCell>Counts</TableCell>
-            <TableCell>Evidence</TableCell>
-            <TableCell>Manual Trigger</TableCell>
+            <TableCell sx={{ width: 44 }} />
+            <TableCell sx={{ width: 170 }}>Module</TableCell>
+            <TableCell sx={{ width: 210 }}>Operation</TableCell>
+            <TableCell sx={{ width: 142 }}>Status</TableCell>
+            <TableCell sx={{ width: 184 }}>Progress</TableCell>
+            <TableCell sx={{ width: 174 }}>Last Run</TableCell>
+            <TableCell sx={{ width: 160 }}>Counts</TableCell>
+            <TableCell sx={{ width: 300 }}>Evidence</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
           {rows.map((row) => {
             const stage = row.activeStage || row.lastStage;
             const isExpanded = expandedRows.has(row.stageKey);
-            const command = row.command;
-            const commandEnabled = command?.availability === 'ENABLED';
-            const commandDisabledReason = command
-              ? (command.availability === 'ENABLED' ? null : command.disabledReason || `${command.commandKey} is not available for manual execution.`)
-              : (catalogLoading ? 'Loading command policy...' : 'No command contract is mapped to this pipeline row.');
-            const triggerLabel = commandPendingKey === command?.commandKey ? 'Running...' : 'Trigger';
             return (
               <Fragment key={row.stageKey}>
                 <TableRow hover>
@@ -164,11 +160,17 @@ export function PipelineOpsTable({
                     </IconButton>
                   </TableCell>
                   <TableCell>
-                    <Typography variant="body2" fontWeight={700}>{row.moduleName}</Typography>
-                    <Typography variant="caption" color="text.secondary">{row.stageKey}</Typography>
+                    <Tooltip title={row.moduleName}>
+                      <Typography variant="body2" fontWeight={700} noWrap sx={clippedTextSx}>{row.moduleName}</Typography>
+                    </Tooltip>
+                    <Tooltip title={row.stageKey}>
+                      <Typography variant="caption" color="text.secondary" noWrap sx={clippedTextSx}>{row.stageKey}</Typography>
+                    </Tooltip>
                   </TableCell>
                   <TableCell>
-                    <Typography variant="body2">{row.operationName}</Typography>
+                    <Tooltip title={row.operationName}>
+                      <Typography variant="body2" noWrap sx={clippedTextSx}>{row.operationName}</Typography>
+                    </Tooltip>
                     <Link component={RouterLink} to={row.sourcePath} variant="caption" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
                       View source <OpenInNewIcon sx={{ fontSize: 14 }} />
                     </Link>
@@ -176,8 +178,8 @@ export function PipelineOpsTable({
                   <TableCell><StatusBadge label={stage?.status || 'NO_RUN_EVIDENCE'} /></TableCell>
                   <TableCell><ProgressCell stage={stage} /></TableCell>
                   <TableCell>
-                    <Typography variant="body2">{formatDateTime(stage?.completedAt || stage?.startedAt || stage?.updatedAt)}</Typography>
-                    <Typography variant="caption" color="text.secondary">Data through {stage?.dataThroughDate ? formatDateTime(stage.dataThroughDate) : 'N/A'}</Typography>
+                    <Typography variant="body2" noWrap sx={clippedTextSx}>{formatDateTime(stage?.completedAt || stage?.startedAt || stage?.updatedAt)}</Typography>
+                    <Typography variant="caption" color="text.secondary" noWrap sx={clippedTextSx}>Data through {stage?.dataThroughDate ? formatDateTime(stage.dataThroughDate) : 'N/A'}</Typography>
                   </TableCell>
                   <TableCell>
                     <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
@@ -188,28 +190,31 @@ export function PipelineOpsTable({
                     </Stack>
                   </TableCell>
                   <TableCell>
-                    <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
-                      <Chip size="small" color={stage?.warnings?.length ? 'warning' : 'default'} label={`Warnings ${stage?.warnings?.length ?? 0}`} />
-                      <Chip size="small" color={stage?.errors?.length ? 'error' : 'default'} label={`Errors ${stage?.errors?.length ?? 0}`} />
+                    <Stack spacing={0.5}>
+                      <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
+                        <Chip size="small" color={stage?.warnings?.length ? 'warning' : 'default'} label={`Warnings ${stage?.warnings?.length ?? 0}`} />
+                        <Chip size="small" color={stage?.errors?.length ? 'error' : 'default'} label={`Errors ${stage?.errors?.length ?? 0}`} />
+                      </Stack>
+                      {stage?.errors?.[0] && (
+                        <Tooltip title={stage.errors[0]}>
+                          <Typography variant="caption" color="error.main" noWrap sx={clippedTextSx}>{stage.errors[0]}</Typography>
+                        </Tooltip>
+                      )}
+                      {!stage?.errors?.length && stage?.warnings?.[0] && (
+                        <Tooltip title={stage.warnings[0]}>
+                          <Typography variant="caption" color="warning.main" noWrap sx={clippedTextSx}>{stage.warnings[0]}</Typography>
+                        </Tooltip>
+                      )}
+                      {stage?.metadata && (
+                        <Tooltip title={compactMetadata(stage.metadata)}>
+                          <Typography variant="caption" color="text.secondary" noWrap sx={clippedTextSx}>{compactMetadata(stage.metadata)}</Typography>
+                        </Tooltip>
+                      )}
                     </Stack>
-                  </TableCell>
-                  <TableCell>
-                    <Tooltip title={commandDisabledReason || `Run ${command?.operationName || row.operationName}`}>
-                      <span>
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          disabled={!commandEnabled || commandPendingKey !== null}
-                          onClick={() => command?.commandKey && void onTriggerCommand(command.commandKey)}
-                        >
-                          {triggerLabel}
-                        </Button>
-                      </span>
-                    </Tooltip>
                   </TableCell>
                 </TableRow>
                 <TableRow>
-                  <TableCell colSpan={9} sx={{ py: 0, borderBottom: isExpanded ? '1px solid' : 0, borderColor: 'divider' }}>
+                  <TableCell colSpan={8} sx={{ py: 0, borderBottom: isExpanded ? '1px solid' : 0, borderColor: 'divider' }}>
                     <Collapse in={isExpanded} timeout="auto" unmountOnExit>
                       <RowDetails stage={stage} />
                     </Collapse>
@@ -291,6 +296,26 @@ function compactMetadata(metadata: Record<string, unknown>) {
     'downstreamInstrumentCount',
     'generatedCount',
     'updatedCount',
+    'rowsRead',
+    'rowsParsed',
+    'rowsInserted',
+    'rowsUpdated',
+    'rowsNoOp',
+    'rowsSkipped',
+    'backfillRunId',
+    'workerCount',
+    'currentWorkers',
+    'totalDates',
+    'completedDates',
+    'skippedDates',
+    'failedDates',
+    'notAvailableDates',
+    'pendingDates',
+    'runningDates',
+    'progressPercent',
+    'bseFills',
+    'datesSkippedAlreadyImported',
+    'nextStartDate',
     'noOpCount',
     'calibratedCount',
     'passthroughCount',

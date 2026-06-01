@@ -43,6 +43,9 @@ describe('Market Data Foundation external provider quarantine', () => {
     const service = {
       syncData: jest.fn(),
       syncAllStocks: jest.fn(),
+      yahooSearch: jest.fn(),
+      searchProvider: jest.fn(),
+      ingestSymbol: jest.fn(),
       backfillPrices: jest.fn(),
       startPriceBackfillRun: jest.fn(),
       syncV1: jest.fn(),
@@ -62,12 +65,18 @@ describe('Market Data Foundation external provider quarantine', () => {
     await controller.backfillPrices({ query: {}, body: {} } as any, backfillRes);
     const runRes = response();
     await controller.startPriceBackfillRun({ query: {}, body: {} } as any, runRes);
+    const yahooSearchRes = response();
+    await controller.yahooSearch({ query: { q: 'RELIANCE' } } as any, yahooSearchRes);
+    const providerSearchRes = response();
+    await controller.searchMarketData({ query: { q: 'RELIANCE' } } as any, providerSearchRes);
+    const ingestRes = response();
+    await controller.ingestSymbol({ body: { symbol: 'RELIANCE' }, query: {}, originalUrl: '/data/ingest' } as any, ingestRes);
     const syncV1Res = response();
     await controller.syncV1({ body: {} } as any, syncV1Res);
     const fxRes = response();
     await controller.syncFxRates({} as any, fxRes);
 
-    for (const res of [syncStockRes, syncAllRes, backfillRes, runRes, syncV1Res, fxRes]) {
+    for (const res of [syncStockRes, syncAllRes, backfillRes, runRes, yahooSearchRes, providerSearchRes, ingestRes, syncV1Res, fxRes]) {
       expect(res.status).toHaveBeenCalledWith(410);
       expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
         code: 'EXTERNAL_PROVIDER_DISABLED_NSE_BSE_ONLY',
@@ -75,6 +84,9 @@ describe('Market Data Foundation external provider quarantine', () => {
     }
     expect(service.syncData).not.toHaveBeenCalled();
     expect(service.syncAllStocks).not.toHaveBeenCalled();
+    expect(service.yahooSearch).not.toHaveBeenCalled();
+    expect(service.searchProvider).not.toHaveBeenCalled();
+    expect(service.ingestSymbol).not.toHaveBeenCalled();
     expect(service.backfillPrices).not.toHaveBeenCalled();
     expect(service.startPriceBackfillRun).not.toHaveBeenCalled();
     expect(service.syncV1).not.toHaveBeenCalled();

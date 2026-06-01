@@ -26,22 +26,20 @@ test.describe('Pipeline Ops UI', () => {
     await mockAuthenticatedUser(page);
   });
 
-  test('uses command catalog safety matrix and posts only one data-quality command click', async ({ page }) => {
-    let statusUrl = '';
+  test('runs only the daily pipeline and does not expose market-data backfill controls', async ({ page }) => {
     let statusRequestCount = 0;
     let commandPostCount = 0;
     let commandPayload: any = null;
-    let providerCallCount = 0;
+    let marketDataCallCount = 0;
 
     await page.route('**/api/v1/pipeline/status**', async (route) => {
       statusRequestCount += 1;
-      statusUrl = route.request().url();
-      const isRefreshedAfterCommand = statusRequestCount > 1;
+      const refreshed = statusRequestCount > 1;
       await route.fulfill({
         json: {
           scope: { region: 'IN', assetType: 'STOCK', timeframe: '1d', pipelineKey: 'market-intelligence' },
-          generatedAt: isRefreshedAfterCommand ? '2026-05-25T09:31:00.000Z' : '2026-05-25T09:30:00.000Z',
-          activeRun: isRefreshedAfterCommand ? null : {
+          generatedAt: refreshed ? '2026-05-25T09:31:00.000Z' : '2026-05-25T09:30:00.000Z',
+          activeRun: refreshed ? null : {
             id: 'run-active-initial',
             status: 'RUNNING',
             triggerType: 'manual',
@@ -54,7 +52,7 @@ test.describe('Pipeline Ops UI', () => {
             failedCount: 0,
             skippedCount: 0,
             unchangedCount: 0,
-            sourceFingerprint: 'manual:dq',
+            sourceFingerprint: 'daily:pipeline',
             startedAt: '2026-05-25T09:25:00.000Z',
             completedAt: null,
             durationMs: null,
@@ -62,20 +60,20 @@ test.describe('Pipeline Ops UI', () => {
             errors: [],
             updatedAt: '2026-05-25T09:26:00.000Z',
           },
-          lastRun: isRefreshedAfterCommand ? {
+          lastRun: refreshed ? {
             id: 'run-complete',
             status: 'COMPLETED',
             triggerType: 'manual',
             dataThroughDate: '2026-05-23T00:00:00.000Z',
             changedInstrumentCount: 5,
             totalCount: 100,
-            processedCount: 25,
-            succeededCount: 25,
+            processedCount: 100,
+            succeededCount: 100,
             partialCount: 0,
             failedCount: 0,
             skippedCount: 0,
             unchangedCount: 0,
-            sourceFingerprint: 'manual:dq',
+            sourceFingerprint: 'daily:pipeline',
             startedAt: '2026-05-25T09:25:00.000Z',
             completedAt: '2026-05-25T09:30:30.000Z',
             durationMs: 30000,
@@ -85,9 +83,49 @@ test.describe('Pipeline Ops UI', () => {
           } : null,
           stages: [
             {
+              stageKey: 'MARKET_DATA',
+              stageOrder: 1,
+              activeStage: null,
+              lastStage: {
+                id: 'stage-market-data',
+                pipelineRunId: 'run-complete',
+                stageKey: 'MARKET_DATA',
+                stageOrder: 1,
+                status: 'COMPLETED',
+                dataThroughDate: '2026-05-23T00:00:00.000Z',
+                changedInstrumentCount: 5,
+                batchSize: 100,
+                offset: 0,
+                nextOffset: null,
+                hasMore: false,
+                totalCount: 100,
+                processedCount: 100,
+                succeededCount: 100,
+                partialCount: 0,
+                failedCount: 0,
+                skippedCount: 0,
+                unchangedCount: 0,
+                attemptCount: 1,
+                cacheKey: 'daily:market-data',
+                cacheStatus: 'MISS',
+                cacheExpiresAt: null,
+                inputFingerprint: 'exchange:latest',
+                outputFingerprint: 'exchange:2026-05-23',
+                leaseOwner: null,
+                leaseExpiresAt: null,
+                startedAt: '2026-05-25T09:25:00.000Z',
+                completedAt: '2026-05-25T09:30:30.000Z',
+                durationMs: 30000,
+                warnings: [],
+                errors: [],
+                metadata: { rowsInserted: 10, rowsUpdated: 2 },
+                updatedAt: '2026-05-25T09:30:30.000Z',
+              },
+            },
+            {
               stageKey: 'DATA_QUALITY',
               stageOrder: 2,
-              activeStage: isRefreshedAfterCommand ? null : {
+              activeStage: refreshed ? null : {
                 id: 'stage-active',
                 pipelineRunId: 'run-active-initial',
                 stageKey: 'DATA_QUALITY',
@@ -113,87 +151,16 @@ test.describe('Pipeline Ops UI', () => {
                 inputFingerprint: 'prices:2026-05-23',
                 outputFingerprint: null,
                 leaseOwner: 'worker-1',
-                leaseExpiresAt: '2026-05-25T09:15:00.000Z',
+                leaseExpiresAt: '2026-05-25T09:35:00.000Z',
                 startedAt: '2026-05-25T09:25:00.000Z',
                 completedAt: null,
                 durationMs: null,
                 warnings: [],
                 errors: [],
+                metadata: {},
                 updatedAt: '2026-05-25T09:26:00.000Z',
               },
-              lastStage: isRefreshedAfterCommand ? {
-                id: 'stage-completed',
-                pipelineRunId: 'run-complete',
-                stageKey: 'DATA_QUALITY',
-                stageOrder: 2,
-                status: 'COMPLETED',
-                dataThroughDate: '2026-05-23T00:00:00.000Z',
-                changedInstrumentCount: 5,
-                batchSize: 25,
-                offset: 0,
-                nextOffset: 25,
-                hasMore: true,
-                totalCount: 100,
-                processedCount: 25,
-                succeededCount: 25,
-                partialCount: 0,
-                failedCount: 0,
-                skippedCount: 0,
-                unchangedCount: 0,
-                attemptCount: 1,
-                cacheKey: 'dq:IN:STOCK:2026-05-23',
-                cacheStatus: 'MISS',
-                cacheExpiresAt: null,
-                inputFingerprint: 'prices:2026-05-23',
-                outputFingerprint: 'dq:batch:0',
-                leaseOwner: null,
-                leaseExpiresAt: null,
-                startedAt: '2026-05-25T09:25:00.000Z',
-                completedAt: '2026-05-25T09:30:30.000Z',
-                durationMs: 30000,
-                warnings: [],
-                errors: [],
-                updatedAt: '2026-05-25T09:30:30.000Z',
-              } : null,
-            },
-            {
-              stageKey: 'SIGNAL_CALIBRATION',
-              stageOrder: 4,
-              activeStage: null,
-              lastStage: {
-                id: 'stage-calibration-partial',
-                pipelineRunId: 'run-calibration-partial',
-                stageKey: 'SIGNAL_CALIBRATION',
-                stageOrder: 4,
-                status: 'PARTIAL',
-                dataThroughDate: '2026-05-23T00:00:00.000Z',
-                changedInstrumentCount: 6,
-                batchSize: 25,
-                offset: 0,
-                nextOffset: null,
-                hasMore: false,
-                totalCount: 6,
-                processedCount: 5,
-                succeededCount: 5,
-                partialCount: 1,
-                failedCount: 0,
-                skippedCount: 1,
-                unchangedCount: 0,
-                attemptCount: 1,
-                cacheKey: 'calibration:IN:STOCK:2026-05-23',
-                cacheStatus: 'MISS',
-                cacheExpiresAt: null,
-                inputFingerprint: 'raw:2026-05-23',
-                outputFingerprint: 'calibration:partial',
-                leaseOwner: null,
-                leaseExpiresAt: null,
-                startedAt: '2026-05-25T09:25:00.000Z',
-                completedAt: '2026-05-25T09:30:30.000Z',
-                durationMs: 30000,
-                warnings: ['One instrument had no raw signal row.'],
-                errors: [],
-                updatedAt: '2026-05-25T09:30:30.000Z',
-              },
+              lastStage: null,
             },
           ],
         },
@@ -207,32 +174,18 @@ test.describe('Pipeline Ops UI', () => {
           generatedAt: '2026-05-25T09:30:00.000Z',
           commands: [
             {
-              commandKey: 'MARKET_DATA_INCREMENTAL_EOD_LOAD',
-              stageKey: 'MARKET_DATA',
-              moduleName: 'Market Data',
-              operationName: 'Incremental EOD data load',
-              availability: 'FORBIDDEN',
-              disabledReason: 'Provider/live ingestion is forbidden from Pipeline Ops in this slice.',
-              runModes: ['single_batch'],
-              defaultBatchSize: 25,
-              maxBatchSize: 100,
-              providerAccess: 'FORBIDDEN',
-              schedulerAccess: 'FORBIDDEN',
-              downstreamFanout: 'FORBIDDEN',
-            },
-            {
-              commandKey: 'DATA_QUALITY_EVALUATE_SCOPE',
-              stageKey: 'DATA_QUALITY',
-              moduleName: 'Data Quality',
-              operationName: 'Readiness evaluation',
+              commandKey: 'PIPELINE_RUN_ALL',
+              stageKey: 'PIPELINE',
+              moduleName: 'Pipeline',
+              operationName: 'Run daily market pipeline',
               availability: 'ENABLED',
               disabledReason: null,
               runModes: ['single_batch'],
-              defaultBatchSize: 25,
+              defaultBatchSize: 100,
               maxBatchSize: 100,
               providerAccess: 'NONE',
               schedulerAccess: 'NONE',
-              downstreamFanout: 'NONE',
+              downstreamFanout: 'APPROVED',
             },
           ],
         },
@@ -244,18 +197,18 @@ test.describe('Pipeline Ops UI', () => {
       commandPayload = route.request().postDataJSON();
       await route.fulfill({
         json: {
-          commandId: 'pipeline-ledger-v1:manual-command:DATA_QUALITY_EVALUATE_SCOPE:IN:STOCK:1d:market-intelligence:0:25:test',
-          commandKey: 'DATA_QUALITY_EVALUATE_SCOPE',
-          stageKey: 'DATA_QUALITY',
+          commandId: 'daily-pipeline-command',
+          commandKey: 'PIPELINE_RUN_ALL',
+          stageKey: 'PIPELINE',
           status: 'COMPLETED',
           scope: { region: 'IN', assetType: 'STOCK', timeframe: '1d', pipelineKey: 'market-intelligence' },
           runMode: 'single_batch',
           pipelineRunId: 'run-complete',
-          stageRunId: 'stage-completed',
-          idempotencyKey: 'pipeline-ledger-v1:manual-command:DATA_QUALITY_EVALUATE_SCOPE:IN:STOCK:1d:market-intelligence:0:25:test',
+          stageRunId: null,
+          idempotencyKey: commandPayload.idempotencyKey,
           lease: { acquired: true, reason: 'ACQUIRED', leaseOwner: null, leaseExpiresAt: null },
-          batch: { batchSize: 25, offset: 0, nextOffset: 25, hasMore: true },
-          counts: { totalCount: 100, processedCount: 25, succeededCount: 25, partialCount: 0, failedCount: 0, skippedCount: 0, unchangedCount: 0 },
+          batch: { batchSize: 100, offset: 0, nextOffset: null, hasMore: false },
+          counts: { totalCount: 100, processedCount: 100, succeededCount: 100, partialCount: 0, failedCount: 0, skippedCount: 0, unchangedCount: 0 },
           warnings: [],
           errors: [],
           statusUrl: '/api/v1/pipeline/status?region=IN&assetType=STOCK&timeframe=1d&pipelineKey=market-intelligence&limit=100',
@@ -266,41 +219,37 @@ test.describe('Pipeline Ops UI', () => {
     });
 
     await page.route('**/api/v1/market-data/**', async (route) => {
-      providerCallCount += 1;
+      marketDataCallCount += 1;
       await route.abort();
     });
 
     await page.goto('/pipeline-ops');
 
-    await expect(page.locator('h4', { hasText: 'Bulk Pipeline Dashboard' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Daily Pipeline Ops' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Run Daily Pipeline' })).toBeEnabled();
+    await expect(page.getByText('Historical Exchange Backfill')).toHaveCount(0);
+    await expect(page.getByText('SourceFileImport Evidence')).toHaveCount(0);
+    await expect(page.getByText('Manual Verified Fundamentals')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Start Backfill' })).toHaveCount(0);
+
     const table = page.getByLabel('pipeline operations');
-    await expect(table.getByText('Data Quality')).toBeVisible();
-    await expect(table.getByText('Readiness evaluation')).toBeVisible();
     await expect(table.getByText('Market Data')).toBeVisible();
-    const calibrationRow = table.locator('tr', { hasText: 'Signal Calibration' }).first();
-    await expect(calibrationRow.getByText('6 / 6')).toBeVisible();
-    await expect(calibrationRow.getByText('100%')).toBeVisible();
-
-    const marketDataRow = table.locator('tr', { hasText: 'Market Data' }).first();
-    await expect(marketDataRow.getByRole('button', { name: 'Trigger' })).toBeDisabled();
-
-    const dataQualityRow = table.locator('tr', { hasText: 'Data Quality' }).first();
-    const dataQualityTrigger = dataQualityRow.getByRole('button', { name: 'Trigger' });
-    await expect(dataQualityTrigger).toBeEnabled();
+    await expect(table.getByText('Data Quality')).toBeVisible();
+    await expect(table.getByRole('button', { name: 'Trigger' })).toHaveCount(0);
 
     expect(commandPostCount).toBe(0);
-    await dataQualityTrigger.click();
+    await page.getByRole('button', { name: 'Run Daily Pipeline' }).click();
 
-    await expect(dataQualityRow.getByText('COMPLETED')).toBeVisible();
-    expect(commandPostCount).toBe(1);
+    await expect.poll(() => commandPostCount).toBe(1);
+    expect(commandPayload).toMatchObject({
+      commandKey: 'PIPELINE_RUN_ALL',
+      region: 'IN',
+      assetType: 'STOCK',
+      runMode: 'single_batch',
+      batchSize: 100,
+      offset: 0,
+    });
     expect(statusRequestCount).toBeGreaterThan(1);
-    expect(commandPayload.commandKey).toBe('DATA_QUALITY_EVALUATE_SCOPE');
-    expect(commandPayload.runMode).toBe('single_batch');
-    expect(typeof commandPayload.idempotencyKey).toBe('string');
-    expect(commandPayload.idempotencyKey.length).toBeGreaterThan(10);
-
-    expect(statusUrl).toContain('region=IN');
-    expect(statusUrl).toContain('assetType=STOCK');
-    expect(providerCallCount).toBe(0);
+    expect(marketDataCallCount).toBe(0);
   });
 });

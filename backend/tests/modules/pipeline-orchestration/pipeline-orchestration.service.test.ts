@@ -1,6 +1,68 @@
 /// <reference types="@types/jest" />
 import { PipelineCommandError, PipelineOrchestrationService } from '../../../src/modules/pipeline-orchestration';
 
+function marketDataStageRecord(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'stage-market-data',
+    pipelineRunId: 'run-market-data',
+    stageKey: 'MARKET_DATA',
+    stageOrder: 1,
+    status: 'COMPLETED',
+    idempotencyKey: 'stage-key',
+    region: 'IN',
+    assetType: 'STOCK',
+    timeframe: '1d',
+    dataThroughDate: '2026-05-25T00:00:00.000Z',
+    inputFingerprint: 'market-data:manual',
+    outputFingerprint: 'market-data-output',
+    changedInstrumentCount: 1,
+    batchSize: 25,
+    offset: 0,
+    nextOffset: null,
+    hasMore: false,
+    totalCount: 1,
+    processedCount: 1,
+    succeededCount: 1,
+    partialCount: 0,
+    failedCount: 0,
+    skippedCount: 0,
+    unchangedCount: 0,
+    attemptCount: 1,
+    cacheKey: null,
+    cacheStatus: 'BYPASS',
+    cacheExpiresAt: null,
+    leaseOwner: null,
+    leaseExpiresAt: null,
+    startedAt: '2026-05-25T03:00:00.000Z',
+    completedAt: '2026-05-25T03:00:02.000Z',
+    durationMs: 2000,
+    warnings: [],
+    errors: [],
+    metadata: null,
+    createdAt: '2026-05-25T03:00:00.000Z',
+    updatedAt: '2026-05-25T03:00:02.000Z',
+    ...overrides,
+  };
+}
+
+function serviceWithMarketData(repository: Record<string, unknown>, marketDataService: Record<string, unknown>) {
+  return new PipelineOrchestrationService(
+    repository as any,
+    {} as any,
+    {} as any,
+    {} as any,
+    {} as any,
+    {} as any,
+    {} as any,
+    {} as any,
+    {} as any,
+    {} as any,
+    {} as any,
+    {} as any,
+    marketDataService as any
+  );
+}
+
 describe('PipelineOrchestrationService', () => {
   it('builds stable run and stage idempotency keys from scope, date, and fingerprints', () => {
     const repository = {
@@ -336,7 +398,7 @@ describe('PipelineOrchestrationService', () => {
     });
   });
 
-  it('returns a command catalog with data quality and daily pipeline commands enabled', () => {
+  it('returns a command catalog with exchange reset workflow commands enabled', () => {
     const service = new PipelineOrchestrationService({} as any, {} as any);
     const catalog = service.commandCatalog({
       region: 'IN',
@@ -346,10 +408,26 @@ describe('PipelineOrchestrationService', () => {
     }, new Date('2026-05-25T02:00:00.000Z'));
 
     const enabled = catalog.commands.filter((item) => item.availability === 'ENABLED');
-    expect(enabled.map((item) => item.commandKey)).toEqual(['DATA_QUALITY_EVALUATE_SCOPE', 'PIPELINE_RUN_ALL']);
+    expect(enabled.map((item) => item.commandKey)).toEqual([
+      'DATA_QUALITY_EVALUATE_SCOPE',
+      'PIPELINE_RUN_ALL',
+      'MARKET_DATA_HISTORICAL_EXCHANGE_BACKFILL',
+      'MARKET_DATA_MANUAL_VERIFIED_FUNDAMENTALS_IMPORT',
+      'PIPELINE_RETRY_FAILED_STAGE',
+    ]);
     expect(catalog.commands.find((item) => item.commandKey === 'PIPELINE_RUN_ALL')).toMatchObject({
       availability: 'ENABLED',
       stageKey: 'MARKET_DATA',
+      providerAccess: 'NONE',
+    });
+    expect(catalog.commands.find((item) => item.commandKey === 'MARKET_DATA_HISTORICAL_EXCHANGE_BACKFILL')).toMatchObject({
+      availability: 'ENABLED',
+      stageKey: 'MARKET_DATA',
+      providerAccess: 'NONE',
+    });
+    expect(catalog.commands.find((item) => item.commandKey === 'MARKET_DATA_PRICE_BACKFILL')).toMatchObject({
+      availability: 'FORBIDDEN',
+      providerAccess: 'FORBIDDEN',
     });
     expect(catalog.generatedAt).toBe('2026-05-25T02:00:00.000Z');
   });
@@ -516,6 +594,340 @@ describe('PipelineOrchestrationService', () => {
         totalCount: 2,
         processedCount: 2,
       },
+    });
+  });
+
+  it('executes historical exchange backfill through Pipeline Ops with resume evidence', async () => {
+    const repository = {
+      findActiveRun: jest.fn().mockResolvedValue(null),
+    };
+    const marketDataService = {
+      runExchangeHistoricalBackfill: jest.fn().mockResolvedValue({
+        runId: 'backfill-run-1',
+        status: 'RUNNING',
+        source: 'NSE',
+        segment: 'CM',
+        region: 'IN',
+        assetType: 'STOCK',
+        startDate: '2026-05-20',
+        endDate: '2026-05-22',
+        maxDates: 2,
+        workerCount: 3,
+        maxWorkers: 5,
+        maxRetries: 2,
+        totalDates: 2,
+        pending: 1,
+        running: 1,
+        completed: 0,
+        skipped: 1,
+        failed: 0,
+        notAvailable: 0,
+        retryCount: 0,
+        currentWorkers: 1,
+        rowsRead: 20,
+        rowsParsed: 18,
+        rowsInserted: 5,
+        rowsUpdated: 2,
+        rowsNoOp: 3,
+        rowsSkipped: 8,
+        bseFills: 1,
+        progressPercent: 50,
+        estimatedRemainingMs: 12000,
+        warnings: ['2026-05-20 already completed in SourceFileImport.'],
+        errors: [],
+        jobs: [
+          {
+            id: 'job-2026-05-20',
+            tradingDate: '2026-05-20',
+            dateRange: '2026-05-20',
+            status: 'SKIPPED_ALREADY_IMPORTED',
+            source: 'NSE',
+            rowsImported: 0,
+            rowsInserted: 0,
+            rowsUpdated: 0,
+            rowsNoOp: 0,
+            rowsSkipped: 1,
+            bseFills: 0,
+            error: null,
+            retryCount: 0,
+            startedAt: null,
+            completedAt: '2026-05-25T03:00:00.000Z',
+            sourceFileImportId: null,
+          },
+          {
+            id: 'job-2026-05-21',
+            tradingDate: '2026-05-21',
+            dateRange: '2026-05-21',
+            status: 'RUNNING',
+            source: 'NSE+BSE',
+            rowsImported: 10,
+            rowsInserted: 5,
+            rowsUpdated: 2,
+            rowsNoOp: 3,
+            rowsSkipped: 8,
+            bseFills: 1,
+            error: null,
+            retryCount: 0,
+            startedAt: '2026-05-25T03:00:01.000Z',
+            completedAt: null,
+            sourceFileImportId: 'source-1',
+          },
+        ],
+      }),
+    };
+    const service = serviceWithMarketData(repository, marketDataService);
+    const recordSnapshot = jest.spyOn(service, 'recordMarketDataStageSnapshot')
+      .mockResolvedValueOnce(marketDataStageRecord({ status: 'RUNNING', completedAt: null }) as any)
+      .mockResolvedValueOnce(marketDataStageRecord({
+        status: 'PARTIAL',
+        dataThroughDate: '2026-05-21T00:00:00.000Z',
+        totalCount: 2,
+        processedCount: 1,
+        succeededCount: 1,
+        skippedCount: 9,
+        hasMore: true,
+        nextOffset: 0,
+      }) as any);
+
+    const result = await service.executeCommand({
+      commandKey: 'MARKET_DATA_HISTORICAL_EXCHANGE_BACKFILL',
+      region: 'IN',
+      assetType: 'STOCK',
+      timeframe: '1d',
+      pipelineKey: 'market-intelligence',
+      runMode: 'single_batch',
+      batchSize: 25,
+      offset: 0,
+      idempotencyKey: 'hist-1',
+      params: {
+        startDate: '2026-05-20',
+        endDate: '2026-05-22',
+        maxDates: 2,
+        workerCount: 3,
+        maxRetries: 2,
+        includeBseFill: true,
+      },
+      force: false,
+    } as any, { requestedByUserId: 'local-manual-operator' }, new Date('2026-05-25T03:00:00.000Z'));
+
+    expect(marketDataService.runExchangeHistoricalBackfill).toHaveBeenCalledWith({
+      region: 'IN',
+      assetType: 'STOCK',
+      startDate: '2026-05-20',
+      endDate: '2026-05-22',
+      maxDates: 2,
+      workerCount: 3,
+      maxRetries: 2,
+      includeBseFill: true,
+    });
+    expect(recordSnapshot).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      operation: 'HISTORICAL_EXCHANGE_BACKFILL',
+      status: 'RUNNING',
+      triggerType: 'backfill',
+    }));
+    expect(recordSnapshot).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      operation: 'HISTORICAL_EXCHANGE_BACKFILL',
+      status: 'RUNNING',
+      dataThroughDate: '2026-05-20',
+      totalCount: 2,
+      processedCount: 1,
+      succeededCount: 0,
+      skippedCount: 1,
+      hasMore: true,
+      metadata: expect.objectContaining({
+        commandKey: 'MARKET_DATA_HISTORICAL_EXCHANGE_BACKFILL',
+        backfillRunId: 'backfill-run-1',
+        workerCount: 3,
+        currentWorkers: 1,
+        progressPercent: 50,
+        rowsRead: 20,
+        rowsInserted: 5,
+        rowsSkipped: 8,
+        bseFills: 1,
+      }),
+    }));
+    expect(result).toMatchObject({
+      commandKey: 'MARKET_DATA_HISTORICAL_EXCHANGE_BACKFILL',
+      stageKey: 'MARKET_DATA',
+      status: 'PARTIAL',
+    });
+  });
+
+  it('executes manual verified fundamentals import through Pipeline Ops and records verified evidence', async () => {
+    const marketDataService = {
+      importManualVerifiedFundamental: jest.fn().mockResolvedValue({
+        status: 'IMPORTED',
+        stockId: 'stock-1',
+        symbol: 'TCS',
+        source: 'MANUAL_VERIFIED',
+        periodType: 'ANNUAL',
+        periodEndDate: '2026-03-31T00:00:00.000Z',
+        validatedAt: '2026-05-25T03:00:00.000Z',
+        id: 'fundamental-1',
+      }),
+    };
+    const service = serviceWithMarketData({}, marketDataService);
+    const recordSnapshot = jest.spyOn(service, 'recordMarketDataStageSnapshot')
+      .mockResolvedValueOnce(marketDataStageRecord({ status: 'RUNNING', completedAt: null }) as any)
+      .mockResolvedValueOnce(marketDataStageRecord({ status: 'COMPLETED', totalCount: 1, processedCount: 1 }) as any);
+
+    const result = await service.executeCommand({
+      commandKey: 'MARKET_DATA_MANUAL_VERIFIED_FUNDAMENTALS_IMPORT',
+      region: 'IN',
+      assetType: 'STOCK',
+      timeframe: '1d',
+      pipelineKey: 'market-intelligence',
+      runMode: 'single_batch',
+      batchSize: 25,
+      offset: 0,
+      idempotencyKey: 'fund-1',
+      params: {
+        stockId: 'stock-1',
+        periodType: 'ANNUAL',
+        periodEndDate: '2026-03-31',
+        marketCap: 1000000,
+        sourceNote: 'NSE/BSE official filing',
+        validatedBy: 'operator',
+      },
+      force: false,
+    } as any, { requestedByUserId: 'local-manual-operator' }, new Date('2026-05-25T03:00:00.000Z'));
+
+    expect(marketDataService.importManualVerifiedFundamental).toHaveBeenCalledWith(expect.objectContaining({
+      stockId: 'stock-1',
+      region: 'IN',
+      assetType: 'STOCK',
+      periodType: 'ANNUAL',
+      periodEndDate: '2026-03-31',
+      sourceNote: 'NSE/BSE official filing',
+      validatedBy: 'operator',
+    }));
+    expect(recordSnapshot).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      operation: 'MANUAL_VERIFIED_FUNDAMENTALS_IMPORT',
+      status: 'COMPLETED',
+      totalCount: 1,
+      processedCount: 1,
+      succeededCount: 1,
+      metadata: expect.objectContaining({
+        commandKey: 'MARKET_DATA_MANUAL_VERIFIED_FUNDAMENTALS_IMPORT',
+        source: 'MANUAL_VERIFIED',
+        stockId: 'stock-1',
+        symbol: 'TCS',
+        evidenceStatus: 'VERIFIED',
+      }),
+    }));
+    expect(result).toMatchObject({
+      commandKey: 'MARKET_DATA_MANUAL_VERIFIED_FUNDAMENTALS_IMPORT',
+      status: 'COMPLETED',
+    });
+  });
+
+  it('retries the latest failed Pipeline Ops stage by reusing its command metadata', async () => {
+    const repository = {
+      latestStages: jest.fn().mockResolvedValue([
+        marketDataStageRecord({
+          id: 'stage-failed-hist',
+          status: 'FAILED',
+          errors: ['download failed'],
+          metadata: {
+            commandKey: 'MARKET_DATA_HISTORICAL_EXCHANGE_BACKFILL',
+            params: {
+              startDate: '2026-05-22',
+              endDate: '2026-05-22',
+              maxDates: 1,
+            },
+          },
+        }),
+      ]),
+    };
+    const marketDataService = {
+      runExchangeHistoricalBackfill: jest.fn().mockResolvedValue({
+        runId: 'backfill-retry-run',
+        status: 'COMPLETED',
+        source: 'NSE',
+        segment: 'CM',
+        region: 'IN',
+        assetType: 'STOCK',
+        startDate: '2026-05-22',
+        endDate: '2026-05-22',
+        maxDates: 1,
+        workerCount: 3,
+        maxWorkers: 5,
+        maxRetries: 2,
+        totalDates: 1,
+        pending: 0,
+        running: 0,
+        completed: 1,
+        skipped: 0,
+        failed: 0,
+        notAvailable: 0,
+        retryCount: 0,
+        currentWorkers: 0,
+        rowsRead: 3,
+        rowsParsed: 3,
+        rowsInserted: 1,
+        rowsUpdated: 0,
+        rowsNoOp: 2,
+        rowsSkipped: 0,
+        bseFills: 0,
+        progressPercent: 100,
+        estimatedRemainingMs: null,
+        warnings: [],
+        errors: [],
+        jobs: [
+          {
+            id: 'job-2026-05-22',
+            tradingDate: '2026-05-22',
+            dateRange: '2026-05-22',
+            status: 'COMPLETED',
+            source: 'NSE',
+            rowsImported: 3,
+            rowsInserted: 1,
+            rowsUpdated: 0,
+            rowsNoOp: 2,
+            rowsSkipped: 0,
+            bseFills: 0,
+            error: null,
+            retryCount: 0,
+            startedAt: '2026-05-25T03:10:00.000Z',
+            completedAt: '2026-05-25T03:10:01.000Z',
+            sourceFileImportId: 'source-2026-05-22',
+          },
+        ],
+      }),
+    };
+    const service = serviceWithMarketData(repository, marketDataService);
+    jest.spyOn(service, 'recordMarketDataStageSnapshot')
+      .mockResolvedValueOnce(marketDataStageRecord({ status: 'RUNNING', completedAt: null }) as any)
+      .mockResolvedValueOnce(marketDataStageRecord({ status: 'COMPLETED', totalCount: 1, processedCount: 1 }) as any);
+
+    const result = await service.executeCommand({
+      commandKey: 'PIPELINE_RETRY_FAILED_STAGE',
+      region: 'IN',
+      assetType: 'STOCK',
+      timeframe: '1d',
+      pipelineKey: 'market-intelligence',
+      runMode: 'single_batch',
+      batchSize: 25,
+      offset: 0,
+      idempotencyKey: 'retry-1',
+      force: false,
+    } as any, { requestedByUserId: 'local-manual-operator' }, new Date('2026-05-25T03:10:00.000Z'));
+
+    expect(repository.latestStages).toHaveBeenCalledWith(expect.objectContaining({
+      region: 'IN',
+      assetType: 'STOCK',
+      timeframe: '1d',
+      pipelineKey: 'market-intelligence',
+      limit: 25,
+    }));
+    expect(marketDataService.runExchangeHistoricalBackfill).toHaveBeenCalledWith(expect.objectContaining({
+      startDate: '2026-05-22',
+      endDate: '2026-05-22',
+      maxDates: 1,
+    }));
+    expect(result).toMatchObject({
+      commandKey: 'MARKET_DATA_HISTORICAL_EXCHANGE_BACKFILL',
+      status: 'COMPLETED',
     });
   });
 
