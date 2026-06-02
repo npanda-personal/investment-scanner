@@ -96,12 +96,16 @@ export type PipelineCommandKey =
   | 'SIGNAL_QUALITY_DIAGNOSTICS_REFRESH'
   | 'CONTEXT_SNAPSHOTS_GENERATE_SCOPE'
   | 'MARKET_CONTEXT_REFRESH_REGION'
+  | 'MARKET_PULSE_REFRESH'
+  | 'SECTOR_INTELLIGENCE_REFRESH'
   | 'SMART_MONEY_REFRESH_SCOPE'
   | 'STRATEGY_DECISION_EVALUATE_SCOPE'
   | 'BACKTEST_PROOF_REFRESH'
   | 'RESEARCH_PROJECTION_REFRESH'
   | 'TODAY_REVIEW_PUBLISH'
   | 'SIGNAL_POSITION_LEDGER_REFRESH'
+  | 'EARNINGS_INTELLIGENCE_REFRESH'
+  | 'STOCK_INTEREST_REFRESH'
   | 'PIPELINE_RUN_ALL'
   | 'MARKET_DATA_HISTORICAL_EXCHANGE_BACKFILL'
   | 'MARKET_DATA_MANUAL_VERIFIED_FUNDAMENTALS_IMPORT'
@@ -126,6 +130,8 @@ export interface PipelineCommandCatalogScope {
   pipelineKey: string;
 }
 
+export type PipelineCommandRunMode = 'single_batch' | 'incremental_changed_only' | 'full_latest_trading_date';
+
 export interface PipelineCommandCatalogItem {
   commandKey: PipelineCommandKey;
   stageKey: string;
@@ -133,7 +139,7 @@ export interface PipelineCommandCatalogItem {
   operationName: string;
   availability: PipelineCommandAvailability;
   disabledReason: string | null;
-  runModes: Array<'single_batch'>;
+  runModes: PipelineCommandRunMode[];
   defaultBatchSize: number;
   maxBatchSize: number;
   providerAccess: 'NONE' | 'FORBIDDEN' | 'APPROVED';
@@ -153,7 +159,7 @@ export interface PipelineCommandRequest {
   assetType: string;
   timeframe?: string;
   pipelineKey?: string;
-  runMode: 'single_batch';
+  runMode: PipelineCommandRunMode;
   batchSize?: number;
   offset?: number;
   idempotencyKey: string;
@@ -168,7 +174,7 @@ export interface PipelineCommandResponse {
   stageKey: string;
   status: PipelineCommandResultStatus;
   scope: PipelineCommandCatalogScope;
-  runMode: 'single_batch';
+  runMode: PipelineCommandRunMode;
   pipelineRunId: string | null;
   stageRunId: string | null;
   idempotencyKey: string;

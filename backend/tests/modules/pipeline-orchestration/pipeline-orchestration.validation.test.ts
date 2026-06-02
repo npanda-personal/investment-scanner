@@ -113,6 +113,42 @@ describe('pipeline orchestration validation', () => {
     }));
   });
 
+  it('parses the full latest trading-date daily pipeline command', () => {
+    expect(parsePipelineCommandRequest({
+      commandKey: 'PIPELINE_RUN_ALL',
+      region: 'in',
+      assetType: 'stock',
+      runMode: 'full_latest_trading_date',
+      batchSize: '100',
+      idempotencyKey: 'daily-full-1',
+    })).toEqual(expect.objectContaining({
+      commandKey: 'PIPELINE_RUN_ALL',
+      region: 'IN',
+      assetType: 'STOCK',
+      timeframe: '1d',
+      pipelineKey: 'market-intelligence',
+      runMode: 'full_latest_trading_date',
+      batchSize: 100,
+      offset: 0,
+      idempotencyKey: 'daily-full-1',
+      force: false,
+    }));
+  });
+
+  it('parses the Signal Position Ledger refresh command as a supported command key', () => {
+    expect(parsePipelineCommandRequest({
+      commandKey: 'SIGNAL_POSITION_LEDGER_REFRESH',
+      region: 'in',
+      assetType: 'stock',
+      runMode: 'single_batch',
+      idempotencyKey: 'ledger-1',
+    })).toEqual(expect.objectContaining({
+      commandKey: 'SIGNAL_POSITION_LEDGER_REFRESH',
+      runMode: 'single_batch',
+      idempotencyKey: 'ledger-1',
+    }));
+  });
+
   it('parses the Sector Intelligence refresh command as a supported manual command', () => {
     expect(parsePipelineCommandRequest({
       commandKey: 'SECTOR_INTELLIGENCE_REFRESH',

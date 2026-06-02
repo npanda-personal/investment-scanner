@@ -108,4 +108,40 @@ describe('StockInterestSnapshotRepository', () => {
     }));
     expect(rows.map((item) => item.symbol)).toEqual(['AAA', 'BBB']);
   });
+
+  it('prunes stale snapshot rows only for the symbols recalculated in the current batch', async () => {
+    const deleteMany = jest.fn().mockResolvedValue({ count: 2 });
+    const repository = new StockInterestSnapshotRepository({
+      stockInterestSnapshot: { deleteMany },
+    } as any);
+
+    const count = await repository.pruneSnapshotRowsForSymbols({
+      snapshotDate,
+      region: 'IN',
+      assetType: 'STOCK',
+      timeframe: '1d',
+      symbols: ['AAA', 'BBB', 'AAA'],
+      keepKeys: [
+        { category: 'TODAY_TOP_INTEREST', symbol: 'AAA' },
+        { category: 'RISK_AVOID', symbol: 'BBB' },
+      ],
+    });
+
+    expect(count).toBe(2);
+    expect(deleteMany).toHaveBeenCalledWith({
+      where: {
+        snapshotDate,
+        scopeRegion: 'IN',
+        scopeAssetType: 'STOCK',
+        timeframe: '1d',
+        symbol: { in: ['AAA', 'BBB'] },
+        NOT: {
+          OR: [
+            { category: 'TODAY_TOP_INTEREST', symbol: 'AAA' },
+            { category: 'RISK_AVOID', symbol: 'BBB' },
+          ],
+        },
+      },
+    });
+  });
 });

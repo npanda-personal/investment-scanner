@@ -63,6 +63,117 @@ function serviceWithMarketData(repository: Record<string, unknown>, marketDataSe
   );
 }
 
+function createInMemoryPipelineRepository() {
+  const stages = new Map<string, any>();
+  let runCounter = 0;
+  let stageCounter = 0;
+
+  const runRecord = (input: any, id = `run-${++runCounter}`) => ({
+    id,
+    pipelineKey: input.pipelineKey,
+    region: input.region,
+    assetType: input.assetType,
+    timeframe: input.timeframe || '1d',
+    triggerType: input.triggerType,
+    status: input.status,
+    idempotencyKey: input.idempotencyKey,
+    dataThroughDate: input.dataThroughDate instanceof Date ? input.dataThroughDate.toISOString() : input.dataThroughDate ?? null,
+    sourceFingerprint: input.sourceFingerprint ?? null,
+    changedInstrumentCount: input.changedInstrumentCount ?? 0,
+    totalCount: input.totalCount ?? 0,
+    processedCount: input.processedCount ?? 0,
+    succeededCount: input.succeededCount ?? 0,
+    partialCount: input.partialCount ?? 0,
+    failedCount: input.failedCount ?? 0,
+    skippedCount: input.skippedCount ?? 0,
+    unchangedCount: input.unchangedCount ?? 0,
+    warnings: input.warnings ?? [],
+    errors: input.errors ?? [],
+    metadata: input.metadata ?? null,
+    startedAt: '2026-05-25T03:00:00.000Z',
+    completedAt: input.completedAt instanceof Date ? input.completedAt.toISOString() : input.completedAt ?? null,
+    durationMs: input.durationMs ?? null,
+    createdAt: '2026-05-25T03:00:00.000Z',
+    updatedAt: '2026-05-25T03:00:00.000Z',
+  });
+
+  const stageRecord = (input: any, existing: any = null) => ({
+    id: existing?.id || `stage-${++stageCounter}`,
+    pipelineRunId: input.pipelineRunId ?? existing?.pipelineRunId ?? `run-${stageCounter}`,
+    stageKey: input.stageKey ?? existing?.stageKey,
+    stageOrder: input.stageOrder ?? existing?.stageOrder ?? 1,
+    status: input.status ?? existing?.status ?? 'PENDING',
+    idempotencyKey: input.idempotencyKey ?? existing?.idempotencyKey,
+    region: input.region ?? existing?.region ?? 'IN',
+    assetType: input.assetType ?? existing?.assetType ?? 'STOCK',
+    timeframe: input.timeframe ?? existing?.timeframe ?? '1d',
+    dataThroughDate: input.dataThroughDate instanceof Date ? input.dataThroughDate.toISOString() : input.dataThroughDate ?? existing?.dataThroughDate ?? null,
+    inputFingerprint: input.inputFingerprint ?? existing?.inputFingerprint ?? null,
+    outputFingerprint: input.outputFingerprint ?? existing?.outputFingerprint ?? null,
+    changedInstrumentCount: input.changedInstrumentCount ?? existing?.changedInstrumentCount ?? 0,
+    batchSize: input.batchSize ?? existing?.batchSize ?? 25,
+    offset: input.offset ?? existing?.offset ?? 0,
+    nextOffset: input.nextOffset === undefined ? existing?.nextOffset ?? null : input.nextOffset,
+    hasMore: input.hasMore ?? existing?.hasMore ?? false,
+    totalCount: input.totalCount ?? existing?.totalCount ?? 0,
+    processedCount: input.processedCount ?? existing?.processedCount ?? 0,
+    succeededCount: input.succeededCount ?? existing?.succeededCount ?? 0,
+    partialCount: input.partialCount ?? existing?.partialCount ?? 0,
+    failedCount: input.failedCount ?? existing?.failedCount ?? 0,
+    skippedCount: input.skippedCount ?? existing?.skippedCount ?? 0,
+    unchangedCount: input.unchangedCount ?? existing?.unchangedCount ?? 0,
+    attemptCount: existing?.attemptCount ?? 1,
+    cacheKey: input.cacheKey ?? existing?.cacheKey ?? null,
+    cacheStatus: input.cacheStatus ?? existing?.cacheStatus ?? 'BYPASS',
+    cacheExpiresAt: input.cacheExpiresAt ?? existing?.cacheExpiresAt ?? null,
+    leaseOwner: input.leaseOwner === undefined ? existing?.leaseOwner ?? null : input.leaseOwner,
+    leaseExpiresAt: input.leaseMs ? '2026-05-25T03:10:00.000Z' : input.leaseExpiresAt === undefined ? existing?.leaseExpiresAt ?? null : input.leaseExpiresAt,
+    startedAt: existing?.startedAt ?? '2026-05-25T03:00:00.000Z',
+    completedAt: input.completedAt instanceof Date ? input.completedAt.toISOString() : input.completedAt ?? existing?.completedAt ?? null,
+    durationMs: input.durationMs ?? existing?.durationMs ?? null,
+    warnings: input.warnings ?? existing?.warnings ?? [],
+    errors: input.errors ?? existing?.errors ?? [],
+    metadata: input.metadata ?? existing?.metadata ?? null,
+    createdAt: existing?.createdAt ?? '2026-05-25T03:00:00.000Z',
+    updatedAt: '2026-05-25T03:00:00.000Z',
+  });
+
+  return {
+    upsertRun: jest.fn(async (input: any) => runRecord(input)),
+    completeRun: jest.fn(async (input: any) => runRecord(input, 'completed-run')),
+    upsertStage: jest.fn(async (input: any) => {
+      const stage = stageRecord(input);
+      stages.set(stage.idempotencyKey, stage);
+      return stage;
+    }),
+    acquireStageLease: jest.fn(async (input: any) => {
+      const stage = stages.get(input.idempotencyKey);
+      if (!stage) return { acquired: false, reason: 'STAGE_NOT_FOUND', stage: null };
+      const leased = stageRecord({
+        idempotencyKey: input.idempotencyKey,
+        status: 'RUNNING',
+        leaseOwner: input.leaseOwner,
+        leaseMs: input.leaseMs,
+      }, stage);
+      stages.set(input.idempotencyKey, leased);
+      return { acquired: true, reason: 'ACQUIRED', stage: leased };
+    }),
+    recordStageProgress: jest.fn(async (input: any) => {
+      const current = stages.get(input.idempotencyKey);
+      const stage = stageRecord(input, current);
+      stages.set(input.idempotencyKey, stage);
+      return stage;
+    }),
+    completeStage: jest.fn(async (input: any) => {
+      const current = stages.get(input.idempotencyKey);
+      const stage = stageRecord({ ...input, leaseOwner: null, leaseExpiresAt: null }, current);
+      stages.set(input.idempotencyKey, stage);
+      return stage;
+    }),
+    latestStages: jest.fn().mockResolvedValue([]),
+  };
+}
+
 describe('PipelineOrchestrationService', () => {
   it('builds stable run and stage idempotency keys from scope, date, and fingerprints', () => {
     const repository = {
@@ -398,6 +509,97 @@ describe('PipelineOrchestrationService', () => {
     });
   });
 
+  it('does not report abandoned zero-progress MARKET_DATA rows as active after lease duration', async () => {
+    const abandonedRun = {
+      id: 'run-abandoned-market-data',
+      pipelineKey: 'market-intelligence',
+      region: 'IN',
+      assetType: 'STOCK',
+      timeframe: '1d',
+      triggerType: 'manual',
+      status: 'RUNNING',
+      idempotencyKey: 'run-abandoned-key',
+      dataThroughDate: null,
+      sourceFingerprint: 'market-data:INCREMENTAL_EOD_LOAD:abandoned',
+      changedInstrumentCount: 0,
+      totalCount: 0,
+      processedCount: 0,
+      succeededCount: 0,
+      partialCount: 0,
+      failedCount: 0,
+      skippedCount: 0,
+      unchangedCount: 0,
+      warnings: [],
+      errors: [],
+      metadata: null,
+      startedAt: '2026-05-25T03:00:00.000Z',
+      completedAt: null,
+      durationMs: null,
+      createdAt: '2026-05-25T03:00:00.000Z',
+      updatedAt: '2026-05-25T03:00:00.000Z',
+    };
+    const repository = {
+      findActiveRun: jest.fn().mockResolvedValue(abandonedRun),
+      findLastRun: jest.fn().mockResolvedValue(null),
+      latestStages: jest.fn().mockResolvedValue([{
+        id: 'stage-abandoned-market-data',
+        pipelineRunId: 'run-abandoned-market-data',
+        stageKey: 'MARKET_DATA',
+        stageOrder: 1,
+        status: 'RUNNING',
+        idempotencyKey: 'stage-abandoned-key',
+        region: 'IN',
+        assetType: 'STOCK',
+        timeframe: '1d',
+        dataThroughDate: null,
+        inputFingerprint: 'market-data:INCREMENTAL_EOD_LOAD:abandoned',
+        outputFingerprint: null,
+        changedInstrumentCount: 0,
+        batchSize: 100,
+        offset: 0,
+        nextOffset: 0,
+        hasMore: false,
+        totalCount: 0,
+        processedCount: 0,
+        succeededCount: 0,
+        partialCount: 0,
+        failedCount: 0,
+        skippedCount: 0,
+        unchangedCount: 0,
+        attemptCount: 1,
+        cacheKey: null,
+        cacheStatus: 'BYPASS',
+        cacheExpiresAt: null,
+        leaseOwner: null,
+        leaseExpiresAt: null,
+        startedAt: null,
+        completedAt: null,
+        durationMs: null,
+        warnings: [],
+        errors: [],
+        metadata: null,
+        createdAt: '2026-05-25T03:00:00.000Z',
+        updatedAt: '2026-05-25T03:00:00.000Z',
+      }]),
+    };
+    const service = new PipelineOrchestrationService(repository as any);
+
+    const snapshot = await service.status({
+      region: 'IN',
+      assetType: 'STOCK',
+      timeframe: '1d',
+      pipelineKey: 'market-intelligence',
+      limit: 25,
+    }, new Date('2026-05-25T03:10:01.000Z'));
+
+    expect(snapshot.activeRun).toBeNull();
+    expect(snapshot.stages[0]).toMatchObject({
+      stageKey: 'MARKET_DATA',
+      activeStage: null,
+      lastStage: null,
+    });
+  });
+
   it('returns a command catalog with exchange reset workflow commands enabled', () => {
     const service = new PipelineOrchestrationService({} as any, {} as any);
     const catalog = service.commandCatalog({
@@ -423,6 +625,8 @@ describe('PipelineOrchestrationService', () => {
       availability: 'ENABLED',
       stageKey: 'MARKET_DATA',
       providerAccess: 'NONE',
+      runModes: ['full_latest_trading_date', 'incremental_changed_only', 'single_batch'],
+      defaultBatchSize: 100,
     });
     expect(catalog.commands.find((item) => item.commandKey === 'MARKET_DATA_HISTORICAL_EXCHANGE_BACKFILL')).toMatchObject({
       availability: 'ENABLED',
@@ -864,7 +1068,23 @@ describe('PipelineOrchestrationService', () => {
       .mockResolvedValueOnce({ ...completedStage, status: 'RUNNING', completedAt: null } as any)
       .mockResolvedValueOnce(completedStage as any);
     const catchUp = jest.spyOn(service, 'runScheduledPipelineCatchUpFromMarketDataSummary')
-      .mockResolvedValue(null as any);
+      .mockResolvedValue({
+        status: 'COMPLETED',
+        pipelineRunId: 'run-dq',
+        stageRunId: 'stage-dq',
+        stageKey: 'DATA_QUALITY',
+        scope: { region: 'IN', assetType: 'STOCK', timeframe: '1d', pipelineKey: 'market-intelligence' },
+        triggerType: 'scheduled',
+        dataThroughDate: '2026-05-25',
+        inputFingerprint: 'dq-input',
+        outputFingerprint: 'dq-output',
+        batch: { totalInstrumentCount: 2, processedCount: 2, batchSize: 2, nextOffset: null, hasMore: false },
+        counts: { totalCount: 2, processedCount: 2, succeededCount: 2, partialCount: 0, failedCount: 0, skippedCount: 0, unchangedCount: 0 },
+        warnings: [],
+        errors: [],
+        startedAt: '2026-05-25T03:00:02.000Z',
+        completedAt: '2026-05-25T03:00:03.000Z',
+      } as any);
 
     const result = await service.executeCommand({
       commandKey: 'PIPELINE_RUN_ALL',
@@ -872,7 +1092,7 @@ describe('PipelineOrchestrationService', () => {
       assetType: 'STOCK',
       timeframe: '1d',
       pipelineKey: 'market-intelligence',
-      runMode: 'single_batch',
+      runMode: 'full_latest_trading_date',
       batchSize: 100,
       offset: 0,
       idempotencyKey: 'manual-daily-1',
@@ -900,7 +1120,7 @@ describe('PipelineOrchestrationService', () => {
       dataThroughDate: '2026-05-25',
       downstreamInstrumentIds: ['stock-1', 'stock-2'],
       dqStageEligible: true,
-    }), expect.any(Date));
+    }), expect.any(Date), { allowCompletedTerminal: true });
     expect(result).toMatchObject({
       commandKey: 'PIPELINE_RUN_ALL',
       stageKey: 'MARKET_DATA',
@@ -910,6 +1130,582 @@ describe('PipelineOrchestrationService', () => {
         processedCount: 2,
       },
     });
+  });
+
+  it('returns a live lease response for PIPELINE_RUN_ALL while MARKET_DATA is still active', async () => {
+    const activeRun = {
+      id: 'run-active-market-data',
+      pipelineKey: 'market-intelligence',
+      region: 'IN',
+      assetType: 'STOCK',
+      timeframe: '1d',
+      triggerType: 'manual',
+      status: 'RUNNING',
+      idempotencyKey: 'active-run-key',
+      dataThroughDate: null,
+      sourceFingerprint: 'market-data:INCREMENTAL_EOD_LOAD:active',
+      changedInstrumentCount: 0,
+      totalCount: 100,
+      processedCount: 0,
+      succeededCount: 0,
+      partialCount: 0,
+      failedCount: 0,
+      skippedCount: 0,
+      unchangedCount: 0,
+      warnings: [],
+      errors: [],
+      metadata: null,
+      startedAt: '2026-05-25T03:00:00.000Z',
+      completedAt: null,
+      durationMs: null,
+      createdAt: '2026-05-25T03:00:00.000Z',
+      updatedAt: '2026-05-25T03:00:00.000Z',
+    };
+    const activeStage = marketDataStageRecord({
+      id: 'stage-active-market-data',
+      pipelineRunId: 'run-active-market-data',
+      status: 'RUNNING',
+      totalCount: 100,
+      processedCount: 0,
+      succeededCount: 0,
+      leaseOwner: 'manual-command:PIPELINE_RUN_ALL:worker-a',
+      leaseExpiresAt: '2026-05-25T03:10:00.000Z',
+      startedAt: '2026-05-25T03:00:00.000Z',
+      completedAt: null,
+      updatedAt: '2026-05-25T03:00:00.000Z',
+    });
+    const repository = {
+      findActiveRun: jest.fn().mockResolvedValue(activeRun),
+      latestStages: jest.fn().mockResolvedValue([activeStage]),
+    };
+    const marketDataService = {
+      syncScheduledRegion: jest.fn(),
+    };
+    const service = serviceWithMarketData(repository, marketDataService);
+
+    await expect(service.executeCommand({
+      commandKey: 'PIPELINE_RUN_ALL',
+      region: 'IN',
+      assetType: 'STOCK',
+      timeframe: '1d',
+      pipelineKey: 'market-intelligence',
+      runMode: 'full_latest_trading_date',
+      batchSize: 100,
+      offset: 0,
+      idempotencyKey: 'manual-daily-active-lease',
+      force: false,
+    }, { requestedByUserId: 'local-manual-operator' }, new Date('2026-05-25T03:05:00.000Z'))).rejects.toMatchObject({
+      statusCode: 409,
+      payload: expect.objectContaining({
+        status: 'LEASE_HELD',
+        pipelineRunId: 'run-active-market-data',
+        stageRunId: 'stage-active-market-data',
+        lease: expect.objectContaining({
+          acquired: false,
+          reason: 'LEASE_HELD',
+          leaseOwner: 'manual-command:PIPELINE_RUN_ALL:worker-a',
+          leaseExpiresAt: '2026-05-25T03:10:00.000Z',
+        }),
+        counts: expect.objectContaining({
+          totalCount: 100,
+          processedCount: 0,
+        }),
+      }),
+    });
+    expect(marketDataService.syncScheduledRegion).not.toHaveBeenCalled();
+  });
+
+  it('retries PIPELINE_RUN_ALL after an abandoned MARKET_DATA lease expires', async () => {
+    const activeRun = {
+      id: 'run-stale-market-data',
+      pipelineKey: 'market-intelligence',
+      region: 'IN',
+      assetType: 'STOCK',
+      timeframe: '1d',
+      triggerType: 'manual',
+      status: 'RUNNING',
+      idempotencyKey: 'stale-run-key',
+      dataThroughDate: null,
+      sourceFingerprint: 'market-data:INCREMENTAL_EOD_LOAD:stale',
+      changedInstrumentCount: 0,
+      totalCount: 0,
+      processedCount: 0,
+      succeededCount: 0,
+      partialCount: 0,
+      failedCount: 0,
+      skippedCount: 0,
+      unchangedCount: 0,
+      warnings: [],
+      errors: [],
+      metadata: null,
+      startedAt: '2026-05-25T03:00:00.000Z',
+      completedAt: null,
+      durationMs: null,
+      createdAt: '2026-05-25T03:00:00.000Z',
+      updatedAt: '2026-05-25T03:00:00.000Z',
+    };
+    const staleStage = marketDataStageRecord({
+      id: 'stage-stale-market-data',
+      pipelineRunId: 'run-stale-market-data',
+      status: 'RUNNING',
+      totalCount: 0,
+      processedCount: 0,
+      succeededCount: 0,
+      leaseOwner: 'manual-command:PIPELINE_RUN_ALL:dead-worker',
+      leaseExpiresAt: '2026-05-25T03:04:59.000Z',
+      startedAt: '2026-05-25T03:00:00.000Z',
+      completedAt: null,
+      updatedAt: '2026-05-25T03:00:00.000Z',
+    });
+    const repository = {
+      findActiveRun: jest.fn().mockResolvedValue(activeRun),
+      latestStages: jest.fn().mockResolvedValue([staleStage]),
+    };
+    const marketDataService = {
+      syncScheduledRegion: jest.fn().mockResolvedValue({
+        region: 'IN',
+        assetType: 'STOCK',
+        tradingDate: '2026-05-25',
+        dataThroughDate: '2026-05-25',
+        sourceFingerprint: 'scheduled-region:retry',
+        instrumentsProcessed: 1,
+        rowsReceived: 1,
+        rowsInserted: 0,
+        rowsUpdated: 0,
+        rowsSkipped: 0,
+        rowsNoOp: 1,
+        changedInstrumentIds: [],
+        downstreamInstrumentIds: ['stock-1'],
+        changedInstrumentCount: 0,
+        dqStageEligible: true,
+        warningCount: 0,
+        warnings: [],
+        errors: [],
+      }),
+    };
+    const service = serviceWithMarketData(repository, marketDataService);
+    const completedStage = marketDataStageRecord({
+      totalCount: 1,
+      processedCount: 1,
+      succeededCount: 1,
+      unchangedCount: 1,
+      changedInstrumentCount: 0,
+    });
+    const recordSnapshot = jest.spyOn(service, 'recordMarketDataStageSnapshot')
+      .mockResolvedValueOnce({ ...completedStage, status: 'RUNNING', completedAt: null } as any)
+      .mockResolvedValueOnce(completedStage as any);
+    jest.spyOn(service, 'runScheduledPipelineCatchUpFromMarketDataSummary')
+      .mockResolvedValue({
+        status: 'COMPLETED',
+        pipelineRunId: 'run-dq-retry',
+        stageRunId: 'stage-dq-retry',
+        stageKey: 'DATA_QUALITY',
+        scope: { region: 'IN', assetType: 'STOCK', timeframe: '1d', pipelineKey: 'market-intelligence' },
+        triggerType: 'scheduled',
+        dataThroughDate: '2026-05-25',
+        inputFingerprint: 'dq-input-retry',
+        outputFingerprint: 'dq-output-retry',
+        batch: { totalInstrumentCount: 1, processedCount: 1, batchSize: 1, nextOffset: null, hasMore: false },
+        counts: { totalCount: 1, processedCount: 1, succeededCount: 1, partialCount: 0, failedCount: 0, skippedCount: 0, unchangedCount: 0 },
+        warnings: [],
+        errors: [],
+        startedAt: '2026-05-25T03:05:01.000Z',
+        completedAt: '2026-05-25T03:05:02.000Z',
+      } as any);
+
+    const result = await service.executeCommand({
+      commandKey: 'PIPELINE_RUN_ALL',
+      region: 'IN',
+      assetType: 'STOCK',
+      timeframe: '1d',
+      pipelineKey: 'market-intelligence',
+      runMode: 'full_latest_trading_date',
+      batchSize: 100,
+      offset: 0,
+      idempotencyKey: 'manual-daily-retry-after-stale',
+      force: false,
+    }, { requestedByUserId: 'local-manual-operator' }, new Date('2026-05-25T03:05:00.000Z'));
+
+    expect(marketDataService.syncScheduledRegion).toHaveBeenCalled();
+    expect(recordSnapshot).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      status: 'RUNNING',
+      leaseOwner: expect.stringContaining('manual-command:PIPELINE_RUN_ALL:'),
+      leaseMs: expect.any(Number),
+    }));
+    expect(result).toMatchObject({
+      commandKey: 'PIPELINE_RUN_ALL',
+      status: 'COMPLETED',
+    });
+  });
+
+  it('runs full daily downstream catch-up when market data has only no-op exchange rows', async () => {
+    const repository = {
+      findActiveRun: jest.fn().mockResolvedValue(null),
+    };
+    const marketDataService = {
+      syncScheduledRegion: jest.fn().mockResolvedValue({
+        region: 'IN',
+        assetType: 'STOCK',
+        tradingDate: '2026-05-25',
+        dataThroughDate: '2026-05-25',
+        sourceFingerprint: 'scheduled-region:no-op',
+        instrumentsProcessed: 2,
+        rowsReceived: 2,
+        rowsInserted: 0,
+        rowsUpdated: 0,
+        rowsSkipped: 0,
+        rowsNoOp: 2,
+        changedInstrumentIds: [],
+        downstreamInstrumentIds: ['stock-1', 'stock-2'],
+        changedInstrumentCount: 0,
+        dqStageEligible: true,
+        warningCount: 0,
+        warnings: [],
+        errors: [],
+      }),
+    };
+    const service = serviceWithMarketData(repository, marketDataService);
+    const completedStage = marketDataStageRecord({
+      totalCount: 2,
+      processedCount: 2,
+      succeededCount: 2,
+      changedInstrumentCount: 0,
+      unchangedCount: 2,
+    });
+    const recordSnapshot = jest.spyOn(service, 'recordMarketDataStageSnapshot')
+      .mockResolvedValueOnce({ ...completedStage, status: 'RUNNING', completedAt: null } as any)
+      .mockResolvedValueOnce(completedStage as any);
+    const catchUp = jest.spyOn(service, 'runScheduledPipelineCatchUpFromMarketDataSummary')
+      .mockResolvedValue({
+        status: 'COMPLETED',
+        pipelineRunId: 'run-dq-no-op',
+        stageRunId: 'stage-dq-no-op',
+        stageKey: 'DATA_QUALITY',
+        scope: { region: 'IN', assetType: 'STOCK', timeframe: '1d', pipelineKey: 'market-intelligence' },
+        triggerType: 'scheduled',
+        dataThroughDate: '2026-05-25',
+        inputFingerprint: 'dq-input',
+        outputFingerprint: 'dq-output',
+        batch: { totalInstrumentCount: 2, processedCount: 2, batchSize: 2, nextOffset: null, hasMore: false },
+        counts: { totalCount: 2, processedCount: 2, succeededCount: 2, partialCount: 0, failedCount: 0, skippedCount: 0, unchangedCount: 0 },
+        warnings: [],
+        errors: [],
+        startedAt: '2026-05-25T03:00:02.000Z',
+        completedAt: '2026-05-25T03:00:03.000Z',
+      } as any);
+
+    const result = await service.executeCommand({
+      commandKey: 'PIPELINE_RUN_ALL',
+      region: 'IN',
+      assetType: 'STOCK',
+      timeframe: '1d',
+      pipelineKey: 'market-intelligence',
+      runMode: 'full_latest_trading_date',
+      batchSize: 100,
+      offset: 0,
+      idempotencyKey: 'manual-daily-no-op',
+      force: false,
+    }, { requestedByUserId: 'local-manual-operator' }, new Date('2026-05-25T03:00:00.000Z'));
+
+    expect(catchUp).toHaveBeenCalledWith(expect.objectContaining({
+      changedInstrumentIds: [],
+      downstreamInstrumentIds: ['stock-1', 'stock-2'],
+      dqStageEligible: true,
+    }), expect.any(Date), { allowCompletedTerminal: true });
+    expect(recordSnapshot).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      status: 'COMPLETED',
+      changedInstrumentIds: [],
+      downstreamInstrumentIds: ['stock-1', 'stock-2'],
+    }));
+    expect(result.status).toBe('COMPLETED');
+  });
+
+  it('resolves full daily downstream eligibility from latest persisted prices when market data is current with no changed rows', async () => {
+    const repository = {
+      findActiveRun: jest.fn().mockResolvedValue(null),
+    };
+    const marketDataService = {
+      syncScheduledRegion: jest.fn().mockResolvedValue({
+        region: 'IN',
+        assetType: 'STOCK',
+        tradingDate: '2026-05-28',
+        dataThroughDate: '2026-05-27',
+        sourceFingerprint: 'scheduled-region:current-no-change',
+        instrumentsProcessed: 0,
+        rowsReceived: 0,
+        rowsInserted: 0,
+        rowsUpdated: 0,
+        rowsSkipped: 0,
+        rowsNoOp: 0,
+        changedInstrumentIds: [],
+        downstreamInstrumentIds: [],
+        changedInstrumentCount: 0,
+        dqStageEligible: false,
+        warningCount: 0,
+        warnings: [],
+        errors: [],
+      }),
+      listDailyRefreshEligibleInstrumentIds: jest.fn().mockResolvedValue({
+        region: 'IN',
+        assetType: 'STOCK',
+        dataThroughDate: '2026-05-27',
+        source: 'LATEST_PRICE',
+        instrumentIds: ['stock-1', 'stock-2'],
+        instrumentCount: 2,
+      }),
+    };
+    const service = serviceWithMarketData(repository, marketDataService);
+    const completedStage = marketDataStageRecord({
+      status: 'COMPLETED',
+      totalCount: 2,
+      processedCount: 0,
+      succeededCount: 0,
+      changedInstrumentCount: 0,
+      unchangedCount: 0,
+      metadata: {
+        downstreamInstrumentCount: 2,
+        downstreamEligibilitySource: 'LATEST_PRICE',
+      },
+    });
+    const recordSnapshot = jest.spyOn(service, 'recordMarketDataStageSnapshot')
+      .mockResolvedValueOnce({ ...completedStage, status: 'RUNNING', completedAt: null } as any)
+      .mockResolvedValueOnce(completedStage as any);
+    const catchUp = jest.spyOn(service, 'runScheduledPipelineCatchUpFromMarketDataSummary')
+      .mockResolvedValue({
+        status: 'COMPLETED',
+        pipelineRunId: 'run-dq-current',
+        stageRunId: 'stage-dq-current',
+        stageKey: 'DATA_QUALITY',
+        scope: { region: 'IN', assetType: 'STOCK', timeframe: '1d', pipelineKey: 'market-intelligence' },
+        triggerType: 'scheduled',
+        dataThroughDate: '2026-05-27',
+        inputFingerprint: 'dq-input-current',
+        outputFingerprint: 'dq-output-current',
+        batch: { totalInstrumentCount: 2, processedCount: 2, batchSize: 2, nextOffset: null, hasMore: false },
+        counts: { totalCount: 2, processedCount: 2, succeededCount: 2, partialCount: 0, failedCount: 0, skippedCount: 0, unchangedCount: 0 },
+        warnings: [],
+        errors: [],
+        startedAt: '2026-05-28T03:00:02.000Z',
+        completedAt: '2026-05-28T03:00:03.000Z',
+      } as any);
+
+    const result = await service.executeCommand({
+      commandKey: 'PIPELINE_RUN_ALL',
+      region: 'IN',
+      assetType: 'STOCK',
+      timeframe: '1d',
+      pipelineKey: 'market-intelligence',
+      runMode: 'full_latest_trading_date',
+      batchSize: 100,
+      offset: 0,
+      idempotencyKey: 'manual-daily-current-no-change',
+      force: false,
+    }, { requestedByUserId: 'local-manual-operator' }, new Date('2026-05-28T03:00:00.000Z'));
+
+    expect(marketDataService.listDailyRefreshEligibleInstrumentIds).toHaveBeenCalledWith({
+      region: 'IN',
+      assetType: 'STOCK',
+      dataThroughDate: '2026-05-27',
+      limit: 10000,
+    });
+    expect(catchUp).toHaveBeenCalledWith(expect.objectContaining({
+      changedInstrumentIds: [],
+      downstreamInstrumentIds: ['stock-1', 'stock-2'],
+      downstreamEligibilitySource: 'LATEST_PRICE',
+      dqStageEligible: true,
+    }), expect.any(Date), { allowCompletedTerminal: true });
+    expect(recordSnapshot).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      status: 'COMPLETED',
+      changedInstrumentIds: [],
+      downstreamInstrumentIds: ['stock-1', 'stock-2'],
+      warnings: [],
+      metadata: expect.objectContaining({
+        rowsInserted: 0,
+        rowsUpdated: 0,
+        downstreamInstrumentCount: 2,
+        downstreamEligibilitySource: 'LATEST_PRICE',
+        downstreamStatus: 'COMPLETED',
+        downstreamAlreadyExecuted: true,
+        downstreamSnapshotBridgeSuppressed: true,
+      }),
+    }));
+    expect(result.status).toBe('COMPLETED');
+  });
+
+  it('keeps incremental no-change pipeline runs changed-only without daily eligibility fallback', async () => {
+    const repository = {
+      findActiveRun: jest.fn().mockResolvedValue(null),
+    };
+    const marketDataService = {
+      syncScheduledRegion: jest.fn().mockResolvedValue({
+        region: 'IN',
+        assetType: 'STOCK',
+        tradingDate: '2026-05-28',
+        dataThroughDate: '2026-05-27',
+        sourceFingerprint: 'scheduled-region:incremental-no-change',
+        instrumentsProcessed: 0,
+        rowsReceived: 0,
+        rowsInserted: 0,
+        rowsUpdated: 0,
+        rowsSkipped: 0,
+        rowsNoOp: 0,
+        changedInstrumentIds: [],
+        downstreamInstrumentIds: ['stock-1', 'stock-2'],
+        downstreamEligibilitySource: 'exchange_file_summary',
+        changedInstrumentCount: 0,
+        dqStageEligible: false,
+        warningCount: 0,
+        warnings: [],
+        errors: [],
+      }),
+      latestStoredCandleInfo: jest.fn().mockResolvedValue({
+        syncState: {
+          lastSummary: {
+            region: 'IN',
+            assetType: 'STOCK',
+            tradingDate: '2026-05-28',
+            dataThroughDate: '2026-05-27',
+            sourceFingerprint: 'prior-full-daily-summary',
+            changedInstrumentIds: [],
+            downstreamInstrumentIds: ['stock-1', 'stock-2'],
+            dqStageEligible: true,
+            instrumentsProcessed: 2,
+            rowsReceived: 2,
+            rowsInserted: 0,
+            rowsUpdated: 0,
+            rowsSkipped: 0,
+            rowsNoOp: 2,
+            warningCount: 0,
+            warnings: [],
+            errors: [],
+          },
+        },
+      }),
+      listDailyRefreshEligibleInstrumentIds: jest.fn(),
+    };
+    const service = serviceWithMarketData(repository, marketDataService);
+    const skippedStage = marketDataStageRecord({
+      status: 'SKIPPED',
+      totalCount: 0,
+      processedCount: 0,
+      succeededCount: 0,
+      changedInstrumentCount: 0,
+    });
+    const recordSnapshot = jest.spyOn(service, 'recordMarketDataStageSnapshot')
+      .mockResolvedValueOnce({ ...skippedStage, status: 'RUNNING', completedAt: null } as any)
+      .mockResolvedValueOnce(skippedStage as any);
+    const catchUp = jest.spyOn(service, 'runScheduledPipelineCatchUpFromMarketDataSummary');
+
+    const result = await service.executeCommand({
+      commandKey: 'PIPELINE_RUN_ALL',
+      region: 'IN',
+      assetType: 'STOCK',
+      timeframe: '1d',
+      pipelineKey: 'market-intelligence',
+      runMode: 'incremental_changed_only',
+      batchSize: 100,
+      offset: 0,
+      idempotencyKey: 'manual-daily-incremental-no-change',
+      force: false,
+    }, { requestedByUserId: 'local-manual-operator' }, new Date('2026-05-28T03:00:00.000Z'));
+
+    expect(marketDataService.listDailyRefreshEligibleInstrumentIds).not.toHaveBeenCalled();
+    expect(marketDataService.latestStoredCandleInfo).not.toHaveBeenCalled();
+    expect(catchUp).not.toHaveBeenCalled();
+    expect(recordSnapshot).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      status: 'SKIPPED',
+      changedInstrumentIds: [],
+      downstreamInstrumentIds: [],
+      warnings: [],
+      metadata: expect.objectContaining({
+        downstreamInstrumentCount: 0,
+        downstreamStatus: null,
+        downstreamAlreadyExecuted: false,
+      }),
+    }));
+    expect(result.status).toBe('SKIPPED');
+  });
+
+  it('marks the full daily pipeline partial when downstream catch-up fails', async () => {
+    const repository = {
+      findActiveRun: jest.fn().mockResolvedValue(null),
+    };
+    const marketDataService = {
+      syncScheduledRegion: jest.fn().mockResolvedValue({
+        region: 'IN',
+        assetType: 'STOCK',
+        tradingDate: '2026-05-25',
+        dataThroughDate: '2026-05-25',
+        sourceFingerprint: 'scheduled-region:downstream-fail',
+        instrumentsProcessed: 1,
+        rowsReceived: 1,
+        rowsInserted: 0,
+        rowsUpdated: 0,
+        rowsSkipped: 0,
+        rowsNoOp: 1,
+        changedInstrumentIds: [],
+        downstreamInstrumentIds: ['stock-1'],
+        changedInstrumentCount: 0,
+        dqStageEligible: true,
+        warningCount: 0,
+        warnings: [],
+        errors: [],
+      }),
+    };
+    const service = serviceWithMarketData(repository, marketDataService);
+    const partialStage = marketDataStageRecord({
+      status: 'PARTIAL',
+      totalCount: 1,
+      processedCount: 1,
+      succeededCount: 1,
+      changedInstrumentCount: 0,
+      unchangedCount: 1,
+      errors: ['DATA_QUALITY: DQ failed'],
+    });
+    const recordSnapshot = jest.spyOn(service, 'recordMarketDataStageSnapshot')
+      .mockResolvedValueOnce({ ...partialStage, status: 'RUNNING', completedAt: null, errors: [] } as any)
+      .mockResolvedValueOnce(partialStage as any);
+    jest.spyOn(service, 'runScheduledPipelineCatchUpFromMarketDataSummary')
+      .mockResolvedValue({
+        status: 'FAILED',
+        pipelineRunId: 'run-dq-failed',
+        stageRunId: 'stage-dq-failed',
+        stageKey: 'DATA_QUALITY',
+        scope: { region: 'IN', assetType: 'STOCK', timeframe: '1d', pipelineKey: 'market-intelligence' },
+        triggerType: 'scheduled',
+        dataThroughDate: '2026-05-25',
+        inputFingerprint: 'dq-input',
+        outputFingerprint: null,
+        batch: { totalInstrumentCount: 1, processedCount: 0, batchSize: 1, nextOffset: null, hasMore: false },
+        counts: { totalCount: 1, processedCount: 0, succeededCount: 0, partialCount: 0, failedCount: 1, skippedCount: 0, unchangedCount: 0 },
+        warnings: [],
+        errors: ['DQ failed'],
+        startedAt: '2026-05-25T03:00:02.000Z',
+        completedAt: '2026-05-25T03:00:03.000Z',
+      } as any);
+
+    const result = await service.executeCommand({
+      commandKey: 'PIPELINE_RUN_ALL',
+      region: 'IN',
+      assetType: 'STOCK',
+      timeframe: '1d',
+      pipelineKey: 'market-intelligence',
+      runMode: 'full_latest_trading_date',
+      batchSize: 100,
+      offset: 0,
+      idempotencyKey: 'manual-daily-downstream-failed',
+      force: false,
+    }, { requestedByUserId: 'local-manual-operator' }, new Date('2026-05-25T03:00:00.000Z'));
+
+    expect(recordSnapshot).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      status: 'PARTIAL',
+      errors: ['DATA_QUALITY: DQ failed'],
+      metadata: expect.objectContaining({
+        downstreamStatus: 'FAILED',
+        downstreamErrors: ['DATA_QUALITY: DQ failed'],
+      }),
+    }));
+    expect(result.status).toBe('PARTIAL');
   });
 
   it('executes historical exchange backfill through Pipeline Ops with resume evidence', async () => {
@@ -1938,12 +2734,13 @@ describe('PipelineOrchestrationService', () => {
     expect(response.downstreamRawSignals?.downstreamSignalCalibration?.downstream?.stageKey).toBe('MARKET_CONTEXT');
     expect(response.batch.totalInstrumentCount).toBe(2);
     expect(response.counts.processedCount).toBe(2);
-    expect(evaluateScheduledStage).toHaveBeenCalledWith({
+    expect(evaluateScheduledStage).toHaveBeenCalledWith(expect.objectContaining({
       instrumentIds: ['stock-1', 'stock-2'],
       region: 'IN',
       assetType: 'STOCK',
       batchSize: 2,
-    });
+      onProgress: expect.any(Function),
+    }));
     expect(signalRun).toHaveBeenCalledWith(expect.objectContaining({
       instrumentIds: ['stock-1', 'stock-2'],
       region: 'IN',
@@ -1989,6 +2786,123 @@ describe('PipelineOrchestrationService', () => {
       status: 'COMPLETED',
       processedCount: 2,
       succeededCount: 2,
+    }));
+  });
+
+  it('persists scheduled Data Quality per-chunk progress and lease renewal', async () => {
+    const repository = createInMemoryPipelineRepository();
+    const changedInstrumentIds = Array.from({ length: 150 }, (_value, index) => `stock-${String(index + 1).padStart(3, '0')}`);
+    const evaluateScheduledStage = jest.fn(async (request: any) => {
+      await request.onProgress({
+        totalCount: 150,
+        processedCount: 100,
+        evaluatedCount: 100,
+        failedCount: 0,
+        skippedCount: 0,
+        warnings: [],
+        errors: [],
+        nextOffset: 100,
+        hasMore: true,
+        metadata: { chunkIndex: 1, totalChunks: 2, chunkStatus: 'COMPLETED' },
+      });
+      await request.onProgress({
+        totalCount: 150,
+        processedCount: 150,
+        evaluatedCount: 100,
+        failedCount: 50,
+        skippedCount: 0,
+        warnings: ['chunk 2/2 offset 100 failed for 50 instruments: Prisma oversized read simulation'],
+        errors: ['chunk 2/2 offset 100 failed for 50 instruments: Prisma oversized read simulation'],
+        nextOffset: null,
+        hasMore: false,
+        metadata: { chunkIndex: 2, totalChunks: 2, chunkStatus: 'FAILED' },
+      });
+      return {
+        processedCount: 150,
+        totalCount: 150,
+        evaluatedCount: 100,
+        failedCount: 50,
+        skippedCount: 0,
+        warnings: ['chunk 2/2 offset 100 failed for 50 instruments: Prisma oversized read simulation'],
+        errors: ['chunk 2/2 offset 100 failed for 50 instruments: Prisma oversized read simulation'],
+        durationMs: 100,
+      };
+    });
+    const service = new PipelineOrchestrationService(repository as any, {
+      evaluateScheduledStage,
+      evaluate: jest.fn(),
+    } as any);
+    jest.spyOn(service, 'runScheduledRawSignalsStage').mockResolvedValue({
+      status: 'SKIPPED',
+      pipelineRunId: 'run-raw',
+      stageRunId: 'stage-raw',
+      stageKey: 'RAW_SIGNALS',
+      scope: { region: 'IN', assetType: 'STOCK', timeframe: '1d', pipelineKey: 'market-intelligence' },
+      triggerType: 'scheduled',
+      dataThroughDate: '2026-05-25',
+      inputFingerprint: 'raw-input',
+      outputFingerprint: 'raw-output',
+      batch: { totalInstrumentCount: 150, processedCount: 0, batchSize: 100, nextOffset: null, hasMore: false },
+      counts: { totalCount: 150, processedCount: 0, succeededCount: 0, partialCount: 0, failedCount: 0, skippedCount: 150, unchangedCount: 0 },
+      warnings: ['Raw signals skipped in progress test.'],
+      errors: [],
+      startedAt: '2026-05-25T03:00:01.000Z',
+      completedAt: '2026-05-25T03:00:02.000Z',
+    } as any);
+
+    const response = await service.runScheduledDataQualityStage({
+      region: 'IN',
+      assetType: 'STOCK',
+      timeframe: '1d',
+      pipelineKey: 'market-intelligence',
+      triggerType: 'scheduled',
+      dataThroughDate: '2026-05-25',
+      sourceFingerprint: 'md-source',
+      changedInstrumentIds,
+      batchSize: 100,
+      schedulerRunStartedAt: '2026-05-25T03:00:00.000Z',
+    }, new Date('2026-05-25T03:00:00.000Z'));
+
+    const progressInputs = repository.recordStageProgress.mock.calls.map(([input]) => input);
+    expect(response.status).toBe('PARTIAL');
+    expect(evaluateScheduledStage).toHaveBeenCalledWith(expect.objectContaining({
+      instrumentIds: changedInstrumentIds,
+      batchSize: 100,
+      onProgress: expect.any(Function),
+    }));
+    expect(progressInputs).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        status: 'RUNNING',
+        processedCount: 100,
+        succeededCount: 100,
+        failedCount: 0,
+        skippedCount: 0,
+        nextOffset: 100,
+        hasMore: true,
+        leaseMs: expect.any(Number),
+        metadata: expect.objectContaining({ chunkIndex: 1, totalChunks: 2 }),
+      }),
+      expect.objectContaining({
+        status: 'RUNNING',
+        processedCount: 150,
+        succeededCount: 100,
+        failedCount: 50,
+        skippedCount: 0,
+        nextOffset: null,
+        hasMore: false,
+        errors: ['chunk 2/2 offset 100 failed for 50 instruments: Prisma oversized read simulation'],
+        leaseMs: expect.any(Number),
+        metadata: expect.objectContaining({ chunkIndex: 2, totalChunks: 2, chunkStatus: 'FAILED' }),
+      }),
+    ]));
+    expect(repository.completeStage).toHaveBeenCalledWith(expect.objectContaining({
+      status: 'PARTIAL',
+      processedCount: 150,
+      succeededCount: 100,
+      failedCount: 50,
+      skippedCount: 0,
+      warnings: ['chunk 2/2 offset 100 failed for 50 instruments: Prisma oversized read simulation'],
+      errors: ['chunk 2/2 offset 100 failed for 50 instruments: Prisma oversized read simulation'],
     }));
   });
 
@@ -2140,6 +3054,231 @@ describe('PipelineOrchestrationService', () => {
     }));
     expect(repository.upsertRun).toHaveBeenCalledTimes(1);
     expect(repository.upsertStage).toHaveBeenCalledTimes(1);
+  });
+
+  it('runs the scheduled daily chain from Data Quality through Signal Position Ledger for one trading date', async () => {
+    const repository = createInMemoryPipelineRepository();
+    const evaluateScheduledStage = jest.fn().mockResolvedValue({
+      processedCount: 2,
+      totalCount: 2,
+      evaluatedCount: 2,
+      failedCount: 0,
+      skippedCount: 0,
+      warnings: [],
+    });
+    const signalRun = jest.fn().mockResolvedValue({
+      generated: 2,
+      skipped: 0,
+      errors: [],
+      warnings: [],
+      processedCount: 2,
+      totalCount: 2,
+      generatedCount: 2,
+      updatedCount: 0,
+      noOpCount: 0,
+      skippedCount: 0,
+      failedCount: 0,
+      dataQuality: { excludedByDataQuality: 0, missingQualityEvaluationCount: 0 },
+    });
+    const signalCalibrationRun = jest.fn().mockResolvedValue({
+      generated: 2,
+      skipped: 0,
+      errors: [],
+      warnings: [],
+      results: [{ instrumentId: 'stock-1' }, { instrumentId: 'stock-2' }],
+      processedCount: 2,
+      totalCount: 2,
+      batchSize: 2,
+      offset: 0,
+      nextOffset: null,
+      hasMore: false,
+      selectedHorizon: '20D',
+      calibratedCount: 2,
+      passthroughCount: 0,
+      skippedCount: 0,
+      failedCount: 0,
+      outOfScopeSkipped: 0,
+      calibrationEvidence: { evidenceStatus: 'SUFFICIENT' },
+      calibrationReadiness: { status: 'USABLE' },
+    });
+    const marketContext = {
+      run: jest.fn().mockResolvedValue({ status: 'success' }),
+      refreshSectorSnapshots: jest.fn().mockResolvedValue({
+        totalCount: 2,
+        processedCount: 2,
+        savedCount: 2,
+        skippedCount: 0,
+        warnings: [],
+        errors: [],
+        snapshotDate: '2026-05-25T00:00:00.000Z',
+        dataThroughDate: '2026-05-25T00:00:00.000Z',
+        status: 'COMPLETED',
+        sectors: [{ sector: 'IT' }, { sector: 'Energy' }],
+      }),
+    };
+    const smartMoneyRun = jest.fn().mockResolvedValue({
+      totalCount: 2,
+      processedCount: 2,
+      generatedCount: 2,
+      failedCount: 0,
+      skippedCount: 0,
+      warnings: [],
+      errors: [],
+      byRange: {},
+      hasMore: false,
+      nextOffset: null,
+    });
+    const historicalGenerate = jest.fn().mockResolvedValue({
+      market: { inserted: 1, updated: 0, skipped: 0 },
+      sectors: { inserted: 1, updated: 0, skipped: 0 },
+      countries: { inserted: 0, updated: 0, skipped: 0 },
+      smartMoney: { inserted: 1, updated: 0, skipped: 0 },
+      dataQuality: { inserted: 1, updated: 0, skipped: 0 },
+      warnings: [],
+      snapshotDate: '2026-05-25',
+    });
+    const signalQualityRecalculate = jest.fn().mockResolvedValue({
+      totalCount: 2,
+      processedCount: 2,
+      skippedCount: 0,
+      failedCount: 0,
+      warnings: [],
+      selectedHorizon: '20D',
+      evidenceUsability: 'USABLE',
+      matureSignalsInBatch: 2,
+      notYetMatureInBatch: 0,
+      evaluatedCount: 2,
+      unevaluatedCount: 0,
+      missingPriceHistoryCount: 0,
+      outcomesPersisted: true,
+      message: 'ok',
+      hasMore: false,
+      nextOffset: null,
+    });
+    const strategyEvaluate = jest.fn().mockResolvedValue({
+      totalCount: 2,
+      processedCount: 2,
+      generatedCount: 2,
+      failedCount: 0,
+      skippedCount: 0,
+      warnings: [],
+      results: [{ id: 'decision-1' }, { id: 'decision-2' }],
+      hasMore: false,
+      nextOffset: null,
+    });
+    const researchRefresh = jest.fn().mockResolvedValue({
+      generatedAt: '2026-05-25T03:00:00.000Z',
+      dataGaps: [],
+      marketReadiness: { marketGate: 'OPEN', marketCondition: 'RISK_ON' },
+      researchPriorities: { tradeCandidates: [{ id: 'candidate-1' }], watchCandidates: [], avoidCandidates: [] },
+    });
+    const todayReviewRun = jest.fn().mockResolvedValue({
+      run: {
+        id: 'today-review-1',
+        status: 'COMPLETED',
+        trustStatus: 'READY',
+        dataThroughDate: '2026-05-25',
+        candidateCounts: { highlyTrusted: 2 },
+        warnings: [],
+      },
+    });
+    const ledgerRefresh = jest.fn().mockResolvedValue({
+      runId: 'ledger-refresh-1',
+      status: 'COMPLETED',
+      totalCount: 2,
+      processedCount: 2,
+      succeededCount: 2,
+      failedCount: 0,
+      skippedCount: 0,
+      warnings: [],
+      errors: [],
+      materializedRowCount: 2,
+      updatedAt: '2026-05-25T03:00:00.000Z',
+    });
+    const earningsRefresh = jest.fn().mockResolvedValue({
+      status: 'COMPLETED',
+      snapshotDate: '2026-05-25T00:00:00.000Z',
+      dataThroughDate: '2026-05-25T00:00:00.000Z',
+      region: 'IN',
+      assetType: 'STOCK',
+      totalCount: 2,
+      processedCount: 2,
+      succeededCount: 2,
+      failedCount: 0,
+      skippedCount: 0,
+      unchangedCount: 0,
+      nextOffset: null,
+      hasMore: false,
+      warnings: [],
+      errors: [],
+      categories: {},
+    });
+    const service = new PipelineOrchestrationService(
+      repository as any,
+      { evaluateScheduledStage, evaluate: jest.fn() } as any,
+      { run: signalRun } as any,
+      { run: signalCalibrationRun } as any,
+      marketContext as any,
+      { run: smartMoneyRun } as any,
+      { generate: historicalGenerate } as any,
+      { recalculate: signalQualityRecalculate } as any,
+      { evaluate: strategyEvaluate } as any,
+      { refreshOverview: researchRefresh } as any,
+      { run: todayReviewRun } as any,
+      { refreshActiveRows: ledgerRefresh } as any,
+      {} as any,
+      {} as any,
+      { refreshSnapshots: earningsRefresh } as any
+    );
+
+    const response = await service.runScheduledDataQualityStage({
+      region: 'IN',
+      assetType: 'STOCK',
+      timeframe: '1d',
+      pipelineKey: 'market-intelligence',
+      triggerType: 'scheduled',
+      dataThroughDate: '2026-05-25',
+      sourceFingerprint: 'exchange-file-fixture',
+      changedInstrumentIds: ['stock-1', 'stock-2'],
+      batchSize: 2,
+      schedulerRunStartedAt: '2026-05-25T03:00:00.000Z',
+    }, new Date('2026-05-25T03:00:00.000Z'));
+
+    const raw = response.downstreamRawSignals;
+    const calibration = raw?.downstreamSignalCalibration;
+    const downstreamKeys: string[] = [];
+    let node: any = calibration?.downstream;
+    while (node) {
+      downstreamKeys.push(node.stageKey);
+      node = node.downstream;
+    }
+
+    expect(response.status).toBe('COMPLETED');
+    expect(raw?.stageKey).toBe('RAW_SIGNALS');
+    expect(calibration?.stageKey).toBe('SIGNAL_CALIBRATION');
+    expect(downstreamKeys).toEqual([
+      'MARKET_CONTEXT',
+      'SMART_MONEY',
+      'CONTEXT_SNAPSHOTS',
+      'SIGNAL_QUALITY',
+      'STRATEGY_DECISION',
+      'RESEARCH_PROJECTION',
+      'TODAY_REVIEW',
+      'SIGNAL_POSITION_LEDGER',
+      'SECTOR_INTELLIGENCE_REFRESH',
+      'EARNINGS_INTELLIGENCE_REFRESH',
+    ]);
+    expect(evaluateScheduledStage).toHaveBeenCalledTimes(1);
+    expect(signalRun).toHaveBeenCalledTimes(1);
+    expect(signalCalibrationRun).toHaveBeenCalledTimes(1);
+    expect(strategyEvaluate).toHaveBeenCalledTimes(1);
+    expect(todayReviewRun).toHaveBeenCalledTimes(1);
+    expect(ledgerRefresh).toHaveBeenCalledWith(expect.objectContaining({
+      region: 'IN',
+      assetType: 'STOCK',
+      limit: 2,
+      offset: 0,
+    }), { force: true, wait: true });
   });
 
   it('fans out calibration with explicit skipped evidence when scheduled Raw Signals is skipped', async () => {
@@ -3382,6 +4521,9 @@ describe('PipelineOrchestrationService', () => {
       status: 'RUNNING',
       processedCount: 20,
       hasMore: true,
+      startedAt: new Date('2026-05-25T03:00:00.000Z'),
+      leaseOwner: expect.stringContaining('market-data:price_backfill:'),
+      leaseMs: expect.any(Number),
     }));
     expect(repository.completeStage).not.toHaveBeenCalled();
     expect(repository.completeRun).not.toHaveBeenCalled();

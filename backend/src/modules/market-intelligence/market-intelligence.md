@@ -15,3 +15,13 @@ The API does not calculate rankings during the request. Snapshot rows are genera
 - stock sector metadata
 
 No external provider calls, market-data ingestion, or frontend writes are part of this module.
+
+Refresh is idempotent on `snapshotDate + scopeRegion + scopeAssetType + timeframe + category + symbol`. After each bounded batch write, the service prunes stale category rows for the recalculated symbols within the same snapshot date and scope, while leaving rows for symbols outside the current batch untouched until their batch runs. This keeps the latest read API from leaking old category memberships after a full `STOCK_INTEREST_REFRESH`.
+
+`GET /api/v1/market-intelligence/stock-interest` is read-only and may be unauthenticated during localhost validation under the current Product Owner decision. It must not calculate rankings, import data, refresh snapshots, or mutate rows during request handling.
+
+## Verification
+
+- `backend/tests/modules/market-intelligence/stock-interest-snapshot.service.test.ts`: Verifies refresh output and batch pruning handoff.
+- `backend/tests/modules/market-intelligence/stock-interest-snapshot.repository.test.ts`: Verifies stale snapshot rows are pruned only for recalculated symbols.
+- `backend/tests/modules/market-intelligence/market-intelligence-mounted-routes.test.ts`: Verifies mounted Market Intelligence snapshot GET reachability and no mutation on GET routes.

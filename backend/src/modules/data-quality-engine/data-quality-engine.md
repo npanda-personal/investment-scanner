@@ -134,7 +134,9 @@ The module now exposes a scheduler-only adapter:
 Adapter contract:
 
 - consumes explicit changed instrument ids only;
-- performs DB-only reads through Market Data Foundation public batch methods (`getInstrumentsByIds`, `listRecentPriceWindowsByInstrumentIds`, `storedFundamentalsByInstrumentIds`) plus bounded per-instrument stored corporate-actions reads;
+- processes the explicit instrument set in bounded chunks using the requested `batchSize` capped at 100 instruments;
+- performs DB-only reads per chunk through Market Data Foundation public batch methods (`getInstrumentsByIds`, `listRecentPriceWindowsByInstrumentIds`, `storedFundamentalsByInstrumentIds`) plus bounded per-instrument stored corporate-actions reads;
+- reports optional per-chunk progress (`processedCount`, success/failure/skip counts, `nextOffset`, `hasMore`, warnings, and errors) to the scheduled pipeline adapter when provided;
 - does not call provider/live HTTP flows;
 - persists one latest evaluation per changed instrument via existing upsert behavior;
 - preserves existing readiness/tier semantics including `automation = BLOCKED` with `PHASE0_AUTOMATION_NOT_AUTHORIZED`.

@@ -61,7 +61,7 @@ export default function PipelineOpsPage() {
         assetType: scope.assetType,
         timeframe: '1d',
         pipelineKey: 'market-intelligence',
-        runMode: 'single_batch',
+        runMode: 'full_latest_trading_date',
         batchSize: 100,
         offset: 0,
         idempotencyKey: crypto.randomUUID(),

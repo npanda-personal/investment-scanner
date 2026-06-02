@@ -301,6 +301,7 @@ describe('PipelineOrchestrationRepository', () => {
       hasMore: true,
       leaseOwner: 'worker-1',
       leaseMs: 300000,
+      startedAt: new Date('2026-05-22T01:00:00.000Z'),
       now,
     });
 
@@ -314,6 +315,7 @@ describe('PipelineOrchestrationRepository', () => {
         hasMore: true,
         leaseOwner: 'worker-1',
         leaseExpiresAt: new Date('2026-05-22T01:05:00.000Z'),
+        startedAt: new Date('2026-05-22T01:00:00.000Z'),
       }),
     }));
     expect(saved).toMatchObject({

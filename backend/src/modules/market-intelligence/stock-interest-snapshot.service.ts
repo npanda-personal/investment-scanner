@@ -77,7 +77,7 @@ export class StockInterestSnapshotService {
       scope,
       snapshot: rows,
       message: 'Persisted Stock Interest snapshot rows loaded.',
-      warnings: [...new Set(rows.flatMap((row) => row.warnings || []))],
+      warnings: this.summarizeRowWarnings(rows),
     };
   }
 
@@ -96,12 +96,23 @@ export class StockInterestSnapshotService {
       timeframe,
     });
     const writeSummary = await this.repository.upsertSnapshots(rows);
+    const prunedCount = typeof (this.repository as any).pruneSnapshotRowsForSymbols === 'function'
+      ? await (this.repository as any).pruneSnapshotRowsForSymbols({
+        snapshotDate: this.snapshotDateFor(generatedAt, request.snapshotDate),
+        region,
+        assetType,
+        timeframe,
+        symbols: input.stocks.map((stock) => stock.symbol),
+        keepKeys: rows.map((row) => ({ category: row.category, symbol: row.symbol })),
+      })
+      : 0;
+    writeSummary.prunedCount = prunedCount;
     const processedCount = input.stocks.length;
     const totalUniverseCount = input.totalUniverseCount ?? input.stocks.length;
     const nextOffset = offset + processedCount < totalUniverseCount ? offset + processedCount : null;
     const categories = this.emptyCategoryCounts();
     for (const row of rows) categories[row.category] += 1;
-    const warnings = [...new Set(rows.flatMap((row) => row.warnings))];
+    const warnings = this.summarizeRowWarnings(rows);
     const succeededCount = writeSummary.createdCount + writeSummary.updatedCount;
     const status = rows.length === 0 ? 'SKIPPED' : 'COMPLETED';
 
@@ -349,6 +360,13 @@ export class StockInterestSnapshotService {
     if (!stock.sector) warnings.push(`${stock.symbol}: sector metadata is unavailable.`);
     if (!dataThroughDate) warnings.push(`${stock.symbol}: source data-through date is unavailable.`);
     return warnings;
+  }
+
+  private summarizeRowWarnings(rows: Array<{ symbol: string; warnings?: string[] }>): string[] {
+    const warningCount = rows.reduce((sum, row) => sum + (row.warnings?.length || 0), 0);
+    if (warningCount === 0) return [];
+    const symbolCount = new Set(rows.filter((row) => (row.warnings?.length || 0) > 0).map((row) => row.symbol)).size;
+    return [`${warningCount} row-level Stock Interest data warnings across ${symbolCount} symbols. Row warnings remain available in snapshot rows for audit detail.`];
   }
 
   private metricRiskTags(

@@ -184,6 +184,7 @@ export interface ScheduledRegionSyncSummary {
   sourceFingerprint?: string | null;
   changedInstrumentIds?: string[];
   downstreamInstrumentIds?: string[];
+  downstreamEligibilitySource?: string | null;
   changedInstrumentCount?: number;
   dqStageEligible?: boolean;
   instrumentsProcessed: number;
@@ -203,6 +204,15 @@ export interface ScheduledRegionSyncSummary {
   warnings: string[];
   errors: string[];
   officialEodBulk?: OfficialEodBulkSyncEvidence | null;
+}
+
+export interface DailyRefreshEligibilityResult {
+  region: string;
+  assetType: string;
+  dataThroughDate: string;
+  source: 'LATEST_PRICE' | 'PRICE_TICK' | 'NONE';
+  instrumentIds: string[];
+  instrumentCount: number;
 }
 
 export type MarketMoverRange = '1D' | '1W' | '1M' | '3M' | '6M' | '1Y';

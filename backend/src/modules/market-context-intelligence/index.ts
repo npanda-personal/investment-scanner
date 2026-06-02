@@ -1,8 +1,10 @@
 export { marketContextIntelligenceModule } from './market-context-intelligence.module';
 export {
   createMarketContextIntelligenceRouter,
+  createMarketIntelligenceContextReadRouter,
   default as marketContextIntelligenceRouter,
   marketContextIntelligenceRouter as marketContextIntelligenceRouterInstance,
+  marketIntelligenceContextReadRouter,
 } from './market-context-intelligence.router';
 export { MarketContextIntelligenceController } from './market-context-intelligence.controller';
 export { MarketContextIntelligenceRepository } from './market-context-intelligence.repository';

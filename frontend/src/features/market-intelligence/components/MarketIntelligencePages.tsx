@@ -26,6 +26,7 @@ import {
   fetchInstrumentContextSnapshot,
   fetchMarketPulseSnapshot,
   fetchRiskRadarSnapshot,
+  fetchSectorIntelligenceSnapshot,
   fetchStockInterestRadarSnapshot,
   fetchTraderSetupRadarSnapshot,
 } from '../api/marketIntelligenceService';
@@ -36,30 +37,63 @@ import type {
   InstrumentContextSnapshot,
   MarketPulseSnapshot,
   RiskRadarSnapshot,
+  SectorIntelligenceSnapshot,
   SnapshotEnvelope,
   StockInterestSnapshot,
   TraderSetupSnapshot,
 } from '../types';
 
+type RadarTab = {
+  label: string;
+  value: string;
+};
+
 const stockInterestTabs = [
-  "Today's Top Interest",
-  'Upcoming Results',
-  'Result Winners',
-  'Growth Consistency',
-  'Growth Acceleration',
-  'Sector Leaders',
-  'Accumulation',
-  'Breakouts / Bases',
-  'Risk / Avoid',
+  { label: "Today's Top Interest", value: 'TODAY_TOP_INTEREST' },
+  { label: 'Growth Consistency', value: 'GROWTH_CONSISTENCY' },
+  { label: 'Growth Acceleration', value: 'GROWTH_ACCELERATION' },
+  { label: 'Sector Leaders', value: 'SECTOR_LEADERS' },
+  { label: 'Accumulation', value: 'ACCUMULATION' },
+  { label: 'Breakouts', value: 'BREAKOUTS' },
+  { label: 'Risk / Avoid', value: 'RISK_AVOID' },
 ];
 
-const earningsTabs = ['Upcoming Results', 'Pre-Result Interest', 'Result Winners', 'Result Disappointments', 'Result Reaction History', 'Earnings Watchlist'];
-const compounderTabs = ['Consistent Growth', 'Quality + Growth', 'Growth + Momentum', 'Margin Expansion', 'Ownership Support'];
-const traderSetupTabs = ['Breakouts', 'Base Breakouts', 'Pullbacks', '52W Highs', 'Relative Strength Leaders', 'Low Volatility Squeeze', 'Delivery Expansion'];
-const riskTabs = ['Weak Sector Stocks', 'Breakdown Candidates', 'Poor Result Reaction', 'Low Liquidity', 'Stale Data', 'Portfolio Risk'];
+const earningsTabs = [
+  { label: 'Upcoming Results', value: 'UPCOMING_RESULTS' },
+  { label: 'Pre-Result Interest', value: 'PRE_RESULT_INTEREST' },
+  { label: 'Result Winners', value: 'RESULT_WINNERS' },
+  { label: 'Result Disappointments', value: 'RESULT_DISAPPOINTMENTS' },
+  { label: 'Result Reaction History', value: 'RESULT_REACTION_HISTORY' },
+  { label: 'Earnings Watchlist', value: 'EARNINGS_WATCHLIST' },
+];
+const compounderTabs = [
+  { label: 'Consistent Growth', value: 'CONSISTENT_GROWTH' },
+  { label: 'Quality + Growth', value: 'QUALITY_GROWTH' },
+  { label: 'Growth + Momentum', value: 'GROWTH_MOMENTUM' },
+  { label: 'Margin Expansion', value: 'MARGIN_EXPANSION' },
+  { label: 'Ownership Support', value: 'OWNERSHIP_SUPPORT' },
+];
+const traderSetupTabs = [
+  { label: 'Breakouts', value: 'BREAKOUTS' },
+  { label: 'Base Breakouts', value: 'BASE_BREAKOUTS' },
+  { label: 'Pullbacks', value: 'PULLBACKS' },
+  { label: '52W Highs', value: '52W_HIGHS' },
+  { label: 'Relative Strength Leaders', value: 'RELATIVE_STRENGTH_LEADERS' },
+  { label: 'Low Volatility Squeeze', value: 'LOW_VOLATILITY_SQUEEZE' },
+  { label: 'Delivery Expansion', value: 'DELIVERY_EXPANSION' },
+];
+const riskTabs = [
+  { label: 'Weak Sector Stocks', value: 'WEAK_SECTOR_STOCKS' },
+  { label: 'Breakdown Candidates', value: 'BREAKDOWN_CANDIDATES' },
+  { label: 'Poor Result Reaction', value: 'POOR_RESULT_REACTION' },
+  { label: 'Low Liquidity', value: 'LOW_LIQUIDITY' },
+  { label: 'Stale Data', value: 'STALE_DATA' },
+  { label: 'Portfolio Risk', value: 'PORTFOLIO_RISK' },
+];
 
 export function MarketPulsePage() {
   const view = useReadModelSnapshot(fetchMarketPulseSnapshot);
+  const sectorView = useReadModelSnapshot(fetchSectorIntelligenceSnapshot);
   const snapshot = view.data?.snapshot ?? null;
 
   return (
@@ -72,6 +106,7 @@ export function MarketPulsePage() {
       missingTitle="Market Pulse backend not available yet."
     >
       {snapshot && <MarketPulseSnapshotView snapshot={snapshot} />}
+      <SectorIntelligencePanel envelope={sectorView.data} loading={sectorView.loading} error={sectorView.error} />
     </SnapshotPageShell>
   );
 }
@@ -87,6 +122,7 @@ export function StockInterestRadarPage() {
       loading={view.loading}
       error={view.error}
       missingTitle="Stock Interest Radar backend not available yet."
+      getRowCategories={(row) => [(row as StockInterestSnapshot).category]}
       renderTable={(rows) => <StockInterestTable rows={rows as StockInterestSnapshot[]} />}
     />
   );
@@ -103,6 +139,7 @@ export function EarningsIntelligencePage() {
       loading={view.loading}
       error={view.error}
       missingTitle="Earnings Intelligence backend not available yet."
+      getRowCategories={(row) => (row as EarningsIntelligenceSnapshot).categories}
       renderTable={(rows) => <EarningsTable rows={rows as EarningsIntelligenceSnapshot[]} />}
     />
   );
@@ -119,6 +156,7 @@ export function CompounderRadarPage() {
       loading={view.loading}
       error={view.error}
       missingTitle="Compounder Radar backend not available yet."
+      getRowCategories={() => []}
       renderTable={(rows) => <CompounderTable rows={rows as CompounderSnapshot[]} />}
     />
   );
@@ -135,6 +173,7 @@ export function TraderSetupRadarPage() {
       loading={view.loading}
       error={view.error}
       missingTitle="Trader Setup Radar backend not available yet."
+      getRowCategories={() => []}
       renderTable={(rows) => <TraderSetupTable rows={rows as TraderSetupSnapshot[]} />}
     />
   );
@@ -151,6 +190,7 @@ export function RiskRadarPage() {
       loading={view.loading}
       error={view.error}
       missingTitle="Risk Radar backend not available yet."
+      getRowCategories={() => []}
       renderTable={(rows) => <RiskTable rows={rows as RiskRadarSnapshot[]} />}
     />
   );
@@ -221,16 +261,34 @@ function SnapshotPageShell({
   missingTitle: string;
   children: ReactNode;
 }) {
+  const showUnavailable = !loading
+    && !error
+    && envelope
+    && ['EMPTY', 'BACKEND_UNAVAILABLE', 'ERROR'].includes(envelope.availability)
+    && (Array.isArray(envelope.snapshot) ? envelope.snapshot.length === 0 : envelope.snapshot === null);
+  const showWarnings = !loading && !error && envelope && !showUnavailable && envelope.warnings.length > 0;
+
   return (
     <Box className="page-container page-container--hub">
       <PageHeader
         title={title}
         subtitle={subtitle}
-        badges={envelope ? <Chip label={`${envelope.scope.region} / ${envelope.scope.assetType}`} color="primary" variant="outlined" size="small" /> : undefined}
+        badges={envelope ? (
+          <Stack direction="row" gap={1} flexWrap="wrap" useFlexGap>
+            <Chip label={`${envelope.scope.region} / ${envelope.scope.assetType}`} color="primary" variant="outlined" size="small" />
+            <Chip label={formatEnum(envelope.availability)} color={envelope.availability === 'ERROR' ? 'error' : envelope.availability === 'STALE' || envelope.availability === 'PARTIAL' ? 'warning' : 'default'} variant="outlined" size="small" />
+          </Stack>
+        ) : undefined}
       />
       {loading && <LinearProgress sx={{ mb: 2 }} />}
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-      {!loading && !error && envelope?.availability !== 'READY' && (
+      {!loading && !error && envelope && <SnapshotMetadata envelope={envelope} />}
+      {showWarnings && (
+        <Stack spacing={1} sx={{ mb: 2 }}>
+          {envelope?.warnings.map((warning) => <Alert key={warning} severity="warning">{warning}</Alert>)}
+        </Stack>
+      )}
+      {showUnavailable && (
         <DataUnavailableState
           title={missingTitle}
           message={envelope?.message && envelope.message !== missingTitle ? envelope.message : 'Future persisted read API capability is required before this page can show snapshot rows.'}
@@ -250,35 +308,35 @@ function RadarPage<T>({
   loading,
   error,
   missingTitle,
+  getRowCategories,
   renderTable,
 }: {
   title: string;
   subtitle: string;
-  tabs: string[];
+  tabs: RadarTab[];
   envelope: SnapshotEnvelope<T[]> | null;
   loading: boolean;
   error: string | null;
   missingTitle: string;
+  getRowCategories: (row: T) => string[];
   renderTable: (rows: T[]) => ReactNode;
 }) {
-  const [activeTab, setActiveTab] = useState(tabs[0]);
+  const [activeTab, setActiveTab] = useState(tabs[0]?.value ?? '');
+  const activeLabel = tabs.find((tab) => tab.value === activeTab)?.label ?? activeTab;
   const rows = envelope?.snapshot ?? [];
-  const filteredRows = rows.filter((row) => {
-    const category = typeof row === 'object' && row !== null && 'category' in row ? String((row as { category?: string }).category) : activeTab;
-    return category === activeTab;
-  });
+  const filteredRows = rows.filter((row) => getRowCategories(row).includes(activeTab));
 
   return (
     <SnapshotPageShell title={title} subtitle={subtitle} loading={loading} error={error} envelope={envelope} missingTitle={missingTitle}>
       <Paper variant="outlined" sx={{ mb: 2 }}>
         <Tabs value={activeTab} onChange={(_event, value) => setActiveTab(value)} variant="scrollable" scrollButtons="auto">
-          {tabs.map((tab) => <Tab key={tab} value={tab} label={tab} />)}
+          {tabs.map((tab) => <Tab key={tab.value} value={tab.value} label={tab.label} />)}
         </Tabs>
       </Paper>
-      {envelope?.availability === 'READY' && (
+      {rows.length > 0 && (
         filteredRows.length > 0
           ? renderTable(filteredRows)
-          : <EmptyState title="No persisted rows for this scope/date." message={`No ${activeTab} rows were present in the backend snapshot.`} />
+          : <EmptyState title="No persisted rows for this tab." message={`No ${activeLabel} rows were present in the backend snapshot.`} />
       )}
     </SnapshotPageShell>
   );
@@ -291,7 +349,9 @@ function MarketPulseSnapshotView({ snapshot }: { snapshot: MarketPulseSnapshot }
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(4, 1fr)' }, gap: 2 }}>
         <ScoreCard label="Health Label" value={snapshot.marketHealthLabel} />
         <ScoreCard label="Health Score" value={formatOptional(snapshot.marketHealthScore)} />
+        <ScoreCard label="Snapshot Status" value={formatEnum(snapshot.status)} />
         <ScoreCard label="Data Through" value={formatDate(snapshot.dataThroughDate)} />
+        <ScoreCard label="Generated At" value={formatDateTime(snapshot.generatedAt)} />
         <ScoreCard label="Candidate Count" value={formatOptional(snapshot.candidateCount)} />
       </Box>
       <SectionPanel title="Top 5 Indices">
@@ -304,7 +364,7 @@ function MarketPulseSnapshotView({ snapshot }: { snapshot: MarketPulseSnapshot }
                   <TableRow key={row.symbol}>
                     <TableCell>{row.label || row.symbol}</TableCell>
                     <TableCell align="right">{formatOptional(row.value)}</TableCell>
-                    <TableCell align="right">{formatPercent(row.changePercent)}</TableCell>
+                    <TableCell align="right">{formatRatioPercent(row.changePercent)}</TableCell>
                     <TableCell>{row.freshness || 'Unavailable'}</TableCell>
                   </TableRow>
                 ))}
@@ -328,11 +388,69 @@ function MarketPulseSnapshotView({ snapshot }: { snapshot: MarketPulseSnapshot }
   );
 }
 
+function SectorIntelligencePanel({
+  envelope,
+  loading,
+  error,
+}: {
+  envelope: SnapshotEnvelope<SectorIntelligenceSnapshot[]> | null;
+  loading: boolean;
+  error: string | null;
+}) {
+  const rows = envelope?.snapshot ?? [];
+
+  return (
+    <SectionPanel title="Sector Intelligence">
+      <Stack spacing={1.25}>
+        {loading && <LinearProgress />}
+        {error && <Alert severity="error">{error}</Alert>}
+        {envelope && <SnapshotMetadata envelope={envelope} compact />}
+        {!loading && !error && envelope?.warnings.map((warning) => <Alert key={warning} severity="warning">{warning}</Alert>)}
+        {!loading && !error && rows.length === 0 && (
+          <EmptyState title="No persisted sector rows for this scope/date." message={envelope?.message || 'No persisted Sector Intelligence rows are available for this scope.'} />
+        )}
+        {rows.length > 0 && (
+          <TableContainer>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Sector</TableCell>
+                  <TableCell>Classification</TableCell>
+                  <TableCell align="right">Sector Score</TableCell>
+                  <TableCell align="right">1W</TableCell>
+                  <TableCell align="right">1M</TableCell>
+                  <TableCell align="right">3M</TableCell>
+                  <TableCell>Reasons</TableCell>
+                  <TableCell>Warnings</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {rows.map((row) => (
+                  <TableRow key={row.sector}>
+                    <TableCell>{row.sector}</TableCell>
+                    <TableCell>{formatEnum(row.classification)}</TableCell>
+                    <TableCell align="right">{formatOptional(row.sectorScore)}</TableCell>
+                    <TableCell align="right">{formatPercentPoints(row.return1W)}</TableCell>
+                    <TableCell align="right">{formatPercentPoints(row.return1M)}</TableCell>
+                    <TableCell align="right">{formatPercentPoints(row.return3M)}</TableCell>
+                    <TableCell><ReasonTags tags={row.reasonTags} /></TableCell>
+                    <TableCell><RiskTags tags={row.warnings} /></TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
+      </Stack>
+    </SectionPanel>
+  );
+}
+
 function StockInterestTable({ rows }: { rows: StockInterestSnapshot[] }) {
   return (
     <RankingTable
       rows={rows}
-      columns={['Symbol', 'Company', 'Sector', 'Interest Score', 'Direction', 'Reasons', 'Risks', 'Freshness', 'Returns', 'Workspace']}
+      columns={['Symbol', 'Company', 'Sector', 'Interest Score', 'Direction', 'Reasons', 'Risks', 'Freshness', 'Data Through', 'Workspace']}
       renderRow={(row) => [
         row.symbol,
         row.company,
@@ -342,7 +460,7 @@ function StockInterestTable({ rows }: { rows: StockInterestSnapshot[] }) {
         <ReasonTags key="reasons" tags={row.reasonTags} />,
         <RiskTags key="risks" tags={row.riskTags} />,
         row.freshness || 'Unavailable',
-        row.returns || 'Unavailable',
+        formatDate(row.dataThroughDate),
         <Button key="workspace" size="small" component={RouterLink} to={`/stocks/${encodeURIComponent(row.symbol)}`}>Open</Button>,
       ]}
     />
@@ -353,16 +471,19 @@ function EarningsTable({ rows }: { rows: EarningsIntelligenceSnapshot[] }) {
   return (
     <RankingTable
       rows={rows}
-      columns={['Symbol', 'Result Date', 'Revenue Growth', 'Profit Growth', 'EPS Growth', 'Margin Trend', 'Consistency', 'Acceleration', 'Reasons', 'Risks']}
+      columns={['Symbol', 'Result Date', 'Date Source', 'Days To Result', 'Revenue Growth', 'Profit Growth', 'EPS Growth', 'Margin Trend', 'Consistency', 'Acceleration', 'Freshness', 'Reasons', 'Risks']}
       renderRow={(row) => [
         row.symbol,
-        row.resultDate || 'Unavailable',
-        formatPercent(row.revenueGrowth),
-        formatPercent(row.profitGrowth),
-        formatPercent(row.epsGrowth),
-        row.marginTrend || 'Unavailable',
+        formatDate(row.resultDate),
+        formatEnum(row.resultDateSource),
+        formatOptional(row.daysToResult),
+        formatPercentPoints(row.revenueGrowth),
+        formatPercentPoints(row.profitGrowth),
+        formatPercentPoints(row.epsGrowth),
+        formatPercentPoints(row.marginTrend),
         formatOptional(row.consistencyScore),
         formatOptional(row.accelerationScore),
+        row.freshness || 'Unavailable',
         <ReasonTags key="reasons" tags={row.reasonTags} />,
         <RiskTags key="risks" tags={row.riskTags} />,
       ]}
@@ -468,6 +589,26 @@ function ScoreCard({ label, value }: { label: string; value: ReactNode }) {
   );
 }
 
+function SnapshotMetadata({ envelope, compact = false }: { envelope: SnapshotEnvelope<unknown>; compact?: boolean }) {
+  const items = [
+    ['Status', envelope.status || envelope.availability],
+    ['Freshness', envelope.freshness],
+    ['Snapshot Date', formatDate(envelope.snapshotDate)],
+    ['Data Through', formatDate(envelope.dataThroughDate)],
+    ['Generated At', formatDateTime(envelope.generatedAt)],
+  ].filter(([, value]) => value && value !== 'Unavailable');
+
+  if (items.length === 0) return null;
+
+  return (
+    <Stack direction="row" gap={1} flexWrap="wrap" useFlexGap sx={{ mb: compact ? 0 : 2 }}>
+      {items.map(([label, value]) => (
+        <Chip key={label} size="small" variant="outlined" label={`${label}: ${label === 'Status' || label === 'Freshness' ? formatEnum(String(value)) : value}`} />
+      ))}
+    </Stack>
+  );
+}
+
 function HealthBadge({ label }: { label: string }) {
   return <Chip label={label} color={label.toLowerCase().includes('risk') ? 'warning' : 'primary'} variant="outlined" />;
 }
@@ -540,13 +681,33 @@ function formatOptional(value: number | string | null | undefined) {
   return value;
 }
 
-function formatPercent(value: number | null | undefined) {
+function formatRatioPercent(value: number | null | undefined) {
   if (typeof value !== 'number' || Number.isNaN(value)) return 'Unavailable';
   return `${value >= 0 ? '+' : ''}${(value * 100).toFixed(1)}%`;
+}
+
+function formatPercentPoints(value: number | null | undefined) {
+  if (typeof value !== 'number' || Number.isNaN(value)) return 'Unavailable';
+  return `${value >= 0 ? '+' : ''}${value.toFixed(1)}%`;
+}
+
+function formatEnum(value: string | null | undefined) {
+  if (!value) return 'Unavailable';
+  return value
+    .toLowerCase()
+    .split('_')
+    .map((part) => part ? `${part[0].toUpperCase()}${part.slice(1)}` : part)
+    .join(' ');
 }
 
 function formatDate(value: string | null | undefined) {
   if (!value) return 'Unavailable';
   const timestamp = new Date(value).getTime();
   return Number.isFinite(timestamp) ? new Date(value).toLocaleDateString() : value;
+}
+
+function formatDateTime(value: string | null | undefined) {
+  if (!value) return 'Unavailable';
+  const timestamp = new Date(value).getTime();
+  return Number.isFinite(timestamp) ? new Date(value).toLocaleString() : value;
 }

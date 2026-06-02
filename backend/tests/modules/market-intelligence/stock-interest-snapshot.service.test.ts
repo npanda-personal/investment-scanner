@@ -101,6 +101,7 @@ describe('StockInterestSnapshotService', () => {
       upsertSnapshots: jest.fn()
         .mockImplementationOnce(async (rows: unknown[]) => ({ createdCount: rows.length, updatedCount: 0, unchangedCount: 0 }))
         .mockImplementationOnce(async (rows: unknown[]) => ({ createdCount: 0, updatedCount: 0, unchangedCount: rows.length })),
+      pruneSnapshotRowsForSymbols: jest.fn().mockResolvedValue(0),
     };
     const service = new StockInterestSnapshotService(repository as any);
 
@@ -112,6 +113,18 @@ describe('StockInterestSnapshotService', () => {
       assetType: 'STOCK',
     }));
     expect(repository.upsertSnapshots).toHaveBeenCalledTimes(2);
+    expect(repository.pruneSnapshotRowsForSymbols).toHaveBeenCalledTimes(2);
+    expect(repository.pruneSnapshotRowsForSymbols).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      snapshotDate: new Date('2026-06-01T00:00:00.000Z'),
+      region: 'IN',
+      assetType: 'STOCK',
+      timeframe: '1d',
+      symbols: ['AAA', 'BBB', 'CCC', 'DDD'],
+      keepKeys: expect.arrayContaining([
+        expect.objectContaining({ category: 'TODAY_TOP_INTEREST', symbol: 'AAA' }),
+        expect.objectContaining({ category: 'RISK_AVOID', symbol: 'CCC' }),
+      ]),
+    }));
     expect(first).toMatchObject({
       status: 'COMPLETED',
       totalCount: (repository.upsertSnapshots.mock.calls[0][0] as unknown[]).length,
@@ -124,5 +137,48 @@ describe('StockInterestSnapshotService', () => {
       succeededCount: 0,
       unchangedCount: (repository.upsertSnapshots.mock.calls[1][0] as unknown[]).length,
     });
+  });
+
+  it('collapses noisy row-level warnings into one top-level latest snapshot warning', async () => {
+    const repository = {
+      latestSnapshots: jest.fn().mockResolvedValue([
+        {
+          snapshotDate: '2026-06-01',
+          dataThroughDate: '2026-06-01',
+          generatedAt: '2026-06-01T06:00:00.000Z',
+          category: 'TODAY_TOP_INTEREST',
+          symbol: 'AAA',
+          company: 'AAA Ltd',
+          sector: null,
+          score: 90,
+          direction: 'bullish interest',
+          reasonTags: [],
+          riskTags: [],
+          freshness: 'FRESH',
+          warnings: ['AAA: insufficient persisted fundamentals.', 'AAA: sector metadata is unavailable.'],
+        },
+        {
+          snapshotDate: '2026-06-01',
+          dataThroughDate: '2026-06-01',
+          generatedAt: '2026-06-01T06:00:00.000Z',
+          category: 'RISK_AVOID',
+          symbol: 'BBB',
+          company: 'BBB Ltd',
+          sector: null,
+          score: 70,
+          direction: 'risk warning',
+          reasonTags: [],
+          riskTags: [],
+          freshness: 'FRESH',
+          warnings: ['BBB: insufficient persisted fundamentals.'],
+        },
+      ]),
+    };
+    const service = new StockInterestSnapshotService(repository as any);
+
+    const envelope = await service.latestSnapshot({ region: 'IN', assetType: 'STOCK' });
+
+    expect(envelope.warnings).toHaveLength(1);
+    expect(envelope.warnings[0]).toContain('3 row-level Stock Interest data warnings across 2 symbols');
   });
 });

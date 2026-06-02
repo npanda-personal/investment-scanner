@@ -1,6 +1,6 @@
 import type { MarketScope } from '@/contexts/MarketScopeContext';
 
-export type SnapshotAvailability = 'READY' | 'EMPTY' | 'BACKEND_UNAVAILABLE' | 'ERROR';
+export type SnapshotAvailability = 'READY' | 'EMPTY' | 'PARTIAL' | 'STALE' | 'BACKEND_UNAVAILABLE' | 'ERROR';
 export type MarketPulseState = 'Healthy' | 'Tradable But Selective' | 'Fragile' | 'Risky' | 'Stale' | 'Partial';
 
 export interface SnapshotEnvelope<T> {
@@ -9,6 +9,11 @@ export interface SnapshotEnvelope<T> {
   snapshot: T | null;
   message: string;
   warnings: string[];
+  status?: string | null;
+  freshness?: string | null;
+  snapshotDate?: string | null;
+  dataThroughDate?: string | null;
+  generatedAt?: string | null;
 }
 
 export interface FreshnessSnapshot {
@@ -50,10 +55,30 @@ export interface MarketPulseSnapshot {
   deliverySummary: string;
   candidateCount: number | null;
   warnings: string[];
+  sourceSummary?: {
+    status?: string | null;
+    dataThroughDate?: string | null;
+    latestCompletedTradingDate?: string | null;
+  } | null;
+}
+
+export interface SectorIntelligenceSnapshot {
+  snapshotDate: string;
+  dataThroughDate: string;
+  sector: string;
+  classification: 'STRONG' | 'IMPROVING' | 'NEUTRAL' | 'WEAK' | string;
+  sectorScore: number | null;
+  return1W: number | null;
+  return1M: number | null;
+  return3M: number | null;
+  trendScore: number | null;
+  reasonTags: string[];
+  warnings: string[];
 }
 
 export interface StockInterestSnapshot {
   snapshotDate: string;
+  dataThroughDate?: string | null;
   generatedAt: string;
   score: number | null;
   symbol: string;
@@ -65,18 +90,24 @@ export interface StockInterestSnapshot {
   riskTags: string[];
   freshness?: string | null;
   returns?: string | null;
+  warnings?: string[];
 }
 
 export interface EarningsIntelligenceSnapshot {
   snapshotDate: string;
+  dataThroughDate?: string | null;
+  generatedAt?: string | null;
   symbol: string;
   resultDate: string | null;
+  resultDateSource: string;
+  daysToResult?: number | null;
   revenueGrowth: number | null;
   profitGrowth: number | null;
   epsGrowth: number | null;
-  marginTrend: string | null;
+  marginTrend: number | null;
   consistencyScore: number | null;
   accelerationScore: number | null;
+  categories: string[];
   reasonTags: string[];
   riskTags: string[];
   freshness?: string | null;
@@ -129,25 +160,10 @@ export interface InstrumentContextSnapshot {
 
 export type MarketReadModelKey =
   | 'marketPulse'
+  | 'sectorIntelligence'
   | 'stockInterest'
   | 'earningsIntelligence'
   | 'compounderRadar'
   | 'traderSetupRadar'
   | 'riskRadar'
   | 'instrumentContext';
-
-export interface MarketIntelligenceFixtureMap {
-  marketPulse?: MarketPulseSnapshot;
-  stockInterest?: StockInterestSnapshot[];
-  earningsIntelligence?: EarningsIntelligenceSnapshot[];
-  compounderRadar?: CompounderSnapshot[];
-  traderSetupRadar?: TraderSetupSnapshot[];
-  riskRadar?: RiskRadarSnapshot[];
-  instrumentContext?: InstrumentContextSnapshot;
-}
-
-declare global {
-  interface Window {
-    __marketIntelligenceReadModelFixtures?: MarketIntelligenceFixtureMap;
-  }
-}

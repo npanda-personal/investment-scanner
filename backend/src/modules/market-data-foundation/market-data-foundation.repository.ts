@@ -17,6 +17,7 @@ import type {
   MarketDataRepairStateStatus,
   MarketMoverRow,
   ProviderValidationQueue,
+  DailyRefreshEligibilityResult,
   ScheduledRegionSyncSummary,
   TrustedReviewUniversePriceRow,
 } from './market-data-foundation.types';
@@ -108,6 +109,8 @@ type DeliverySnapshotInput = {
 };
 
 export class MarketDataFoundationRepository {
+  private static historicalBulkWriteChain: Promise<void> = Promise.resolve();
+
   constructor(public readonly prisma: PrismaClient = defaultPrisma) {}
 
   async upsertSourceFileImport(input: SourceFileImportInput) {
@@ -176,6 +179,28 @@ export class MarketDataFoundationRepository {
         source: input.source,
         segment: input.segment,
         status: 'COMPLETED',
+        tradingDate: {
+          gte: this.normalizeUtcDay(input.startDate),
+          lte: this.normalizeUtcDay(input.endDate),
+        },
+      },
+      orderBy: { tradingDate: 'asc' },
+      select: { tradingDate: true },
+    });
+    return rows.map((row: { tradingDate: Date }) => this.normalizeUtcDay(row.tradingDate));
+  }
+
+  async listCompletedOfficialNseIndexImportDates(input: {
+    startDate: Date;
+    endDate: Date;
+  }): Promise<Date[]> {
+    const rows = await (this.prisma as any).sourceFileImport.findMany({
+      where: {
+        source: 'NSE',
+        segment: 'INDEX',
+        status: 'COMPLETED',
+        fileName: { startsWith: 'ind_close_all_' },
+        parserVersion: 'nse-index-eod-v1',
         tradingDate: {
           gte: this.normalizeUtcDay(input.startDate),
           lte: this.normalizeUtcDay(input.endDate),
@@ -535,40 +560,23 @@ export class MarketDataFoundationRepository {
 
   async rebuildLatestPricesFromExchangeCandles() {
     const sourceList = EXCHANGE_PRICE_SOURCES.map((source) => source.toUpperCase());
-    const latestRows = await this.prisma.$queryRaw<Array<{
-      symbol: string;
-      region: string | null;
-      timestamp: Date;
-      close: Prisma.Decimal | number | string;
-    }>>(Prisma.sql`
+    const rebuiltCount = await this.prisma.$executeRaw(Prisma.sql`
+      INSERT INTO latest_prices (symbol, region, price, timestamp, "updatedAt")
       SELECT DISTINCT ON (pt.symbol)
         pt.symbol,
         pt.region,
+        pt.close,
         pt.timestamp,
-        pt.close
+        NOW()
       FROM price_ticks pt
       WHERE UPPER(COALESCE(pt.source, '')) IN (${Prisma.join(sourceList)})
       ORDER BY pt.symbol ASC, pt.timestamp DESC, pt."lastUpdatedTimestamp" DESC
+      ON CONFLICT (symbol) DO UPDATE SET
+        region = EXCLUDED.region,
+        price = EXCLUDED.price,
+        timestamp = EXCLUDED.timestamp,
+        "updatedAt" = EXCLUDED."updatedAt"
     `);
-
-    for (const row of latestRows) {
-      await this.prisma.latestPrice.upsert({
-        where: { symbol: row.symbol },
-        update: {
-          region: row.region,
-          price: new Prisma.Decimal(row.close),
-          timestamp: row.timestamp,
-          updatedAt: new Date(),
-        },
-        create: {
-          symbol: row.symbol,
-          region: row.region,
-          price: new Prisma.Decimal(row.close),
-          timestamp: row.timestamp,
-          updatedAt: new Date(),
-        },
-      });
-    }
 
     const staleDeleted = await this.prisma.$executeRaw(Prisma.sql`
       DELETE FROM latest_prices lp
@@ -581,7 +589,7 @@ export class MarketDataFoundationRepository {
     `);
 
     return {
-      rebuiltCount: latestRows.length,
+      rebuiltCount: Number(rebuiltCount || 0),
       staleDeletedCount: Number(staleDeleted || 0),
     };
   }
@@ -821,6 +829,7 @@ export class MarketDataFoundationRepository {
         ...this.stockWhere(options),
         ...(excludeIds.length > 0 ? { id: { notIn: excludeIds } } : {}),
         isActive: true,
+        isDelisted: false,
         OR: [
           { providerSupportStatus: null },
           { providerSupportStatus: { in: ['SUPPORTED', 'UNKNOWN'], mode: 'insensitive' } },
@@ -913,6 +922,7 @@ export class MarketDataFoundationRepository {
       where: {
         ...this.stockWhere(options),
         isActive: true,
+        isDelisted: false,
         OR: [
           { providerSupportStatus: null },
           { providerSupportStatus: { in: ['SUPPORTED', 'UNKNOWN'], mode: 'insensitive' } },
@@ -2352,6 +2362,15 @@ export class MarketDataFoundationRepository {
     regionInfoBySymbol: Map<string, PriceRegionInfo> = new Map(),
     options: HistoricalStoreOptions = {}
   ): Promise<HistoricalBulkStoreSummary> {
+    return this.withHistoricalBulkWriteSlot(() => this.storeHistoricalBulkUnlocked(prices, inferRegion, regionInfoBySymbol, options));
+  }
+
+  private async storeHistoricalBulkUnlocked(
+    prices: HistoricalPrice[],
+    inferRegion: InferPriceRegion,
+    regionInfoBySymbol: Map<string, PriceRegionInfo> = new Map(),
+    options: HistoricalStoreOptions = {}
+  ): Promise<HistoricalBulkStoreSummary> {
     const rowsReceived = prices.length;
     const receivedBySymbol = new Map<string, number>();
     for (const price of prices) {
@@ -2425,21 +2444,26 @@ export class MarketDataFoundationRepository {
 
     console.log(`  Bulk storing ${validPrices.length} price ticks across ${validSymbols.length} symbols...`);
 
-    await this.prisma.$transaction(async (tx: any) => {
-      const batchSize = 1000;
-      for (let i = 0; i < rowsToInsert.length; i += batchSize) {
-        const batch = rowsToInsert.slice(i, i + batchSize);
+    const batchSize = this.exchangeBulkWriteBatchSize();
+    for (let i = 0; i < rowsToInsert.length; i += batchSize) {
+      const batch = rowsToInsert.slice(i, i + batchSize);
+      await this.prisma.$transaction(async (tx: any) => {
         await tx.priceTick.createMany({
           data: batch.map((price) => this.priceTickCreateData(price, regionInfoBySymbol.get(price.symbol) ?? inferRegion(price.symbol), options)),
           skipDuplicates: true,
         });
-      }
+      }, {
+        maxWait: 30000,
+        timeout: 60000,
+      });
+    }
 
-      for (let i = 0; i < rowsToUpdate.length; i += batchSize) {
-        const batch = rowsToUpdate.slice(i, i + batchSize);
-        await Promise.all(batch.map((price) => {
+    for (let i = 0; i < rowsToUpdate.length; i += batchSize) {
+      const batch = rowsToUpdate.slice(i, i + batchSize);
+      await this.prisma.$transaction(async (tx: any) => {
+        for (const price of batch) {
           const regionInfo = regionInfoBySymbol.get(price.symbol) ?? inferRegion(price.symbol);
-          return tx.priceTick.update({
+          await tx.priceTick.update({
             where: {
               symbol_timestamp: {
                 symbol: price.symbol,
@@ -2448,16 +2472,21 @@ export class MarketDataFoundationRepository {
             },
             data: this.priceTickUpdateData(price, regionInfo, options),
           });
-        }));
-      }
+        }
+      }, {
+        maxWait: 30000,
+        timeout: 60000,
+      });
+    }
 
-      if (options.skipLatestPriceUpdate !== true) {
-        const latestEntries = Array.from(latestBySymbol.entries());
-        for (let i = 0; i < latestEntries.length; i += 500) {
-          const batch = latestEntries.slice(i, i + 500);
-          await Promise.all(batch.map(([symbol, latest]) => {
+    if (options.skipLatestPriceUpdate !== true) {
+      const latestEntries = Array.from(latestBySymbol.entries());
+      for (let i = 0; i < latestEntries.length; i += 100) {
+        const batch = latestEntries.slice(i, i + 100);
+        await this.prisma.$transaction(async (tx: any) => {
+          for (const [symbol, latest] of batch) {
             const regionInfo = regionInfoBySymbol.get(symbol) ?? inferRegion(symbol);
-            return tx.latestPrice.upsert({
+            await tx.latestPrice.upsert({
               where: { symbol },
               update: {
                 region: regionInfo.region,
@@ -2473,13 +2502,13 @@ export class MarketDataFoundationRepository {
                 updatedAt: new Date(),
               },
             });
-          }));
-        }
+          }
+        }, {
+          maxWait: 30000,
+          timeout: 60000,
+        });
       }
-    }, {
-      maxWait: 30000,
-      timeout: 120000,
-    });
+    }
 
     const insertedBySymbol = this.countPricesBySymbol(rowsToInsert);
     const updatedBySymbol = this.countPricesBySymbol(rowsToUpdate);
@@ -2516,9 +2545,97 @@ export class MarketDataFoundationRepository {
     };
   }
 
+  private async withHistoricalBulkWriteSlot<T>(operation: () => Promise<T>): Promise<T> {
+    const previous = MarketDataFoundationRepository.historicalBulkWriteChain.catch(() => undefined);
+    let release!: () => void;
+    MarketDataFoundationRepository.historicalBulkWriteChain = previous.then(() => new Promise<void>((resolve) => {
+      release = resolve;
+    }));
+    await previous;
+    try {
+      return await operation();
+    } finally {
+      release();
+    }
+  }
+
+  private exchangeBulkWriteBatchSize(): number {
+    const raw = Number(process.env.MARKET_DATA_EXCHANGE_BULK_WRITE_BATCH_SIZE || 500);
+    if (!Number.isFinite(raw)) return 500;
+    return Math.max(100, Math.min(Math.floor(raw), 1000));
+  }
+
   async latestStoredTradingDateForRegion(region: string, assetType: string): Promise<string | null> {
     const latest = await this.latestDataTimestamp({ region, assetType });
     return latest?.toISOString().slice(0, 10) ?? null;
+  }
+
+  async listDailyRefreshEligibleInstrumentIds(input: {
+    region: string;
+    assetType: string;
+    dataThroughDate: string;
+    limit?: number;
+  }): Promise<DailyRefreshEligibilityResult> {
+    const dateText = String(input.dataThroughDate || '').slice(0, 10);
+    const start = new Date(`${dateText}T00:00:00.000Z`);
+    if (!dateText || Number.isNaN(start.getTime())) {
+      return {
+        region: input.region,
+        assetType: input.assetType,
+        dataThroughDate: dateText,
+        source: 'NONE',
+        instrumentIds: [],
+        instrumentCount: 0,
+      };
+    }
+    const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+    const limit = Math.max(1, Math.min(Math.floor(input.limit || 5000), 10_000));
+    const limitFilter = Prisma.sql`LIMIT ${limit}`;
+    const scope = { region: input.region, assetType: input.assetType };
+
+    const latestPriceRows = await this.prisma.$queryRaw<Array<{ id: string; symbol: string }>>(Prisma.sql`
+      SELECT stocks.id, stocks.symbol
+      FROM latest_prices
+      INNER JOIN stocks ON stocks.symbol = latest_prices.symbol
+      WHERE ${this.activeStockSyncTaskSqlWhere(scope)}
+        AND latest_prices.timestamp >= ${start}
+        AND latest_prices.timestamp < ${end}
+      GROUP BY stocks.id, stocks.symbol
+      ORDER BY stocks.symbol ASC
+      ${limitFilter}
+    `);
+    if (latestPriceRows.length > 0) {
+      const instrumentIds = latestPriceRows.map((row) => row.id);
+      return {
+        region: input.region,
+        assetType: input.assetType,
+        dataThroughDate: dateText,
+        source: 'LATEST_PRICE',
+        instrumentIds,
+        instrumentCount: instrumentIds.length,
+      };
+    }
+
+    const priceTickRows = await this.prisma.$queryRaw<Array<{ id: string; symbol: string }>>(Prisma.sql`
+      SELECT stocks.id, stocks.symbol
+      FROM price_ticks
+      INNER JOIN stocks ON stocks.symbol = price_ticks.symbol
+      WHERE ${this.activeStockSyncTaskSqlWhere(scope)}
+        AND price_ticks.timestamp >= ${start}
+        AND price_ticks.timestamp < ${end}
+      GROUP BY stocks.id, stocks.symbol
+      ORDER BY stocks.symbol ASC
+      ${limitFilter}
+    `);
+    const instrumentIds = priceTickRows.map((row) => row.id);
+    return {
+      region: input.region,
+      assetType: input.assetType,
+      dataThroughDate: dateText,
+      source: instrumentIds.length > 0 ? 'PRICE_TICK' : 'NONE',
+      instrumentIds,
+      instrumentCount: instrumentIds.length,
+    };
   }
 
   async getSyncState(
@@ -3281,6 +3398,7 @@ export class MarketDataFoundationRepository {
     const filters: Prisma.Sql[] = [
       this.scopedStockSqlWhere(options),
       Prisma.sql`stocks."isActive" = TRUE`,
+      Prisma.sql`stocks."isDelisted" = FALSE`,
       Prisma.sql`(
         stocks."providerSupportStatus" IS NULL
         OR UPPER(stocks."providerSupportStatus") IN (${Prisma.join(['SUPPORTED', 'UNKNOWN'])})

@@ -3,21 +3,21 @@ services:
     image: timescale/timescaledb:latest-pg16
     container_name: investment_scanner_postgres
     restart: unless-stopped
-    mem_limit: 1g
-    memswap_limit: 1g
+    mem_limit: 1536m
+    memswap_limit: 1536m
     shm_size: 128mb
     command:
       - postgres
       - -c
-      - shared_buffers=256MB
+      - shared_buffers=128MB
       - -c
-      - effective_cache_size=768MB
+      - effective_cache_size=512MB
       - -c
       - maintenance_work_mem=64MB
       - -c
-      - work_mem=2MB
+      - work_mem=1MB
       - -c
-      - max_connections=25
+      - max_connections=20
     environment:
       POSTGRES_DB: investment_scanner
       POSTGRES_USER: scanner

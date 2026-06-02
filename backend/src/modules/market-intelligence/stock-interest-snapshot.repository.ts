@@ -132,7 +132,7 @@ export class StockInterestSnapshotRepository {
   }
 
   async upsertSnapshots(rows: StockInterestSnapshotWriteInput[]): Promise<StockInterestSnapshotWriteSummary> {
-    const summary = { createdCount: 0, updatedCount: 0, unchangedCount: 0 };
+    const summary = { createdCount: 0, updatedCount: 0, unchangedCount: 0, prunedCount: 0 };
     for (const row of rows) {
       const where = {
         snapshotDate_scopeRegion_scopeAssetType_timeframe_category_symbol: {
@@ -174,6 +174,38 @@ export class StockInterestSnapshotRepository {
       else summary.createdCount += 1;
     }
     return summary;
+  }
+
+  async pruneSnapshotRowsForSymbols(input: {
+    snapshotDate: Date;
+    region: string;
+    assetType: string;
+    timeframe: string;
+    symbols: string[];
+    keepKeys: Array<{ category: string; symbol: string }>;
+  }): Promise<number> {
+    const symbols = [...new Set(input.symbols.map((symbol) => symbol.trim()).filter(Boolean))];
+    if (symbols.length === 0 || typeof this.db.stockInterestSnapshot.deleteMany !== 'function') return 0;
+    const keepKeys = input.keepKeys
+      .map((key) => ({ category: String(key.category || '').trim(), symbol: String(key.symbol || '').trim() }))
+      .filter((key) => key.category && key.symbol);
+    const where: any = {
+      snapshotDate: input.snapshotDate,
+      scopeRegion: input.region,
+      scopeAssetType: input.assetType,
+      timeframe: input.timeframe,
+      symbol: { in: symbols },
+    };
+    if (keepKeys.length > 0) {
+      where.NOT = {
+        OR: keepKeys.map((key) => ({
+          category: key.category,
+          symbol: key.symbol,
+        })),
+      };
+    }
+    const result = await this.db.stockInterestSnapshot.deleteMany({ where });
+    return Number(result?.count || 0);
   }
 
   async latestSnapshots(query: StockInterestScope & { timeframe?: string }): Promise<StockInterestSnapshotDto[]> {

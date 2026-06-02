@@ -238,6 +238,7 @@ export class PipelineOrchestrationRepository {
         metadata: input.metadata === undefined ? undefined : this.optionalJson(input.metadata),
         leaseOwner: input.leaseOwner === undefined ? undefined : input.leaseOwner,
         leaseExpiresAt: input.leaseMs ? new Date(now.getTime() + input.leaseMs) : undefined,
+        startedAt: input.startedAt === undefined ? undefined : input.startedAt,
       },
     });
     return this.toStageRecord(saved);

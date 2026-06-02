@@ -22,6 +22,8 @@ const DAY_MS = 86_400_000;
 const STALE_PRICE_DAYS = 7;
 const DEFAULT_EVALUATION_CONCURRENCY = 6;
 const MAX_EVALUATION_CONCURRENCY = 10;
+const DEFAULT_SCHEDULED_DQ_CHUNK_SIZE = 100;
+const MAX_SCHEDULED_DQ_CHUNK_SIZE = 100;
 const PHASE0_AUTOMATION_NOT_AUTHORIZED = 'PHASE0_AUTOMATION_NOT_AUTHORIZED';
 const TIER_REASON_STALE_PRICE = 'STALE_PRICE_DATA';
 const TIER_REASON_UNUSABLE_COVERAGE = 'UNUSABLE_COVERAGE';
@@ -170,63 +172,124 @@ export class DataQualityEngineService {
         failedCount: 0,
         skippedCount: 0,
         warnings: [],
+        errors: [],
+        nextOffset: null,
+        hasMore: false,
         durationMs: Date.now() - started,
       };
     }
 
-    const [instruments, priceWindowsByInstrumentId, fundamentalsByInstrumentId] = await Promise.all([
-      this.marketDataService.getInstrumentsByIds(normalizedIds),
-      this.marketDataService.listRecentPriceWindowsByInstrumentIds(normalizedIds, 300, { region, assetType }),
-      this.marketDataService.storedFundamentalsByInstrumentIds(normalizedIds, { region, assetType }),
-    ]);
-
-    const instrumentById = new Map(
-      instruments
-        .filter((instrument: any) => this.matchesScheduledScope(instrument, region, assetType))
-        .map((instrument: any) => [String(instrument.id), instrument])
-    );
-
+    const chunkSize = this.scheduledStageChunkSize(request.batchSize);
+    const totalChunks = Math.ceil(normalizedIds.length / chunkSize);
+    let processedCount = 0;
     let evaluatedCount = 0;
     let failedCount = 0;
     let skippedCount = 0;
     const warnings: string[] = [];
-    const concurrency = Math.max(1, Math.min(this.positiveNumber(request.batchSize, 25), MAX_EVALUATION_CONCURRENCY));
+    const errors: string[] = [];
+    const concurrency = Math.max(1, Math.min(this.positiveNumber(request.batchSize, DEFAULT_EVALUATION_CONCURRENCY), MAX_EVALUATION_CONCURRENCY));
 
-    await this.eachWithConcurrency(normalizedIds, concurrency, async (instrumentId) => {
-      const instrument = instrumentById.get(instrumentId);
-      if (!instrument) {
-        skippedCount += 1;
-        warnings.push(`${instrumentId}: instrument missing or out of scope`);
-        return;
-      }
+    const reportProgress = async (metadata: Record<string, unknown>) => {
+      if (!request.onProgress) return;
+      const hasMore = processedCount < normalizedIds.length;
+      await request.onProgress({
+        processedCount,
+        totalCount: normalizedIds.length,
+        evaluatedCount,
+        failedCount,
+        skippedCount,
+        warnings: [...warnings],
+        errors: [...errors],
+        nextOffset: hasMore ? processedCount : null,
+        hasMore,
+        metadata,
+      });
+    };
+
+    for (let offset = 0; offset < normalizedIds.length; offset += chunkSize) {
+      const chunkIds = normalizedIds.slice(offset, offset + chunkSize);
+      const chunkIndex = Math.floor(offset / chunkSize) + 1;
+      let instruments: any[] = [];
+      let priceWindowsByInstrumentId = new Map<string, any[]>();
+      let fundamentalsByInstrumentId = new Map<string, any>();
 
       try {
-        const [actionsResponse, latestSignal] = await Promise.all([
-          this.marketDataService.storedCorporateActionsByInstrumentId(instrumentId, { region, assetType }).catch(() => ({ actions: [] })),
-          this.signalService?.signalHistory({ instrumentId, limit: 1 }).catch(() => []) ?? Promise.resolve([]),
+        [instruments, priceWindowsByInstrumentId, fundamentalsByInstrumentId] = await Promise.all([
+          this.marketDataService.getInstrumentsByIds(chunkIds),
+          this.marketDataService.listRecentPriceWindowsByInstrumentIds(chunkIds, 300, { region, assetType }),
+          this.marketDataService.storedFundamentalsByInstrumentIds(chunkIds, { region, assetType }),
         ]);
-        const priceWindow = priceWindowsByInstrumentId.get(instrumentId) || [];
-        const prices = this.normalizePrices(priceWindow);
-        const latestPrice = prices[0] || null;
-        const fundamentalsResponse = fundamentalsByInstrumentId.get(instrumentId) || { records: [] };
-        const fundamentals = fundamentalsResponse.records || [];
-        const actions = actionsResponse?.actions || [];
-        const evaluated = this.evaluateInstrument(instrument, prices, latestPrice, fundamentals, actions, latestSignal.length > 0);
-        await this.repository.upsertEvaluation(evaluated);
-        evaluatedCount += 1;
       } catch (error: any) {
-        failedCount += 1;
-        warnings.push(`${instrument.symbol || instrumentId}: ${error?.message || 'evaluation failed'}`);
+        const message = `chunk ${chunkIndex}/${totalChunks} offset ${offset} failed for ${chunkIds.length} instruments: ${error?.message || 'scheduled data quality preload failed'}`;
+        failedCount += chunkIds.length;
+        processedCount += chunkIds.length;
+        warnings.push(message);
+        errors.push(message);
+        await reportProgress({
+          chunkIndex,
+          totalChunks,
+          chunkOffset: offset,
+          chunkInstrumentCount: chunkIds.length,
+          chunkStatus: 'FAILED',
+          chunkError: error?.message || 'scheduled data quality preload failed',
+        });
+        continue;
       }
-    });
+
+      const instrumentById = new Map(
+        instruments
+          .filter((instrument: any) => this.matchesScheduledScope(instrument, region, assetType))
+          .map((instrument: any) => [String(instrument.id), instrument])
+      );
+
+      await this.eachWithConcurrency(chunkIds, concurrency, async (instrumentId) => {
+        const instrument = instrumentById.get(instrumentId);
+        if (!instrument) {
+          skippedCount += 1;
+          warnings.push(`chunk ${chunkIndex}/${totalChunks} ${instrumentId}: instrument missing or out of scope`);
+          return;
+        }
+
+        try {
+          const [actionsResponse, latestSignal] = await Promise.all([
+            this.marketDataService.storedCorporateActionsByInstrumentId(instrumentId, { region, assetType }).catch(() => ({ actions: [] })),
+            this.signalService?.signalHistory({ instrumentId, limit: 1 }).catch(() => []) ?? Promise.resolve([]),
+          ]);
+          const priceWindow = priceWindowsByInstrumentId.get(instrumentId) || [];
+          const prices = this.normalizePrices(priceWindow);
+          const latestPrice = prices[0] || null;
+          const fundamentalsResponse = fundamentalsByInstrumentId.get(instrumentId) || { records: [] };
+          const fundamentals = fundamentalsResponse.records || [];
+          const actions = actionsResponse?.actions || [];
+          const evaluated = this.evaluateInstrument(instrument, prices, latestPrice, fundamentals, actions, latestSignal.length > 0);
+          await this.repository.upsertEvaluation(evaluated);
+          evaluatedCount += 1;
+        } catch (error: any) {
+          failedCount += 1;
+          warnings.push(`chunk ${chunkIndex}/${totalChunks} ${instrument.symbol || instrumentId}: ${error?.message || 'evaluation failed'}`);
+        }
+      });
+
+      processedCount += chunkIds.length;
+      await reportProgress({
+        chunkIndex,
+        totalChunks,
+        chunkOffset: offset,
+        chunkInstrumentCount: chunkIds.length,
+        chunkStatus: 'COMPLETED',
+      });
+    }
 
     return {
-      processedCount: normalizedIds.length,
+      processedCount,
       totalCount: normalizedIds.length,
       evaluatedCount,
       failedCount,
       skippedCount,
       warnings,
+      errors,
+      nextOffset: null,
+      hasMore: false,
       durationMs: Date.now() - started,
     };
   }
@@ -606,6 +669,10 @@ export class DataQualityEngineService {
   private positiveNumber(value: unknown, fallback: number): number {
     const numeric = Number(value);
     return Number.isFinite(numeric) && numeric > 0 ? Math.trunc(numeric) : fallback;
+  }
+
+  private scheduledStageChunkSize(value: unknown): number {
+    return Math.max(1, Math.min(this.positiveNumber(value, DEFAULT_SCHEDULED_DQ_CHUNK_SIZE), MAX_SCHEDULED_DQ_CHUNK_SIZE));
   }
 
   private async eachWithConcurrency<T>(items: T[], concurrency: number, worker: (item: T, index: number) => Promise<void>) {

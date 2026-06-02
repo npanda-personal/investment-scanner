@@ -58,6 +58,8 @@ This lets a user leave Market Data, Data Quality, Signal, Backtesting, Research,
 
 Terminal stage progress is outcome-based. For `COMPLETED`, `PARTIAL`, `FAILED`, `SKIPPED`, `BLOCKED`, or `CANCELED` rows, skipped and failed rows are counted as completed outcomes for progress display and ledger `processedCount` where the adapter reports them separately. This prevents a finished partial stage from appearing stuck below 100% when the remaining rows were intentionally skipped or blocked by missing upstream evidence.
 
+Non-terminal `MARKET_DATA` snapshots renew a local stage lease and persist their supplied `startedAt`. If a client disconnects while `PIPELINE_RUN_ALL` is still running, the server can still complete the ledger row. If the server-side work is interrupted, the stale `MARKET_DATA` stage stops appearing as healthy active progress after its lease expires, and a later `PIPELINE_RUN_ALL` can retry instead of being blocked by an abandoned zero-progress row.
+
 Scheduled `RAW_SIGNALS` and `SIGNAL_CALIBRATION` stages process explicit downstream instrument sets in bounded chunks and persist progress after each chunk. A terminal scheduled stage means the configured changed/downstream set was processed, not that a full-market manual sweep was performed. Pipeline Ops surfaces this execution scope and cursor metadata so users can distinguish incremental pipeline work from feature-owned full-scope manual actions.
 
 ## Read-Only Status API
@@ -137,7 +139,8 @@ This slice adds a ledgered scheduled `DATA_QUALITY` stage adapter entrypoint:
 - input set: explicit changed instrument ids from the same scheduled Market Data pass or terminal price-backfill ledger snapshot;
 - idempotency key: deterministic key over scope, data-through date, source fingerprint, changed-set fingerprint, and stage version;
 - lease behavior: terminal duplicate returns `DUPLICATE_TERMINAL`, active lease returns `LEASE_HELD`, and no duplicate execution is allowed;
-- execution: DB-only Data Quality adapter over explicit instrument ids;
+- execution: DB-only Data Quality adapter over explicit instrument ids in bounded chunks;
+- progress: chunk-level `processedCount`, outcome counts, warnings/errors, cursor fields, and lease renewal are persisted when the adapter reports progress;
 - completion: stage/run terminal counts and progress persisted with lease cleared on completion/failure.
 
 Out of scope in this slice:
@@ -227,7 +230,12 @@ Current Market Data bridge:
 - startup/manual price backfill writes a `MARKET_DATA` stage snapshot while its module-owned backfill run is active;
 - the bridge records progress, counts, warnings, errors, and terminal status using the existing pipeline ledger;
 - terminal `COMPLETED` or `PARTIAL` price-backfill snapshots with changed instrument ids start scheduled Data Quality for that explicit changed set, then the normal DB-only downstream chain can continue;
-- Pipeline Ops exposes `Run Daily Pipeline`, which runs Market Data first and then starts the downstream scheduled chain for the resulting changed/downstream instrument set;
+- Pipeline Ops exposes `Run Daily Pipeline`, which runs Market Data first and then starts the downstream scheduled chain for the resulting instrument set;
+- `PIPELINE_RUN_ALL` supports explicit run modes: `full_latest_trading_date` for the user-facing manual button, `incremental_changed_only` for changed-set automation, and legacy `single_batch` as a compatibility alias for the full daily path;
+- the full daily path treats valid no-op or duplicate-current exchange-file rows as downstream-eligible so Data Quality and read models can refresh even when Market Data rows were already current;
+- if the Market Data summary has no explicit downstream set in full daily mode, Pipeline Orchestration asks Market Data Foundation for DB-only persisted eligibility for the same `dataThroughDate`, preferring `LatestPrice` rows and then `PriceTick` rows; incremental mode does not use this fallback;
+- downstream exceptions are recorded as failed child-stage responses and make the daily Market Data command `PARTIAL` instead of disappearing as `null`;
+- paged scheduled adapters persist in-progress counts after each page/chunk where the module exposes page-level progress;
 - if a server shutdown leaves Market Data in `PENDING`, the next startup/manual run retries from Market Data first instead of jumping to downstream stages;
 - if Market Data is already current but downstream did not finish, startup/manual catch-up can relaunch the downstream chain for the last terminal Market Data summary;
 - it does not change provider calls, scheduler decisions, or Pipeline Ops command permissions.

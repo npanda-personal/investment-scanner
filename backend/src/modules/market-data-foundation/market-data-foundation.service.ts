@@ -12,6 +12,7 @@ import type {
   CompanyMasterData,
   CorporateAction,
   CoreFundamentals,
+  DailyRefreshEligibilityResult,
   FxRateInput,
   HistoricalPrice,
   MarketDataStatus,
@@ -133,6 +134,34 @@ const MARKET_MOVER_MAX_ABS_RETURN: Record<MarketMoverRange, number> = {
 const NSE_BSE_ONLY_PROVIDER_DISABLED_CODE = 'EXTERNAL_PROVIDER_DISABLED_NSE_BSE_ONLY';
 const NSE_BSE_ONLY_PROVIDER_DISABLED_MESSAGE =
   'External Yahoo/yfinance and Angel One provider paths are disabled. Use NSE/BSE exchange-file imports or manual verified evidence only.';
+const MANUAL_VERIFIED_FUNDAMENTALS_SOURCE = 'MANUAL_VERIFIED';
+const MANUAL_VERIFIED_FUNDAMENTALS_SEGMENT = 'FUNDAMENTALS';
+const MANUAL_VERIFIED_FUNDAMENTALS_PARSER_VERSION = 'manual-verified-fundamentals-csv-v1';
+const RECENT_PRICE_WINDOW_SYMBOL_CHUNK_SIZE = 100;
+
+type ManualVerifiedFundamentalsPeriodType = 'ANNUAL' | 'QUARTERLY';
+type ParsedManualVerifiedFundamentalRow = {
+  rowNumber: number;
+  symbol: string;
+  periodType: ManualVerifiedFundamentalsPeriodType;
+  periodEndDate: Date;
+  revenue: number;
+  netIncome: number;
+  eps: number;
+  peRatio: number | null;
+  marketCap: number | null;
+  currency: string | null;
+  sourceNote: string | null;
+  sourceUrl: string | null;
+  validatedBy: string;
+  validatedAt: Date;
+};
+type RejectedManualVerifiedFundamentalRow = {
+  rowNumber: number;
+  symbol: string | null;
+  reason: string;
+  errors: string[];
+};
 
 type LegacyMarketDataProviderPort = {
   inferRegion(symbol: string): { region: string; exchange?: string | null };
@@ -240,7 +269,7 @@ type ExchangeHistoricalBackfillJobRecord = {
   tradingDate: string;
   dateRange: string;
   status: ExchangeHistoricalBackfillJobStatus;
-  source: 'NSE' | 'NSE+BSE';
+  source: 'NSE' | 'NSE+BSE' | 'NSE_INDEX';
   rowsImported: number;
   rowsInserted: number;
   rowsUpdated: number;
@@ -257,7 +286,7 @@ type ExchangeHistoricalBackfillRunResponse = {
   runId: string;
   status: ExchangeHistoricalBackfillRunStatus;
   source: 'NSE';
-  segment: 'CM';
+  segment: string;
   region: string;
   assetType: string;
   startDate: string;
@@ -304,6 +333,69 @@ type ExchangeHistoricalBackfillRunInput = {
   staleJobTimeoutMs?: number;
   autoStart?: boolean;
   mode?: 'ALL' | 'RESUME_INCOMPLETE' | 'RETRY_FAILED';
+};
+type ExchangeHistoricalBackfillDatabasePause = {
+  pausedAt: string;
+  message: string;
+};
+type NseDeliveryHistoricalBackfillInput = {
+  region?: string;
+  assetType?: string;
+  startDate?: Date | string;
+  endDate?: Date | string;
+  sessions?: number;
+  batchSize?: number;
+  offset?: number;
+  force?: boolean;
+  downloadDelayMs?: number;
+  jitterMs?: number;
+};
+type NseDeliveryHistoricalBackfillDateResult = {
+  tradingDate: string;
+  status: ExchangeDailyImportSummary['status'] | 'NOT_AVAILABLE';
+  sourceFileImportId: string | null;
+  rowsRead: number;
+  rowsParsed: number;
+  rowsInserted: number;
+  rowsUpdated: number;
+  rowsNoOp: number;
+  rowsSkipped: number;
+  symbolsCovered: number;
+  warnings: string[];
+  errors: string[];
+};
+type NseDeliveryHistoricalBackfillResponse = {
+  status: 'COMPLETED' | 'PARTIAL' | 'FAILED';
+  source: 'NSE';
+  segment: 'DELIVERY';
+  region: string;
+  assetType: string;
+  startDate: string;
+  endDate: string;
+  targetSessions: number | null;
+  totalDates: number;
+  processedCount: number;
+  batchSize: number;
+  offset: number;
+  nextOffset: number | null;
+  hasMore: boolean;
+  completed: number;
+  skippedDuplicates: number;
+  failed: number;
+  notAvailable: number;
+  symbolsCovered: number;
+  oldestDate: string | null;
+  newestDate: string | null;
+  rowsRead: number;
+  rowsParsed: number;
+  rowsInserted: number;
+  rowsUpdated: number;
+  rowsNoOp: number;
+  rowsSkipped: number;
+  sourceFileImportIds: string[];
+  warnings: string[];
+  errors: string[];
+  dates: NseDeliveryHistoricalBackfillDateResult[];
 };
 type StockMissingDataColumnConfig = {
   column: string;
@@ -688,6 +780,8 @@ export class MarketDataFoundationService {
   private static priceBackfillRuns = new Map<string, PriceBackfillRunRecord>();
   private static activePriceBackfillRuns = new Map<string, string>();
   private static priceBackfillPipelineSnapshotChains = new Map<string, Promise<void>>();
+  private static historicalBackfillDatabasePauses = new Map<string, ExchangeHistoricalBackfillDatabasePause>();
+  private static activeHistoricalBackfillRuns = new Set<string>();
   private readonly manualSyncCooldownMinutes = this.readPositiveNumber(
     process.env.MARKET_DATA_MANUAL_SYNC_COOLDOWN_MINUTES,
     15
@@ -3673,27 +3767,33 @@ export class MarketDataFoundationService {
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - Math.max(365, safeLimit * 3));
     const instrumentIdBySymbol = new Map(stocks.map((stock) => [stock.symbol, stock.id]));
-    const prices = await this.repository.prisma.priceTick.findMany({
-      where: {
-        symbol: { in: stocks.map((stock) => stock.symbol) },
-        timestamp: { gte: cutoff },
-      },
-      orderBy: [{ symbol: 'asc' }, { timestamp: 'desc' }],
-      select: {
-        symbol: true,
-        timestamp: true,
-        open: true,
-        high: true,
-        low: true,
-        close: true,
-        adjustedClose: true,
-        volume: true,
-        source: true,
-        ingestionTimestamp: true,
-        lastUpdatedTimestamp: true,
-        dataStatus: true,
-      },
-    });
+    const symbols = stocks.map((stock) => stock.symbol);
+    const prices: any[] = [];
+    for (let offset = 0; offset < symbols.length; offset += RECENT_PRICE_WINDOW_SYMBOL_CHUNK_SIZE) {
+      const symbolChunk = symbols.slice(offset, offset + RECENT_PRICE_WINDOW_SYMBOL_CHUNK_SIZE);
+      const chunkPrices = await this.repository.prisma.priceTick.findMany({
+        where: {
+          symbol: { in: symbolChunk },
+          timestamp: { gte: cutoff },
+        },
+        orderBy: [{ symbol: 'asc' }, { timestamp: 'desc' }],
+        select: {
+          symbol: true,
+          timestamp: true,
+          open: true,
+          high: true,
+          low: true,
+          close: true,
+          adjustedClose: true,
+          volume: true,
+          source: true,
+          ingestionTimestamp: true,
+          lastUpdatedTimestamp: true,
+          dataStatus: true,
+        },
+      });
+      prices.push(...chunkPrices);
+    }
 
     const byInstrumentId = new Map(uniqueIds.map((id) => [id, [] as any[]]));
     for (const price of prices) {
@@ -3995,6 +4095,210 @@ export class MarketDataFoundationService {
     };
   }
 
+  async importBulkManualVerifiedFundamentals(input: {
+    fileName?: string;
+    csvText: string;
+    region?: string;
+    assetType?: string;
+    sourceUrl?: string | null;
+    evidenceDate?: Date | string | null;
+  }) {
+    const started = Date.now();
+    const csvText = input.csvText || '';
+    if (!csvText.trim()) throw new Error('Bulk manual verified fundamentals import requires CSV text.');
+    this.assertManualVerifiedFundamentalsHeaders(csvText);
+
+    const rows = this.parseCsv(csvText);
+    if (rows.length === 0) {
+      throw new Error('Bulk manual verified fundamentals import requires at least one data row.');
+    }
+
+    const fileName = path.basename((input.fileName || 'manual-verified-fundamentals.csv').trim() || 'manual-verified-fundamentals.csv');
+    const region = input.region?.trim().toUpperCase() || 'IN';
+    const assetType = input.assetType?.trim().toUpperCase() || 'STOCK';
+    const fileHash = createHash('sha256').update(csvText.replace(/\r\n/g, '\n').trim()).digest('hex');
+    const fileSize = Buffer.byteLength(csvText, 'utf8');
+    const parsedRows: ParsedManualVerifiedFundamentalRow[] = [];
+    const rejectedRows: RejectedManualVerifiedFundamentalRow[] = [];
+
+    rows.forEach((row, index) => {
+      const parsed = this.parseManualVerifiedFundamentalsRow(row, index + 2, input.sourceUrl ?? null);
+      if (parsed.valid) {
+        parsedRows.push(parsed.row);
+      } else {
+        rejectedRows.push(parsed.rejection);
+      }
+    });
+
+    const evidenceDate = input.evidenceDate
+      ? this.normalizeExchangeTradingDate(input.evidenceDate)
+      : this.manualVerifiedFundamentalsEvidenceDate(parsedRows);
+    const repository = this.repository as any;
+    if (typeof repository.upsertSourceFileImport !== 'function') {
+      throw new Error('SourceFileImport evidence persistence is required for bulk manual verified fundamentals import.');
+    }
+
+    const pendingImport = await repository.upsertSourceFileImport({
+      source: MANUAL_VERIFIED_FUNDAMENTALS_SOURCE,
+      segment: MANUAL_VERIFIED_FUNDAMENTALS_SEGMENT,
+      tradingDate: evidenceDate,
+      fileName,
+      fileUrl: input.sourceUrl ?? null,
+      fileHash,
+      fileSize,
+      status: 'PENDING',
+      rowsRaw: rows.length,
+      rowsAccepted: 0,
+      rowsRejected: 0,
+      parserVersion: MANUAL_VERIFIED_FUNDAMENTALS_PARSER_VERSION,
+      errorMessage: null,
+    });
+
+    const symbols = [...new Set(parsedRows.map((row) => row.symbol))];
+    const scopedStocks = typeof repository.findStocksBySymbolsInScope === 'function'
+      ? await repository.findStocksBySymbolsInScope(symbols, { region, assetType })
+      : [];
+    const stocksBySymbol = this.manualFundamentalsStocksBySymbol(scopedStocks);
+    const importedRecords: any[] = [];
+    const seenNaturalKeys = new Set<string>();
+
+    for (const row of parsedRows) {
+      const candidates = stocksBySymbol.get(row.symbol) || [];
+      const uniqueCandidates = [...new Map(candidates.map((stock: any) => [stock.id, stock])).values()];
+      if (uniqueCandidates.length === 0) {
+        rejectedRows.push({
+          rowNumber: row.rowNumber,
+          symbol: row.symbol,
+          reason: 'Instrument not found in scoped review universe.',
+          errors: [`${row.symbol} was not found for ${region}/${assetType}.`],
+        });
+        continue;
+      }
+      if (uniqueCandidates.length > 1) {
+        rejectedRows.push({
+          rowNumber: row.rowNumber,
+          symbol: row.symbol,
+          reason: 'Ambiguous instrument in scoped review universe.',
+          errors: [`${row.symbol} matched multiple instruments for ${region}/${assetType}.`],
+        });
+        continue;
+      }
+
+      const stock = uniqueCandidates[0] as any;
+      const naturalKey = `${stock.id}|${row.periodType}|${row.periodEndDate.toISOString().slice(0, 10)}`;
+      if (seenNaturalKeys.has(naturalKey)) {
+        rejectedRows.push({
+          rowNumber: row.rowNumber,
+          symbol: row.symbol,
+          reason: 'Duplicate fundamental period in import file.',
+          errors: [`Duplicate ${row.periodType} period ${row.periodEndDate.toISOString().slice(0, 10)} for ${row.symbol}.`],
+        });
+        continue;
+      }
+      seenNaturalKeys.add(naturalKey);
+
+      try {
+        const saved = await repository.upsertManualVerifiedFundamental(stock.id, {
+          periodType: row.periodType,
+          periodEndDate: row.periodEndDate,
+          revenue: row.revenue,
+          eps: row.eps,
+          netIncome: row.netIncome,
+          peRatio: row.peRatio,
+          marketCap: row.marketCap,
+          sourceNote: row.sourceNote,
+          sourceUrl: row.sourceUrl,
+          validatedBy: row.validatedBy,
+          validatedAt: row.validatedAt,
+          currency: row.currency ?? stock.currency ?? 'INR',
+        });
+        importedRecords.push({
+          id: saved?.id ?? null,
+          stockId: stock.id,
+          symbol: stock.symbol || row.symbol,
+          periodType: row.periodType,
+          periodEndDate: row.periodEndDate.toISOString().slice(0, 10),
+          revenue: row.revenue,
+          netIncome: row.netIncome,
+          eps: row.eps,
+          source: MANUAL_VERIFIED_FUNDAMENTALS_SOURCE,
+          sourceUrl: row.sourceUrl,
+          validatedBy: row.validatedBy,
+          validatedAt: row.validatedAt.toISOString(),
+        });
+      } catch (error) {
+        rejectedRows.push({
+          rowNumber: row.rowNumber,
+          symbol: row.symbol,
+          reason: 'Fundamental row persistence failed.',
+          errors: [error instanceof Error ? error.message : 'Unknown persistence error.'],
+        });
+      }
+    }
+
+    const finalStatus = importedRecords.length > 0 ? 'COMPLETED' : 'FAILED';
+    const completedImport = await repository.upsertSourceFileImport({
+      source: MANUAL_VERIFIED_FUNDAMENTALS_SOURCE,
+      segment: MANUAL_VERIFIED_FUNDAMENTALS_SEGMENT,
+      tradingDate: evidenceDate,
+      fileName,
+      fileUrl: input.sourceUrl ?? null,
+      fileHash,
+      fileSize,
+      status: finalStatus,
+      rowsRaw: rows.length,
+      rowsAccepted: importedRecords.length,
+      rowsRejected: rejectedRows.length,
+      parserVersion: MANUAL_VERIFIED_FUNDAMENTALS_PARSER_VERSION,
+      errorMessage: finalStatus === 'FAILED' ? 'No valid manual verified fundamental rows were imported.' : null,
+    });
+
+    const quarterlyRecords = importedRecords.filter((record) => record.periodType === 'QUARTERLY');
+    const annualRecords = importedRecords.filter((record) => record.periodType === 'ANNUAL');
+    const buildCoverage = (recordsForPeriod: any[]) => ({
+      rowsImported: recordsForPeriod.length,
+      symbolsCovered: new Set(recordsForPeriod.map((record) => record.symbol)).size,
+      periodsCovered: new Set(recordsForPeriod.map((record) => record.periodEndDate)).size,
+      symbols: [...new Set(recordsForPeriod.map((record) => record.symbol))].sort(),
+      latestPeriodEndDate: recordsForPeriod
+        .map((record) => record.periodEndDate)
+        .sort()
+        .at(-1) ?? null,
+    });
+
+    return {
+      status: finalStatus,
+      source: MANUAL_VERIFIED_FUNDAMENTALS_SOURCE,
+      segment: MANUAL_VERIFIED_FUNDAMENTALS_SEGMENT,
+      region,
+      assetType,
+      fileName,
+      rowsRead: rows.length,
+      rowsImported: importedRecords.length,
+      rowsRejected: rejectedRows.length,
+      symbolsCovered: new Set(importedRecords.map((record) => record.symbol)).size,
+      quarterlyCoverage: buildCoverage(quarterlyRecords),
+      annualCoverage: buildCoverage(annualRecords),
+      sampleRecords: importedRecords.slice(0, 5),
+      rejectedRows: rejectedRows.slice(0, 25),
+      sourceFileImport: {
+        id: completedImport?.id ?? pendingImport?.id ?? null,
+        source: MANUAL_VERIFIED_FUNDAMENTALS_SOURCE,
+        segment: MANUAL_VERIFIED_FUNDAMENTALS_SEGMENT,
+        evidenceDate: evidenceDate.toISOString().slice(0, 10),
+        fileName,
+        fileHash,
+        fileSize,
+        status: finalStatus,
+        rowsRaw: rows.length,
+        rowsAccepted: importedRecords.length,
+        rowsRejected: rejectedRows.length,
+        parserVersion: MANUAL_VERIFIED_FUNDAMENTALS_PARSER_VERSION,
+      },
+      durationMs: Date.now() - started,
+    };
+  }
+
   async corporateActionsByInstrumentId(instrumentId: string, options: Pick<PaginationOptions, 'region' | 'assetType'> = {}) {
     const stock = await this.repository.findStockByIdInScope(instrumentId, options);
     if (!stock) {
@@ -4123,6 +4427,32 @@ export class MarketDataFoundationService {
     };
   }
 
+  async listDailyRefreshEligibleInstrumentIds(input: {
+    region: string;
+    assetType: string;
+    dataThroughDate: string;
+    limit?: number;
+  }): Promise<DailyRefreshEligibilityResult> {
+    const repository = this.repository as any;
+    const dataThroughDate = String(input.dataThroughDate || '').slice(0, 10);
+    if (!dataThroughDate || typeof repository.listDailyRefreshEligibleInstrumentIds !== 'function') {
+      return {
+        region: input.region,
+        assetType: input.assetType,
+        dataThroughDate,
+        source: 'NONE',
+        instrumentIds: [],
+        instrumentCount: 0,
+      };
+    }
+    return repository.listDailyRefreshEligibleInstrumentIds({
+      region: input.region,
+      assetType: input.assetType,
+      dataThroughDate,
+      limit: input.limit,
+    });
+  }
+
   async shouldRunScheduledSync(region: string, assetType = 'STOCK', now = new Date(), options: {
     syncDuringMarketHours?: boolean;
     postCloseSyncWindowMinutes?: number;
@@ -4227,6 +4557,7 @@ export class MarketDataFoundationService {
       : null;
 
     if (!input.force && existingImport?.status === 'COMPLETED') {
+      const downstreamSymbols = this.parsedSymbolsFromPrices(parsed.prices);
       return {
         status: 'SKIPPED_DUPLICATE',
         source: 'NSE',
@@ -4246,6 +4577,8 @@ export class MarketDataFoundationService {
         warningCount: parsed.warnings.length,
         warnings: parsed.warnings.slice(0, 10),
         errors: [],
+        changedSymbols: [],
+        downstreamSymbols,
       };
     }
 
@@ -4363,6 +4696,233 @@ export class MarketDataFoundationService {
     }
   }
 
+  async importNseCmOfficialDaily(input: {
+    tradingDate: Date | string;
+    force?: boolean;
+    skipLatestPriceUpdate?: boolean;
+  }): Promise<ExchangeDailyImportSummary> {
+    const tradingDate = this.normalizeExchangeTradingDate(input.tradingDate);
+    const tradingDateText = tradingDate.toISOString().slice(0, 10);
+    const repository = this.repository as any;
+    let archive: NseArchiveUrl | null = null;
+    let parsed: ReturnType<typeof parseIndianExchangeEodCsv> | null = null;
+    let csvText = '';
+    let sourceWarnings: string[] = [];
+
+    try {
+      const loaded = await this.loadFirstAvailableNseOfficialEodCsv(tradingDate);
+      archive = loaded.archive;
+      parsed = loaded.parsed;
+      csvText = loaded.csvText;
+      sourceWarnings = loaded.warnings;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'NSE official EOD download or parse failed';
+      const failureHash = createHash('sha256')
+        .update(JSON.stringify({
+          source: 'NSE_OFFICIAL_EOD',
+          tradingDate: tradingDateText,
+          error: message,
+        }))
+        .digest('hex');
+      const failedImport = typeof repository.upsertSourceFileImport === 'function'
+        ? await repository.upsertSourceFileImport({
+          source: 'NSE',
+          segment: 'CM',
+          tradingDate,
+          fileName: `nse-official-eod-${tradingDateText}.csv`,
+          fileUrl: null,
+          fileHash: failureHash,
+          fileSize: 0,
+          status: 'FAILED',
+          rowsRaw: 0,
+          rowsAccepted: 0,
+          rowsRejected: 0,
+          parserVersion: 'nse-official-eod-v1',
+          errorMessage: message,
+        }).catch(() => null)
+        : null;
+      return {
+        status: 'FAILED',
+        source: 'NSE',
+        segment: 'CM',
+        tradingDate: tradingDateText,
+        sourceName: 'NSE_OFFICIAL_EOD',
+        fileName: `nse-official-eod-${tradingDateText}.csv`,
+        fileUrl: null,
+        sourceFileImportId: failedImport?.id ?? null,
+        sourceFingerprint: `nse-official-eod-failed:${failureHash.slice(0, 16)}`,
+        rowsRead: 0,
+        rowsParsed: 0,
+        rowsInserted: 0,
+        rowsUpdated: 0,
+        rowsNoOp: 0,
+        rowsSkipped: 0,
+        warningCount: 0,
+        warnings: [],
+        errors: [message],
+        changedSymbols: [],
+        downstreamSymbols: [],
+      };
+    }
+
+    const fileHash = parsed.sourceIdentity.contentSha256;
+    const fileSize = Buffer.byteLength(csvText, 'utf8');
+    const fileName = archive.fileName;
+    const fileUrl = archive.url;
+    const parserVersion = this.nseOfficialEodParserVersion(archive.sourceName);
+
+    const existingImport = typeof repository.findSourceFileImportByKey === 'function'
+      ? await repository.findSourceFileImportByKey({
+        source: 'NSE',
+        segment: 'CM',
+        tradingDate,
+        fileHash,
+      })
+      : null;
+
+    if (!input.force && existingImport?.status === 'COMPLETED') {
+      const downstreamSymbols = this.parsedSymbolsFromPrices(parsed.prices);
+      return {
+        status: 'SKIPPED_DUPLICATE',
+        source: 'NSE',
+        segment: 'CM',
+        tradingDate: tradingDateText,
+        sourceName: parsed.sourceName,
+        fileName,
+        fileUrl,
+        sourceFileImportId: existingImport.id ?? null,
+        sourceFingerprint: parsed.sourceFingerprint,
+        rowsRead: parsed.rowsRead,
+        rowsParsed: parsed.rowsParsed,
+        rowsInserted: 0,
+        rowsUpdated: 0,
+        rowsNoOp: 0,
+        rowsSkipped: parsed.rowsSkipped,
+        warningCount: sourceWarnings.length + parsed.warnings.length,
+        warnings: [...sourceWarnings, ...parsed.warnings].slice(0, 10),
+        errors: [],
+        changedSymbols: [],
+        downstreamSymbols,
+      };
+    }
+
+    const pendingImport = await repository.upsertSourceFileImport({
+      source: 'NSE',
+      segment: 'CM',
+      tradingDate,
+      fileName,
+      fileUrl,
+      fileHash,
+      fileSize,
+      status: 'PENDING',
+      rowsRaw: parsed.rowsRead,
+      rowsAccepted: 0,
+      rowsRejected: parsed.rowsSkipped,
+      parserVersion,
+      errorMessage: null,
+    });
+
+    try {
+      const regionInfoBySymbol = new Map<string, PriceRegionInfo>();
+      parsed.prices.forEach((price) => {
+        regionInfoBySymbol.set(price.symbol, { region: 'IN', exchange: 'NSE' });
+      });
+      const storeSummary = await this.storeHistoricalBulk(parsed.prices, regionInfoBySymbol, {
+        sourceFileImportId: pendingImport?.id ?? null,
+        ...(input.skipLatestPriceUpdate === true ? { skipLatestPriceUpdate: true } : {}),
+      });
+      const changedSymbols: string[] = [];
+      const downstreamSymbols: string[] = [];
+      storeSummary.summaryBySymbol.forEach((summary, symbol) => {
+        if ((summary.rowsReceived || 0) > 0 || (summary.rowsInserted || 0) > 0 || (summary.rowsUpdated || 0) > 0 || (summary.rowsNoOp || 0) > 0) {
+          downstreamSymbols.push(symbol);
+        }
+        if ((summary.rowsInserted || 0) > 0 || (summary.rowsUpdated || 0) > 0) {
+          changedSymbols.push(symbol);
+        }
+      });
+
+      const completedImport = await repository.upsertSourceFileImport({
+        source: 'NSE',
+        segment: 'CM',
+        tradingDate,
+        fileName,
+        fileUrl,
+        fileHash,
+        fileSize,
+        status: 'COMPLETED',
+        rowsRaw: parsed.rowsRead,
+        rowsAccepted: parsed.rowsParsed,
+        rowsRejected: parsed.rowsSkipped,
+        parserVersion,
+        errorMessage: null,
+      });
+
+      const warnings = [...sourceWarnings, ...parsed.warnings, ...(storeSummary.warnings || [])].slice(0, 10);
+      return {
+        status: 'COMPLETED',
+        source: 'NSE',
+        segment: 'CM',
+        tradingDate: tradingDateText,
+        sourceName: parsed.sourceName,
+        fileName,
+        fileUrl,
+        sourceFileImportId: completedImport?.id ?? pendingImport?.id ?? null,
+        sourceFingerprint: parsed.sourceFingerprint,
+        rowsRead: parsed.rowsRead,
+        rowsParsed: parsed.rowsParsed,
+        rowsInserted: storeSummary.rowsInserted || 0,
+        rowsUpdated: storeSummary.rowsUpdated || 0,
+        rowsNoOp: storeSummary.rowsNoOp || 0,
+        rowsSkipped: (storeSummary.rowsSkipped || 0) + parsed.rowsSkipped,
+        warningCount: (storeSummary.warningCount || 0) + sourceWarnings.length + parsed.warnings.length,
+        warnings,
+        errors: [],
+        changedSymbols: changedSymbols.sort((a, b) => a.localeCompare(b)),
+        downstreamSymbols: downstreamSymbols.sort((a, b) => a.localeCompare(b)),
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'NSE official EOD import failed';
+      await repository.upsertSourceFileImport({
+        source: 'NSE',
+        segment: 'CM',
+        tradingDate,
+        fileName,
+        fileUrl,
+        fileHash,
+        fileSize,
+        status: 'FAILED',
+        rowsRaw: parsed.rowsRead,
+        rowsAccepted: 0,
+        rowsRejected: parsed.rowsRead,
+        parserVersion,
+        errorMessage: message,
+      }).catch(() => undefined);
+      return {
+        status: 'FAILED',
+        source: 'NSE',
+        segment: 'CM',
+        tradingDate: tradingDateText,
+        sourceName: parsed.sourceName,
+        fileName,
+        fileUrl,
+        sourceFileImportId: pendingImport?.id ?? null,
+        sourceFingerprint: parsed.sourceFingerprint,
+        rowsRead: parsed.rowsRead,
+        rowsParsed: parsed.rowsParsed,
+        rowsInserted: 0,
+        rowsUpdated: 0,
+        rowsNoOp: 0,
+        rowsSkipped: parsed.rowsRead,
+        warningCount: sourceWarnings.length + parsed.warnings.length,
+        warnings: [...sourceWarnings, ...parsed.warnings].slice(0, 10),
+        errors: [message],
+        changedSymbols: [],
+        downstreamSymbols: [],
+      };
+    }
+  }
+
   async importBseCmBackupDaily(input: {
     tradingDate: Date | string;
     csvText?: string;
@@ -4400,6 +4960,7 @@ export class MarketDataFoundationService {
       })
       : null;
     if (!input.force && existingImport?.status === 'COMPLETED') {
+      const downstreamSymbols = this.parsedSymbolsFromPrices(parsed.prices);
       return {
         status: 'SKIPPED_DUPLICATE',
         source: 'BSE',
@@ -4420,7 +4981,7 @@ export class MarketDataFoundationService {
         warnings: parsed.warnings.slice(0, 10),
         errors: [],
         changedSymbols: [],
-        downstreamSymbols: [],
+        downstreamSymbols,
       };
     }
 
@@ -4593,6 +5154,23 @@ export class MarketDataFoundationService {
     }
   }
 
+  async importNseIndexOfficialDaily(input: {
+    tradingDate: Date | string;
+    force?: boolean;
+    skipLatestPriceUpdate?: boolean;
+  }): Promise<ExchangeDailyImportSummary> {
+    const tradingDate = this.normalizeExchangeTradingDate(input.tradingDate);
+    const archive = this.buildNseIndexEodArchiveUrl(tradingDate);
+    return this.importNseIndexEodDaily({
+      tradingDate,
+      fileName: archive.fileName,
+      fileUrl: archive.url,
+      force: input.force,
+      segment: 'INDEX',
+      skipLatestPriceUpdate: input.skipLatestPriceUpdate,
+    });
+  }
+
   async importNseIndexEodDaily(input: {
     tradingDate: Date | string;
     csvText?: string;
@@ -4600,6 +5178,7 @@ export class MarketDataFoundationService {
     fileUrl?: string | null;
     force?: boolean;
     segment?: 'INDEX' | 'SECTOR_INDEX';
+    skipLatestPriceUpdate?: boolean;
   }): Promise<ExchangeDailyImportSummary> {
     const tradingDate = this.normalizeExchangeTradingDate(input.tradingDate);
     const tradingDateText = tradingDate.toISOString().slice(0, 10);
@@ -4636,6 +5215,7 @@ export class MarketDataFoundationService {
       }
       parsedRows.push({ officialName, date: this.startOfUtcDay(date), open, high, low, close });
     });
+    const sectorParsedRows = parsedRows.filter((row) => this.indexPriceSourceForName(row.officialName) === 'NIFTY_SECTOR_INDEX');
 
     const repository = this.repository as any;
     const existingImport = typeof repository.findSourceFileImportByKey === 'function'
@@ -4647,6 +5227,20 @@ export class MarketDataFoundationService {
       })
       : null;
     if (!input.force && existingImport?.status === 'COMPLETED') {
+      if (segment === 'INDEX') {
+        const sectorAcceptedRows = await this.countMatchedNseIndexRows(repository, sectorParsedRows);
+        await this.upsertNseIndexSectorSourceEvidence(repository, {
+          tradingDate,
+          fileName,
+          fileUrl,
+          fileHash,
+          fileSize,
+          rowsRaw: sectorParsedRows.length,
+          rowsAccepted: sectorAcceptedRows,
+          status: 'COMPLETED',
+          errorMessage: null,
+        });
+      }
       return {
         status: 'SKIPPED_DUPLICATE',
         source: 'NSE',
@@ -4705,7 +5299,7 @@ export class MarketDataFoundationService {
           unmatchedRows += 1;
           return;
         }
-        const source = this.isBroadIndianIndexName(row.officialName) ? 'NSE_INDEX_EOD' : 'NIFTY_SECTOR_INDEX';
+        const source = this.indexPriceSourceForName(row.officialName);
         prices.push({
           symbol: stock.symbol,
           date: row.date,
@@ -4731,7 +5325,10 @@ export class MarketDataFoundationService {
         summaryBySymbol: new Map(),
       };
       const storeSummary = prices.length > 0
-        ? await this.storeHistoricalBulk(prices, regionInfoBySymbol, { sourceFileImportId: pendingImport?.id ?? null })
+        ? await this.storeHistoricalBulk(prices, regionInfoBySymbol, {
+          sourceFileImportId: pendingImport?.id ?? null,
+          ...(input.skipLatestPriceUpdate === true ? { skipLatestPriceUpdate: true } : {}),
+        })
         : emptyStoreSummary;
       const changedSymbols: string[] = [];
       const downstreamSymbols: string[] = [];
@@ -4759,6 +5356,20 @@ export class MarketDataFoundationService {
         parserVersion: 'nse-index-eod-v1',
         errorMessage: null,
       });
+      if (segment === 'INDEX') {
+        const sectorAcceptedRows = prices.filter((price) => price.source === 'NIFTY_SECTOR_INDEX').length;
+        await this.upsertNseIndexSectorSourceEvidence(repository, {
+          tradingDate,
+          fileName,
+          fileUrl,
+          fileHash,
+          fileSize,
+          rowsRaw: sectorParsedRows.length,
+          rowsAccepted: sectorAcceptedRows,
+          status: 'COMPLETED',
+          errorMessage: null,
+        });
+      }
 
       return {
         status: 'COMPLETED',
@@ -4822,6 +5433,54 @@ export class MarketDataFoundationService {
         downstreamSymbols: [],
       };
     }
+  }
+
+  private async upsertNseIndexSectorSourceEvidence(
+    repository: any,
+    input: {
+      tradingDate: Date;
+      fileName: string;
+      fileUrl: string | null;
+      fileHash: string;
+      fileSize: number;
+      rowsRaw: number;
+      rowsAccepted: number;
+      status: string;
+      errorMessage: string | null;
+    }
+  ) {
+    if (input.rowsRaw <= 0 || input.rowsAccepted <= 0 || typeof repository.upsertSourceFileImport !== 'function') return null;
+    return repository.upsertSourceFileImport({
+      source: 'NSE',
+      segment: 'SECTOR_INDEX',
+      tradingDate: input.tradingDate,
+      fileName: input.fileName,
+      fileUrl: input.fileUrl,
+      fileHash: input.fileHash,
+      fileSize: input.fileSize,
+      status: input.status,
+      rowsRaw: input.rowsRaw,
+      rowsAccepted: input.rowsAccepted,
+      rowsRejected: Math.max(0, input.rowsRaw - input.rowsAccepted),
+      parserVersion: 'nse-index-eod-v1',
+      errorMessage: input.errorMessage,
+    });
+  }
+
+  private async countMatchedNseIndexRows(
+    repository: any,
+    rows: Array<{ officialName: string }>
+  ): Promise<number> {
+    if (rows.length === 0 || typeof repository.findIndexStocksBySourceSymbols !== 'function') return 0;
+    const officialNames = [...new Set(rows.map((row) => row.officialName))];
+    const indexStocks = await repository.findIndexStocksBySourceSymbols(officialNames);
+    const stockByName = new Map<string, any>();
+    indexStocks.forEach((stock: any) => {
+      [stock.sourceSymbol, stock.displaySymbol, stock.name]
+        .filter(Boolean)
+        .forEach((value) => stockByName.set(this.cleanIndexName(String(value)).toUpperCase(), stock));
+    });
+    return rows.filter((row) => Boolean(stockByName.get(row.officialName.toUpperCase())?.symbol)).length;
   }
 
   async importNseFoUdiffDaily(input: {
@@ -4996,11 +5655,62 @@ export class MarketDataFoundationService {
     if (!input.csvText && !fileUrl) {
       throw new Error('csvText or fileUrl is required for NSE delivery import.');
     }
-    const csvText = input.csvText ?? await this.downloadOfficialExchangeText(fileUrl as string);
+    const repository = this.repository as any;
+    let csvText = '';
+    try {
+      csvText = input.csvText ?? await this.downloadOfficialExchangeText(fileUrl as string);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'NSE delivery file download failed';
+      const failureHash = this.sha256(JSON.stringify({
+        source: 'NSE_DELIVERY',
+        tradingDate: tradingDateText,
+        fileName,
+        fileUrl,
+        error: message,
+      }));
+      const failedImport = typeof repository.upsertSourceFileImport === 'function'
+        ? await repository.upsertSourceFileImport({
+          source: 'NSE',
+          segment: 'DELIVERY',
+          tradingDate,
+          fileName,
+          fileUrl,
+          fileHash: failureHash,
+          fileSize: 0,
+          status: 'FAILED',
+          rowsRaw: 0,
+          rowsAccepted: 0,
+          rowsRejected: 0,
+          parserVersion: 'nse-delivery-v1',
+          errorMessage: message,
+        }).catch(() => null)
+        : null;
+      return {
+        status: 'FAILED',
+        source: 'NSE',
+        segment: 'DELIVERY',
+        tradingDate: tradingDateText,
+        sourceName: 'NSE_DELIVERY',
+        fileName,
+        fileUrl,
+        sourceFileImportId: failedImport?.id ?? null,
+        sourceFingerprint: `nse-delivery-failed:${failureHash.slice(0, 16)}`,
+        rowsRead: 0,
+        rowsParsed: 0,
+        rowsInserted: 0,
+        rowsUpdated: 0,
+        rowsNoOp: 0,
+        rowsSkipped: 0,
+        warningCount: 0,
+        warnings: [],
+        errors: [message],
+        changedSymbols: [],
+        downstreamSymbols: [],
+      };
+    }
     const fileHash = this.sha256(csvText);
     const fileSize = Buffer.byteLength(csvText, 'utf8');
     const rows = this.parseCsv(csvText);
-    const repository = this.repository as any;
     const existingImport = typeof repository.findSourceFileImportByKey === 'function'
       ? await repository.findSourceFileImportByKey({
         source: 'NSE',
@@ -5092,6 +5802,7 @@ export class MarketDataFoundationService {
         : [];
       const stockBySymbol = new Map<string, any>();
       stocks.forEach((stock: any) => {
+        if (stock?.isActive === false || stock?.isDelisted === true) return;
         [stock.symbol, stock.sourceSymbol, stock.displaySymbol]
           .filter(Boolean)
           .forEach((value) => stockBySymbol.set(this.baseSymbolFromProviderSymbol(String(value)), stock));
@@ -5202,6 +5913,148 @@ export class MarketDataFoundationService {
     }
   }
 
+  async refreshNseDeliveryDaily(input: {
+    tradingDate?: Date | string;
+    force?: boolean;
+  } = {}): Promise<ExchangeDailyImportSummary> {
+    const targetDate = input.tradingDate
+      ? this.normalizeExchangeTradingDate(input.tradingDate)
+      : this.latestCompletedExchangeTradingDateOrThrow('IN');
+    return this.importNseDeliveryOfficialDaily({
+      tradingDate: targetDate,
+      force: input.force === true,
+    });
+  }
+
+  async importNseDeliveryOfficialDaily(input: {
+    tradingDate: Date | string;
+    force?: boolean;
+  }): Promise<ExchangeDailyImportSummary> {
+    const tradingDate = this.normalizeExchangeTradingDate(input.tradingDate);
+    const archive = buildNseSecurityBhavdataArchiveUrl(tradingDate);
+    return this.importNseDeliveryDaily({
+      tradingDate,
+      fileName: archive.fileName,
+      fileUrl: archive.url,
+      force: input.force === true,
+    });
+  }
+
+  async runNseDeliveryHistoricalBackfill(input: NseDeliveryHistoricalBackfillInput = {}): Promise<NseDeliveryHistoricalBackfillResponse> {
+    const config = await this.normalizeNseDeliveryHistoricalBackfillInput(input);
+    const repository = this.repository as any;
+    const completedDates = !config.force && typeof repository.listCompletedSourceFileImportDates === 'function'
+      ? await repository.listCompletedSourceFileImportDates({
+        source: 'NSE',
+        segment: 'DELIVERY',
+        startDate: config.startDate,
+        endDate: config.endDate,
+      })
+      : [];
+    const completedDateKeys = new Set(completedDates.map((date: Date) => this.exchangeDateKey(date)));
+    const batchDates = config.dates.slice(config.offset, config.offset + config.batchSize);
+    const dateResults: NseDeliveryHistoricalBackfillDateResult[] = [];
+    const coveredSymbols = new Set<string>();
+    const sourceFileImportIds = new Set<string>();
+    const warnings: string[] = [...config.warnings];
+    const errors: string[] = [];
+
+    for (let index = 0; index < batchDates.length; index += 1) {
+      const date = batchDates[index];
+      const key = this.exchangeDateKey(date);
+      if (!config.force && completedDateKeys.has(key)) {
+        dateResults.push({
+          tradingDate: key,
+          status: 'SKIPPED_DUPLICATE',
+          sourceFileImportId: null,
+          rowsRead: 0,
+          rowsParsed: 0,
+          rowsInserted: 0,
+          rowsUpdated: 0,
+          rowsNoOp: 0,
+          rowsSkipped: 1,
+          symbolsCovered: 0,
+          warnings: [],
+          errors: [],
+        });
+        continue;
+      }
+
+      const delayMs = config.downloadDelayMs + Math.floor(Math.random() * (config.jitterMs + 1));
+      if (delayMs > 0 && index > 0) await this.sleep(delayMs);
+      const summary = await this.importNseDeliveryOfficialDaily({
+        tradingDate: date,
+        force: config.force,
+      });
+      const summarySymbols = new Set([...(summary.downstreamSymbols || []), ...(summary.changedSymbols || [])]);
+      summarySymbols.forEach((symbol) => coveredSymbols.add(symbol));
+      if (summary.sourceFileImportId) sourceFileImportIds.add(summary.sourceFileImportId);
+      const notAvailable = summary.status === 'FAILED' && this.isHistoricalBackfillNotAvailable(summary);
+      dateResults.push({
+        tradingDate: key,
+        status: notAvailable ? 'NOT_AVAILABLE' : summary.status,
+        sourceFileImportId: summary.sourceFileImportId || null,
+        rowsRead: Number(summary.rowsRead || 0),
+        rowsParsed: Number(summary.rowsParsed || 0),
+        rowsInserted: Number(summary.rowsInserted || 0),
+        rowsUpdated: Number(summary.rowsUpdated || 0),
+        rowsNoOp: Number(summary.rowsNoOp || 0),
+        rowsSkipped: Number(summary.rowsSkipped || 0),
+        symbolsCovered: summarySymbols.size,
+        warnings: (summary.warnings || []).slice(0, 5),
+        errors: (summary.errors || []).slice(0, 5),
+      });
+      warnings.push(...(summary.warnings || []));
+      errors.push(...(summary.errors || []).map((error) => `${key}: ${error}`));
+    }
+
+    const nextOffset = config.offset + batchDates.length < config.dates.length
+      ? config.offset + batchDates.length
+      : null;
+    const completed = dateResults.filter((result) => result.status === 'COMPLETED').length;
+    const skippedDuplicates = dateResults.filter((result) => result.status === 'SKIPPED_DUPLICATE').length;
+    const failed = dateResults.filter((result) => result.status === 'FAILED').length;
+    const notAvailable = dateResults.filter((result) => result.status === 'NOT_AVAILABLE').length;
+    const processedCount = dateResults.length;
+    const status: NseDeliveryHistoricalBackfillResponse['status'] = failed > 0 || notAvailable > 0
+      ? completed > 0 || skippedDuplicates > 0 ? 'PARTIAL' : 'FAILED'
+      : 'COMPLETED';
+
+    return {
+      status,
+      source: 'NSE',
+      segment: 'DELIVERY',
+      region: config.region,
+      assetType: config.assetType,
+      startDate: config.startDateKey,
+      endDate: config.endDateKey,
+      targetSessions: config.targetSessions,
+      totalDates: config.dates.length,
+      processedCount,
+      batchSize: config.batchSize,
+      offset: config.offset,
+      nextOffset,
+      hasMore: nextOffset !== null,
+      completed,
+      skippedDuplicates,
+      failed,
+      notAvailable,
+      symbolsCovered: coveredSymbols.size,
+      oldestDate: dateResults.length > 0 ? dateResults[0].tradingDate : null,
+      newestDate: dateResults.length > 0 ? dateResults[dateResults.length - 1].tradingDate : null,
+      rowsRead: dateResults.reduce((sum, result) => sum + result.rowsRead, 0),
+      rowsParsed: dateResults.reduce((sum, result) => sum + result.rowsParsed, 0),
+      rowsInserted: dateResults.reduce((sum, result) => sum + result.rowsInserted, 0),
+      rowsUpdated: dateResults.reduce((sum, result) => sum + result.rowsUpdated, 0),
+      rowsNoOp: dateResults.reduce((sum, result) => sum + result.rowsNoOp, 0),
+      rowsSkipped: dateResults.reduce((sum, result) => sum + result.rowsSkipped, 0),
+      sourceFileImportIds: [...sourceFileImportIds].sort((a, b) => a.localeCompare(b)),
+      warnings: Array.from(new Set(warnings)).slice(0, 10),
+      errors: errors.slice(0, 10),
+      dates: dateResults,
+    };
+  }
+
   async runExchangeHistoricalBackfill(input: ExchangeHistoricalBackfillRunInput): Promise<ExchangeHistoricalBackfillRunResponse> {
     return this.startExchangeHistoricalBackfillRun({ ...input, autoStart: input.autoStart !== false });
   }
@@ -5210,6 +6063,17 @@ export class MarketDataFoundationService {
     const config = await this.normalizeHistoricalBackfillRunInput(input);
     const db = this.marketDataDb();
     const now = new Date();
+    const activeRun = await this.findActiveHistoricalBackfillRun(config);
+    if (activeRun) {
+      if (
+        input.autoStart !== false
+        && String(activeRun.status || '').toUpperCase() === 'RUNNING'
+        && !MarketDataFoundationService.activeHistoricalBackfillRuns.has(activeRun.id)
+      ) {
+        this.startHistoricalBackfillWorkers(activeRun.id);
+      }
+      return this.getExchangeHistoricalBackfillRun(activeRun.id);
+    }
     const idempotencyKey = `historical-exchange-backfill:${config.region}:${config.assetType}:${config.startDateKey}:${config.endDateKey}:${randomUUID()}`;
     const run = await db.pipelineRun.create({
       data: {
@@ -5231,7 +6095,7 @@ export class MarketDataFoundationService {
         metadata: {
           kind: 'HISTORICAL_EXCHANGE_BACKFILL_RUN',
           source: 'NSE',
-          segment: 'CM',
+          segment: config.segment,
           startDate: config.startDateKey,
           endDate: config.endDateKey,
           maxDates: config.maxDates,
@@ -5264,7 +6128,7 @@ export class MarketDataFoundationService {
           scopeAssetType: config.assetType,
           timeframe: '1d',
           dataThroughDate: job.date,
-          inputFingerprint: `NSE:CM:${job.key}`,
+          inputFingerprint: `NSE:${config.segment}:${job.key}`,
           outputFingerprint: null,
           totalCount: 1,
           processedCount: job.alreadyImported ? 1 : 0,
@@ -5283,7 +6147,9 @@ export class MarketDataFoundationService {
             kind: 'HISTORICAL_EXCHANGE_BACKFILL_JOB',
             tradingDate: job.key,
             dateRange: job.key,
-            source: config.includeBseFill ? 'NSE+BSE' : 'NSE',
+            source: config.source,
+            segment: config.segment,
+            assetType: config.assetType,
             jobStatus: job.alreadyImported ? 'SKIPPED_ALREADY_IMPORTED' : 'PENDING',
             rowsRead: 0,
             rowsParsed: 0,
@@ -5310,12 +6176,48 @@ export class MarketDataFoundationService {
 
   async getExchangeHistoricalBackfillRun(runId: string): Promise<ExchangeHistoricalBackfillRunResponse> {
     const db = this.marketDataDb();
-    const run = await db.pipelineRun.findUnique({
+    let run = await this.withTransientDatabaseRetry<any | null>(() => db.pipelineRun.findUnique({
       where: { id: runId },
       include: { stages: { orderBy: [{ dataThroughDate: 'asc' }, { stageOrder: 'asc' }] } },
-    });
+    }), 'read historical backfill run');
     if (!run || run.pipelineKey !== 'market-data-historical-exchange-backfill') {
       throw new Error('Historical exchange backfill run not found.');
+    }
+    if (MarketDataFoundationService.historicalBackfillDatabasePauses.has(runId)) {
+      await this.blockHistoricalBackfillForTransientDatabase(runId);
+      run = await this.withTransientDatabaseRetry<any | null>(() => db.pipelineRun.findUnique({
+        where: { id: runId },
+        include: { stages: { orderBy: [{ dataThroughDate: 'asc' }, { stageOrder: 'asc' }] } },
+      }), 'reread historical backfill after database pause recovery');
+      if (!run || run.pipelineKey !== 'market-data-historical-exchange-backfill') {
+        throw new Error('Historical exchange backfill run not found.');
+      }
+    }
+    if (
+      String(run.status || '').toUpperCase() === 'RUNNING'
+      && !MarketDataFoundationService.activeHistoricalBackfillRuns.has(runId)
+    ) {
+      const staleCount = await this.markStaleHistoricalBackfillJobs(runId, Number(this.objectMetadata(run.metadata).staleJobTimeoutMs || 10 * 60_000));
+      if (staleCount > 0) {
+        const metadata = this.objectMetadata(run.metadata);
+        const warning = `${staleCount} stale worker job(s) were marked retryable. Resume the historical backfill to continue.`;
+        await this.withTransientDatabaseRetry<any>(() => db.pipelineRun.update({
+          where: { id: runId },
+          data: {
+            status: 'BLOCKED',
+            warnings: [...this.stringArray(run.warnings), warning].slice(-10),
+            metadata: {
+              ...metadata,
+              staleWorkerDetectedAt: new Date().toISOString(),
+              staleWorkerCount: staleCount,
+            },
+          },
+        }), 'mark historical backfill blocked for stale workers');
+        run = await this.withTransientDatabaseRetry<any | null>(() => db.pipelineRun.findUnique({
+          where: { id: runId },
+          include: { stages: { orderBy: [{ dataThroughDate: 'asc' }, { stageOrder: 'asc' }] } },
+        }), 'reread historical backfill after stale worker detection');
+      }
     }
     return this.historicalBackfillResponse(run);
   }
@@ -5429,12 +6331,79 @@ export class MarketDataFoundationService {
     return this.getExchangeHistoricalBackfillRun(runId);
   }
 
-  private async normalizeHistoricalBackfillRunInput(input: ExchangeHistoricalBackfillRunInput) {
+  private async normalizeNseDeliveryHistoricalBackfillInput(input: NseDeliveryHistoricalBackfillInput) {
     const region = (input.region || 'IN').trim().toUpperCase();
     const assetType = (input.assetType || 'STOCK').trim().toUpperCase();
     if (region !== 'IN' || assetType !== 'STOCK') {
-      throw new Error('Exchange historical backfill currently supports IN/STOCK only.');
+      throw new Error('NSE delivery backfill currently supports IN/STOCK only.');
     }
+    const explicitStart = input.startDate !== undefined && input.startDate !== null && String(input.startDate).trim().length > 0;
+    const endDate = input.endDate
+      ? this.normalizeExchangeTradingDate(input.endDate)
+      : this.latestCompletedExchangeTradingDateOrThrow(region);
+    const latestCompletedDate = this.latestCompletedExchangeTradingDateOrThrow(region);
+    const warnings: string[] = [];
+    const cappedEndDate = endDate.getTime() > latestCompletedDate.getTime() ? latestCompletedDate : endDate;
+    if (endDate.getTime() > latestCompletedDate.getTime()) {
+      warnings.push(`Requested delivery end date ${this.exchangeDateKey(endDate)} was capped to latest completed trading date ${this.exchangeDateKey(latestCompletedDate)}.`);
+    }
+    const requestedSessions = Number(input.sessions);
+    const targetSessions = explicitStart
+      ? null
+      : Number.isFinite(requestedSessions) && requestedSessions > 0
+        ? Math.max(30, Math.min(Math.floor(requestedSessions), 90))
+        : 90;
+    const startDate = explicitStart
+      ? this.normalizeExchangeTradingDate(input.startDate as Date | string)
+      : this.addUtcDays(cappedEndDate, -Math.max((targetSessions || 90) * 3, 60));
+    if (startDate.getTime() > cappedEndDate.getTime()) {
+      throw new Error('NSE delivery backfill startDate must be on or before endDate.');
+    }
+
+    const allCandidateDates = this.exchangeBackfillDates(startDate, cappedEndDate)
+      .filter((date) => this.isWeekdayTradingCandidate(date));
+    const officialHolidayDates = await this.nseCmTradingHolidayDatesForRange(startDate, cappedEndDate);
+    const tradingDates = allCandidateDates.filter((date) => !officialHolidayDates.has(this.exchangeDateKey(date)));
+    const dates = targetSessions === null ? tradingDates : tradingDates.slice(-targetSessions);
+    if (dates.length === 0) {
+      throw new Error('No NSE delivery trading dates were available for the requested backfill range.');
+    }
+    const skippedOfficialHolidayDates = allCandidateDates.length - tradingDates.length;
+    if (skippedOfficialHolidayDates > 0) {
+      warnings.push(`Skipped ${skippedOfficialHolidayDates} official NSE trading holiday date(s) from the delivery backfill range.`);
+    }
+    if (targetSessions !== null && dates.length < targetSessions) {
+      warnings.push(`Only ${dates.length} delivery trading date(s) were available before ${this.exchangeDateKey(cappedEndDate)}; target was ${targetSessions}.`);
+    }
+
+    const batchSize = this.clampNumber(Number(input.batchSize), 1, 100, 25);
+    const offset = this.clampNumber(Number(input.offset), 0, Math.max(0, dates.length), 0);
+    return {
+      region,
+      assetType,
+      startDate: dates[0],
+      endDate: dates[dates.length - 1],
+      startDateKey: this.exchangeDateKey(dates[0]),
+      endDateKey: this.exchangeDateKey(dates[dates.length - 1]),
+      targetSessions,
+      dates,
+      batchSize,
+      offset,
+      force: input.force === true,
+      downloadDelayMs: this.clampNumber(Number(input.downloadDelayMs), 0, 60_000, 350),
+      jitterMs: this.clampNumber(Number(input.jitterMs), 0, 10_000, 250),
+      warnings,
+    };
+  }
+
+  private async normalizeHistoricalBackfillRunInput(input: ExchangeHistoricalBackfillRunInput) {
+    const region = (input.region || 'IN').trim().toUpperCase();
+    const assetType = (input.assetType || 'STOCK').trim().toUpperCase();
+    if (region !== 'IN' || !['STOCK', 'INDEX'].includes(assetType)) {
+      throw new Error('Exchange historical backfill currently supports IN/STOCK and IN/INDEX only.');
+    }
+    const segment = assetType === 'INDEX' ? 'INDEX' : 'CM';
+    const source = assetType === 'INDEX' ? 'NSE_INDEX' : input.includeBseFill === true ? 'NSE+BSE' : 'NSE';
     const startDate = this.normalizeExchangeTradingDate(input.startDate);
     const requestedEndDate = this.normalizeExchangeTradingDate(input.endDate);
     const latestCompletedDateKey = latestCompletedTradingDateForRegion(region);
@@ -5463,9 +6432,7 @@ export class MarketDataFoundationService {
     const downloadDelayMs = this.clampNumber(input.downloadDelayMs, 0, 60_000, 350);
     const jitterMs = this.clampNumber(input.jitterMs, 0, 10_000, 250);
     const staleJobTimeoutMs = this.clampNumber(input.staleJobTimeoutMs, 60_000, 60 * 60_000, 10 * 60_000);
-    const completedDates = typeof (this.repository as any).listCompletedSourceFileImportDates === 'function'
-      ? await (this.repository as any).listCompletedSourceFileImportDates({ source: 'NSE', segment: 'CM', startDate, endDate })
-      : [];
+    const completedDates = await this.listCompletedNseSourceImportDates(segment, startDate, endDate);
     const completedDateKeys = new Set(completedDates.map((date: Date) => this.exchangeDateKey(date)));
     const allDates = this.exchangeBackfillDates(startDate, endDate);
     const officialHolidayDates = await this.nseCmTradingHolidayDatesForRange(startDate, endDate);
@@ -5496,10 +6463,12 @@ export class MarketDataFoundationService {
       endDate,
       startDateKey: this.exchangeDateKey(startDate),
       endDateKey: this.exchangeDateKey(endDate),
+      source,
+      segment,
       maxDates,
       workerCount,
       maxRetries,
-      includeBseFill: input.includeBseFill === true,
+      includeBseFill: assetType === 'STOCK' && input.includeBseFill === true,
       downloadDelayMs,
       jitterMs,
       staleJobTimeoutMs,
@@ -5520,79 +6489,177 @@ export class MarketDataFoundationService {
     }, 0);
   }
 
-  private async processExchangeHistoricalBackfillRun(runId: string): Promise<void> {
-    const run = await this.requireHistoricalBackfillRun(runId);
-    const metadata = this.objectMetadata(run.metadata);
-    const workerCount = this.clampHistoricalBackfillWorkers(Number(metadata.workerCount || 3));
-    await this.markStaleHistoricalBackfillJobs(runId, Number(metadata.staleJobTimeoutMs || 10 * 60_000));
-    await Promise.all(Array.from({ length: workerCount }, (_, index) => this.exchangeHistoricalBackfillWorkerLoop(runId, index + 1)));
-    await this.finalizeExchangeHistoricalBackfillRun(runId);
+  private async findActiveHistoricalBackfillRun(config: any): Promise<any | null> {
+    const db = this.marketDataDb();
+    if (typeof db.pipelineRun.findMany !== 'function') return null;
+    const runs = await this.withTransientDatabaseRetry<any[]>(() => db.pipelineRun.findMany({
+      where: {
+        pipelineKey: 'market-data-historical-exchange-backfill',
+        scopeRegion: config.region,
+        scopeAssetType: config.assetType,
+        timeframe: '1d',
+        status: { in: ['PENDING', 'RUNNING', 'BLOCKED'] },
+      },
+      orderBy: { startedAt: 'desc' },
+      take: 10,
+    }), 'find active historical backfill run');
+    return runs.find((run: any) => {
+      const metadata = this.objectMetadata(run.metadata);
+      return String(metadata.startDate || '') === config.startDateKey
+        && String(metadata.endDate || '') === config.endDateKey
+        && String(metadata.maxDates ?? '') === String(config.maxDates ?? '')
+        && Boolean(metadata.includeBseFill) === Boolean(config.includeBseFill);
+    }) || null;
   }
 
-  private async exchangeHistoricalBackfillWorkerLoop(runId: string, workerIndex: number): Promise<void> {
+  private async processExchangeHistoricalBackfillRun(runId: string): Promise<void> {
+    MarketDataFoundationService.activeHistoricalBackfillRuns.add(runId);
+    try {
+      const run = await this.requireHistoricalBackfillRun(runId);
+      const metadata = this.objectMetadata(run.metadata);
+      const workerCount = this.clampHistoricalBackfillWorkers(Number(metadata.workerCount || 3));
+      await this.markStaleHistoricalBackfillJobs(runId, Number(metadata.staleJobTimeoutMs || 10 * 60_000));
+      const workerResults = await Promise.all(Array.from({ length: workerCount }, (_, index) => this.exchangeHistoricalBackfillWorkerLoop(runId, index + 1)));
+      if (workerResults.includes('PAUSED_DATABASE')) {
+        await this.blockHistoricalBackfillForTransientDatabase(runId);
+        return;
+      }
+      await this.finalizeExchangeHistoricalBackfillRun(runId);
+    } catch (error) {
+      if (this.isTransientDatabaseError(error)) {
+        this.recordHistoricalBackfillDatabasePause(runId, error);
+        console.warn(`[MarketDataFoundation] historical exchange backfill ${runId} paused because the database is temporarily unavailable: ${this.transientDatabaseMessage(error)}`);
+        return;
+      }
+      throw error;
+    } finally {
+      MarketDataFoundationService.activeHistoricalBackfillRuns.delete(runId);
+    }
+  }
+
+  private async exchangeHistoricalBackfillWorkerLoop(runId: string, workerIndex: number): Promise<'IDLE' | 'PAUSED_DATABASE'> {
     const db = this.marketDataDb();
     const run = await this.requireHistoricalBackfillRun(runId);
     const runMetadata = this.objectMetadata(run.metadata);
     const leaseOwner = `historical-backfill:${runId}:worker-${workerIndex}:${process.pid}`;
     const leaseMs = 5 * 60_000;
     while (true) {
-      const latestRun = await db.pipelineRun.findUnique({ where: { id: runId } });
-      const metadata = this.objectMetadata(latestRun?.metadata);
-      if (!latestRun || metadata.cancelRequested === true || latestRun.status === 'CANCELLED') return;
-      const memoryPercent = this.currentMemoryUtilizationPercent();
-      if (memoryPercent >= 95) {
-        await this.pauseHistoricalBackfillForMemory(runId, memoryPercent);
-        return;
+      try {
+        const latestRun = await this.withTransientDatabaseRetry<any | null>(() => db.pipelineRun.findUnique({ where: { id: runId } }), 'read historical backfill worker state');
+        const metadata = this.objectMetadata(latestRun?.metadata);
+        if (!latestRun || metadata.cancelRequested === true || latestRun.status === 'CANCELLED') return 'IDLE';
+        const memoryPercent = this.currentMemoryUtilizationPercent();
+        if (memoryPercent >= 95) {
+          await this.pauseHistoricalBackfillForMemory(runId, memoryPercent);
+          return 'IDLE';
+        }
+        const job = await this.claimNextHistoricalBackfillJob(runId, leaseOwner, leaseMs);
+        if (!job) return 'IDLE';
+        const jobMetadata = this.objectMetadata(job.metadata);
+        const delayMs = this.clampNumber(Number(runMetadata.downloadDelayMs), 0, 60_000, 350)
+          + Math.floor(Math.random() * (this.clampNumber(Number(runMetadata.jitterMs), 0, 10_000, 250) + 1));
+        if (delayMs > 0) await this.sleep(delayMs);
+        await this.processHistoricalBackfillJob(job, jobMetadata, leaseOwner);
+        await this.refreshExchangeHistoricalBackfillRun(runId);
+      } catch (error) {
+        if (this.isTransientDatabaseError(error)) {
+          this.recordHistoricalBackfillDatabasePause(runId, error);
+          console.warn(`[MarketDataFoundation] historical exchange backfill worker ${workerIndex} paused because the database is temporarily unavailable: ${this.transientDatabaseMessage(error)}`);
+          return 'PAUSED_DATABASE';
+        }
+        throw error;
       }
-      const job = await this.claimNextHistoricalBackfillJob(runId, leaseOwner, leaseMs);
-      if (!job) return;
-      const jobMetadata = this.objectMetadata(job.metadata);
-      const delayMs = this.clampNumber(Number(runMetadata.downloadDelayMs), 0, 60_000, 350)
-        + Math.floor(Math.random() * (this.clampNumber(Number(runMetadata.jitterMs), 0, 10_000, 250) + 1));
-      if (delayMs > 0) await this.sleep(delayMs);
-      await this.processHistoricalBackfillJob(job, jobMetadata, leaseOwner);
-      await this.refreshExchangeHistoricalBackfillRun(runId);
     }
   }
 
   private async claimNextHistoricalBackfillJob(runId: string, leaseOwner: string, leaseMs: number): Promise<any | null> {
     const db = this.marketDataDb();
-    const now = new Date();
-    const candidates = await db.pipelineStageRun.findMany({
-      where: { pipelineRunId: runId, status: 'PENDING' },
-      orderBy: [{ dataThroughDate: 'asc' }, { stageOrder: 'asc' }],
-      take: 10,
-    });
-    for (const candidate of candidates) {
-      const result = await db.pipelineStageRun.updateMany({
-        where: {
-          id: candidate.id,
-          status: 'PENDING',
-          OR: [{ leaseExpiresAt: null }, { leaseExpiresAt: { lt: now } }, { leaseOwner }],
-        },
-        data: {
-          status: 'RUNNING',
-          leaseOwner,
-          leaseExpiresAt: new Date(now.getTime() + leaseMs),
-          attemptCount: { increment: 1 },
-          startedAt: candidate.startedAt ?? now,
-          completedAt: null,
-          metadata: { ...this.objectMetadata(candidate.metadata), jobStatus: 'RUNNING' },
-        },
+    return this.withTransientDatabaseRetry<any | null>(async () => {
+      const now = new Date();
+      const candidates = await db.pipelineStageRun.findMany({
+        where: { pipelineRunId: runId, status: 'PENDING' },
+        orderBy: [{ dataThroughDate: 'asc' }, { stageOrder: 'asc' }],
+        take: 10,
       });
-      if (result.count > 0) {
-        return db.pipelineStageRun.findUnique({ where: { id: candidate.id } });
+      for (const candidate of candidates) {
+        const result = await db.pipelineStageRun.updateMany({
+          where: {
+            id: candidate.id,
+            status: 'PENDING',
+            OR: [{ leaseExpiresAt: null }, { leaseExpiresAt: { lt: now } }, { leaseOwner }],
+          },
+          data: {
+            status: 'RUNNING',
+            leaseOwner,
+            leaseExpiresAt: new Date(now.getTime() + leaseMs),
+            attemptCount: { increment: 1 },
+            startedAt: candidate.startedAt ?? now,
+            completedAt: null,
+            metadata: { ...this.objectMetadata(candidate.metadata), jobStatus: 'RUNNING' },
+          },
+        });
+        if (result.count > 0) {
+          return db.pipelineStageRun.findUnique({ where: { id: candidate.id } });
+        }
       }
-    }
-    return null;
+      return null;
+    }, 'claim historical backfill date job');
   }
 
   private async processHistoricalBackfillJob(stage: any, metadata: Record<string, unknown>, leaseOwner: string): Promise<void> {
     const tradingDate = String(metadata.tradingDate || this.exchangeDateKey(stage.dataThroughDate));
     const date = this.normalizeExchangeTradingDate(tradingDate);
+    const assetType = String(stage.scopeAssetType || metadata.assetType || 'STOCK').trim().toUpperCase();
     const includeBseFill = String(metadata.source || '') === 'NSE+BSE';
     const startedAt = stage.startedAt instanceof Date ? stage.startedAt : new Date();
     try {
+      if (assetType === 'INDEX') {
+        if (await this.hasCompletedNseSourceImportForDate(date, 'INDEX')) {
+          await this.completeHistoricalBackfillJob(stage, {
+            status: 'SKIPPED',
+            jobStatus: 'SKIPPED_ALREADY_IMPORTED',
+            rowsRead: 0,
+            rowsParsed: 0,
+            rowsInserted: 0,
+            rowsUpdated: 0,
+            rowsNoOp: 0,
+            rowsSkipped: 1,
+            bseFills: 0,
+            sourceFileImportId: null,
+            warnings: [],
+            errors: [],
+            startedAt,
+            leaseOwner,
+          });
+          return;
+        }
+        const nse = await this.importNseIndexOfficialDaily({ tradingDate: date, skipLatestPriceUpdate: true });
+        const jobStatus = nse.status === 'SKIPPED_DUPLICATE'
+          ? 'SKIPPED_ALREADY_IMPORTED'
+          : nse.status === 'FAILED' && this.isHistoricalBackfillNotAvailable(nse)
+            ? 'NOT_AVAILABLE'
+            : nse.status === 'FAILED'
+              ? 'FAILED'
+              : 'COMPLETED';
+        await this.completeHistoricalBackfillJob(stage, {
+          status: jobStatus === 'COMPLETED' ? 'COMPLETED' : jobStatus === 'FAILED' ? 'FAILED' : 'SKIPPED',
+          jobStatus,
+          rowsRead: Number(nse.rowsRead || 0),
+          rowsParsed: Number(nse.rowsParsed || 0),
+          rowsInserted: Number(nse.rowsInserted || 0),
+          rowsUpdated: Number(nse.rowsUpdated || 0),
+          rowsNoOp: Number(nse.rowsNoOp || 0),
+          rowsSkipped: Number(nse.rowsSkipped || 0),
+          bseFills: 0,
+          sourceFileImportId: nse.sourceFileImportId || null,
+          warnings: (nse.warnings || []).slice(0, 10),
+          errors: [...(nse.errors || [])],
+          startedAt,
+          leaseOwner,
+        });
+        return;
+      }
+
       if (await this.hasCompletedNseCmImportForDate(date)) {
         await this.completeHistoricalBackfillJob(stage, {
           status: 'SKIPPED',
@@ -5612,7 +6679,7 @@ export class MarketDataFoundationService {
         });
         return;
       }
-      const nse = await this.importNseCmUdiffDaily({ tradingDate: date, skipLatestPriceUpdate: true });
+      const nse = await this.importNseCmOfficialDaily({ tradingDate: date, skipLatestPriceUpdate: true });
       let bse: ExchangeDailyImportSummary | null = null;
       if (includeBseFill && nse.status !== 'FAILED') {
         try {
@@ -5708,8 +6775,12 @@ export class MarketDataFoundationService {
     const db = this.marketDataDb();
     const completedAt = new Date();
     const previousMetadata = this.objectMetadata(stage.metadata);
-    await db.pipelineStageRun.update({
-      where: { id: stage.id },
+    const result = await this.withTransientDatabaseRetry<any>(() => db.pipelineStageRun.updateMany({
+      where: {
+        id: stage.id,
+        status: 'RUNNING',
+        leaseOwner: input.leaseOwner,
+      },
       data: {
         status: input.status,
         processedCount: 1,
@@ -5739,7 +6810,10 @@ export class MarketDataFoundationService {
           lastError: input.errors[0] || null,
         },
       },
-    });
+    }), 'complete historical backfill date job');
+    if (Number(result?.count || 0) === 0) {
+      console.warn(`[MarketDataFoundation] skipped completion for historical backfill job ${stage.id}; worker no longer owns the lease.`);
+    }
   }
 
   private async finalizeExchangeHistoricalBackfillRun(runId: string): Promise<void> {
@@ -5756,36 +6830,32 @@ export class MarketDataFoundationService {
       } catch (error) {
         latestPriceRebuildFailed = true;
         const message = `LatestPrice rebuild failed after historical exchange backfill: ${error instanceof Error ? error.message : 'unknown error'}`;
-        const existingRun = await db.pipelineRun.findUnique({ where: { id: runId } });
-        await db.pipelineRun.update({
+        const existingRun = await this.withTransientDatabaseRetry<any | null>(() => db.pipelineRun.findUnique({ where: { id: runId } }), 'read historical backfill run after LatestPrice rebuild failure');
+        await this.withTransientDatabaseRetry<any>(() => db.pipelineRun.update({
           where: { id: runId },
           data: {
             errors: [...(existingRun?.errors || []), message].slice(0, 10),
             warnings: [...(existingRun?.warnings || []), 'LatestPrice rebuild failed after backfill; persisted candles were still imported.'].slice(0, 10),
           },
-        });
+        }), 'record historical backfill LatestPrice rebuild failure');
       }
     }
-    const terminalStatus: ExchangeHistoricalBackfillRunStatus = response.failed > 0
-      ? (response.completed > 0 || response.skipped > 0 || response.notAvailable > 0 ? 'PARTIAL' : 'FAILED')
-      : latestPriceRebuildFailed
-        ? 'PARTIAL'
-      : 'COMPLETED';
-    await db.pipelineRun.update({
+    const terminalStatus = this.historicalBackfillTerminalStatus(response, latestPriceRebuildFailed);
+    await this.withTransientDatabaseRetry<any>(() => db.pipelineRun.update({
       where: { id: runId },
       data: {
         status: terminalStatus,
         completedAt: new Date(),
         durationMs: response.startedAt ? Math.max(0, Date.now() - Date.parse(response.startedAt)) : null,
       },
-    });
+    }), 'finalize historical backfill run');
     await this.refreshExchangeHistoricalBackfillRun(runId, terminalStatus);
   }
 
   private async refreshExchangeHistoricalBackfillRun(runId: string, statusOverride?: ExchangeHistoricalBackfillRunStatus): Promise<ExchangeHistoricalBackfillRunResponse> {
     const db = this.marketDataDb();
     const response = await this.getExchangeHistoricalBackfillRun(runId);
-    const previousRun = await db.pipelineRun.findUnique({ where: { id: runId } });
+    const previousRun = await this.withTransientDatabaseRetry<any | null>(() => db.pipelineRun.findUnique({ where: { id: runId } }), 'read historical backfill run before refresh');
     const metadata = this.objectMetadata(previousRun?.metadata);
     const currentStatus = String(previousRun?.status || '').toUpperCase();
     const terminalish = response.pending === 0 && response.running === 0;
@@ -5794,9 +6864,9 @@ export class MarketDataFoundationService {
       : currentStatus === 'BLOCKED' && !terminalish
         ? 'BLOCKED'
         : terminalish
-      ? (response.failed > 0 ? (response.completed > 0 || response.skipped > 0 || response.notAvailable > 0 ? 'PARTIAL' : 'FAILED') : 'COMPLETED')
+      ? this.historicalBackfillTerminalStatus(response)
       : 'RUNNING');
-    await db.pipelineRun.update({
+    await this.withTransientDatabaseRetry<any>(() => db.pipelineRun.update({
       where: { id: runId },
       data: {
         status: nextStatus,
@@ -5829,7 +6899,7 @@ export class MarketDataFoundationService {
           progressPercent: response.progressPercent,
         },
       },
-    });
+    }), 'refresh historical backfill run counters');
     return this.getExchangeHistoricalBackfillRun(runId);
   }
 
@@ -5838,27 +6908,72 @@ export class MarketDataFoundationService {
     const run = await this.requireHistoricalBackfillRun(runId);
     const metadata = this.objectMetadata(run.metadata);
     const message = `Historical backfill paused: memory utilization ${memoryPercent.toFixed(1)}% reached the 95% stop threshold.`;
-    await db.pipelineRun.update({
+    await this.withTransientDatabaseRetry<any>(() => db.pipelineRun.update({
       where: { id: runId },
       data: {
         status: 'BLOCKED',
         warnings: [...this.stringArray(run.warnings), message].slice(-10),
         metadata: { ...metadata, memoryPausedAt: new Date().toISOString(), memoryPercent, cancelRequested: false },
       },
-    });
+    }), 'pause historical backfill for memory');
   }
 
-  private async markStaleHistoricalBackfillJobs(runId: string, staleJobTimeoutMs: number): Promise<void> {
+  private async blockHistoricalBackfillForTransientDatabase(runId: string): Promise<void> {
+    const db = this.marketDataDb();
+    const run = await this.withTransientDatabaseRetry<any | null>(() => db.pipelineRun.findUnique({ where: { id: runId } }), 'read historical backfill run for database pause');
+    if (!run) return;
+    const pause = MarketDataFoundationService.historicalBackfillDatabasePauses.get(runId);
+    const metadata = this.objectMetadata(run.metadata);
+    const message = pause?.message || 'Historical backfill paused because the database was temporarily unavailable. Resume the run after database recovery.';
+    const pausedAt = pause?.pausedAt || new Date().toISOString();
+    const runningStages = await this.withTransientDatabaseRetry<any[]>(() => db.pipelineStageRun.findMany({
+      where: { pipelineRunId: runId, status: 'RUNNING' },
+    }), 'find historical backfill jobs claimed during database pause');
+    await Promise.all(runningStages.map((stage: any) => this.withTransientDatabaseRetry<any>(() => db.pipelineStageRun.update({
+      where: { id: stage.id },
+      data: {
+        status: 'PENDING',
+        leaseOwner: null,
+        leaseExpiresAt: null,
+        metadata: {
+          ...this.objectMetadata(stage.metadata),
+          jobStatus: 'STALE_RETRYABLE',
+          databasePausedAt: pausedAt,
+          lastError: message,
+        },
+        warnings: [message],
+      },
+    }), 'release historical backfill job after database pause')));
+    await this.withTransientDatabaseRetry<any>(() => db.pipelineRun.update({
+      where: { id: runId },
+      data: {
+        status: 'BLOCKED',
+        warnings: Array.from(new Set([...this.stringArray(run.warnings), message])).slice(-10),
+        metadata: { ...metadata, databasePausedAt: pausedAt, databasePausedJobCount: runningStages.length, cancelRequested: false },
+      },
+    }), 'mark historical backfill blocked for transient database outage');
+    MarketDataFoundationService.historicalBackfillDatabasePauses.delete(runId);
+  }
+
+  private historicalBackfillTerminalStatus(response: ExchangeHistoricalBackfillRunResponse, latestPriceRebuildFailed = false): ExchangeHistoricalBackfillRunStatus {
+    if (response.failed > 0 || response.notAvailable > 0) {
+      return response.completed > 0 || response.skipped > 0 ? 'PARTIAL' : 'FAILED';
+    }
+    return latestPriceRebuildFailed ? 'PARTIAL' : 'COMPLETED';
+  }
+
+  private async markStaleHistoricalBackfillJobs(runId: string, staleJobTimeoutMs: number): Promise<number> {
     const db = this.marketDataDb();
     const staleBefore = new Date(Date.now() - staleJobTimeoutMs);
-    const staleJobs = await db.pipelineStageRun.findMany({
+    const staleJobs = await this.withTransientDatabaseRetry<any[]>(() => db.pipelineStageRun.findMany({
       where: {
         pipelineRunId: runId,
         status: 'RUNNING',
-        OR: [{ leaseExpiresAt: { lt: new Date() } }, { updatedAt: { lt: staleBefore } }],
+        leaseExpiresAt: { lt: new Date() },
+        updatedAt: { lt: staleBefore },
       },
-    });
-    await Promise.all(staleJobs.map((stage: any) => db.pipelineStageRun.update({
+    }), 'find stale historical backfill jobs');
+    await Promise.all(staleJobs.map((stage: any) => this.withTransientDatabaseRetry<any>(() => db.pipelineStageRun.update({
       where: { id: stage.id },
       data: {
         status: 'PENDING',
@@ -5870,14 +6985,28 @@ export class MarketDataFoundationService {
           lastError: 'Previous worker lease became stale before completion.',
         },
       },
-    })));
+    }), 'mark stale historical backfill job retryable')));
+    return staleJobs.length;
   }
 
   private async hasCompletedNseCmImportForDate(date: Date): Promise<boolean> {
-    const completedDates = typeof (this.repository as any).listCompletedSourceFileImportDates === 'function'
-      ? await (this.repository as any).listCompletedSourceFileImportDates({ source: 'NSE', segment: 'CM', startDate: date, endDate: date })
-      : [];
+    return this.hasCompletedNseSourceImportForDate(date, 'CM');
+  }
+
+  private async hasCompletedNseSourceImportForDate(date: Date, segment: 'CM' | 'INDEX'): Promise<boolean> {
+    const completedDates = await this.listCompletedNseSourceImportDates(segment, date, date);
     return completedDates.some((item: Date) => this.exchangeDateKey(item) === this.exchangeDateKey(date));
+  }
+
+  private async listCompletedNseSourceImportDates(segment: 'CM' | 'INDEX', startDate: Date, endDate: Date): Promise<Date[]> {
+    const repository = this.repository as any;
+    if (segment === 'INDEX' && typeof repository.listCompletedOfficialNseIndexImportDates === 'function') {
+      return repository.listCompletedOfficialNseIndexImportDates({ startDate, endDate });
+    }
+    if (typeof repository.listCompletedSourceFileImportDates === 'function') {
+      return repository.listCompletedSourceFileImportDates({ source: 'NSE', segment, startDate, endDate });
+    }
+    return [];
   }
 
   private historicalBackfillResponse(run: any): ExchangeHistoricalBackfillRunResponse {
@@ -5910,7 +7039,7 @@ export class MarketDataFoundationService {
       runId: run.id,
       status: String(run.status || 'RUNNING') as ExchangeHistoricalBackfillRunStatus,
       source: 'NSE',
-      segment: 'CM',
+      segment: String(metadata.segment || (String(run.scopeAssetType || '').toUpperCase() === 'INDEX' ? 'INDEX' : 'CM')),
       region: run.scopeRegion,
       assetType: run.scopeAssetType,
       startDate: String(metadata.startDate || ''),
@@ -5956,7 +7085,11 @@ export class MarketDataFoundationService {
       tradingDate: String(metadata.tradingDate || this.exchangeDateKey(stage.dataThroughDate)),
       dateRange: String(metadata.dateRange || metadata.tradingDate || this.exchangeDateKey(stage.dataThroughDate)),
       status,
-      source: String(metadata.source || 'NSE') === 'NSE+BSE' ? 'NSE+BSE' : 'NSE',
+      source: String(metadata.source || 'NSE') === 'NSE+BSE'
+        ? 'NSE+BSE'
+        : String(metadata.source || 'NSE') === 'NSE_INDEX'
+          ? 'NSE_INDEX'
+          : 'NSE',
       rowsImported: rowsInserted + rowsUpdated + rowsNoOp,
       rowsInserted,
       rowsUpdated,
@@ -5986,7 +7119,8 @@ export class MarketDataFoundationService {
   }
 
   private async requireHistoricalBackfillRun(runId: string): Promise<any> {
-    const run = await this.marketDataDb().pipelineRun.findUnique({ where: { id: runId } });
+    const db = this.marketDataDb();
+    const run = await this.withTransientDatabaseRetry<any | null>(() => db.pipelineRun.findUnique({ where: { id: runId } }), 'read historical backfill run');
     if (!run || run.pipelineKey !== 'market-data-historical-exchange-backfill') {
       throw new Error('Historical exchange backfill run not found.');
     }
@@ -6007,6 +7141,25 @@ export class MarketDataFoundationService {
 
   private stringArray(value: unknown): string[] {
     return Array.isArray(value) ? value.map(String).filter(Boolean) : [];
+  }
+
+  private errorMessage(error: unknown, fallback: string): string {
+    return error instanceof Error ? error.message : fallback;
+  }
+
+  private transientDatabaseMessage(error: unknown): string {
+    const raw = this.errorMessage(error, 'database unavailable').replace(/\s+/g, ' ').trim();
+    const fatal = raw.match(/FATAL:\s*.*?(?=\s+Invalid `|\s+at\s+|$)/i)?.[0];
+    const detail = raw.match(/DETAIL:\s*.*?(?=\s+Invalid `|\s+at\s+|$)/i)?.[0];
+    const connector = raw.match(/Server has closed the connection\.?|database system is in recovery mode|database system is not yet accepting connections|Consistent recovery state has not been yet reached\.?|connection terminated|connection reset|connection pool timeout|timed out/i)?.[0];
+    return [fatal, detail].filter(Boolean).join(' ') || connector || 'database temporarily unavailable';
+  }
+
+  private recordHistoricalBackfillDatabasePause(runId: string, error: unknown): void {
+    MarketDataFoundationService.historicalBackfillDatabasePauses.set(runId, {
+      pausedAt: new Date().toISOString(),
+      message: `Historical backfill paused because the database was temporarily unavailable: ${this.transientDatabaseMessage(error)}. Resume the run after database recovery.`,
+    });
   }
 
   private iso(value: unknown): string | null {
@@ -6041,6 +7194,32 @@ export class MarketDataFoundationService {
 
   private sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  private async withTransientDatabaseRetry<T>(operation: () => Promise<T>, label: string): Promise<T> {
+    const maxAttempts = Math.max(1, Math.min(this.readPositiveNumber(process.env.MARKET_DATA_DB_TRANSIENT_RETRY_ATTEMPTS, 4), 8));
+    const baseDelayMs = Math.max(25, Math.min(this.readPositiveNumber(process.env.MARKET_DATA_DB_TRANSIENT_RETRY_DELAY_MS, 250), 5_000));
+    let lastError: unknown = null;
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      try {
+        return await operation();
+      } catch (error) {
+        lastError = error;
+        if (!this.isTransientDatabaseError(error) || attempt >= maxAttempts) throw error;
+        const delayMs = Math.min(baseDelayMs * attempt, 10_000);
+        console.warn(`[MarketDataFoundation] transient database error during ${label}; retrying attempt ${attempt + 1}/${maxAttempts}: ${this.transientDatabaseMessage(error)}`);
+        await this.sleep(delayMs);
+      }
+    }
+    throw lastError instanceof Error ? lastError : new Error('Transient database operation failed');
+  }
+
+  private isTransientDatabaseError(error: unknown): boolean {
+    const typed = error as { code?: string; message?: string } | null | undefined;
+    const code = typeof typed?.code === 'string' ? typed.code : '';
+    const message = error instanceof Error ? error.message : String(typed?.message || '');
+    return ['P1001', 'P1002', 'P1017', 'P2024'].includes(code)
+      || /server has closed the connection|database system is in recovery mode|not yet accepting connections|connection terminated|connection reset|can't reach database|connection pool timeout|timed out/i.test(message);
   }
 
   private isHistoricalBackfillNotAvailable(summary: ExchangeDailyImportSummary): boolean {
@@ -6189,10 +7368,12 @@ export class MarketDataFoundationService {
       await this.repository.upsertSyncState({ region, assetType, tradingDate, status: 'PENDING', summary, lastCheckedAt: now });
 
       const tasks = await this.repository.listActiveStockSyncTasks({ region, assetType });
-      const importSummary = await this.importNseCmUdiffDaily({ tradingDate: targetTradingDate });
+      const importSummary = assetType === 'INDEX'
+        ? await this.importNseIndexOfficialDaily({ tradingDate: targetTradingDate })
+        : await this.importNseCmUdiffDaily({ tradingDate: targetTradingDate });
       const changedInstrumentIds = this.instrumentIdsForImportedSymbols(tasks, importSummary.changedSymbols || []);
       const matchedInstrumentIds = this.instrumentIdsForImportedSymbols(tasks, importSummary.downstreamSymbols || importSummary.changedSymbols || []);
-      const downstreamInstrumentIds = changedInstrumentIds;
+      const downstreamInstrumentIds = matchedInstrumentIds;
 
       summary.instrumentsProcessed = importSummary.rowsParsed;
       summary.rowsReceived = importSummary.rowsParsed;
@@ -6214,6 +7395,7 @@ export class MarketDataFoundationService {
       });
       summary.changedInstrumentIds = changedInstrumentIds;
       summary.downstreamInstrumentIds = downstreamInstrumentIds;
+      summary.downstreamEligibilitySource = downstreamInstrumentIds.length > 0 ? 'exchange_file_summary' : null;
       summary.changedInstrumentCount = changedInstrumentIds.length;
       summary.dqStageEligible = changedInstrumentIds.length > 0 && importSummary.status !== 'FAILED';
       summary.officialEodBulk = {
@@ -6323,8 +7505,9 @@ export class MarketDataFoundationService {
     const sortedDownstreamInstrumentIds = [...downstreamInstrumentIds].sort((a, b) => a.localeCompare(b));
     summary.changedInstrumentIds = sortedChangedInstrumentIds;
     summary.downstreamInstrumentIds = sortedDownstreamInstrumentIds;
+    summary.downstreamEligibilitySource = sortedDownstreamInstrumentIds.length > 0 ? 'official_eod_bulk' : null;
     summary.changedInstrumentCount = sortedChangedInstrumentIds.length;
-    summary.dqStageEligible = sortedDownstreamInstrumentIds.length > 0;
+    summary.dqStageEligible = sortedChangedInstrumentIds.length > 0;
     summary.sourceFingerprint = summary.officialEodBulk?.sourceFingerprint
       || this.scheduledRegionSourceFingerprint({
         region,
@@ -6513,21 +7696,23 @@ export class MarketDataFoundationService {
   private async loadFirstAvailableNseOfficialEodCsv(tradingDate: Date): Promise<{
     archive: NseArchiveUrl;
     parsed: ReturnType<typeof parseIndianExchangeEodCsv>;
+    csvText: string;
     warnings: string[];
   }> {
     const warnings: string[] = [];
-    for (const archive of buildNseOfficialArchiveUrls(tradingDate)) {
+    for (const archive of buildNseOfficialArchiveUrls(tradingDate).filter((candidate) => this.nseOfficialArchiveAppliesToDate(candidate, tradingDate))) {
       try {
         const csvText = await this.downloadOfficialExchangeText(archive.url);
         const parsed = parseIndianExchangeEodCsv(csvText, {
           source: archive.sourceName,
+          sourceName: archive.sourceName,
           sourceUrl: archive.url,
           exchange: 'NSE',
           includeSeries: ['EQ', 'BE'],
           tradingDate,
         });
         if (parsed.rowsParsed > 0) {
-          return { archive, parsed, warnings };
+          return { archive, parsed, csvText, warnings };
         }
         warnings.push(`${archive.sourceName} ${archive.fileName}: parsed zero usable rows.`);
       } catch (error) {
@@ -6536,6 +7721,30 @@ export class MarketDataFoundationService {
       }
     }
     throw new Error(warnings.length > 0 ? warnings.join(' | ') : 'No official NSE EOD source was available.');
+  }
+
+  private nseOfficialArchiveAppliesToDate(archive: NseArchiveUrl, tradingDate: Date): boolean {
+    const tradingDateKey = this.exchangeDateKey(tradingDate);
+    if (archive.activeFrom && tradingDateKey < archive.activeFrom) return false;
+    if (archive.discontinuedFrom && tradingDateKey >= archive.discontinuedFrom) return false;
+    return true;
+  }
+
+  private nseOfficialEodParserVersion(sourceName: string): string {
+    if (sourceName === 'NSE_UDIFF_CM_BHAVCOPY') return 'nse-cm-udiff-v1';
+    if (sourceName === 'NSE_SECURITY_BHAVDATA') return 'nse-security-bhavdata-v1';
+    if (sourceName === 'NSE_LEGACY_CM_BHAVCOPY') return 'nse-legacy-cm-bhavcopy-v1';
+    return 'nse-official-eod-v1';
+  }
+
+  private buildNseIndexEodArchiveUrl(tradingDate: Date): { sourceName: 'NSE_INDEX_EOD'; fileName: string; url: string } {
+    const [yyyy, mm, dd] = this.exchangeDateKey(tradingDate).split('-');
+    const fileName = `ind_close_all_${dd}${mm}${yyyy}.csv`;
+    return {
+      sourceName: 'NSE_INDEX_EOD',
+      fileName,
+      url: `https://archives.nseindia.com/content/indices/${fileName}`,
+    };
   }
 
   private taskPriceRegionInfo(defaultRegion: string, task: StockSyncTask): PriceRegionInfo {
@@ -6552,9 +7761,14 @@ export class MarketDataFoundationService {
   private shouldUseExchangeDailyImportPath(region: string, assetType: string): boolean {
     const repository = this.repository as any;
     return region === 'IN'
-      && assetType === 'STOCK'
+      && ['STOCK', 'INDEX'].includes(assetType)
       && typeof repository.upsertSourceFileImport === 'function'
       && typeof repository.storeHistoricalBulk === 'function';
+  }
+
+  private parsedSymbolsFromPrices(prices: Array<Pick<HistoricalPrice, 'symbol'>>): string[] {
+    return [...new Set(prices.map((price) => String(price.symbol || '').trim()).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b));
   }
 
   private instrumentIdsForImportedSymbols(tasks: StockSyncTask[], symbols: string[]): string[] {
@@ -7084,8 +8298,22 @@ export class MarketDataFoundationService {
     return this.startOfUtcDay(date);
   }
 
+  private latestCompletedExchangeTradingDateOrThrow(region: string): Date {
+    const latestCompletedDateKey = latestCompletedTradingDateForRegion(region);
+    if (!latestCompletedDateKey) {
+      throw new Error(`Latest completed trading date is unavailable for ${region}.`);
+    }
+    return this.normalizeExchangeTradingDate(latestCompletedDateKey);
+  }
+
   private exchangeDateKey(date: Date): string {
     return this.startOfUtcDay(date).toISOString().slice(0, 10);
+  }
+
+  private addUtcDays(date: Date, days: number): Date {
+    const next = this.startOfUtcDay(date);
+    next.setUTCDate(next.getUTCDate() + days);
+    return this.startOfUtcDay(next);
   }
 
   private exchangeBackfillDates(startDate: Date, endDate: Date): Date[] {
@@ -12007,7 +13235,19 @@ export class MarketDataFoundationService {
   }
 
   private mapNseSecurityRow(row: Record<string, string>, source: string): CreateStockRequest | null {
-    const sourceSymbol = this.readCsv(row, ['SYMBOL', 'SM_SYMBOL', 'TRADING SYMBOL', 'TRADINGSYMBOL']);
+    const exchange = source === 'BSE_EQUITY_SECURITIES' ? 'BSE' : 'NSE';
+    const sourceSymbol = this.readCsv(row, [
+      'SYMBOL',
+      'SM_SYMBOL',
+      'TRADING SYMBOL',
+      'TRADINGSYMBOL',
+      'SCRIP ID',
+      'SCRIP_ID',
+      'SCRIPID',
+      'SECURITY ID',
+      'SECURITY_ID',
+      'SECURITYID',
+    ]);
     const name = this.readCsv(row, [
       'NAME OF COMPANY',
       'NAME_OF_COMPANY',
@@ -12015,6 +13255,12 @@ export class MarketDataFoundationService {
       'COMPANY NAME',
       'SECURITY NAME',
       'SECURITYNAME',
+      'SCRIP NAME',
+      'SCRIP_NAME',
+      'SCRIPNAME',
+      'ISSUER NAME',
+      'ISSUER_NAME',
+      'ISSUERNAME',
       'SM_NAME',
       'NAME OF ETF',
       'NAME OF THE ETF',
@@ -12024,9 +13270,24 @@ export class MarketDataFoundationService {
     const isin = this.readCsv(row, ['ISIN', 'ISIN NUMBER', 'ISIN_NUMBER', 'ISINNUMBER']);
     const listingDate = this.readCsv(row, ['DATE OF LISTING', 'DATE_OF_LISTING', 'DATEOFLISTING']);
     const series = this.readCsv(row, ['SERIES', 'SM_SERIES', 'INSTRUMENT TYPE', 'INSTRUMENT']).toUpperCase();
+    const sector = this.readCsv(row, ['SECTOR', 'SECTOR NAME', 'SECTOR_NAME', 'SECTORNAME']);
+    const industry = this.readCsv(row, [
+      'INDUSTRY',
+      'INDUSTRY NAME',
+      'INDUSTRY_NAME',
+      'INDUSTRYNAME',
+      'INDUSTRY NEW NAME',
+      'INDUSTRY_NEW_NAME',
+      'IGROUP NAME',
+      'IGROUP_NAME',
+      'ISUBGROUP NAME',
+      'ISUBGROUP_NAME',
+      'BASIC INDUSTRY',
+      'BASIC_INDUSTRY',
+    ]);
     if (!sourceSymbol || !name) return null;
     const sourceSymbolUpper = this.baseSymbolFromProviderSymbol(sourceSymbol);
-    const normalized = this.normalizeCatalogSymbol({ sourceSymbol: sourceSymbolUpper, exchange: 'NSE' }, source);
+    const normalized = this.normalizeCatalogSymbol({ sourceSymbol: sourceSymbolUpper, exchange }, source);
     const isEtf = source === 'NSE_ETF_SECURITIES' || series.includes('ETF') || /\bETF\b|BEES|NIFTY.*ETF/i.test(name);
     const isCashEquity = isEtf || !series || ['EQ', 'BE', 'BZ', 'SM', 'ST'].includes(series);
     if (!isCashEquity) return null;
@@ -12037,15 +13298,17 @@ export class MarketDataFoundationService {
       displaySymbol: normalized.displaySymbol,
       name: name.trim(),
       region: 'IN',
-      exchange: 'NSE',
+      exchange,
       country: 'India',
       currency: 'INR',
       assetType: isEtf ? 'ETF' : 'STOCK',
       instrumentSegment: isEtf ? 'ETF' : 'CASH',
-      derivativesEligible: this.isKnownNseDerivativesEligibleStock(normalized.sourceSymbol),
-      catalogSource: isEtf ? 'NSE_ETF_SECURITIES' : source,
+      derivativesEligible: exchange === 'NSE' && this.isKnownNseDerivativesEligibleStock(normalized.sourceSymbol),
+      catalogSource: isEtf && source !== 'BSE_EQUITY_SECURITIES' ? 'NSE_ETF_SECURITIES' : source,
       providerSupportStatus: 'UNKNOWN',
       isActive: true,
+      sector: this.hasValidMetadataValue(sector) ? sector : null,
+      industry: this.hasValidMetadataValue(industry) ? industry : null,
       isin: isin || null,
       ipoDate: this.parseCatalogDate(listingDate),
       source: source,
@@ -12265,8 +13528,42 @@ export class MarketDataFoundationService {
     return ['NIFTY 50', 'NIFTY BANK', 'NIFTY FINANCIAL SERVICES', 'NIFTY MIDCAP SELECT', 'NIFTY NEXT 50', 'SENSEX', 'BSE SENSEX', 'S&P BSE SENSEX'].includes(upperName);
   }
 
-  private isBroadIndianIndexName(name: string): boolean {
-    return this.isDerivativesEligibleIndexName(this.cleanIndexName(name).toUpperCase());
+  private indexPriceSourceForName(name: string): 'NSE_INDEX_EOD' | 'NIFTY_SECTOR_INDEX' {
+    return this.isNseSectorIndexName(name) ? 'NIFTY_SECTOR_INDEX' : 'NSE_INDEX_EOD';
+  }
+
+  private isNseSectorIndexName(name: string): boolean {
+    const upperName = this.cleanIndexName(name).toUpperCase();
+    const sectorNames = new Set([
+      'NIFTY AUTO',
+      'NIFTY BANK',
+      'NIFTY CAPITAL MARKETS',
+      'NIFTY CONSUMER DURABLES',
+      'NIFTY CONSUMER SERVICES',
+      'NIFTY COMMODITIES',
+      'NIFTY CPSE',
+      'NIFTY ENERGY',
+      'NIFTY FINANCIAL SERVICES',
+      'NIFTY FINANCIAL SERVICES 25/50',
+      'NIFTY FMCG',
+      'NIFTY HEALTHCARE INDEX',
+      'NIFTY INDIA DEFENCE',
+      'NIFTY INDIA CONSUMPTION',
+      'NIFTY INFRA',
+      'NIFTY INFRASTRUCTURE',
+      'NIFTY IT',
+      'NIFTY MEDIA',
+      'NIFTY METAL',
+      'NIFTY MNC',
+      'NIFTY OIL & GAS',
+      'NIFTY PHARMA',
+      'NIFTY PRIVATE BANK',
+      'NIFTY PSE',
+      'NIFTY PSU BANK',
+      'NIFTY REALTY',
+      'NIFTY SERVICES SECTOR',
+    ]);
+    return sectorNames.has(upperName);
   }
 
   private parseMarketDataNumber(value: string): number | null {
@@ -12293,6 +13590,163 @@ export class MarketDataFoundationService {
       .replace(/&gt;/gi, '>')
       .replace(/&quot;/gi, '"')
       .replace(/&#39;/gi, "'");
+  }
+
+  private assertManualVerifiedFundamentalsHeaders(csvText: string) {
+    const firstLine = csvText.replace(/^\uFEFF/, '').split(/\r?\n/).find((line) => line.trim().length > 0);
+    if (!firstLine) throw new Error('Bulk manual verified fundamentals CSV is empty.');
+    const headers = new Set(this.splitCsvLine(firstLine).map((header) => header.trim().toUpperCase()));
+    const required = [
+      { label: 'symbol', aliases: ['SYMBOL'] },
+      { label: 'period type', aliases: ['PERIOD_TYPE', 'PERIODTYPE', 'PERIOD TYPE'] },
+      { label: 'period end date', aliases: ['PERIOD_END_DATE', 'PERIODENDDATE', 'PERIOD END DATE'] },
+      { label: 'revenue', aliases: ['REVENUE'] },
+      { label: 'net income', aliases: ['NET_INCOME', 'NETINCOME', 'NET INCOME'] },
+      { label: 'EPS', aliases: ['EPS'] },
+      { label: 'source', aliases: ['SOURCE'] },
+      { label: 'validatedBy', aliases: ['VALIDATED_BY', 'VALIDATEDBY', 'VALIDATED BY'] },
+      { label: 'validatedAt', aliases: ['VALIDATED_AT', 'VALIDATEDAT', 'VALIDATED AT'] },
+    ];
+    const missing = required
+      .filter((field) => !field.aliases.some((alias) => headers.has(alias)))
+      .map((field) => field.label);
+    if (missing.length > 0) {
+      throw new Error(`Bulk manual verified fundamentals CSV is missing required columns: ${missing.join(', ')}.`);
+    }
+  }
+
+  private parseManualVerifiedFundamentalsRow(
+    row: Record<string, string>,
+    rowNumber: number,
+    fallbackSourceUrl: string | null
+  ): { valid: true; row: ParsedManualVerifiedFundamentalRow } | { valid: false; rejection: RejectedManualVerifiedFundamentalRow } {
+    const errors: string[] = [];
+    const symbol = this.readCsv(row, ['SYMBOL']).trim().toUpperCase();
+    if (!symbol) errors.push('symbol is required.');
+
+    const periodTypeRaw = this.readCsv(row, ['PERIOD_TYPE', 'PERIODTYPE', 'PERIOD TYPE']);
+    const periodType = this.normalizeManualVerifiedFundamentalsPeriodType(periodTypeRaw);
+    if (!periodType) errors.push('period type must be ANNUAL or QUARTERLY.');
+
+    const periodEndDateRaw = this.readCsv(row, ['PERIOD_END_DATE', 'PERIODENDDATE', 'PERIOD END DATE']);
+    let periodEndDate: Date | null = null;
+    try {
+      periodEndDate = periodEndDateRaw ? this.normalizeExchangeTradingDate(periodEndDateRaw) : null;
+    } catch {
+      periodEndDate = null;
+    }
+    if (!periodEndDate) errors.push('period end date is required and must be a valid date.');
+
+    const revenue = this.parseManualVerifiedFundamentalsNumber(this.readCsv(row, ['REVENUE']), 'revenue', true, errors);
+    const netIncome = this.parseManualVerifiedFundamentalsNumber(this.readCsv(row, ['NET_INCOME', 'NETINCOME', 'NET INCOME']), 'net income', true, errors);
+    const eps = this.parseManualVerifiedFundamentalsNumber(this.readCsv(row, ['EPS']), 'EPS', true, errors);
+    const peRatio = this.parseManualVerifiedFundamentalsNumber(this.readCsv(row, ['PE_RATIO', 'PERATIO', 'PE RATIO']), 'PE ratio', false, errors);
+    const marketCap = this.parseManualVerifiedFundamentalsNumber(this.readCsv(row, ['MARKET_CAP', 'MARKETCAP', 'MARKET CAP']), 'market cap', false, errors);
+
+    const source = this.readCsv(row, ['SOURCE']).trim().toUpperCase();
+    if (!source) {
+      errors.push('source is required.');
+    } else if (source !== MANUAL_VERIFIED_FUNDAMENTALS_SOURCE) {
+      errors.push('source must be MANUAL_VERIFIED.');
+    }
+
+    const validatedBy = this.readCsv(row, ['VALIDATED_BY', 'VALIDATEDBY', 'VALIDATED BY']);
+    if (!validatedBy) errors.push('validatedBy is required.');
+    const validatedAtRaw = this.readCsv(row, ['VALIDATED_AT', 'VALIDATEDAT', 'VALIDATED AT']);
+    const validatedAt = validatedAtRaw ? new Date(validatedAtRaw) : null;
+    if (!validatedAt || Number.isNaN(validatedAt.getTime())) {
+      errors.push('validatedAt is required and must be a valid date/time.');
+    }
+
+    if (errors.length > 0 || !periodType || !periodEndDate || revenue === null || netIncome === null || eps === null || !validatedAt) {
+      return {
+        valid: false,
+        rejection: {
+          rowNumber,
+          symbol: symbol || null,
+          reason: 'Manual verified fundamentals row failed validation.',
+          errors,
+        },
+      };
+    }
+
+    const currency = this.readCsv(row, ['CURRENCY']).trim().toUpperCase() || null;
+    const sourceNote = this.readCsv(row, ['SOURCE_NOTE', 'SOURCENOTE', 'SOURCE NOTE']) || null;
+    const sourceUrl = this.readCsv(row, ['SOURCE_URL', 'SOURCEURL', 'SOURCE URL']) || fallbackSourceUrl || null;
+
+    return {
+      valid: true,
+      row: {
+        rowNumber,
+        symbol,
+        periodType,
+        periodEndDate,
+        revenue,
+        netIncome,
+        eps,
+        peRatio,
+        marketCap,
+        currency,
+        sourceNote,
+        sourceUrl,
+        validatedBy,
+        validatedAt,
+      },
+    };
+  }
+
+  private normalizeManualVerifiedFundamentalsPeriodType(value: string): ManualVerifiedFundamentalsPeriodType | null {
+    const normalized = value.trim().toUpperCase();
+    if (['ANNUAL', 'YEARLY', 'YEAR', 'FY'].includes(normalized)) return 'ANNUAL';
+    if (['QUARTERLY', 'QUARTER', 'QTR', 'Q'].includes(normalized)) return 'QUARTERLY';
+    return null;
+  }
+
+  private parseManualVerifiedFundamentalsNumber(value: string, fieldName: string, required: boolean, errors: string[]): number | null {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      if (required) errors.push(`${fieldName} is required.`);
+      return null;
+    }
+    const nullEquivalent = ['NA', 'N/A', 'NULL', 'NONE', '-'].includes(trimmed.toUpperCase());
+    if (nullEquivalent) {
+      if (required) errors.push(`${fieldName} is required.`);
+      return null;
+    }
+    const parenthesized = /^\((.*)\)$/.exec(trimmed);
+    const numericText = (parenthesized ? `-${parenthesized[1]}` : trimmed)
+      .replace(/[,\s]/g, '')
+      .replace(/^(INR|RS\.?|₹|\$)/i, '');
+    const parsed = Number(numericText);
+    if (!Number.isFinite(parsed)) {
+      errors.push(`${fieldName} must be numeric.`);
+      return null;
+    }
+    return parsed;
+  }
+
+  private manualVerifiedFundamentalsEvidenceDate(rows: ParsedManualVerifiedFundamentalRow[]): Date {
+    const latestValidatedAt = rows
+      .map((row) => row.validatedAt)
+      .sort((a, b) => b.getTime() - a.getTime())[0];
+    return this.startOfUtcDay(latestValidatedAt || new Date());
+  }
+
+  private manualFundamentalsStocksBySymbol(stocks: any[]): Map<string, any[]> {
+    const map = new Map<string, any[]>();
+    const add = (key: unknown, stock: any) => {
+      const normalized = String(key || '').trim().toUpperCase();
+      if (!normalized) return;
+      const rows = map.get(normalized) || [];
+      rows.push(stock);
+      map.set(normalized, rows);
+    };
+    for (const stock of stocks || []) {
+      add(stock.symbol, stock);
+      add(stock.sourceSymbol, stock);
+      add(stock.displaySymbol, stock);
+    }
+    return map;
   }
 
   private parseCsv(csvText: string): Record<string, string>[] {

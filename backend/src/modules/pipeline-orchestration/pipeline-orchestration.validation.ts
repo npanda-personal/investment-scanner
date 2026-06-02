@@ -27,6 +27,7 @@ const SUPPORTED_COMMAND_KEYS: PipelineCommandKey[] = [
   'BACKTEST_PROOF_REFRESH',
   'RESEARCH_PROJECTION_REFRESH',
   'TODAY_REVIEW_PUBLISH',
+  'SIGNAL_POSITION_LEDGER_REFRESH',
   'EARNINGS_INTELLIGENCE_REFRESH',
   'STOCK_INTEREST_REFRESH',
   'PIPELINE_RUN_ALL',
@@ -112,9 +113,12 @@ function parseCommandKey(value: unknown): PipelineCommandKey {
   return key;
 }
 
-function parseRunMode(value: unknown): 'single_batch' {
-  if (String(value ?? '').trim() !== 'single_batch') throw new Error('runMode must be single_batch');
-  return 'single_batch';
+function parseRunMode(value: unknown): PipelineCommandRequest['runMode'] {
+  const normalized = String(value ?? '').trim();
+  if (normalized === 'single_batch' || normalized === 'incremental_changed_only' || normalized === 'full_latest_trading_date') {
+    return normalized;
+  }
+  throw new Error('runMode must be single_batch, incremental_changed_only, or full_latest_trading_date');
 }
 
 function parseBatchSize(value: unknown): number {

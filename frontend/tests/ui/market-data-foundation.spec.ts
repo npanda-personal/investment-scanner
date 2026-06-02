@@ -457,11 +457,13 @@ test.describe('Market Data Foundation UI', () => {
 
     backfillPayload = null;
     await page.getByLabel('By year').check();
-    await page.getByRole('combobox', { name: 'Year' }).click();
+    await page.getByRole('combobox', { name: 'From year' }).click();
+    await page.getByRole('option', { name: '2024' }).click();
+    await page.getByRole('combobox', { name: 'To year' }).click();
     await page.getByRole('option', { name: '2025' }).click();
     await page.getByRole('button', { name: 'Run Backfill' }).click();
     await expect.poll(() => backfillPayload).toMatchObject({
-      startDate: '2025-01-01',
+      startDate: '2024-01-01',
       endDate: '2025-12-31',
     });
     expect(sourceImportRequestCount).toBeGreaterThanOrEqual(countAfterInitialEvidenceLoad);

@@ -27,6 +27,22 @@ export class MarketDataFoundationController {
     return error instanceof Error ? error.message : fallback;
   }
 
+  private isTransientDatabaseError(error: unknown): boolean {
+    const typed = error as { code?: string; message?: string } | null | undefined;
+    const code = typeof typed?.code === 'string' ? typed.code : '';
+    const message = error instanceof Error ? error.message : String(typed?.message || '');
+    return ['P1001', 'P1002', 'P1017', 'P2024'].includes(code)
+      || /server has closed the connection|database system is in recovery mode|not yet accepting connections|connection terminated|connection reset|can't reach database|connection pool timeout|timed out/i.test(message);
+  }
+
+  private databaseUnavailableResponse(res: Response, error: unknown) {
+    return res.status(503).json({
+      code: 'DATABASE_UNAVAILABLE',
+      error: 'Database is temporarily unavailable. Retry the request after the database finishes recovery.',
+      details: this.errorMessage(error, 'Database is temporarily unavailable'),
+    });
+  }
+
   private providerDisabledResponse(res: Response, operation: string) {
     return res.status(410).json({
       code: 'EXTERNAL_PROVIDER_DISABLED_NSE_BSE_ONLY',
@@ -123,6 +139,7 @@ export class MarketDataFoundationController {
         sortDirection: typeof req.query.sortDirection === 'string' ? req.query.sortDirection : undefined,
       }));
     } catch (error) {
+      if (this.isTransientDatabaseError(error)) return this.databaseUnavailableResponse(res, error);
       console.error('Error listing source file imports:', error);
       return res.status(500).json({ error: 'Failed to list source file imports' });
     }
@@ -174,11 +191,20 @@ export class MarketDataFoundationController {
       if (!tradingDate) {
         return res.status(400).json({ error: 'tradingDate is required' });
       }
+      const csvText = typeof req.body?.csvText === 'string' ? req.body.csvText : undefined;
+      const fileUrl = typeof req.body?.fileUrl === 'string' ? req.body.fileUrl : undefined;
+      if (!csvText && !fileUrl) {
+        const result = await this.service.importNseIndexOfficialDaily({
+          tradingDate: String(tradingDate),
+          force: req.body?.force === true,
+        });
+        return res.status(result.status === 'FAILED' ? 500 : 200).json(result);
+      }
       const result = await this.service.importNseIndexEodDaily({
         tradingDate: String(tradingDate),
-        csvText: typeof req.body?.csvText === 'string' ? req.body.csvText : undefined,
+        csvText,
         fileName: typeof req.body?.fileName === 'string' ? req.body.fileName : undefined,
-        fileUrl: typeof req.body?.fileUrl === 'string' ? req.body.fileUrl : undefined,
+        fileUrl,
         force: req.body?.force === true,
         segment: req.body?.segment === 'SECTOR_INDEX' ? 'SECTOR_INDEX' : 'INDEX',
       });
@@ -226,6 +252,41 @@ export class MarketDataFoundationController {
     } catch (error) {
       console.error('Error importing NSE delivery file:', error);
       return res.status(500).json({ error: this.errorMessage(error, 'NSE delivery import failed') });
+    }
+  };
+
+  refreshNseDeliveryDaily = async (req: Request, res: Response) => {
+    try {
+      const tradingDate = req.body?.tradingDate || req.query.tradingDate;
+      const result = await this.service.refreshNseDeliveryDaily({
+        tradingDate: tradingDate ? String(tradingDate) : undefined,
+        force: req.body?.force === true || req.query.force === 'true',
+      });
+      return res.status(result.status === 'FAILED' ? 500 : 200).json(result);
+    } catch (error) {
+      console.error('Error refreshing NSE delivery file:', error);
+      return res.status(500).json({ error: this.errorMessage(error, 'NSE delivery refresh failed') });
+    }
+  };
+
+  runNseDeliveryHistoricalBackfill = async (req: Request, res: Response) => {
+    try {
+      const result = await this.service.runNseDeliveryHistoricalBackfill({
+        region: typeof req.body?.region === 'string' ? req.body.region : typeof req.query.region === 'string' ? req.query.region : undefined,
+        assetType: typeof req.body?.assetType === 'string' ? req.body.assetType : typeof req.query.assetType === 'string' ? req.query.assetType : undefined,
+        startDate: req.body?.startDate || req.query.startDate,
+        endDate: req.body?.endDate || req.query.endDate,
+        sessions: req.body?.sessions === undefined ? (req.query.sessions === undefined ? undefined : Number(req.query.sessions)) : Number(req.body.sessions),
+        batchSize: req.body?.batchSize === undefined ? (req.query.batchSize === undefined ? undefined : Number(req.query.batchSize)) : Number(req.body.batchSize),
+        offset: req.body?.offset === undefined ? (req.query.offset === undefined ? undefined : Number(req.query.offset)) : Number(req.body.offset),
+        force: req.body?.force === true || req.query.force === 'true',
+        downloadDelayMs: req.body?.downloadDelayMs === undefined ? (req.query.downloadDelayMs === undefined ? undefined : Number(req.query.downloadDelayMs)) : Number(req.body.downloadDelayMs),
+        jitterMs: req.body?.jitterMs === undefined ? (req.query.jitterMs === undefined ? undefined : Number(req.query.jitterMs)) : Number(req.body.jitterMs),
+      });
+      return res.status(result.status === 'FAILED' ? 500 : 200).json(result);
+    } catch (error) {
+      console.error('Error running NSE delivery historical backfill:', error);
+      return res.status(500).json({ error: this.errorMessage(error, 'NSE delivery historical backfill failed') });
     }
   };
 
@@ -284,6 +345,7 @@ export class MarketDataFoundationController {
     try {
       return res.json(await this.service.getExchangeHistoricalBackfillRun(this.getParam(req.params.runId)));
     } catch (error) {
+      if (this.isTransientDatabaseError(error)) return this.databaseUnavailableResponse(res, error);
       console.error('Error reading exchange historical backfill:', error);
       return res.status(404).json({ error: this.errorMessage(error, 'Exchange historical backfill run not found') });
     }
@@ -341,6 +403,23 @@ export class MarketDataFoundationController {
     } catch (error) {
       console.error('Manual verified fundamental import error:', error);
       return res.status(400).json({ error: this.errorMessage(error, 'Manual verified fundamental import failed') });
+    }
+  };
+
+  importBulkManualVerifiedFundamentals = async (req: Request, res: Response) => {
+    try {
+      const result = await this.service.importBulkManualVerifiedFundamentals({
+        fileName: String(req.body?.fileName || req.body?.sourceFileName || 'manual-verified-fundamentals.csv'),
+        csvText: String(req.body?.csvText || req.body?.fileContent || ''),
+        region: typeof req.body?.region === 'string' ? req.body.region : undefined,
+        assetType: typeof req.body?.assetType === 'string' ? req.body.assetType : undefined,
+        sourceUrl: typeof req.body?.sourceUrl === 'string' ? req.body.sourceUrl : undefined,
+        evidenceDate: req.body?.evidenceDate,
+      });
+      return res.status(201).json(result);
+    } catch (error) {
+      console.error('Bulk manual verified fundamentals import error:', error);
+      return res.status(400).json({ error: this.errorMessage(error, 'Bulk manual verified fundamentals import failed') });
     }
   };
 

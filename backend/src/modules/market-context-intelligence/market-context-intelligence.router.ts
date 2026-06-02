@@ -20,5 +20,16 @@ export const createMarketContextIntelligenceRouter = (
   return router;
 };
 
+export const createMarketIntelligenceContextReadRouter = (
+  controller = new MarketContextIntelligenceController()
+) => {
+  const router = express.Router();
+  router.get('/market-intelligence/market-pulse', controller.marketPulse);
+  router.get('/market-intelligence/market-pulse/history', controller.marketPulseHistory);
+  router.get('/market-intelligence/sectors', controller.sectorSnapshots);
+  return router;
+};
+
 export const marketContextIntelligenceRouter = createMarketContextIntelligenceRouter();
+export const marketIntelligenceContextReadRouter = createMarketIntelligenceContextReadRouter();
 export default marketContextIntelligenceRouter;

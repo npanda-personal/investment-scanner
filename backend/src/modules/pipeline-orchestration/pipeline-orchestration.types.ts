@@ -93,6 +93,7 @@ export interface PipelineStageProgressInput extends PipelineCounters {
   hasMore?: boolean;
   leaseOwner?: string | null;
   leaseMs?: number | null;
+  startedAt?: Date | null;
   now?: Date;
   warnings?: string[];
   errors?: string[];
@@ -301,7 +302,7 @@ export type PipelineCommandKey =
   | 'PIPELINE_CANCEL_ACTIVE';
 
 export type PipelineCommandAvailability = 'ENABLED' | 'DEFERRED' | 'FORBIDDEN';
-export type PipelineCommandRunMode = 'single_batch';
+export type PipelineCommandRunMode = 'single_batch' | 'incremental_changed_only' | 'full_latest_trading_date';
 export type PipelineCommandResultStatus =
   | 'COMPLETED'
   | 'PARTIAL'
@@ -663,6 +664,8 @@ export interface MarketDataStageSnapshotRequest {
   hasMore: boolean;
   startedAt: string;
   completedAt?: string | null;
+  leaseOwner?: string | null;
+  leaseMs?: number | null;
   warnings?: string[];
   errors?: string[];
   metadata?: Record<string, unknown> | null;

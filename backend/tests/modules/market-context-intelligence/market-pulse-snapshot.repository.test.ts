@@ -102,4 +102,51 @@ describe('MarketPulseSnapshotRepository', () => {
       orderBy: [{ snapshotDate: 'desc' }, { generatedAt: 'desc' }, { updatedAt: 'desc' }],
     });
   });
+
+  it('uses completed NSE index source-file provenance from sector-index prices as SECTOR_INDEX freshness evidence', async () => {
+    const sourceFileImport = {
+      findMany: jest.fn().mockResolvedValue([
+        {
+          source: 'NSE',
+          segment: 'INDEX',
+          status: 'COMPLETED',
+          tradingDate: new Date('2026-06-01T00:00:00.000Z'),
+          importedAt: new Date('2026-06-01T18:00:00.000Z'),
+        },
+      ]),
+    };
+    const priceTick = {
+      findMany: jest.fn().mockResolvedValue([
+        {
+          timestamp: new Date('2026-06-01T00:00:00.000Z'),
+          sourceFileImport: {
+            source: 'NSE',
+            segment: 'INDEX',
+            status: 'COMPLETED',
+            tradingDate: new Date('2026-06-01T00:00:00.000Z'),
+            importedAt: new Date('2026-06-01T18:00:00.000Z'),
+          },
+        },
+      ]),
+    };
+    const repository = new MarketPulseSnapshotRepository({ sourceFileImport, priceTick } as any);
+
+    const rows = await (repository as any).loadSourceImports('IN');
+
+    expect(priceTick.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        region: 'IN',
+        source: 'NIFTY_SECTOR_INDEX',
+        sourceFileImportId: { not: null },
+      }),
+    }));
+    expect(rows).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        source: 'NSE',
+        segment: 'SECTOR_INDEX',
+        status: 'COMPLETED',
+        tradingDate: new Date('2026-06-01T00:00:00.000Z'),
+      }),
+    ]));
+  });
 });

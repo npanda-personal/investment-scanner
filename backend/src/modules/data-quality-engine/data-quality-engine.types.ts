@@ -126,11 +126,25 @@ export interface DataQualityEvaluateResponse {
   durationMs: number;
 }
 
+export interface DataQualityScheduledEvaluateProgress {
+  processedCount: number;
+  totalCount: number;
+  evaluatedCount: number;
+  failedCount: number;
+  skippedCount: number;
+  warnings: string[];
+  errors?: string[];
+  nextOffset?: number | null;
+  hasMore?: boolean;
+  metadata?: Record<string, unknown>;
+}
+
 export interface DataQualityScheduledEvaluateRequest {
   instrumentIds: string[];
   region: string;
   assetType: string;
   batchSize: number;
+  onProgress?: (progress: DataQualityScheduledEvaluateProgress) => Promise<void> | void;
 }
 
 export interface DataQualityScheduledEvaluateResponse {
@@ -140,6 +154,9 @@ export interface DataQualityScheduledEvaluateResponse {
   failedCount: number;
   skippedCount: number;
   warnings: string[];
+  errors?: string[];
+  nextOffset?: number | null;
+  hasMore?: boolean;
   durationMs: number;
 }
 

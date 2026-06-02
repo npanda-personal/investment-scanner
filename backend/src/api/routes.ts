@@ -9,7 +9,7 @@ import { portfolioManagementRouter } from '../modules/portfolio-management';
 import { portfolioIntelligenceRouter } from '../modules/portfolio-intelligence';
 import { watchlistManagementRouter } from '../modules/watchlist-management';
 import { alertsMonitoringRouter } from '../modules/alerts-monitoring';
-import { marketContextIntelligenceRouter } from '../modules/market-context-intelligence';
+import { marketContextIntelligenceRouter, marketIntelligenceContextReadRouter } from '../modules/market-context-intelligence';
 import { backtestingStrategyLabRouter } from '../modules/backtesting-strategy-lab';
 import { smartMoneyIntelligenceRouter } from '../modules/smart-money-intelligence';
 import { aiInvestmentCopilotRouter } from '../modules/ai-investment-copilot';
@@ -44,6 +44,7 @@ export const apiModules: ApiModule[] = [
   { path: '/api/v1', router: pipelineOrchestrationRouter },
   { path: '/api/v1', router: earningsIntelligenceRouter },
   { path: '/api/v1', router: marketIntelligenceRouter },
+  { path: '/api/v1', router: marketIntelligenceContextReadRouter },
   { path: '/api/v1', router: portfolioManagementRouter },
   { path: '/api/v1', router: portfolioIntelligenceRouter },
   { path: '/api/v1', router: watchlistManagementRouter },

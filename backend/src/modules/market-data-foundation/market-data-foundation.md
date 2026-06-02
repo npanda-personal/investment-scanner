@@ -12,6 +12,7 @@ Approved active sources for this phase:
 
 - NSE CM UDiFF Bhavcopy.
 - BSE BhavCopy as ISIN/security-matched fill-only backup.
+- NSE all-index EOD close files.
 - NSE delivery data.
 - NSE F&O UDiFF as enrichment.
 - NSE/BSE official filings or manual verified fundamentals.
@@ -31,9 +32,11 @@ The second slice adds the first source-file-backed import path:
 
 - `POST /api/v1/market-data/exchange-files/nse-cm-udiff/import` imports a specific NSE CM UDiFF daily file.
 - `POST /api/v1/market-data/exchange-files/bse-cm-backup/import` imports BSE CM rows as fill-only backup.
-- `POST /api/v1/market-data/exchange-files/nse-index-eod/import` imports NSE index or sector-index daily rows.
+- `POST /api/v1/market-data/exchange-files/nse-index-eod/import` imports NSE index or sector-index daily rows from submitted CSV text or from the official NSE all-index close file for a supplied trading date.
 - `POST /api/v1/market-data/exchange-files/nse-fo-udiff/import` imports NSE F&O enrichment evidence into existing derivatives-eligibility catalog fields.
 - `POST /api/v1/market-data/exchange-files/nse-delivery/import` imports NSE delivery evidence into persisted per-instrument delivery snapshots.
+- `POST /api/v1/market-data/exchange-files/nse-delivery/refresh` imports delivery evidence for the latest completed trading date, or an explicit completed date when supplied.
+- `POST /api/v1/market-data/exchange-files/nse-delivery/backfill` runs bounded historical delivery recovery. Without an explicit date range it targets 90 completed NSE sessions, never less than the 30-session recovery target, and returns `offset`, `nextOffset`, and `hasMore` for incremental reruns.
 - `POST /api/v1/market-data/exchange-files/historical-backfill` starts a persisted NSE/BSE-only historical candle backfill run by trading date.
 - `POST /api/v1/market-data/exchange-files/historical-backfill/runs` starts a worker-backed historical run with configurable `workerCount` (default 3, max 5), retry bounds, BSE fill-only mode, and date/chunk job persistence.
 - `GET /api/v1/market-data/exchange-files/historical-backfill/runs/:runId` reads run progress, counts, active workers, row totals, and per-date job evidence.
@@ -41,18 +44,31 @@ The second slice adds the first source-file-backed import path:
 - `POST /api/v1/market-data/exchange-files/historical-backfill/runs/:runId/retry-failed` retries only failed, not-available, or stale date jobs.
 - `POST /api/v1/market-data/exchange-files/historical-backfill/runs/:runId/cancel` stops starting new jobs and marks pending dates cancelled.
 - `POST /api/v1/market-data/fundamentals/manual-verified-import` imports operator-verified fundamentals without scraping.
+- `POST /api/v1/market-data/fundamentals/manual-verified-bulk-import` imports a manually verified CSV of quarterly and annual fundamentals for a scoped review universe and writes `SourceFileImport(source=MANUAL_VERIFIED, segment=FUNDAMENTALS)` evidence.
 - Imported NSE CM candles are stored under canonical exchange symbols without `.NS` / `.BO` suffixes.
 - Each imported candle receives `PriceTick.sourceFileImportId` provenance.
 - `GET /api/v1/market-data/source-file-imports` defaults to latest imported evidence by `importedAt desc`; operators can request server-side sorting by `importedAt` or `tradingDate` before the latest-10 UI limit is applied.
 - Duplicate completed source-file imports are skipped by `source`, `segment`, `tradingDate`, and `fileHash`.
 - Scheduled IN/STOCK market-data sync now uses the same NSE CM UDiFF source-file import path when the repository supports the source-file ledger.
-- Scheduled downstream eligibility is derived from imported symbols mapped back to active instruments, not from a provider fetch loop.
+- Scheduled IN/INDEX market-data sync uses NSE `ind_close_all_DDMMYYYY.csv` all-index EOD files, maps official index names to existing index catalog rows, and stores broad index rows as `NSE_INDEX_EOD` and major sector index rows as `NIFTY_SECTOR_INDEX`.
+- Scheduled downstream eligibility is derived from imported or duplicate-current official exchange-file symbols mapped back to active, non-delisted, supported instruments, not from a provider fetch loop.
+- Full daily downstream catch-up can also request DB-only persisted eligibility for a `dataThroughDate`; the service returns active eligible instruments from matching `LatestPrice` rows first, then matching `PriceTick` rows, and never calls providers for this lookup.
 - BSE backup rows are stored only when an explicit BSE `InstrumentExchangeIdentity` maps the row to a stock and no NSE primary candle exists for that stock/date.
-- Index/sector-index rows map official index names to existing index catalog instruments and persist daily index candles without provider calls.
+- Index/sector-index rows map official index names to existing index catalog instruments and persist daily index candles without provider calls. Completed official all-index files are tracked with `SourceFileImport(source=NSE, segment=INDEX, tradingDate, fileHash)`.
 - F&O enrichment uses the source-file ledger and the existing F&O-underlying catalog path. It marks stock/index underlyings as `derivativesEligible=true` and does not create fake futures instruments or call providers.
 - Delivery enrichment uses `MarketDeliverySnapshot` with `SourceFileImport` provenance. Rows are matched by scoped exchange symbols only, store traded quantity, deliverable quantity, and delivery percent, and do not call provider or broker APIs.
+- Delivery history recovery uses NSE `sec_bhavdata_full_DDMMYYYY.csv` files from the official archive. Completed delivery files are skipped through `SourceFileImport(source=NSE, segment=DELIVERY, tradingDate, fileHash)`, and persisted snapshots are duplicate-safe through `MarketDeliverySnapshot(stockId, exchange, tradingDate, source)`.
+- Delivery backfill is date-first and bounded. It skips weekends and official NSE trading holidays, skips already completed delivery imports before download unless `force=true`, reports symbols covered, oldest/newest processed dates, row counts, source-import ids, duplicate skips, failed dates, and `notAvailable` dates, and does not trigger Market Pulse, Earnings, Stock Interest scoring, Smart Money scoring, frontend changes, or downstream pipeline work.
 - Manual fundamentals store explicit validation evidence (`sourceNote`, `sourceUrl`, `validatedBy`, `validatedAt`) and use `MANUAL_VERIFIED` source only.
-- Historical candle backfill is date-first, not stock-first. It persists one `PipelineRun` for the requested range and one `PipelineStageRun` per date job, skips dates with completed NSE CM imports, leases each date to one worker at a time, pauses at the AGENTS.md memory stop threshold, retries failed/not-available/stale jobs only, and imports candles through the same NSE CM UDiFF path as the daily scheduler.
+- Bulk manual fundamentals import is CSV-only. Required columns are `symbol`, `period_type`, `period_end_date`, `revenue`, `net_income`, `eps`, `source`, `validated_by`, and `validated_at`. CamelCase and space-separated variants are accepted for period, net-income, and validation columns. `source` must be `MANUAL_VERIFIED`.
+- Optional bulk manual fundamentals columns are `pe_ratio`, `market_cap`, `currency`, `source_note`, and `source_url`.
+- Bulk manual fundamentals import rejects invalid rows independently and continues importing valid rows. It does not create instruments, scrape providers, call Yahoo/yfinance, call Screener, infer missing values, or modify Earnings, Market Pulse, Stock Interest, frontend, or downstream scoring workflows.
+- Bulk manual fundamentals import returns `rowsImported`, `symbolsCovered`, `quarterlyCoverage`, `annualCoverage`, `sampleRecords`, `rejectedRows`, and `sourceFileImport` evidence. Coverage counts are based on persisted valid rows in the submitted file.
+- `backend/scripts/export-nse-xbrl-fundamentals-csv.ts` is the first bounded NSE official-filings exporter. It fetches NSE Corporate Filings financial-result metadata for an explicit symbol list, downloads linked NSE XBRL files, extracts only `RevenueFromOperations`, `ProfitLossForPeriod`, and `BasicEarningsLossPerShareFromContinuingAndDiscontinuedOperations`, prefers consolidated filings for the same symbol/period, and writes a review CSV compatible with `POST /api/v1/market-data/fundamentals/manual-verified-bulk-import`.
+- The NSE XBRL exporter does not import directly into `Fundamental`, does not create instruments, does not scrape providers, and enforces a default maximum of 50 requested symbols. Rows with missing XBRL facts keep the field blank and emit warnings in the JSON export report for manual review before import.
+- Historical candle backfill is date-first, not stock-first. It persists one `PipelineRun` for the requested range and one `PipelineStageRun` per date job, skips dates with completed source-file imports for the requested segment, leases each date to one worker at a time, pauses at the AGENTS.md memory stop threshold, retries failed/not-available/stale jobs only, and imports candles through official NSE EOD sources. `IN/STOCK` runs use date-appropriate CM sources: UDiFF CM bhavcopy when active, NSE security bhavdata for older dates, then legacy CM bhavcopy archive. `IN/INDEX` runs use official NSE all-index close files and defer `LatestPrice` rebuild until the run finalization step.
+- Historical backfill status, worker lease, stale-job, and evidence reads treat transient Prisma/database recovery errors (`P1017`, recovery mode, closed connection, connection timeout) as temporary infrastructure outages: backend operations retry briefly, workers pause without crashing the process, and read APIs return `503 DATABASE_UNAVAILABLE` instead of misclassifying the run as missing.
+- Historical backfill is laptop-safe at the database layer: the same active range reuses the existing `PipelineRun`, status polling does not recycle jobs while this process is actively working the run, date-job completion is guarded by the current lease owner, exchange candle bulk writes are serialized through one database writer, candle inserts/updates commit in bounded chunks, and final `LatestPrice` rebuild uses a set-based SQL upsert instead of per-symbol Prisma upsert loops.
 - Historical backfill is bounded by `maxDates`, returns `nextStartDate` when more work remains, and reports attempted, skipped, failed, accepted, rejected, inserted, updated, and no-op counts. It does not write fundamentals, corporate actions, FX, provider metadata, portfolios, watchlists, alerts, or notes.
 - BSE historical fill remains explicit per-date backup import work until a durable BSE file-discovery source is configured; BSE rows still require explicit exchange identity matching and cannot override existing NSE primary candles.
 
@@ -343,6 +359,12 @@ The import endpoint is `POST /api/v1/market-data/catalog/import`. It supports tw
 Requests accept `catalogSource`, `importMode`, optional `csvText`, optional `validateProvider`, and bounded `batchSize`/`offset`. Responses include `sourceRows`, `processedCount`, `totalCount`, `nextOffset`, `hasMore`, inserted/updated/no-op/invalid counts, provider validation counts, warnings, duration, and URL-download metadata when applicable. Imports are idempotent on current `Stock.symbol`, preserve non-null metadata, and only update changed fields.
 
 `GET /api/v1/market-data/catalog/sources` returns configured source metadata for the UI: source display name, enabled flag, region, asset type, segment/class, import modes, parser type, `urlConfigured`, `urlSource`, setup hint, and support flags for manual CSV, configured URL, and internal seed. Full configured URLs are not exposed in the response.
+
+### Sector Metadata Recovery
+
+`backend/scripts/recover-sector-metadata.js` is a local operator recovery script for active `IN / STOCK` rows whose `sector` is missing or null-equivalent. It reads official NSE `quote-equity` metadata per bounded batch, maps `industryInfo.sector` to `Stock.sector`, maps `industryInfo.industry` to `Stock.industry` when missing, and records repair provenance with source `NSE_OFFICIAL_QUOTE_EQUITY`. The script defaults to dry-run and requires `--execute` before it mutates stock metadata or repair-state rows.
+
+This recovery path is not a trader-page side effect, not a route, and not a paid/provider fallback. It is intended for operator-run metadata repair when NSE/BSE catalog files have imported identity data but do not contain sector classification.
 
 ### Configured URL Imports
 

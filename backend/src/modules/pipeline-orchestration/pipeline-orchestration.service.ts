@@ -100,6 +100,20 @@ type ScheduledAdapterResult = {
   metadata?: Record<string, unknown>;
 };
 
+type ScheduledAdapterProgressInput = {
+  totalCount: number;
+  processedCount: number;
+  succeededCount: number;
+  failedCount: number;
+  skippedCount: number;
+  unchangedCount?: number;
+  nextOffset?: number | null;
+  hasMore?: boolean;
+  warnings?: string[];
+  errors?: string[];
+  metadata?: Record<string, unknown>;
+};
+
 type ScheduledStageDefinition = {
   stageKey: string;
   stageOrder: number;
@@ -133,7 +147,17 @@ const PIPELINE_COMMAND_POLICIES: PipelineCommandPolicy[] = [
   commandPolicy('SIGNAL_POSITION_LEDGER_REFRESH', 'SIGNAL_POSITION_LEDGER', 13, 'Signal Position Ledger', 'Materialized ledger refresh', 'DEFERRED', 'Manual command remains module-owned; scheduler-only materialization is active.'),
   commandPolicy('EARNINGS_INTELLIGENCE_REFRESH', 'EARNINGS_INTELLIGENCE_REFRESH', 15, 'Earnings Intelligence', 'Earnings intelligence snapshot refresh', 'ENABLED', null),
   commandPolicy('STOCK_INTEREST_REFRESH', 'STOCK_INTEREST_REFRESH', 16, 'Market Intelligence', 'Stock Interest snapshot refresh', 'ENABLED', null),
-  commandPolicy('PIPELINE_RUN_ALL', 'MARKET_DATA', 1, 'Pipeline', 'Run daily market pipeline', 'ENABLED', null),
+  commandPolicy(
+    'PIPELINE_RUN_ALL',
+    'MARKET_DATA',
+    1,
+    'Pipeline',
+    'Run daily market pipeline',
+    'ENABLED',
+    null,
+    ['full_latest_trading_date', 'incremental_changed_only', 'single_batch'],
+    100
+  ),
   commandPolicy('MARKET_DATA_HISTORICAL_EXCHANGE_BACKFILL', 'MARKET_DATA', 1, 'Market Data', 'Historical exchange candle backfill', 'ENABLED', null),
   commandPolicy('MARKET_DATA_MANUAL_VERIFIED_FUNDAMENTALS_IMPORT', 'MARKET_DATA', 1, 'Market Data', 'Manual verified fundamentals import', 'ENABLED', null),
   commandPolicy('PIPELINE_RETRY_FAILED_STAGE', 'PIPELINE', 16, 'Pipeline', 'Retry failed stage or run', 'ENABLED', null),
@@ -277,6 +301,10 @@ export class PipelineOrchestrationService {
 
     if (!request.idempotencyKey.trim()) {
       throw new PipelineCommandError(400, 'idempotencyKey is required for executable commands');
+    }
+
+    if (!policy.runModes.includes(request.runMode)) {
+      throw new PipelineCommandError(400, `${request.commandKey} does not support runMode ${request.runMode}`);
     }
 
     if (request.commandKey === 'PIPELINE_RUN_ALL') {
@@ -1414,22 +1442,28 @@ export class PipelineOrchestrationService {
         pipelineKey: request.pipelineKey,
       });
       if (activeRun && !this.isStaleActiveRun(activeRun, now)) {
-        throw new PipelineCommandError(
-          409,
-          'Pipeline run is already active for this scope',
-          this.activeRunHeldResponse(request, policy, commandIdempotencyKey, activeRun)
-        );
+        const blockingStage = await this.findBlockingActiveStageForScope({
+          region: request.region,
+          assetType: request.assetType,
+          timeframe: request.timeframe,
+          pipelineKey: request.pipelineKey,
+        }, now);
+        // A null stage means the active run row only has stale stage evidence, so
+        // the retry path may recover before the wider active-run stale timeout.
+        if (blockingStage !== null) {
+          throw new PipelineCommandError(
+            409,
+            'Pipeline run is already active for this scope',
+            this.activeRunHeldResponse(request, policy, commandIdempotencyKey, activeRun, blockingStage)
+          );
+        }
       }
     }
 
     const commandRunId = `manual-daily-pipeline-${createHash('sha256').update(commandIdempotencyKey).digest('hex').slice(0, 16)}`;
     const batchSize = Math.max(1, Math.min(request.batchSize || 100, 250));
     const startedAt = now.toISOString();
-    const priorSyncSummary = typeof (this.marketDataService as any).latestStoredCandleInfo === 'function'
-      ? await this.marketDataService.latestStoredCandleInfo(request.region, request.assetType, now)
-        .then((latest) => this.toScheduledRegionSyncSummary(latest.syncState?.lastSummary))
-        .catch(() => null)
-      : null;
+    const marketDataLeaseOwner = `manual-command:${request.commandKey}:${PROCESS_LOCAL_ID}`;
 
     await this.recordMarketDataStageSnapshot({
       region: request.region,
@@ -1454,6 +1488,8 @@ export class PipelineOrchestrationService {
       hasMore: false,
       startedAt,
       completedAt: null,
+      leaseOwner: marketDataLeaseOwner,
+      leaseMs: DEFAULT_LEASE_MS,
       warnings: [],
       errors: [],
       metadata: {
@@ -1466,16 +1502,20 @@ export class PipelineOrchestrationService {
     });
 
     try {
-      const summary = await this.marketDataService.syncScheduledRegion(request.region, {
+      const initialSummary = await this.marketDataService.syncScheduledRegion(request.region, {
         assetType: request.assetType,
         batchSize,
         now,
         syncDuringMarketHours: false,
         skipWeekends: true,
       });
-      const completedAt = new Date();
-      const stageStatus = this.marketDataPipelineStageStatus(summary);
-      const totalCount = this.marketDataPipelineTotalCount(summary);
+      const fullDailyMode = this.isFullDailyPipelineRun(request);
+      const summary = fullDailyMode
+        ? await this.withFullDailyDownstreamEligibility(initialSummary)
+        : initialSummary;
+      const downstreamExecutionSummary = fullDailyMode ? summary : this.incrementalChangedOnlyDownstreamSummary(summary);
+      const stageStatus = this.marketDataPipelineStageStatus(downstreamExecutionSummary);
+      const totalCount = this.marketDataPipelineTotalCount(downstreamExecutionSummary);
       const providerSkippedCount = Math.max(0, Number(summary.providerFetchSkippedCount || summary.skippedBeforeFetchCount || 0));
       const processedCount = stageStatus === 'SKIPPED'
         ? Math.max(totalCount, providerSkippedCount)
@@ -1485,7 +1525,67 @@ export class PipelineOrchestrationService {
       const succeededCount = stageStatus === 'SKIPPED'
         ? 0
         : Math.max(0, processedCount - failedCount - skippedCount);
-
+      const downstreamSummary = fullDailyMode
+        ? downstreamExecutionSummary
+        : downstreamExecutionSummary.dqStageEligible
+          ? downstreamExecutionSummary
+          : null;
+      let downstreamResult: ScheduledDataQualityStageResponse | null = null;
+      let downstreamErrors: string[] = [];
+      const downstreamWarnings: string[] = [];
+      if (downstreamSummary) {
+        try {
+          downstreamResult = await this.runScheduledPipelineCatchUpFromMarketDataSummary(downstreamSummary, new Date(), {
+            allowCompletedTerminal: fullDailyMode,
+          });
+          if (!downstreamResult && fullDailyMode) {
+            downstreamWarnings.push('Full daily pipeline did not start downstream stages because no eligible instruments or active lease evidence was available.');
+          }
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Downstream daily pipeline failed';
+          downstreamResult = {
+            status: 'FAILED',
+            pipelineRunId: null,
+            stageRunId: null,
+            stageKey: 'DATA_QUALITY',
+            scope: {
+              region: request.region,
+              assetType: request.assetType,
+              timeframe: request.timeframe,
+              pipelineKey: request.pipelineKey,
+            },
+            triggerType: 'scheduled',
+            dataThroughDate: summary.dataThroughDate || summary.tradingDate || '',
+            inputFingerprint: 'manual-daily-pipeline:downstream-error',
+            outputFingerprint: null,
+            batch: {
+              totalInstrumentCount: 0,
+              processedCount: 0,
+              batchSize,
+              nextOffset: null,
+              hasMore: false,
+            },
+            counts: {
+              totalCount: 0,
+              processedCount: 0,
+              succeededCount: 0,
+              partialCount: 0,
+              failedCount: 1,
+              skippedCount: 0,
+              unchangedCount: 0,
+            },
+            warnings: [],
+            errors: [message],
+            startedAt: null,
+            completedAt: null,
+          };
+        }
+      } else if (fullDailyMode) {
+        downstreamWarnings.push('Full daily pipeline could not run downstream stages because Market Data produced no dataThroughDate/sourceFingerprint evidence.');
+      }
+      downstreamErrors = this.scheduledChainErrors(downstreamResult);
+      const terminalStageStatus = this.dailyPipelineTerminalStatus(stageStatus, downstreamResult, fullDailyMode, downstreamWarnings);
+      const completedAt = new Date();
       const completedStage = await this.recordMarketDataStageSnapshot({
         region: request.region,
         assetType: request.assetType,
@@ -1494,7 +1594,7 @@ export class PipelineOrchestrationService {
         triggerType: 'manual',
         operation: 'INCREMENTAL_EOD_LOAD',
         runId: commandRunId,
-        status: stageStatus,
+        status: terminalStageStatus,
         dataThroughDate: summary.dataThroughDate || summary.tradingDate || null,
         totalCount,
         processedCount,
@@ -1502,15 +1602,17 @@ export class PipelineOrchestrationService {
         failedCount,
         skippedCount,
         unchangedCount: Math.max(0, Number(summary.rowsNoOp || 0)),
-        changedInstrumentIds: summary.changedInstrumentIds || [],
-        downstreamInstrumentIds: summary.downstreamInstrumentIds?.length ? summary.downstreamInstrumentIds : summary.changedInstrumentIds || [],
+        changedInstrumentIds: downstreamExecutionSummary.changedInstrumentIds || [],
+        downstreamInstrumentIds: downstreamExecutionSummary.downstreamInstrumentIds?.length
+          ? downstreamExecutionSummary.downstreamInstrumentIds
+          : downstreamExecutionSummary.changedInstrumentIds || [],
         batchSize,
         nextOffset: null,
         hasMore: false,
         startedAt,
         completedAt: completedAt.toISOString(),
-        warnings: summary.warnings || [],
-        errors: summary.errors || [],
+        warnings: [...(summary.warnings || []), ...downstreamWarnings],
+        errors: [...(summary.errors || []), ...downstreamErrors],
         metadata: {
           commandKey: request.commandKey,
           commandIdempotencyKey,
@@ -1526,21 +1628,15 @@ export class PipelineOrchestrationService {
           rowsUpdated: summary.rowsUpdated,
           rowsSkipped: summary.rowsSkipped,
           rowsNoOp: summary.rowsNoOp,
-          downstreamInstrumentCount: summary.downstreamInstrumentIds?.length || 0,
+          downstreamInstrumentCount: downstreamExecutionSummary.downstreamInstrumentIds?.length || 0,
+          downstreamEligibilitySource: downstreamExecutionSummary.downstreamEligibilitySource || null,
           changedInstrumentCount: summary.changedInstrumentIds?.length || 0,
+          downstreamStatus: this.scheduledChainStatus(downstreamResult),
+          downstreamErrors,
+          downstreamAlreadyExecuted: downstreamResult !== null,
+          downstreamSnapshotBridgeSuppressed: true,
         },
       });
-      const downstreamSummary = summary.dqStageEligible ? summary : priorSyncSummary;
-      if (downstreamSummary) {
-        await this.runScheduledPipelineCatchUpFromMarketDataSummary(downstreamSummary, new Date()).catch((error) => {
-          console.error('[PipelineOrchestration] manual daily pipeline downstream catch-up failed', {
-            region: request.region,
-            assetType: request.assetType,
-            error: error instanceof Error ? error.message : 'unknown error',
-          });
-          return null;
-        });
-      }
 
       return this.responseFromStage(
         request,
@@ -1548,7 +1644,7 @@ export class PipelineOrchestrationService {
         commandIdempotencyKey,
         completedStage,
         { acquired: true, reason: 'ACQUIRED', stage: completedStage },
-        this.commandStatusFromStageStatus(stageStatus)
+        this.commandStatusFromStageStatus(terminalStageStatus)
       );
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Daily pipeline command failed';
@@ -2227,6 +2323,16 @@ export class PipelineOrchestrationService {
 
     const leasedStage = stageLease.stage;
     const startedAt = now;
+    const baseDataQualityMetadata = {
+      sourceStage: 'MARKET_DATA',
+      dataThroughDate: request.dataThroughDate,
+      sourceFingerprint: request.sourceFingerprint,
+      changedInstrumentCount: changedInstrumentIds.length,
+      changedInstrumentFingerprint,
+      dqStageVersion: DQ_SCHEDULED_STAGE_VERSION,
+      schedulerRunStartedAt: request.schedulerRunStartedAt,
+      adapter: 'DataQualityEngineService.evaluateScheduledStage',
+    };
     await this.recordStageProgress({
       idempotencyKey: stageIdempotencyKey,
       status: 'RUNNING',
@@ -2239,18 +2345,23 @@ export class PipelineOrchestrationService {
       unchangedCount: 0,
       nextOffset: 0,
       hasMore: false,
-      metadata: {
-        sourceStage: 'MARKET_DATA',
-        dataThroughDate: request.dataThroughDate,
-        sourceFingerprint: request.sourceFingerprint,
-        changedInstrumentCount: changedInstrumentIds.length,
-        changedInstrumentFingerprint,
-        dqStageVersion: DQ_SCHEDULED_STAGE_VERSION,
-        schedulerRunStartedAt: request.schedulerRunStartedAt,
-        adapter: 'DataQualityEngineService.evaluateScheduledStage',
-      },
+      leaseOwner,
+      leaseMs: DEFAULT_LEASE_MS,
+      metadata: baseDataQualityMetadata,
       now: startedAt,
     });
+
+    const latestAdapterProgress: {
+      current: {
+        totalCount: number;
+        processedCount: number;
+        evaluatedCount: number;
+        failedCount: number;
+        skippedCount: number;
+        warnings: string[];
+        errors?: string[];
+      } | null;
+    } = { current: null };
 
     try {
       const adapterResult = await this.dataQualityService.evaluateScheduledStage({
@@ -2258,6 +2369,32 @@ export class PipelineOrchestrationService {
         region: normalizedScope.region,
         assetType: normalizedScope.assetType,
         batchSize: normalizedBatchSize,
+        onProgress: async (progress: any) => {
+          latestAdapterProgress.current = progress;
+          await this.recordStageProgress({
+            idempotencyKey: stageIdempotencyKey,
+            status: 'RUNNING',
+            totalCount: progress.totalCount,
+            processedCount: progress.processedCount,
+            succeededCount: progress.evaluatedCount,
+            partialCount: 0,
+            failedCount: progress.failedCount,
+            skippedCount: progress.skippedCount,
+            unchangedCount: 0,
+            nextOffset: progress.nextOffset === undefined ? null : progress.nextOffset,
+            hasMore: progress.hasMore ?? false,
+            warnings: progress.warnings,
+            errors: progress.errors,
+            leaseOwner,
+            leaseMs: DEFAULT_LEASE_MS,
+            metadata: {
+              ...baseDataQualityMetadata,
+              ...(progress.metadata || {}),
+              adapterProcessedCount: progress.processedCount,
+            },
+            now: new Date(),
+          });
+        },
       });
       const completedAt = new Date();
       const durationMs = Math.max(0, completedAt.getTime() - startedAt.getTime());
@@ -2283,14 +2420,7 @@ export class PipelineOrchestrationService {
         String(skippedCount),
       ]);
       const metadata = {
-        sourceStage: 'MARKET_DATA',
-        dataThroughDate: request.dataThroughDate,
-        sourceFingerprint: request.sourceFingerprint,
-        changedInstrumentCount: changedInstrumentIds.length,
-        changedInstrumentFingerprint,
-        dqStageVersion: DQ_SCHEDULED_STAGE_VERSION,
-        schedulerRunStartedAt: request.schedulerRunStartedAt,
-        adapter: 'DataQualityEngineService.evaluateScheduledStage',
+        ...baseDataQualityMetadata,
         adapterProcessedCount,
         completedCount,
       };
@@ -2309,7 +2439,7 @@ export class PipelineOrchestrationService {
         hasMore: false,
         outputFingerprint,
         warnings: adapterResult.warnings,
-        errors: [],
+        errors: adapterResult.errors || [],
         completedAt,
         durationMs,
         metadata,
@@ -2326,7 +2456,7 @@ export class PipelineOrchestrationService {
         skippedCount,
         unchangedCount: 0,
         warnings: adapterResult.warnings,
-        errors: [],
+        errors: adapterResult.errors || [],
         completedAt,
         durationMs,
         metadata,
@@ -2347,13 +2477,12 @@ export class PipelineOrchestrationService {
           schedulerRunStartedAt: request.schedulerRunStartedAt,
           upstreamStageRunId: completedStage.id,
         }).catch((error) => {
-          console.error('[PipelineOrchestration] scheduled Raw Signals stage failed after Data Quality', {
-            region: normalizedScope.region,
-            assetType: normalizedScope.assetType,
-            dataThroughDate: request.dataThroughDate,
-            error: error instanceof Error ? error.message : 'unknown error',
-          });
-          return null;
+          return this.logScheduledDownstreamFailure('Raw Signals', 'DATA_QUALITY', {
+            ...request,
+            changedInstrumentIds,
+            batchSize: normalizedBatchSize,
+            upstreamStageRunId: completedStage.id,
+          }, error);
         });
       }
       return response;
@@ -2365,28 +2494,21 @@ export class PipelineOrchestrationService {
         idempotencyKey: stageIdempotencyKey,
         status: 'FAILED',
         totalCount: changedInstrumentIds.length,
-        processedCount: leasedStage.processedCount,
-        succeededCount: leasedStage.succeededCount,
+        processedCount: latestAdapterProgress.current?.processedCount ?? leasedStage.processedCount,
+        succeededCount: latestAdapterProgress.current?.evaluatedCount ?? leasedStage.succeededCount,
         partialCount: leasedStage.partialCount,
-        failedCount: Math.max(1, leasedStage.failedCount),
-        skippedCount: leasedStage.skippedCount,
+        failedCount: Math.max(1, latestAdapterProgress.current?.failedCount ?? leasedStage.failedCount),
+        skippedCount: latestAdapterProgress.current?.skippedCount ?? leasedStage.skippedCount,
         unchangedCount: leasedStage.unchangedCount,
         nextOffset: null,
         hasMore: false,
         outputFingerprint: null,
-        warnings: leasedStage.warnings,
-        errors: [...leasedStage.errors, errorMessage],
+        warnings: latestAdapterProgress.current?.warnings ?? leasedStage.warnings,
+        errors: [...(latestAdapterProgress.current?.errors ?? leasedStage.errors), errorMessage],
         completedAt,
         durationMs,
         metadata: {
-          sourceStage: 'MARKET_DATA',
-          dataThroughDate: request.dataThroughDate,
-          sourceFingerprint: request.sourceFingerprint,
-          changedInstrumentCount: changedInstrumentIds.length,
-          changedInstrumentFingerprint,
-          dqStageVersion: DQ_SCHEDULED_STAGE_VERSION,
-          schedulerRunStartedAt: request.schedulerRunStartedAt,
-          adapter: 'DataQualityEngineService.evaluateScheduledStage',
+          ...baseDataQualityMetadata,
           error: errorMessage,
         },
       });
@@ -2405,14 +2527,7 @@ export class PipelineOrchestrationService {
         completedAt,
         durationMs,
         metadata: {
-          sourceStage: 'MARKET_DATA',
-          dataThroughDate: request.dataThroughDate,
-          sourceFingerprint: request.sourceFingerprint,
-          changedInstrumentCount: changedInstrumentIds.length,
-          changedInstrumentFingerprint,
-          dqStageVersion: DQ_SCHEDULED_STAGE_VERSION,
-          schedulerRunStartedAt: request.schedulerRunStartedAt,
-          adapter: 'DataQualityEngineService.evaluateScheduledStage',
+          ...baseDataQualityMetadata,
           error: errorMessage,
         },
       });
@@ -2422,7 +2537,8 @@ export class PipelineOrchestrationService {
 
   async runScheduledPipelineCatchUpFromMarketDataSummary(
     summary: ScheduledRegionSyncSummary,
-    now = new Date()
+    now = new Date(),
+    options: { allowCompletedTerminal?: boolean } = {}
   ): Promise<ScheduledDataQualityStageResponse | null> {
     const dataThroughDate = summary.dataThroughDate || summary.tradingDate;
     const changedInstrumentIds = this.normalizeInstrumentIds(
@@ -2430,7 +2546,7 @@ export class PipelineOrchestrationService {
     );
     if (!dataThroughDate || !summary.sourceFingerprint || changedInstrumentIds.length === 0) return null;
     if (await this.hasActiveScheduledDownstream(summary, dataThroughDate, now)) return null;
-    if (await this.hasCompletedScheduledTerminal(summary, dataThroughDate)) return null;
+    if (!options.allowCompletedTerminal && await this.hasCompletedScheduledTerminal(summary, dataThroughDate)) return null;
 
     return this.runScheduledDataQualityStage({
       region: summary.region,
@@ -2774,13 +2890,12 @@ export class PipelineOrchestrationService {
           schedulerRunStartedAt: request.schedulerRunStartedAt,
           upstreamStageRunId: completedStage.id,
         }).catch((error) => {
-          console.error('[PipelineOrchestration] scheduled Signal Calibration stage failed after Raw Signals', {
-            region: normalizedScope.region,
-            assetType: normalizedScope.assetType,
-            dataThroughDate: request.dataThroughDate,
-            error: error instanceof Error ? error.message : 'unknown error',
-          });
-          return null;
+          return this.logScheduledDownstreamFailure('Signal Calibration', 'RAW_SIGNALS', {
+            ...request,
+            changedInstrumentIds,
+            batchSize: normalizedBatchSize,
+            upstreamStageRunId: completedStage.id,
+          }, error);
         });
       }
       return response;
@@ -3180,13 +3295,12 @@ export class PipelineOrchestrationService {
           schedulerRunStartedAt: request.schedulerRunStartedAt,
           upstreamStageRunId: completedStage.id,
         }).catch((error) => {
-          console.error('[PipelineOrchestration] scheduled Market Context stage failed after Signal Calibration', {
-            region: normalizedScope.region,
-            assetType: normalizedScope.assetType,
-            dataThroughDate: request.dataThroughDate,
-            error: error instanceof Error ? error.message : 'unknown error',
-          });
-          return null;
+          return this.logScheduledDownstreamFailure('Market Context', 'SIGNAL_CALIBRATION', {
+            ...request,
+            changedInstrumentIds,
+            batchSize: normalizedBatchSize,
+            upstreamStageRunId: completedStage.id,
+          }, error);
         });
       }
       return response;
@@ -3296,7 +3410,7 @@ export class PipelineOrchestrationService {
       stageVersion: SMART_MONEY_SCHEDULED_STAGE_VERSION,
       sourceStage: 'MARKET_CONTEXT',
       adapter: 'SmartMoneyIntelligenceService.run',
-    }, async ({ normalizedScope, changedInstrumentIds, normalizedBatchSize }) => {
+    }, async ({ normalizedScope, changedInstrumentIds, normalizedBatchSize, reportProgress }) => {
       const aggregate = {
         totalCount: changedInstrumentIds.length,
         processedCount: 0,
@@ -3331,6 +3445,25 @@ export class PipelineOrchestrationService {
           };
         }
         aggregate.pages += 1;
+        const nextOffset = result.hasMore && result.nextOffset !== null && result.nextOffset !== undefined ? result.nextOffset : null;
+        await reportProgress({
+          totalCount: aggregate.totalCount,
+          processedCount: Math.min(aggregate.totalCount, aggregate.processedCount),
+          succeededCount: Math.max(0, Math.min(aggregate.totalCount, aggregate.processedCount) - aggregate.failedCount),
+          failedCount: aggregate.failedCount,
+          skippedCount: aggregate.skippedCount,
+          unchangedCount: 0,
+          nextOffset,
+          hasMore: nextOffset !== null,
+          warnings: aggregate.warnings,
+          errors: aggregate.errors,
+          metadata: {
+            adapterPages: aggregate.pages,
+            byRange: aggregate.byRange,
+            generatedRecordCount: aggregate.generatedCount,
+            skippedRecordCount: aggregate.skippedCount,
+          },
+        });
         if (!result.hasMore || result.processedCount <= 0 || result.nextOffset === null || result.nextOffset === undefined) break;
         offset = result.nextOffset;
       }
@@ -3370,7 +3503,7 @@ export class PipelineOrchestrationService {
       stageVersion: CONTEXT_SNAPSHOTS_SCHEDULED_STAGE_VERSION,
       sourceStage: 'SMART_MONEY',
       adapter: 'HistoricalContextSnapshotsService.generate',
-    }, async ({ normalizedScope, changedInstrumentIds, normalizedBatchSize }) => {
+    }, async ({ normalizedScope, changedInstrumentIds, normalizedBatchSize, reportProgress }) => {
       const aggregate = {
         market: { inserted: 0, updated: 0, skipped: 0 },
         sectors: { inserted: 0, updated: 0, skipped: 0 },
@@ -3403,6 +3536,33 @@ export class PipelineOrchestrationService {
         aggregate.snapshotDate = result.snapshotDate;
         aggregate.pages += 1;
         aggregate.processedCount += chunkIds.length;
+        const inserted = aggregate.market.inserted + aggregate.sectors.inserted + aggregate.countries.inserted + aggregate.smartMoney.inserted + aggregate.dataQuality.inserted;
+        const updated = aggregate.market.updated + aggregate.sectors.updated + aggregate.countries.updated + aggregate.smartMoney.updated + aggregate.dataQuality.updated;
+        const skipped = aggregate.market.skipped + aggregate.sectors.skipped + aggregate.countries.skipped + aggregate.smartMoney.skipped + aggregate.dataQuality.skipped;
+        const nextOffset = offset + chunkIds.length;
+        await reportProgress({
+          totalCount: changedInstrumentIds.length,
+          processedCount: Math.min(changedInstrumentIds.length, aggregate.processedCount),
+          succeededCount: Math.min(changedInstrumentIds.length, aggregate.processedCount),
+          failedCount: 0,
+          skippedCount: 0,
+          unchangedCount: updated,
+          nextOffset: nextOffset < changedInstrumentIds.length ? nextOffset : null,
+          hasMore: nextOffset < changedInstrumentIds.length,
+          warnings: aggregate.warnings,
+          errors: [],
+          metadata: {
+            adapterPages: aggregate.pages,
+            persistedRecordCount: inserted + updated,
+            skippedRecordCount: skipped,
+            snapshotDate: aggregate.snapshotDate,
+            market: aggregate.market,
+            sectors: aggregate.sectors,
+            countries: aggregate.countries,
+            smartMoney: aggregate.smartMoney,
+            dataQuality: aggregate.dataQuality,
+          },
+        });
       }
       const result = aggregate;
       const inserted = result.market.inserted + result.sectors.inserted + result.countries.inserted + result.smartMoney.inserted + result.dataQuality.inserted;
@@ -3449,7 +3609,7 @@ export class PipelineOrchestrationService {
       stageVersion: SIGNAL_QUALITY_SCHEDULED_STAGE_VERSION,
       sourceStage: 'CONTEXT_SNAPSHOTS',
       adapter: 'SignalQualityLabService.recalculate',
-    }, async ({ normalizedScope, changedInstrumentIds, normalizedBatchSize }) => {
+    }, async ({ normalizedScope, changedInstrumentIds, normalizedBatchSize, reportProgress }) => {
       const aggregate = {
         totalCount: changedInstrumentIds.length,
         processedCount: 0,
@@ -3492,6 +3652,32 @@ export class PipelineOrchestrationService {
         aggregate.outcomesPersisted = aggregate.outcomesPersisted || result.outcomesPersisted;
         aggregate.message = result.message;
         aggregate.pages += 1;
+        const processed = Math.min(aggregate.totalCount, aggregate.processedCount);
+        const nextOffset = result.hasMore && result.nextOffset !== null && result.nextOffset !== undefined ? result.nextOffset : null;
+        await reportProgress({
+          totalCount: aggregate.totalCount,
+          processedCount: processed,
+          succeededCount: Math.max(0, processed - aggregate.failedCount - aggregate.skippedCount),
+          failedCount: aggregate.failedCount,
+          skippedCount: aggregate.skippedCount,
+          unchangedCount: 0,
+          nextOffset,
+          hasMore: nextOffset !== null,
+          warnings: aggregate.warnings,
+          errors: [],
+          metadata: {
+            adapterPages: aggregate.pages,
+            selectedHorizon: aggregate.selectedHorizon,
+            evidenceUsability: aggregate.evidenceUsability,
+            matureSignalsInBatch: aggregate.matureSignalsInBatch,
+            notYetMatureInBatch: aggregate.notYetMatureInBatch,
+            evaluatedCount: aggregate.evaluatedCount,
+            unevaluatedCount: aggregate.unevaluatedCount,
+            missingPriceHistoryCount: aggregate.missingPriceHistoryCount,
+            outcomesPersisted: aggregate.outcomesPersisted,
+            message: aggregate.message,
+          },
+        });
         if (!result.hasMore || result.processedCount <= 0 || result.nextOffset === null || result.nextOffset === undefined) break;
         offset = result.nextOffset;
       }
@@ -3537,7 +3723,7 @@ export class PipelineOrchestrationService {
       stageVersion: STRATEGY_DECISION_SCHEDULED_STAGE_VERSION,
       sourceStage: 'SIGNAL_QUALITY',
       adapter: 'StrategyDecisionEngineService.evaluate',
-    }, async ({ normalizedScope, changedInstrumentIds, normalizedBatchSize }) => {
+    }, async ({ normalizedScope, changedInstrumentIds, normalizedBatchSize, reportProgress }) => {
       const aggregate = {
         totalCount: changedInstrumentIds.length,
         processedCount: 0,
@@ -3568,6 +3754,26 @@ export class PipelineOrchestrationService {
         aggregate.resultsLength += result.results.length;
         aggregate.pages += 1;
         hasMore = result.hasMore;
+        const processed = Math.min(aggregate.totalCount, aggregate.processedCount);
+        const nextOffset = result.hasMore && result.nextOffset !== null && result.nextOffset !== undefined ? result.nextOffset : null;
+        await reportProgress({
+          totalCount: aggregate.totalCount,
+          processedCount: processed,
+          succeededCount: Math.max(0, processed - aggregate.failedCount - aggregate.skippedCount),
+          failedCount: aggregate.failedCount,
+          skippedCount: aggregate.skippedCount,
+          unchangedCount: 0,
+          nextOffset,
+          hasMore: nextOffset !== null,
+          warnings: aggregate.warnings,
+          errors: [],
+          metadata: {
+            adapterPages: aggregate.pages,
+            persistedDecisionCount: aggregate.generatedCount,
+            resultCount: aggregate.resultsLength,
+            hasMore,
+          },
+        });
         if (!result.hasMore || result.processedCount <= 0 || result.nextOffset === null || result.nextOffset === undefined) break;
         offset = result.nextOffset;
       }
@@ -3696,11 +3902,11 @@ export class PipelineOrchestrationService {
       stageVersion: SIGNAL_POSITION_LEDGER_SCHEDULED_STAGE_VERSION,
       sourceStage: 'TODAY_REVIEW',
       adapter: 'SignalPositionLedgerService.refreshActiveRows',
-    }, async ({ normalizedScope }) => {
+    }, async ({ normalizedScope, normalizedBatchSize }) => {
       const progress = await this.signalPositionLedgerService.refreshActiveRows({
         region: normalizedScope.region,
         assetType: normalizedScope.assetType,
-        limit: 25,
+        limit: normalizedBatchSize,
         offset: 0,
       }, { force: true, wait: true });
       return {
@@ -3782,31 +3988,83 @@ export class PipelineOrchestrationService {
       stageVersion: EARNINGS_INTELLIGENCE_SCHEDULED_STAGE_VERSION,
       sourceStage: 'SECTOR_INTELLIGENCE_REFRESH',
       adapter: 'EarningsIntelligenceService.refreshSnapshots',
-    }, async ({ normalizedScope, changedInstrumentIds, normalizedBatchSize }) => {
-      const result = await this.earningsIntelligenceService.refreshSnapshots({
-        region: normalizedScope.region,
-        assetType: normalizedScope.assetType,
-        batchSize: normalizedBatchSize,
-        offset: 0,
-        instrumentIds: changedInstrumentIds,
-        snapshotDate: new Date(`${request.dataThroughDate}T00:00:00.000Z`),
-        dataThroughDate: new Date(`${request.dataThroughDate}T00:00:00.000Z`),
-      });
+    }, async ({ normalizedScope, changedInstrumentIds, normalizedBatchSize, reportProgress }) => {
+      const aggregate = {
+        totalCount: changedInstrumentIds.length,
+        processedCount: 0,
+        succeededCount: 0,
+        failedCount: 0,
+        skippedCount: 0,
+        unchangedCount: 0,
+        warnings: [] as string[],
+        errors: [] as string[],
+        categories: {} as Record<string, number>,
+        snapshotDate: null as string | null,
+        dataThroughDate: null as string | null,
+        pages: 0,
+      };
+      for (let offset = 0; offset < changedInstrumentIds.length; offset += normalizedBatchSize) {
+        const chunk = changedInstrumentIds.slice(offset, offset + normalizedBatchSize);
+        if (chunk.length === 0) break;
+        const result = await this.earningsIntelligenceService.refreshSnapshots({
+          region: normalizedScope.region,
+          assetType: normalizedScope.assetType,
+          batchSize: normalizedBatchSize,
+          offset: 0,
+          instrumentIds: chunk,
+          snapshotDate: new Date(`${request.dataThroughDate}T00:00:00.000Z`),
+          dataThroughDate: new Date(`${request.dataThroughDate}T00:00:00.000Z`),
+        });
+        aggregate.totalCount = changedInstrumentIds.length;
+        aggregate.processedCount += result.processedCount;
+        aggregate.succeededCount += result.succeededCount;
+        aggregate.failedCount += result.failedCount;
+        aggregate.skippedCount += result.skippedCount;
+        aggregate.unchangedCount += result.unchangedCount;
+        aggregate.warnings.push(...result.warnings);
+        aggregate.errors.push(...result.errors);
+        aggregate.snapshotDate = aggregate.snapshotDate || result.snapshotDate;
+        aggregate.dataThroughDate = aggregate.dataThroughDate || result.dataThroughDate;
+        aggregate.pages += 1;
+        for (const [category, count] of Object.entries(result.categories || {})) {
+          aggregate.categories[category] = (aggregate.categories[category] || 0) + Number(count || 0);
+        }
+        const nextOffset = offset + chunk.length;
+        await reportProgress({
+          totalCount: aggregate.totalCount,
+          processedCount: Math.min(aggregate.totalCount, aggregate.processedCount),
+          succeededCount: aggregate.succeededCount,
+          failedCount: aggregate.failedCount,
+          skippedCount: aggregate.skippedCount,
+          unchangedCount: aggregate.unchangedCount,
+          nextOffset: nextOffset < changedInstrumentIds.length ? nextOffset : null,
+          hasMore: nextOffset < changedInstrumentIds.length,
+          warnings: aggregate.warnings,
+          errors: aggregate.errors,
+          metadata: {
+            snapshotDate: aggregate.snapshotDate,
+            dataThroughDate: aggregate.dataThroughDate,
+            categories: aggregate.categories,
+            adapterPages: aggregate.pages,
+          },
+        });
+      }
       return {
-        totalCount: result.totalCount,
-        processedCount: result.processedCount,
-        succeededCount: result.succeededCount,
-        failedCount: result.failedCount,
-        skippedCount: result.skippedCount,
-        unchangedCount: result.unchangedCount,
-        warnings: result.warnings,
-        errors: result.errors,
+        totalCount: aggregate.totalCount,
+        processedCount: Math.min(aggregate.totalCount, aggregate.processedCount),
+        succeededCount: aggregate.succeededCount,
+        failedCount: aggregate.failedCount,
+        skippedCount: aggregate.skippedCount,
+        unchangedCount: aggregate.unchangedCount,
+        warnings: aggregate.warnings,
+        errors: aggregate.errors,
         metadata: {
-          snapshotDate: result.snapshotDate,
-          dataThroughDate: result.dataThroughDate,
-          categories: result.categories,
-          hasMore: result.hasMore,
-          nextOffset: result.nextOffset,
+          snapshotDate: aggregate.snapshotDate,
+          dataThroughDate: aggregate.dataThroughDate,
+          categories: aggregate.categories,
+          hasMore: false,
+          nextOffset: null,
+          adapterPages: aggregate.pages,
         },
       };
     }, now);
@@ -3846,6 +4104,9 @@ export class PipelineOrchestrationService {
     const completedAt = this.parseOptionalDate(request.completedAt) || (terminal ? now : null);
     const succeededCount = request.succeededCount ?? Math.max(0, request.processedCount - request.failedCount - request.skippedCount);
     const unchangedCount = request.unchangedCount ?? 0;
+    const leaseOwner = request.leaseOwner?.trim()
+      || `market-data:${this.keyPart(request.operation)}:${PROCESS_LOCAL_ID}`;
+    const leaseMs = this.normalizeLeaseMs(request.leaseMs);
     const metadata = {
       operation: request.operation,
       sourceRunId: runId,
@@ -3921,6 +4182,9 @@ export class PipelineOrchestrationService {
         errors,
         metadata,
         now,
+        startedAt,
+        leaseOwner,
+        leaseMs,
       });
     }
 
@@ -4067,22 +4331,54 @@ export class PipelineOrchestrationService {
     if (!ACTIVE_STATUSES.has(run.status)) return false;
     const updatedAt = Date.parse(run.updatedAt || run.startedAt);
     if (!Number.isFinite(updatedAt)) return true;
-    return now.getTime() - updatedAt > this.activeStaleMs();
+    return now.getTime() - updatedAt > this.staleThresholdMs(run);
   }
 
   private isStaleActiveStage(stage: PipelineStageRunRecord, now: Date): boolean {
     if (!ACTIVE_STATUSES.has(stage.status)) return false;
     const leaseExpiresAt = stage.leaseExpiresAt ? Date.parse(stage.leaseExpiresAt) : NaN;
-    if (Number.isFinite(leaseExpiresAt)) return leaseExpiresAt < now.getTime();
+    if (Number.isFinite(leaseExpiresAt)) return leaseExpiresAt <= now.getTime();
     const updatedAt = Date.parse(stage.updatedAt || stage.startedAt || stage.createdAt);
     if (!Number.isFinite(updatedAt)) return true;
-    return now.getTime() - updatedAt > this.activeStaleMs();
+    return now.getTime() - updatedAt > this.staleThresholdMs(stage);
+  }
+
+  private staleThresholdMs(record: Pick<PipelineRunRecord | PipelineStageRunRecord, 'processedCount' | 'succeededCount' | 'failedCount' | 'skippedCount' | 'unchangedCount'>): number {
+    return this.hasNoProgressEvidence(record) ? DEFAULT_LEASE_MS : this.activeStaleMs();
+  }
+
+  private hasNoProgressEvidence(record: Pick<PipelineRunRecord | PipelineStageRunRecord, 'processedCount' | 'succeededCount' | 'failedCount' | 'skippedCount' | 'unchangedCount'>): boolean {
+    return Math.max(
+      Number(record.processedCount || 0),
+      Number(record.succeededCount || 0),
+      Number(record.failedCount || 0),
+      Number(record.skippedCount || 0),
+      Number(record.unchangedCount || 0)
+    ) === 0;
   }
 
   private activeStaleMs(): number {
     const configured = Number(process.env.PIPELINE_ACTIVE_STALE_MS);
     if (Number.isFinite(configured) && configured >= 60_000) return Math.floor(configured);
     return DEFAULT_ACTIVE_STALE_MS;
+  }
+
+  private normalizeLeaseMs(value: number | null | undefined): number {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed) && parsed > 0) return Math.floor(parsed);
+    return DEFAULT_LEASE_MS;
+  }
+
+  private async findBlockingActiveStageForScope(
+    query: Required<Pick<PipelineLatestStageQuery, 'region' | 'assetType' | 'timeframe' | 'pipelineKey'>>,
+    now: Date
+  ): Promise<PipelineStageRunRecord | null | undefined> {
+    if (typeof (this.repository as any).latestStages !== 'function') return undefined;
+    const stages = await this.latestStages({
+      ...query,
+      limit: 100,
+    });
+    return stages.find((stage) => ACTIVE_STATUSES.has(stage.status) && !this.isStaleActiveStage(stage, now)) || null;
   }
 
   private async hasActiveScheduledDownstream(
@@ -4353,8 +4649,10 @@ export class PipelineOrchestrationService {
     request: PipelineCommandRequest,
     policy: PipelineCommandPolicy,
     idempotencyKey: string,
-    activeRun: PipelineRunRecord
+    activeRun: PipelineRunRecord,
+    activeStage?: PipelineStageRunRecord | null
   ): PipelineCommandResponse {
+    const countSource = activeStage || activeRun;
     return {
       commandId: idempotencyKey,
       commandKey: request.commandKey,
@@ -4368,34 +4666,34 @@ export class PipelineOrchestrationService {
       },
       runMode: request.runMode,
       pipelineRunId: activeRun.id,
-      stageRunId: null,
+      stageRunId: activeStage?.id || null,
       idempotencyKey,
       lease: {
         acquired: false,
         reason: 'LEASE_HELD',
-        leaseOwner: null,
-        leaseExpiresAt: null,
+        leaseOwner: activeStage?.leaseOwner || null,
+        leaseExpiresAt: activeStage?.leaseExpiresAt || null,
       },
       batch: {
-        batchSize: request.batchSize,
-        offset: request.offset,
-        nextOffset: null,
-        hasMore: false,
+        batchSize: activeStage?.batchSize ?? request.batchSize,
+        offset: activeStage?.offset ?? request.offset,
+        nextOffset: activeStage?.nextOffset ?? null,
+        hasMore: activeStage?.hasMore ?? false,
       },
       counts: {
-        totalCount: activeRun.totalCount,
-        processedCount: activeRun.processedCount,
-        succeededCount: activeRun.succeededCount,
-        partialCount: activeRun.partialCount,
-        failedCount: activeRun.failedCount,
-        skippedCount: activeRun.skippedCount,
-        unchangedCount: activeRun.unchangedCount,
+        totalCount: countSource.totalCount,
+        processedCount: countSource.processedCount,
+        succeededCount: countSource.succeededCount,
+        partialCount: countSource.partialCount,
+        failedCount: countSource.failedCount,
+        skippedCount: countSource.skippedCount,
+        unchangedCount: countSource.unchangedCount,
       },
-      warnings: activeRun.warnings,
+      warnings: activeStage?.warnings ?? activeRun.warnings,
       errors: ['Pipeline run is already active for this scope.'],
       statusUrl: this.statusUrl(request),
-      startedAt: activeRun.startedAt,
-      completedAt: activeRun.completedAt,
+      startedAt: activeStage?.startedAt ?? activeRun.startedAt,
+      completedAt: activeStage?.completedAt ?? activeRun.completedAt,
     };
   }
 
@@ -4565,6 +4863,68 @@ export class PipelineOrchestrationService {
     return 'COMPLETED';
   }
 
+  private async withFullDailyDownstreamEligibility(summary: ScheduledRegionSyncSummary): Promise<ScheduledRegionSyncSummary> {
+    const explicitDownstreamIds = this.normalizeInstrumentIds(
+      summary.downstreamInstrumentIds?.length ? summary.downstreamInstrumentIds : summary.changedInstrumentIds
+    );
+    if (explicitDownstreamIds.length > 0) {
+      return {
+        ...summary,
+        downstreamInstrumentIds: this.normalizeInstrumentIds(summary.downstreamInstrumentIds?.length ? summary.downstreamInstrumentIds : explicitDownstreamIds),
+        downstreamEligibilitySource: summary.downstreamEligibilitySource || 'market_data_summary',
+        dqStageEligible: summary.dqStageEligible ?? true,
+      };
+    }
+
+    const dataThroughDate = summary.dataThroughDate || summary.tradingDate;
+    if (!dataThroughDate || summary.errors?.length) return summary;
+    const resolver = (this.marketDataService as any).listDailyRefreshEligibleInstrumentIds;
+    if (typeof resolver !== 'function') return summary;
+
+    try {
+      const eligibility = await resolver.call(this.marketDataService, {
+        region: summary.region,
+        assetType: summary.assetType,
+        dataThroughDate,
+        limit: 10_000,
+      });
+      const resolvedIds = this.normalizeInstrumentIds(eligibility?.instrumentIds);
+      if (resolvedIds.length === 0) return summary;
+
+      return {
+        ...summary,
+        downstreamInstrumentIds: resolvedIds,
+        downstreamEligibilitySource: eligibility?.source || 'daily_refresh_fallback',
+        dqStageEligible: true,
+        sourceFingerprint: summary.sourceFingerprint || `full-daily-eligibility:${this.hashValues([
+          summary.region,
+          summary.assetType,
+          dataThroughDate,
+          eligibility?.source || 'daily-refresh-fallback',
+          ...resolvedIds,
+        ])}`,
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'daily refresh eligibility lookup failed';
+      return {
+        ...summary,
+        warningCount: Math.max(0, Number(summary.warningCount || 0)) + 1,
+        warnings: [...(summary.warnings || []), `Full daily downstream eligibility fallback failed: ${message}`].slice(0, 10),
+      };
+    }
+  }
+
+  private incrementalChangedOnlyDownstreamSummary(summary: ScheduledRegionSyncSummary): ScheduledRegionSyncSummary {
+    const changedInstrumentIds = this.normalizeInstrumentIds(summary.changedInstrumentIds);
+    return {
+      ...summary,
+      changedInstrumentIds,
+      downstreamInstrumentIds: changedInstrumentIds,
+      downstreamEligibilitySource: changedInstrumentIds.length > 0 ? 'changed_instruments' : null,
+      dqStageEligible: changedInstrumentIds.length > 0 && (summary.dqStageEligible ?? true),
+    };
+  }
+
   private marketDataPipelineTotalCount(summary: ScheduledRegionSyncSummary): number {
     return Math.max(
       0,
@@ -4588,17 +4948,26 @@ export class PipelineOrchestrationService {
     return 'FAILED';
   }
 
-  private toScheduledRegionSyncSummary(value: unknown): ScheduledRegionSyncSummary | null {
-    if (!value || typeof value !== 'object') return null;
-    const summary = value as Partial<ScheduledRegionSyncSummary>;
-    if (!summary.region || !summary.assetType || !summary.tradingDate) return null;
-    return summary as ScheduledRegionSyncSummary;
-  }
-
   private marketDataRunStatusAfterDownstream(status: PipelineStageStatus, downstreamResult: unknown | null): PipelineStageStatus {
     if (!downstreamResult) return status;
     if (this.scheduledChainHasStatus(downstreamResult, 'FAILED')) return 'PARTIAL';
     if (this.scheduledChainHasStatus(downstreamResult, 'LEASE_HELD')) return 'PARTIAL';
+    return status;
+  }
+
+  private isFullDailyPipelineRun(request: Pick<PipelineCommandRequest, 'commandKey' | 'runMode'>): boolean {
+    return request.commandKey === 'PIPELINE_RUN_ALL' && request.runMode !== 'incremental_changed_only';
+  }
+
+  private dailyPipelineTerminalStatus(
+    marketDataStatus: PipelineStageStatus,
+    downstreamResult: unknown | null,
+    downstreamRequired: boolean,
+    downstreamWarnings: string[]
+  ): PipelineStageStatus {
+    const status = this.marketDataRunStatusAfterDownstream(marketDataStatus, downstreamResult);
+    if (status === 'FAILED') return 'FAILED';
+    if (downstreamRequired && (!downstreamResult || downstreamWarnings.length > 0)) return status === 'SKIPPED' ? 'PARTIAL' : 'PARTIAL';
     return status;
   }
 
@@ -4702,6 +5071,8 @@ export class PipelineOrchestrationService {
     request: MarketDataStageSnapshotRequest,
     changedInstrumentIds: string[]
   ): boolean {
+    if ((request.metadata as any)?.downstreamAlreadyExecuted === true) return false;
+    if ((request.metadata as any)?.downstreamSnapshotBridgeSuppressed === true) return false;
     if (changedInstrumentIds.length === 0) return false;
     if (request.operation === 'CATALOG_SYNC') return false;
     return request.status === 'COMPLETED' || request.status === 'PARTIAL';
@@ -4757,6 +5128,7 @@ export class PipelineOrchestrationService {
       normalizedScope: ReturnType<PipelineOrchestrationService['normalizeScope']>;
       changedInstrumentIds: string[];
       normalizedBatchSize: number;
+      reportProgress: (progress: ScheduledAdapterProgressInput) => Promise<void>;
     }) => Promise<ScheduledAdapterResult>,
     now: Date
   ): Promise<ScheduledPipelineStageResponse> {
@@ -4898,7 +5270,29 @@ export class PipelineOrchestrationService {
     });
 
     try {
-      const adapterResult = await adapter({ normalizedScope, changedInstrumentIds, normalizedBatchSize });
+      const reportProgress = async (progress: ScheduledAdapterProgressInput) => {
+        await this.recordStageProgress({
+          idempotencyKey: stageIdempotencyKey,
+          status: 'RUNNING',
+          totalCount: progress.totalCount,
+          processedCount: progress.processedCount,
+          succeededCount: progress.succeededCount,
+          partialCount: 0,
+          failedCount: progress.failedCount,
+          skippedCount: progress.skippedCount,
+          unchangedCount: progress.unchangedCount ?? 0,
+          nextOffset: progress.nextOffset === undefined ? null : progress.nextOffset,
+          hasMore: progress.hasMore ?? false,
+          warnings: progress.warnings,
+          errors: progress.errors,
+          metadata: {
+            ...baseMetadata,
+            ...(progress.metadata || {}),
+          },
+          now: new Date(),
+        });
+      };
+      const adapterResult = await adapter({ normalizedScope, changedInstrumentIds, normalizedBatchSize, reportProgress });
       const completedAt = new Date();
       const durationMs = Math.max(0, completedAt.getTime() - startedAt.getTime());
       const totalCount = adapterResult.totalCount;
@@ -5033,14 +5427,69 @@ export class PipelineOrchestrationService {
     };
   }
 
-  private logScheduledDownstreamFailure(stageName: string, sourceStage: string, request: ScheduledPipelineStageRequest, error: unknown): null {
+  private logScheduledDownstreamFailure(stageName: string, sourceStage: string, request: ScheduledPipelineStageRequest, error: unknown): any {
+    const message = error instanceof Error ? error.message : 'unknown error';
     console.error(`[PipelineOrchestration] scheduled ${stageName} stage failed after ${sourceStage}`, {
       region: request.region,
       assetType: request.assetType,
       dataThroughDate: request.dataThroughDate,
-      error: error instanceof Error ? error.message : 'unknown error',
+      error: message,
     });
-    return null;
+    const stageKey = this.downstreamFailureStageKey(stageName);
+    return {
+      status: 'FAILED',
+      pipelineRunId: null,
+      stageRunId: null,
+      stageKey,
+      scope: {
+        region: request.region,
+        assetType: request.assetType,
+        timeframe: request.timeframe,
+        pipelineKey: request.pipelineKey,
+      },
+      triggerType: 'scheduled',
+      dataThroughDate: request.dataThroughDate,
+      inputFingerprint: `${stageKey}:downstream-exception`,
+      outputFingerprint: null,
+      batch: {
+        totalInstrumentCount: request.changedInstrumentIds.length,
+        processedCount: 0,
+        batchSize: request.batchSize,
+        nextOffset: null,
+        hasMore: false,
+      },
+      counts: {
+        totalCount: request.changedInstrumentIds.length,
+        processedCount: 0,
+        succeededCount: 0,
+        partialCount: 0,
+        failedCount: 1,
+        skippedCount: 0,
+        unchangedCount: 0,
+      },
+      warnings: [],
+      errors: [message],
+      startedAt: null,
+      completedAt: null,
+    };
+  }
+
+  private downstreamFailureStageKey(stageName: string): string {
+    const map: Record<string, string> = {
+      'Raw Signals': 'RAW_SIGNALS',
+      'Signal Calibration': 'SIGNAL_CALIBRATION',
+      'Market Context': 'MARKET_CONTEXT',
+      'Smart Money': 'SMART_MONEY',
+      'Context Snapshots': 'CONTEXT_SNAPSHOTS',
+      'Signal Quality': 'SIGNAL_QUALITY',
+      'Strategy Decision': 'STRATEGY_DECISION',
+      'Research Projection': 'RESEARCH_PROJECTION',
+      'Today Review': 'TODAY_REVIEW',
+      'Signal Position Ledger': 'SIGNAL_POSITION_LEDGER',
+      'Sector Intelligence': 'SECTOR_INTELLIGENCE_REFRESH',
+      'Earnings Intelligence': 'EARNINGS_INTELLIGENCE_REFRESH',
+    };
+    return map[stageName] || stageName.trim().toUpperCase().replace(/[^A-Z0-9]+/g, '_');
   }
 
   private scheduledDataQualityStageIdempotencyKey(input: {
@@ -5896,7 +6345,9 @@ function commandPolicy(
   moduleName: string,
   operationName: string,
   availability: PipelineCommandAvailability,
-  disabledReason: string | null
+  disabledReason: string | null,
+  runModes: PipelineCommandPolicy['runModes'] = ['single_batch'],
+  defaultBatchSize = 25
 ): PipelineCommandPolicy {
   const providerAccess = availability === 'ENABLED'
     ? 'NONE'
@@ -5911,8 +6362,8 @@ function commandPolicy(
     operationName,
     availability,
     disabledReason,
-    runModes: ['single_batch'],
-    defaultBatchSize: 25,
+    runModes,
+    defaultBatchSize,
     maxBatchSize: 100,
     providerAccess,
     schedulerAccess: availability === 'ENABLED' ? 'NONE' : 'FORBIDDEN',

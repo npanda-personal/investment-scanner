@@ -28,6 +28,8 @@ const controller = {
   importNseIndexEodDaily: jest.fn(),
   importNseFoUdiffDaily: jest.fn(),
   importNseDeliveryDaily: jest.fn(),
+  refreshNseDeliveryDaily: jest.fn(),
+  runNseDeliveryHistoricalBackfill: jest.fn(),
   runExchangeHistoricalBackfill: jest.fn(),
   startExchangeHistoricalBackfillRun: jest.fn(),
   getExchangeHistoricalBackfillRun: jest.fn(),
@@ -41,6 +43,7 @@ const controller = {
   repairPriceIdentity: jest.fn(),
   importManualMetadata: jest.fn(),
   importManualVerifiedFundamental: jest.fn(),
+  importBulkManualVerifiedFundamentals: jest.fn(),
   enrichMetadata: jest.fn(),
   backfillPrices: jest.fn(),
   startPriceBackfillRun: jest.fn(),
@@ -82,6 +85,11 @@ const controller = {
   getCorporateActions: jest.fn(),
 } as any;
 
+const transientDbError = () => Object.assign(new Error('Server has closed the connection.'), {
+  code: 'P1017',
+  clientVersion: '6.0.0',
+});
+
 const routePaths = (router: any) =>
   router.stack
     .filter((layer: any) => layer.route)
@@ -111,6 +119,8 @@ describe('market data routers', () => {
         'POST /market-data/exchange-files/nse-index-eod/import',
         'POST /market-data/exchange-files/nse-fo-udiff/import',
         'POST /market-data/exchange-files/nse-delivery/import',
+        'POST /market-data/exchange-files/nse-delivery/refresh',
+        'POST /market-data/exchange-files/nse-delivery/backfill',
         'POST /market-data/exchange-files/historical-backfill',
         'POST /market-data/exchange-files/historical-backfill/runs',
         'GET /market-data/exchange-files/historical-backfill/runs/:runId',
@@ -125,6 +135,7 @@ describe('market data routers', () => {
         'POST /market-data/prices/identity-repair',
         'POST /market-data/metadata/manual-import',
         'POST /market-data/fundamentals/manual-verified-import',
+        'POST /market-data/fundamentals/manual-verified-bulk-import',
         'POST /market-data/metadata/enrich',
         'POST /market-data/prices/backfill',
         'POST /market-data/prices/backfill-runs',
@@ -215,6 +226,78 @@ describe('market data exchange-file controller', () => {
     expect(res.status).toHaveBeenCalledWith(200);
   });
 
+  it('passes NSE delivery daily refresh requests to the service path', async () => {
+    const service = {
+      refreshNseDeliveryDaily: jest.fn().mockResolvedValue({
+        status: 'COMPLETED',
+        source: 'NSE',
+        segment: 'DELIVERY',
+      }),
+    };
+    const controller = new MarketDataFoundationController(service as any);
+    const req = {
+      query: {},
+      body: {
+        tradingDate: '2026-05-27',
+        force: true,
+      },
+    };
+    const res = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn(),
+    };
+
+    await controller.refreshNseDeliveryDaily(req as any, res as any);
+
+    expect(service.refreshNseDeliveryDaily).toHaveBeenCalledWith({
+      tradingDate: '2026-05-27',
+      force: true,
+    });
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
+
+  it('passes NSE delivery historical backfill controls to the service path', async () => {
+    const service = {
+      runNseDeliveryHistoricalBackfill: jest.fn().mockResolvedValue({
+        status: 'COMPLETED',
+        source: 'NSE',
+        segment: 'DELIVERY',
+      }),
+    };
+    const controller = new MarketDataFoundationController(service as any);
+    const req = {
+      query: {},
+      body: {
+        startDate: '2026-04-01',
+        endDate: '2026-05-27',
+        sessions: 90,
+        batchSize: 25,
+        offset: 25,
+        force: false,
+      },
+    };
+    const res = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn(),
+    };
+
+    await controller.runNseDeliveryHistoricalBackfill(req as any, res as any);
+
+    expect(service.runNseDeliveryHistoricalBackfill).toHaveBeenCalledWith({
+      region: undefined,
+      assetType: undefined,
+      startDate: '2026-04-01',
+      endDate: '2026-05-27',
+      sessions: 90,
+      batchSize: 25,
+      offset: 25,
+      force: false,
+      downloadDelayMs: undefined,
+      jitterMs: undefined,
+    });
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
+
   it('passes NSE F&O UDiFF file imports to the enrichment service path', async () => {
     const service = {
       importNseFoUdiffDaily: jest.fn().mockResolvedValue({
@@ -247,6 +330,38 @@ describe('market data exchange-file controller', () => {
       fileUrl: 'local-fo.csv',
       force: false,
     });
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
+
+  it('uses official NSE all-index import when only an index trading date is supplied', async () => {
+    const service = {
+      importNseIndexOfficialDaily: jest.fn().mockResolvedValue({
+        status: 'COMPLETED',
+        source: 'NSE',
+        segment: 'INDEX',
+      }),
+      importNseIndexEodDaily: jest.fn(),
+    };
+    const controller = new MarketDataFoundationController(service as any);
+    const req = {
+      query: {},
+      body: {
+        tradingDate: '2026-05-27',
+        force: true,
+      },
+    };
+    const res = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn(),
+    };
+
+    await controller.importNseIndexEodDaily(req as any, res as any);
+
+    expect(service.importNseIndexOfficialDaily).toHaveBeenCalledWith({
+      tradingDate: '2026-05-27',
+      force: true,
+    });
+    expect(service.importNseIndexEodDaily).not.toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(200);
   });
 
@@ -346,6 +461,24 @@ describe('market data exchange-file controller', () => {
     expect(res.status).toHaveBeenNthCalledWith(1, 202);
     expect(res.status).toHaveBeenNthCalledWith(2, 202);
     expect(res.status).toHaveBeenNthCalledWith(3, 202);
+  });
+
+  it('returns 503 for transient database outages while reading historical backfill status', async () => {
+    const service = {
+      getExchangeHistoricalBackfillRun: jest.fn().mockRejectedValue(transientDbError()),
+    };
+    const controller = new MarketDataFoundationController(service as any);
+    const res = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn(),
+    };
+
+    await controller.getExchangeHistoricalBackfillRun({ params: { runId: 'run-hist-1' } } as any, res as any);
+
+    expect(res.status).toHaveBeenCalledWith(503);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      code: 'DATABASE_UNAVAILABLE',
+    }));
   });
 });
 
@@ -606,5 +739,59 @@ describe('market data controller', () => {
       sortDirection: 'desc',
     });
     expect(res.json).toHaveBeenCalledWith({ count: 1, imports: [{ id: 'import-1' }] });
+  });
+
+  it('imports bulk manual verified fundamentals through the Market Data Foundation service', async () => {
+    const service = {
+      importBulkManualVerifiedFundamentals: jest.fn().mockResolvedValue({
+        status: 'COMPLETED',
+        rowsImported: 2,
+      }),
+    };
+    const controller = new MarketDataFoundationController(service as any);
+    const req = {
+      body: {
+        fileName: 'review-universe-fundamentals.csv',
+        csvText: 'symbol,period_type,period_end_date,revenue,net_income,eps,source,validated_by,validated_at\nRELIANCE,ANNUAL,2026-03-31,100,20,12,MANUAL_VERIFIED,Nrusingha,2026-06-01T10:00:00.000Z',
+        region: 'IN',
+        assetType: 'STOCK',
+      },
+    } as any;
+    const res = {
+      json: jest.fn(),
+      status: jest.fn().mockReturnThis(),
+    } as any;
+
+    await controller.importBulkManualVerifiedFundamentals(req, res);
+
+    expect(service.importBulkManualVerifiedFundamentals).toHaveBeenCalledWith({
+      fileName: 'review-universe-fundamentals.csv',
+      csvText: req.body.csvText,
+      region: 'IN',
+      assetType: 'STOCK',
+      sourceUrl: undefined,
+      evidenceDate: undefined,
+    });
+    expect(res.status).toHaveBeenCalledWith(201);
+    expect(res.json).toHaveBeenCalledWith({ status: 'COMPLETED', rowsImported: 2 });
+  });
+
+  it('returns 503 when source-file evidence cannot be read during database recovery', async () => {
+    const service = {
+      listSourceFileImports: jest.fn().mockRejectedValue(transientDbError()),
+    };
+    const controller = new MarketDataFoundationController(service as any);
+    const req = { query: { limit: '10' } } as any;
+    const res = {
+      json: jest.fn(),
+      status: jest.fn().mockReturnThis(),
+    } as any;
+
+    await controller.listSourceFileImports(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(503);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      code: 'DATABASE_UNAVAILABLE',
+    }));
   });
 });

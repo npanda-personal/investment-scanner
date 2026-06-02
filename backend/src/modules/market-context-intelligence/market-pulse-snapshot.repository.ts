@@ -94,7 +94,7 @@ export class MarketPulseSnapshotRepository {
       this.loadStockUniverse(region, assetType),
       this.loadIndexPricePoints(region, priceSince),
       this.loadDeliverySnapshots(deliverySince),
-      this.loadSourceImports(),
+      this.loadSourceImports(region),
     ]);
     const stockPrices = await this.loadStockPricePoints(region, stockUniverse.map((stock) => stock.symbol), priceSince);
 
@@ -203,29 +203,77 @@ export class MarketPulseSnapshotRepository {
     }));
   }
 
-  private async loadSourceImports(): Promise<MarketPulseSourceImport[]> {
-    const rows = await (this.db as any).sourceFileImport.findMany({
-      where: {
-        segment: { in: SOURCE_SEGMENTS },
-        status: 'COMPLETED',
-      },
-      select: {
-        source: true,
-        segment: true,
-        status: true,
-        tradingDate: true,
-        importedAt: true,
-      },
-      orderBy: [{ tradingDate: 'desc' }, { importedAt: 'desc' }],
-      take: 100,
-    });
-    return rows.map((row: any) => ({
-      source: row.source,
-      segment: row.segment,
-      status: row.status,
-      tradingDate: row.tradingDate,
-      importedAt: row.importedAt ?? null,
-    }));
+  private async loadSourceImports(region: string): Promise<MarketPulseSourceImport[]> {
+    const [rows, sectorPriceRows] = await Promise.all([
+      (this.db as any).sourceFileImport.findMany({
+        where: {
+          segment: { in: SOURCE_SEGMENTS },
+          status: 'COMPLETED',
+        },
+        select: {
+          source: true,
+          segment: true,
+          status: true,
+          tradingDate: true,
+          importedAt: true,
+        },
+        orderBy: [{ tradingDate: 'desc' }, { importedAt: 'desc' }],
+        take: 100,
+      }),
+      (this.db as any).priceTick.findMany({
+        where: {
+          region,
+          source: 'NIFTY_SECTOR_INDEX',
+          sourceFileImportId: { not: null },
+        },
+        select: {
+          timestamp: true,
+          sourceFileImport: {
+            select: {
+              source: true,
+              segment: true,
+              status: true,
+              tradingDate: true,
+              importedAt: true,
+            },
+          },
+        },
+        orderBy: [{ timestamp: 'desc' }, { ingestionTimestamp: 'desc' }],
+        take: 100,
+      }),
+    ]);
+    return [
+      ...rows.map((row: any) => ({
+        source: row.source,
+        segment: row.segment,
+        status: row.status,
+        tradingDate: row.tradingDate,
+        importedAt: row.importedAt ?? null,
+      })),
+      ...this.sectorIndexImportsFromPriceProvenance(sectorPriceRows),
+    ];
+  }
+
+  private sectorIndexImportsFromPriceProvenance(rows: any[]): MarketPulseSourceImport[] {
+    const latestByImportDate = new Map<string, MarketPulseSourceImport>();
+    for (const row of rows) {
+      const sourceImport = row.sourceFileImport;
+      if (!sourceImport || String(sourceImport.status).toUpperCase() !== 'COMPLETED') continue;
+      if (String(sourceImport.source || '').toUpperCase() !== 'NSE') continue;
+      if (String(sourceImport.segment || '').toUpperCase() !== 'INDEX') continue;
+      const tradingDate = sourceImport.tradingDate instanceof Date ? sourceImport.tradingDate : row.timestamp;
+      if (!(tradingDate instanceof Date)) continue;
+      const key = tradingDate.toISOString();
+      if (latestByImportDate.has(key)) continue;
+      latestByImportDate.set(key, {
+        source: sourceImport.source,
+        segment: 'SECTOR_INDEX',
+        status: sourceImport.status,
+        tradingDate,
+        importedAt: sourceImport.importedAt ?? null,
+      });
+    }
+    return [...latestByImportDate.values()];
   }
 
   private toPricePoint(row: any): MarketPulsePricePoint {

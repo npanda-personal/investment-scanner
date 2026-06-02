@@ -313,7 +313,9 @@ const MarketDataFoundationPage: React.FC = () => {
   const [historicalBackfillInputMode, setHistoricalBackfillInputMode] = useState<BackfillInputMode>('DATE_RANGE');
   const [historicalStartDate, setHistoricalStartDate] = useState('');
   const [historicalEndDate, setHistoricalEndDate] = useState('');
-  const [historicalBackfillYear, setHistoricalBackfillYear] = useState(String(new Date().getFullYear() - 1));
+  const defaultHistoricalBackfillYear = String(new Date().getFullYear() - 1);
+  const [historicalBackfillStartYear, setHistoricalBackfillStartYear] = useState(defaultHistoricalBackfillYear);
+  const [historicalBackfillEndYear, setHistoricalBackfillEndYear] = useState(defaultHistoricalBackfillYear);
   const [historicalBackfillRunning, setHistoricalBackfillRunning] = useState(false);
   const [historicalBackfillResult, setHistoricalBackfillResult] = useState<ExchangeHistoricalBackfillResponse | null>(null);
   const [manualFundamental, setManualFundamental] = useState({
@@ -358,9 +360,11 @@ const MarketDataFoundationPage: React.FC = () => {
   }, []);
   const selectedHistoricalBackfillRange = useMemo(() => {
     if (historicalBackfillInputMode === 'YEAR') {
-      const yearEndDate = `${historicalBackfillYear}-12-31`;
+      const startYear = Math.min(Number(historicalBackfillStartYear), Number(historicalBackfillEndYear));
+      const endYear = Math.max(Number(historicalBackfillStartYear), Number(historicalBackfillEndYear));
+      const yearEndDate = `${endYear}-12-31`;
       return {
-        startDate: `${historicalBackfillYear}-01-01`,
+        startDate: `${startYear}-01-01`,
         endDate: yearEndDate > latestSelectableBackfillDate ? latestSelectableBackfillDate : yearEndDate,
       };
     }
@@ -368,12 +372,33 @@ const MarketDataFoundationPage: React.FC = () => {
       startDate: historicalStartDate,
       endDate: historicalEndDate > latestSelectableBackfillDate ? latestSelectableBackfillDate : historicalEndDate,
     };
-  }, [historicalBackfillInputMode, historicalBackfillYear, historicalEndDate, historicalStartDate, latestSelectableBackfillDate]);
+  }, [
+    historicalBackfillEndYear,
+    historicalBackfillInputMode,
+    historicalBackfillStartYear,
+    historicalEndDate,
+    historicalStartDate,
+    latestSelectableBackfillDate,
+  ]);
   const historicalBackfillStorageKey = useMemo(() => {
     const region = normalizeMarketForApi(scope.region) || scope.region || 'GLOBAL';
     const storedAssetType = normalizeAssetTypeForMarketDataApi(assetType.trim() || scope.assetType) || 'STOCK';
     return `${historicalBackfillStorageKeyPrefix}:${region}:${storedAssetType}`;
   }, [assetType, scope.assetType, scope.region]);
+
+  const handleHistoricalBackfillStartYearChange = (year: string) => {
+    setHistoricalBackfillStartYear(year);
+    if (Number(year) > Number(historicalBackfillEndYear)) {
+      setHistoricalBackfillEndYear(year);
+    }
+  };
+
+  const handleHistoricalBackfillEndYearChange = (year: string) => {
+    setHistoricalBackfillEndYear(year);
+    if (Number(year) < Number(historicalBackfillStartYear)) {
+      setHistoricalBackfillStartYear(year);
+    }
+  };
 
   const loadInstruments = useCallback(async () => {
     setLoading(true);
@@ -1332,41 +1357,55 @@ const MarketDataFoundationPage: React.FC = () => {
                   gridTemplateColumns: {
                     xs: '1fr',
                     md: historicalBackfillInputMode === 'YEAR'
-                      ? 'minmax(180px, 240px) auto'
+                      ? 'minmax(160px, 220px) minmax(160px, 220px) auto'
                       : 'minmax(180px, 240px) minmax(180px, 240px) auto',
                   },
                   gap: 1,
                   alignItems: 'center',
                 }}
               >
-              {historicalBackfillInputMode === 'YEAR' ? (
-                <TextField
-                  select
-                  size="small"
-                  label="Year"
-                  value={historicalBackfillYear}
-                  onChange={(event) => setHistoricalBackfillYear(event.target.value)}
-                  fullWidth
+                {historicalBackfillInputMode === 'YEAR' ? (
+                  <>
+                    <TextField
+                      select
+                      size="small"
+                      label="From year"
+                      value={historicalBackfillStartYear}
+                      onChange={(event) => handleHistoricalBackfillStartYearChange(event.target.value)}
+                      fullWidth
+                    >
+                      {historicalBackfillYearOptions.map((year) => (
+                        <MenuItem key={year} value={year}>{year}</MenuItem>
+                      ))}
+                    </TextField>
+                    <TextField
+                      select
+                      size="small"
+                      label="To year"
+                      value={historicalBackfillEndYear}
+                      onChange={(event) => handleHistoricalBackfillEndYearChange(event.target.value)}
+                      fullWidth
+                    >
+                      {historicalBackfillYearOptions.map((year) => (
+                        <MenuItem key={year} value={year}>{year}</MenuItem>
+                      ))}
+                    </TextField>
+                  </>
+                ) : (
+                  <>
+                    <TextField size="small" type="date" label="Start Date" value={historicalStartDate} onChange={(event) => setHistoricalStartDate(event.target.value)} InputLabelProps={{ shrink: true }} inputProps={{ max: latestSelectableBackfillDate }} fullWidth />
+                    <TextField size="small" type="date" label="End Date" value={historicalEndDate} onChange={(event) => setHistoricalEndDate(event.target.value)} InputLabelProps={{ shrink: true }} inputProps={{ max: latestSelectableBackfillDate }} fullWidth />
+                  </>
+                )}
+                <Button
+                  variant="contained"
+                  startIcon={historicalBackfillRunning ? <CircularProgress size={18} /> : <SyncIcon />}
+                  onClick={() => void handleHistoricalBackfill()}
+                  disabled={operatorBackgroundActive || historicalBackfillRunning || !selectedHistoricalBackfillRange.startDate || !selectedHistoricalBackfillRange.endDate}
+                  sx={{ height: 40, whiteSpace: 'nowrap', width: 'fit-content', justifySelf: 'start', minWidth: 132 }}
                 >
-                  {historicalBackfillYearOptions.map((year) => (
-                    <MenuItem key={year} value={year}>{year}</MenuItem>
-                  ))}
-                </TextField>
-              ) : (
-                <>
-                  <TextField size="small" type="date" label="Start Date" value={historicalStartDate} onChange={(event) => setHistoricalStartDate(event.target.value)} InputLabelProps={{ shrink: true }} inputProps={{ max: latestSelectableBackfillDate }} fullWidth />
-                  <TextField size="small" type="date" label="End Date" value={historicalEndDate} onChange={(event) => setHistoricalEndDate(event.target.value)} InputLabelProps={{ shrink: true }} inputProps={{ max: latestSelectableBackfillDate }} fullWidth />
-                </>
-              )}
-              <Button
-                variant="contained"
-                startIcon={historicalBackfillRunning ? <CircularProgress size={18} /> : <SyncIcon />}
-                onClick={() => void handleHistoricalBackfill()}
-                disabled={operatorBackgroundActive || historicalBackfillRunning || !selectedHistoricalBackfillRange.startDate || !selectedHistoricalBackfillRange.endDate}
-                sx={{ height: 40, whiteSpace: 'nowrap', width: 'fit-content', justifySelf: 'start', minWidth: 132 }}
-              >
-                {historicalBackfillRunning ? 'Starting...' : 'Run Backfill'}
-              </Button>
+                  {historicalBackfillRunning ? 'Starting...' : 'Run Backfill'}
+                </Button>
               </Box>
             </Stack>
             {historicalBackfillResult && (

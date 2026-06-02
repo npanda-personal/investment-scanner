@@ -74,6 +74,8 @@ export const createMarketDataV1Router = (
   router.post('/market-data/exchange-files/nse-index-eod/import', controller.importNseIndexEodDaily);
   router.post('/market-data/exchange-files/nse-fo-udiff/import', controller.importNseFoUdiffDaily);
   router.post('/market-data/exchange-files/nse-delivery/import', controller.importNseDeliveryDaily);
+  router.post('/market-data/exchange-files/nse-delivery/refresh', controller.refreshNseDeliveryDaily);
+  router.post('/market-data/exchange-files/nse-delivery/backfill', controller.runNseDeliveryHistoricalBackfill);
   router.post('/market-data/exchange-files/historical-backfill', controller.runExchangeHistoricalBackfill);
   router.post('/market-data/exchange-files/historical-backfill/runs', controller.startExchangeHistoricalBackfillRun);
   router.get('/market-data/exchange-files/historical-backfill/runs/:runId', controller.getExchangeHistoricalBackfillRun);
@@ -88,6 +90,7 @@ export const createMarketDataV1Router = (
   router.post('/market-data/prices/identity-repair', controller.repairPriceIdentity);
   router.post('/market-data/metadata/manual-import', controller.importManualMetadata);
   router.post('/market-data/fundamentals/manual-verified-import', controller.importManualVerifiedFundamental);
+  router.post('/market-data/fundamentals/manual-verified-bulk-import', controller.importBulkManualVerifiedFundamentals);
   router.post('/market-data/metadata/enrich', controller.enrichMetadata);
   router.post('/market-data/prices/backfill', controller.backfillPrices);
   router.post('/market-data/prices/backfill-runs', controller.startPriceBackfillRun);

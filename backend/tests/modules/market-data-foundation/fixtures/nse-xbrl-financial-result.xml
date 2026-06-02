@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xbrli:xbrl
+  xmlns:xbrli="http://www.xbrl.org/2003/instance"
+  xmlns:in-gaap="http://www.mca.gov.in/ind-as"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <xbrli:context id="OneD">
+    <xbrli:entity>
+      <xbrli:identifier scheme="https://www.nseindia.com">RELIANCE</xbrli:identifier>
+    </xbrli:entity>
+    <xbrli:period>
+      <xbrli:startDate>2024-10-01</xbrli:startDate>
+      <xbrli:endDate>2024-12-31</xbrli:endDate>
+    </xbrli:period>
+  </xbrli:context>
+  <xbrli:context id="TwoD">
+    <xbrli:entity>
+      <xbrli:identifier scheme="https://www.nseindia.com">RELIANCE</xbrli:identifier>
+    </xbrli:entity>
+    <xbrli:period>
+      <xbrli:startDate>2024-07-01</xbrli:startDate>
+      <xbrli:endDate>2024-09-30</xbrli:endDate>
+    </xbrli:period>
+  </xbrli:context>
+  <xbrli:context id="FourD">
+    <xbrli:entity>
+      <xbrli:identifier scheme="https://www.nseindia.com">RELIANCE</xbrli:identifier>
+    </xbrli:entity>
+    <xbrli:period>
+      <xbrli:startDate>2024-04-01</xbrli:startDate>
+      <xbrli:endDate>2025-03-31</xbrli:endDate>
+    </xbrli:period>
+  </xbrli:context>
+  <in-gaap:RevenueFromOperations contextRef="TwoD" decimals="2" unitRef="INR">999</in-gaap:RevenueFromOperations>
+  <in-gaap:RevenueFromOperations contextRef="OneD" decimals="2" unitRef="INR">1282600000000.00</in-gaap:RevenueFromOperations>
+  <in-gaap:RevenueFromOperations contextRef="FourD" decimals="2" unitRef="INR">9820000000000.00</in-gaap:RevenueFromOperations>
+  <in-gaap:ProfitLossForPeriod contextRef="OneD" decimals="2" unitRef="INR">87210000000.00</in-gaap:ProfitLossForPeriod>
+  <in-gaap:ProfitLossForPeriod contextRef="FourD" decimals="2" unitRef="INR">695000000000.00</in-gaap:ProfitLossForPeriod>
+  <in-gaap:BasicEarningsLossPerShareFromContinuingAndDiscontinuedOperations contextRef="OneD" decimals="2" unitRef="INR">6.44</in-gaap:BasicEarningsLossPerShareFromContinuingAndDiscontinuedOperations>
+  <in-gaap:BasicEarningsLossPerShareFromContinuingAndDiscontinuedOperations contextRef="TwoD" decimals="2" unitRef="INR">1.23</in-gaap:BasicEarningsLossPerShareFromContinuingAndDiscontinuedOperations>
+  <in-gaap:BasicEarningsLossPerShareFromContinuingAndDiscontinuedOperations contextRef="FourD" decimals="2" unitRef="INR">51.30</in-gaap:BasicEarningsLossPerShareFromContinuingAndDiscontinuedOperations>
+  <in-gaap:SomeNilFact contextRef="OneD" xsi:nil="true" />
+</xbrli:xbrl>

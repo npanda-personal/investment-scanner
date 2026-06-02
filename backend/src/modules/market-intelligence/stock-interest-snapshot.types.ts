@@ -139,4 +139,5 @@ export interface StockInterestSnapshotWriteSummary {
   createdCount: number;
   updatedCount: number;
   unchangedCount: number;
+  prunedCount?: number;
 }

@@ -34,6 +34,10 @@ The refresh path is idempotent on `snapshotDate + scopeRegion + scopeAssetType +
 
 `GET /api/v1/market-intelligence/market-pulse` and `/history` are read-only. They return the latest persisted `MarketPulseSnapshot` rows for `region + assetType + timeframe` and never calculate, import, refresh, or call providers during the GET request.
 
+The Market Intelligence context snapshot GET routes are exposed through a dedicated read-only router under `/api/v1` before protected market-context routes. Current Product Owner decision: these snapshot GETs may be unauthenticated during localhost validation. Do not add refresh, mutation, provider, import, or repair routes to this read-only router.
+
+Freshness is based on persisted source evidence. Official NSE all-index imports write sector-index `PriceTick` rows with `sourceFileImportId` pointing at the completed NSE `INDEX` `SourceFileImport`; Market Pulse treats that linked price provenance as `SECTOR_INDEX` freshness evidence only when sector-index price rows exist. Future all-index imports also upsert `SECTOR_INDEX` source-file evidence when accepted sector rows are present. The refresh must not invent freshness when neither linked price provenance nor completed source-file evidence exists.
+
 `MARKET_PULSE_REFRESH` is the approved refresh path. It uses persisted DB rows only and upserts by `snapshotDate + region + assetType + timeframe`, making repeated refreshes idempotent for the same day and scope. Missing snapshots return `availability=EMPTY` with a clear operator hint instead of a server error.
 
 ## API Reference
@@ -74,4 +78,5 @@ The refresh path is idempotent on `snapshotDate + scopeRegion + scopeAssetType +
 - `backend/tests/modules/market-context-intelligence/market-pulse-snapshot.repository.test.ts`: Verifies snapshot upsert idempotency and latest persisted reads.
 - `backend/tests/modules/market-context-intelligence/market-pulse-snapshot.controller.test.ts`: Verifies read API returns persisted snapshots and does not trigger refresh work.
 - `backend/tests/modules/market-context-intelligence/market-context-intelligence.routes.test.ts`: Verifies controller/route behavior.
+- `backend/tests/modules/market-intelligence/market-intelligence-mounted-routes.test.ts`: Verifies Market Intelligence snapshot GET routes are reachable through the mounted app without authentication and do not trigger refresh services.
 - `frontend/tests/ui/market-context-intelligence.spec.ts`: Verifies visible sample-count coherence and Unknown-sector exclusion on `/market-context`.

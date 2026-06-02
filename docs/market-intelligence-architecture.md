@@ -70,7 +70,7 @@ Inputs:
 - active scoped `Stock` rows and persisted stock `PriceTick` rows;
 - persisted `LatestPrice` rows where needed by the calculation;
 - persisted `MarketDeliverySnapshot` rows;
-- persisted `SourceFileImport` rows for source freshness.
+- persisted `SourceFileImport` rows for source freshness, including linked sector-index price provenance from official NSE all-index imports.
 
 Rules:
 
@@ -79,6 +79,7 @@ Rules:
 - Refresh is idempotent for the same date, scope, and timeframe.
 - Missing snapshots must return an empty/unavailable envelope with a useful operator hint.
 - Health language must stay research-support oriented: healthy, tradable but selective, fragile, risky, stale, partial.
+- Sector-index freshness must come from completed source-file evidence or `PriceTick.sourceFileImportId` provenance on real sector-index rows; it must not be inferred from wall-clock time.
 
 ### SectorSnapshot
 
@@ -205,6 +206,7 @@ Rules:
 
 - GET requests must never calculate rankings.
 - Refresh reads local persisted data only.
+- Refresh must keep the latest snapshot coherent by pruning stale category rows for symbols recalculated in the current batch.
 - Frontend must preserve backend row order and tags.
 - Direction labels must remain review-oriented and must not become buy/sell instructions.
 
@@ -462,6 +464,7 @@ Dependency rules:
 ## Read API Rules
 
 - Trader read APIs are read-only `GET` endpoints.
+- Current localhost-validation decision: implemented Market Intelligence snapshot GET routes may be unauthenticated, but this exception is limited to read-only persisted snapshot routes.
 - Read APIs must return persisted snapshots only.
 - Read APIs must not call providers, import market data, repair data, backfill history, run pipeline commands, generate signals, evaluate strategies, calibrate signals, or calculate trader rows during request handling.
 - Standard query parameters are `region` and `assetType`; `timeframe`, `category`, `limit`, or `symbol` may be added only where the owning contract defines them.

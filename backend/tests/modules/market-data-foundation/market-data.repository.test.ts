@@ -2,6 +2,11 @@
 import { MarketDataFoundationRepository } from '../../../src/modules/market-data-foundation';
 
 describe('MarketDataFoundationRepository', () => {
+  beforeEach(() => {
+    (MarketDataFoundationRepository as any).historicalBulkWriteChain = Promise.resolve();
+    delete process.env.MARKET_DATA_EXCHANGE_BULK_WRITE_BATCH_SIZE;
+  });
+
   it('upserts source file imports by source, segment, trading date, and file hash', async () => {
     const upsert = jest.fn().mockResolvedValue({ id: 'import-1' });
     const prisma = {
@@ -108,6 +113,38 @@ describe('MarketDataFoundationRepository', () => {
     }));
   });
 
+  it('lists only official NSE all-index imports for index historical backfill skips', async () => {
+    const findMany = jest.fn().mockResolvedValue([
+      { tradingDate: new Date('2026-05-28T00:00:00.000Z') },
+    ]);
+    const prisma = {
+      sourceFileImport: { findMany },
+    };
+    const repository = new MarketDataFoundationRepository(prisma as any);
+
+    const rows = await (repository as any).listCompletedOfficialNseIndexImportDates({
+      startDate: new Date('2026-05-26T00:00:00.000Z'),
+      endDate: new Date('2026-05-29T00:00:00.000Z'),
+    });
+
+    expect(rows).toEqual([new Date('2026-05-28T00:00:00.000Z')]);
+    expect(findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: {
+        source: 'NSE',
+        segment: 'INDEX',
+        status: 'COMPLETED',
+        fileName: { startsWith: 'ind_close_all_' },
+        parserVersion: 'nse-index-eod-v1',
+        tradingDate: {
+          gte: new Date('2026-05-26T00:00:00.000Z'),
+          lte: new Date('2026-05-29T00:00:00.000Z'),
+        },
+      },
+      orderBy: { tradingDate: 'asc' },
+      select: { tradingDate: true },
+    }));
+  });
+
   it('sorts source-file import evidence server-side before applying the latest-10 limit', async () => {
     const findMany = jest.fn().mockResolvedValue([]);
     const prisma = {
@@ -196,6 +233,83 @@ describe('MarketDataFoundationRepository', () => {
         timestamp: new Date('2026-05-27T00:00:00.000Z'),
       }),
     });
+  });
+
+  it('serializes exchange bulk writes so parallel backfill dates do not run overlapping DB transactions', async () => {
+    let activeTransactions = 0;
+    let maxActiveTransactions = 0;
+    const createMany = jest.fn().mockResolvedValue({ count: 1 });
+    const prisma = {
+      priceTick: {
+        findMany: jest.fn().mockResolvedValue([]),
+        createMany,
+      },
+      latestPrice: { upsert: jest.fn() },
+      $transaction: jest.fn(async (callback: any): Promise<any> => {
+        activeTransactions += 1;
+        maxActiveTransactions = Math.max(maxActiveTransactions, activeTransactions);
+        try {
+          await new Promise((resolve) => setTimeout(resolve, 5));
+          return await callback(prisma);
+        } finally {
+          activeTransactions -= 1;
+        }
+      }),
+    } as any;
+    const repository = new MarketDataFoundationRepository(prisma as any);
+    const price = (symbol: string, date: string) => ({
+      symbol,
+      date: new Date(date),
+      open: 100,
+      high: 110,
+      low: 95,
+      close: 105,
+      volume: 1000,
+      source: 'NSE_SECURITY_BHAVDATA',
+    });
+
+    await Promise.all([
+      repository.storeHistoricalBulk([price('RELIANCE', '2026-05-27T00:00:00.000Z')], () => ({ region: 'IN', exchange: 'NSE' }), new Map(), { skipLatestPriceUpdate: true }),
+      repository.storeHistoricalBulk([price('TCS', '2026-05-28T00:00:00.000Z')], () => ({ region: 'IN', exchange: 'NSE' }), new Map(), { skipLatestPriceUpdate: true }),
+    ]);
+
+    expect(createMany).toHaveBeenCalledTimes(2);
+    expect(maxActiveTransactions).toBe(1);
+  });
+
+  it('splits exchange bulk inserts into bounded transactions', async () => {
+    process.env.MARKET_DATA_EXCHANGE_BULK_WRITE_BATCH_SIZE = '100';
+    const createMany = jest.fn().mockResolvedValue({ count: 1 });
+    const prisma = {
+      priceTick: {
+        findMany: jest.fn().mockResolvedValue([]),
+        createMany,
+      },
+      latestPrice: { upsert: jest.fn() },
+      $transaction: jest.fn(async (callback: any): Promise<any> => callback(prisma)),
+    } as any;
+    const repository = new MarketDataFoundationRepository(prisma as any);
+    const prices = Array.from({ length: 250 }, (_, index) => ({
+      symbol: `SYM${index}`,
+      date: new Date('2026-05-27T00:00:00.000Z'),
+      open: 100 + index,
+      high: 110 + index,
+      low: 95 + index,
+      close: 105 + index,
+      volume: 1000 + index,
+      source: 'NSE_SECURITY_BHAVDATA',
+    }));
+
+    await repository.storeHistoricalBulk(
+      prices,
+      () => ({ region: 'IN', exchange: 'NSE' }),
+      new Map(),
+      { skipLatestPriceUpdate: true }
+    );
+
+    expect(createMany).toHaveBeenCalledTimes(3);
+    expect(createMany.mock.calls.map(([input]) => input.data.length)).toEqual([100, 100, 50]);
+    expect(prisma.$transaction).toHaveBeenCalledTimes(3);
   });
 
   it('treats same-date exchange candle reruns as no-op while refreshing latest price', async () => {
@@ -460,9 +574,6 @@ describe('MarketDataFoundationRepository', () => {
 
   it('executes provider cleanup and rebuilds latest prices only from exchange candles', async () => {
     const count = jest.fn().mockResolvedValue(0);
-    const latestRows = [
-      { symbol: 'RELIANCE', region: 'IN', timestamp: new Date('2026-05-27T00:00:00.000Z'), close: 1430 },
-    ];
     const executeRaw = jest.fn()
       .mockResolvedValueOnce(50000)
       .mockResolvedValueOnce(2)
@@ -471,6 +582,7 @@ describe('MarketDataFoundationRepository', () => {
       .mockResolvedValueOnce(0)
       .mockResolvedValueOnce(3)
       .mockResolvedValueOnce(4)
+      .mockResolvedValueOnce(1)
       .mockResolvedValueOnce(2);
     const prisma = {
       priceTick: { count },
@@ -483,7 +595,7 @@ describe('MarketDataFoundationRepository', () => {
         count,
         upsert: jest.fn().mockResolvedValue({}),
       },
-      $queryRaw: jest.fn().mockResolvedValueOnce([{ count: 0 }]).mockResolvedValueOnce(latestRows),
+      $queryRaw: jest.fn().mockResolvedValueOnce([{ count: 0 }]),
       $executeRaw: executeRaw,
     } as any;
     const repository = new MarketDataFoundationRepository(prisma as any);
@@ -499,15 +611,8 @@ describe('MarketDataFoundationRepository', () => {
       repairAttempts: 3,
       repairStates: 4,
     });
-    expect(prisma.latestPrice.upsert).toHaveBeenCalledWith(expect.objectContaining({
-      where: { symbol: 'RELIANCE' },
-      update: expect.objectContaining({
-        region: 'IN',
-        price: expect.anything(),
-        timestamp: new Date('2026-05-27T00:00:00.000Z'),
-      }),
-    }));
-    expect(executeRaw).toHaveBeenCalledTimes(8);
+    expect(prisma.latestPrice.upsert).not.toHaveBeenCalled();
+    expect(executeRaw).toHaveBeenCalledTimes(9);
   });
 
   it('lists stocks with pagination, sorting, and market segmentation filters', async () => {

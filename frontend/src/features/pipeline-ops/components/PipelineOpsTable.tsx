@@ -44,6 +44,7 @@ const OPERATION_CATALOG: OperationDefinition[] = [
   { stageKey: 'SIGNAL_CALIBRATION', stageOrder: 4, moduleName: 'Signal Calibration', operationName: 'Calibration refresh', sourcePath: '/signals/calibration' },
   { stageKey: 'CONTEXT_SNAPSHOTS', stageOrder: 5, moduleName: 'Context Snapshots', operationName: 'Historical context snapshots', sourcePath: '/context-snapshots' },
   { stageKey: 'MARKET_CONTEXT', stageOrder: 6, moduleName: 'Market Context', operationName: 'Market and sector context', sourcePath: '/market-context' },
+  { stageKey: 'MARKET_PULSE', stageOrder: 7, moduleName: 'Market Pulse', operationName: 'Market Pulse snapshot refresh', sourcePath: '/market-pulse' },
   { stageKey: 'SIGNAL_QUALITY', stageOrder: 7, moduleName: 'Signal Quality', operationName: 'Outcome quality refresh', sourcePath: '/signals/quality' },
   { stageKey: 'SMART_MONEY', stageOrder: 8, moduleName: 'Smart Money', operationName: 'Smart money context', sourcePath: '/smart-money' },
   { stageKey: 'STRATEGY_DECISION', stageOrder: 9, moduleName: 'Strategy', operationName: 'Strategy decision refresh', sourcePath: '/strategy' },
@@ -51,6 +52,9 @@ const OPERATION_CATALOG: OperationDefinition[] = [
   { stageKey: 'RESEARCH_PROJECTION', stageOrder: 11, moduleName: 'Research', operationName: 'Research command projection', sourcePath: '/research' },
   { stageKey: 'TODAY_REVIEW', stageOrder: 12, moduleName: 'Today Review', operationName: 'Daily candidate publication', sourcePath: '/today-review' },
   { stageKey: 'SIGNAL_POSITION_LEDGER', stageOrder: 13, moduleName: 'Signal Position Ledger', operationName: 'Entry/exit trigger lifecycle refresh', sourcePath: '/signals/position-ledger' },
+  { stageKey: 'SECTOR_INTELLIGENCE_REFRESH', stageOrder: 14, moduleName: 'Sector Intelligence', operationName: 'Sector snapshot refresh', sourcePath: '/market-map' },
+  { stageKey: 'EARNINGS_INTELLIGENCE_REFRESH', stageOrder: 15, moduleName: 'Earnings Intelligence', operationName: 'Earnings snapshot refresh', sourcePath: '/earnings-intelligence' },
+  { stageKey: 'STOCK_INTEREST_REFRESH', stageOrder: 16, moduleName: 'Stock Interest', operationName: 'Stock interest snapshot refresh', sourcePath: '/stock-interest-radar' },
 ];
 
 type PipelineOpsRow = OperationDefinition & PipelineStatusStageGroup;

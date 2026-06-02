@@ -332,4 +332,131 @@ describe('data quality engine service', () => {
     expect(setup.marketDataService.storedCorporateActionsByInstrumentId).toHaveBeenCalledTimes(2);
     expect(setup.repository.upsertEvaluation).toHaveBeenCalledTimes(2);
   });
+
+  it('chunks scheduled stage price-window reads by requested batch size', async () => {
+    const ids = Array.from({ length: 205 }, (_value, index) => `stock-${index + 1}`);
+    const sharedPrices = prices(260);
+    const setup = service({
+      marketDataService: {
+        getInstrumentsByIds: jest.fn(async (chunkIds: string[]) => chunkIds.map((id) => instrument({
+          id,
+          symbol: `SYM${id.split('-')[1]}`,
+          region: 'IN',
+          asset_type: 'STOCK',
+        }))),
+        listRecentPriceWindowsByInstrumentIds: jest.fn(async (chunkIds: string[]) => {
+          if (chunkIds.length > 100) throw new Error(`oversized read: ${chunkIds.length}`);
+          return new Map(chunkIds.map((id) => [id, sharedPrices]));
+        }),
+        storedFundamentalsByInstrumentIds: jest.fn(async (chunkIds: string[]) => (
+          new Map(chunkIds.map((id) => [id, { records: [{ eps: 1 }] }]))
+        )),
+      },
+    });
+
+    const result = await setup.instance.evaluateScheduledStage({
+      instrumentIds: ids,
+      region: 'IN',
+      assetType: 'STOCK',
+      batchSize: 100,
+    });
+
+    expect(result).toMatchObject({
+      totalCount: 205,
+      processedCount: 205,
+      evaluatedCount: 205,
+      failedCount: 0,
+      skippedCount: 0,
+      hasMore: false,
+    });
+    expect(setup.marketDataService.listRecentPriceWindowsByInstrumentIds).toHaveBeenCalledTimes(3);
+    expect(setup.marketDataService.listRecentPriceWindowsByInstrumentIds.mock.calls.map((call: any[]) => call[0].length)).toEqual([100, 100, 5]);
+    expect(setup.marketDataService.getInstrumentsByIds.mock.calls.map((call: any[]) => call[0].length)).toEqual([100, 100, 5]);
+    expect(setup.marketDataService.storedFundamentalsByInstrumentIds.mock.calls.map((call: any[]) => call[0].length)).toEqual([100, 100, 5]);
+    expect(setup.marketDataService.fundamentalsByInstrumentId).not.toHaveBeenCalled();
+    expect(setup.marketDataService.corporateActionsByInstrumentId).not.toHaveBeenCalled();
+  });
+
+  it('reports scheduled stage progress after each chunk', async () => {
+    const progress: any[] = [];
+    const ids = ['stock-1', 'stock-2', 'stock-3'];
+    const setup = service({
+      marketDataService: {
+        getInstrumentsByIds: jest.fn(async (chunkIds: string[]) => chunkIds.map((id) => instrument({
+          id,
+          symbol: id.toUpperCase(),
+          region: 'IN',
+          asset_type: 'STOCK',
+        }))),
+        listRecentPriceWindowsByInstrumentIds: jest.fn(async (chunkIds: string[]) => (
+          new Map(chunkIds.map((id) => [id, prices(260)]))
+        )),
+        storedFundamentalsByInstrumentIds: jest.fn(async (chunkIds: string[]) => (
+          new Map(chunkIds.map((id) => [id, { records: [{ eps: 1 }] }]))
+        )),
+      },
+    });
+
+    const result = await setup.instance.evaluateScheduledStage({
+      instrumentIds: ids,
+      region: 'IN',
+      assetType: 'STOCK',
+      batchSize: 2,
+      onProgress: async (update) => {
+        progress.push(update);
+      },
+    });
+
+    expect(result.processedCount).toBe(3);
+    expect(progress).toHaveLength(2);
+    expect(progress.map((item) => item.processedCount)).toEqual([2, 3]);
+    expect(progress.map((item) => item.nextOffset)).toEqual([2, null]);
+    expect(progress.map((item) => item.hasMore)).toEqual([true, false]);
+    expect(progress.map((item) => item.metadata.chunkIndex)).toEqual([1, 2]);
+  });
+
+  it('records failed scheduled chunks with clear evidence and continues later chunks', async () => {
+    const progress: any[] = [];
+    const setup = service({
+      marketDataService: {
+        getInstrumentsByIds: jest.fn(async (chunkIds: string[]) => chunkIds.map((id) => instrument({
+          id,
+          symbol: id.toUpperCase(),
+          region: 'IN',
+          asset_type: 'STOCK',
+        }))),
+        listRecentPriceWindowsByInstrumentIds: jest.fn()
+          .mockImplementationOnce(async (chunkIds: string[]) => new Map(chunkIds.map((id) => [id, prices(260)])))
+          .mockRejectedValueOnce(new Error('Prisma oversized read simulation'))
+          .mockImplementationOnce(async (chunkIds: string[]) => new Map(chunkIds.map((id) => [id, prices(260)]))),
+        storedFundamentalsByInstrumentIds: jest.fn(async (chunkIds: string[]) => (
+          new Map(chunkIds.map((id) => [id, { records: [{ eps: 1 }] }]))
+        )),
+      },
+    });
+
+    const result = await setup.instance.evaluateScheduledStage({
+      instrumentIds: ['stock-1', 'stock-2', 'stock-3', 'stock-4', 'stock-5'],
+      region: 'IN',
+      assetType: 'STOCK',
+      batchSize: 2,
+      onProgress: async (update) => {
+        progress.push(update);
+      },
+    });
+
+    expect(result).toMatchObject({
+      totalCount: 5,
+      processedCount: 5,
+      evaluatedCount: 3,
+      failedCount: 2,
+      skippedCount: 0,
+      hasMore: false,
+    });
+    expect(result.warnings.join('\n')).toContain('chunk 2/3 offset 2 failed for 2 instruments: Prisma oversized read simulation');
+    expect(result.errors?.join('\n')).toContain('chunk 2/3 offset 2 failed for 2 instruments: Prisma oversized read simulation');
+    expect(progress.map((item) => item.processedCount)).toEqual([2, 4, 5]);
+    expect(progress[1].metadata).toMatchObject({ chunkIndex: 2, chunkStatus: 'FAILED' });
+    expect(setup.repository.upsertEvaluation).toHaveBeenCalledTimes(3);
+  });
 });

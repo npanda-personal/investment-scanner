@@ -1,5 +1,8 @@
 /// <reference types="@types/jest" />
-import { createMarketContextIntelligenceRouter } from '../../../src/modules/market-context-intelligence';
+import {
+  createMarketContextIntelligenceRouter,
+  createMarketIntelligenceContextReadRouter,
+} from '../../../src/modules/market-context-intelligence';
 
 describe('market context routes', () => {
   it('registers MVP endpoints', () => {
@@ -32,6 +35,22 @@ describe('market context routes', () => {
       'GET /market-context/countries',
       'GET /market-context/macro',
       'POST /market-context/run',
+    ]);
+  });
+
+  it('registers a read-only Market Intelligence context router for early unauthenticated snapshot mounts', () => {
+    const router = createMarketIntelligenceContextReadRouter({
+      marketPulse: jest.fn(),
+      marketPulseHistory: jest.fn(),
+      sectorSnapshots: jest.fn(),
+    } as any);
+    const routes = router.stack.filter((layer: any) => layer.route).map((layer: any) => `${Object.keys(layer.route.methods)[0].toUpperCase()} ${layer.route.path}`);
+
+    expect(router.stack.filter((layer: any) => !layer.route)).toHaveLength(0);
+    expect(routes).toEqual([
+      'GET /market-intelligence/market-pulse',
+      'GET /market-intelligence/market-pulse/history',
+      'GET /market-intelligence/sectors',
     ]);
   });
 });
