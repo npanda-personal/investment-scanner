@@ -57,7 +57,7 @@ assignees: ""
 - Supporting modules:
 - Directly responsible module developer:
 
-## Codex Agent Assignment
+## Agent Assignment
 
 - Orchestrator agent:
 - Product Owner agent:

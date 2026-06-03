@@ -6,7 +6,7 @@ async function setupWatchlistPage(page: Page) {
     window.localStorage.setItem('investment_scanner_auth_token', 'playwright-watchlist-token');
     window.localStorage.setItem('market_scope', JSON.stringify({ region: 'IN', assetType: 'STOCK' }));
   });
-  await page.route('**/api/v1/auth/me', (route) => route.fulfill({ json: { id: 'watchlist-user', email: 'codex.test@example.com', name: 'Codex Test' } }));
+  await page.route('**/api/v1/auth/me', (route) => route.fulfill({ json: { id: 'watchlist-user', email: 'test@example.com', name: 'Test User' } }));
   await page.route('**/api/v1/watchlists', (route) => route.fulfill({ json: { watchlists: [] } }));
 }
 

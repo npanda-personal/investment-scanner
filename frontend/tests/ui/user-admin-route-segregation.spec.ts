@@ -10,8 +10,8 @@ async function mockAuthenticatedUser(page: Page) {
     await route.fulfill({
       json: {
         id: 'playwright-route-segregation-user',
-        email: 'codex.test@example.com',
-        name: 'Codex Test',
+        email: 'test@example.com',
+        name: 'Test User',
       },
     });
   });

@@ -5,7 +5,7 @@ async function setupResearchCompatibility(page: Page) {
   await page.addInitScript(() => {
     window.localStorage.setItem('investment_scanner_auth_token', 'playwright-stock-research-token');
   });
-  await page.route('**/api/v1/auth/me', (route) => route.fulfill({ json: { id: 'research-user', email: 'codex.test@example.com', name: 'Codex Test' } }));
+  await page.route('**/api/v1/auth/me', (route) => route.fulfill({ json: { id: 'research-user', email: 'test@example.com', name: 'Test User' } }));
   await page.route('**/api/v1/research/stocks/*/workbench**', (route) => route.fulfill({
     json: {
       overview: {

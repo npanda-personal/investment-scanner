@@ -7,9 +7,9 @@
 - Lane:
 - Primary module:
 - Directly responsible module developer:
-- Codex orchestrator:
-- Codex lane agent:
-- Codex lane agent WIP status:
+- Orchestrator:
+- Lane agent:
+- Lane agent WIP status:
 - Product Owner acceptance criteria:
 - Product Owner acceptance return path:
 - Requirement or roadmap changes:

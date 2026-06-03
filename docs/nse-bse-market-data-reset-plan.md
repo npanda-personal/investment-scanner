@@ -201,7 +201,6 @@ Test candidates:
 Docs candidates:
 
 - Provider-heavy roadmap/module-verification language.
-- Historical `docs/codex-agent-team-plan/**` remains historical evidence only and should not be updated as active authority.
 - Active docs should state NSE/BSE-only source policy and the new operator workflow.
 
 ## Later Build Scope
@@ -424,7 +423,7 @@ Completed evidence:
   - `latestCount=2`
 - `GET /api/v1/market-data/source-file-imports?source=NSE&segment=CM&limit=5` returned persisted source-file evidence, including real prior NSE CM imports.
 - Legacy provider price backfill endpoint returned HTTP `410`.
-- Synthetic `CODEXSMOKE*` validation rows were removed after evidence capture to avoid polluting local market data.
+- Synthetic smoke-test validation rows were removed after evidence capture to avoid polluting local market data.
 - The backend process started for validation was stopped after the check. Docker/Postgres was left running per Product Owner instruction.
 
 Still pending from full reset scope:

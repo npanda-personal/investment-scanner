@@ -8,8 +8,8 @@ async function mockAuthenticatedUser(page: Page) {
     await route.fulfill({
       json: {
         id: 'playwright-pipeline-ops-user',
-        email: 'codex.test@example.com',
-        name: 'Codex Test',
+        email: 'test@example.com',
+        name: 'Test User',
         createdAt: '2026-05-25T00:00:00.000Z',
         updatedAt: '2026-05-25T00:00:00.000Z',
         lastLoginAt: '2026-05-25T00:00:00.000Z',

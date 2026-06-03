@@ -137,4 +137,7 @@ backend/.env
 frontend/dist/
 frontend/.env
 frontend/test-results/
+frontend/test-results-*/
 frontend/playwright-report/
+frontend/playwright-results*/
+frontend/tmp-*

@@ -1,7 +1,7 @@
 import { expect, type Page } from '@playwright/test';
 
-const email = process.env.E2E_EMAIL || 'codex.test@example.com';
-const password = process.env.E2E_PASSWORD || 'CodexTest123!';
+const email = process.env.E2E_EMAIL || 'test@example.com';
+const password = process.env.E2E_PASSWORD || 'TestUser123!';
 
 export async function visitAuthenticated(page: Page, path: string) {
   await page.goto(path);

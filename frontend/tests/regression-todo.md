@@ -5,7 +5,7 @@ Use this checklist whenever a module change does not yet have full automated UI 
 ## Preconditions
 
 - Backend and frontend are running locally.
-- Login uses the local test user: `codex.test@example.com` / `CodexTest123!`.
+- Login uses the local test user: `test@example.com` / `TestUser123!`.
 - Default market scope is `IN / STOCK` unless the task explicitly changes scope.
 - Do not run full-universe/provider-heavy jobs from the automated UI suite. Run those manually in the browser when the task requires real data mutation or provider access.
 

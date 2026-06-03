@@ -82,8 +82,8 @@ async function mockCalibrationApi(page: Page) {
       contentType: 'application/json',
       body: JSON.stringify({
         id: 'playwright-signal-calibration-user',
-        email: 'codex.test@example.com',
-        name: 'Codex Test',
+        email: 'test@example.com',
+        name: 'Test User',
         createdAt: '2026-05-25T00:00:00.000Z',
         updatedAt: '2026-05-25T00:00:00.000Z',
         lastLoginAt: '2026-05-25T00:00:00.000Z',

@@ -197,8 +197,8 @@ async function setupReadOnlyPage(page: Page, responses: MarketIntelligenceRespon
       await route.fulfill({
         json: {
           id: 'playwright-market-intelligence-user',
-          email: 'codex.test@example.com',
-          name: 'Codex Test',
+          email: 'test@example.com',
+          name: 'Test User',
         },
       });
       return;

@@ -2,7 +2,7 @@
 
 You are working inside my existing investment-scanner project.
 
-This file is the root operating constitution for Codex, Codex subagents, planning mode, implementation mode, reviews, and release gates.
+This file is the root operating constitution for the AI agent, subagents, planning mode, implementation mode, reviews, and release gates.
 
 Keep this file durable. Do not turn it into a task log. Detailed plans, audits, work packets, QA evidence, release notes, and decision records belong under `docs/`.
 
@@ -68,7 +68,7 @@ frontend/src/features/{feature-name}
 
 ## Existing modules/features may include
 
-Codex must inspect the repository before assuming these exist, are complete, or are correct.
+The agent must inspect the repository before assuming these exist, are complete, or are correct.
 
 Likely current modules include:
 
@@ -109,7 +109,7 @@ Do not blindly preserve the current setup.
 
 Do not blindly recommend starting fresh.
 
-Before recommending a major refactor, migration, or fresh scaffold, Codex must produce evidence from a current-state audit.
+Before recommending a major refactor, migration, or fresh scaffold, the agent must produce evidence from a current-state audit.
 
 The audit must compare:
 
@@ -159,7 +159,7 @@ Major architecture changes require Product Owner approval.
 - Data quality status must be checked before downstream signal, strategy, alert, portfolio, or copilot workflows use market data.
 - UX must be designed before meaningful UI implementation.
 - Product Owner acceptance happens only after QA, code review, and release audit.
-- Codex must not self-approve its own implementation.
+- The agent must not self-approve its own implementation.
 
 ## Product language constraints
 
@@ -198,7 +198,7 @@ If the Product Owner says “buy signal” or “sell signal,” map internally 
 
 ---
 
-# 5. Codex Startup Protocol
+# 5. Agent Startup Protocol
 
 For complex, ambiguous, architectural, cross-module, planning, refactor, signal-related, data-related, UX-related, or release-related work:
 
@@ -223,39 +223,14 @@ At task start:
 Relevant docs may include:
 
 ```text
-docs/AGENTS.md
 docs/instructions.md
 docs/architecture.md
 docs/roadmap.md
 docs/ux-ui-best-practices.md
 docs/module-verification-register.md
-docs/codex-agent-team-plan/active-work-board.md
-docs/codex-agent-team-plan/blocker-register.md
-docs/codex-agent-team-plan/codex-agent-team.md
-docs/codex-agent-team-plan/release-checklist.md
-docs/codex-agent-team-plan/sdlc-operating-model.md
-docs/codex-agent-team-plan/team-operating-model.md
-docs/codex-agent-team-plan/technical-debt-register.md
-docs/codex-agent-team-plan/decision-record-template.md
 ```
 
-Also inspect relevant files under:
-
-```text
-docs/codex-agent-team-plan/architecture-contracts/
-docs/codex-agent-team-plan/architecture-signoff/
-docs/codex-agent-team-plan/developer-handoffs/
-docs/codex-agent-team-plan/lead-validation/
-docs/codex-agent-team-plan/po-acceptance/
-docs/codex-agent-team-plan/po-audits/
-docs/codex-agent-team-plan/po-briefs/
-docs/codex-agent-team-plan/po-roadmaps/
-docs/codex-agent-team-plan/qa-evidence/
-docs/codex-agent-team-plan/qa-plans/
-docs/codex-agent-team-plan/ux-audits/
-docs/codex-agent-team-plan/ux-roadmaps/
-docs/codex-agent-team-plan/work-packets/
-```
+Module-specific notes live alongside each module under `backend/src/modules/{module}/{module}.md`.
 
 Do not assume these docs are correct just because they exist.
 
@@ -285,13 +260,13 @@ The Product Owner owns:
 - final acceptance
 - whether the product feels useful and trustworthy
 
-Codex may challenge assumptions, but final product judgment belongs to the Product Owner.
+The agent may challenge assumptions, but final product judgment belongs to the Product Owner.
 
 ---
 
-# 7. Codex Team Operating Model
+# 7. Team Operating Model
 
-Use a Codex-led local software factory model.
+Use an agent-led local software factory model.
 
 ## Roles
 
@@ -426,7 +401,7 @@ Owns:
 
 # 8. Module Team Lanes
 
-Individual modules should be driven by individual Codex module teams where practical.
+Individual modules should be driven by individual agent module teams where practical.
 
 Use lanes for coordination.
 
@@ -588,16 +563,16 @@ Use branches or worktrees for isolated parallel module work when practical.
 Recommended branch naming:
 
 ```text
-codex/sprint-{n}-{module-or-lane}-{short-task}
+agent/sprint-{n}-{module-or-lane}-{short-task}
 ```
 
 Examples:
 
 ```text
-codex/sprint-0-audit-contracts
-codex/sprint-1-market-data-readiness
-codex/sprint-1-signal-contract
-codex/sprint-1-research-workbench-ux
+agent/sprint-0-audit-contracts
+agent/sprint-1-market-data-readiness
+agent/sprint-1-signal-contract
+agent/sprint-1-research-workbench-ux
 ```
 
 Rules:
@@ -821,7 +796,7 @@ Rules:
 
 # 16. UX Before UI
 
-For meaningful user-facing work, Codex must define UX before implementing UI.
+For meaningful user-facing work, the agent must define UX before implementing UI.
 
 Required UX planning fields:
 
@@ -1287,7 +1262,7 @@ If a user action can take more than a few seconds, make it:
 
 or record a blocker with concrete follow-up owner.
 
-Before starting local servers, builds, browser tests, Docker services, process-heavy workflows, or new Codex workers, check laptop memory utilization where possible.
+Before starting local servers, builds, browser tests, Docker services, process-heavy workflows, or new agent workers, check laptop memory utilization where possible.
 
 Rules:
 
@@ -1359,11 +1334,6 @@ docs/architecture.md
 docs/roadmap.md
 docs/ux-ui-best-practices.md
 docs/module-verification-register.md
-docs/codex-agent-team-plan/active-work-board.md
-docs/codex-agent-team-plan/blocker-register.md
-docs/codex-agent-team-plan/technical-debt-register.md
-docs/codex-agent-team-plan/release-checklist.md
-docs/codex-agent-team-plan/decision-record-template.md
 ```
 
 ---
@@ -1442,7 +1412,7 @@ Reviewer checks:
 - no hidden paid/cloud dependency
 - no arbitrary targets
 - no direct financial advice
-- no Codex drift
+- no agent drift
 
 ## Architect signoff
 
@@ -1501,7 +1471,7 @@ A requirement is not released until:
 
 # 32. Output Expectations For Any Task
 
-Every Codex response after implementation or review must include:
+Every agent response after implementation or review must include:
 
 ## Structural changes
 
@@ -1589,7 +1559,7 @@ Avoid:
 
 Sprint 0 is not product implementation.
 
-Sprint 0 prepares disciplined Codex execution.
+Sprint 0 prepares disciplined agent execution.
 
 Sprint 0 should produce or update:
 
@@ -1623,7 +1593,7 @@ Optimize for:
 - modular ownership
 - contract-first parallel work
 - strong QA
-- efficient Codex usage
+- efficient agent usage
 - Product Owner control
 - future B2C/B2B readiness
 

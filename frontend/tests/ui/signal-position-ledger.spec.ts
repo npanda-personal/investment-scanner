@@ -116,8 +116,8 @@ async function mockAuthenticatedUser(page: Page) {
       contentType: 'application/json',
       body: JSON.stringify({
         id: 'playwright-signal-position-ledger-user',
-        email: 'codex.test@example.com',
-        name: 'Codex Test',
+        email: 'test@example.com',
+        name: 'Test User',
         createdAt: '2026-05-26T00:00:00.000Z',
         updatedAt: '2026-05-26T00:00:00.000Z',
         lastLoginAt: '2026-05-26T00:00:00.000Z',

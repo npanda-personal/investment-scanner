@@ -163,7 +163,7 @@ describe('NSE XBRL fundamentals CSV exporter', () => {
       outputDir: path.resolve(process.cwd(), 'tmp', 'test-nse-xbrl-insurance-amc-export'),
       maxQuarterlyPeriods: 1,
       maxAnnualPeriods: 1,
-      validatedBy: 'CODEX_MAPPING_TEST',
+      validatedBy: 'XBRL_MAPPING_TEST',
       validatedAt: new Date('2026-06-02T00:00:00.000Z'),
     });
     const stocks = symbols.map((symbol, index) => ({

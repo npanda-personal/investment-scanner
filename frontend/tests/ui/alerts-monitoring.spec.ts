@@ -11,7 +11,7 @@ async function setupAlertsPage(page: Page) {
     const url = new URL(request.url());
     if (url.pathname.includes('/api/v1/')) requests.push(`${request.method()} ${url.pathname}`);
   });
-  await page.route('**/api/v1/auth/me', (route) => route.fulfill({ json: { id: 'alerts-user', email: 'codex.test@example.com', name: 'Codex Test' } }));
+  await page.route('**/api/v1/auth/me', (route) => route.fulfill({ json: { id: 'alerts-user', email: 'test@example.com', name: 'Test User' } }));
   await page.route('**/api/v1/alerts/rules', (route) => route.fulfill({ json: { rules: [] } }));
   await page.route('**/api/v1/alerts/events', (route) => route.fulfill({ json: { events: [] } }));
   await page.route('**/api/v1/alerts/evaluate', async (route) => {
