@@ -7,6 +7,8 @@ import type { TradePlanResultDto } from '@/features/trade-plan-risk-engine/types
 
 export type TodayReviewRunStatus = 'RUNNING' | 'COMPLETED' | 'PARTIAL' | 'FAILED';
 export type TodayReviewTrustStatus = 'OK' | 'PARTIAL' | 'STALE' | 'FAILED';
+export type TodayReviewBoardSection = 'LONG_REVIEW' | 'WATCH_ONLY' | 'EXIT_RISK' | 'SPECIAL_CASES';
+export type TodayReviewBoardSourceType = 'STRATEGY_BACKED' | 'LITE' | 'MIXED' | 'OTHER';
 export type TodayReviewCandidateState =
   | 'LONG_REVIEW'
   | 'SHORT_REVIEW'
@@ -89,7 +91,19 @@ export interface TodayReviewSourceSnapshot {
   reviewUniverse?: TodayReviewUniverseSnapshot | null;
   scanFunnel?: TodayReviewScanFunnel | null;
   explainability?: TodayReviewExplainability | null;
+  boardSelection?: TodayReviewBoardSelection | null;
   [key: string]: unknown;
+}
+
+export interface TodayReviewBoardSelection {
+  contractVersion: string;
+  quotas: Record<TodayReviewBoardSection, number>;
+  eligibleCounts: Record<TodayReviewBoardSection, number>;
+  displayedCounts: Record<TodayReviewBoardSection, number>;
+  strategyBackedCount: number;
+  liteCount: number;
+  suppressedCount: number;
+  fillBackfillReasons: string[];
 }
 
 export interface TodayReviewCandidateDataQualitySnapshot extends Partial<DataQualityEvaluation> {
@@ -120,6 +134,10 @@ export interface TodayReviewCandidate {
   strategyProofSnapshot: Record<string, any> | null;
   tradePlanSnapshot: TradePlanResultDto | Record<string, any> | null;
   sourceSignalSnapshot: Record<string, any> | null;
+  boardSection?: TodayReviewBoardSection | null;
+  boardSourceType?: TodayReviewBoardSourceType | null;
+  boardReason?: string | null;
+  boardContractVersion?: string | null;
   explainability?: TodayReviewCandidateExplainability;
   createdAt: string;
   updatedAt: string;
@@ -221,6 +239,7 @@ export interface TodayReviewGroups {
   shortReview: TodayReviewCandidate[];
   exitRiskReview: TodayReviewCandidate[];
   watchOnly: TodayReviewCandidate[];
+  specialCases: TodayReviewCandidate[];
   blocked: TodayReviewCandidate[];
   avoid: TodayReviewCandidate[];
   insufficientData: TodayReviewCandidate[];

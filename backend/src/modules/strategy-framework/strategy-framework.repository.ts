@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import { Prisma } from '@prisma/client';
 import prisma from '../../db/prisma';
 import type {
@@ -13,10 +14,17 @@ export class StrategyFrameworkRepository {
 
   async upsertDefinitions(strategies: StrategyDefinition[]): Promise<void> {
     for (const strategy of strategies) {
+      const data = this.toDefinitionData(strategy);
+      const { effectiveAt: _effectiveAt, ...updateData } = data;
       await this.db.strategyDefinition.upsert({
-        where: { code: strategy.code },
-        create: this.toDefinitionData(strategy),
-        update: this.toDefinitionData(strategy),
+        where: {
+          strategyCode_strategyVersion: {
+            strategyCode: strategy.code,
+            strategyVersion: strategy.version,
+          },
+        },
+        create: data,
+        update: updateData,
       });
     }
   }
@@ -28,7 +36,7 @@ export class StrategyFrameworkRepository {
         category: query.category,
         style: query.style,
       },
-      orderBy: [{ status: 'asc' }, { code: 'asc' }],
+      orderBy: [{ status: 'asc' }, { strategyCode: 'asc' }, { effectiveAt: 'desc' }],
     });
     return rows.map(this.toDefinitionDto).filter((strategy) => {
       const regionOk = !query.region || strategy.supportedRegions.includes(query.region) || strategy.supportedRegions.includes('GLOBAL');
@@ -37,8 +45,21 @@ export class StrategyFrameworkRepository {
     });
   }
 
-  async getDefinition(code: string): Promise<StrategyDefinition | null> {
-    const row = await this.db.strategyDefinition.findUnique({ where: { code: code.toUpperCase() } });
+  async getDefinition(code: string, version?: string): Promise<StrategyDefinition | null> {
+    const strategyCode = code.toUpperCase();
+    const row = version
+      ? await this.db.strategyDefinition.findUnique({
+        where: {
+          strategyCode_strategyVersion: {
+            strategyCode,
+            strategyVersion: version,
+          },
+        },
+      })
+      : await this.db.strategyDefinition.findFirst({
+        where: { strategyCode },
+        orderBy: [{ effectiveAt: 'desc' }, { createdAt: 'desc' }],
+      });
     return row ? this.toDefinitionDto(row) : null;
   }
 
@@ -150,8 +171,9 @@ export class StrategyFrameworkRepository {
   }
 
   private toDefinitionData(strategy: StrategyDefinition) {
+    const checksum = strategy.checksum || checksumStrategyDefinition(strategy);
     return {
-      code: strategy.code,
+      strategyCode: strategy.code,
       name: strategy.name,
       description: strategy.description,
       category: strategy.category,
@@ -159,21 +181,26 @@ export class StrategyFrameworkRepository {
       timeframe: strategy.timeframe,
       assetTypes: strategy.assetTypes as unknown as Prisma.InputJsonValue,
       supportedRegions: strategy.supportedRegions as unknown as Prisma.InputJsonValue,
-      version: strategy.version,
+      strategyVersion: strategy.version,
       status: strategy.status,
       parameters: strategy.parameters as Prisma.InputJsonValue,
       entryRules: strategy.entryRules as unknown as Prisma.InputJsonValue,
       exitRules: strategy.exitRules as unknown as Prisma.InputJsonValue,
+      invalidationRules: strategy.invalidationRules as unknown as Prisma.InputJsonValue,
       noiseFilters: strategy.noiseFilters as unknown as Prisma.InputJsonValue,
       riskRules: strategy.riskRules as unknown as Prisma.InputJsonValue,
       requiredInputs: strategy.requiredInputs as unknown as Prisma.InputJsonValue,
       marketGateRules: strategy.marketGateRules as unknown as Prisma.InputJsonValue,
+      strategyRating: strategy.strategyRating == null ? Prisma.JsonNull : strategy.strategyRating as Prisma.InputJsonValue,
+      readinessLabel: strategy.readinessLabel || 'RESEARCH_ONLY',
+      checksum,
+      effectiveAt: strategy.effectiveAt ? new Date(strategy.effectiveAt) : new Date(),
     };
   }
 
   private toDefinitionDto(row: any): StrategyDefinition {
     return {
-      code: row.code,
+      code: row.strategyCode ?? row.code,
       name: row.name,
       description: row.description,
       category: row.category,
@@ -181,16 +208,20 @@ export class StrategyFrameworkRepository {
       timeframe: row.timeframe,
       assetTypes: Array.isArray(row.assetTypes) ? row.assetTypes : [],
       supportedRegions: Array.isArray(row.supportedRegions) ? row.supportedRegions : [],
-      version: row.version,
+      version: row.strategyVersion ?? row.version,
       status: row.status,
       parameters: row.parameters || {},
       entryRules: Array.isArray(row.entryRules) ? row.entryRules : [],
       exitRules: Array.isArray(row.exitRules) ? row.exitRules : [],
-      invalidationRules: [],
+      invalidationRules: Array.isArray(row.invalidationRules) ? row.invalidationRules : [],
       noiseFilters: Array.isArray(row.noiseFilters) ? row.noiseFilters : [],
       riskRules: Array.isArray(row.riskRules) ? row.riskRules : [],
       requiredInputs: Array.isArray(row.requiredInputs) ? row.requiredInputs : [],
       marketGateRules: Array.isArray(row.marketGateRules) ? row.marketGateRules : [],
+      strategyRating: row.strategyRating && row.strategyRating !== Prisma.JsonNull ? row.strategyRating : null,
+      readinessLabel: row.readinessLabel || 'RESEARCH_ONLY',
+      checksum: row.checksum,
+      effectiveAt: row.effectiveAt ? row.effectiveAt.toISOString() : undefined,
       explanationTemplate: '',
       examples: { triggers: [], blocks: [] },
       id: row.id,
@@ -253,4 +284,36 @@ function automationFromStored(value: string): StrategyPerformanceSummaryDto['aut
   if (value === 'PAPER_TRADING_ELIGIBLE' || value === 'LIVE_TRADING_ELIGIBLE_FUTURE' || value === 'PAPER_TEST_CANDIDATE') return 'PAPER_TEST_CANDIDATE';
   if (value === 'WATCHLIST_ONLY') return 'WATCHLIST_ONLY';
   return 'NOT_ELIGIBLE';
+}
+
+export function checksumStrategyDefinition(strategy: StrategyDefinition): string {
+  const payload = {
+    strategyCode: strategy.code,
+    strategyVersion: strategy.version,
+    category: strategy.category,
+    style: strategy.style,
+    timeframe: strategy.timeframe,
+    assetTypes: strategy.assetTypes,
+    supportedRegions: strategy.supportedRegions,
+    status: strategy.status,
+    parameters: strategy.parameters,
+    entryRules: strategy.entryRules,
+    exitRules: strategy.exitRules,
+    invalidationRules: strategy.invalidationRules,
+    noiseFilters: strategy.noiseFilters,
+    riskRules: strategy.riskRules,
+    requiredInputs: strategy.requiredInputs,
+    marketGateRules: strategy.marketGateRules,
+    readinessLabel: strategy.readinessLabel || 'RESEARCH_ONLY',
+  };
+  return createHash('sha256').update(stableStringify(payload)).digest('hex');
+}
+
+function stableStringify(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
+  if (value && typeof value === 'object') {
+    const objectValue = value as Record<string, unknown>;
+    return `{${Object.keys(objectValue).sort().map((key) => `${JSON.stringify(key)}:${stableStringify(objectValue[key])}`).join(',')}}`;
+  }
+  return JSON.stringify(value);
 }

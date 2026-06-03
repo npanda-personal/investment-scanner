@@ -1628,6 +1628,8 @@ export class PipelineOrchestrationService {
           rowsUpdated: summary.rowsUpdated,
           rowsSkipped: summary.rowsSkipped,
           rowsNoOp: summary.rowsNoOp,
+          officialEodBulk: summary.officialEodBulk ?? null,
+          marketDataAvailabilityStatus: summary.officialEodBulk?.fallbackReason === 'OFFICIAL_EOD_NOT_AVAILABLE' ? 'NOT_AVAILABLE' : null,
           downstreamInstrumentCount: downstreamExecutionSummary.downstreamInstrumentIds?.length || 0,
           downstreamEligibilitySource: downstreamExecutionSummary.downstreamEligibilitySource || null,
           changedInstrumentCount: summary.changedInstrumentIds?.length || 0,

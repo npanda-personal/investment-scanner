@@ -85,7 +85,7 @@ Strategy Framework owns strategy definitions, versions, metadata, rule declarati
 Definitions include code, name, description, category, style, timeframe, asset types, supported regions, version, status, required inputs, entry rules, exit rules, invalidation rules, noise filters, risk rules, market gate rules, parameters, explanation template, and examples.
 
 ### Registry Pattern
-`strategy-framework.registry.ts` contains 10 deterministic built-in strategies. The database can persist the same definitions through `POST /strategies/seed`, but TypeScript registry remains the MVP source of truth so local development works without seed state.
+`strategy-framework.registry.ts` contains 10 deterministic built-in strategies and remains the source generator for built-in definitions. Runtime Strategy Framework reads are persistence-first after Phase 1: persisted `StrategyDefinition` rows are used when available, and registry definitions are appended only as fallback rows when persistence is empty, missing a strategy, or unavailable.
 
 ### Evaluation Interface
 `StrategyFrameworkEvaluator` implements:
@@ -150,9 +150,19 @@ User-facing readiness labels are conservative: `RESEARCH_ONLY`, `WATCHLIST_CANDI
 Each strategy has a semantic `version`. Performance summaries are unique by strategy code, version, timeframe, region, asset type, and universe key.
 
 ### Persistence Model
-`StrategyDefinition` stores the registry definition shape for the current code-only persistence model. `StrategyPerformanceSummary` stores idempotent summary metrics and rating fields. Its natural key is `strategyCode + strategyVersion + timeframe + region + assetType + universeKey`, so rerunning the same registered strategy/timeframe/region/universe updates the existing summary. Large backtest internals remain in `BacktestRun`.
+`StrategyDefinition` stores durable registry-seeded definition snapshots keyed by `strategyCode + strategyVersion`. Reseeding the same strategy version updates that version row, while seeding a newer version inserts a separate row and preserves prior versions for audit. The TypeScript registry remains the source generator for built-in definitions, and the persisted table is the durable source of record after seeding.
 
-Known persistence limitation: durable `StrategyDefinition.invalidationRules` and version-safe definition history require separate Prisma/schema decisions. Until those are approved, runtime registry definitions remain the source of truth for invalidation rules, and proof surfaces filter persisted summaries to the current registry version before displaying them as current evidence.
+Persisted definition rows include entry rules, exit rules, invalidation rules, noise filters, strategy rating metadata when supplied, conservative readiness label, checksum, and effective timestamp. The checksum is derived from the persisted strategy/rule snapshot so future registry revisions can be compared without overwriting older versions.
+
+`StrategyPerformanceSummary` stores idempotent summary metrics and rating fields. Its natural key is `strategyCode + strategyVersion + timeframe + region + assetType + universeKey`, so rerunning the same registered strategy/timeframe/region/universe updates the existing summary. Large backtest internals remain in `BacktestRun`.
+
+Current Strategy Framework list/detail/proof/ranking/evaluation/backtest API paths resolve definitions through a persistence-first provider. The provider falls back to the TypeScript registry for missing or unreadable persisted definitions so local development still works without seed state.
+
+Provider diagnostics mark each returned definition with `definitionSource` (`PERSISTED` or `REGISTRY_FALLBACK`) and `definitionDrift` evidence when applicable. Health output includes persisted count, registry count, fallback count, definition source, drift status, warnings, and checksum/version drift rows.
+
+Phase 2 migrated Signal Generation strategy matching to the Strategy Framework service contract. Signal Generation receives persisted-first definitions, registry fallback definitions, and definition drift diagnostics through framework evaluation output while preserving raw signal scoring.
+
+Phase 3 migrates Strategy Decision strategy selection and validation to the same Strategy Framework service contract. Strategy Decision now receives persisted-first definitions, registry fallback definitions, and definition drift diagnostics through framework evaluation output while preserving its existing decision scoring adapter and evaluation behavior.
 
 ### API Design
 Endpoints under `/api/v1`:

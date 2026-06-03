@@ -9,6 +9,9 @@ import { StrategyDecisionEngineService, type StrategyDecisionDto } from '../stra
 import { TradePlanRiskEngineService, type TradePlanResultDto } from '../trade-plan-risk-engine';
 import { TodayTradeReviewRepository } from './today-trade-review.repository';
 import type {
+  TodayReviewBoardSection,
+  TodayReviewBoardSelection,
+  TodayReviewBoardSourceType,
   TodayReviewCandidateDto,
   TodayReviewCandidateReason,
   TodayReviewCandidateSource,
@@ -39,6 +42,19 @@ const EXIT_LIMIT = 20;
 const TRUSTED_REVIEW_PAGE_SIZE = 250;
 const TRUSTED_REVIEW_SCAN_ORDERING = 'recentVolumeDesc_priceHistoryCompleteness_latestFreshness_symbol';
 const TRUSTED_REVIEW_UNAVAILABLE_WARNING = 'Trusted Review Universe unavailable or not ready; Today Review cannot publish candidates.';
+const TODAY_REVIEW_BOARD_CONTRACT_VERSION = 'today-review-board-v1';
+const TODAY_REVIEW_BOARD_TOTAL_LIMIT = 40;
+const TODAY_REVIEW_BOARD_QUOTAS: Record<TodayReviewBoardSection, number> = {
+  LONG_REVIEW: 20,
+  WATCH_ONLY: 10,
+  EXIT_RISK: 5,
+  SPECIAL_CASES: 5,
+};
+const LONG_REVIEW_SOURCE_QUOTAS = {
+  strategyBacked: 8,
+  lite: 8,
+  flexible: 4,
+};
 
 interface TrustedLoadResult {
   status: TodayReviewTrustedLoadStatus;
@@ -55,6 +71,11 @@ interface StrategyFunnelStats {
   strategyCandidatesExcluded: number;
   outsideTrustedUniverse: number;
   excludedExamples: TodayReviewExcludedExample[];
+}
+
+interface BoardAssemblyResult {
+  candidates: TodayReviewCandidateDto[];
+  boardSelection: TodayReviewBoardSelection;
 }
 
 export class TodayTradeReviewService {
@@ -105,7 +126,9 @@ export class TodayTradeReviewService {
         ? []
         : await this.buildCandidateSources(sources.entryDecisions, sources.exitDecisions, sources, scope, warnings, Boolean(request.skipTradePlanGeneration));
       const strategyCandidates = candidateSources.map((candidateSource) => this.mapCandidate(candidateSource));
-      const candidates = this.rankCandidates(this.mergeCandidates([...liteResult.candidates, ...strategyCandidates]));
+      const board = this.assembleBoardCandidates(this.mergeCandidates([...liteResult.candidates, ...strategyCandidates]));
+      sourceSnapshot.boardSelection = board.boardSelection;
+      const candidates = board.candidates;
       const candidateCounts = this.countCandidates(candidates);
       sourceSnapshot.explainability = this.buildRunExplainability(startedRun.id, scope, sources.reviewUniverse, liteResult.scanFunnel, candidates, sources.strategyFunnel.excludedExamples);
       const status: TodayReviewRunStatus = warnings.length > 0 || sources.reviewUniverse?.mode === 'NO_REVIEW' || sources.reviewUniverse?.mode === 'LIMITED_REVIEW' || !sources.scanEvidence.scanComplete ? 'PARTIAL' : 'COMPLETED';
@@ -170,15 +193,19 @@ export class TodayTradeReviewService {
   }
 
   groupCandidates(candidates: TodayReviewCandidateDto[]): TodayReviewGroupedCandidates {
+    const isSpecialCase = (candidate: TodayReviewCandidateDto) => candidate.boardSection === 'SPECIAL_CASES';
+    const isBoardSection = (candidate: TodayReviewCandidateDto, section: TodayReviewBoardSection) => candidate.boardSection === section;
+    const nonSpecial = candidates.filter((candidate) => !isSpecialCase(candidate));
     return {
-      longReview: candidates.filter((candidate) => candidate.state === 'LONG_REVIEW'),
-      shortReview: candidates.filter((candidate) => candidate.state === 'SHORT_REVIEW'),
-      exitRiskReview: candidates.filter((candidate) => candidate.state === 'EXIT_RISK_REVIEW'),
-      watchOnly: candidates.filter((candidate) => candidate.state === 'WATCH_ONLY'),
-      blocked: candidates.filter((candidate) => candidate.state === 'BLOCKED'),
-      avoid: candidates.filter((candidate) => candidate.state === 'AVOID'),
-      insufficientData: candidates.filter((candidate) => candidate.state === 'INSUFFICIENT_DATA'),
-      unproven: candidates.filter((candidate) => candidate.state === 'UNPROVEN'),
+      longReview: nonSpecial.filter((candidate) => isBoardSection(candidate, 'LONG_REVIEW') || (!candidate.boardSection && candidate.state === 'LONG_REVIEW')),
+      shortReview: nonSpecial.filter((candidate) => (isBoardSection(candidate, 'EXIT_RISK') && candidate.state === 'SHORT_REVIEW') || (!candidate.boardSection && candidate.state === 'SHORT_REVIEW')),
+      exitRiskReview: nonSpecial.filter((candidate) => (isBoardSection(candidate, 'EXIT_RISK') && candidate.state === 'EXIT_RISK_REVIEW') || (!candidate.boardSection && candidate.state === 'EXIT_RISK_REVIEW')),
+      watchOnly: nonSpecial.filter((candidate) => isBoardSection(candidate, 'WATCH_ONLY') || (!candidate.boardSection && candidate.state === 'WATCH_ONLY')),
+      specialCases: candidates.filter(isSpecialCase),
+      blocked: nonSpecial.filter((candidate) => candidate.state === 'BLOCKED'),
+      avoid: nonSpecial.filter((candidate) => candidate.state === 'AVOID'),
+      insufficientData: nonSpecial.filter((candidate) => candidate.state === 'INSUFFICIENT_DATA'),
+      unproven: nonSpecial.filter((candidate) => candidate.state === 'UNPROVEN'),
     };
   }
 
@@ -538,7 +565,7 @@ export class TodayTradeReviewService {
     if (!decision.instrumentId || !decision.symbol) return null;
     const latest = await this.safe(
       () => this.services.tradePlanService.latestForInstrument(decision.instrumentId!, decision.strategy, undefined, scope),
-      `${decision.symbol} persisted trade-plan snapshot is unavailable.`,
+      `${decision.symbol} persisted exit/invalidation evidence snapshot is unavailable.`,
       warnings
     );
     if (latest) return latest;
@@ -554,7 +581,7 @@ export class TodayTradeReviewService {
         region: scope.region,
         assetType: scope.assetType,
       }),
-      `${decision.symbol} trade-plan snapshot could not be generated.`,
+      `${decision.symbol} exit/invalidation evidence snapshot could not be generated.`,
       warnings
     );
   }
@@ -623,7 +650,7 @@ export class TodayTradeReviewService {
       } else if (tradePlan.rewardRiskRatio < 1.2) {
         state = 'WATCH_ONLY';
         scanFunnel.watchOnly += 1;
-        this.incrementReason(scanFunnel, 'reward/risk incomplete');
+        this.incrementReason(scanFunnel, 'exit/invalidation evidence incomplete');
       } else {
         state = setup.direction === 'SHORT' ? 'SHORT_REVIEW' : 'LONG_REVIEW';
         scanFunnel.promotedCandidates += 1;
@@ -631,7 +658,7 @@ export class TodayTradeReviewService {
       const score = state === 'BLOCKED' ? 0 : this.liteScore(setup, evidence, tradePlan.rewardRiskRatio, instrument, contextGapPenalty);
       const watchReasons = [
         ...(state === 'WATCH_ONLY' && evidence.label === 'UNPROVEN' ? ['Historical evidence is UNPROVEN; keep as watch only until more occurrences are available.'] : []),
-        ...(tradePlan.rewardRiskRatio < 1.2 ? ['Reward/risk is incomplete for paper review.'] : []),
+        ...(tradePlan.rewardRiskRatio < 1.2 ? ['Exit/invalidation evidence is incomplete for research review.'] : []),
         ...(instrument.contextGaps.length > 0 ? [`Context gaps: ${instrument.contextGaps.join(', ')}.`] : []),
         ...instrument.warnings.slice(0, 2),
       ];
@@ -849,7 +876,7 @@ export class TodayTradeReviewService {
         target2,
         method: 'LITE_REWARD_RISK_MULTIPLE',
         quality: rewardRiskRatio >= 1.8 ? 'ACCEPTABLE' : 'WATCH_ONLY',
-        rationale: 'Targets are derived from entry risk for research support only.',
+        rationale: 'Compatibility range is derived from entry and invalidation distance for legacy consumers only.',
       },
       rewardRiskRatio,
       invalidationRules: [
@@ -863,7 +890,7 @@ export class TodayTradeReviewService {
       blockers,
       dataGaps: instrument.contextGaps,
       paperReadinessStatus: blockers.length > 0 ? 'BLOCKED' : 'READY_FOR_PAPER_REVIEW',
-      paperReadinessReasons: blockers.length > 0 ? [] : ['Lite trade plan geometry is valid for research support.'],
+      paperReadinessReasons: blockers.length > 0 ? [] : ['Lite entry and invalidation evidence is valid for research support.'],
       paperReadinessBlockers: blockers,
       marketDataSnapshot: {
         latestStoredTradingDate: instrument.latestPriceDate,
@@ -898,7 +925,7 @@ export class TodayTradeReviewService {
 
   private liteReasonSummary(state: TodayReviewCandidateState, evidence: { label: string; sampleSize: number }, blockers: string[], watchReasons: string[]) {
     if (state === 'BLOCKED') return `Blocked: ${blockers[0] || 'hard blocker exists.'}`;
-    if (state === 'WATCH_ONLY') return `Watch only: ${watchReasons[0] || 'lite evidence is not strong enough for paper review.'}`;
+    if (state === 'WATCH_ONLY') return `Watch only: ${watchReasons[0] || 'lite evidence is not strong enough for research review.'}`;
     if (state === 'SHORT_REVIEW') return `Short review candidate from price-action setup and ${evidence.label.toLowerCase()} OHLCV evidence across ${evidence.sampleSize} prior occurrences.`;
     return `Long review candidate from price-action setup and ${evidence.label.toLowerCase()} OHLCV evidence across ${evidence.sampleSize} prior occurrences.`;
   }
@@ -1011,14 +1038,14 @@ export class TodayTradeReviewService {
     if (source.sourceKind === 'ENTRY') {
       const marketGate = String(source.marketGate?.marketGate || source.decision.marketGate || 'UNKNOWN');
       if (marketGate === 'CLOSED') add('Market gate is CLOSED for new long review candidates.');
-      if (!source.tradePlan) add('Trade-plan snapshot is missing for long review candidate.');
-      if (source.tradePlan?.planStatus === 'BLOCKED') add('Trade-plan snapshot has hard blockers.');
-      for (const blocker of source.tradePlan?.blockers || []) add(blocker);
+      if (!source.tradePlan) add('Exit/invalidation evidence snapshot is missing for long review candidate.');
+      if (source.tradePlan?.planStatus === 'BLOCKED') add('Exit/invalidation evidence snapshot has hard blockers.');
+      for (const blocker of source.tradePlan?.blockers || []) add(this.safeReviewLanguage(blocker));
       for (const blocker of source.tradePlan?.paperReadinessBlockers || []) {
         const text = blocker.toLowerCase();
-        if (text.includes('market gate is closed') || text.includes('trade plan has active blockers') || text.includes('stop loss')) add(blocker);
+        if (text.includes('market gate is closed') || text.includes('trade plan has active blockers') || text.includes('stop loss')) add(this.safeReviewLanguage(blocker));
       }
-      if (source.tradePlan?.paperReadinessStatus === 'BLOCKED') add('Paper review readiness is BLOCKED by the trade-plan snapshot.');
+      if (source.tradePlan?.paperReadinessStatus === 'BLOCKED') add('Exit/invalidation evidence is BLOCKED by the risk snapshot.');
     }
     if (source.dataQuality?.coverageStatus === 'UNUSABLE') add('Data quality coverage is UNUSABLE.');
     if (source.dataQuality?.liquidityStatus === 'ILLIQUID') add('Liquidity status is ILLIQUID.');
@@ -1038,7 +1065,7 @@ export class TodayTradeReviewService {
     if (!this.hasUsableProof(source)) add('Strategy Framework proof is missing or weak.');
     if (!source.marketContext) add('Market context snapshot is missing.');
     if (source.decision.confidence === 'LOW') add('Strategy Decision confidence is LOW.');
-    if (source.tradePlan?.rewardRiskRatio !== undefined && source.tradePlan.rewardRiskRatio < 1.5) add('Reward/risk is below the paper review threshold.');
+    if (source.tradePlan?.rewardRiskRatio !== undefined && source.tradePlan.rewardRiskRatio < 1.5) add('Exit/invalidation evidence is incomplete for research review.');
     for (const warning of source.decision.warnings || []) add(warning);
     for (const warning of source.tradePlan?.warnings || []) add(warning);
     return [...reasons];
@@ -1151,8 +1178,8 @@ export class TodayTradeReviewService {
     if (state === 'INSUFFICIENT_DATA') return `Insufficient data: ${watchReasons[0] || 'required snapshot is missing.'}`;
     if (state === 'UNPROVEN') return 'Unproven: Strategy Framework proof is missing or weak.';
     if (state === 'EXIT_RISK_REVIEW') return 'Exit-risk review candidate from Strategy Decision evidence and supporting diagnostics.';
-    if (state === 'WATCH_ONLY') return `Watch only: ${watchReasons[0] || 'evidence is not strong enough for paper review.'}`;
-    return 'Long review candidate with Strategy Framework proof, acceptable data quality, market alignment, and valid trade-plan geometry.';
+    if (state === 'WATCH_ONLY') return `Watch only: ${watchReasons[0] || 'evidence is not strong enough for research review.'}`;
+    return 'Long review candidate with Strategy Framework proof, acceptable data quality, market alignment, entry trigger context, and exit/invalidation evidence.';
   }
 
   private marketContextSnapshotFor(source: TodayReviewCandidateSource) {
@@ -1209,7 +1236,99 @@ export class TodayTradeReviewService {
     };
   }
 
-  private rankCandidates(candidates: TodayReviewCandidateDto[]): TodayReviewCandidateDto[] {
+  private assembleBoardCandidates(candidates: TodayReviewCandidateDto[]): BoardAssemblyResult {
+    const ordered = this.orderBoardCandidates(candidates);
+    const selected = new Map<string, TodayReviewCandidateDto>();
+    const fillBackfillReasons: string[] = [];
+    const sourceTypesBySymbol = this.sourceTypesBySymbol(candidates);
+    const specialReasons = new Map<string, string>();
+    for (const candidate of ordered) {
+      const reason = this.specialCaseReason(candidate, sourceTypesBySymbol);
+      if (reason) specialReasons.set(this.boardCandidateKey(candidate), reason);
+    }
+
+    const longPool = ordered.filter((candidate) => candidate.state === 'LONG_REVIEW');
+    const watchPool = ordered.filter((candidate) => candidate.state === 'WATCH_ONLY');
+    const exitRiskPool = ordered.filter((candidate) => candidate.state === 'EXIT_RISK_REVIEW' || candidate.state === 'SHORT_REVIEW');
+    const specialPool = ordered.filter((candidate) => specialReasons.has(this.boardCandidateKey(candidate)));
+
+    const select = (
+      pool: TodayReviewCandidateDto[],
+      section: TodayReviewBoardSection,
+      limit: number,
+      reason: string | ((candidate: TodayReviewCandidateDto) => string)
+    ) => {
+      let selectedCount = 0;
+      for (const candidate of pool) {
+        if (selectedCount >= limit || selected.size >= TODAY_REVIEW_BOARD_TOTAL_LIMIT) break;
+        const key = this.boardCandidateKey(candidate);
+        if (selected.has(key)) continue;
+        const boardReason = typeof reason === 'function' ? reason(candidate) : reason;
+        selected.set(key, this.withBoardMetadata(candidate, section, boardReason));
+        selectedCount += 1;
+      }
+      return selectedCount;
+    };
+    const remaining = (pool: TodayReviewCandidateDto[]) => pool.filter((candidate) => !selected.has(this.boardCandidateKey(candidate)));
+
+    const strategyLongPool = longPool.filter((candidate) => this.boardSourceType(candidate) === 'STRATEGY_BACKED');
+    const liteLongPool = longPool.filter((candidate) => this.boardSourceType(candidate) === 'LITE');
+    const strategyReserved = select(strategyLongPool, 'LONG_REVIEW', LONG_REVIEW_SOURCE_QUOTAS.strategyBacked, 'Strategy Decision-backed LONG_REVIEW reserved slot.');
+    const liteReserved = select(liteLongPool, 'LONG_REVIEW', LONG_REVIEW_SOURCE_QUOTAS.lite, 'Lite discovery LONG_REVIEW reserved slot.');
+    select(remaining(longPool), 'LONG_REVIEW', LONG_REVIEW_SOURCE_QUOTAS.flexible, 'Flexible LONG_REVIEW slot filled by next ranked eligible candidate.');
+    const longDisplayed = () => [...selected.values()].filter((candidate) => candidate.boardSection === 'LONG_REVIEW').length;
+    const longBackfilled = select(
+      remaining(longPool),
+      'LONG_REVIEW',
+      Math.max(0, TODAY_REVIEW_BOARD_QUOTAS.LONG_REVIEW - longDisplayed()),
+      'Unused LONG_REVIEW source-reserve slot backfilled by next ranked eligible long review candidate.'
+    );
+    if (strategyLongPool.length > strategyReserved) fillBackfillReasons.push(`Strategy-backed LONG_REVIEW reserve displayed ${strategyReserved} of ${strategyLongPool.length} eligible candidates.`);
+    if (liteLongPool.length > liteReserved) fillBackfillReasons.push(`Lite LONG_REVIEW reserve displayed ${liteReserved} of ${liteLongPool.length} eligible candidates.`);
+    if (longBackfilled > 0) fillBackfillReasons.push(`LONG_REVIEW flex/backfill added ${longBackfilled} candidates after source reserves.`);
+
+    select(watchPool, 'WATCH_ONLY', TODAY_REVIEW_BOARD_QUOTAS.WATCH_ONLY, 'WATCH_ONLY visibility reserved by board contract.');
+    select(exitRiskPool, 'EXIT_RISK', TODAY_REVIEW_BOARD_QUOTAS.EXIT_RISK, (candidate) => (
+      candidate.state === 'SHORT_REVIEW'
+        ? 'SHORT_REVIEW visibility reserved by board contract.'
+        : 'EXIT_RISK_REVIEW visibility reserved by board contract.'
+    ));
+    select(specialPool, 'SPECIAL_CASES', TODAY_REVIEW_BOARD_QUOTAS.SPECIAL_CASES, (candidate) => specialReasons.get(this.boardCandidateKey(candidate)) || 'Special-case evidence overlap selected by board contract.');
+
+    const rankedCandidates = [...selected.values()]
+      .slice(0, TODAY_REVIEW_BOARD_TOTAL_LIMIT)
+      .map((candidate, index) => this.withCandidateExplainability({ ...candidate, rank: index + 1 }));
+    const displayedCounts = this.countBoardSections(rankedCandidates);
+    const eligibleCounts: Record<TodayReviewBoardSection, number> = {
+      LONG_REVIEW: longPool.length,
+      WATCH_ONLY: watchPool.length,
+      EXIT_RISK: exitRiskPool.length,
+      SPECIAL_CASES: specialPool.length,
+    };
+    for (const section of Object.keys(TODAY_REVIEW_BOARD_QUOTAS) as TodayReviewBoardSection[]) {
+      if (displayedCounts[section] < Math.min(TODAY_REVIEW_BOARD_QUOTAS[section], eligibleCounts[section])) {
+        fillBackfillReasons.push(`${section} quota displayed ${displayedCounts[section]} of ${eligibleCounts[section]} eligible candidates.`);
+      } else if (eligibleCounts[section] < TODAY_REVIEW_BOARD_QUOTAS[section]) {
+        fillBackfillReasons.push(`${section} quota underfilled because only ${eligibleCounts[section]} eligible candidate(s) existed.`);
+      }
+    }
+
+    return {
+      candidates: rankedCandidates,
+      boardSelection: {
+        contractVersion: TODAY_REVIEW_BOARD_CONTRACT_VERSION,
+        quotas: { ...TODAY_REVIEW_BOARD_QUOTAS },
+        eligibleCounts,
+        displayedCounts,
+        strategyBackedCount: rankedCandidates.filter((candidate) => candidate.boardSourceType === 'STRATEGY_BACKED').length,
+        liteCount: rankedCandidates.filter((candidate) => candidate.boardSourceType === 'LITE').length,
+        suppressedCount: Math.max(0, candidates.length - rankedCandidates.length),
+        fillBackfillReasons,
+      },
+    };
+  }
+
+  private orderBoardCandidates(candidates: TodayReviewCandidateDto[]): TodayReviewCandidateDto[] {
     const statePriority: Record<TodayReviewCandidateState, number> = {
       LONG_REVIEW: 0,
       EXIT_RISK_REVIEW: 1,
@@ -1221,9 +1340,104 @@ export class TodayTradeReviewService {
       AVOID: 7,
     };
     return [...candidates]
-      .sort((a, b) => statePriority[a.state] - statePriority[b.state] || b.confidenceScore - a.confidenceScore || a.symbol.localeCompare(b.symbol))
-      .slice(0, 40)
-      .map((candidate, index) => this.withCandidateExplainability({ ...candidate, rank: index + 1 }));
+      .sort((a, b) => statePriority[a.state] - statePriority[b.state] || b.confidenceScore - a.confidenceScore || a.symbol.localeCompare(b.symbol));
+  }
+
+  private withBoardMetadata(candidate: TodayReviewCandidateDto, section: TodayReviewBoardSection, boardReason: string): TodayReviewCandidateDto {
+    const boardSourceType = this.boardSourceType(candidate);
+    const boardMetadata = {
+      section,
+      sourceType: boardSourceType,
+      reason: boardReason,
+      contractVersion: TODAY_REVIEW_BOARD_CONTRACT_VERSION,
+    };
+    return {
+      ...candidate,
+      boardSection: section,
+      boardSourceType,
+      boardReason,
+      boardContractVersion: TODAY_REVIEW_BOARD_CONTRACT_VERSION,
+      sourceSignalSnapshot: {
+        ...(candidate.sourceSignalSnapshot || {}),
+        todayReviewBoard: boardMetadata,
+      },
+    };
+  }
+
+  private boardCandidateKey(candidate: TodayReviewCandidateDto) {
+    return `${candidate.instrumentId}:${candidate.symbol}:${candidate.direction}:${candidate.setupType || candidate.strategyCode}`;
+  }
+
+  private boardSourceType(candidate: TodayReviewCandidateDto): TodayReviewBoardSourceType {
+    if (candidate.strategyCode === 'TODAY_REVIEW_LITE') return 'LITE';
+    const proof = candidate.strategyProofSnapshot as any;
+    if (proof?.frameworkBacked || proof?.strategyDecisionId || candidate.strategyCode) return 'STRATEGY_BACKED';
+    return 'OTHER';
+  }
+
+  private sourceTypesBySymbol(candidates: TodayReviewCandidateDto[]) {
+    const bySymbol = new Map<string, Set<TodayReviewBoardSourceType>>();
+    for (const candidate of candidates) {
+      const symbol = this.normalizedMembershipKey(candidate.symbol);
+      if (!symbol) continue;
+      const sourceTypes = bySymbol.get(symbol) || new Set<TodayReviewBoardSourceType>();
+      sourceTypes.add(this.boardSourceType(candidate));
+      bySymbol.set(symbol, sourceTypes);
+    }
+    return bySymbol;
+  }
+
+  private specialCaseReason(candidate: TodayReviewCandidateDto, sourceTypesBySymbol: Map<string, Set<TodayReviewBoardSourceType>>) {
+    if (candidate.state === 'BLOCKED' || candidate.state === 'AVOID') return null;
+    const sourceTypes = sourceTypesBySymbol.get(this.normalizedMembershipKey(candidate.symbol));
+    if (sourceTypes?.has('STRATEGY_BACKED') && sourceTypes.has('LITE')) return 'Strategy + Lite overlap.';
+    if (this.hasEvidenceKey(candidate, ['stockinterest', 'stockinterestsnapshot'])) return 'Stock Interest overlap.';
+    if (this.hasEvidenceKey(candidate, ['activeledger', 'ledgersnapshot', 'ledgeroverlap', 'positionledger'])) return 'Active Ledger overlap.';
+    if (this.hasEvidenceKey(candidate, ['newlyappeared', 'newcandidate', 'firstseenat'])) return 'Newly appeared candidate.';
+    const missingEvidenceAreas = this.missingEvidenceAreas(candidate);
+    if (candidate.confidenceScore >= 60 && missingEvidenceAreas.length === 1) {
+      return `High-quality candidate with one missing evidence area: ${missingEvidenceAreas[0]}.`;
+    }
+    return null;
+  }
+
+  private missingEvidenceAreas(candidate: TodayReviewCandidateDto) {
+    const sourceSignal = candidate.sourceSignalSnapshot as any;
+    const missing: string[] = [];
+    if (!candidate.dataQualitySnapshot) missing.push('Data Quality');
+    if (!candidate.marketContextSnapshot) missing.push('Market Context');
+    if (!candidate.strategyProofSnapshot) missing.push('Strategy Decision');
+    if (!candidate.tradePlanSnapshot) missing.push('Exit/invalidation evidence');
+    if (!sourceSignal?.rawSignal && !sourceSignal?.setup && !sourceSignal?.calibration) missing.push('Signal');
+    return missing;
+  }
+
+  private hasEvidenceKey(candidate: TodayReviewCandidateDto, normalizedKeys: string[]) {
+    return [candidate.sourceSignalSnapshot, candidate.strategyProofSnapshot, candidate.tradePlanSnapshot, candidate.dataQualitySnapshot]
+      .some((snapshot) => this.containsEvidenceKey(snapshot, normalizedKeys));
+  }
+
+  private containsEvidenceKey(value: unknown, normalizedKeys: string[], depth = 0): boolean {
+    if (!value || typeof value !== 'object' || depth > 5) return false;
+    for (const [key, nested] of Object.entries(value as Record<string, unknown>)) {
+      const normalizedKey = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (normalizedKeys.some((candidateKey) => normalizedKey.includes(candidateKey))) return true;
+      if (this.containsEvidenceKey(nested, normalizedKeys, depth + 1)) return true;
+    }
+    return false;
+  }
+
+  private countBoardSections(candidates: TodayReviewCandidateDto[]) {
+    const counts: Record<TodayReviewBoardSection, number> = {
+      LONG_REVIEW: 0,
+      WATCH_ONLY: 0,
+      EXIT_RISK: 0,
+      SPECIAL_CASES: 0,
+    };
+    for (const candidate of candidates) {
+      if (candidate.boardSection) counts[candidate.boardSection] += 1;
+    }
+    return counts;
   }
 
   private withCandidateExplainability(candidate: TodayReviewCandidateDto): TodayReviewCandidateDto {
@@ -1233,7 +1447,7 @@ export class TodayTradeReviewService {
       ? [
         this.reason('READINESS', 'TRUSTED_REVIEW_READY', 'Trusted review data is available for this candidate.', 'INFO', 'Market Data Foundation', candidate.dataQualitySnapshot as any, '/market-data'),
         this.reason('STRATEGY_PROOF', 'STRATEGY_PROOF_USABLE', 'Strategy proof is usable for research review.', 'INFO', 'Strategy Framework', candidate.strategyProofSnapshot as any, '/strategy'),
-        this.reason('TRADE_PLAN_PROOF_CHAIN', 'TRADE_PLAN_REVIEW_READY', 'Trade-plan proof-chain snapshot supports paper-review research.', 'INFO', 'Trade Plan Risk Engine', candidate.tradePlanSnapshot as any, `/trade-plans/${candidate.instrumentId}`),
+        this.reason('TRADE_PLAN_PROOF_CHAIN', 'EXIT_INVALIDATION_EVIDENCE_READY', 'Exit and invalidation evidence is available for research review.', 'INFO', 'Today Review', candidate.tradePlanSnapshot as any, `/today-review/candidates/${candidate.id || candidate.instrumentId}`),
       ]
       : [];
     const sourceSignal = candidate.sourceSignalSnapshot as any;
@@ -1297,7 +1511,8 @@ export class TodayTradeReviewService {
   private reasonFromText(label: string, severity: 'WATCH' | 'BLOCKER', candidate: TodayReviewCandidateDto): TodayReviewCandidateReason {
     const text = label.toLowerCase();
     if (text.includes('trade-plan') || text.includes('trade plan') || text.includes('reward/risk') || text.includes('stop loss') || text.includes('paper review')) {
-      return this.reason('TRADE_PLAN_PROOF_CHAIN', this.reasonCode(label), label, severity, 'Trade Plan Risk Engine', candidate.tradePlanSnapshot as any, `/trade-plans/${candidate.instrumentId}`);
+      const safeLabel = this.safeReviewLanguage(label);
+      return this.reason('TRADE_PLAN_PROOF_CHAIN', this.reasonCode(safeLabel), safeLabel, severity, 'Today Review', candidate.tradePlanSnapshot as any, `/today-review/candidates/${candidate.id || candidate.instrumentId}`);
     }
     if (text.includes('market gate')) return this.reason('MARKET_GATE', this.reasonCode(label), label, severity, 'Strategy Decision Engine', candidate.strategyProofSnapshot as any, '/strategy');
     if (text.includes('strategy') || text.includes('framework') || text.includes('proof')) return this.reason('STRATEGY_PROOF', this.reasonCode(label), label, severity, 'Strategy Framework', candidate.strategyProofSnapshot as any, '/strategy');
@@ -1305,6 +1520,31 @@ export class TodayTradeReviewService {
     if (text.includes('calibration')) return this.reason('CALIBRATION', this.reasonCode(label), label, severity, 'Signal Calibration Engine', candidate.sourceSignalSnapshot as any, '/signals/calibration');
     if (text.includes('data') || text.includes('coverage') || text.includes('liquidity') || text.includes('context gaps')) return this.reason('DATA_QUALITY', this.reasonCode(label), label, severity, 'Market Data Foundation', candidate.dataQualitySnapshot as any, '/market-data');
     return this.reason('STRATEGY_DECISION', this.reasonCode(label), label, severity, 'Strategy Decision Engine', candidate.strategyProofSnapshot as any, '/strategy');
+  }
+
+  private safeReviewLanguage(label: string): string {
+    return label
+      .replace(/Trade-plan proof-chain snapshot supports paper-review research\./gi, 'Exit and invalidation evidence is available for research review.')
+      .replace(/Paper review readiness is BLOCKED by the trade-plan snapshot\./gi, 'Exit/invalidation evidence is BLOCKED by the risk snapshot.')
+      .replace(/Reward\/risk is below the paper review threshold\./gi, 'Exit/invalidation evidence is incomplete for research review.')
+      .replace(/Reward\/risk is incomplete for paper review\./gi, 'Exit/invalidation evidence is incomplete for research review.')
+      .replace(/Trade-plan snapshot/gi, 'Exit/invalidation evidence snapshot')
+      .replace(/Trade plan has active blockers/gi, 'Exit/invalidation evidence has active blockers')
+      .replace(/Trade plan status/gi, 'Risk snapshot status')
+      .replace(/Trade plan/gi, 'Risk evidence')
+      .replace(/trade plan/gi, 'risk evidence')
+      .replace(/trade-plan/gi, 'risk-evidence')
+      .replace(/Stop loss/gi, 'Invalidation level')
+      .replace(/stop loss/gi, 'invalidation level')
+      .replace(/stop level/gi, 'invalidation level')
+      .replace(/paper-readiness/gi, 'research-readiness')
+      .replace(/paper review/gi, 'research review')
+      .replace(/paper-review/gi, 'research-review')
+      .replace(/reward\/risk/gi, 'exit/invalidation evidence')
+      .replace(/modeled reward/gi, 'modeled compatibility range')
+      .replace(/target\/reward/gi, 'exit/invalidation')
+      .replace(/target price/gi, 'compatibility price')
+      .replace(/price target/gi, 'compatibility price');
   }
 
   private reason(category: TodayReviewReasonCategory, code: string, label: string, severity: 'INFO' | 'WATCH' | 'BLOCKER', sourceModule: string, evidence?: Record<string, any> | null, targetRoute?: string): TodayReviewCandidateReason {
@@ -1343,7 +1583,7 @@ export class TodayTradeReviewService {
     add('OUTSIDE_SCOPE', 'OUTSIDE_TRUSTED_UNIVERSE', 'Strategy candidates were outside the trusted review universe.', scanFunnel.outsideTrustedUniverse, true, 'Market Data Foundation', '/market-data');
     add('NO_SETUP', 'NO_PRICE_ACTION_SETUP', 'Trusted instruments had no Today Review setup.', scanFunnel.noSetup, false, 'Today Review', '/today-review');
     add('STRATEGY_PROOF', 'UNPROVEN_EVIDENCE', 'Strategy or lite historical evidence is unproven.', scanFunnel.unproven, false, 'Strategy Framework', '/strategy');
-    add('TRADE_PLAN_PROOF_CHAIN', 'HARD_BLOCKER', 'Trade-plan or review geometry produced a hard blocker.', scanFunnel.blocked, true, 'Trade Plan Risk Engine', '/trade-plans');
+    add('TRADE_PLAN_PROOF_CHAIN', 'HARD_BLOCKER', 'Exit/invalidation evidence produced a hard blocker.', scanFunnel.blocked, true, 'Today Review', '/today-review');
     add('DATA_QUALITY', 'INSUFFICIENT_DATA', 'Required data quality evidence is missing or insufficient.', candidates.filter((candidate) => candidate.state === 'INSUFFICIENT_DATA').length, true, 'Market Data Foundation', '/market-data');
     for (const candidate of candidates) {
       for (const reason of [...(candidate.explainability?.blockers || []), ...(candidate.explainability?.watchReasons || [])]) {

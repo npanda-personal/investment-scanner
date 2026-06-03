@@ -5,9 +5,13 @@ import type {
   StrategyQuery,
   StrategyEvaluateRequest,
 } from './strategy-decision-engine.types';
-import { StrategyFrameworkRegistry } from '../strategy-framework';
+import { StrategyFrameworkService } from '../strategy-framework';
+import type { StrategyDefinition } from '../strategy-framework';
 
-const registry = new StrategyFrameworkRegistry();
+type StrategyDecisionValidationService = Pick<StrategyFrameworkService, 'list'>;
+
+let defaultStrategyFrameworkService: StrategyDecisionValidationService | null = null;
+const DEFAULT_STRATEGY = 'TREND_MOMENTUM';
 const DECISIONS: StrategyDecision[] = [
   'TRADE_CANDIDATE',
   'WATCH',
@@ -20,13 +24,16 @@ const DECISIONS: StrategyDecision[] = [
 ];
 const CONFIDENCES: DecisionConfidence[] = ['LOW', 'MEDIUM', 'HIGH'];
 
-export function parseStrategyQuery(query: Record<string, unknown>): StrategyQuery {
+export async function parseStrategyQuery(
+  query: Record<string, unknown>,
+  strategyFrameworkService: StrategyDecisionValidationService = defaultValidationService()
+): Promise<StrategyQuery> {
   const minScoreValue = Number(first(query.minScore));
   const limitValue = Number(first(query.limit));
   const offsetValue = Number(first(query.offset));
 
   return {
-    strategy: normalizeStrategy(query.strategy),
+    strategy: await normalizeStrategy(query.strategy, strategyFrameworkService),
     decision: normalizeDecision(query.decision),
     minScore: Number.isFinite(minScoreValue) ? Math.min(100, Math.max(0, minScoreValue)) : undefined,
     confidence: normalizeConfidence(query.confidence),
@@ -46,13 +53,19 @@ export function parseStrategyQuery(query: Record<string, unknown>): StrategyQuer
   };
 }
 
-export function parseEvaluateRequest(body: any): StrategyEvaluateRequest {
+export async function parseEvaluateRequest(
+  body: any,
+  strategyFrameworkService: StrategyDecisionValidationService = defaultValidationService()
+): Promise<StrategyEvaluateRequest> {
   const batchSize = Number(body?.batchSize);
   const offset = Number(body?.offset);
   const workerConcurrency = Number(body?.workerConcurrency);
+  const strategy = body?.strategy === 'ALL'
+    ? 'ALL'
+    : await normalizeStrategy(body?.strategy, strategyFrameworkService) || DEFAULT_STRATEGY;
 
   return {
-    strategy: body?.strategy === 'ALL' ? 'ALL' : normalizeStrategy(body?.strategy) || 'TREND_MOMENTUM',
+    strategy,
     instrumentId: typeof body?.instrumentId === 'string' ? body.instrumentId.trim() || undefined : undefined,
     symbol: typeof body?.symbol === 'string' ? body.symbol.trim().toUpperCase() || undefined : undefined,
     portfolioId: typeof body?.portfolioId === 'string' ? body.portfolioId.trim() || undefined : undefined,
@@ -65,11 +78,24 @@ export function parseEvaluateRequest(body: any): StrategyEvaluateRequest {
   };
 }
 
-function normalizeStrategy(value: unknown): StrategyName | undefined {
-  const str = String(value || '').toUpperCase();
-  const definition = registry.get(str);
-  if (!definition || definition.status !== 'ACTIVE') return undefined;
-  return ['ENTRY', 'EXIT'].includes(definition.category) ? definition.code : undefined;
+async function normalizeStrategy(
+  value: unknown,
+  strategyFrameworkService: StrategyDecisionValidationService
+): Promise<StrategyName | undefined> {
+  const str = String(first(value as any) || '').trim().toUpperCase();
+  if (!str) return undefined;
+  const definition = (await reviewStrategyDefinitions(strategyFrameworkService)).find((strategy) => strategy.code === str);
+  return definition?.code;
+}
+
+async function reviewStrategyDefinitions(strategyFrameworkService: StrategyDecisionValidationService): Promise<StrategyDefinition[]> {
+  const strategies = await strategyFrameworkService.list({}).catch(() => []);
+  return strategies.filter((strategy) => strategy.status === 'ACTIVE' && ['ENTRY', 'EXIT'].includes(strategy.category));
+}
+
+function defaultValidationService(): StrategyDecisionValidationService {
+  defaultStrategyFrameworkService ??= new StrategyFrameworkService();
+  return defaultStrategyFrameworkService;
 }
 
 function normalizeDecision(value: unknown): StrategyDecision | undefined {

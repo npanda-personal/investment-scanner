@@ -18,7 +18,7 @@ export class StrategyDecisionEngineController {
 
   evaluate = async (req: Request, res: Response) => {
     try {
-      const request = parseEvaluateRequest(req.body);
+      const request = await parseEvaluateRequest(req.body);
       const response = await this.service.evaluate(request);
       return res.json(response);
     } catch (error: any) {
@@ -29,7 +29,7 @@ export class StrategyDecisionEngineController {
 
   candidates = async (req: Request, res: Response) => {
     try {
-      const query = parseStrategyQuery(req.query as any);
+      const query = await parseStrategyQuery(req.query as any);
       const response = await this.service.candidates(query);
       return res.json(response);
     } catch (error: any) {

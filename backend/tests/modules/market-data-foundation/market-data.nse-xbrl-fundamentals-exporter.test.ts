@@ -4,6 +4,10 @@ import path from 'path';
 import { MarketDataFoundationService } from '../../../src/modules/market-data-foundation/market-data-foundation.service';
 import {
   ManualVerifiedFundamentalsCsvRow,
+  NseFinancialResultsApiPeriod,
+  NseFinancialResultsClient,
+  NseOfficialFinancialResultsClient,
+  NseXbrlFundamentalsCsvExporter,
   normalizeNseFinancialResultMetadataRows,
   parseNseXbrlFundamentalFacts,
   selectPreferredNseFinancialResults,
@@ -47,6 +51,170 @@ describe('NSE XBRL fundamentals CSV exporter', () => {
     });
   });
 
+  it('extracts approved banking revenue, net income, and EPS fact aliases', () => {
+    const aliasCases = [
+      {
+        revenueFact: 'Income',
+        netIncomeFact: 'ProfitLossForThePeriod',
+        epsFact: 'BasicEarningsPerShareAfterExtraordinaryItems',
+      },
+      {
+        revenueFact: 'TurnoverOrTotalIncome',
+        netIncomeFact: 'ProfitLossFromOrdinaryActivitiesAfterTax',
+        epsFact: 'BasicEarningsPerShareBeforeExtraordinaryItems',
+      },
+      {
+        revenueFact: 'InterestEarned',
+        netIncomeFact: 'NetProfitAfterTax',
+        epsFact: 'EarningPerShare',
+      },
+    ];
+
+    for (const aliasCase of aliasCases) {
+      const xml = bankingXbrlFixture(aliasCase);
+      const facts = parseNseXbrlFundamentalFacts(xml);
+
+      expect(facts.revenue).toMatchObject({
+        factName: aliasCase.revenueFact,
+        value: '5010.25',
+        contextRef: 'OneD',
+      });
+      expect(facts.netIncome).toMatchObject({
+        factName: aliasCase.netIncomeFact,
+        value: '1200.50',
+        contextRef: 'OneD',
+      });
+      expect(facts.eps).toMatchObject({
+        factName: aliasCase.epsFact,
+        value: '18.75',
+        contextRef: 'OneD',
+      });
+    }
+  });
+
+  it('extracts approved insurance and AMC/NBFC revenue, net income, and EPS fact aliases', () => {
+    const aliasCases = [
+      {
+        taxonomy: 'life insurance total income',
+        revenueFact: 'TotalIncome',
+        netIncomeFact: 'ProfitAfterTax',
+        epsFact: 'BasicEPSAfterExtraordinaryItems',
+      },
+      {
+        taxonomy: 'life insurance net premium income',
+        revenueFact: 'NetPremiumIncome',
+        netIncomeFact: 'ProfitAfterTax',
+        epsFact: 'BasicEPSBeforeExtraordinaryItems',
+      },
+      {
+        taxonomy: 'general insurance premium earned net',
+        revenueFact: 'PremiumEarnedNet',
+        netIncomeFact: 'ProfitAfterTax',
+        epsFact: 'BasicEPSAfterExtraordinaryItems',
+      },
+      {
+        taxonomy: 'AMC total revenue from operations',
+        revenueFact: 'TotalRevenueFromOperations',
+        netIncomeFact: 'TotalProfitLossForPeriod',
+        epsFact: 'BasicEPS',
+      },
+      {
+        taxonomy: 'AMC revenue from operations',
+        revenueFact: 'RevenueFromOperations',
+        netIncomeFact: 'NetProfitAfterTax',
+        epsFact: 'BasicEPSContinuingOperations',
+      },
+      {
+        taxonomy: 'AMC fees and commission income',
+        revenueFact: 'FeesAndCommissionIncome',
+        netIncomeFact: 'NetProfitAfterTax',
+        epsFact: 'BasicEPS',
+      },
+    ];
+
+    for (const aliasCase of aliasCases) {
+      const xml = sectorXbrlFixture(aliasCase);
+      const facts = parseNseXbrlFundamentalFacts(xml);
+
+      expect(facts.revenue).toMatchObject({
+        factName: aliasCase.revenueFact,
+        value: '7010.25',
+        contextRef: 'OneD',
+      });
+      expect(facts.netIncome).toMatchObject({
+        factName: aliasCase.netIncomeFact,
+        value: '2200.50',
+        contextRef: 'OneD',
+      });
+      expect(facts.eps).toMatchObject({
+        factName: aliasCase.epsFact,
+        value: '28.75',
+        contextRef: 'OneD',
+      });
+    }
+  });
+
+  it('exports and imports approved insurance and AMC/NBFC fundamentals for the recovery symbol set', async () => {
+    const symbols = ['LICI', 'SBILIFE', 'HDFCLIFE', 'ICICIPRULI', 'ICICIGI', 'GICRE', 'NIACL', 'ICICIAMC'];
+    const client = new RecoverySymbolFixtureClient();
+    const exporter = new NseXbrlFundamentalsCsvExporter(client);
+    const exportResult = await exporter.exportSymbols({
+      symbols,
+      outputDir: path.resolve(process.cwd(), 'tmp', 'test-nse-xbrl-insurance-amc-export'),
+      maxQuarterlyPeriods: 1,
+      maxAnnualPeriods: 1,
+      validatedBy: 'CODEX_MAPPING_TEST',
+      validatedAt: new Date('2026-06-02T00:00:00.000Z'),
+    });
+    const stocks = symbols.map((symbol, index) => ({
+      id: `stock-${index + 1}`,
+      symbol,
+      sourceSymbol: symbol,
+      displaySymbol: symbol,
+      currency: 'INR',
+    }));
+    const upsertSourceFileImport = jest.fn()
+      .mockResolvedValueOnce({ id: 'source-import-recovery', status: 'PENDING' })
+      .mockResolvedValueOnce({
+        id: 'source-import-recovery',
+        source: 'MANUAL_VERIFIED',
+        segment: 'FUNDAMENTALS',
+        status: 'COMPLETED',
+      });
+    const repository = {
+      findStocksBySymbolsInScope: jest.fn().mockResolvedValue(stocks),
+      upsertManualVerifiedFundamental: jest.fn(async (_stockId: string, row: any) => ({ id: `fundamental-${row.periodType}-${row.periodEndDate.toISOString()}` })),
+      upsertSourceFileImport,
+    };
+    const service = new MarketDataFoundationService(repository as any, { fetchCoreFundamentals: jest.fn() } as any);
+
+    const importResult = await (service as any).importBulkManualVerifiedFundamentals({
+      fileName: path.basename(exportResult.outputFilePath),
+      csvText: exportResult.csvText,
+      region: 'IN',
+      assetType: 'STOCK',
+    });
+
+    expect(exportResult.report).toMatchObject({
+      symbolCount: 8,
+      rowsExported: 16,
+      rowsSkipped: 0,
+      missingFieldCounts: { revenue: 0, netIncome: 0, eps: 0 },
+    });
+    expect(exportResult.rows).toHaveLength(16);
+    expect(new Set(exportResult.rows.map((row) => row.symbol))).toEqual(new Set(symbols));
+    expect(importResult).toMatchObject({
+      status: 'COMPLETED',
+      rowsRead: 16,
+      rowsImported: 16,
+      rowsRejected: 0,
+      symbolsCovered: 8,
+    });
+    expect(importResult.quarterlyCoverage).toMatchObject({ rowsImported: 8, symbolsCovered: 8 });
+    expect(importResult.annualCoverage).toMatchObject({ rowsImported: 8, symbolsCovered: 8 });
+    expect(repository.upsertManualVerifiedFundamental).toHaveBeenCalledTimes(16);
+  });
+
   it('normalizes NSE financial-result metadata into manual import period fields', () => {
     const result = normalizeNseFinancialResultMetadataRows([
       {
@@ -71,6 +239,120 @@ describe('NSE XBRL fundamentals CSV exporter', () => {
       isAudited: false,
       isCumulative: false,
       xbrlUrl: 'https://nsearchives.nseindia.com/corporate/xbrl/INDAS_117298_1348254_16012025082021.xml',
+    });
+  });
+
+  it('normalizes integrated filing and old insurance metadata into eligible XBRL rows', () => {
+    const result = normalizeNseFinancialResultMetadataRows([
+      {
+        symbol: 'LICI',
+        period: 'Quarterly',
+        qe_Date: '31-MAR-2026',
+        type: 'Integrated Filing- Financials',
+        type_Sub: 'Original',
+        xbrl: 'https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_LI_1670942_21052026082347_WEB.xml',
+        ixbrl: 'https://nsearchives.nseindia.com/corporate/ixbrl/INTEGRATED_FILING_LI_1670942_21052026082347_iXBRL_WEB.html',
+        consolidated: 'Consolidated',
+        audited: 'Audited',
+        broadcast_Date: '21-May-2026 08:23:47',
+      },
+      {
+        symbol: 'LICI',
+        period: 'Quarterly',
+        periodEnd: '31-Dec-2024',
+        xbrl: 'https://nsearchives.nseindia.com/corporate/xbrl/LICI_INSURANCE_OLD.xml',
+        consolidated: 'Standalone',
+        audited: 'Unaudited',
+        broadCastDate: '30-Jan-2025 16:00:00',
+      },
+    ]);
+
+    expect(result.skippedCount).toBe(0);
+    expect(result.records).toHaveLength(2);
+    expect(result.records[0]).toMatchObject({
+      symbol: 'LICI',
+      periodType: 'QUARTERLY',
+      periodEndDate: '2026-03-31',
+      isConsolidated: true,
+      isAudited: true,
+      xbrlUrl: 'https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_LI_1670942_21052026082347_WEB.xml',
+    });
+    expect(result.records[1]).toMatchObject({
+      symbol: 'LICI',
+      periodType: 'QUARTERLY',
+      periodEndDate: '2024-12-31',
+      isConsolidated: false,
+      isAudited: false,
+      xbrlUrl: 'https://nsearchives.nseindia.com/corporate/xbrl/LICI_INSURANCE_OLD.xml',
+    });
+  });
+
+  it('discovers integrated filing metadata coverage for the insurance and AMC recovery symbols', async () => {
+    const symbols = ['LICI', 'SBILIFE', 'HDFCLIFE', 'ICICIPRULI', 'ICICIGI', 'GICRE', 'NIACL', 'ICICIAMC'];
+    const requestedUrls: string[] = [];
+    const fetchImpl = jest.fn(async (url: string) => {
+      requestedUrls.push(url);
+      if (url.includes('/api/integrated-filing-results')) {
+        const symbol = new URL(url).searchParams.get('symbol') || 'UNKNOWN';
+        return responseJson({
+          data: [integratedFilingMetadataFixture(symbol, '31-MAR-2026')],
+          totalCount: 1,
+          page: 1,
+          size: 100,
+        });
+      }
+      if (url.includes('/api/corporates-financial-results')) return responseJson([]);
+      return responseText('<html>NSE session</html>');
+    });
+    const client = new NseOfficialFinancialResultsClient(fetchImpl as any, 0);
+
+    const coverageBefore = Object.fromEntries(symbols.map((symbol) => [symbol, 0]));
+    const coverageAfter: Record<string, number> = {};
+    for (const symbol of symbols) {
+      const metadataRows = await client.fetchFinancialResultsMetadata(symbol, 'Quarterly');
+      const normalized = normalizeNseFinancialResultMetadataRows(metadataRows, {
+        requestedSymbol: symbol,
+        fallbackPeriodType: 'QUARTERLY',
+      });
+      coverageAfter[symbol] = normalized.records.filter((record) => record.symbol === symbol).length;
+    }
+
+    expect(coverageBefore).toEqual(Object.fromEntries(symbols.map((symbol) => [symbol, 0])));
+    expect(coverageAfter).toEqual(Object.fromEntries(symbols.map((symbol) => [symbol, 1])));
+    expect(requestedUrls.some((url) => url.includes('/api/integrated-filing-results'))).toBe(true);
+    expect(requestedUrls.some((url) => url.includes('/api/corporates-financial-results') && url.includes('index=equities'))).toBe(true);
+    expect(requestedUrls.some((url) => url.includes('/api/corporates-financial-results') && url.includes('index=insurance'))).toBe(true);
+  });
+
+  it('limits integrated annual metadata discovery to fiscal year-end filings', async () => {
+    const fetchImpl = jest.fn(async (url: string) => {
+      if (url.includes('/api/integrated-filing-results')) {
+        return responseJson({
+          data: [
+            integratedFilingMetadataFixture('LICI', '31-DEC-2025'),
+            integratedFilingMetadataFixture('LICI', '31-MAR-2026'),
+          ],
+          totalCount: 2,
+          page: 1,
+          size: 100,
+        });
+      }
+      if (url.includes('/api/corporates-financial-results')) return responseJson([]);
+      return responseText('<html>NSE session</html>');
+    });
+    const client = new NseOfficialFinancialResultsClient(fetchImpl as any, 0);
+
+    const metadataRows = await client.fetchFinancialResultsMetadata('LICI', 'Annual');
+    const normalized = normalizeNseFinancialResultMetadataRows(metadataRows, {
+      requestedSymbol: 'LICI',
+      fallbackPeriodType: 'ANNUAL',
+    });
+
+    expect(normalized.records).toHaveLength(1);
+    expect(normalized.records[0]).toMatchObject({
+      symbol: 'LICI',
+      periodType: 'ANNUAL',
+      periodEndDate: '2026-03-31',
     });
   });
 
@@ -157,3 +439,179 @@ describe('NSE XBRL fundamentals CSV exporter', () => {
     });
   });
 });
+
+const bankingXbrlFixture = (facts: {
+  revenueFact: string;
+  netIncomeFact: string;
+  epsFact: string;
+}): string => `<?xml version="1.0" encoding="UTF-8"?>
+<xbrli:xbrl
+  xmlns:xbrli="http://www.xbrl.org/2003/instance"
+  xmlns:in-bnk="http://www.mca.gov.in/ind-as">
+  <xbrli:context id="OneD">
+    <xbrli:period>
+      <xbrli:startDate>2025-01-01</xbrli:startDate>
+      <xbrli:endDate>2025-03-31</xbrli:endDate>
+    </xbrli:period>
+  </xbrli:context>
+  <in-bnk:${facts.revenueFact} contextRef="OneD">5010.25</in-bnk:${facts.revenueFact}>
+  <in-bnk:${facts.netIncomeFact} contextRef="OneD">1200.50</in-bnk:${facts.netIncomeFact}>
+  <in-bnk:${facts.epsFact} contextRef="OneD">18.75</in-bnk:${facts.epsFact}>
+</xbrli:xbrl>`;
+
+const sectorXbrlFixture = (facts: {
+  taxonomy: string;
+  revenueFact: string;
+  netIncomeFact: string;
+  epsFact: string;
+}): string => `<?xml version="1.0" encoding="UTF-8"?>
+<xbrli:xbrl
+  xmlns:xbrli="http://www.xbrl.org/2003/instance"
+  xmlns:in-sec="http://www.mca.gov.in/ind-as">
+  <!-- ${facts.taxonomy} -->
+  <xbrli:context id="OneD">
+    <xbrli:period>
+      <xbrli:startDate>2025-01-01</xbrli:startDate>
+      <xbrli:endDate>2025-03-31</xbrli:endDate>
+    </xbrli:period>
+  </xbrli:context>
+  <in-sec:${facts.revenueFact} contextRef="OneD">7010.25</in-sec:${facts.revenueFact}>
+  <in-sec:${facts.netIncomeFact} contextRef="OneD">2200.50</in-sec:${facts.netIncomeFact}>
+  <in-sec:${facts.epsFact} contextRef="OneD">28.75</in-sec:${facts.epsFact}>
+</xbrli:xbrl>`;
+
+const integratedFilingMetadataFixture = (symbol: string, quarterEndDate: string): Record<string, unknown> => ({
+  symbol,
+  cmName: `${symbol} LIMITED`,
+  qe_Date: quarterEndDate,
+  type: 'Integrated Filing- Financials',
+  type_Sub: 'Original',
+  audited: 'Audited',
+  consolidated: 'Consolidated',
+  xbrl: `https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_${symbol}_${quarterEndDate.replace(/-/g, '_')}_WEB.xml`,
+  ixbrl: `https://nsearchives.nseindia.com/corporate/ixbrl/INTEGRATED_FILING_${symbol}_${quarterEndDate.replace(/-/g, '_')}_iXBRL_WEB.html`,
+  broadcast_Date: '21-May-2026 08:23:47',
+  seq_Id: 1670942,
+});
+
+const responseJson = (payload: unknown): Response => responseText(JSON.stringify(payload));
+
+const responseText = (text: string): Response => ({
+  ok: true,
+  status: 200,
+  headers: {
+    get: () => '',
+    getSetCookie: () => [],
+  },
+  text: async () => text,
+} as unknown as Response);
+
+class RecoverySymbolFixtureClient implements NseFinancialResultsClient {
+  async fetchFinancialResultsMetadata(symbol: string, period: NseFinancialResultsApiPeriod) {
+    return [{
+      symbol,
+      period,
+      toDate: period === 'Annual' ? '31-Mar-2025' : '31-Dec-2025',
+      xbrl: `https://nsearchives.nseindia.com/corporate/xbrl/${symbol}_${period}.xml`,
+      consolidated: 'Standalone',
+      audited: 'Audited',
+      cumulative: period === 'Annual' ? 'Cumulative' : 'Non Cumulative',
+      broadCastDate: period === 'Annual' ? '30-Apr-2025 16:00:00' : '20-Jan-2026 16:00:00',
+    }];
+  }
+
+  async fetchXbrl(url: string): Promise<string> {
+    const fileName = path.basename(url, '.xml');
+    const [symbol, period] = fileName.split('_');
+    const facts = recoveryFactsBySymbol[symbol] || recoveryFactsBySymbol.LICI;
+    const contextRef = period === 'Annual' ? 'FourD' : 'OneD';
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<xbrli:xbrl
+  xmlns:xbrli="http://www.xbrl.org/2003/instance"
+  xmlns:in-sec="http://www.mca.gov.in/ind-as">
+  <xbrli:context id="${contextRef}">
+    <xbrli:period>
+      <xbrli:startDate>${period === 'Annual' ? '2024-04-01' : '2025-10-01'}</xbrli:startDate>
+      <xbrli:endDate>${period === 'Annual' ? '2025-03-31' : '2025-12-31'}</xbrli:endDate>
+    </xbrli:period>
+  </xbrli:context>
+  <in-sec:${facts.revenueFact} contextRef="${contextRef}">${facts.revenue}</in-sec:${facts.revenueFact}>
+  <in-sec:${facts.netIncomeFact} contextRef="${contextRef}">${facts.netIncome}</in-sec:${facts.netIncomeFact}>
+  <in-sec:${facts.epsFact} contextRef="${contextRef}">${facts.eps}</in-sec:${facts.epsFact}>
+</xbrli:xbrl>`;
+  }
+}
+
+const recoveryFactsBySymbol: Record<string, {
+  revenueFact: string;
+  netIncomeFact: string;
+  epsFact: string;
+  revenue: string;
+  netIncome: string;
+  eps: string;
+}> = {
+  LICI: {
+    revenueFact: 'NetPremiumIncome',
+    netIncomeFact: 'ProfitAfterTax',
+    epsFact: 'BasicEPSAfterExtraordinaryItems',
+    revenue: '1000000.00',
+    netIncome: '100000.00',
+    eps: '10.00',
+  },
+  SBILIFE: {
+    revenueFact: 'TotalIncome',
+    netIncomeFact: 'ProfitAfterTax',
+    epsFact: 'BasicEPSBeforeExtraordinaryItems',
+    revenue: '2000000.00',
+    netIncome: '200000.00',
+    eps: '20.00',
+  },
+  HDFCLIFE: {
+    revenueFact: 'NetPremiumIncome',
+    netIncomeFact: 'ProfitAfterTax',
+    epsFact: 'BasicEPSAfterExtraordinaryItems',
+    revenue: '3000000.00',
+    netIncome: '300000.00',
+    eps: '30.00',
+  },
+  ICICIPRULI: {
+    revenueFact: 'TotalIncome',
+    netIncomeFact: 'ProfitAfterTax',
+    epsFact: 'BasicEPSBeforeExtraordinaryItems',
+    revenue: '4000000.00',
+    netIncome: '400000.00',
+    eps: '40.00',
+  },
+  ICICIGI: {
+    revenueFact: 'PremiumEarnedNet',
+    netIncomeFact: 'ProfitAfterTax',
+    epsFact: 'BasicEPSAfterExtraordinaryItems',
+    revenue: '5000000.00',
+    netIncome: '500000.00',
+    eps: '50.00',
+  },
+  GICRE: {
+    revenueFact: 'TotalIncome',
+    netIncomeFact: 'ProfitAfterTax',
+    epsFact: 'BasicEPSBeforeExtraordinaryItems',
+    revenue: '6000000.00',
+    netIncome: '600000.00',
+    eps: '60.00',
+  },
+  NIACL: {
+    revenueFact: 'PremiumEarnedNet',
+    netIncomeFact: 'ProfitAfterTax',
+    epsFact: 'BasicEPSAfterExtraordinaryItems',
+    revenue: '7000000.00',
+    netIncome: '700000.00',
+    eps: '70.00',
+  },
+  ICICIAMC: {
+    revenueFact: 'FeesAndCommissionIncome',
+    netIncomeFact: 'NetProfitAfterTax',
+    epsFact: 'BasicEPSContinuingOperations',
+    revenue: '8000000.00',
+    netIncome: '800000.00',
+    eps: '80.00',
+  },
+};

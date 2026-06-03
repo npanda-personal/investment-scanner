@@ -244,10 +244,13 @@ export async function fetchEarningsIntelligenceSnapshot(scope: MarketScope): Pro
       dataThroughDate: row.dataThroughDate ?? body.dataThroughDate ?? null,
       generatedAt: row.generatedAt ?? body.generatedAt ?? null,
       resultDateSource: row.resultDateSource || 'UNKNOWN',
+      periodEndDate: row.periodEndDate ?? null,
+      validatedAt: row.validatedAt ?? null,
       marginTrend: typeof row.marginTrend === 'number' ? row.marginTrend : null,
       categories: arrayOfStrings(row.categories),
       reasonTags: arrayOfStrings(row.reasonTags),
       riskTags: arrayOfStrings(row.riskTags),
+      warnings: arrayOfStrings(row.warnings),
     }));
 
     return {

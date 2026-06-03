@@ -58,9 +58,9 @@ Trade Plan & Risk Management Engine converts strategy-backed decisions into revi
 
 ### 7a. Today Trade Review is the daily shortlist publisher
 
-Today Trade Review composes persisted Strategy Decision, Strategy Framework proof, Data Quality, Market Context, Signal/Calibration support, Smart Money, and Trade Plan snapshots into one daily before-market research-support shortlist. It owns daily run orchestration, candidate ranking, candidate state mapping, and persisted TodayReviewRun/TodayReviewCandidate snapshots. It does not own raw signal generation, proof calculation, trade-plan geometry, market-data ingestion, or live/paper execution.
+Today Trade Review composes persisted Strategy Decision, Strategy Framework proof, Data Quality, Market Context, Signal/Calibration support, Smart Money, and compatibility risk snapshots into one daily before-market research-support shortlist. It owns daily run orchestration, candidate ranking, candidate state mapping, and persisted TodayReviewRun/TodayReviewCandidate snapshots. It does not own raw signal generation, proof calculation, risk snapshot compatibility calculation, market-data ingestion, or live/paper execution.
 
-Raw signals alone must never create a promoted Today Review candidate. Today Review must first obtain a Trusted Review Universe snapshot and load the trusted membership reliably; if the health snapshot is unavailable, membership loading fails, or the mode is `NO_REVIEW`, it publishes zero candidates with an explicit warning. Strategy Decision, Trade Plan, calibration, smart-money, and market-context rows are supporting evidence only and are filtered to instruments present in that loaded trusted snapshot. Promoted long review candidates require Strategy Framework proof, acceptable data quality, an acceptable market gate, and valid trade-plan geometry. Hard blockers override score and positive reasons, and the persisted Today Review candidate snapshots the conservative state used at publication time.
+Raw signals alone must never create a promoted Today Review candidate. Today Review must first obtain a Trusted Review Universe snapshot and load the trusted membership reliably; if the health snapshot is unavailable, membership loading fails, or the mode is `NO_REVIEW`, it publishes zero candidates with an explicit warning. Strategy Decision, compatibility risk, calibration, smart-money, and market-context rows are supporting evidence only and are filtered to instruments present in that loaded trusted snapshot. Promoted long review candidates require Strategy Framework proof, acceptable data quality, an acceptable market gate, and valid exit/invalidation evidence from the compatibility risk snapshot. Hard blockers override score and positive reasons, and the persisted Today Review candidate snapshots the conservative state used at publication time.
 
 ### 8. Batch work must be bounded
 
@@ -106,7 +106,7 @@ Do not add paid hosted browser testing, paid visual regression tools, paid UI li
 | Strategy | Strategy Framework | Reusable strategy registry, evaluator, rules, ratings, and readiness labels |
 | Intelligence Lab | Backtesting Strategy Lab | Detailed historical simulation for registered strategies and custom rules |
 | Research | Strategy Decision Engine | Convert strategy/context inputs into candidate/watch/avoid/exit decisions |
-| Research | Today Trade Review | Persisted before-market shortlist built from proof, context, data quality, and trade-plan snapshots |
+| Research | Today Trade Review | Persisted before-market shortlist built from proof, context, data quality, entry trigger context, and exit/invalidation evidence |
 | Research | Research Hub | Strategy-proof-driven command center and daily research triage layer |
 | Research | Smart Money Intelligence | Price-volume accumulation/distribution context and confirmation/contradiction layer |
 | Research | Market Context Intelligence | Market regime, breadth, sector/country context, market gate support |
@@ -1053,7 +1053,7 @@ review
 watch
 avoid
 risk level
-paper review candidate
+research review candidate
 research support
 historical simulation
 ```
@@ -1079,7 +1079,7 @@ Market Data Foundation now exposes two separate readiness contracts:
 1. **Full Catalog Health** is the strict data-ops contract. It covers provider validation, identity, metadata, price history, repair queues, and `universeSignoff`. It can remain `NOT_TRUSTWORTHY` while bad catalog rows are still being classified or repaired.
 2. **Trusted Review Universe** is the user-facing review input. It includes only active `IN / STOCK` instruments with supported provider status, current latest EOD price, at least 120 OHLCV bars, recent volume, adjusted-close coverage or a documented close fallback, and no critical corporate-action blocker. Missing sector, industry, market cap, ISIN, or listing date is a context gap, not a hard blocker for price-action review.
 
-Trusted Review Universe health publishes `targetTradingDate`, `requiredDataThroughDate`, and `storedDataThroughDate`. A pre-market review for session `T` requires EOD data through the previous completed session, while a post-close refresh for the next session can require the just-completed session after the final candle window. Today Trade Review must use Trusted Review Universe mode (`FULL_REVIEW`, `LIMITED_REVIEW`, or `NO_REVIEW`) for run eligibility, not full-catalog signoff or raw catalog size. Full-catalog signoff remains the operator gate for data quality repair and downstream broad-universe claims. Today Review candidate snapshots must also record membership load status, membership load failure reason, scan completeness, and outside-trusted-universe Strategy Decision exclusions. `LOAD_FAILED` means fail-closed `NO_REVIEW`; `CONFIGURED_PARTIAL` is valid only when a configured scan limit intentionally caps the loaded trusted set and is disclosed in the API/UI.
+Trusted Review Universe health publishes review trading date (`targetTradingDate` compatibility field), `requiredDataThroughDate`, and `storedDataThroughDate`. A pre-market review for session `T` requires EOD data through the previous completed session, while a post-close refresh for the next session can require the just-completed session after the final candle window. Today Trade Review must use Trusted Review Universe mode (`FULL_REVIEW`, `LIMITED_REVIEW`, or `NO_REVIEW`) for run eligibility, not full-catalog signoff or raw catalog size. Full-catalog signoff remains the operator gate for data quality repair and downstream broad-universe claims. Today Review candidate snapshots must also record membership load status, membership load failure reason, scan completeness, and outside-trusted-universe Strategy Decision exclusions. `LOAD_FAILED` means fail-closed `NO_REVIEW`; `CONFIGURED_PARTIAL` is valid only when a configured scan limit intentionally caps the loaded trusted set and is disclosed in the API/UI.
 
 ---
 

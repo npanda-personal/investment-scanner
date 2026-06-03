@@ -4,6 +4,7 @@ import path from 'path';
 export type NseFinancialResultsApiPeriod = 'Quarterly' | 'Annual';
 export type ManualVerifiedFundamentalsCsvPeriodType = 'QUARTERLY' | 'ANNUAL';
 export type NseXbrlFundamentalField = 'revenue' | 'netIncome' | 'eps';
+type NseLegacyFinancialResultsIndex = 'equities' | 'insurance';
 
 export interface NseFinancialResultMetadata {
   [key: string]: unknown;
@@ -95,6 +96,12 @@ type FetchLike = (url: string, init?: RequestInit) => Promise<Response>;
 
 const NSE_FINANCIAL_RESULTS_PAGE_URL = 'https://www.nseindia.com/companies-listing/corporate-filings-financial-results';
 const NSE_FINANCIAL_RESULTS_API_URL = 'https://www.nseindia.com/api/corporates-financial-results';
+const NSE_INTEGRATED_FILING_FINANCIALS_PAGE_URL = 'https://www.nseindia.com/companies-listing/corporate-integrated-filing?integratedType=integratedfilingfinancials&tabIndex=equity';
+const NSE_INTEGRATED_FILING_RESULTS_API_URL = 'https://www.nseindia.com/api/integrated-filing-results';
+const NSE_INTEGRATED_FILING_FINANCIALS_TYPE = 'Integrated Filing- Financials';
+const NSE_INTEGRATED_FILING_PAGE_SIZE = 100;
+const NSE_INTEGRATED_FILING_MAX_PAGES = 5;
+const NSE_LEGACY_FINANCIAL_RESULTS_INDICES: readonly NseLegacyFinancialResultsIndex[] = ['equities', 'insurance'];
 const NSE_XBRL_ARCHIVE_PREFIX = 'https://nsearchives.nseindia.com/corporate/xbrl/';
 const DEFAULT_MAX_SYMBOLS = 50;
 const DEFAULT_QUARTERLY_PERIODS = 8;
@@ -105,6 +112,38 @@ export const NSE_XBRL_FACT_NAMES: Record<NseXbrlFundamentalField, string> = {
   revenue: 'RevenueFromOperations',
   netIncome: 'ProfitLossForPeriod',
   eps: 'BasicEarningsLossPerShareFromContinuingAndDiscontinuedOperations',
+};
+
+export const NSE_XBRL_FACT_NAME_ALIASES: Record<NseXbrlFundamentalField, readonly string[]> = {
+  revenue: [
+    NSE_XBRL_FACT_NAMES.revenue,
+    'TotalRevenueFromOperations',
+    'Income',
+    'TotalIncome',
+    'TurnoverOrTotalIncome',
+    'InterestEarned',
+    'NetPremiumIncome',
+    'PremiumEarnedNet',
+    'FeesAndCommissionIncome',
+  ],
+  netIncome: [
+    NSE_XBRL_FACT_NAMES.netIncome,
+    'TotalProfitLossForPeriod',
+    'ProfitLossForThePeriod',
+    'ProfitLossFromOrdinaryActivitiesAfterTax',
+    'ProfitAfterTax',
+    'NetProfitAfterTax',
+  ],
+  eps: [
+    NSE_XBRL_FACT_NAMES.eps,
+    'BasicEPS',
+    'BasicEPSContinuingOperations',
+    'BasicEPSAfterExtraordinaryItems',
+    'BasicEPSBeforeExtraordinaryItems',
+    'BasicEarningsPerShareAfterExtraordinaryItems',
+    'BasicEarningsPerShareBeforeExtraordinaryItems',
+    'EarningPerShare',
+  ],
 };
 
 export const MANUAL_VERIFIED_FUNDAMENTALS_EXPORT_HEADERS = [
@@ -131,14 +170,80 @@ export class NseOfficialFinancialResultsClient implements NseFinancialResultsCli
 
   async fetchFinancialResultsMetadata(symbol: string, period: NseFinancialResultsApiPeriod): Promise<NseFinancialResultMetadata[]> {
     if (!this.warmed) await this.warmSession(symbol);
+    const rows: NseFinancialResultMetadata[] = [];
+    const failures: string[] = [];
+
+    try {
+      rows.push(...await this.fetchIntegratedFilingFinancialsMetadata(symbol, period));
+    } catch (error) {
+      failures.push(`integrated-filing-results: ${errorMessage(error)}`);
+    }
+
+    for (const index of NSE_LEGACY_FINANCIAL_RESULTS_INDICES) {
+      try {
+        rows.push(...await this.fetchLegacyFinancialResultsMetadata(symbol, period, index));
+      } catch (error) {
+        failures.push(`corporates-financial-results ${index}: ${errorMessage(error)}`);
+      }
+    }
+
+    if (rows.length === 0 && failures.length > 0) {
+      throw new Error(failures.join(' | '));
+    }
+
+    return rows;
+  }
+
+  private async fetchLegacyFinancialResultsMetadata(
+    symbol: string,
+    period: NseFinancialResultsApiPeriod,
+    index: NseLegacyFinancialResultsIndex
+  ): Promise<NseFinancialResultMetadata[]> {
     await sleep(this.delayMs);
     const query = new URLSearchParams({
-      index: 'equities',
+      index,
       period,
       symbol: symbol.trim().toUpperCase(),
     });
     const text = await this.requestText(`${NSE_FINANCIAL_RESULTS_API_URL}?${query.toString()}`, symbol);
-    return extractNseFinancialResultsMetadataRows(JSON.parse(text));
+    return extractNseFinancialResultsMetadataRows(JSON.parse(text)).map((record) => ({
+      ...record,
+      __nseDiscoverySource: `corporates-financial-results:${index}`,
+    }));
+  }
+
+  private async fetchIntegratedFilingFinancialsMetadata(
+    symbol: string,
+    period: NseFinancialResultsApiPeriod
+  ): Promise<NseFinancialResultMetadata[]> {
+    const rows: NseFinancialResultMetadata[] = [];
+    const normalizedSymbol = symbol.trim().toUpperCase();
+
+    for (let page = 1; page <= NSE_INTEGRATED_FILING_MAX_PAGES; page += 1) {
+      await sleep(this.delayMs);
+      const query = new URLSearchParams({
+        symbol: normalizedSymbol,
+        type: NSE_INTEGRATED_FILING_FINANCIALS_TYPE,
+        page: String(page),
+        size: String(NSE_INTEGRATED_FILING_PAGE_SIZE),
+      });
+      const payload = JSON.parse(await this.requestText(
+        `${NSE_INTEGRATED_FILING_RESULTS_API_URL}?${query.toString()}`,
+        normalizedSymbol,
+        integratedFilingFinancialsReferer(normalizedSymbol)
+      ));
+      const pageRows = extractNseFinancialResultsMetadataRows(payload);
+      rows.push(...pageRows
+        .filter((record) => isIntegratedFilingFinancialsRow(record))
+        .filter((record) => integratedFilingRowMatchesRequestedPeriod(record, period))
+        .map((record) => adaptIntegratedFilingFinancialsRow(record, period)));
+
+      const totalCount = isRecord(payload) ? readPayloadNumber(payload, 'totalCount') : null;
+      if (pageRows.length < NSE_INTEGRATED_FILING_PAGE_SIZE) break;
+      if (totalCount !== null && page * NSE_INTEGRATED_FILING_PAGE_SIZE >= totalCount) break;
+    }
+
+    return rows;
   }
 
   async fetchXbrl(url: string): Promise<string> {
@@ -155,15 +260,15 @@ export class NseOfficialFinancialResultsClient implements NseFinancialResultsCli
     this.warmed = response.ok;
   }
 
-  private async requestText(url: string, symbol?: string): Promise<string> {
-    let response = await this.fetchImpl(url, { headers: this.headers(symbol) });
+  private async requestText(url: string, symbol?: string, referer?: string): Promise<string> {
+    let response = await this.fetchImpl(url, { headers: this.headers(symbol, referer) });
     this.captureCookie(response);
 
     if ((response.status === 401 || response.status === 403) && this.warmed) {
       this.warmed = false;
       await this.warmSession(symbol);
       await sleep(this.delayMs);
-      response = await this.fetchImpl(url, { headers: this.headers(symbol) });
+      response = await this.fetchImpl(url, { headers: this.headers(symbol, referer) });
       this.captureCookie(response);
     }
 
@@ -174,14 +279,14 @@ export class NseOfficialFinancialResultsClient implements NseFinancialResultsCli
     return response.text();
   }
 
-  private headers(symbol?: string): Record<string, string> {
+  private headers(symbol?: string, referer?: string): Record<string, string> {
     const headers: Record<string, string> = {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0 Safari/537.36',
       Accept: 'application/json, text/plain, */*',
       'Accept-Language': 'en-US,en;q=0.9',
-      Referer: symbol
+      Referer: referer || (symbol
         ? `https://www.nseindia.com/get-quotes/equity?symbol=${encodeURIComponent(symbol.trim().toUpperCase())}`
-        : NSE_FINANCIAL_RESULTS_PAGE_URL,
+        : NSE_FINANCIAL_RESULTS_PAGE_URL),
     };
     if (this.cookie) headers.Cookie = this.cookie;
     return headers;
@@ -328,6 +433,42 @@ export const extractNseFinancialResultsMetadataRows = (payload: unknown): NseFin
   return [];
 };
 
+const adaptIntegratedFilingFinancialsRow = (
+  record: NseFinancialResultMetadata,
+  period: NseFinancialResultsApiPeriod
+): NseFinancialResultMetadata => {
+  const periodEnd = readRecordString(record, ['qe_Date', 'periodEndDate', 'periodEnd']);
+  const filingTimestamp = readRecordString(record, ['broadcast_Date', 'revised_Date', 'creation_Date']);
+  return {
+    ...record,
+    period,
+    periodType: period,
+    toDate: periodEnd,
+    periodEndDate: periodEnd,
+    broadCastDate: filingTimestamp,
+    __nseDiscoverySource: 'integrated-filing-results',
+  };
+};
+
+const isIntegratedFilingFinancialsRow = (record: NseFinancialResultMetadata): boolean => {
+  const type = readRecordString(record, ['type', 'integratedType']);
+  if (!type) return true;
+  return normalizeObjectKey(type) === normalizeObjectKey(NSE_INTEGRATED_FILING_FINANCIALS_TYPE);
+};
+
+const integratedFilingRowMatchesRequestedPeriod = (
+  record: NseFinancialResultMetadata,
+  period: NseFinancialResultsApiPeriod
+): boolean => {
+  if (period === 'Quarterly') return true;
+  const periodEndDate = parseNseDate(readRecordString(record, ['qe_Date', 'periodEndDate', 'periodEnd']));
+  return Boolean(periodEndDate && periodEndDate.endsWith('-03-31'));
+};
+
+const integratedFilingFinancialsReferer = (symbol: string): string => (
+  `${NSE_INTEGRATED_FILING_FINANCIALS_PAGE_URL}&symbol=${encodeURIComponent(symbol.trim().toUpperCase())}`
+);
+
 export const normalizeNseFinancialResultMetadataRows = (
   records: NseFinancialResultMetadata[],
   options: { requestedSymbol?: string; fallbackPeriodType?: ManualVerifiedFundamentalsCsvPeriodType } = {}
@@ -357,7 +498,7 @@ export const normalizeNseFinancialResultMetadataRow = (
   const symbol = (readRecordString(record, ['symbol', 'companySymbol', 'tradingSymbol']) || requestedSymbol || '').trim().toUpperCase();
   const periodRaw = readRecordString(record, ['period', 'periodType']) || options.fallbackPeriodType || '';
   const periodType = normalizeFinancialResultsPeriodType(periodRaw);
-  const periodEndDate = parseNseDate(readRecordString(record, ['toDate', 'periodEndDate', 'period_end_date']));
+  const periodEndDate = parseNseDate(readRecordString(record, ['toDate', 'periodEndDate', 'period_end_date', 'periodEnd', 'qe_Date']));
   const xbrlUrl = normalizeNseXbrlUrl(readRecordString(record, ['xbrl', 'xbrlUrl', 'xbrl_url', 'fileUrl', 'url']));
   if (!symbol || !periodType || !periodEndDate || !xbrlUrl) return null;
 
@@ -369,7 +510,7 @@ export const normalizeNseFinancialResultMetadataRow = (
     isConsolidated: isConsolidatedValue(readRecordString(record, ['consolidated', 'consolidatedOrStandalone'])),
     isAudited: isAuditedValue(readRecordString(record, ['audited', 'auditStatus'])),
     isCumulative: isCumulativeValue(readRecordString(record, ['cumulative', 'cumulativeOrNonCumulative'])),
-    filingTimestamp: parseNseDateTime(readRecordString(record, ['broadcastDate', 'broadCastDate', 'filingDate', 'dateOfFiling'])),
+    filingTimestamp: parseNseDateTime(readRecordString(record, ['broadcastDate', 'broadCastDate', 'broadcast_Date', 'filingDate', 'dateOfFiling', 'creation_Date', 'revised_Date', 'exchdisstime'])),
     raw: record,
   };
 };
@@ -397,9 +538,9 @@ export const parseNseXbrlFundamentalFacts = (
   xmlText: string,
   options: NseXbrlFactParseOptions = {}
 ): NseXbrlParsedFacts => ({
-  revenue: parseNseXbrlFundamentalFact(xmlText, 'revenue', NSE_XBRL_FACT_NAMES.revenue, options),
-  netIncome: parseNseXbrlFundamentalFact(xmlText, 'netIncome', NSE_XBRL_FACT_NAMES.netIncome, options),
-  eps: parseNseXbrlFundamentalFact(xmlText, 'eps', NSE_XBRL_FACT_NAMES.eps, options),
+  revenue: parseNseXbrlFundamentalFact(xmlText, 'revenue', NSE_XBRL_FACT_NAME_ALIASES.revenue, options),
+  netIncome: parseNseXbrlFundamentalFact(xmlText, 'netIncome', NSE_XBRL_FACT_NAME_ALIASES.netIncome, options),
+  eps: parseNseXbrlFundamentalFact(xmlText, 'eps', NSE_XBRL_FACT_NAME_ALIASES.eps, options),
 });
 
 export const toManualVerifiedFundamentalsCsv = (rows: ManualVerifiedFundamentalsCsvRow[]): string => {
@@ -427,20 +568,28 @@ export const normalizeSymbols = (symbols: string[]): string[] => {
 const parseNseXbrlFundamentalFact = (
   xmlText: string,
   field: NseXbrlFundamentalField,
-  factName: string,
+  factNames: string | readonly string[],
   options: NseXbrlFactParseOptions
 ): NseXbrlParsedFact => {
-  const facts = extractXbrlFactsByLocalName(xmlText, factName)
-    .map((fact) => ({
-      ...fact,
-      value: normalizeXbrlNumericValue(fact.text),
-    }))
+  const candidates = Array.isArray(factNames) ? factNames : [factNames];
+  const facts = candidates
+    .flatMap((factName, factNameIndex) => extractXbrlFactsByLocalName(xmlText, factName)
+      .map((fact) => ({
+        ...fact,
+        factName,
+        factNameIndex,
+        value: normalizeXbrlNumericValue(fact.text),
+      })))
     .filter((fact) => fact.value !== null)
-    .sort((a, b) => contextRefPriority(a.contextRef, options.periodType) - contextRefPriority(b.contextRef, options.periodType) || a.order - b.order);
+    .sort((a, b) => (
+      contextRefPriority(a.contextRef, options.periodType) - contextRefPriority(b.contextRef, options.periodType)
+      || a.factNameIndex - b.factNameIndex
+      || a.order - b.order
+    ));
   const selected = facts[0] || null;
   return {
     field,
-    factName,
+    factName: selected?.factName ?? candidates[0],
     value: selected?.value ?? null,
     contextRef: selected?.contextRef ?? null,
   };
@@ -630,6 +779,16 @@ const readRecordString = (record: Record<string, unknown>, keys: string[]): stri
     if (typeof value === 'number' && Number.isFinite(value)) return String(value);
   }
   return '';
+};
+
+const readPayloadNumber = (payload: Record<string, unknown>, key: string): number | null => {
+  const value = readPayloadValue(payload, key);
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
 };
 
 const normalizeObjectKey = (key: string): string => key.replace(/[\s_-]/g, '').toUpperCase();

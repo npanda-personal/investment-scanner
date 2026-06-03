@@ -1,5 +1,5 @@
 import type { MarketDataStatus } from '../market-data-foundation';
-import type { StrategyDecision, StrategyDirection, StrategyRatingGrade, StrategyReadinessLabel } from '../strategy-framework';
+import type { StrategyDecision, StrategyDefinitionDrift, StrategyDefinitionSource, StrategyDirection, StrategyRatingGrade, StrategyReadinessLabel } from '../strategy-framework';
 
 export type SignalDirection = 'BULLISH' | 'NEUTRAL' | 'BEARISH';
 export type SignalConfidence = 'LOW' | 'MEDIUM' | 'HIGH';
@@ -188,6 +188,8 @@ export interface SignalStrategyMatchSummary {
   triggerPriceEvidence?: SignalTriggerPriceEvidence | null;
   readinessLabel?: StrategyReadinessLabel | null;
   ratingGrade?: StrategyRatingGrade | null;
+  strategyDefinitionSource?: StrategyDefinitionSource | null;
+  strategyDefinitionDrift?: StrategyDefinitionDrift[];
 }
 
 export interface SignalBlockedStrategySummary {
@@ -202,6 +204,8 @@ export interface SignalBlockedStrategySummary {
   noiseFiltersTriggered: string[];
   reason: string;
   triggerPriceEvidence?: SignalTriggerPriceEvidence | null;
+  strategyDefinitionSource?: StrategyDefinitionSource | null;
+  strategyDefinitionDrift?: StrategyDefinitionDrift[];
 }
 
 export interface PaginatedSignalResponse {

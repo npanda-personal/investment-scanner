@@ -2003,6 +2003,14 @@ export class MarketDataFoundationRepository {
       latestVolume: null,
       latestAdjustedClose: null,
       latestClose: null,
+      latestSource: null,
+      latestSourceFileImportId: null,
+      latestSnapshotDate: null,
+      approvedExchangePriceRows: 0,
+      approvedExchangeLatestPriceDate: null,
+      approvedExchangeLatestSource: null,
+      approvedExchangeLatestSourceFileImportId: null,
+      sourceFileImportPriceRows: 0,
       rollingWindowBars: 0,
       rollingWindowCoveragePercent: 0,
       maxPriceGapDays: null,
@@ -2025,6 +2033,14 @@ export class MarketDataFoundationRepository {
         latestVolume: row.latestVolume ?? null,
         latestAdjustedClose: row.latestAdjustedClose ?? null,
         latestClose: row.latestClose ?? null,
+        latestSource: row.latestSource ?? null,
+        latestSourceFileImportId: row.latestSourceFileImportId ?? null,
+        latestSnapshotDate: row.latestSnapshotTimestamp ? row.latestSnapshotTimestamp.toISOString().slice(0, 10) : null,
+        approvedExchangePriceRows: Number(row.approvedExchangePriceRows || 0),
+        approvedExchangeLatestPriceDate: row.approvedExchangeLatestTimestamp ? row.approvedExchangeLatestTimestamp.toISOString().slice(0, 10) : null,
+        approvedExchangeLatestSource: row.approvedExchangeLatestSource ?? null,
+        approvedExchangeLatestSourceFileImportId: row.approvedExchangeLatestSourceFileImportId ?? null,
+        sourceFileImportPriceRows: Number(row.sourceFileImportPriceRows || 0),
         rollingWindowBars,
         rollingWindowCoveragePercent: this.percent(rollingWindowBars, STANDARD_REVIEW_MIN_BARS),
         maxPriceGapDays: rollingWindowBars > 1 ? Math.round(Number(row.maxPriceGapDays || 0)) : null,
@@ -2090,6 +2106,14 @@ export class MarketDataFoundationRepository {
       latestVolume: bigint | null;
       latestAdjustedClose: Prisma.Decimal | null;
       latestClose: Prisma.Decimal | null;
+      latestSource: string | null;
+      latestSourceFileImportId: string | null;
+      latestSnapshotTimestamp: Date | null;
+      approvedExchangePriceRows: number | bigint;
+      approvedExchangeLatestTimestamp: Date | null;
+      approvedExchangeLatestSource: string | null;
+      approvedExchangeLatestSourceFileImportId: string | null;
+      sourceFileImportPriceRows: number | bigint;
       rollingWindowBars: number | bigint;
       volumeRows: number | bigint;
       adjustedCloseRows: number | bigint;
@@ -2102,12 +2126,20 @@ export class MarketDataFoundationRepository {
         SELECT
           input_symbols.symbol,
           history_stats."priceHistoryBars",
-          history_stats."firstTimestamp"
+          history_stats."firstTimestamp",
+          history_stats."approvedExchangePriceRows",
+          history_stats."sourceFileImportPriceRows"
         FROM input_symbols
         LEFT JOIN LATERAL (
           SELECT
             COUNT(*)::int AS "priceHistoryBars",
-            MIN(price_ticks.timestamp) AS "firstTimestamp"
+            MIN(price_ticks.timestamp) AS "firstTimestamp",
+            SUM(CASE
+              WHEN UPPER(COALESCE(price_ticks.source, '')) IN (${Prisma.join(EXCHANGE_PRICE_SOURCES.map((source) => source.toUpperCase()))})
+                OR price_ticks."sourceFileImportId" IS NOT NULL
+              THEN 1 ELSE 0
+            END)::int AS "approvedExchangePriceRows",
+            SUM(CASE WHEN price_ticks."sourceFileImportId" IS NOT NULL THEN 1 ELSE 0 END)::int AS "sourceFileImportPriceRows"
           FROM price_ticks
           WHERE price_ticks.symbol = input_symbols.symbol
         ) history_stats ON TRUE
@@ -2119,6 +2151,8 @@ export class MarketDataFoundationRepository {
           recent.volume,
           recent."adjustedClose",
           recent.close,
+          recent.source,
+          recent."sourceFileImportId",
           recent.row_num,
           recent.previous_timestamp
         FROM input_symbols
@@ -2133,7 +2167,9 @@ export class MarketDataFoundationRepository {
               price_ticks.timestamp,
               price_ticks.volume,
               price_ticks."adjustedClose",
-              price_ticks.close
+              price_ticks.close,
+              price_ticks.source,
+              price_ticks."sourceFileImportId"
             FROM price_ticks
             WHERE price_ticks.symbol = input_symbols.symbol
             ORDER BY price_ticks.timestamp DESC
@@ -2147,9 +2183,40 @@ export class MarketDataFoundationRepository {
           timestamp AS "latestTimestamp",
           volume AS "latestVolume",
           "adjustedClose" AS "latestAdjustedClose",
-          close AS "latestClose"
+          close AS "latestClose",
+          source AS "latestSource",
+          "sourceFileImportId" AS "latestSourceFileImportId"
         FROM recent_ranked
         WHERE row_num = 1
+      ),
+      approved_latest AS (
+        SELECT
+          input_symbols.symbol,
+          latest_official.timestamp AS "approvedExchangeLatestTimestamp",
+          latest_official.source AS "approvedExchangeLatestSource",
+          latest_official."sourceFileImportId" AS "approvedExchangeLatestSourceFileImportId"
+        FROM input_symbols
+        LEFT JOIN LATERAL (
+          SELECT
+            price_ticks.timestamp,
+            price_ticks.source,
+            price_ticks."sourceFileImportId"
+          FROM price_ticks
+          WHERE price_ticks.symbol = input_symbols.symbol
+            AND (
+              UPPER(COALESCE(price_ticks.source, '')) IN (${Prisma.join(EXCHANGE_PRICE_SOURCES.map((source) => source.toUpperCase()))})
+              OR price_ticks."sourceFileImportId" IS NOT NULL
+            )
+          ORDER BY price_ticks.timestamp DESC
+          LIMIT 1
+        ) latest_official ON TRUE
+      ),
+      latest_snapshot AS (
+        SELECT
+          input_symbols.symbol,
+          latest_prices.timestamp AS "latestSnapshotTimestamp"
+        FROM input_symbols
+        LEFT JOIN latest_prices ON latest_prices.symbol = input_symbols.symbol
       ),
       quality AS (
         SELECT
@@ -2172,6 +2239,14 @@ export class MarketDataFoundationRepository {
         latest."latestVolume",
         latest."latestAdjustedClose",
         latest."latestClose",
+        latest."latestSource",
+        latest."latestSourceFileImportId",
+        latest_snapshot."latestSnapshotTimestamp",
+        COALESCE(history."approvedExchangePriceRows", 0)::int AS "approvedExchangePriceRows",
+        approved_latest."approvedExchangeLatestTimestamp",
+        approved_latest."approvedExchangeLatestSource",
+        approved_latest."approvedExchangeLatestSourceFileImportId",
+        COALESCE(history."sourceFileImportPriceRows", 0)::int AS "sourceFileImportPriceRows",
         COALESCE(quality."rollingWindowBars", 0)::int AS "rollingWindowBars",
         COALESCE(quality."volumeRows", 0)::int AS "volumeRows",
         COALESCE(quality."adjustedCloseRows", 0)::int AS "adjustedCloseRows",
@@ -2179,6 +2254,8 @@ export class MarketDataFoundationRepository {
       FROM input_symbols
       LEFT JOIN history ON history.symbol = input_symbols.symbol
       LEFT JOIN latest ON latest.symbol = input_symbols.symbol
+      LEFT JOIN approved_latest ON approved_latest.symbol = input_symbols.symbol
+      LEFT JOIN latest_snapshot ON latest_snapshot.symbol = input_symbols.symbol
       LEFT JOIN quality ON quality.symbol = input_symbols.symbol
       ORDER BY input_symbols.symbol ASC
     `);

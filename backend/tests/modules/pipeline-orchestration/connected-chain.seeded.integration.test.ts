@@ -1244,7 +1244,7 @@ describe('Pipeline Orchestration seeded connected-chain integration', () => {
         listingDate: START_DAY.toISOString().slice(0, 10),
         listingDateStatus: 'PRESENT_USED_LISTING_DATE',
         providerFallbackState: 'PROVIDER_SUPPORTED',
-        primarySourceAttempted: 'YAHOO',
+        primarySourceAttempted: 'NSE_BSE_EXCHANGE_EOD',
         fallbackSourcesAttempted: [],
         sourceFallbackReason: null,
         contextGaps,

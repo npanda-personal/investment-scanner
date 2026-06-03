@@ -34,7 +34,9 @@ The `marketGate` endpoint accepts a `region` parameter. This ensures the "OPEN/C
 
 This module preserves its existing decision API and persisted `StrategyDecisionResult` behavior. Strategy Framework is the source of truth for Strategy Decision's selectable review strategies.
 
-`GET /api/v1/strategy/model` returns all registered Strategy Framework definitions and marks the subset available for Strategy Decision evaluation with `evaluationSupported=true`.
+Strategy Decision resolves strategy definitions through the Strategy Framework persisted-first service contract. Persisted `StrategyDefinition` rows are used when available; registry definitions are used only as framework provider fallback rows when persistence is empty, missing a strategy, or unavailable.
+
+`GET /api/v1/strategy/model` returns all Strategy Framework provider definitions and marks the subset available for Strategy Decision evaluation with `evaluationSupported=true`. Model rows include `strategyDefinitionSource` and `strategyDefinitionDrift` so users can see whether a strategy is using persisted metadata or registry fallback.
 
 The default `strategy=ALL` evaluation expands to active Strategy Framework definitions whose category is `ENTRY` or `EXIT`. It intentionally excludes `GATE`, `FILTER`, and `DRAFT` definitions because those are support rules or experimental strategies, not standalone Strategy Decision review strategies.
 
@@ -62,11 +64,14 @@ Framework output is mapped to existing Strategy Decision fields:
 Additive compatibility fields:
 
 - `frameworkBacked`
+- `strategyName`
 - `strategyVersion`
 - `frameworkDecision`
 - `frameworkAction`
 - `strategyRating`
 - `readinessLabel`
+- `strategyDefinitionSource`
+- `strategyDefinitionDrift`
 
 Research Hub consumes these additive fields to build strategy-proof-driven priority buckets. Framework-backed decisions with missing proof are kept as watch candidates rather than promoted as top review candidates.
 
@@ -97,7 +102,15 @@ Market context must exist as a persisted snapshot for the requested `region`. If
 
 Persisted decision rows include the existing API-compatible `scoreBreakdown` JSON payload. `entryZone` is serialized before persistence and parsed back for API responses, matching the current Prisma column shape while preserving the frontend response contract.
 
-Framework invalidation rule IDs are also copied into the rule-based `riskPlan.invalidationRules` text so existing persisted JSON evidence keeps the invalidation context even before a future schema slice adds a dedicated top-level persisted `invalidationRulesTriggered` column.
+Framework invalidation rule IDs persist as top-level `invalidationRulesTriggered` JSON on `StrategyDecisionResult`. They are also copied into the rule-based `riskPlan.invalidationRules` text for compatibility with existing risk-review consumers.
+
+Strategy definition diagnostics persist additively on `StrategyDecisionResult`:
+
+- `strategyName`
+- `strategyDefinitionSource` (`PERSISTED` or `REGISTRY_FALLBACK`)
+- `strategyDefinitionDrift`
+
+When a persisted definition supplies `strategyRating` or `readinessLabel`, Strategy Decision uses that persisted metadata before falling back to compact performance summaries. Registry fallback rows remain explicitly marked as `REGISTRY_FALLBACK` with provider drift diagnostics.
 
 The Strategy Decision UI treats these compatibility risk packets as risk-review evidence. It does not display target-price or reward-risk fields when the backend returns null/deprecated compatibility values; users see review evidence, risk level, and exit/invalidation rule context instead.
 

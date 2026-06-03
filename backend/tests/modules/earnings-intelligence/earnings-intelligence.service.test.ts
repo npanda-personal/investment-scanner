@@ -33,7 +33,9 @@ function persistedRow(categories: EarningsSnapshotDto['categories']): EarningsSn
     dataThroughDate: '2026-05-31T00:00:00.000Z',
     symbol: 'AAA',
     resultDate: '2026-05-10T00:00:00.000Z',
-    resultDateSource: 'UNKNOWN',
+    resultDateSource: 'OFFICIAL_CALENDAR',
+    periodEndDate: '2026-03-31T00:00:00.000Z',
+    validatedAt: '2026-05-11T00:00:00.000Z',
     daysToResult: null,
     revenueGrowth: 20,
     profitGrowth: 30,
@@ -43,6 +45,7 @@ function persistedRow(categories: EarningsSnapshotDto['categories']): EarningsSn
     accelerationScore: 75,
     reasonTags: ['MANUAL_VERIFIED_RESULT'],
     riskTags: [],
+    warnings: [],
     freshness: 'FRESH',
     categories,
   };
@@ -69,7 +72,7 @@ describe('EarningsIntelligenceService', () => {
     ])).toBe(100);
   });
 
-  it('generates result winner, reaction history, and upcoming interest categories from persisted inputs', () => {
+  it('generates result winner and reaction history only from official result date inputs', () => {
     const service = new EarningsIntelligenceService({} as any);
     const winner = service.calculateSnapshot({
       stockId: 'stock-1',
@@ -79,7 +82,10 @@ describe('EarningsIntelligenceService', () => {
       snapshotDate: new Date('2026-06-01T00:00:00.000Z'),
       dataThroughDate: null,
       fundamentals: [
-        fundamental('2026-03-31', 130, 18, 1.8, { validatedAt: new Date('2026-05-10T00:00:00.000Z') }),
+        fundamental('2026-03-31', 130, 18, 1.8, {
+          officialResultDate: new Date('2026-05-10T00:00:00.000Z'),
+          validatedAt: new Date('2026-05-11T00:00:00.000Z'),
+        }),
         fundamental('2025-03-31', 100, 10, 1),
       ],
       prices: [
@@ -94,6 +100,15 @@ describe('EarningsIntelligenceService', () => {
       'RESULT_REACTION_HISTORY',
       'EARNINGS_WATCHLIST',
     ]));
+    expect(winner.resultDateSource).toBe('OFFICIAL_CALENDAR');
+    expect(winner.resultDate?.toISOString()).toBe('2026-05-10T00:00:00.000Z');
+    expect(winner.periodEndDate?.toISOString()).toBe('2026-03-31T00:00:00.000Z');
+    expect(winner.validatedAt?.toISOString()).toBe('2026-05-11T00:00:00.000Z');
+    expect(winner.warnings).toEqual([]);
+  });
+
+  it('generates upcoming estimated categories with explicit estimated provenance', () => {
+    const service = new EarningsIntelligenceService({} as any);
 
     const upcoming = service.calculateSnapshot({
       stockId: 'stock-1',
@@ -115,10 +130,72 @@ describe('EarningsIntelligenceService', () => {
     expect(upcoming.daysToResult).toBe(30);
     expect(upcoming.resultDateSource).toBe('ESTIMATED_FROM_PERIOD_CADENCE');
     expect(upcoming.riskTags).toContain('ESTIMATED_RESULT_DATE');
+    expect(upcoming.reasonTags).toContain('RESULT_WINDOW_ESTIMATED_FROM_PERSISTED_PERIODS');
+    expect(upcoming.warnings).toEqual(expect.arrayContaining([
+      'OFFICIAL_CALENDAR_NOT_AVAILABLE',
+      'RESULT_DATE_ESTIMATED_FROM_PERIOD_CADENCE',
+    ]));
     expect(upcoming.categories).toEqual(expect.arrayContaining([
       'UPCOMING_RESULTS',
       'PRE_RESULT_INTEREST',
     ]));
+  });
+
+  it('uses period end fallback without treating validatedAt as the result date', () => {
+    const service = new EarningsIntelligenceService({} as any);
+
+    const snapshot = service.calculateSnapshot({
+      stockId: 'stock-1',
+      symbol: 'AAA',
+      region: 'IN',
+      assetType: 'STOCK',
+      snapshotDate: new Date('2026-06-01T00:00:00.000Z'),
+      dataThroughDate: null,
+      fundamentals: [
+        fundamental('2026-03-31', 130, 18, 1.8, { validatedAt: new Date('2026-05-10T00:00:00.000Z') }),
+        fundamental('2025-03-31', 100, 10, 1),
+      ],
+      prices: [
+        { symbol: 'AAA', timestamp: new Date('2026-05-08T00:00:00.000Z'), close: 100, adjustedClose: 100, volume: 1000 },
+        { symbol: 'AAA', timestamp: new Date('2026-05-16T00:00:00.000Z'), close: 106, adjustedClose: 106, volume: 1200 },
+      ],
+      deliverySnapshots: [],
+    });
+
+    expect(snapshot.resultDateSource).toBe('PERIOD_END_DATE_FALLBACK');
+    expect(snapshot.resultDate?.toISOString()).toBe('2026-03-31T00:00:00.000Z');
+    expect(snapshot.periodEndDate?.toISOString()).toBe('2026-03-31T00:00:00.000Z');
+    expect(snapshot.validatedAt?.toISOString()).toBe('2026-05-10T00:00:00.000Z');
+    expect(snapshot.categories).not.toContain('RESULT_WINNERS');
+    expect(snapshot.categories).not.toContain('RESULT_REACTION_HISTORY');
+    expect(snapshot.riskTags).toContain('PRICE_REACTION_REQUIRES_OFFICIAL_RESULT_DATE');
+    expect(snapshot.warnings).toEqual(expect.arrayContaining([
+      'OFFICIAL_CALENDAR_NOT_AVAILABLE',
+      'RESULT_DATE_USES_PERIOD_END_DATE_FALLBACK',
+    ]));
+  });
+
+  it('marks stale freshness from period end even when validatedAt is recent', () => {
+    const service = new EarningsIntelligenceService({} as any);
+
+    const snapshot = service.calculateSnapshot({
+      stockId: 'stock-1',
+      symbol: 'AAA',
+      region: 'IN',
+      assetType: 'STOCK',
+      snapshotDate: new Date('2026-06-01T00:00:00.000Z'),
+      dataThroughDate: null,
+      fundamentals: [
+        fundamental('2025-03-31', 130, 18, 1.8, { validatedAt: new Date('2026-05-10T00:00:00.000Z') }),
+        fundamental('2024-03-31', 100, 10, 1),
+      ],
+      prices: [],
+      deliverySnapshots: [],
+    });
+
+    expect(snapshot.resultDateSource).toBe('PERIOD_END_DATE_FALLBACK');
+    expect(snapshot.freshness).toBe('STALE');
+    expect(snapshot.riskTags).toContain('STALE_EARNINGS_DATA');
   });
 
   it('assigns a valid fallback category when no stronger earnings bucket qualifies', () => {

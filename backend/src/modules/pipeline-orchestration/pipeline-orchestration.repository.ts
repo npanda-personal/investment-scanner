@@ -49,6 +49,7 @@ export class PipelineOrchestrationRepository {
       update: {
         triggerType: input.triggerType,
         status: input.status || 'RUNNING',
+        dataThroughDate: input.dataThroughDate ?? null,
         sourceFingerprint: input.sourceFingerprint ?? null,
         changedInstrumentCount: input.changedInstrumentCount ?? 0,
         totalCount: input.totalCount ?? 0,
@@ -128,6 +129,7 @@ export class PipelineOrchestrationRepository {
       update: {
         stageOrder: input.stageOrder,
         status: input.status || 'PENDING',
+        dataThroughDate: input.dataThroughDate ?? null,
         inputFingerprint: input.inputFingerprint ?? null,
         outputFingerprint: input.outputFingerprint ?? null,
         changedInstrumentCount: input.changedInstrumentCount ?? 0,

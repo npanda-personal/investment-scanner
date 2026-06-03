@@ -4,6 +4,7 @@ import { MarketDataFoundationService } from '../market-data-foundation';
 import { SignalCalibrationEngineService } from '../signal-calibration-engine';
 import { SignalGenerationEngineService } from '../signal-generation-engine';
 import { SmartMoneyIntelligenceService } from '../smart-money-intelligence';
+import { StrategyFrameworkDefinitionProvider } from './strategy-framework.definition-provider';
 import { StrategyFrameworkEvaluator } from './strategy-framework.evaluator';
 import { StrategyFrameworkRegistry, STRATEGY_TIMEFRAMES } from './strategy-framework.registry';
 import { StrategyFrameworkRepository } from './strategy-framework.repository';
@@ -12,6 +13,7 @@ import type {
   StrategyContext,
   StrategyDefinition,
   StrategyEvaluateRequest,
+  StrategyFrameworkContextEvaluation,
   StrategyListQuery,
   StrategyModelResponse,
   StrategyPerformanceQuery,
@@ -34,7 +36,8 @@ export class StrategyFrameworkService {
     private readonly calibrationService = new SignalCalibrationEngineService(),
     private readonly dataQualityService = new DataQualityEngineService(),
     private readonly contextService = new MarketContextIntelligenceService(),
-    private readonly smartMoneyService = new SmartMoneyIntelligenceService()
+    private readonly smartMoneyService = new SmartMoneyIntelligenceService(),
+    private readonly definitionProvider = new StrategyFrameworkDefinitionProvider(repository, registry)
   ) {}
 
   async seedDefinitions(): Promise<void> {
@@ -42,7 +45,7 @@ export class StrategyFrameworkService {
   }
 
   async list(query: StrategyListQuery = {}) {
-    const configured = this.registry.list().filter((strategy) => this.matches(strategy, query));
+    const configured = (await this.definitionProvider.list(query)).definitions;
     const performance = await this.repository.latestPerformanceForStrategies(configured.map((strategy) => strategy.code), {
       region: query.region,
       assetType: query.assetType,
@@ -53,20 +56,20 @@ export class StrategyFrameworkService {
   }
 
   async detail(code: string, query: StrategyPerformanceQuery = {}) {
-    const strategy = this.requireStrategy(code);
+    const strategy = await this.requireStrategy(code);
     const latestPerformanceSummaries = await this.performance(code, query).catch(() => []);
     return { ...strategy, latestPerformanceSummaries };
   }
 
   async performance(code: string, query: StrategyPerformanceQuery = {}) {
-    const strategy = this.requireStrategy(code);
+    const strategy = await this.requireStrategy(code);
     const rows = await this.repository.performance(strategy.code, query).catch(() => []);
     return this.currentVersionSummaries(rows, [strategy]);
   }
 
   async proofRegistry(query: StrategyPerformanceQuery = {}): Promise<StrategyProofRegistryResponse> {
     const scope = this.proofScope(query);
-    const strategies = this.registry.list().filter((strategy) => this.matches(strategy, { region: scope.region, assetType: scope.assetType }));
+    const strategies = (await this.definitionProvider.list({ region: scope.region, assetType: scope.assetType })).definitions;
     const summaries = await this.repository.latestPerformanceForStrategies(strategies.map((strategy) => strategy.code), scope).catch(() => []);
     const latestByCode = new Map<string, StrategyPerformanceSummaryDto>();
     for (const summary of this.currentVersionSummaries(summaries, strategies)) {
@@ -86,18 +89,19 @@ export class StrategyFrameworkService {
   }
 
   async proofDetail(code: string, query: StrategyPerformanceQuery = {}): Promise<StrategyProofRegistryRow> {
-    const strategy = this.requireStrategy(code);
+    const strategy = await this.requireStrategy(code);
     const scope = this.proofScope(query);
     const [summary] = await this.performance(strategy.code, scope).catch(() => []);
     return this.proofRow(strategy, summary ?? null, scope);
   }
 
   async rankings(query: StrategyRankingsQuery = {}) {
+    const definitions = (await this.definitionProvider.list({})).definitions;
     const persisted = await this.repository.rankings(query).catch(() => []);
-    const activeByCode = new Map(this.registry.list().map((strategy) => [strategy.code, strategy]));
+    const activeByCode = new Map(definitions.map((strategy) => [strategy.code, strategy]));
     const currentPersisted = persisted.filter((row) => activeByCode.get(row.strategyCode)?.version === row.strategyVersion);
     const currentCodes = new Set(currentPersisted.map((row) => row.strategyCode));
-    const missingCurrentRows = this.registry.list()
+    const missingCurrentRows = definitions
       .filter((strategy) => !currentCodes.has(strategy.code))
       .map((strategy) => this.unprovenSummary(strategy, query.timeframe || '1Y', query.region || 'IN', query.assetType || 'STOCK'));
     return [...currentPersisted, ...missingCurrentRows]
@@ -107,8 +111,8 @@ export class StrategyFrameworkService {
 
   async evaluate(request: StrategyEvaluateRequest) {
     const strategies = request.strategyCode && request.strategyCode !== 'ALL'
-      ? [this.requireStrategy(request.strategyCode)]
-      : this.registry.list().filter((strategy) => strategy.status !== 'DISABLED' && strategy.status !== 'DEPRECATED');
+      ? [await this.requireStrategy(request.strategyCode)]
+      : (await this.definitionProvider.list({})).definitions.filter((strategy) => strategy.status !== 'DISABLED' && strategy.status !== 'DEPRECATED');
     const context = await this.buildContext(request);
     const results = strategies.map((strategy) => new StrategyFrameworkEvaluator(strategy).evaluateSignalCandidate(context));
     return {
@@ -120,14 +124,23 @@ export class StrategyFrameworkService {
   }
 
   async evaluateContext(context: StrategyContext, strategyCode?: string): Promise<StrategySignalOutput[]> {
+    return (await this.evaluateContextWithDefinitions(context, strategyCode)).map((evaluation) => evaluation.result);
+  }
+
+  async evaluateContextWithDefinitions(context: StrategyContext, strategyCode?: string): Promise<StrategyFrameworkContextEvaluation[]> {
     const strategies = strategyCode && strategyCode !== 'ALL'
-      ? [this.requireStrategy(strategyCode)]
-      : this.registry.active();
-    return strategies.map((strategy) => new StrategyFrameworkEvaluator(strategy).evaluateSignalCandidate(context));
+      ? [await this.requireStrategy(strategyCode)]
+      : (await this.definitionProvider.list({ status: 'ACTIVE' })).definitions;
+    return strategies.map((strategy) => ({
+      definition: strategy,
+      result: new StrategyFrameworkEvaluator(strategy).evaluateSignalCandidate(context),
+      definitionSource: strategy.definitionSource,
+      definitionDrift: strategy.definitionDrift ?? [],
+    }));
   }
 
   async runBacktest(input: RegisteredBacktestInput, userId = 'default-user') {
-    const strategy = this.requireStandaloneBacktestStrategy(input.strategyCode);
+    const strategy = await this.requireStandaloneBacktestStrategy(input.strategyCode);
     const config = new StrategyFrameworkEvaluator(strategy).getBacktestConfig(input);
     const { BacktestingStrategyLabService } = require('../backtesting-strategy-lab') as typeof import('../backtesting-strategy-lab');
     const backtestingService = new BacktestingStrategyLabService();
@@ -183,7 +196,7 @@ export class StrategyFrameworkService {
     exposurePercent?: number | null;
     dataCoverageScore?: number;
   }): Promise<StrategyPerformanceSummaryDto> {
-    const strategy = this.requireStrategy(input.strategyCode);
+    const strategy = await this.requireStrategy(input.strategyCode);
     const base: Omit<StrategyPerformanceSummaryDto, 'ratingScore' | 'ratingGrade' | 'automationEligibility' | 'readinessLabel' | 'ratingReasons' | 'ratingWarnings' | 'ratingCapsApplied'> & { dataCoverageScore?: number; strategyStatus?: string } = {
       strategyCode: strategy.code,
       strategyVersion: strategy.version,
@@ -218,7 +231,7 @@ export class StrategyFrameworkService {
     return this.repository.upsertPerformance({ ...base, ...rated });
   }
 
-  getDefinition(code: string): StrategyDefinition {
+  async getDefinition(code: string): Promise<StrategyDefinition> {
     return this.requireStrategy(code);
   }
 
@@ -243,18 +256,38 @@ export class StrategyFrameworkService {
   }
 
   async health() {
-    const configured = this.registry.list();
-    const persisted = await this.repository.health(configured.length).catch(() => ({ strategiesWithBacktestResults: 0, missingPerformanceCount: configured.length, activeDefinitionsCount: configured.filter((strategy) => strategy.status === 'ACTIVE').length }));
+    const definitions = await this.definitionProvider.list({});
+    const configured = definitions.definitions;
+    const fallbackHealth = {
+      strategiesWithBacktestResults: 0,
+      missingPerformanceCount: configured.length,
+      activeDefinitionsCount: configured.filter((strategy) => strategy.status === 'ACTIVE').length,
+    };
+    const persisted = typeof (this.repository as any).health === 'function'
+      ? await this.repository.health(configured.length).catch(() => fallbackHealth)
+      : fallbackHealth;
     return {
       configuredStrategiesCount: configured.length,
       activeStrategiesCount: configured.filter((strategy) => strategy.status === 'ACTIVE').length,
       strategiesWithBacktestResults: persisted.strategiesWithBacktestResults,
       missingPerformanceCount: persisted.missingPerformanceCount,
+      definitionSource: definitions.source,
+      persistedDefinitionsCount: definitions.persistedDefinitionsCount,
+      registryDefinitionsCount: definitions.registryDefinitionsCount,
+      fallbackDefinitionsCount: definitions.fallbackDefinitionsCount,
+      definitionDriftStatus: definitions.persistenceReadFailed
+        ? 'PERSISTENCE_UNAVAILABLE'
+        : definitions.drift.length > 0
+          ? 'DRIFT_DETECTED'
+          : 'OK',
+      definitionDrift: definitions.drift,
+      definitionWarnings: definitions.warnings,
+      persistenceReadFailed: definitions.persistenceReadFailed,
     };
   }
 
   strategyToBacktestConfig(input: RegisteredBacktestInput) {
-    return new StrategyFrameworkEvaluator(this.requireStandaloneBacktestStrategy(input.strategyCode)).getBacktestConfig(input);
+    return new StrategyFrameworkEvaluator(this.requireStandaloneBacktestStrategyFromRegistry(input.strategyCode)).getBacktestConfig(input);
   }
 
   proofRow(strategy: StrategyDefinition, summary: StrategyPerformanceSummaryDto | null, query: StrategyPerformanceQuery = {}): StrategyProofRegistryRow {
@@ -363,7 +396,13 @@ export class StrategyFrameworkService {
     return response.instruments.find((instrument: any) => instrument.symbol.toUpperCase() === request.symbol?.toUpperCase()) ?? response.instruments[0] ?? null;
   }
 
-  private requireStrategy(code: string): StrategyDefinition {
+  private async requireStrategy(code: string): Promise<StrategyDefinition> {
+    const { definition } = await this.definitionProvider.get(code);
+    if (!definition) throw new Error(`Strategy ${code} is not registered`);
+    return definition;
+  }
+
+  private requireRegistryStrategy(code: string): StrategyDefinition {
     const strategy = this.registry.get(code);
     if (!strategy) throw new Error(`Strategy ${code} is not registered`);
     return strategy;
@@ -390,8 +429,8 @@ export class StrategyFrameworkService {
     return Promise.resolve(null);
   }
 
-  private requireStandaloneBacktestStrategy(code: string): StrategyDefinition {
-    const strategy = this.requireStrategy(code);
+  private async requireStandaloneBacktestStrategy(code: string): Promise<StrategyDefinition> {
+    const strategy = await this.requireStrategy(code);
     if (strategy.status !== 'ACTIVE') {
       throw new Error(`Strategy ${strategy.code} is ${strategy.status} and cannot be run as a registered backtest.`);
     }
@@ -401,13 +440,15 @@ export class StrategyFrameworkService {
     return strategy;
   }
 
-  private matches(strategy: StrategyDefinition, query: StrategyListQuery) {
-    if (query.status && strategy.status !== query.status) return false;
-    if (query.category && strategy.category !== query.category) return false;
-    if (query.style && strategy.style !== query.style) return false;
-    if (query.region && !strategy.supportedRegions.includes(query.region) && !strategy.supportedRegions.includes('GLOBAL')) return false;
-    if (query.assetType && !strategy.assetTypes.includes(query.assetType)) return false;
-    return true;
+  private requireStandaloneBacktestStrategyFromRegistry(code: string): StrategyDefinition {
+    const strategy = this.requireRegistryStrategy(code);
+    if (strategy.status !== 'ACTIVE') {
+      throw new Error(`Strategy ${strategy.code} is ${strategy.status} and cannot be run as a registered backtest.`);
+    }
+    if (strategy.category !== 'ENTRY') {
+      throw new Error(`Strategy ${strategy.code} is a ${strategy.category} rule. Registered backtests currently support active ENTRY strategies only.`);
+    }
+    return strategy;
   }
 
   private unprovenSummary(strategy: StrategyDefinition, timeframe: StrategyTimeframe, region: string, assetType: string): StrategyPerformanceSummaryDto {

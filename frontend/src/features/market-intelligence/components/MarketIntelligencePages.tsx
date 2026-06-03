@@ -471,11 +471,13 @@ function EarningsTable({ rows }: { rows: EarningsIntelligenceSnapshot[] }) {
   return (
     <RankingTable
       rows={rows}
-      columns={['Symbol', 'Result Date', 'Date Source', 'Days To Result', 'Revenue Growth', 'Profit Growth', 'EPS Growth', 'Margin Trend', 'Consistency', 'Acceleration', 'Freshness', 'Reasons', 'Risks']}
+      columns={['Symbol', 'Result Date', 'Date Source', 'Period End', 'Validated At', 'Days To Result', 'Revenue Growth', 'Profit Growth', 'EPS Growth', 'Margin Trend', 'Consistency', 'Acceleration', 'Freshness', 'Reasons', 'Risks', 'Warnings']}
       renderRow={(row) => [
         row.symbol,
         formatDate(row.resultDate),
         formatEnum(row.resultDateSource),
+        formatDate(row.periodEndDate),
+        formatDate(row.validatedAt),
         formatOptional(row.daysToResult),
         formatPercentPoints(row.revenueGrowth),
         formatPercentPoints(row.profitGrowth),
@@ -486,6 +488,7 @@ function EarningsTable({ rows }: { rows: EarningsIntelligenceSnapshot[] }) {
         row.freshness || 'Unavailable',
         <ReasonTags key="reasons" tags={row.reasonTags} />,
         <RiskTags key="risks" tags={row.riskTags} />,
+        <RiskTags key="warnings" tags={row.warnings || []} />,
       ]}
     />
   );

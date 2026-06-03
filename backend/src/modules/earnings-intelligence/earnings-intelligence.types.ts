@@ -9,9 +9,21 @@ export type EarningsIntelligenceCategory =
 export type EarningsFreshness = 'FRESH' | 'PARTIAL' | 'STALE' | 'MISSING';
 
 export type EarningsResultDateSource =
-  | 'ESTIMATED_FROM_PERIOD_CADENCE'
   | 'OFFICIAL_CALENDAR'
+  | 'ESTIMATED_FROM_PERIOD_CADENCE'
+  | 'PERIOD_END_DATE_FALLBACK'
+  | 'VALIDATED_AT_FALLBACK'
   | 'UNKNOWN';
+
+export interface EarningsProvenanceSummary {
+  rowCount: number;
+  resultDateSourceCounts: Record<string, number>;
+  warningCounts: Record<string, number>;
+  officialCalendarRows: number;
+  estimatedRows: number;
+  fallbackRows: number;
+  unknownRows: number;
+}
 
 export interface EarningsIntelligenceQuery {
   region: string;
@@ -56,6 +68,8 @@ export interface EarningsSnapshotDto {
   symbol: string;
   resultDate: string | null;
   resultDateSource: EarningsResultDateSource | string;
+  periodEndDate: string | null;
+  validatedAt: string | null;
   daysToResult: number | null;
   revenueGrowth: number | null;
   profitGrowth: number | null;
@@ -65,6 +79,7 @@ export interface EarningsSnapshotDto {
   accelerationScore: number;
   reasonTags: string[];
   riskTags: string[];
+  warnings: string[];
   freshness: EarningsFreshness | string;
   categories: EarningsIntelligenceCategory[];
 }
@@ -81,6 +96,7 @@ export interface EarningsIntelligenceResponse {
   categories: Record<EarningsIntelligenceCategory, EarningsSnapshotDto[]>;
   items: EarningsSnapshotDto[];
   warnings: string[];
+  provenance: EarningsProvenanceSummary;
 }
 
 export interface EarningsFundamentalInput {
@@ -91,6 +107,7 @@ export interface EarningsFundamentalInput {
   netIncome: number | null;
   periodType: string;
   periodEndDate: Date;
+  officialResultDate?: Date | null;
   source: string;
   validatedAt?: Date | null;
   ingestionTimestamp?: Date | null;
@@ -127,11 +144,13 @@ export interface EarningsSnapshotCalculationInput {
   deliverySnapshots: EarningsDeliveryInput[];
 }
 
-export type EarningsSnapshotUpsertInput = Omit<EarningsSnapshotDto, 'id' | 'snapshotDate' | 'dataThroughDate' | 'resultDate'> & {
+export type EarningsSnapshotUpsertInput = Omit<EarningsSnapshotDto, 'id' | 'snapshotDate' | 'dataThroughDate' | 'resultDate' | 'periodEndDate' | 'validatedAt'> & {
   snapshotDate: Date;
   dataThroughDate: Date | null;
   stockId: string;
   scopeRegion: string;
   scopeAssetType: string;
   resultDate: Date | null;
+  periodEndDate: Date | null;
+  validatedAt: Date | null;
 };

@@ -1418,6 +1418,93 @@ describe('MarketDataFoundationService syncV1', () => {
     }));
   });
 
+  it('keeps scheduled IN/STOCK sync warning-only when the expected NSE file is not available and uses latest stored dataThroughDate', async () => {
+    const repository = {
+      latestStoredTradingDateForRegion: jest.fn().mockResolvedValue('2026-05-26'),
+      getSyncState: jest.fn().mockResolvedValue(null),
+      upsertSyncState: jest.fn().mockResolvedValue({}),
+      upsertSourceFileImport: jest.fn(),
+      storeHistoricalBulk: jest.fn(),
+      listActiveStockSyncTasks: jest.fn().mockResolvedValue([
+        {
+          id: 'reliance-id',
+          symbol: 'RELIANCE',
+          providerSymbol: 'RELIANCE.NS',
+          sourceSymbol: 'RELIANCE',
+          displaySymbol: 'RELIANCE',
+          exchange: 'NSE',
+        },
+      ]),
+    };
+    const service = new MarketDataFoundationService(repository as any, {
+      inferRegion: jest.fn().mockReturnValue({ region: 'IN', exchange: 'NSE' }),
+    } as any);
+    jest.spyOn(service, 'importNseCmUdiffDaily').mockResolvedValue(nseImportSummary('2026-05-27', {
+      status: 'NOT_AVAILABLE',
+      sourceName: 'NSE_UDIFF_CM_BHAVCOPY',
+      fileName: 'BhavCopy_NSE_CM_0_0_0_20260527_F_0000.csv.zip',
+      fileUrl: 'https://nsearchives.nseindia.com/content/cm/BhavCopy_NSE_CM_0_0_0_20260527_F_0000.csv.zip',
+      sourceFileImportId: 'nse-unavailable-import-1',
+      sourceFingerprint: null,
+      rowsRead: 0,
+      rowsParsed: 0,
+      rowsInserted: 0,
+      rowsUpdated: 0,
+      rowsNoOp: 0,
+      rowsSkipped: 0,
+      warningCount: 1,
+      warnings: ['NSE CM UDiFF file is not available yet (HTTP 404).'],
+      errors: [],
+      changedSymbols: [],
+      downstreamSymbols: [],
+    }) as any);
+
+    const summary = await service.syncScheduledRegion('IN', {
+      assetType: 'STOCK',
+      now: new Date('2026-05-27T18:00:00.000Z'),
+      skipWeekends: false,
+    });
+
+    expect(summary).toMatchObject({
+      tradingDate: '2026-05-27',
+      dataThroughDate: '2026-05-26',
+      rowsReceived: 0,
+      rowsInserted: 0,
+      rowsUpdated: 0,
+      rowsNoOp: 0,
+      changedInstrumentIds: [],
+      downstreamInstrumentIds: [],
+      changedInstrumentCount: 0,
+      dqStageEligible: false,
+      warningCount: 2,
+      warnings: expect.arrayContaining([
+        expect.stringContaining('not available yet'),
+        expect.stringContaining('using latest stored dataThroughDate 2026-05-26'),
+      ]),
+      errors: [],
+      officialEodBulk: expect.objectContaining({
+        attempted: true,
+        targetTradingDate: '2026-05-27',
+        sourceFingerprint: null,
+        fallbackReason: 'OFFICIAL_EOD_NOT_AVAILABLE',
+      }),
+    });
+    expect(summary.sourceFingerprint).toEqual(expect.stringContaining('scheduled-region:'));
+    expect(repository.upsertSyncState).toHaveBeenLastCalledWith(expect.objectContaining({
+      region: 'IN',
+      assetType: 'STOCK',
+      tradingDate: '2026-05-27',
+      status: 'SYNCED',
+      summary: expect.objectContaining({
+        dataThroughDate: '2026-05-26',
+        errors: [],
+        warnings: expect.arrayContaining([
+          expect.stringContaining('using latest stored dataThroughDate 2026-05-26'),
+        ]),
+      }),
+    }));
+  });
+
   it('uses the NSE all-index import path for scheduled daily IN/INDEX syncs', async () => {
     const repository = {
       latestStoredTradingDateForRegion: jest.fn()
@@ -2806,11 +2893,11 @@ describe('MarketDataFoundationService syncV1', () => {
       provider_fallback_state: 'PROVIDER_SUPPORTED',
     });
     expect(bySymbol.get('HISTORY')).toMatchObject({
-      trusted_baseline_residual_state: 'REQUIRED_HISTORY_INCOMPLETE',
+      trusted_baseline_residual_state: 'REVIEW_READY',
       required_history_status: 'INCOMPLETE',
     });
     expect(bySymbol.get('LISTING')).toMatchObject({
-      trusted_baseline_residual_state: 'LISTING_DATE_MISSING_REQUIRED_15Y',
+      trusted_baseline_residual_state: 'CATALOG_IDENTITY_REPAIR_REQUIRED',
       listing_date_status: 'MISSING_USED_15_YEAR_TARGET',
     });
     expect(bySymbol.get('ZERO')).toMatchObject({
@@ -3571,7 +3658,7 @@ describe('MarketDataFoundationService syncV1', () => {
 
 
 
-  it('excludes provider-supported stocks from trusted review until required 15-year coverage exists', async () => {
+  it('allows provider-supported stocks into trusted Lite review with current 120-bar OHLCV evidence', async () => {
     const repository = {
       listStocksForUniverseHealth: jest.fn().mockResolvedValue([
         {
@@ -3613,11 +3700,10 @@ describe('MarketDataFoundationService syncV1', () => {
 
     const result = await service.trustedReviewUniverseHealth({ region: 'IN', assetType: 'STOCK' });
 
-    expect(result.trustedCount).toBe(0);
-    expect(result.excludedCounts.requiredHistoryIncomplete).toBe(1);
-    expect(result.warnings).toEqual(expect.arrayContaining([
-      expect.stringContaining('15 years of daily OHLCV'),
-    ]));
+    expect(result.trustedCount).toBe(1);
+    expect(result.excludedCounts.requiredHistoryIncomplete).toBe(0);
+    expect(result.excludedCounts.insufficientBarsUnder252).toBe(0);
+    expect(result.warnings.join(' ')).not.toMatch(/15 years of daily OHLCV/);
   });
 
   it('reports read-only active stock missing-data diagnostics with expected-null and identity mismatch samples', async () => {
@@ -4037,7 +4123,7 @@ describe('MarketDataFoundationService syncV1', () => {
     }
   });
 
-  it('records a failed NSE UDiFF import instead of throwing when the official startup file is unavailable', async () => {
+  it('records a not-available NSE UDiFF import instead of failing when the official file is unavailable', async () => {
     const previousFetch = global.fetch;
     global.fetch = jest.fn().mockResolvedValue({
       ok: false,
@@ -4047,7 +4133,7 @@ describe('MarketDataFoundationService syncV1', () => {
     }) as any;
     const repository = {
       findSourceFileImportByKey: jest.fn().mockResolvedValue(null),
-      upsertSourceFileImport: jest.fn().mockResolvedValue({ id: 'nse-failed-import-1', status: 'FAILED' }),
+      upsertSourceFileImport: jest.fn().mockResolvedValue({ id: 'nse-unavailable-import-1', status: 'NOT_AVAILABLE' }),
       storeHistoricalBulk: jest.fn(),
     };
     const service = new MarketDataFoundationService(repository as any, {} as any);
@@ -4056,21 +4142,24 @@ describe('MarketDataFoundationService syncV1', () => {
       const result = await service.importNseCmUdiffDaily({ tradingDate: '2026-06-01' });
 
       expect(result).toMatchObject({
-        status: 'FAILED',
+        status: 'NOT_AVAILABLE',
         source: 'NSE',
         segment: 'CM',
         tradingDate: '2026-06-01',
-        sourceFileImportId: 'nse-failed-import-1',
+        sourceFileImportId: 'nse-unavailable-import-1',
+        sourceFingerprint: null,
         rowsRead: 0,
         rowsParsed: 0,
         rowsInserted: 0,
         rowsSkipped: 0,
-        errors: ['HTTP 404'],
+        warningCount: 1,
+        warnings: [expect.stringContaining('not available yet')],
+        errors: [],
       });
       expect(repository.upsertSourceFileImport).toHaveBeenCalledWith(expect.objectContaining({
         source: 'NSE',
         segment: 'CM',
-        status: 'FAILED',
+        status: 'NOT_AVAILABLE',
         rowsRaw: 0,
         rowsAccepted: 0,
         rowsRejected: 0,

@@ -12,6 +12,26 @@ export type StrategyCategory = 'ENTRY' | 'EXIT' | 'FILTER' | 'GATE' | 'RISK' | '
 export type StrategyRuleKind = 'REQUIRES' | 'BLOCKS' | 'SCORES' | 'WARNS';
 export type StrategyProofStatus = 'PROVEN' | 'LIMITED' | 'UNPROVEN' | 'BLOCKED' | 'MISSING';
 export type StrategySampleSufficiency = 'SUFFICIENT' | 'LOW_SAMPLE' | 'INSUFFICIENT' | 'NOT_APPLICABLE';
+export type StrategyDefinitionSource = 'PERSISTED' | 'REGISTRY_FALLBACK';
+export type StrategyDefinitionProviderSource = 'PERSISTED' | 'MIXED' | 'REGISTRY_FALLBACK';
+export type StrategyDefinitionDriftType =
+  | 'MISSING_PERSISTED_DEFINITION'
+  | 'PERSISTED_VERSION_DIFFERS_FROM_REGISTRY'
+  | 'CHECKSUM_MISMATCH'
+  | 'PERSISTED_DEFINITION_NOT_IN_REGISTRY'
+  | 'PERSISTENCE_READ_FAILED';
+export type StrategyDefinitionDriftSeverity = 'INFO' | 'WARN';
+
+export interface StrategyDefinitionDrift {
+  type: StrategyDefinitionDriftType;
+  severity: StrategyDefinitionDriftSeverity;
+  strategyCode: string;
+  persistedVersion?: string;
+  registryVersion?: string;
+  persistedChecksum?: string;
+  registryChecksum?: string;
+  message: string;
+}
 
 export interface StrategyRuleDeclaration {
   code: string;
@@ -43,6 +63,12 @@ export interface StrategyDefinition {
   riskRules: StrategyRuleDeclaration[];
   marketGateRules: StrategyRuleDeclaration[];
   parameters: Record<string, unknown>;
+  strategyRating?: Record<string, unknown> | null;
+  readinessLabel?: StrategyReadinessLabel;
+  checksum?: string;
+  effectiveAt?: string;
+  definitionSource?: StrategyDefinitionSource;
+  definitionDrift?: StrategyDefinitionDrift[];
   explanationTemplate: string;
   examples: {
     triggers: string[];
@@ -129,6 +155,13 @@ export interface StrategySignalOutput {
   eligibleForSignalGeneration: boolean;
   eligibleForBacktest: boolean;
   eligibleForAutomationFuture: boolean;
+}
+
+export interface StrategyFrameworkContextEvaluation {
+  definition: StrategyDefinition;
+  result: StrategySignalOutput;
+  definitionSource?: StrategyDefinitionSource;
+  definitionDrift: StrategyDefinitionDrift[];
 }
 
 export interface StrategyEvaluator {
@@ -318,6 +351,14 @@ export interface StrategyFrameworkHealth {
   activeStrategiesCount: number;
   strategiesWithBacktestResults: number;
   missingPerformanceCount: number;
+  definitionSource: StrategyDefinitionProviderSource;
+  persistedDefinitionsCount: number;
+  registryDefinitionsCount: number;
+  fallbackDefinitionsCount: number;
+  definitionDriftStatus: 'OK' | 'DRIFT_DETECTED' | 'PERSISTENCE_UNAVAILABLE';
+  definitionDrift: StrategyDefinitionDrift[];
+  definitionWarnings: string[];
+  persistenceReadFailed: boolean;
 }
 
 export interface StrategyModelResponse {
@@ -328,6 +369,18 @@ export interface StrategyModelResponse {
   ratingMethodology: string[];
   ruleModel: string[];
   disclaimer: string;
+}
+
+export interface StrategyDefinitionProviderResult {
+  definitions: StrategyDefinition[];
+  source: StrategyDefinitionProviderSource;
+  drift: StrategyDefinitionDrift[];
+  registryDefinitionsCount: number;
+  persistedDefinitionsCount: number;
+  fallbackDefinitionsCount: number;
+  persistenceReadFailed: boolean;
+  persistenceFailureReason?: string;
+  warnings: string[];
 }
 
 export type StrategySignalItem = SignalItem;

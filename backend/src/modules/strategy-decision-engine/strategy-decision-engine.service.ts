@@ -6,8 +6,13 @@ import { DataQualityEngineService } from '../data-quality-engine';
 import { SmartMoneyIntelligenceService } from '../smart-money-intelligence';
 import { PortfolioManagementService } from '../portfolio-management';
 import { WatchlistManagementService } from '../watchlist-management';
-import { StrategyFrameworkEvaluator, StrategyFrameworkRegistry, StrategyFrameworkService } from '../strategy-framework';
-import type { StrategyContext, StrategySignalOutput } from '../strategy-framework';
+import { StrategyFrameworkService } from '../strategy-framework';
+import type {
+  StrategyContext,
+  StrategyDefinition,
+  StrategyFrameworkContextEvaluation,
+  StrategySignalOutput,
+} from '../strategy-framework';
 import type { SignalResultDto } from '../signal-generation-engine';
 import { StrategyDecisionEngineRepository } from './strategy-decision-engine.repository';
 import type {
@@ -39,6 +44,8 @@ type StrategyEvaluationBatchContext = {
   smartMoneyByInstrumentId: Map<string, any>;
 };
 
+type StrategyDecisionFrameworkService = Pick<StrategyFrameworkService, 'list' | 'evaluateContextWithDefinitions' | 'performance'>;
+
 export class StrategyDecisionEngineService {
   constructor(
     private readonly repository = new StrategyDecisionEngineRepository(),
@@ -50,8 +57,7 @@ export class StrategyDecisionEngineService {
     private readonly smartMoneyService = new SmartMoneyIntelligenceService(),
     private readonly portfolioService = new PortfolioManagementService(),
     private readonly watchlistService = new WatchlistManagementService(),
-    private readonly strategyRegistry = new StrategyFrameworkRegistry(),
-    private readonly strategyFrameworkService = new StrategyFrameworkService()
+    private readonly strategyFrameworkService: StrategyDecisionFrameworkService = new StrategyFrameworkService()
   ) {}
 
   async marketGate(region?: string): Promise<MarketGateResponse> {
@@ -157,7 +163,7 @@ export class StrategyDecisionEngineService {
       : await this.marketGate(request.region);
     const instruments = await this.getEvaluationInstruments(instrumentIds);
     const instrumentsById = new Map(instruments.map((instrument: any) => [instrument.id, instrument]));
-    const strategies = this.strategiesForRequest(request);
+    const strategies = await this.strategiesForRequest(request);
     const portfolio = request.portfolioId
       ? await this.portfolioService.getPortfolioDetail(request.portfolioId).catch(() => null)
       : null;
@@ -253,7 +259,7 @@ export class StrategyDecisionEngineService {
   }
 
   async model() {
-    const strategies = this.strategyRegistry.list();
+    const strategies = await this.strategyFrameworkService.list({});
     return {
       modelVersion: MODEL_VERSION,
       strategies: strategies.map((strategy) => ({
@@ -264,7 +270,11 @@ export class StrategyDecisionEngineService {
         style: strategy.style,
         status: strategy.status,
         version: strategy.version,
+        readinessLabel: strategy.readinessLabel ?? null,
+        strategyRating: strategy.strategyRating ?? null,
         evaluationSupported: this.isReviewStrategy(strategy),
+        strategyDefinitionSource: strategy.definitionSource ?? null,
+        strategyDefinitionDrift: strategy.definitionDrift ?? [],
         thresholds: {
           tradeCandidate: Number(strategy.parameters.minScore ?? 70),
           watch: 50,
@@ -436,15 +446,25 @@ export class StrategyDecisionEngineService {
     ctx: any,
     strategyRatings?: Map<string, Promise<StrategyDecisionDto['strategyRating']>>
   ): Promise<StrategyDecisionDto | null> {
-    const definition = this.strategyRegistry.get(strategyName);
-    if (!definition) return null;
     const strategyContext = this.toStrategyFrameworkContext(ctx);
-    const evaluator = new StrategyFrameworkEvaluator(definition);
-    const frameworkResult = definition.category === 'EXIT'
-      ? evaluator.evaluateExit(strategyContext)
-      : evaluator.evaluateEntry(strategyContext);
-    const rating = await this.latestStrategyRating(definition.code, strategyContext.region || 'IN', strategyContext.assetType || 'STOCK', strategyRatings);
-    return this.adaptFrameworkResult(ctx, frameworkResult, rating);
+    const evaluation = await this.resolveFrameworkEvaluation(strategyName, strategyContext);
+    if (!evaluation) return null;
+    const rating = await this.latestStrategyRating(
+      evaluation.definition,
+      strategyContext.region || 'IN',
+      strategyContext.assetType || 'STOCK',
+      strategyRatings
+    );
+    return this.adaptFrameworkResult(ctx, evaluation.result, evaluation.definition, rating);
+  }
+
+  private async resolveFrameworkEvaluation(
+    strategyName: StrategyName,
+    strategyContext: StrategyContext
+  ): Promise<StrategyFrameworkContextEvaluation | null> {
+    if (typeof this.strategyFrameworkService.evaluateContextWithDefinitions !== 'function') return null;
+    const [evaluation] = await this.strategyFrameworkService.evaluateContextWithDefinitions(strategyContext, String(strategyName || '').trim().toUpperCase());
+    return evaluation ?? null;
   }
 
   private toStrategyFrameworkContext(ctx: any): StrategyContext {
@@ -500,7 +520,12 @@ export class StrategyDecisionEngineService {
     };
   }
 
-  private adaptFrameworkResult(ctx: any, result: StrategySignalOutput, rating: StrategyDecisionDto['strategyRating']): StrategyDecisionDto {
+  private adaptFrameworkResult(
+    ctx: any,
+    result: StrategySignalOutput,
+    definition: StrategyDefinition,
+    rating: StrategyDecisionDto['strategyRating']
+  ): StrategyDecisionDto {
     const mapped = this.mapFrameworkDecision(result);
     const dataGaps = [...new Set([...(ctx.dataGaps || []), ...result.dataGaps])];
     const warnings = [...result.warnings];
@@ -544,8 +569,9 @@ export class StrategyDecisionEngineService {
       result.reasons,
       blockers,
       warnings,
-      [...new Set(dataGaps)]
-    , {
+      [...new Set(dataGaps)],
+      {
+      strategyName: definition.name,
       strategyVersion: result.strategyVersion,
       frameworkBacked: true,
       frameworkDecision: result.decision,
@@ -555,7 +581,9 @@ export class StrategyDecisionEngineService {
       invalidationRulesTriggered: result.invalidationRulesTriggered,
       noiseFiltersTriggered: result.noiseFiltersTriggered,
       strategyRating: rating,
-      readinessLabel: rating?.readinessLabel || null,
+      readinessLabel: rating?.readinessLabel || definition.readinessLabel || null,
+      strategyDefinitionSource: definition.definitionSource ?? null,
+      strategyDefinitionDrift: definition.definitionDrift ?? [],
     });
   }
 
@@ -571,23 +599,40 @@ export class StrategyDecisionEngineService {
   }
 
   private async latestStrategyRating(
-    strategyCode: string,
+    definition: StrategyDefinition,
     region: string,
     assetType: string,
     cache?: Map<string, Promise<StrategyDecisionDto['strategyRating']>>
   ): Promise<StrategyDecisionDto['strategyRating']> {
+    const definitionRating = this.ratingFromDefinition(definition);
+    if (definitionRating) return definitionRating;
+    const strategyCode = definition.code;
     const key = `${strategyCode}|${region}|${assetType}`;
     if (cache?.has(key)) return cache.get(key)!;
+    if (typeof this.strategyFrameworkService.performance !== 'function') return null;
     const promise = this.strategyFrameworkService.performance(strategyCode, { region, assetType }).catch(() => []).then((summaries) => {
-    const latest = summaries[0];
-    return latest ? {
-      ratingScore: latest.ratingScore,
-      ratingGrade: latest.ratingGrade,
-      readinessLabel: latest.readinessLabel,
-    } : null;
+      const latest = summaries[0];
+      return latest ? {
+        ratingScore: latest.ratingScore,
+        ratingGrade: latest.ratingGrade,
+        readinessLabel: latest.readinessLabel || definition.readinessLabel,
+      } : null;
     });
     cache?.set(key, promise);
     return promise;
+  }
+
+  private ratingFromDefinition(definition: StrategyDefinition): StrategyDecisionDto['strategyRating'] {
+    const raw = definition.strategyRating;
+    if (!raw || typeof raw !== 'object') return null;
+    const ratingScore = Number((raw as any).ratingScore ?? (raw as any).score);
+    const ratingGrade = String((raw as any).ratingGrade ?? (raw as any).grade ?? '').trim().toUpperCase();
+    if (!Number.isFinite(ratingScore) || !ratingGrade) return null;
+    return {
+      ratingScore: Math.round(ratingScore),
+      ratingGrade,
+      readinessLabel: definition.readinessLabel ?? (String((raw as any).readinessLabel || '') || undefined),
+    };
   }
 
   private latestPersistedCalibration(instrumentId: string) {
@@ -980,7 +1025,7 @@ export class StrategyDecisionEngineService {
     blockers: string[],
     warnings: string[],
     dataGaps: string[],
-    frameworkMetadata: Partial<Pick<StrategyDecisionDto, 'strategyVersion' | 'frameworkBacked' | 'frameworkDecision' | 'frameworkAction' | 'entryRulesPassed' | 'exitRulesTriggered' | 'invalidationRulesTriggered' | 'noiseFiltersTriggered' | 'strategyRating' | 'readinessLabel'>> = {}
+    frameworkMetadata: Partial<Pick<StrategyDecisionDto, 'strategyName' | 'strategyVersion' | 'frameworkBacked' | 'frameworkDecision' | 'frameworkAction' | 'entryRulesPassed' | 'exitRulesTriggered' | 'invalidationRulesTriggered' | 'noiseFiltersTriggered' | 'strategyRating' | 'readinessLabel' | 'strategyDefinitionSource' | 'strategyDefinitionDrift'>> = {}
   ): StrategyDecisionDto {
     const invalidationRules = [
       'Market gate closes (CLOSED status).',
@@ -1077,13 +1122,13 @@ export class StrategyDecisionEngineService {
     return confidence;
   }
 
-  private strategiesForRequest(request: StrategyEvaluateRequest): StrategyName[] {
+  private async strategiesForRequest(request: StrategyEvaluateRequest): Promise<StrategyName[]> {
     if (request.strategy !== 'ALL') return [request.strategy];
-    return this.reviewStrategyDefinitions().map((strategy) => strategy.code);
+    return (await this.reviewStrategyDefinitions()).map((strategy) => strategy.code);
   }
 
-  private reviewStrategyDefinitions() {
-    return this.strategyRegistry.active().filter((strategy) => this.isReviewStrategy(strategy));
+  private async reviewStrategyDefinitions() {
+    return (await this.strategyFrameworkService.list({})).filter((strategy) => this.isReviewStrategy(strategy));
   }
 
   private isReviewStrategy(strategy: { status: string; category: string }) {

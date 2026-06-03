@@ -186,6 +186,8 @@ model EarningsIntelligenceSnapshot {
   scopeAssetType     String
   resultDate         DateTime?
   resultDateSource   String   @default("UNKNOWN")
+  periodEndDate      DateTime?
+  validatedAt        DateTime?
   daysToResult       Int?
   revenueGrowth      Float?
   profitGrowth       Float?
@@ -195,6 +197,7 @@ model EarningsIntelligenceSnapshot {
   accelerationScore  Float
   reasonTags         Json     @default("[]")
   riskTags           Json     @default("[]")
+  warnings           Json     @default("[]")
   freshness          String
   categories         Json     @default("[]")
   calculationVersion String   @default("earnings-intelligence-v1")
@@ -1018,6 +1021,7 @@ model StrategyDecisionResult {
   country          String?
   exchange         String?
   strategy         String   // TREND_MOMENTUM, PULLBACK_IN_UPTREND, DEFENSIVE_EXIT
+  strategyName     String?
   decision         String   // TRADE_CANDIDATE, WATCH, WAIT, AVOID, EXIT_CANDIDATE, etc.
   action           String   // CONSIDER_ENTRY, WAIT_FOR_PULLBACK, etc.
   decisionScore    Int
@@ -1037,9 +1041,12 @@ model StrategyDecisionResult {
   frameworkAction  String?
   entryRulesPassed Json?
   exitRulesTriggered Json?
+  invalidationRulesTriggered Json?
   noiseFiltersTriggered Json?
   strategyRating   Json?
   readinessLabel   String?
+  strategyDefinitionSource String?
+  strategyDefinitionDrift Json?
   modelVersion     String   @default("strategy-decision-v1")
   generatedAt      DateTime @default(now())
   generatedDate    DateTime // Normalized to UTC midnight for idempotency
@@ -1050,31 +1057,39 @@ model StrategyDecisionResult {
   @@index([instrumentId])
   @@index([portfolioId])
   @@index([strategy])
+  @@index([strategyDefinitionSource])
   @@map("strategy_decision_results")
 }
 
 model StrategyDefinition {
-  id               String   @id @default(cuid())
-  code             String   @unique
-  name             String
-  description      String
-  category         String
-  style            String
-  timeframe        String
-  assetTypes       Json
-  supportedRegions Json
-  version          String
-  status           String
-  parameters       Json
-  entryRules       Json
-  exitRules        Json
-  noiseFilters     Json
-  riskRules        Json
-  requiredInputs   Json
-  marketGateRules  Json
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id                String   @id @default(cuid())
+  strategyCode      String
+  name              String
+  description       String
+  category          String
+  style             String
+  timeframe         String
+  assetTypes        Json
+  supportedRegions  Json
+  strategyVersion   String
+  status            String
+  parameters        Json
+  entryRules        Json
+  exitRules         Json
+  invalidationRules Json     @default("[]")
+  noiseFilters      Json
+  riskRules         Json
+  requiredInputs    Json
+  marketGateRules   Json
+  strategyRating    Json?
+  readinessLabel    String   @default("RESEARCH_ONLY")
+  checksum          String   @default("LEGACY_UNCHECKED")
+  effectiveAt       DateTime @default(now())
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
+  @@unique([strategyCode, strategyVersion])
+  @@index([strategyCode])
   @@index([status])
   @@index([category])
   @@index([style])
@@ -1299,15 +1314,24 @@ model SignalPositionLedgerEntry {
   currentReturnPercent      Float?
   currentReturnStatus       String   @default("UNAVAILABLE")
   currentDataQualityStatus  String?
+  lifecycleEvidenceStatus   String   @default("ACTIVE_ENTRY")
   trustEvidenceStatus       String   @default("SOURCE_PROVEN_PRICE_UNAVAILABLE")
   calibrationEvidenceStatus String   @default("UNAVAILABLE")
   displayWarnings           Json     @default("[]")
   exitSignalId              String?
+  exitStrategyId            String?
+  exitStrategyVersion       String?
+  exitSourceDecisionId      String?
   exitTriggerTimestamp      DateTime?
   exitTriggerPrice          Float?
+  closePriceStatus          String   @default("UNAVAILABLE")
   exitReasonSummary         String?
   exitRuleId                String?
+  exitRuleIds               Json     @default("[]")
   exitDecision              String?
+  invalidationSourceDecisionId String?
+  invalidationRuleIds       Json     @default("[]")
+  invalidationTimestamp     DateTime?
   closedAt                  DateTime?
   lastEvaluatedAt           DateTime?
   createdAt                 DateTime @default(now())

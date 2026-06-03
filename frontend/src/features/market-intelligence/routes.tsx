@@ -9,9 +9,11 @@ import {
   StockInterestRadarPage,
   TraderSetupRadarPage,
 } from './components/MarketIntelligencePages';
+import { DailyReviewShortlistPage } from './components/DailyReviewShortlistPage';
 
 export const marketIntelligenceRoutes: RouteObject[] = [
   { path: 'market-pulse', element: <MarketPulsePage /> },
+  { path: 'daily-review-shortlist', element: <DailyReviewShortlistPage /> },
   { path: 'stock-interest-radar', element: <StockInterestRadarPage /> },
   { path: 'earnings-intelligence', element: <EarningsIntelligencePage /> },
   { path: 'compounder-radar', element: <CompounderRadarPage /> },

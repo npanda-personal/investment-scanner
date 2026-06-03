@@ -50,41 +50,47 @@ const groupTabs: Array<{ key: keyof TodayReviewGroups; label: string }> = [
   { key: 'longReview', label: 'Long Review' },
   { key: 'exitRiskReview', label: 'Exit Risk / Short Review' },
   { key: 'watchOnly', label: 'Watch Only' },
+  { key: 'specialCases', label: 'Special Cases' },
   { key: 'blocked', label: 'Blocked' },
 ];
 
 export function TodayReviewPage() {
-  const { data, loading, error, reload, scope } = useTodayReview();
+  const { data, loading, error, scope } = useTodayReview();
   const [tab, setTab] = useState<keyof TodayReviewGroups>('longReview');
   const run = data?.run || null;
   const groups = data?.groups || emptyGroups();
+  const boardSelection = run ? sourceSnapshotForRun(run).boardSelection || null : null;
   const activeCandidates = candidatesForTab(groups, tab);
   const totals = useMemo(() => ({
     long: groups.longReview.length,
     exit: groups.exitRiskReview.length + groups.shortReview.length,
     watch: groups.watchOnly.length + groups.unproven.length + groups.insufficientData.length,
+    special: groups.specialCases.length,
     blocked: groups.blocked.length + groups.avoid.length,
+    strategyBacked: boardSelection?.strategyBackedCount || 0,
+    lite: boardSelection?.liteCount || 0,
+    suppressed: boardSelection?.suppressedCount || 0,
     warnings: run?.warnings.length || 0,
     missingTierContext: [
       ...groups.longReview,
       ...groups.shortReview,
       ...groups.exitRiskReview,
       ...groups.watchOnly,
+      ...groups.specialCases,
       ...groups.blocked,
       ...groups.avoid,
       ...groups.insufficientData,
       ...groups.unproven,
     ].filter(hasMissingTierContext).length,
-  }), [groups, run?.warnings.length]);
+  }), [boardSelection, groups, run?.warnings.length]);
 
   return (
     <Box className="page-container page-container--workspace">
       <Stack spacing={3}>
       <PageHeader
         title="Daily Review"
-        subtitle="Persisted research support shortlist built from trusted OHLCV coverage, supporting evidence, and trade-plan geometry. This page does not run review generation."
+        subtitle="Persisted research support shortlist built from trusted OHLCV coverage, entry trigger context, exit/invalidation evidence, data quality, and supporting evidence. This page does not run review generation."
         badges={<Chip label={`${scope.region} / ${scope.assetType}`} color="primary" variant="outlined" />}
-        secondaryActions={<Button onClick={() => void reload()} disabled={loading}>Reload snapshot</Button>}
       />
 
       {loading && (
@@ -94,10 +100,7 @@ export function TodayReviewPage() {
       )}
 
       {error && (
-        <Alert
-          severity="error"
-          action={<Button color="inherit" size="small" onClick={() => void reload()}>Retry</Button>}
-        >
+        <Alert severity="error">
           {error}
         </Alert>
       )}
@@ -122,14 +125,19 @@ export function TodayReviewPage() {
             <SummaryCard label="Long review candidates" value={totals.long} tone="success" />
             <SummaryCard label="Exit-risk review candidates" value={totals.exit} tone="warning" />
             <SummaryCard label="Watch only" value={totals.watch} tone="info" />
+            <SummaryCard label="Special cases" value={totals.special} tone="info" />
+            <SummaryCard label="Strategy-backed" value={totals.strategyBacked} tone="success" />
+            <SummaryCard label="Lite discovery" value={totals.lite} tone="default" />
+            <SummaryCard label="Suppressed" value={totals.suppressed} tone="warning" />
             <SummaryCard label="Blocked" value={totals.blocked} tone="error" />
             <SummaryCard label="Data gaps/warnings" value={totals.warnings} tone="default" />
             <SummaryCard label="Missing DQ tier context" value={totals.missingTierContext} tone="warning" />
           </Grid>
+          <BoardSelectionPanel run={run} />
           <ExclusionExplainabilityPanel run={run} />
 
           <Alert severity="info">
-            Signals and calibration are supporting evidence only. Promoted review candidates require trusted price data, enough OHLCV history, and valid trade-plan geometry.
+            Signals and calibration are supporting evidence only. Promoted review candidates require trusted price data, enough OHLCV history, entry trigger context, exit/invalidation evidence, and data quality.
           </Alert>
           <Alert severity="info">
             Data Quality tiers are read-only context from Data Quality Engine and never change Today Review ranking or promotion in this view.
@@ -150,7 +158,7 @@ export function TodayReviewPage() {
             <CardContent>
               {activeCandidates.length === 0 ? (
                 <Typography color="text.secondary">
-                  No candidates in this section for the current persisted run.
+                  {emptySectionExplanation(tab, run)}
                 </Typography>
               ) : (
                 <CandidateTable candidates={activeCandidates} />
@@ -228,7 +236,7 @@ function CoveragePanel({ run }: { run: TodayReviewRun }) {
             <Chip label={`Review mode: ${coverageValue(run, 'mode')}`} color={coverageValue(run, 'mode') === 'FULL_REVIEW' ? 'success' : coverageValue(run, 'mode') === 'LIMITED_REVIEW' ? 'warning' : 'default'} />
             <Chip label={`Trusted universe: ${formatNumber(Number(coverageValue(run, 'trustedCount') || 0))}`} variant="outlined" />
             <Chip label={`Catalog: ${formatNumber(Number(coverageValue(run, 'catalogCount') || 0))}`} variant="outlined" />
-            <Chip label={`Target session: ${reviewUniverse.targetTradingDate || 'Unavailable'}`} variant="outlined" />
+            <Chip label={`Review session: ${reviewUniverse.targetTradingDate || 'Unavailable'}`} variant="outlined" />
             <Chip label={`Required data-through: ${reviewUniverse.requiredDataThroughDate || 'Unavailable'}`} variant="outlined" />
             <Chip label={`Stored data-through: ${reviewUniverse.storedDataThroughDate || reviewUniverse.dataThroughDate || formatDate(run.dataThroughDate)}`} variant="outlined" />
             <Chip label={`Readiness decision: ${reviewReadiness.userDecision || 'WAIT'}`} variant="outlined" />
@@ -370,12 +378,59 @@ function SummaryCard({ label, value, tone }: { label: string; value: number; ton
   );
 }
 
+function BoardSelectionPanel({ run }: { run: TodayReviewRun }) {
+  const boardSelection = sourceSnapshotForRun(run).boardSelection || null;
+  if (!boardSelection) {
+    return (
+      <Alert severity="info">
+        Board contract metadata is unavailable for this persisted run. Legacy snapshots still use state-based grouping.
+      </Alert>
+    );
+  }
+  const sections: Array<{ key: keyof typeof boardSelection.quotas; label: string }> = [
+    { key: 'LONG_REVIEW', label: 'Long Review' },
+    { key: 'WATCH_ONLY', label: 'Watch Only' },
+    { key: 'EXIT_RISK', label: 'Exit / Short Risk' },
+    { key: 'SPECIAL_CASES', label: 'Special Cases' },
+  ];
+  return (
+    <Card variant="outlined">
+      <CardContent>
+        <Stack spacing={1.25}>
+          <Stack direction="row" spacing={1} alignItems="center" useFlexGap flexWrap="wrap">
+            <Typography variant="h6">Board Contract</Typography>
+            <Chip label={boardSelection.contractVersion} size="small" variant="outlined" />
+          </Stack>
+          <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+            {sections.map((section) => (
+              <Chip
+                key={section.key}
+                label={`${section.label}: ${boardSelection.displayedCounts[section.key] || 0}/${boardSelection.eligibleCounts[section.key] || 0} eligible; quota ${boardSelection.quotas[section.key] || 0}`}
+                variant="outlined"
+              />
+            ))}
+            <Chip label={`Strategy-backed: ${boardSelection.strategyBackedCount}`} color="success" variant="outlined" />
+            <Chip label={`Lite: ${boardSelection.liteCount}`} variant="outlined" />
+            <Chip label={`Suppressed: ${boardSelection.suppressedCount}`} color="warning" variant="outlined" />
+          </Stack>
+          {boardSelection.fillBackfillReasons.length > 0 && (
+            <Typography variant="body2" color="text.secondary">
+              {boardSelection.fillBackfillReasons.join(' ')}
+            </Typography>
+          )}
+        </Stack>
+      </CardContent>
+    </Card>
+  );
+}
+
 type SortDirection = 'asc' | 'desc';
 type SortKey =
   | 'rank'
   | 'symbol'
   | 'state'
   | 'setup'
+  | 'board'
   | 'entry'
   | 'exit'
   | 'confidence'
@@ -405,14 +460,17 @@ const todayReviewExportColumns: Array<{ label: string; value: (candidate: TodayR
   { label: 'Company', value: (candidate) => candidate.companyName },
   { label: 'State', value: (candidate) => stateLabel(candidate.state) },
   { label: 'Setup', value: (candidate) => candidate.setupType || candidate.strategyCode },
+  { label: 'Board Section', value: (candidate) => boardSectionLabel(candidate) },
+  { label: 'Board Source', value: (candidate) => boardSourceLabel(candidate) },
+  { label: 'Board Reason', value: (candidate) => candidate.boardReason },
   { label: 'Entry Evidence', value: (candidate) => formatEntry(candidate.tradePlanSnapshot as any) },
   { label: 'Confidence', value: (candidate) => confidenceDisplay(candidate).label },
   { label: 'Grade', value: (candidate) => candidate.grade },
   { label: 'Daily Tier', value: (candidate) => tierContextForCandidate(candidate).dailyReview.status },
   { label: 'Data Through', value: (candidate) => latestDataDate(candidate) },
   { label: 'Data Quality', value: dataQualityLabel },
-  { label: 'Reason Summary', value: (candidate) => candidate.reasonSummary },
-  { label: 'Blocker', value: blockerLabel },
+  { label: 'Reason Summary', value: (candidate) => safeReviewText(candidate.reasonSummary) },
+  { label: 'Blocker', value: (candidate) => safeReviewText(blockerLabel(candidate)) },
   { label: 'Strategy Code', value: (candidate) => candidate.strategyCode },
 ];
 
@@ -516,6 +574,13 @@ function CandidateTable({ candidates }: { candidates: TodayReviewCandidate[] }) 
       render: (candidate) => <EllipsisCell fullText={candidate.setupType || candidate.strategyCode} />,
     },
     {
+      id: 'board',
+      label: 'Board',
+      width: 230,
+      value: (candidate) => `${boardSectionLabel(candidate)} ${boardSourceLabel(candidate)} ${candidate.boardReason || ''}`,
+      render: (candidate) => <EllipsisCell fullText={`${boardSectionLabel(candidate)} / ${boardSourceLabel(candidate)} - ${candidate.boardReason || 'Standard board selection.'}`} />,
+    },
+    {
       id: 'entry',
       label: 'Entry evidence',
       width: 190,
@@ -606,15 +671,15 @@ function CandidateTable({ candidates }: { candidates: TodayReviewCandidate[] }) 
       id: 'reason',
       label: 'Reason',
       width: 320,
-      value: (candidate) => candidate.reasonSummary,
-      render: (candidate) => <EllipsisCell fullText={candidate.reasonSummary} />,
+      value: (candidate) => safeReviewText(candidate.reasonSummary),
+      render: (candidate) => <EllipsisCell fullText={safeReviewText(candidate.reasonSummary)} />,
     },
     {
       id: 'blocker',
       label: 'Blocker',
       width: 300,
-      value: (candidate) => blockerLabel(candidate),
-      render: (candidate) => <EllipsisCell fullText={blockerLabel(candidate)} />,
+      value: (candidate) => safeReviewText(blockerLabel(candidate)),
+      render: (candidate) => <EllipsisCell fullText={safeReviewText(blockerLabel(candidate))} />,
     },
   ], []);
   const tableMinWidth = useMemo(() => columns.reduce((total, column) => total + column.width, 0), [columns]);
@@ -939,6 +1004,9 @@ function searchableCandidateText(candidate: TodayReviewCandidate) {
     candidate.setupType,
     candidate.strategyCode,
     candidate.strategyVersion,
+    boardSectionLabel(candidate),
+    boardSourceLabel(candidate),
+    candidate.boardReason,
     candidate.grade,
     candidate.reasonSummary,
     candidate.blockers.join(' '),
@@ -1055,8 +1123,19 @@ function confidenceDisplay(candidate: TodayReviewCandidate) {
 function candidatesForTab(groups: TodayReviewGroups, tab: keyof TodayReviewGroups) {
   if (tab === 'exitRiskReview') return [...groups.exitRiskReview, ...groups.shortReview];
   if (tab === 'watchOnly') return [...groups.watchOnly, ...groups.unproven, ...groups.insufficientData];
+  if (tab === 'specialCases') return groups.specialCases;
   if (tab === 'blocked') return [...groups.blocked, ...groups.avoid];
   return groups[tab] || [];
+}
+
+function emptySectionExplanation(tab: keyof TodayReviewGroups, run: TodayReviewRun) {
+  const boardSelection = sourceSnapshotForRun(run).boardSelection || null;
+  const eligibleCounts = boardSelection?.eligibleCounts || {};
+  if (tab === 'longReview') return `No LONG_REVIEW rows were displayed. Eligible LONG_REVIEW candidates: ${formatNumber((eligibleCounts as any).LONG_REVIEW || 0)}.`;
+  if (tab === 'watchOnly') return `No WATCH_ONLY rows were displayed. Eligible WATCH_ONLY candidates: ${formatNumber((eligibleCounts as any).WATCH_ONLY || 0)}.`;
+  if (tab === 'exitRiskReview') return `No EXIT_RISK_REVIEW or SHORT_REVIEW rows were displayed. Eligible exit/short-risk candidates: ${formatNumber((eligibleCounts as any).EXIT_RISK || 0)}.`;
+  if (tab === 'specialCases') return `No SPECIAL_CASES rows matched existing overlap, ledger, Stock Interest, newly appeared, or high-quality missing-evidence rules. Eligible special cases: ${formatNumber((eligibleCounts as any).SPECIAL_CASES || 0)}.`;
+  return 'No candidates in this section for the current persisted run.';
 }
 
 function emptyGroups(): TodayReviewGroups {
@@ -1065,6 +1144,7 @@ function emptyGroups(): TodayReviewGroups {
     shortReview: [],
     exitRiskReview: [],
     watchOnly: [],
+    specialCases: [],
     blocked: [],
     avoid: [],
     insufficientData: [],
@@ -1074,6 +1154,18 @@ function emptyGroups(): TodayReviewGroups {
 
 function stateLabel(state: string) {
   return state.toLowerCase().split('_').map((part) => part[0]?.toUpperCase() + part.slice(1)).join(' ');
+}
+
+function boardSectionLabel(candidate: TodayReviewCandidate) {
+  return candidate.boardSection ? stateLabel(candidate.boardSection) : 'Legacy';
+}
+
+function boardSourceLabel(candidate: TodayReviewCandidate) {
+  if (!candidate.boardSourceType) return 'Unknown source';
+  if (candidate.boardSourceType === 'STRATEGY_BACKED') return 'Strategy-backed';
+  if (candidate.boardSourceType === 'LITE') return 'Lite';
+  if (candidate.boardSourceType === 'MIXED') return 'Mixed';
+  return 'Other';
 }
 
 function formatDate(value?: string | null) {
@@ -1110,9 +1202,9 @@ function formatEntry(plan: any) {
 }
 
 function formatStop(plan: any, candidate?: TodayReviewCandidate) {
-  if (candidate?.blockers?.[0]) return candidate.blockers[0];
+  if (candidate?.blockers?.[0]) return safeReviewText(candidate.blockers[0]);
   if (!plan?.stopLoss) return 'Unavailable';
-  return `${formatCurrency(Number(plan.stopLoss.price))}; ${plan.invalidationRules?.[0] || 'Invalidation unavailable'}`;
+  return `${formatCurrency(Number(plan.stopLoss.price))}; ${safeReviewText(plan.invalidationRules?.[0] || 'Invalidation unavailable')}`;
 }
 
 function gradeColor(grade: string) {
@@ -1137,4 +1229,31 @@ function tierColor(status: TierStatus): 'success' | 'warning' | 'error' | 'defau
   if (status === 'LIMITED') return 'warning';
   if (status === 'BLOCKED' || status === 'MISSING') return 'error';
   return 'default';
+}
+
+function safeReviewText(value: string) {
+  return String(value || '')
+    .replace(/PAPER_TEST_CANDIDATE/g, 'RESEARCH_REVIEW_CANDIDATE')
+    .replace(/READY_FOR_PAPER_REVIEW/g, 'RESEARCH_REVIEW_READY')
+    .replace(/Trade-plan proof-chain snapshot supports paper-review research\./gi, 'Exit and invalidation evidence is available for research review.')
+    .replace(/Paper review readiness is BLOCKED by the trade-plan snapshot\./gi, 'Exit/invalidation evidence is BLOCKED by the risk snapshot.')
+    .replace(/Reward\/risk is below the paper review threshold\./gi, 'Exit/invalidation evidence is incomplete for research review.')
+    .replace(/Reward\/risk is incomplete for paper review\./gi, 'Exit/invalidation evidence is incomplete for research review.')
+    .replace(/Trade-plan snapshot/gi, 'Exit/invalidation evidence snapshot')
+    .replace(/Trade plan has active blockers/gi, 'Exit/invalidation evidence has active blockers')
+    .replace(/Trade plan status/gi, 'Risk snapshot status')
+    .replace(/Trade plan/gi, 'Risk evidence')
+    .replace(/trade plan/gi, 'risk evidence')
+    .replace(/trade-plan/gi, 'risk-evidence')
+    .replace(/Stop loss/gi, 'Invalidation level')
+    .replace(/stop loss/gi, 'invalidation level')
+    .replace(/stop level/gi, 'invalidation level')
+    .replace(/paper-readiness/gi, 'research-readiness')
+    .replace(/paper review/gi, 'research review')
+    .replace(/paper-review/gi, 'research-review')
+    .replace(/reward\/risk/gi, 'exit/invalidation evidence')
+    .replace(/modeled reward/gi, 'modeled compatibility range')
+    .replace(/target\/reward/gi, 'exit/invalidation')
+    .replace(/target price/gi, 'compatibility price')
+    .replace(/price target/gi, 'compatibility price');
 }

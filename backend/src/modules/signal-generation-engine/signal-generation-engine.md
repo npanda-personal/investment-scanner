@@ -76,7 +76,7 @@ Composite score (0-100) is calculated from Technical, Momentum, and Fundamental 
 
 ## Strategy Framework Integration
 
-Raw signal generation remains owned here. Strategy Framework is consumed only as an opt-in strategy-aware enrichment path so existing signal behavior is preserved.
+Raw signal generation remains owned here. Strategy Framework is consumed only as an opt-in strategy-aware enrichment path so existing signal behavior is preserved. Signal Generation resolves strategy matching through the Strategy Framework service contract, which reads persisted strategy definitions first and uses registry fallback definitions only when persistence is empty or unavailable.
 
 Supported request/query flags:
 - `strategyCode`
@@ -89,7 +89,7 @@ Supported request/query flags:
 
 When enabled, signal results may include `strategyMatches[]` and `blockedStrategies[]` explaining which registered strategies matched or were blocked by noise filters/data gaps. These arrays are derived on demand and are not part of raw `SignalResult` persistence.
 
-`strategyMatches[]` includes `strategyCode`, `strategyName`, `strategyVersion`, `decision`, `score`, `confidence`, `reasons`, `entryRulesPassed`, `timeframe`, `readinessLabel`, and `ratingGrade`.
+`strategyMatches[]` includes `strategyCode`, `strategyName`, `strategyVersion`, `decision`, `score`, `confidence`, `reasons`, `entryRulesPassed`, `timeframe`, `readinessLabel`, `ratingGrade`, `strategyDefinitionSource`, and `strategyDefinitionDrift`. The definition source/drift fields propagate Strategy Framework provider diagnostics so callers can distinguish persisted definitions from registry fallback definitions.
 
 When a strategy-aware enrichment pass evaluates an ENTRY strategy against a local stored price row, the match may also include `triggerPriceEvidence`. This is compatibility-only evidence, not durable trigger persistence. It is marked `SOURCE_PROVEN` only when:
 
@@ -107,7 +107,7 @@ Strategy matching passes the signal row's `dataQualityEligibility` into Strategy
 
 When Strategy Framework matching is requested, Signal Generation uses persisted-only Market Context and Smart Money evidence when those module readers are available. It does not call on-demand Smart Money detail generation during signal list enrichment. Missing market, sector, or smart-money context remains visible as `blockedStrategies[].dataGaps` and must not be treated as healthy/supportive evidence.
 
-`blockedStrategies[]` includes `strategyCode`, `strategyName`, `strategyVersion`, `timeframe`, `category`, `blockers`, `warnings`, `dataGaps`, `noiseFiltersTriggered`, a compact `reason`, and unavailable `triggerPriceEvidence` when an explicit strategy was evaluated but cannot produce a source-proven entry trigger. This preserves explicit strategy metadata for support/filter strategies without counting them as entry matches.
+`blockedStrategies[]` includes `strategyCode`, `strategyName`, `strategyVersion`, `timeframe`, `category`, `blockers`, `warnings`, `dataGaps`, `noiseFiltersTriggered`, a compact `reason`, definition source/drift diagnostics, and unavailable `triggerPriceEvidence` when an explicit strategy was evaluated but cannot produce a source-proven entry trigger. This preserves explicit strategy metadata for support/filter strategies without counting them as entry matches.
 
 ## Trigger Contract Projection
 

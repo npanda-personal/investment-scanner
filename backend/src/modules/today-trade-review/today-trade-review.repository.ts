@@ -10,6 +10,14 @@ import type {
   TodayReviewSourceSnapshot,
 } from './today-trade-review.types';
 
+const LATEST_VISIBLE_RUN_PAGE_SIZE = 25;
+const LATEST_VISIBLE_RUN_MAX_SCAN_ROWS = 250;
+const FIXTURE_SOURCE_MARKERS = [
+  'TEST_CONNECTED_CHAIN',
+  'CONNECTED-CHAIN.SEEDED.INTEGRATION',
+  'CONNECTED-CHAIN-SEEDED',
+];
+
 export class TodayTradeReviewRepository implements TodayReviewRepositoryContract {
   constructor(private readonly db = prisma) {}
 
@@ -111,12 +119,21 @@ export class TodayTradeReviewRepository implements TodayReviewRepositoryContract
   }
 
   async latest(region: string, assetType: string): Promise<TodayReviewRunDto | null> {
-    const record = await this.db.todayReviewRun.findFirst({
-      where: { region, assetType, status: { in: ['COMPLETED', 'PARTIAL'] } },
-      orderBy: [{ runDate: 'desc' }, { updatedAt: 'desc' }],
-      include: { candidates: { orderBy: { rank: 'asc' } } },
-    });
-    return record ? this.toRunDto(record) : null;
+    let scanned = 0;
+    while (scanned < LATEST_VISIBLE_RUN_MAX_SCAN_ROWS) {
+      const records = await this.db.todayReviewRun.findMany({
+        where: { region, assetType, status: { in: ['COMPLETED', 'PARTIAL'] } },
+        orderBy: [{ runDate: 'desc' }, { updatedAt: 'desc' }],
+        take: LATEST_VISIBLE_RUN_PAGE_SIZE,
+        skip: scanned,
+        include: { candidates: { orderBy: { rank: 'asc' } } },
+      });
+      const record = records.find((item: any) => this.isTraderVisibleRun(item));
+      if (record) return this.toRunDto(record);
+      if (records.length < LATEST_VISIBLE_RUN_PAGE_SIZE) return null;
+      scanned += records.length;
+    }
+    return null;
   }
 
   async getRun(id: string): Promise<TodayReviewRunDto | null> {
@@ -184,6 +201,8 @@ export class TodayTradeReviewRepository implements TodayReviewRepositoryContract
   }
 
   private toCandidateDto(record: any): TodayReviewCandidateDto {
+    const sourceSignalSnapshot = this.nullableJson(record.sourceSignalSnapshot);
+    const boardMetadata = this.boardMetadataFromSnapshot(sourceSignalSnapshot);
     const dto: TodayReviewCandidateDto = {
       id: record.id,
       runId: record.runId,
@@ -205,11 +224,26 @@ export class TodayTradeReviewRepository implements TodayReviewRepositoryContract
       marketContextSnapshot: this.nullableJson(record.marketContextSnapshot),
       strategyProofSnapshot: this.nullableJson(record.strategyProofSnapshot),
       tradePlanSnapshot: this.nullableJson(record.tradePlanSnapshot),
-      sourceSignalSnapshot: this.nullableJson(record.sourceSignalSnapshot),
+      sourceSignalSnapshot,
+      boardSection: boardMetadata?.section || null,
+      boardSourceType: boardMetadata?.sourceType || null,
+      boardReason: boardMetadata?.reason || null,
+      boardContractVersion: boardMetadata?.contractVersion || null,
       createdAt: record.createdAt?.toISOString(),
       updatedAt: record.updatedAt?.toISOString(),
     };
     return { ...dto, explainability: this.candidateExplainability(dto) };
+  }
+
+  private boardMetadataFromSnapshot(sourceSignalSnapshot: Record<string, any> | null) {
+    const board = this.jsonObject(sourceSignalSnapshot?.todayReviewBoard);
+    if (!board.section && !board.sourceType && !board.reason && !board.contractVersion) return null;
+    return {
+      section: typeof board.section === 'string' ? board.section as any : null,
+      sourceType: typeof board.sourceType === 'string' ? board.sourceType as any : null,
+      reason: typeof board.reason === 'string' ? board.reason : null,
+      contractVersion: typeof board.contractVersion === 'string' ? board.contractVersion : null,
+    };
   }
 
   private runExplainability(
@@ -304,5 +338,20 @@ export class TodayTradeReviewRepository implements TodayReviewRepositoryContract
   private nullableJson(value: unknown): Record<string, any> | null {
     if (!value || value === Prisma.DbNull || value === Prisma.JsonNull) return null;
     return value as Record<string, any>;
+  }
+
+  private isTraderVisibleRun(record: any): boolean {
+    return !this.containsFixtureSourceMarker(record.sourceSnapshot);
+  }
+
+  private containsFixtureSourceMarker(value: unknown): boolean {
+    if (!value || value === Prisma.DbNull || value === Prisma.JsonNull) return false;
+    if (typeof value === 'string') {
+      const normalized = value.toUpperCase();
+      return FIXTURE_SOURCE_MARKERS.some((marker) => normalized.includes(marker));
+    }
+    if (Array.isArray(value)) return value.some((item) => this.containsFixtureSourceMarker(item));
+    if (typeof value === 'object') return Object.values(value as Record<string, unknown>).some((item) => this.containsFixtureSourceMarker(item));
+    return false;
   }
 }

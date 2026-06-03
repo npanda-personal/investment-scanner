@@ -9,6 +9,7 @@ import type {
   EarningsIntelligenceRefreshResult,
   EarningsIntelligenceResponse,
   EarningsPricePointInput,
+  EarningsProvenanceSummary,
   EarningsResultDateSource,
   EarningsSnapshotCalculationInput,
   EarningsSnapshotDto,
@@ -38,6 +39,7 @@ export class EarningsIntelligenceService {
         categories: this.emptyCategoryBuckets(),
         items: [],
         warnings: ['Earnings Intelligence snapshot is not ready yet. Run the backend refresh pipeline to materialize it.'],
+        provenance: this.provenanceSummary([]),
       };
     }
 
@@ -54,7 +56,8 @@ export class EarningsIntelligenceService {
       freshness: this.responseFreshness(latest.rows),
       categories: grouped,
       items,
-      warnings: latest.truncated ? ['Snapshot read was truncated at the backend safety limit.'] : [],
+      warnings: this.responseWarnings(latest.rows, latest.truncated),
+      provenance: this.provenanceSummary(latest.rows),
     };
   }
 
@@ -159,12 +162,13 @@ export class EarningsIntelligenceService {
     const annual = fundamentals.filter((record) => this.isAnnual(record.periodType));
     const latest = quarterly[0] || annual[0] || fundamentals[0] || null;
     const comparison = latest ? this.findComparisonRecord(latest, fundamentals) : null;
-    const actualResultDate = latest ? this.actualResultDate(latest) : null;
+    const periodEndDate = latest ? this.safeUtcDay(latest.periodEndDate) : null;
+    const validatedAt = latest ? this.safeUtcDay(latest.validatedAt ?? null) : null;
     const expectedResultDate = latest ? this.expectedResultDate(latest, quarterly.length > 0) : null;
-    const daysToResult = expectedResultDate ? this.daysBetween(input.snapshotDate, expectedResultDate) : null;
-    const upcomingResultDate = daysToResult !== null && daysToResult >= 0 && daysToResult <= UPCOMING_WINDOW_DAYS ? expectedResultDate : null;
-    const resultDate = upcomingResultDate || actualResultDate;
-    const resultDateSource: EarningsResultDateSource = upcomingResultDate ? 'ESTIMATED_FROM_PERIOD_CADENCE' : 'UNKNOWN';
+    const dateResolution = this.resolveResultDate(latest, expectedResultDate, input.snapshotDate);
+    const resultDate = dateResolution.resultDate;
+    const resultDateSource = dateResolution.resultDateSource;
+    const daysToResult = dateResolution.daysToResult;
     const revenueGrowth = this.growth(latest?.revenue ?? null, comparison?.revenue ?? null);
     const profitGrowth = this.growth(latest?.netIncome ?? null, comparison?.netIncome ?? null);
     const epsGrowth = this.growth(latest?.eps ?? null, comparison?.eps ?? null);
@@ -172,7 +176,8 @@ export class EarningsIntelligenceService {
     const consistencyScore = this.calculateConsistencyScore(fundamentals);
     const accelerationScore = this.calculateAccelerationScore(fundamentals);
     const deliveryInterest = this.deliveryInterest(input.deliverySnapshots);
-    const priceReaction = actualResultDate ? this.priceReaction(input.prices, actualResultDate) : null;
+    const reactionDate = resultDateSource === 'OFFICIAL_CALENDAR' ? resultDate : null;
+    const priceReaction = reactionDate ? this.priceReaction(input.prices, reactionDate) : null;
     const preResultPriceMove = this.priceMove(input.prices, 10);
     const freshness = this.freshness(input.snapshotDate, latest);
     const reasonTags = this.reasonTags({
@@ -186,7 +191,8 @@ export class EarningsIntelligenceService {
       deliveryInterest,
       priceReaction,
       preResultPriceMove,
-      upcoming: Boolean(upcomingResultDate),
+      upcoming: resultDateSource === 'ESTIMATED_FROM_PERIOD_CADENCE',
+      resultDateSource,
     });
     const riskTags = this.riskTags({
       latest,
@@ -201,10 +207,13 @@ export class EarningsIntelligenceService {
       priceReaction,
       prices: input.prices,
       estimatedResultDate: resultDateSource === 'ESTIMATED_FROM_PERIOD_CADENCE',
+      authoritativeResultDate: resultDateSource === 'OFFICIAL_CALENDAR',
     });
+    const warnings = this.rowWarnings(resultDateSource);
     const categories = this.categories({
       snapshotDate: input.snapshotDate,
-      actualResultDate,
+      resultDate,
+      resultDateSource,
       daysToResult,
       revenueGrowth,
       profitGrowth,
@@ -235,7 +244,9 @@ export class EarningsIntelligenceService {
       scopeAssetType: input.assetType,
       resultDate,
       resultDateSource,
-      daysToResult: upcomingResultDate ? daysToResult : null,
+      periodEndDate,
+      validatedAt,
+      daysToResult,
       revenueGrowth,
       profitGrowth,
       epsGrowth,
@@ -244,6 +255,7 @@ export class EarningsIntelligenceService {
       accelerationScore,
       reasonTags,
       riskTags,
+      warnings,
       freshness,
       categories,
     };
@@ -300,7 +312,8 @@ export class EarningsIntelligenceService {
 
   private categories(input: {
     snapshotDate: Date;
-    actualResultDate: Date | null;
+    resultDate: Date | null;
+    resultDateSource: EarningsResultDateSource;
     daysToResult: number | null;
     revenueGrowth: number | null;
     profitGrowth: number | null;
@@ -314,15 +327,19 @@ export class EarningsIntelligenceService {
     freshness: EarningsFreshness;
   }): EarningsIntelligenceCategory[] {
     const categories: EarningsIntelligenceCategory[] = [];
-    const recentResult = Boolean(input.actualResultDate && this.daysBetween(input.actualResultDate, input.snapshotDate) <= RECENT_RESULT_WINDOW_DAYS && input.actualResultDate <= input.snapshotDate);
-    const upcoming = input.daysToResult !== null && input.daysToResult >= 0 && input.daysToResult <= UPCOMING_WINDOW_DAYS;
+    const hasAuthoritativeResultDate = input.resultDateSource === 'OFFICIAL_CALENDAR';
+    const recentResult = Boolean(hasAuthoritativeResultDate && input.resultDate && this.daysBetween(input.resultDate, input.snapshotDate) <= RECENT_RESULT_WINDOW_DAYS && input.resultDate <= input.snapshotDate);
+    const upcoming = input.daysToResult !== null
+      && input.daysToResult >= 0
+      && input.daysToResult <= UPCOMING_WINDOW_DAYS
+      && ['OFFICIAL_CALENDAR', 'ESTIMATED_FROM_PERIOD_CADENCE'].includes(input.resultDateSource);
     if (upcoming) categories.push('UPCOMING_RESULTS');
     if (upcoming && (input.deliveryInterest || (input.preResultPriceMove !== null && input.preResultPriceMove >= 3))) {
       categories.push('PRE_RESULT_INTEREST');
     }
     if (recentResult && this.isWinner(input)) categories.push('RESULT_WINNERS');
     if (recentResult && this.isDisappointment(input)) categories.push('RESULT_DISAPPOINTMENTS');
-    if (input.priceReaction !== null && input.actualResultDate) categories.push('RESULT_REACTION_HISTORY');
+    if (input.priceReaction !== null && hasAuthoritativeResultDate) categories.push('RESULT_REACTION_HISTORY');
     if (input.freshness !== 'MISSING' && (input.consistencyScore >= 70 || input.accelerationScore >= 70 || categories.includes('PRE_RESULT_INTEREST') || categories.includes('RESULT_WINNERS'))) {
       categories.push('EARNINGS_WATCHLIST');
     }
@@ -369,6 +386,7 @@ export class EarningsIntelligenceService {
     priceReaction: number | null;
     preResultPriceMove: number | null;
     upcoming: boolean;
+    resultDateSource: EarningsResultDateSource;
   }): string[] {
     const tags: string[] = [];
     if (!input.latest) return tags;
@@ -385,6 +403,9 @@ export class EarningsIntelligenceService {
     if (input.preResultPriceMove !== null && input.preResultPriceMove >= 3) tags.push('PRE_RESULT_PRICE_INTEREST');
     if (input.priceReaction !== null && input.priceReaction >= 2) tags.push('POSITIVE_RESULT_REACTION');
     if (input.upcoming) tags.push('RESULT_WINDOW_ESTIMATED_FROM_PERSISTED_PERIODS');
+    if (input.resultDateSource === 'OFFICIAL_CALENDAR') tags.push('OFFICIAL_RESULT_DATE');
+    if (input.resultDateSource === 'PERIOD_END_DATE_FALLBACK') tags.push('RESULT_DATE_FROM_PERIOD_END_FALLBACK');
+    if (input.resultDateSource === 'VALIDATED_AT_FALLBACK') tags.push('RESULT_DATE_FROM_VALIDATION_TIMESTAMP_FALLBACK');
     return [...new Set(tags)];
   }
 
@@ -401,6 +422,7 @@ export class EarningsIntelligenceService {
     priceReaction: number | null;
     prices: EarningsPricePointInput[];
     estimatedResultDate: boolean;
+    authoritativeResultDate: boolean;
   }): string[] {
     const tags: string[] = [];
     if (!input.latest) tags.push('MISSING_EARNINGS_FUNDAMENTALS');
@@ -413,8 +435,20 @@ export class EarningsIntelligenceService {
     if (input.marginTrend !== null && input.marginTrend < 0) tags.push('MARGIN_COMPRESSION');
     if (input.consistencyScore > 0 && input.consistencyScore < 50) tags.push('LOW_EARNINGS_CONSISTENCY');
     if (input.prices.length === 0) tags.push('MISSING_PRICE_REACTION_DATA');
+    else if (!input.authoritativeResultDate) tags.push('PRICE_REACTION_REQUIRES_OFFICIAL_RESULT_DATE');
     else if (input.priceReaction === null) tags.push('INSUFFICIENT_RESULT_REACTION_WINDOW');
     return [...new Set(tags)];
+  }
+
+  private rowWarnings(resultDateSource: EarningsResultDateSource): string[] {
+    const warnings: string[] = [];
+    if (resultDateSource !== 'OFFICIAL_CALENDAR') warnings.push('OFFICIAL_CALENDAR_NOT_AVAILABLE');
+    if (resultDateSource === 'ESTIMATED_FROM_PERIOD_CADENCE') warnings.push('RESULT_DATE_ESTIMATED_FROM_PERIOD_CADENCE');
+    if (resultDateSource === 'PERIOD_END_DATE_FALLBACK') warnings.push('RESULT_DATE_USES_PERIOD_END_DATE_FALLBACK');
+    if (resultDateSource === 'VALIDATED_AT_FALLBACK') warnings.push('RESULT_DATE_USES_VALIDATED_AT_FALLBACK');
+    if (resultDateSource === 'UNKNOWN') warnings.push('RESULT_DATE_SOURCE_UNKNOWN');
+    if (resultDateSource !== 'OFFICIAL_CALENDAR') warnings.push('RESULT_REACTION_REQUIRES_OFFICIAL_RESULT_DATE');
+    return [...new Set(warnings)];
   }
 
   private deliveryInterest(deliverySnapshots: EarningsSnapshotCalculationInput['deliverySnapshots']): boolean {
@@ -448,7 +482,7 @@ export class EarningsIntelligenceService {
 
   private freshness(snapshotDate: Date, latest: EarningsFundamentalInput | null): EarningsFreshness {
     if (!latest) return 'MISSING';
-    const latestDate = this.actualResultDate(latest);
+    const latestDate = this.safeUtcDay(latest.periodEndDate);
     const ageDays = latestDate ? this.daysBetween(latestDate, snapshotDate) : Number.POSITIVE_INFINITY;
     if (ageDays <= 120) return 'FRESH';
     if (ageDays <= 240) return 'PARTIAL';
@@ -456,19 +490,27 @@ export class EarningsIntelligenceService {
   }
 
   private findComparisonRecord(latest: EarningsFundamentalInput, records: EarningsFundamentalInput[]): EarningsFundamentalInput | null {
+    const latestPeriodEnd = this.safeUtcDay(latest.periodEndDate);
+    if (!latestPeriodEnd) return null;
     const sameType = records
-      .filter((record) => record.id !== latest.id && record.periodType === latest.periodType && record.periodEndDate < latest.periodEndDate)
-      .sort((left, right) => right.periodEndDate.getTime() - left.periodEndDate.getTime());
+      .filter((record) => {
+        const recordPeriodEnd = this.safeUtcDay(record.periodEndDate);
+        return Boolean(recordPeriodEnd && record.id !== latest.id && record.periodType === latest.periodType && recordPeriodEnd < latestPeriodEnd);
+      })
+      .sort((left, right) => this.dateTime(right.periodEndDate) - this.dateTime(left.periodEndDate));
     const samePeriodLastYear = sameType.find((record) => {
-      const monthMatches = record.periodEndDate.getUTCMonth() === latest.periodEndDate.getUTCMonth();
-      const diffDays = this.daysBetween(record.periodEndDate, latest.periodEndDate);
+      const recordPeriodEnd = this.safeUtcDay(record.periodEndDate);
+      if (!recordPeriodEnd) return false;
+      const monthMatches = recordPeriodEnd.getUTCMonth() === latestPeriodEnd.getUTCMonth();
+      const diffDays = this.daysBetween(recordPeriodEnd, latestPeriodEnd);
       return monthMatches && diffDays >= 300 && diffDays <= 430;
     });
     return samePeriodLastYear || sameType[0] || null;
   }
 
-  private expectedResultDate(latest: EarningsFundamentalInput, quarterlyCadence: boolean): Date {
-    const periodEnd = this.startOfUtcDay(latest.periodEndDate);
+  private expectedResultDate(latest: EarningsFundamentalInput, quarterlyCadence: boolean): Date | null {
+    const periodEnd = this.safeUtcDay(latest.periodEndDate);
+    if (!periodEnd) return null;
     if (quarterlyCadence) {
       const nextPeriodEnd = this.addMonths(periodEnd, 3);
       return this.addDays(nextPeriodEnd, 45);
@@ -476,12 +518,63 @@ export class EarningsIntelligenceService {
     return this.addDays(this.addMonths(periodEnd, 12), 60);
   }
 
-  private actualResultDate(record: EarningsFundamentalInput): Date {
-    return this.startOfUtcDay(record.validatedAt || record.periodEndDate);
+  private resolveResultDate(
+    latest: EarningsFundamentalInput | null,
+    expectedResultDate: Date | null,
+    snapshotDate: Date
+  ): {
+    resultDate: Date | null;
+    resultDateSource: EarningsResultDateSource;
+    daysToResult: number | null;
+  } {
+    if (!latest) {
+      return { resultDate: null, resultDateSource: 'UNKNOWN', daysToResult: null };
+    }
+
+    const officialResultDate = this.safeUtcDay(latest.officialResultDate ?? null);
+    if (officialResultDate) {
+      const daysToResult = this.daysBetween(snapshotDate, officialResultDate);
+      return {
+        resultDate: officialResultDate,
+        resultDateSource: 'OFFICIAL_CALENDAR',
+        daysToResult: daysToResult >= 0 ? daysToResult : null,
+      };
+    }
+
+    if (expectedResultDate) {
+      const daysToExpected = this.daysBetween(snapshotDate, expectedResultDate);
+      if (daysToExpected >= 0 && daysToExpected <= UPCOMING_WINDOW_DAYS) {
+        return {
+          resultDate: expectedResultDate,
+          resultDateSource: 'ESTIMATED_FROM_PERIOD_CADENCE',
+          daysToResult: daysToExpected,
+        };
+      }
+    }
+
+    const periodEndDate = this.safeUtcDay(latest.periodEndDate);
+    if (periodEndDate) {
+      return {
+        resultDate: periodEndDate,
+        resultDateSource: 'PERIOD_END_DATE_FALLBACK',
+        daysToResult: null,
+      };
+    }
+
+    const validatedAt = this.safeUtcDay(latest.validatedAt ?? null);
+    if (validatedAt) {
+      return {
+        resultDate: validatedAt,
+        resultDateSource: 'VALIDATED_AT_FALLBACK',
+        daysToResult: null,
+      };
+    }
+
+    return { resultDate: null, resultDateSource: 'UNKNOWN', daysToResult: null };
   }
 
   private sortFundamentals(records: EarningsFundamentalInput[]): EarningsFundamentalInput[] {
-    return [...records].sort((left, right) => right.periodEndDate.getTime() - left.periodEndDate.getTime());
+    return [...records].sort((left, right) => this.dateTime(right.periodEndDate) - this.dateTime(left.periodEndDate));
   }
 
   private sortPricesAscending(prices: EarningsPricePointInput[]): EarningsPricePointInput[] {
@@ -529,6 +622,48 @@ export class EarningsIntelligenceService {
       for (const category of row.categories) counts[category] += 1;
     }
     return counts;
+  }
+
+  private responseWarnings(rows: EarningsSnapshotDto[], truncated: boolean): string[] {
+    const warnings: string[] = [];
+    const summary = this.provenanceSummary(rows);
+    if (truncated) warnings.push('Snapshot read was truncated at the backend safety limit.');
+    if (summary.rowCount > 0 && summary.officialCalendarRows === 0) {
+      warnings.push('No official earnings calendar dates are present in this snapshot; fallback dates are labelled per row.');
+    }
+    if (summary.resultDateSourceCounts.ESTIMATED_FROM_PERIOD_CADENCE > 0) {
+      warnings.push('Estimated result dates are not official calendar events.');
+    }
+    if (summary.resultDateSourceCounts.PERIOD_END_DATE_FALLBACK > 0) {
+      warnings.push('Some result dates use the fiscal period end as a fallback and are not earnings announcement dates.');
+    }
+    if (summary.resultDateSourceCounts.VALIDATED_AT_FALLBACK > 0) {
+      warnings.push('Some result dates use validation timestamps as a fallback and are not earnings announcement dates.');
+    }
+    if (summary.warningCounts.RESULT_REACTION_REQUIRES_OFFICIAL_RESULT_DATE > 0) {
+      warnings.push('Result reaction history requires official earnings dates and is limited for fallback-date rows.');
+    }
+    return [...new Set(warnings)];
+  }
+
+  private provenanceSummary(rows: EarningsSnapshotDto[]): EarningsProvenanceSummary {
+    const resultDateSourceCounts: Record<string, number> = {};
+    const warningCounts: Record<string, number> = {};
+    for (const row of rows) {
+      resultDateSourceCounts[row.resultDateSource || 'UNKNOWN'] = (resultDateSourceCounts[row.resultDateSource || 'UNKNOWN'] || 0) + 1;
+      for (const warning of row.warnings || []) {
+        warningCounts[warning] = (warningCounts[warning] || 0) + 1;
+      }
+    }
+    return {
+      rowCount: rows.length,
+      resultDateSourceCounts,
+      warningCounts,
+      officialCalendarRows: resultDateSourceCounts.OFFICIAL_CALENDAR || 0,
+      estimatedRows: resultDateSourceCounts.ESTIMATED_FROM_PERIOD_CADENCE || 0,
+      fallbackRows: (resultDateSourceCounts.PERIOD_END_DATE_FALLBACK || 0) + (resultDateSourceCounts.VALIDATED_AT_FALLBACK || 0),
+      unknownRows: resultDateSourceCounts.UNKNOWN || 0,
+    };
   }
 
   private emptyCategoryBuckets(): Record<EarningsIntelligenceCategory, EarningsSnapshotDto[]> {
@@ -599,6 +734,15 @@ export class EarningsIntelligenceService {
   private maxDate(values: Array<Date | null | undefined>): Date | null {
     return values.filter((value): value is Date => Boolean(value && !Number.isNaN(value.getTime())))
       .sort((left, right) => right.getTime() - left.getTime())[0] || null;
+  }
+
+  private safeUtcDay(date: Date | null | undefined): Date | null {
+    if (!date || Number.isNaN(date.getTime())) return null;
+    return this.startOfUtcDay(date);
+  }
+
+  private dateTime(date: Date | null | undefined): number {
+    return this.safeUtcDay(date)?.getTime() ?? Number.NEGATIVE_INFINITY;
   }
 
   private addDays(date: Date, days: number): Date {

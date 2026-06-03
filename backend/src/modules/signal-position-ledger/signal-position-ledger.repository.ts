@@ -6,6 +6,7 @@ import type {
   SignalPositionLatestPriceSnapshot,
   SignalPositionLedgerActiveQuery,
   SignalPositionLedgerActiveRow,
+  SignalPositionLedgerStatus,
   SignalPositionLedgerMaterializedSnapshot,
   SignalPositionLedgerRefreshProgress,
   SignalPositionLedgerRefreshStatus,
@@ -35,7 +36,7 @@ type MaterializedRefreshSaveInput = Pick<SignalPositionLedgerActiveQuery, 'regio
 };
 
 type LedgerRowsQuery = Pick<SignalPositionLedgerActiveQuery, 'region' | 'assetType'> & {
-  status: 'ACTIVE' | 'CLOSED';
+  status: SignalPositionLedgerStatus;
   limit: number;
   offset: number;
   sortBy?: SignalPositionLedgerActiveQuery['sortBy'];
@@ -58,9 +59,9 @@ export class SignalPositionLedgerRepository {
     const where = {
       scopeRegion: query.region,
       scopeAssetType: query.assetType,
-      status: query.status,
+      status: this.ledgerStatusWhere(query.status),
     };
-    const canCount = query.status === 'CLOSED' && typeof delegate.count === 'function';
+    const canCount = typeof delegate.count === 'function';
     const [totalCount, rows] = await Promise.all([
       canCount ? delegate.count({ where }) : Promise.resolve(0),
       delegate.findMany({
@@ -81,14 +82,14 @@ export class SignalPositionLedgerRepository {
     };
   }
 
-  async listAllLedgerRows(scope: Pick<SignalPositionLedgerActiveQuery, 'region' | 'assetType'>, status: 'ACTIVE' | 'CLOSED'): Promise<SignalPositionLedgerActiveRow[]> {
+  async listAllLedgerRows(scope: Pick<SignalPositionLedgerActiveQuery, 'region' | 'assetType'>, status: SignalPositionLedgerStatus): Promise<SignalPositionLedgerActiveRow[]> {
     const delegate = (this.db as any).signalPositionLedgerEntry;
     if (!delegate || typeof delegate.findMany !== 'function') return [];
     const rows = await delegate.findMany({
       where: {
         scopeRegion: scope.region,
         scopeAssetType: scope.assetType,
-        status,
+        status: this.ledgerStatusWhere(status),
       },
       orderBy: status === 'CLOSED'
         ? [{ exitTriggerTimestamp: 'desc' }, { updatedAt: 'desc' }]
@@ -175,7 +176,7 @@ export class SignalPositionLedgerRepository {
         scopeRegion: scope.region,
         scopeAssetType: scope.assetType,
         instrumentId,
-        status: 'ACTIVE',
+        status: this.ledgerStatusWhere('ACTIVE'),
       },
       orderBy: [{ entryTriggerTimestamp: 'asc' }, { createdAt: 'asc' }],
     });
@@ -277,7 +278,7 @@ export class SignalPositionLedgerRepository {
           evaluatedAt: true,
         },
       }),
-      this.db.strategyDecisionResult.findMany({
+      (this.db as any).strategyDecisionResult.findMany({
         where: {
           instrumentId: { in: uniqueIds },
           strategy: 'DEFENSIVE_EXIT',
@@ -285,12 +286,15 @@ export class SignalPositionLedgerRepository {
         orderBy: [{ instrumentId: 'asc' }, { generatedAt: 'desc' }],
         distinct: ['instrumentId'],
         select: {
+          id: true,
           instrumentId: true,
           strategy: true,
+          strategyVersion: true,
           decision: true,
           generatedAt: true,
           reasons: true,
           exitRulesTriggered: true,
+          invalidationRulesTriggered: true,
         },
       }),
     ]);
@@ -325,11 +329,14 @@ export class SignalPositionLedgerRepository {
       const current = snapshots.get(exitDecision.instrumentId);
       if (!current) continue;
       current.exitDecision = {
+        id: exitDecision.id ?? null,
         strategy: exitDecision.strategy,
+        strategyVersion: exitDecision.strategyVersion ?? null,
         decision: exitDecision.decision,
         generatedAt: exitDecision.generatedAt.toISOString(),
         reasons: Array.isArray(exitDecision.reasons) ? exitDecision.reasons.map(String) : [],
         exitRulesTriggered: Array.isArray(exitDecision.exitRulesTriggered) ? exitDecision.exitRulesTriggered.map(String) : [],
+        invalidationRulesTriggered: Array.isArray(exitDecision.invalidationRulesTriggered) ? exitDecision.invalidationRulesTriggered.map(String) : [],
       };
     }
 
@@ -461,28 +468,34 @@ export class SignalPositionLedgerRepository {
   }
 
   async latestExitDecisionByInstrumentId(instrumentId: string): Promise<SignalPositionExitDecisionSnapshot | null> {
-    const latest = await this.db.strategyDecisionResult.findFirst({
+    const latest = await (this.db as any).strategyDecisionResult.findFirst({
       where: {
         instrumentId,
         strategy: 'DEFENSIVE_EXIT',
       },
       orderBy: { generatedAt: 'desc' },
       select: {
+        id: true,
         strategy: true,
+        strategyVersion: true,
         decision: true,
         generatedAt: true,
         reasons: true,
         exitRulesTriggered: true,
+        invalidationRulesTriggered: true,
       },
     });
     if (!latest) return null;
 
     return {
+      id: latest.id ?? null,
       strategy: latest.strategy,
+      strategyVersion: latest.strategyVersion ?? null,
       decision: latest.decision,
       generatedAt: latest.generatedAt.toISOString(),
       reasons: Array.isArray(latest.reasons) ? latest.reasons.map(String) : [],
       exitRulesTriggered: Array.isArray(latest.exitRulesTriggered) ? latest.exitRulesTriggered.map(String) : [],
+      invalidationRulesTriggered: Array.isArray(latest.invalidationRulesTriggered) ? latest.invalidationRulesTriggered.map(String) : [],
     };
   }
 
@@ -630,6 +643,7 @@ export class SignalPositionLedgerRepository {
     const region = value.region || scope.region;
     const assetType = value.assetType || scope.assetType;
     const entryTriggerTimestamp = value.entryTriggerTimestamp;
+    const status = this.normalizeLedgerStatus(value.status);
     const ledgerKey = value.ledgerKey || [
       String(region).trim().toUpperCase(),
       String(assetType).trim().toUpperCase(),
@@ -640,24 +654,34 @@ export class SignalPositionLedgerRepository {
     return {
       ...value,
       ledgerKey,
-      status: value.status === 'CLOSED' ? 'CLOSED' : 'ACTIVE',
+      status,
       region,
       assetType,
-      lifecycleEvidenceStatus: value.lifecycleEvidenceStatus || 'ACTIVE_ENTRY',
+      healthState: value.healthState ?? this.healthStateForStatus(status),
+      lifecycleEvidenceStatus: this.lifecycleEvidenceStatus(value.lifecycleEvidenceStatus, status),
       exitSignalId: value.exitSignalId ?? null,
+      exitStrategyId: value.exitStrategyId ?? null,
+      exitStrategyVersion: value.exitStrategyVersion ?? null,
+      exitSourceDecisionId: value.exitSourceDecisionId ?? null,
       exitTriggerTimestamp: value.exitTriggerTimestamp ?? null,
       exitTriggerPrice: value.exitTriggerPrice ?? null,
+      closePriceStatus: value.closePriceStatus ?? (value.exitTriggerPrice ? 'SOURCE_PROVEN' : 'UNAVAILABLE'),
       exitReasonSummary: value.exitReasonSummary ?? null,
       exitRuleId: value.exitRuleId ?? null,
+      exitRuleIds: Array.isArray(value.exitRuleIds) ? value.exitRuleIds.map(String) : value.exitRuleId ? [String(value.exitRuleId)] : [],
       exitDecision: value.exitDecision ?? null,
+      invalidationSourceDecisionId: value.invalidationSourceDecisionId ?? null,
+      invalidationRuleIds: Array.isArray(value.invalidationRuleIds) ? value.invalidationRuleIds.map(String) : [],
+      invalidationTimestamp: value.invalidationTimestamp ?? null,
       closedAt: value.closedAt ?? null,
     };
   }
 
   private toLedgerRow(row: any): SignalPositionLedgerActiveRow {
+    const status = this.normalizeLedgerStatus(row.status);
     return {
       ledgerKey: row.ledgerKey,
-      status: row.status === 'CLOSED' ? 'CLOSED' : 'ACTIVE',
+      status,
       signalId: row.entrySignalId ?? null,
       instrumentId: row.instrumentId,
       symbol: row.symbol,
@@ -679,17 +703,25 @@ export class SignalPositionLedgerRepository {
       currentReturnPercent: row.currentReturnPercent === null || row.currentReturnPercent === undefined ? null : Number(row.currentReturnPercent),
       currentReturnStatus: row.currentReturnStatus || 'UNAVAILABLE',
       currentDataQualityStatus: row.currentDataQualityStatus ?? null,
-      healthState: row.status === 'CLOSED' ? 'EXIT_TRIGGERED' : null,
-      lifecycleEvidenceStatus: row.status === 'CLOSED' ? 'EXIT_TRIGGERED' : 'ACTIVE_ENTRY',
+      healthState: this.healthStateForStatus(status),
+      lifecycleEvidenceStatus: this.lifecycleEvidenceStatus(row.lifecycleEvidenceStatus, status),
       trustEvidenceStatus: row.trustEvidenceStatus || 'SOURCE_PROVEN_PRICE_UNAVAILABLE',
       calibrationEvidenceStatus: row.calibrationEvidenceStatus || 'UNAVAILABLE',
       displayWarnings: Array.isArray(row.displayWarnings) ? row.displayWarnings.map(String) : [],
       exitSignalId: row.exitSignalId ?? null,
+      exitStrategyId: row.exitStrategyId ?? null,
+      exitStrategyVersion: row.exitStrategyVersion ?? null,
+      exitSourceDecisionId: row.exitSourceDecisionId ?? null,
       exitTriggerTimestamp: row.exitTriggerTimestamp?.toISOString?.() ?? null,
       exitTriggerPrice: row.exitTriggerPrice === null || row.exitTriggerPrice === undefined ? null : Number(row.exitTriggerPrice),
+      closePriceStatus: row.closePriceStatus === 'SOURCE_PROVEN' ? 'SOURCE_PROVEN' : 'UNAVAILABLE',
       exitReasonSummary: row.exitReasonSummary ?? null,
       exitRuleId: row.exitRuleId ?? null,
+      exitRuleIds: Array.isArray(row.exitRuleIds) ? row.exitRuleIds.map(String) : row.exitRuleId ? [String(row.exitRuleId)] : [],
       exitDecision: row.exitDecision ?? null,
+      invalidationSourceDecisionId: row.invalidationSourceDecisionId ?? null,
+      invalidationRuleIds: Array.isArray(row.invalidationRuleIds) ? row.invalidationRuleIds.map(String) : [],
+      invalidationTimestamp: row.invalidationTimestamp?.toISOString?.() ?? null,
       closedAt: row.closedAt?.toISOString?.() ?? null,
     };
   }
@@ -703,7 +735,7 @@ export class SignalPositionLedgerRepository {
       symbol: row.symbol,
       companyName: row.companyName,
       stockKey: this.stockKey(row.symbol),
-      activeSlot: row.status === 'ACTIVE' ? this.stockKey(row.symbol) : null,
+      activeSlot: this.isActiveLikeStatus(row.status) ? this.stockKey(row.symbol) : null,
       status: row.status,
       entrySignalId: row.signalId,
       entryTriggerType: row.triggerType,
@@ -721,16 +753,25 @@ export class SignalPositionLedgerRepository {
       currentReturnPercent: row.currentReturnPercent,
       currentReturnStatus: row.currentReturnStatus,
       currentDataQualityStatus: row.currentDataQualityStatus,
+      lifecycleEvidenceStatus: row.lifecycleEvidenceStatus,
       trustEvidenceStatus: row.trustEvidenceStatus,
       calibrationEvidenceStatus: row.calibrationEvidenceStatus,
       displayWarnings: row.displayWarnings || [],
       exitSignalId: row.exitSignalId ?? null,
+      exitStrategyId: row.exitStrategyId ?? null,
+      exitStrategyVersion: row.exitStrategyVersion ?? null,
+      exitSourceDecisionId: row.exitSourceDecisionId ?? null,
       exitTriggerTimestamp: row.exitTriggerTimestamp ? new Date(row.exitTriggerTimestamp) : null,
       exitTriggerPrice: row.exitTriggerPrice ?? null,
+      closePriceStatus: row.closePriceStatus ?? 'UNAVAILABLE',
       exitReasonSummary: row.exitReasonSummary ?? null,
       exitRuleId: row.exitRuleId ?? null,
+      exitRuleIds: row.exitRuleIds || [],
       exitDecision: row.exitDecision ?? null,
-      closedAt: row.closedAt ? new Date(row.closedAt) : null,
+      invalidationSourceDecisionId: row.invalidationSourceDecisionId ?? null,
+      invalidationRuleIds: row.invalidationRuleIds || [],
+      invalidationTimestamp: row.invalidationTimestamp ? new Date(row.invalidationTimestamp) : null,
+      closedAt: row.status === 'CLOSED' && row.closedAt ? new Date(row.closedAt) : null,
       lastEvaluatedAt: new Date(),
     };
   }
@@ -740,31 +781,69 @@ export class SignalPositionLedgerRepository {
       symbol: row.symbol,
       companyName: row.companyName,
       stockKey: this.stockKey(row.symbol),
-      activeSlot: row.status === 'ACTIVE' ? this.stockKey(row.symbol) : null,
+      status: row.status,
+      activeSlot: this.isActiveLikeStatus(row.status) ? this.stockKey(row.symbol) : null,
       latestTrustedPriceDate: row.latestTrustedPriceDate ? new Date(row.latestTrustedPriceDate) : null,
       latestTrustedPrice: row.latestTrustedPrice,
       currentReturnPercent: row.currentReturnPercent,
       currentReturnStatus: row.currentReturnStatus,
       currentDataQualityStatus: row.currentDataQualityStatus,
+      lifecycleEvidenceStatus: row.lifecycleEvidenceStatus,
       trustEvidenceStatus: row.trustEvidenceStatus,
       calibrationEvidenceStatus: row.calibrationEvidenceStatus,
       displayWarnings: row.displayWarnings || [],
+      exitSignalId: row.exitSignalId ?? null,
+      exitStrategyId: row.exitStrategyId ?? null,
+      exitStrategyVersion: row.exitStrategyVersion ?? null,
+      exitSourceDecisionId: row.exitSourceDecisionId ?? null,
+      exitTriggerTimestamp: row.exitTriggerTimestamp ? new Date(row.exitTriggerTimestamp) : null,
+      exitTriggerPrice: row.exitTriggerPrice ?? null,
+      closePriceStatus: row.closePriceStatus ?? 'UNAVAILABLE',
+      exitReasonSummary: row.exitReasonSummary ?? null,
+      exitRuleId: row.exitRuleId ?? null,
+      exitRuleIds: row.exitRuleIds || [],
+      exitDecision: row.exitDecision ?? null,
+      invalidationSourceDecisionId: row.invalidationSourceDecisionId ?? null,
+      invalidationRuleIds: row.invalidationRuleIds || [],
+      invalidationTimestamp: row.invalidationTimestamp ? new Date(row.invalidationTimestamp) : null,
       lastEvaluatedAt: new Date(),
     };
     if (includeExit) {
       Object.assign(data, {
-        status: 'CLOSED',
-        activeSlot: null,
-        exitSignalId: row.exitSignalId ?? null,
-        exitTriggerTimestamp: row.exitTriggerTimestamp ? new Date(row.exitTriggerTimestamp) : null,
-        exitTriggerPrice: row.exitTriggerPrice ?? null,
-        exitReasonSummary: row.exitReasonSummary ?? null,
-        exitRuleId: row.exitRuleId ?? null,
-        exitDecision: row.exitDecision ?? null,
-        closedAt: row.closedAt ? new Date(row.closedAt) : new Date(),
+        status: row.status,
+        activeSlot: this.isActiveLikeStatus(row.status) ? this.stockKey(row.symbol) : null,
+        closedAt: row.status === 'CLOSED' ? (row.closedAt ? new Date(row.closedAt) : new Date()) : null,
       });
     }
     return data;
+  }
+
+  private ledgerStatusWhere(status: SignalPositionLedgerStatus) {
+    return status === 'ACTIVE' ? { in: ['ACTIVE', 'RISK_WARNING', 'EXIT_TRIGGERED'] } : status;
+  }
+
+  private normalizeLedgerStatus(value: unknown): SignalPositionLedgerStatus {
+    if (value === 'RISK_WARNING' || value === 'EXIT_TRIGGERED' || value === 'INVALIDATED' || value === 'CLOSED') return value;
+    return 'ACTIVE';
+  }
+
+  private isActiveLikeStatus(status: SignalPositionLedgerStatus): boolean {
+    return status === 'ACTIVE' || status === 'RISK_WARNING' || status === 'EXIT_TRIGGERED';
+  }
+
+  private healthStateForStatus(status: SignalPositionLedgerStatus): SignalPositionLedgerActiveRow['healthState'] {
+    if (status === 'RISK_WARNING') return 'RISK_WARNING';
+    if (status === 'EXIT_TRIGGERED' || status === 'CLOSED') return 'EXIT_TRIGGERED';
+    return null;
+  }
+
+  private lifecycleEvidenceStatus(value: unknown, status: SignalPositionLedgerStatus): SignalPositionLedgerActiveRow['lifecycleEvidenceStatus'] {
+    if (value === 'RISK_WARNING' || value === 'EXIT_TRIGGERED' || value === 'INVALIDATED' || value === 'CLOSED' || value === 'UNAVAILABLE' || value === 'ACTIVE_ENTRY') return value;
+    if (status === 'RISK_WARNING') return 'RISK_WARNING';
+    if (status === 'EXIT_TRIGGERED') return 'EXIT_TRIGGERED';
+    if (status === 'INVALIDATED') return 'INVALIDATED';
+    if (status === 'CLOSED') return 'CLOSED';
+    return 'ACTIVE_ENTRY';
   }
 
   private stockKey(symbol: string): string {

@@ -37,7 +37,7 @@ const candidate = {
   rank: 1,
   grade: 'A',
   confidenceScore: 88,
-  reasonSummary: 'Long review candidate with Strategy Framework proof, acceptable data quality, market alignment, and valid trade-plan geometry.',
+  reasonSummary: 'Long review candidate with Strategy Framework proof, acceptable data quality, market alignment, entry trigger context, and exit/invalidation evidence.',
   blockers: [],
   watchReasons: [],
   dataQualitySnapshot: {
@@ -95,7 +95,7 @@ const candidate = {
     riskGrade: 'LOW',
     entryZone: { type: 'BREAKOUT', referencePrice: 100, preferredEntryMin: 99, preferredEntryMax: 101, quality: 'STRONG', rationale: 'Breakout review zone.' },
     stopLoss: { price: 95, percentBelowEntry: 5, method: 'RECENT_SWING_LOW', quality: 'STRONG', rationale: 'Below review floor.' },
-    target: { price: 112, expectedReturnPercent: 12, method: 'REWARD_RISK_MULTIPLE', quality: 'ACCEPTABLE', rationale: 'Modeled reward range.' },
+    target: { price: 112, expectedReturnPercent: 12, method: 'REWARD_RISK_MULTIPLE', quality: 'ACCEPTABLE', rationale: 'Compatibility range retained for legacy consumers.' },
     rewardRiskRatio: 2.4,
     invalidationRules: ['Daily close below stop level.'],
     warnings: [],
@@ -112,7 +112,17 @@ const candidate = {
     rawSignal: { direction: 'BULLISH', score: 77, confidence: 'HIGH', supportOnly: true },
     calibration: { calibratedDirection: 'BULLISH', calibratedScore: 80, calibratedConfidence: 'HIGH', supportOnly: true },
     smartMoney: { status: 'ACCUMULATION', score: 70, confidence: 'MEDIUM', supportOnly: true },
+    todayReviewBoard: {
+      section: 'LONG_REVIEW',
+      sourceType: 'STRATEGY_BACKED',
+      reason: 'Strategy Decision-backed LONG_REVIEW reserved slot.',
+      contractVersion: 'today-review-board-v1',
+    },
   },
+  boardSection: 'LONG_REVIEW',
+  boardSourceType: 'STRATEGY_BACKED',
+  boardReason: 'Strategy Decision-backed LONG_REVIEW reserved slot.',
+  boardContractVersion: 'today-review-board-v1',
   explainability: {
     candidateId: 'candidate-1',
     state: 'LONG_REVIEW',
@@ -129,7 +139,7 @@ const candidate = {
     promotionReasons: [
       { category: 'READINESS', code: 'TRUSTED_REVIEW_READY', label: 'Trusted review data is available for this candidate.', severity: 'INFO', sourceModule: 'Market Data Foundation', evidenceDate: '2026-05-10T16:00:00.000Z' },
       { category: 'STRATEGY_PROOF', code: 'STRATEGY_PROOF_USABLE', label: 'Strategy proof is usable for research review.', severity: 'INFO', sourceModule: 'Strategy Framework', evidenceDate: '2026-05-11T06:30:00.000Z' },
-      { category: 'TRADE_PLAN_PROOF_CHAIN', code: 'TRADE_PLAN_REVIEW_READY', label: 'Trade-plan proof-chain snapshot supports paper-review research.', severity: 'INFO', sourceModule: 'Trade Plan Risk Engine', evidenceDate: '2026-05-11T06:30:00.000Z' },
+      { category: 'TRADE_PLAN_PROOF_CHAIN', code: 'EXIT_INVALIDATION_EVIDENCE_READY', label: 'Exit and invalidation evidence is available for research review.', severity: 'INFO', sourceModule: 'Today Review', evidenceDate: '2026-05-11T06:30:00.000Z' },
     ],
     watchReasons: [],
     blockers: [],
@@ -156,8 +166,12 @@ const blockedCandidate = {
   rank: 2,
   grade: 'D',
   confidenceScore: 0,
-  reasonSummary: 'Blocked: Stop loss is inside or above the long entry zone; plan is blocked until the stop is below the planned entry floor.',
-  blockers: ['Stop loss is inside or above the long entry zone; plan is blocked until the stop is below the planned entry floor.'],
+  reasonSummary: 'Blocked: Invalidation level is inside or above the long entry zone; evidence is blocked until the invalidation level is below the planned entry floor.',
+  blockers: ['Invalidation level is inside or above the long entry zone; evidence is blocked until the invalidation level is below the planned entry floor.'],
+  boardSection: null,
+  boardSourceType: null,
+  boardReason: null,
+  boardContractVersion: null,
   explainability: {
     ...candidate.explainability,
     candidateId: 'candidate-2',
@@ -165,7 +179,7 @@ const blockedCandidate = {
     rankingComponents: { ...candidate.explainability.rankingComponents, hardBlockerOverride: true },
     promotionReasons: [],
     blockers: [
-      { category: 'TRADE_PLAN_PROOF_CHAIN', code: 'STOP_LOSS_BLOCKED', label: 'Stop loss is inside or above the long entry zone; plan is blocked until the stop is below the planned entry floor.', severity: 'BLOCKER', sourceModule: 'Trade Plan Risk Engine', evidenceDate: '2026-05-11T06:30:00.000Z' },
+      { category: 'TRADE_PLAN_PROOF_CHAIN', code: 'INVALIDATION_LEVEL_BLOCKED', label: 'Invalidation level is inside or above the long entry zone; evidence is blocked until the invalidation level is below the planned entry floor.', severity: 'BLOCKER', sourceModule: 'Today Review', evidenceDate: '2026-05-11T06:30:00.000Z' },
     ],
   },
   tradePlanSnapshot: {
@@ -177,10 +191,10 @@ const blockedCandidate = {
     riskGrade: 'HIGH',
     entryZone: { type: 'PULLBACK', referencePrice: 304.51, preferredEntryMin: 298.42, preferredEntryMax: 310.6, quality: 'STRONG', rationale: 'Pullback review zone.' },
     stopLoss: { price: 307.49, percentBelowEntry: 0.81, method: 'RECENT_SWING_LOW', quality: 'WEAK', rationale: 'Geometry blocked.' },
-    blockers: ['Stop loss is inside or above the long entry zone; plan is blocked until the stop is below the planned entry floor.'],
+    blockers: ['Invalidation level is inside or above the long entry zone; evidence is blocked until the invalidation level is below the planned entry floor.'],
     paperReadinessStatus: 'BLOCKED',
     paperReadinessReasons: [],
-    paperReadinessBlockers: ['Trade-plan snapshot has hard blockers.'],
+    paperReadinessBlockers: ['Exit/invalidation evidence snapshot has hard blockers.'],
   },
   dataQualitySnapshot: {
     ...candidate.dataQualitySnapshot,
@@ -218,6 +232,10 @@ const unprovenCandidate = {
   reasonSummary: 'Unproven: Strategy Framework proof is missing or weak.',
   blockers: [],
   watchReasons: ['Strategy Framework proof is missing or weak.'],
+  boardSection: null,
+  boardSourceType: null,
+  boardReason: null,
+  boardContractVersion: null,
   explainability: {
     ...candidate.explainability,
     candidateId: 'candidate-3',
@@ -242,6 +260,28 @@ const unprovenCandidate = {
   },
 };
 
+const specialCandidate = {
+  ...candidate,
+  id: 'candidate-4',
+  instrumentId: 'stock-4',
+  symbol: 'SPECIAL.NS',
+  companyName: 'Special Case Ltd',
+  rank: 4,
+  boardSection: 'SPECIAL_CASES',
+  boardSourceType: 'STRATEGY_BACKED',
+  boardReason: 'Strategy + Lite overlap.',
+  sourceSignalSnapshot: {
+    ...candidate.sourceSignalSnapshot,
+    todayReviewBoard: {
+      section: 'SPECIAL_CASES',
+      sourceType: 'STRATEGY_BACKED',
+      reason: 'Strategy + Lite overlap.',
+      contractVersion: 'today-review-board-v1',
+    },
+  },
+  reasonSummary: 'Special-case review candidate with Strategy Decision and Lite discovery overlap.',
+};
+
 const completedResponse = {
   run: {
     id: 'run-1',
@@ -254,9 +294,22 @@ const completedResponse = {
     startedAt: '2026-05-11T06:30:00.000Z',
     finishedAt: '2026-05-11T06:31:00.000Z',
     warnings: [],
-    candidateCounts: { LONG_REVIEW: 1, BLOCKED: 1, UNPROVEN: 1 },
+    candidateCounts: { LONG_REVIEW: 2, BLOCKED: 1, UNPROVEN: 1 },
     sourceSnapshot: {
       rawSignalUniverse: { supportOnly: true, sampleCount: 25 },
+      boardSelection: {
+        contractVersion: 'today-review-board-v1',
+        quotas: { LONG_REVIEW: 20, WATCH_ONLY: 10, EXIT_RISK: 5, SPECIAL_CASES: 5 },
+        eligibleCounts: { LONG_REVIEW: 2, WATCH_ONLY: 0, EXIT_RISK: 0, SPECIAL_CASES: 1 },
+        displayedCounts: { LONG_REVIEW: 1, WATCH_ONLY: 0, EXIT_RISK: 0, SPECIAL_CASES: 1 },
+        strategyBackedCount: 2,
+        liteCount: 0,
+        suppressedCount: 3,
+        fillBackfillReasons: [
+          'WATCH_ONLY quota underfilled because only 0 eligible candidate(s) existed.',
+          'EXIT_RISK quota underfilled because only 0 eligible candidate(s) existed.',
+        ],
+      },
       reviewReadiness: {
         scope: { region: 'IN', assetType: 'STOCK' },
         generatedAt: '2026-05-11T06:30:00.000Z',
@@ -380,13 +433,14 @@ const completedResponse = {
     },
     createdAt: '2026-05-11T06:30:00.000Z',
     updatedAt: '2026-05-11T06:31:00.000Z',
-    candidates: [candidate, blockedCandidate, unprovenCandidate],
+    candidates: [candidate, blockedCandidate, unprovenCandidate, specialCandidate],
   },
   groups: {
     longReview: [candidate],
     shortReview: [],
     exitRiskReview: [],
     watchOnly: [],
+    specialCases: [specialCandidate],
     blocked: [blockedCandidate],
     avoid: [],
     insufficientData: [],
@@ -418,7 +472,7 @@ test.describe('Today Trade Review UI', () => {
         contentType: 'application/json',
         body: JSON.stringify(!showCompletedSnapshot ? {
           run: null,
-          groups: { longReview: [], shortReview: [], exitRiskReview: [], watchOnly: [], blocked: [], avoid: [], insufficientData: [], unproven: [] },
+          groups: { longReview: [], shortReview: [], exitRiskReview: [], watchOnly: [], specialCases: [], blocked: [], avoid: [], insufficientData: [], unproven: [] },
           scope: { region: 'IN', assetType: 'STOCK' },
         } : completedResponse),
       });
@@ -430,20 +484,29 @@ test.describe('Today Trade Review UI', () => {
     await expect(page.getByText('No Daily Review snapshot has been published for IN / STOCK.')).toBeVisible();
     await expect(page.getByText('Data-production workflows are handled in Admin / Data Ops.')).toBeVisible();
     await expect(page.getByRole('button', { name: /Run review|Run Today's Review/i })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Reload snapshot' })).toHaveCount(0);
     await expect(page.getByRole('progressbar')).toHaveCount(0);
 
     showCompletedSnapshot = true;
-    await page.getByRole('button', { name: 'Reload snapshot' }).click();
+    await page.reload();
 
     await expect(page.getByText('Scope: IN / STOCK')).toBeVisible();
     await expect(page.getByText('Long review candidates', { exact: true })).toBeVisible();
+    await expect(page.getByText('Special cases', { exact: true })).toBeVisible();
+    await expect(page.getByText('Strategy-backed', { exact: true })).toBeVisible();
+    await expect(page.getByText('Lite discovery', { exact: true })).toBeVisible();
+    await expect(page.getByText('Suppressed', { exact: true })).toBeVisible();
+    await expect(page.getByText('Board Contract')).toBeVisible();
+    await expect(page.getByText('today-review-board-v1')).toBeVisible();
+    await expect(page.getByText('Long Review: 1/2 eligible; quota 20')).toBeVisible();
+    await expect(page.getByText('Suppressed: 3')).toBeVisible();
     await expect(page.getByText('Signals and calibration are supporting evidence only.').first()).toBeVisible();
     await expect(page.getByText('Review mode: LIMITED_REVIEW').first()).toBeVisible();
     await expect(page.getByText('Readiness decision: PROCEED_LIMITED')).toBeVisible();
     await expect(page.getByText('Market Data summary mode: LIMITED_REVIEW')).toBeVisible();
     await expect(page.getByText('Next bounded action: Review bounded repair plan')).toBeVisible();
     await expect(page.getByText('Data Quality tiers are read-only context from Data Quality Engine and never change Today Review ranking or promotion in this view.')).toBeVisible();
-    await expect(page.getByText('Target session: 2026-05-12').first()).toBeVisible();
+    await expect(page.getByText('Review session: 2026-05-12').first()).toBeVisible();
     await expect(page.getByText('Required data-through: 2026-05-11').first()).toBeVisible();
     await expect(page.getByText('Stored data-through: 2026-05-11').first()).toBeVisible();
     await expect(page.getByText('Limited review mode: candidates are generated only from stocks with current price, sufficient OHLCV history, and recent volume. Missing sector/market-cap data is shown as context gaps.')).toBeVisible();
@@ -462,6 +525,9 @@ test.describe('Today Trade Review UI', () => {
     await expect(page.getByText('Automation: BLOCKED').first()).toBeVisible();
     await expect(page.getByTitle('Automation: BLOCKED - PHASE0_AUTOMATION_NOT_AUTHORIZED').first()).toBeVisible();
     await expect(page.getByRole('tab', { name: 'Long Review (1)' })).toBeVisible();
+    await page.getByRole('tab', { name: 'Special Cases (1)' }).click();
+    await expect(page.getByRole('link', { name: 'SPECIAL.NS' })).toBeVisible();
+    await expect(page.getByText('Strategy + Lite overlap.').first()).toBeVisible();
     await page.getByRole('tab', { name: /Watch Only/ }).click();
     await expect(page.getByText('UNPROVEN.NS')).toBeVisible();
     await expect(page.getByRole('cell', { name: 'Unproven', exact: true })).toBeVisible();
@@ -470,7 +536,7 @@ test.describe('Today Trade Review UI', () => {
     await expect(page.getByText('Data Quality use-case tier context is missing; confidence view is conservatively downgraded.').first()).toBeVisible();
     await page.getByRole('tab', { name: /Blocked/ }).click();
     await expect(page.getByText('BLOCKED.NS')).toBeVisible();
-    await expect(page.getByText('Stop loss is inside or above the long entry zone; plan is blocked until the stop is below the planned entry floor.').first()).toBeVisible();
+    await expect(page.getByText('Invalidation level is inside or above the long entry zone; evidence is blocked until the invalidation level is below the planned entry floor.').first()).toBeVisible();
     await expect(page.getByText('Daily: BLOCKED').first()).toBeVisible();
     await expect(page.getByTitle('Daily: BLOCKED - DAILY_REVIEW_BLOCKED_BY_HISTORY').first()).toBeVisible();
 
@@ -481,7 +547,7 @@ test.describe('Today Trade Review UI', () => {
     await expect(page.getByText('Missing DQ tier context')).toBeVisible();
 
     const body = await page.locator('body').innerText();
-    expect(body).not.toMatch(/buy now|sell now|guaranteed|place order|execute order|live trade|financial advice|execution/i);
+    expect(body).not.toMatch(/buy now|sell now|guaranteed|place order|execute order|live trade|financial advice|execution|target session|target \/ reward|reward\/risk|paper review|trade-plan|trade plan/i);
     expect(body).not.toContain('Raw signal count');
     expect(postRequests).toEqual([]);
   });
@@ -546,7 +612,7 @@ test.describe('Today Trade Review UI', () => {
     await download.saveAs(csvPath);
     const csv = await readFile(csvPath, 'utf8');
     const header = csv.split(/\r?\n/)[0].replace(/^\uFEFF/, '');
-    expect(header).toBe('Rank,Symbol,Company,State,Setup,Entry Evidence,Confidence,Grade,Daily Tier,Data Through,Data Quality,Reason Summary,Blocker,Strategy Code');
+    expect(header).toBe('Rank,Symbol,Company,State,Setup,Board Section,Board Source,Board Reason,Entry Evidence,Confidence,Grade,Daily Tier,Data Through,Data Quality,Reason Summary,Blocker,Strategy Code');
     expect(header).not.toContain('Automation Reason');
     expect(header).not.toContain('Candidate URL');
     await expect(page.getByText('Exported 7 Today Review rows as an Excel-compatible CSV.')).toBeVisible();
@@ -569,10 +635,10 @@ test.describe('Today Trade Review UI', () => {
     await expect(page.getByRole('link', { name: 'ZETA.NS' })).toBeVisible();
 
     const body = await page.locator('body').innerText();
-    expect(body).not.toMatch(/R:R|reward\/risk|target \/ reward|buy now|sell now|guaranteed|financial advice/i);
+    expect(body).not.toMatch(/R:R|reward\/risk|target \/ reward|target session|paper review|trade-plan|trade plan|buy now|sell now|guaranteed|financial advice/i);
   });
 
-  test('candidate detail shows plan, invalidation, context, data quality, and proof panels', async ({ page }) => {
+  test('candidate detail shows entry trigger, exit condition, invalidation, data quality, and proof panels', async ({ page }) => {
     await page.route('**/api/v1/today-review/candidates/candidate-1', async (route) => {
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(candidate) });
     });
@@ -580,18 +646,21 @@ test.describe('Today Trade Review UI', () => {
     await visitAuthenticated(page, '/today-review/candidates/candidate-1');
 
     await expect(page.getByRole('heading', { name: 'ALPHA.NS research support' })).toBeVisible();
-    await expect(page.getByText('Preferred entry zone')).toBeVisible();
-    await expect(page.getByText('INR 99.00 - INR 101.00').first()).toBeVisible();
-    await expect(page.getByText('Stop / invalidation').first()).toBeVisible();
-    await expect(page.getByText('INR 95.00; Daily close below stop level.').first()).toBeVisible();
-    await expect(page.getByText('Target 1 / Target 2 or reward range')).toBeVisible();
-    await expect(page.getByText('Reward/risk').first()).toBeVisible();
+    await expect(page.getByText('Entry trigger context')).toBeVisible();
+    await expect(page.getByText('Entry context INR 99.00 - INR 101.00').first()).toBeVisible();
+    await expect(page.getByText('Exit condition').first()).toBeVisible();
+    await expect(page.getByText('Exit condition unavailable in this snapshot.').first()).toBeVisible();
+    await expect(page.getByText('Invalidation condition').first()).toBeVisible();
+    await expect(page.getByText('INR 95.00; Daily close below invalidation level.').first()).toBeVisible();
+    await expect(page.getByText('Data quality status')).toBeVisible();
+    await expect(page.getByText('Target 1 / Target 2 or reward range')).toHaveCount(0);
+    await expect(page.getByText('Reward/risk')).toHaveCount(0);
     await expect(page.getByText('Do nothing unless')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Strategy proof' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Market context' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Data quality' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Use-case tiers (read-only)' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Trade plan' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Exit/invalidation evidence' })).toBeVisible();
     await expect(page.getByText('Daily review tier')).toBeVisible();
     await expect(page.getByText('READY (TRUSTED_BASELINE_READY)')).toBeVisible();
     await expect(page.getByText('Backtest tier')).toBeVisible();
@@ -602,16 +671,18 @@ test.describe('Today Trade Review UI', () => {
     await expect(page.getByRole('heading', { name: 'Ranking components' })).toBeVisible();
     const rankingComponentsPanel = page.getByRole('heading', { name: 'Ranking components' }).locator('xpath=..');
     await expect(rankingComponentsPanel.getByText('Strategy proof', { exact: true })).toBeVisible();
+    await expect(rankingComponentsPanel.getByText('Exit/invalidation evidence', { exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Reason categories' })).toBeVisible();
-    await expect(page.getByText('READINESS / INFO')).toBeVisible();
+    await expect(page.getByText('Readiness / INFO')).toBeVisible();
     await expect(page.getByText('Source: Market Data Foundation')).toBeVisible();
+    await expect(page.getByText('Exit/invalidation evidence / INFO')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Supporting evidence' })).toBeVisible();
     const supportingEvidencePanel = page.getByRole('heading', { name: 'Supporting evidence' }).locator('xpath=..');
-    await expect(supportingEvidencePanel.getByText('Trade-plan proof-chain', { exact: true })).toBeVisible();
+    await expect(supportingEvidencePanel.getByText('Exit/invalidation evidence', { exact: true })).toBeVisible();
     await expect(page.getByRole('main').getByRole('link', { name: 'Instrument Workspace' })).toHaveAttribute('href', '/stocks/stock-1');
 
     const body = await page.locator('body').innerText();
-    expect(body).not.toMatch(/buy now|sell now|guaranteed|place order|execute order|live trade|financial advice|execution/i);
+    expect(body).not.toMatch(/buy now|sell now|guaranteed|place order|execute order|live trade|financial advice|execution|target 1|reward range|reward\/risk|paper review|trade-plan|trade plan|PAPER_TEST_CANDIDATE|READY_FOR_PAPER_REVIEW|TRADE_CANDIDATE/i);
   });
 
   test('candidate detail shows conservative fallback when use-case tiers are missing', async ({ page }) => {
@@ -717,7 +788,7 @@ test.describe('Today Trade Review UI', () => {
             },
             candidates: [],
           },
-          groups: { longReview: [], shortReview: [], exitRiskReview: [], watchOnly: [], blocked: [], avoid: [], insufficientData: [], unproven: [] },
+          groups: { longReview: [], shortReview: [], exitRiskReview: [], watchOnly: [], specialCases: [], blocked: [], avoid: [], insufficientData: [], unproven: [] },
           scope: { region: 'IN', assetType: 'STOCK' },
         }),
       });
@@ -727,7 +798,7 @@ test.describe('Today Trade Review UI', () => {
 
     await expect(page.getByText('Review mode: NO_REVIEW').first()).toBeVisible();
     await expect(page.getByText('No review mode: trusted price-action universe is unavailable or below the lite threshold. Today review cannot publish candidates until the trusted-universe evidence is ready.')).toBeVisible();
-    await expect(page.getByText('Target session: 2026-05-12').first()).toBeVisible();
+    await expect(page.getByText('Review session: 2026-05-12').first()).toBeVisible();
     await expect(page.getByText('Required data-through: 2026-05-11').first()).toBeVisible();
     await expect(page.getByText('Stored data-through: 2026-05-10').first()).toBeVisible();
     await expect(page.getByText('Trusted universe membership unavailable. Trusted universe membership page failed at offset 250.')).toBeVisible();

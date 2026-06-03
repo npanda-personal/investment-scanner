@@ -170,6 +170,152 @@ describe('SignalPositionLedgerRepository', () => {
     expect(page.hasMore).toBe(true);
     expect(page.nextOffset).toBe(2);
   });
+
+  it('persists active risk-warning lifecycle evidence without clearing the active slot', async () => {
+    const upsert = jest.fn().mockResolvedValue(null);
+    const repository = new SignalPositionLedgerRepository({
+      signalPositionLedgerEntry: { upsert },
+    } as any);
+    const row = ledgerActiveRow({
+      status: 'RISK_WARNING',
+      healthState: 'RISK_WARNING',
+      lifecycleEvidenceStatus: 'RISK_WARNING',
+      exitStrategyId: 'DEFENSIVE_EXIT',
+      exitStrategyVersion: '1.2.0',
+      exitSourceDecisionId: 'decision-risk-1',
+      exitRuleIds: ['RELATIVE_STRENGTH_DECAY_EXIT'],
+      exitDecision: 'REDUCE_RISK',
+    });
+
+    await repository.upsertActiveLedgerRow(row as any);
+    const payload = upsert.mock.calls[0][0];
+
+    expect(payload.create).toMatchObject({
+      status: 'RISK_WARNING',
+      activeSlot: 'ABC',
+      lifecycleEvidenceStatus: 'RISK_WARNING',
+      exitStrategyId: 'DEFENSIVE_EXIT',
+      exitStrategyVersion: '1.2.0',
+      exitSourceDecisionId: 'decision-risk-1',
+      exitRuleIds: ['RELATIVE_STRENGTH_DECAY_EXIT'],
+      exitDecision: 'REDUCE_RISK',
+      closePriceStatus: 'UNAVAILABLE',
+    });
+    expect(payload.update).toMatchObject({
+      status: 'RISK_WARNING',
+      activeSlot: 'ABC',
+      lifecycleEvidenceStatus: 'RISK_WARNING',
+      exitRuleIds: ['RELATIVE_STRENGTH_DECAY_EXIT'],
+    });
+  });
+
+  it('persists exit-triggered evidence as active-like until close price is source-proven', async () => {
+    const upsert = jest.fn().mockResolvedValue(null);
+    const repository = new SignalPositionLedgerRepository({
+      signalPositionLedgerEntry: { upsert },
+    } as any);
+    const row = ledgerActiveRow({
+      status: 'EXIT_TRIGGERED',
+      healthState: 'EXIT_TRIGGERED',
+      lifecycleEvidenceStatus: 'EXIT_TRIGGERED',
+      exitStrategyId: 'DEFENSIVE_EXIT',
+      exitStrategyVersion: '1.2.0',
+      exitSourceDecisionId: 'decision-exit-1',
+      exitTriggerTimestamp: '2026-05-27T00:00:00.000Z',
+      exitRuleId: 'PRICE_BELOW_SMA50',
+      exitRuleIds: ['PRICE_BELOW_SMA50'],
+      exitDecision: 'EXIT_CANDIDATE',
+      closePriceStatus: 'UNAVAILABLE',
+    });
+
+    await repository.upsertActiveLedgerRow(row as any);
+    const payload = upsert.mock.calls[0][0];
+
+    expect(payload.create).toMatchObject({
+      status: 'EXIT_TRIGGERED',
+      activeSlot: 'ABC',
+      lifecycleEvidenceStatus: 'EXIT_TRIGGERED',
+      exitSourceDecisionId: 'decision-exit-1',
+      exitRuleIds: ['PRICE_BELOW_SMA50'],
+      exitTriggerPrice: null,
+      closePriceStatus: 'UNAVAILABLE',
+      closedAt: null,
+    });
+  });
+
+  it('persists closed lifecycle rows with source decision and close evidence while clearing active slot', async () => {
+    const update = jest.fn().mockResolvedValue(null);
+    const repository = new SignalPositionLedgerRepository({
+      signalPositionLedgerEntry: { update },
+    } as any);
+    const row = ledgerActiveRow({
+      status: 'CLOSED',
+      lifecycleEvidenceStatus: 'CLOSED',
+      exitStrategyId: 'DEFENSIVE_EXIT',
+      exitStrategyVersion: '1.2.0',
+      exitSourceDecisionId: 'decision-close-1',
+      exitTriggerTimestamp: '2026-05-27T00:00:00.000Z',
+      exitTriggerPrice: 108,
+      closePriceStatus: 'SOURCE_PROVEN',
+      exitReasonSummary: 'Price closed below SMA50.',
+      exitRuleId: 'PRICE_BELOW_SMA50',
+      exitRuleIds: ['PRICE_BELOW_SMA50'],
+      exitDecision: 'EXIT_CANDIDATE',
+      closedAt: '2026-05-27T00:05:00.000Z',
+    });
+
+    await repository.closeLedgerRow(row as any);
+    const payload = update.mock.calls[0][0];
+
+    expect(payload.where).toEqual({ ledgerKey: row.ledgerKey });
+    expect(payload.data).toMatchObject({
+      status: 'CLOSED',
+      activeSlot: null,
+      lifecycleEvidenceStatus: 'CLOSED',
+      exitStrategyId: 'DEFENSIVE_EXIT',
+      exitStrategyVersion: '1.2.0',
+      exitSourceDecisionId: 'decision-close-1',
+      exitTriggerPrice: 108,
+      closePriceStatus: 'SOURCE_PROVEN',
+      exitRuleIds: ['PRICE_BELOW_SMA50'],
+      exitDecision: 'EXIT_CANDIDATE',
+      closedAt: new Date('2026-05-27T00:05:00.000Z'),
+    });
+  });
+
+  it('persists invalidated lifecycle rows separately from closed history while clearing active slot', async () => {
+    const update = jest.fn().mockResolvedValue(null);
+    const repository = new SignalPositionLedgerRepository({
+      signalPositionLedgerEntry: { update },
+    } as any);
+    const row = ledgerActiveRow({
+      status: 'INVALIDATED',
+      lifecycleEvidenceStatus: 'INVALIDATED',
+      exitStrategyId: 'DEFENSIVE_EXIT',
+      exitStrategyVersion: '1.2.0',
+      exitSourceDecisionId: 'decision-invalidated-1',
+      closePriceStatus: 'UNAVAILABLE',
+      invalidationSourceDecisionId: 'decision-invalidated-1',
+      invalidationRuleIds: ['SUPPORT_INVALIDATED'],
+      invalidationTimestamp: '2026-05-27T00:00:00.000Z',
+      closedAt: null,
+    });
+
+    await repository.closeLedgerRow(row as any);
+    const payload = update.mock.calls[0][0];
+
+    expect(payload.where).toEqual({ ledgerKey: row.ledgerKey });
+    expect(payload.data).toMatchObject({
+      status: 'INVALIDATED',
+      activeSlot: null,
+      lifecycleEvidenceStatus: 'INVALIDATED',
+      closePriceStatus: 'UNAVAILABLE',
+      invalidationSourceDecisionId: 'decision-invalidated-1',
+      invalidationRuleIds: ['SUPPORT_INVALIDATED'],
+      invalidationTimestamp: new Date('2026-05-27T00:00:00.000Z'),
+      closedAt: null,
+    });
+  });
 });
 
 function ledgerEntryRow(overrides: Record<string, unknown>) {
@@ -209,6 +355,55 @@ function ledgerEntryRow(overrides: Record<string, unknown>) {
     closedAt: null,
     createdAt: new Date('2026-05-26T00:00:00.000Z'),
     updatedAt: new Date('2026-05-26T00:00:00.000Z'),
+    ...overrides,
+  };
+}
+
+function ledgerActiveRow(overrides: Record<string, unknown> = {}) {
+  return {
+    ledgerKey: 'IN:STOCK:stock-1:bullish_entry_trigger:2026-05-26T00:00:00.000Z',
+    status: 'ACTIVE',
+    signalId: 'signal-1',
+    instrumentId: 'stock-1',
+    symbol: 'ABC.NS',
+    companyName: 'ABC Co',
+    region: 'IN',
+    assetType: 'STOCK',
+    triggerType: 'bullish_entry_trigger',
+    entryTriggerTimestamp: '2026-05-26T00:00:00.000Z',
+    entryTriggerPrice: 100,
+    entryReasonSummary: 'Entry trigger reason.',
+    strategyId: 'BREAKOUT',
+    strategyVersion: '1.0.0',
+    strategyDecision: 'ENTRY_CANDIDATE',
+    strategyReadinessLabel: 'READY',
+    strategyRatingGrade: 'A',
+    entryRuleId: 'ENTRY_RULE',
+    latestTrustedPriceDate: null,
+    latestTrustedPrice: null,
+    currentReturnPercent: null,
+    currentReturnStatus: 'UNAVAILABLE',
+    currentDataQualityStatus: 'READY',
+    healthState: null,
+    lifecycleEvidenceStatus: 'ACTIVE_ENTRY',
+    trustEvidenceStatus: 'SOURCE_PROVEN_PRICE_UNAVAILABLE',
+    calibrationEvidenceStatus: 'AVAILABLE',
+    displayWarnings: [],
+    exitSignalId: null,
+    exitStrategyId: null,
+    exitStrategyVersion: null,
+    exitSourceDecisionId: null,
+    exitTriggerTimestamp: null,
+    exitTriggerPrice: null,
+    closePriceStatus: 'UNAVAILABLE',
+    exitReasonSummary: null,
+    exitRuleId: null,
+    exitRuleIds: [],
+    exitDecision: null,
+    invalidationSourceDecisionId: null,
+    invalidationRuleIds: [],
+    invalidationTimestamp: null,
+    closedAt: null,
     ...overrides,
   };
 }

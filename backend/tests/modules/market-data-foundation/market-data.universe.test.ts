@@ -333,9 +333,43 @@ describe('Market Data Foundation universe readiness', () => {
       listingDateStatus: 'PRESENT_OLDER_THAN_15Y_USED_15Y',
       providerFallbackState: 'PROVIDER_SUPPORTED',
       latestCompletedEodDate: latestCompleted,
-      primarySourceAttempted: 'YAHOO',
+      primarySourceAttempted: 'NSE_BSE_EXCHANGE_EOD',
     });
     expect(Array.isArray(rows[0].trustedBaselineBlockerCodes)).toBe(true);
+  });
+
+  it('admits provider-unknown stocks into trusted review when NSE/BSE source-file evidence proves identity and prices', async () => {
+    const repository = {
+      listStocksForUniverseHealth: jest.fn().mockResolvedValue([
+        {
+          ...stockRow('exchange-backed', 'EXCHANGE.NS', 'UNKNOWN'),
+          exchange: 'NSE',
+          sourceSymbol: 'EXCHANGE',
+          displaySymbol: 'EXCHANGE',
+          providerSymbol: null,
+        },
+      ]),
+      priceReadinessStatsForSymbols: jest.fn().mockResolvedValue(new Map([
+        ['EXCHANGE.NS', completeHistoryPriceStats({
+          latestPriceDate: '2099-01-01',
+          latestSource: 'NSE_SECURITY_BHAVDATA',
+          latestSourceFileImportId: 'source-file-1',
+          latestSnapshotDate: '2099-01-01',
+          approvedExchangePriceRows: 252,
+          approvedExchangeLatestPriceDate: '2099-01-01',
+          approvedExchangeLatestSource: 'NSE_SECURITY_BHAVDATA',
+          approvedExchangeLatestSourceFileImportId: 'source-file-1',
+          sourceFileImportPriceRows: 252,
+        })],
+      ])),
+    };
+    const service = new MarketDataFoundationService(repository as any, {} as any);
+
+    const result = await service.trustedReviewUniverseHealth({ region: 'IN', assetType: 'STOCK' });
+
+    expect(result.trustedCount).toBe(1);
+    expect(result.providerSupportedCount).toBe(1);
+    expect(result.excludedCounts.providerUnknown).toBe(0);
   });
 
   it('publishes the pre-market target session with the previous completed EOD requirement', async () => {
@@ -381,6 +415,43 @@ describe('Market Data Foundation universe readiness', () => {
     expect(result.targetTradingDate).toBe('2026-05-13');
     expect(result.requiredDataThroughDate).toBe('2026-05-12');
     expect(result.storedDataThroughDate).toBe('2026-05-12');
+  });
+
+  it('uses latest stored official exchange EOD when the just-completed exchange file is not imported yet', async () => {
+    const repository = {
+      listStocksForUniverseHealth: jest.fn().mockResolvedValue([
+        stockRow('lite-ready', 'LITE.NS', 'SUPPORTED'),
+      ]),
+      priceReadinessStatsForSymbols: jest.fn().mockResolvedValue(new Map([
+        ['LITE.NS', completeHistoryPriceStats({
+          latestPriceDate: '2026-05-11',
+          latestSource: 'NSE_SECURITY_BHAVDATA',
+          latestSourceFileImportId: 'source-file-1',
+          latestSnapshotDate: '2026-05-11',
+          approvedExchangePriceRows: 252,
+          approvedExchangeLatestPriceDate: '2026-05-11',
+          approvedExchangeLatestSource: 'NSE_SECURITY_BHAVDATA',
+          approvedExchangeLatestSourceFileImportId: 'source-file-1',
+          sourceFileImportPriceRows: 252,
+        })],
+      ])),
+    };
+    const service = new MarketDataFoundationService(repository as any, {} as any);
+
+    const result = await service.trustedReviewUniverseHealth({
+      region: 'IN',
+      assetType: 'STOCK',
+      now: new Date('2026-05-12T10:30:00.000Z'),
+    } as any);
+
+    expect(result.targetTradingDate).toBe('2026-05-13');
+    expect(result.requiredDataThroughDate).toBe('2026-05-11');
+    expect(result.storedDataThroughDate).toBe('2026-05-11');
+    expect(result.trustedCount).toBe(1);
+    expect(result.excludedCounts.staleLatestPrice).toBe(0);
+    expect(result.warnings).toEqual(expect.arrayContaining([
+      expect.stringContaining('Official exchange EOD for 2026-05-12 is not available'),
+    ]));
   });
 
   it('excludes non-trusted provider and OHLCV states from the trusted review universe', async () => {
@@ -475,13 +546,13 @@ describe('Market Data Foundation universe readiness', () => {
         staleLatestPrice: 1,
       },
       nextAction: {
-        code: 'VALIDATE_PROVIDERS',
-        label: 'Validate unknown providers',
+        code: 'BACKFILL_PRICES',
+        label: 'Backfill prices',
         boundedRequest: { batchSize: 50, region: 'IN', assetType: 'STOCK' },
       },
     });
     expect(result.blockers).toEqual(expect.arrayContaining([
-      expect.objectContaining({ category: 'PROVIDER_VALIDATION', severity: 'HARD_BLOCKER', affectedCount: 1 }),
+      expect.objectContaining({ category: 'PROVIDER_VALIDATION', severity: 'CONTEXT_GAP', affectedCount: 1 }),
       expect.objectContaining({ category: 'PRICE_BACKFILL', nextActionCode: 'BACKFILL_PRICES' }),
       expect.objectContaining({ category: 'INSUFFICIENT_TRUSTED_UNIVERSE', severity: 'HARD_BLOCKER' }),
     ]));

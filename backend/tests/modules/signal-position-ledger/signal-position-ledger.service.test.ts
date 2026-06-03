@@ -121,6 +121,9 @@ const activeLedgerRow = (overrides: Partial<any> = {}) => ({
   trustEvidenceStatus: 'SOURCE_PROVEN_PRICE_UNAVAILABLE' as const,
   calibrationEvidenceStatus: 'AVAILABLE' as const,
   displayWarnings: [],
+  closePriceStatus: 'UNAVAILABLE' as const,
+  exitRuleIds: [],
+  invalidationRuleIds: [],
 });
 
 describe('SignalPositionLedgerService', () => {
@@ -323,6 +326,9 @@ describe('SignalPositionLedgerService', () => {
     expect(result.totalCount).toBe(2);
     expect(result.items.map((row) => row.symbol).sort()).toEqual(['AAA', 'BBB']);
     expect(result.items.find((row) => row.symbol === 'AAA')?.entryTriggerTimestamp).toBe('2026-05-20T00:00:00.000Z');
+    const writtenLedgerKeys = repository.upsertActiveLedgerRow.mock.calls.map(([row]) => row.ledgerKey);
+    expect(writtenLedgerKeys).toContain(existingA.ledgerKey);
+    expect(writtenLedgerKeys).not.toContain('IN:STOCK:stock-a:bullish_entry_trigger:2026-05-26T00:00:00.000Z');
     expect(repository.closeLedgerRow).not.toHaveBeenCalled();
   });
 
@@ -345,11 +351,14 @@ describe('SignalPositionLedgerService', () => {
           latestPrice: { date: '2026-05-27T00:00:00.000Z', close: 112, adjustedClose: 112, dataStatus: 'COMPLETE', source: 'database' },
           quality: { signalReadinessStatus: 'READY', coverageStatus: 'GOOD', liquidityStatus: 'LIQUID', lastEvaluatedAt: '2026-05-27T00:00:00.000Z' },
           exitDecision: {
+            id: 'decision-exit-1',
             strategy: 'DEFENSIVE_EXIT',
+            strategyVersion: '1.2.0',
             decision: 'EXIT_CANDIDATE',
             generatedAt: '2026-05-27T00:00:00.000Z',
             reasons: ['Price closed below SMA50.'],
             exitRulesTriggered: ['PRICE_BELOW_SMA50'],
+            invalidationRulesTriggered: [],
           },
         }],
       ])),
@@ -378,10 +387,414 @@ describe('SignalPositionLedgerService', () => {
       symbol: 'ABC',
       exitTriggerTimestamp: '2026-05-27T00:00:00.000Z',
       exitTriggerPrice: 112,
+      closePriceStatus: 'SOURCE_PROVEN',
       exitReasonSummary: 'Price closed below SMA50.',
       exitRuleId: 'PRICE_BELOW_SMA50',
+      exitRuleIds: ['PRICE_BELOW_SMA50'],
+      exitStrategyId: 'DEFENSIVE_EXIT',
+      exitStrategyVersion: '1.2.0',
+      exitSourceDecisionId: 'decision-exit-1',
+      lifecycleEvidenceStatus: 'CLOSED',
     });
     expect(repository.closeLedgerRow).toHaveBeenCalledWith(expect.objectContaining({ status: 'CLOSED' }));
+  });
+
+  it('keeps an active row exit-triggered when close price evidence is missing', async () => {
+    const existing = activeLedgerRow({ instrumentId: 'stock-1', symbol: 'ABC' });
+    const repository = {
+      listAllLedgerRows: jest.fn()
+        .mockResolvedValueOnce([existing])
+        .mockResolvedValueOnce([]),
+      listLatestSignals: jest.fn().mockResolvedValue({
+        items: [],
+        totalCount: 0,
+        limit: 100,
+        offset: 0,
+        nextOffset: null,
+        hasMore: false,
+      }),
+      latestSnapshotsByInstrumentIds: jest.fn().mockResolvedValue(new Map([
+        ['stock-1', {
+          latestPrice: { date: '2026-05-27T00:00:00.000Z', close: 112, adjustedClose: 112, dataStatus: 'COMPLETE', source: 'database' },
+          quality: { signalReadinessStatus: 'READY', coverageStatus: 'GOOD', liquidityStatus: 'LIQUID', lastEvaluatedAt: '2026-05-27T00:00:00.000Z' },
+          exitDecision: {
+            id: 'decision-exit-missing-price',
+            strategy: 'DEFENSIVE_EXIT',
+            strategyVersion: '1.2.0',
+            decision: 'EXIT_CANDIDATE',
+            generatedAt: '2026-05-27T00:00:00.000Z',
+            reasons: ['Price closed below SMA50.'],
+            exitRulesTriggered: ['PRICE_BELOW_SMA50'],
+            invalidationRulesTriggered: [],
+          },
+        }],
+      ])),
+      priceAtOrBeforeInstrumentId: jest.fn().mockResolvedValue(null),
+      upsertActiveLedgerRow: jest.fn(),
+      closeLedgerRow: jest.fn(),
+    };
+    const signalService = { enrichSignals: jest.fn() };
+    const service = new SignalPositionLedgerService(repository as any, signalService as any);
+    const query = { region: 'IN', assetType: 'STOCK', limit: 25, offset: 0 };
+
+    await service.refreshActiveRows(query, { force: true, wait: true });
+    const active = await service.listActiveRows(query);
+    const closed = await service.listClosedRows(query);
+
+    expect(active.totalCount).toBe(1);
+    expect(closed.totalCount).toBe(0);
+    expect(active.items[0]).toMatchObject({
+      status: 'EXIT_TRIGGERED',
+      healthState: 'EXIT_TRIGGERED',
+      lifecycleEvidenceStatus: 'EXIT_TRIGGERED',
+      exitSourceDecisionId: 'decision-exit-missing-price',
+      exitRuleIds: ['PRICE_BELOW_SMA50'],
+      exitTriggerTimestamp: '2026-05-27T00:00:00.000Z',
+      exitTriggerPrice: null,
+      closePriceStatus: 'UNAVAILABLE',
+      closedAt: null,
+    });
+    expect(repository.upsertActiveLedgerRow).toHaveBeenCalledWith(expect.objectContaining({ status: 'EXIT_TRIGGERED' }));
+    expect(repository.closeLedgerRow).not.toHaveBeenCalled();
+  });
+
+  it('keeps exit-triggered pending when close price evidence is not source-proven', async () => {
+    const existing = activeLedgerRow({ instrumentId: 'stock-1', symbol: 'ABC' });
+    const repository = {
+      listAllLedgerRows: jest.fn()
+        .mockResolvedValueOnce([existing])
+        .mockResolvedValueOnce([]),
+      listLatestSignals: jest.fn().mockResolvedValue({
+        items: [],
+        totalCount: 0,
+        limit: 100,
+        offset: 0,
+        nextOffset: null,
+        hasMore: false,
+      }),
+      latestSnapshotsByInstrumentIds: jest.fn().mockResolvedValue(new Map([
+        ['stock-1', {
+          latestPrice: { date: '2026-05-27T00:00:00.000Z', close: 112, adjustedClose: 112, dataStatus: 'COMPLETE', source: 'database' },
+          quality: { signalReadinessStatus: 'READY', coverageStatus: 'GOOD', liquidityStatus: 'LIQUID', lastEvaluatedAt: '2026-05-27T00:00:00.000Z' },
+          exitDecision: {
+            id: 'decision-exit-partial-price',
+            strategy: 'DEFENSIVE_EXIT',
+            strategyVersion: '1.2.0',
+            decision: 'EXIT_CANDIDATE',
+            generatedAt: '2026-05-27T00:00:00.000Z',
+            reasons: ['Price closed below SMA50.'],
+            exitRulesTriggered: ['PRICE_BELOW_SMA50'],
+            invalidationRulesTriggered: [],
+          },
+        }],
+      ])),
+      priceAtOrBeforeInstrumentId: jest.fn().mockResolvedValue({
+        date: '2026-05-27T00:00:00.000Z',
+        close: 112,
+        adjustedClose: 112,
+        dataStatus: 'PARTIAL',
+        source: 'database',
+      }),
+      upsertActiveLedgerRow: jest.fn(),
+      closeLedgerRow: jest.fn(),
+    };
+    const signalService = { enrichSignals: jest.fn() };
+    const service = new SignalPositionLedgerService(repository as any, signalService as any);
+    const query = { region: 'IN', assetType: 'STOCK', limit: 25, offset: 0 };
+
+    await service.refreshActiveRows(query, { force: true, wait: true });
+    const active = await service.listActiveRows(query);
+    const closed = await service.listClosedRows(query);
+
+    expect(active.totalCount).toBe(1);
+    expect(closed.totalCount).toBe(0);
+    expect(active.items[0]).toMatchObject({
+      status: 'EXIT_TRIGGERED',
+      lifecycleEvidenceStatus: 'EXIT_TRIGGERED',
+      exitSourceDecisionId: 'decision-exit-partial-price',
+      exitRuleIds: ['PRICE_BELOW_SMA50'],
+      exitTriggerPrice: null,
+      closePriceStatus: 'UNAVAILABLE',
+      closedAt: null,
+    });
+    expect(repository.closeLedgerRow).not.toHaveBeenCalled();
+  });
+
+  it('persists terminal invalidation evidence separately from closed history', async () => {
+    const existing = activeLedgerRow({ instrumentId: 'stock-1', symbol: 'ABC' });
+    const repository = {
+      listAllLedgerRows: jest.fn()
+        .mockResolvedValueOnce([existing])
+        .mockResolvedValueOnce([]),
+      listLatestSignals: jest.fn().mockResolvedValue({
+        items: [],
+        totalCount: 0,
+        limit: 100,
+        offset: 0,
+        nextOffset: null,
+        hasMore: false,
+      }),
+      latestSnapshotsByInstrumentIds: jest.fn().mockResolvedValue(new Map([
+        ['stock-1', {
+          latestPrice: { date: '2026-05-27T00:00:00.000Z', close: 95, adjustedClose: 95, dataStatus: 'COMPLETE', source: 'database' },
+          quality: { signalReadinessStatus: 'READY', coverageStatus: 'GOOD', liquidityStatus: 'LIQUID', lastEvaluatedAt: '2026-05-27T00:00:00.000Z' },
+          exitDecision: {
+            id: 'decision-invalidated-1',
+            strategy: 'DEFENSIVE_EXIT',
+            strategyVersion: '1.2.0',
+            decision: 'HOLD',
+            generatedAt: '2026-05-27T00:00:00.000Z',
+            reasons: ['Two-bar support loss invalidates the active long setup.'],
+            exitRulesTriggered: [],
+            invalidationRulesTriggered: ['SUPPORT_INVALIDATED'],
+          },
+        }],
+      ])),
+      upsertActiveLedgerRow: jest.fn(),
+      closeLedgerRow: jest.fn(),
+    };
+    const signalService = { enrichSignals: jest.fn() };
+    const service = new SignalPositionLedgerService(repository as any, signalService as any);
+    const query = { region: 'IN', assetType: 'STOCK', limit: 25, offset: 0 };
+
+    await service.refreshActiveRows(query, { force: true, wait: true });
+    const active = await service.listActiveRows(query);
+    const closed = await service.listClosedRows(query);
+
+    expect(active.totalCount).toBe(0);
+    expect(closed.totalCount).toBe(0);
+    expect(repository.closeLedgerRow).toHaveBeenCalledWith(expect.objectContaining({
+      status: 'INVALIDATED',
+      lifecycleEvidenceStatus: 'INVALIDATED',
+      invalidationSourceDecisionId: 'decision-invalidated-1',
+      invalidationRuleIds: ['SUPPORT_INVALIDATED'],
+      invalidationTimestamp: '2026-05-27T00:00:00.000Z',
+      closedAt: null,
+    }));
+  });
+
+  it('prioritizes terminal invalidation over exit candidate close evidence', async () => {
+    const existing = activeLedgerRow({ instrumentId: 'stock-1', symbol: 'ABC' });
+    const repository = {
+      listAllLedgerRows: jest.fn()
+        .mockResolvedValueOnce([existing])
+        .mockResolvedValueOnce([]),
+      listLatestSignals: jest.fn().mockResolvedValue({
+        items: [],
+        totalCount: 0,
+        limit: 100,
+        offset: 0,
+        nextOffset: null,
+        hasMore: false,
+      }),
+      latestSnapshotsByInstrumentIds: jest.fn().mockResolvedValue(new Map([
+        ['stock-1', {
+          latestPrice: { date: '2026-05-27T00:00:00.000Z', close: 92, adjustedClose: 92, dataStatus: 'COMPLETE', source: 'database' },
+          quality: { signalReadinessStatus: 'READY', coverageStatus: 'GOOD', liquidityStatus: 'LIQUID', lastEvaluatedAt: '2026-05-27T00:00:00.000Z' },
+          exitDecision: {
+            id: 'decision-invalidated-exit-1',
+            strategy: 'DEFENSIVE_EXIT',
+            strategyVersion: '1.2.0',
+            decision: 'EXIT_CANDIDATE',
+            generatedAt: '2026-05-27T00:00:00.000Z',
+            reasons: ['Support loss invalidates the active setup.'],
+            exitRulesTriggered: ['PRICE_BELOW_SMA50'],
+            invalidationRulesTriggered: ['SUPPORT_INVALIDATED'],
+          },
+        }],
+      ])),
+      priceAtOrBeforeInstrumentId: jest.fn().mockResolvedValue({
+        date: '2026-05-27T00:00:00.000Z',
+        close: 92,
+        adjustedClose: 92,
+        dataStatus: 'COMPLETE',
+        source: 'database',
+      }),
+      upsertActiveLedgerRow: jest.fn(),
+      closeLedgerRow: jest.fn(),
+    };
+    const signalService = { enrichSignals: jest.fn() };
+    const service = new SignalPositionLedgerService(repository as any, signalService as any);
+    const query = { region: 'IN', assetType: 'STOCK', limit: 25, offset: 0 };
+
+    await service.refreshActiveRows(query, { force: true, wait: true });
+    const active = await service.listActiveRows(query);
+    const closed = await service.listClosedRows(query);
+
+    expect(active.totalCount).toBe(0);
+    expect(closed.totalCount).toBe(0);
+    expect(repository.priceAtOrBeforeInstrumentId).not.toHaveBeenCalled();
+    expect(repository.closeLedgerRow).toHaveBeenCalledWith(expect.objectContaining({
+      status: 'INVALIDATED',
+      lifecycleEvidenceStatus: 'INVALIDATED',
+      invalidationSourceDecisionId: 'decision-invalidated-exit-1',
+      invalidationRuleIds: ['SUPPORT_INVALIDATED'],
+      closePriceStatus: 'UNAVAILABLE',
+      exitTriggerPrice: null,
+      closedAt: null,
+    }));
+  });
+
+  it('does not invalidate without persisted invalidation rule evidence', async () => {
+    const existing = activeLedgerRow({ instrumentId: 'stock-1', symbol: 'ABC' });
+    const repository = {
+      listAllLedgerRows: jest.fn()
+        .mockResolvedValueOnce([existing])
+        .mockResolvedValueOnce([]),
+      listLatestSignals: jest.fn().mockResolvedValue({
+        items: [],
+        totalCount: 0,
+        limit: 100,
+        offset: 0,
+        nextOffset: null,
+        hasMore: false,
+      }),
+      latestSnapshotsByInstrumentIds: jest.fn().mockResolvedValue(new Map([
+        ['stock-1', {
+          latestPrice: { date: '2026-05-27T00:00:00.000Z', close: 101, adjustedClose: 101, dataStatus: 'COMPLETE', source: 'database' },
+          quality: { signalReadinessStatus: 'READY', coverageStatus: 'GOOD', liquidityStatus: 'LIQUID', lastEvaluatedAt: '2026-05-27T00:00:00.000Z' },
+          exitDecision: {
+            id: 'decision-no-invalidation-rules',
+            strategy: 'DEFENSIVE_EXIT',
+            strategyVersion: '1.2.0',
+            decision: 'HOLD',
+            generatedAt: '2026-05-27T00:00:00.000Z',
+            reasons: ['Narrative mentions invalidation review, but no rule fired.'],
+            exitRulesTriggered: [],
+            invalidationRulesTriggered: [],
+          },
+        }],
+      ])),
+      upsertActiveLedgerRow: jest.fn(),
+      closeLedgerRow: jest.fn(),
+    };
+    const signalService = { enrichSignals: jest.fn() };
+    const service = new SignalPositionLedgerService(repository as any, signalService as any);
+    const query = { region: 'IN', assetType: 'STOCK', limit: 25, offset: 0 };
+
+    await service.refreshActiveRows(query, { force: true, wait: true });
+    const active = await service.listActiveRows(query);
+    const closed = await service.listClosedRows(query);
+
+    expect(active.totalCount).toBe(1);
+    expect(closed.totalCount).toBe(0);
+    expect(active.items[0]).toMatchObject({
+      status: 'ACTIVE',
+      lifecycleEvidenceStatus: 'ACTIVE_ENTRY',
+      invalidationRuleIds: [],
+    });
+    expect(active.items[0].invalidationSourceDecisionId ?? null).toBeNull();
+    expect(repository.upsertActiveLedgerRow).toHaveBeenCalledWith(expect.objectContaining({ status: 'ACTIVE' }));
+    expect(repository.closeLedgerRow).not.toHaveBeenCalled();
+  });
+
+  it('maps weak non-terminal exit rule evidence to risk warning', async () => {
+    const existing = activeLedgerRow({ instrumentId: 'stock-1', symbol: 'ABC' });
+    const repository = {
+      listAllLedgerRows: jest.fn()
+        .mockResolvedValueOnce([existing])
+        .mockResolvedValueOnce([]),
+      listLatestSignals: jest.fn().mockResolvedValue({
+        items: [],
+        totalCount: 0,
+        limit: 100,
+        offset: 0,
+        nextOffset: null,
+        hasMore: false,
+      }),
+      latestSnapshotsByInstrumentIds: jest.fn().mockResolvedValue(new Map([
+        ['stock-1', {
+          latestPrice: { date: '2026-05-27T00:00:00.000Z', close: 101, adjustedClose: 101, dataStatus: 'COMPLETE', source: 'database' },
+          quality: { signalReadinessStatus: 'READY', coverageStatus: 'GOOD', liquidityStatus: 'LIQUID', lastEvaluatedAt: '2026-05-27T00:00:00.000Z' },
+          exitDecision: {
+            id: 'decision-weak-exit-1',
+            strategy: 'DEFENSIVE_EXIT',
+            strategyVersion: '1.2.0',
+            decision: 'WATCH',
+            generatedAt: '2026-05-27T00:00:00.000Z',
+            reasons: ['Relative strength is weakening.'],
+            exitRulesTriggered: ['RELATIVE_STRENGTH_DECAY_EXIT'],
+            invalidationRulesTriggered: [],
+          },
+        }],
+      ])),
+      upsertActiveLedgerRow: jest.fn(),
+      closeLedgerRow: jest.fn(),
+    };
+    const signalService = { enrichSignals: jest.fn() };
+    const service = new SignalPositionLedgerService(repository as any, signalService as any);
+    const query = { region: 'IN', assetType: 'STOCK', limit: 25, offset: 0 };
+
+    await service.refreshActiveRows(query, { force: true, wait: true });
+    const active = await service.listActiveRows(query);
+    const closed = await service.listClosedRows(query);
+
+    expect(active.totalCount).toBe(1);
+    expect(closed.totalCount).toBe(0);
+    expect(active.items[0]).toMatchObject({
+      status: 'RISK_WARNING',
+      healthState: 'RISK_WARNING',
+      lifecycleEvidenceStatus: 'RISK_WARNING',
+      exitRuleIds: ['RELATIVE_STRENGTH_DECAY_EXIT'],
+      exitSourceDecisionId: 'decision-weak-exit-1',
+      closePriceStatus: 'UNAVAILABLE',
+      closedAt: null,
+    });
+    expect(repository.closeLedgerRow).not.toHaveBeenCalled();
+  });
+
+  it('replays risk-warning transitions idempotently without duplicate lifecycle rows', async () => {
+    const existing = activeLedgerRow({ instrumentId: 'stock-1', symbol: 'ABC' });
+    const activeRows = new Map<string, any>([[existing.ledgerKey, existing]]);
+    const repository = {
+      listAllLedgerRows: jest.fn(async (_query: any, status: 'ACTIVE' | 'CLOSED') => (
+        status === 'ACTIVE' ? [...activeRows.values()] : []
+      )),
+      listLatestSignals: jest.fn().mockResolvedValue({
+        items: [],
+        totalCount: 0,
+        limit: 100,
+        offset: 0,
+        nextOffset: null,
+        hasMore: false,
+      }),
+      latestSnapshotsByInstrumentIds: jest.fn().mockResolvedValue(new Map([
+        ['stock-1', {
+          latestPrice: { date: '2026-05-27T00:00:00.000Z', close: 101, adjustedClose: 101, dataStatus: 'COMPLETE', source: 'database' },
+          quality: { signalReadinessStatus: 'READY', coverageStatus: 'GOOD', liquidityStatus: 'LIQUID', lastEvaluatedAt: '2026-05-27T00:00:00.000Z' },
+          exitDecision: {
+            id: 'decision-risk-replay-1',
+            strategy: 'DEFENSIVE_EXIT',
+            strategyVersion: '1.2.0',
+            decision: 'REDUCE_RISK',
+            generatedAt: '2026-05-27T00:00:00.000Z',
+            reasons: ['Risk evidence weakened.'],
+            exitRulesTriggered: ['RELATIVE_STRENGTH_DECAY_EXIT'],
+            invalidationRulesTriggered: [],
+          },
+        }],
+      ])),
+      upsertActiveLedgerRow: jest.fn(async (row: any) => activeRows.set(row.ledgerKey, row)),
+      closeLedgerRow: jest.fn(),
+    };
+    const signalService = { enrichSignals: jest.fn() };
+    const service = new SignalPositionLedgerService(repository as any, signalService as any);
+    const query = { region: 'IN', assetType: 'STOCK', limit: 25, offset: 0 };
+
+    await service.refreshActiveRows(query, { force: true, wait: true });
+    await service.refreshActiveRows(query, { force: true, wait: true });
+    const active = await service.listActiveRows(query);
+
+    const writtenLedgerKeys = repository.upsertActiveLedgerRow.mock.calls.map(([row]) => row.ledgerKey);
+    expect(new Set(writtenLedgerKeys)).toEqual(new Set([existing.ledgerKey]));
+    expect(activeRows.size).toBe(1);
+    expect(active.totalCount).toBe(1);
+    expect(active.items[0]).toMatchObject({
+      ledgerKey: existing.ledgerKey,
+      status: 'RISK_WARNING',
+      lifecycleEvidenceStatus: 'RISK_WARNING',
+    });
+    expect(repository.closeLedgerRow).not.toHaveBeenCalled();
   });
 
   it('keeps active entry trigger rows visible when current price is stale', async () => {
@@ -575,7 +988,9 @@ describe('SignalPositionLedgerService', () => {
     expect(result.items[0]).toMatchObject({
       symbol: 'ABC',
       healthState: 'RISK_WARNING',
-      status: 'ACTIVE',
+      status: 'RISK_WARNING',
+      lifecycleEvidenceStatus: 'RISK_WARNING',
+      closePriceStatus: 'UNAVAILABLE',
     });
   });
 

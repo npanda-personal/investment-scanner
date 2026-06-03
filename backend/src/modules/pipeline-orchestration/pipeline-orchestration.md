@@ -233,6 +233,7 @@ Current Market Data bridge:
 - Pipeline Ops exposes `Run Daily Pipeline`, which runs Market Data first and then starts the downstream scheduled chain for the resulting instrument set;
 - `PIPELINE_RUN_ALL` supports explicit run modes: `full_latest_trading_date` for the user-facing manual button, `incremental_changed_only` for changed-set automation, and legacy `single_batch` as a compatibility alias for the full daily path;
 - the full daily path treats valid no-op or duplicate-current exchange-file rows as downstream-eligible so Data Quality and read models can refresh even when Market Data rows were already current;
+- the full daily path also treats expected current exchange-file unavailability as warning-only when Market Data supplies a latest valid `dataThroughDate`; it records `NOT_AVAILABLE` evidence and continues DB-only downstream refresh from that persisted date;
 - if the Market Data summary has no explicit downstream set in full daily mode, Pipeline Orchestration asks Market Data Foundation for DB-only persisted eligibility for the same `dataThroughDate`, preferring `LatestPrice` rows and then `PriceTick` rows; incremental mode does not use this fallback;
 - downstream exceptions are recorded as failed child-stage responses and make the daily Market Data command `PARTIAL` instead of disappearing as `null`;
 - paged scheduled adapters persist in-progress counts after each page/chunk where the module exposes page-level progress;

@@ -1,4 +1,5 @@
 import type { MarketDataStatus } from '../market-data-foundation';
+import type { StrategyDefinitionDrift, StrategyDefinitionSource } from '../strategy-framework';
 
 export type MarketCondition = 'HEALTHY' | 'MIXED' | 'BAD' | 'UNKNOWN';
 export type MarketGate = 'OPEN' | 'SELECTIVE' | 'CLOSED' | 'UNKNOWN';
@@ -91,6 +92,7 @@ export interface StrategyDecisionDto {
   country?: string;
   exchange?: string;
   strategy: StrategyName;
+  strategyName?: string | null;
   decision: StrategyDecision;
   action: DecisionAction;
   decisionScore: number;
@@ -120,6 +122,8 @@ export interface StrategyDecisionDto {
     readinessLabel?: string;
   } | null;
   readinessLabel?: string | null;
+  strategyDefinitionSource?: StrategyDefinitionSource | null;
+  strategyDefinitionDrift?: StrategyDefinitionDrift[];
 }
 
 export interface StrategyEvaluateRequest {

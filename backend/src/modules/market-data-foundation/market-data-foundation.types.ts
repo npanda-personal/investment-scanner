@@ -488,7 +488,7 @@ export interface V1Instrument {
   required_history_status?: TrustedBaselineRequiredHistoryStatus;
   listing_date_status?: TrustedBaselineListingDateStatus;
   provider_fallback_state?: TrustedBaselineProviderFallbackState;
-  primary_source_attempted?: 'YAHOO' | null;
+  primary_source_attempted?: 'NSE_BSE_EXCHANGE_EOD' | 'YAHOO' | null;
   fallback_sources_attempted?: string[];
   source_fallback_reason?: string | null;
   is_active: boolean;
@@ -950,7 +950,7 @@ export interface TrustedReviewUniverseInstrument {
   listingDate: string | null;
   listingDateStatus: TrustedBaselineListingDateStatus;
   providerFallbackState: TrustedBaselineProviderFallbackState;
-  primarySourceAttempted: 'YAHOO' | null;
+  primarySourceAttempted: 'NSE_BSE_EXCHANGE_EOD' | 'YAHOO' | null;
   fallbackSourcesAttempted: string[];
   sourceFallbackReason: string | null;
   contextGaps: string[];

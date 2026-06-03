@@ -1,6 +1,7 @@
 /// <reference types="@types/jest" />
 import { SignalGenerationEngineService } from '../../../src/modules/signal-generation-engine';
-import { StrategyFrameworkRegistry } from '../../../src/modules/strategy-framework';
+import { StrategyFrameworkRegistry, StrategyFrameworkService } from '../../../src/modules/strategy-framework';
+import type { StrategyDefinition } from '../../../src/modules/strategy-framework';
 
 const price = (index: number, adjusted_close: number, volume = 100) => ({
   date: new Date(2026, 3, 28 - index).toISOString(),
@@ -1122,6 +1123,117 @@ describe('SignalGenerationEngineService', () => {
     expect(frameworkService.performance).toHaveBeenCalledWith('BREAKOUT_CONFIRMATION', { region: 'IN', assetType: 'STOCK' });
   });
 
+  it('uses persisted Strategy Framework definitions for strategy match metadata when available', async () => {
+    const registry = new StrategyFrameworkRegistry();
+    const persistedBreakout = clonedStrategy(registry, 'BREAKOUT_CONFIRMATION', {
+      name: 'Persisted Breakout Confirmation',
+      version: '9.9.0',
+      readinessLabel: 'PAPER_TEST_CANDIDATE',
+      effectiveAt: '2026-06-01T00:00:00.000Z',
+    });
+    const strategyRepository = {
+      listDefinitions: jest.fn().mockResolvedValue([persistedBreakout]),
+      performance: jest.fn().mockResolvedValue([]),
+    };
+    const frameworkService = new StrategyFrameworkService(strategyRepository as any, registry, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any);
+    const prices = breakoutMatchPrices();
+    const repository = {
+      latestSignals: jest.fn().mockResolvedValue({
+        signals: [strategyMatchSignal({ sourcePriceDate: prices[0].date })],
+        total: 1,
+      }),
+    };
+    const marketDataService = strategyMatchMarketData(prices);
+    const service = new SignalGenerationEngineService(
+      repository as any,
+      marketDataService as any,
+      {} as any,
+      {} as any,
+      frameworkService as any,
+      undefined,
+      persistedMarketContextService() as any,
+      persistedSmartMoneyService('stock-1') as any,
+    );
+
+    const result = await service.topSignals({ limit: 5, includeStrategyMatches: true, strategyCode: 'BREAKOUT_CONFIRMATION' });
+    const match = result.signals[0].strategyMatches?.[0];
+
+    expect(match).toMatchObject({
+      strategyCode: 'BREAKOUT_CONFIRMATION',
+      strategyName: 'Persisted Breakout Confirmation',
+      strategyVersion: '9.9.0',
+      readinessLabel: 'PAPER_TEST_CANDIDATE',
+      strategyDefinitionSource: 'PERSISTED',
+    });
+    expect(match?.strategyDefinitionDrift).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'PERSISTED_VERSION_DIFFERS_FROM_REGISTRY',
+        persistedVersion: '9.9.0',
+        registryVersion: '1.2.0',
+      }),
+    ]));
+    expect(result.signals[0].triggerContract).toMatchObject({
+      strategy_id: 'BREAKOUT_CONFIRMATION',
+      strategy_version: '9.9.0',
+      trigger_price_evidence: expect.objectContaining({
+        strategy_id: 'BREAKOUT_CONFIRMATION',
+        strategy_version: '9.9.0',
+      }),
+    });
+  });
+
+  it('falls back to registry Strategy Framework definitions when persistence is empty', async () => {
+    const registry = new StrategyFrameworkRegistry();
+    const strategyRepository = {
+      listDefinitions: jest.fn().mockResolvedValue([]),
+      performance: jest.fn().mockResolvedValue([]),
+    };
+    const frameworkService = new StrategyFrameworkService(strategyRepository as any, registry, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any);
+    const prices = breakoutMatchPrices();
+    const repository = {
+      latestSignals: jest.fn().mockResolvedValue({
+        signals: [strategyMatchSignal({ sourcePriceDate: prices[0].date })],
+        total: 1,
+      }),
+    };
+    const marketDataService = strategyMatchMarketData(prices);
+    const service = new SignalGenerationEngineService(
+      repository as any,
+      marketDataService as any,
+      {} as any,
+      {} as any,
+      frameworkService as any,
+      undefined,
+      persistedMarketContextService() as any,
+      persistedSmartMoneyService('stock-1') as any,
+    );
+
+    const result = await service.topSignals({ limit: 5, includeStrategyMatches: true, strategyCode: 'BREAKOUT_CONFIRMATION' });
+    const match = result.signals[0].strategyMatches?.[0];
+    const registryBreakout = registry.get('BREAKOUT_CONFIRMATION');
+
+    expect(match).toMatchObject({
+      strategyCode: 'BREAKOUT_CONFIRMATION',
+      strategyName: registryBreakout?.name,
+      strategyVersion: registryBreakout?.version,
+      strategyDefinitionSource: 'REGISTRY_FALLBACK',
+    });
+    expect(match?.strategyDefinitionDrift).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'MISSING_PERSISTED_DEFINITION',
+        registryVersion: registryBreakout?.version,
+      }),
+    ]));
+    expect(result.signals[0].triggerContract).toMatchObject({
+      strategy_id: 'BREAKOUT_CONFIRMATION',
+      strategy_version: registryBreakout?.version,
+      trigger_price_evidence: expect.objectContaining({
+        strategy_id: 'BREAKOUT_CONFIRMATION',
+        strategy_version: registryBreakout?.version,
+      }),
+    });
+  });
+
   it('does not promote strategy matches when signal Data Quality eligibility is incomplete', async () => {
     const prices = breakoutMatchPrices();
     const service = new SignalGenerationEngineService({} as any, {
@@ -1416,4 +1528,67 @@ function breakoutMatchPrices() {
           : 106;
     return price(index, close, index === 0 ? 4000 : 1000);
   });
+}
+
+function clonedStrategy(registry: StrategyFrameworkRegistry, code: string, overrides: Partial<StrategyDefinition> = {}): StrategyDefinition {
+  const strategy = registry.get(code);
+  if (!strategy) throw new Error(`Missing registry strategy ${code}`);
+  return {
+    ...(JSON.parse(JSON.stringify(strategy)) as StrategyDefinition),
+    ...overrides,
+  };
+}
+
+function strategyMatchSignal(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'signal-1',
+    instrument_id: 'stock-1',
+    symbol: 'ABC',
+    company_name: 'ABC Co',
+    sector: 'Technology',
+    country: 'IN',
+    currentPrice: null,
+    previousClose: null,
+    dailyChange: null,
+    dailyChangePercent: null,
+    currency: null,
+    priceTimestamp: null,
+    score: 85,
+    direction: 'BULLISH',
+    confidence: 'HIGH',
+    triggered_signals: [{ code: 'PRICE_ABOVE_SMA50', label: 'price is above SMA50', category: 'TECHNICAL' }],
+    negative_signals: [],
+    explanation: 'Bullish because price is above SMA50.',
+    generated_at: '2026-04-28T00:00:00.000Z',
+    source: 'signal-generation-engine',
+    data_status: 'COMPLETE',
+    marketGate: 'OPEN',
+    ...trustedReadEvidence,
+    ...overrides,
+  };
+}
+
+function strategyMatchMarketData(prices: ReturnType<typeof breakoutMatchPrices>) {
+  return {
+    getInstrumentsByIds: jest.fn().mockResolvedValue([{ id: 'stock-1', symbol: 'ABC', country: 'India', asset_type: 'STOCK', currency: 'INR', sector: 'Technology' }]),
+    getLatestPricesBySymbols: jest.fn().mockResolvedValue([{ symbol: 'ABC', adjusted_close: prices[0].adjusted_close, date: prices[0].date }]),
+    listPricesByInstrumentId: jest.fn().mockResolvedValue({ prices }),
+  };
+}
+
+function persistedMarketContextService() {
+  return {
+    latestPersistedSummary: jest.fn().mockResolvedValue({
+      regime: { regime: 'RISK_ON' },
+      breadth: { percentAboveSma50: 0.7 },
+      topSectors: [{ sector: 'Technology', leadershipStatus: 'LEADING', relativeStrengthScore: 72 }],
+      weakSectors: [],
+    }),
+  };
+}
+
+function persistedSmartMoneyService(instrumentId: string) {
+  return {
+    latestPersistedStocks: jest.fn().mockResolvedValue([{ instrumentId, status: 'ACCUMULATION', smartMoneyScore: 78 }]),
+  };
 }

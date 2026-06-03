@@ -7,6 +7,7 @@ const makeDecision = (): StrategyDecisionDto => ({
   symbol: 'ABC.NS',
   exchange: 'NSE',
   strategy: 'TREND_MOMENTUM',
+  strategyName: 'Trend Momentum',
   decision: 'WATCH',
   action: 'WAIT_FOR_CONFIRMATION',
   decisionScore: 70,
@@ -50,8 +51,18 @@ const makeDecision = (): StrategyDecisionDto => ({
   frameworkAction: 'WAIT_FOR_CONFIRMATION',
   entryRulesPassed: ['PRICE_ABOVE_SMA50'],
   exitRulesTriggered: [],
+  invalidationRulesTriggered: ['SUPPORT_INVALIDATED'],
   noiseFiltersTriggered: [],
   readinessLabel: null,
+  strategyDefinitionSource: 'PERSISTED',
+  strategyDefinitionDrift: [{
+    type: 'CHECKSUM_MISMATCH',
+    severity: 'WARN',
+    strategyCode: 'TREND_MOMENTUM',
+    persistedVersion: '1.0.0',
+    registryVersion: '1.2.0',
+    message: 'Persisted strategy checksum differs from registry snapshot.',
+  }],
   modelVersion: 'strategy-decision-v1',
   generatedAt: '2026-05-06T18:53:36.829Z',
 });
@@ -82,8 +93,45 @@ describe('StrategyDecisionEngineRepository', () => {
     expect(call.create).not.toHaveProperty('instrumentId');
     expect(call.create.scoreBreakdown).toEqual(expect.objectContaining({ total: 70, frameworkScore: 70 }));
     expect(call.create.entryZone).toBe(JSON.stringify(makeDecision().entryZone));
+    expect(call.create.strategyName).toBe('Trend Momentum');
+    expect(call.create.strategyDefinitionSource).toBe('PERSISTED');
+    expect(call.create.strategyDefinitionDrift).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'CHECKSUM_MISMATCH' }),
+    ]));
+    expect(call.update.strategyDefinitionSource).toBe('PERSISTED');
+    expect(call.create.invalidationRulesTriggered).toEqual(['SUPPORT_INVALIDATED']);
+    expect(call.update.invalidationRulesTriggered).toEqual(['SUPPORT_INVALIDATED']);
     expect(result.entryZone?.type).toBe('BREAKOUT');
     expect(result.scoreBreakdown?.total).toBe(70);
+    expect(result.invalidationRulesTriggered).toEqual(['SUPPORT_INVALIDATED']);
+    expect(result.strategyDefinitionSource).toBe('PERSISTED');
+    expect(result.strategyDefinitionDrift).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'CHECKSUM_MISMATCH' }),
+    ]));
+  });
+
+  it('persists top-level invalidation rules in bulk replacement rows', async () => {
+    const transaction = jest.fn().mockResolvedValue([]);
+    const deleteMany = jest.fn((input) => ({ operation: 'deleteMany', input }));
+    const createMany = jest.fn((input) => ({ operation: 'createMany', input }));
+    const repository = new StrategyDecisionEngineRepository({
+      $transaction: transaction,
+      strategyDecisionResult: { deleteMany, createMany },
+    } as any);
+
+    await repository.replaceMany([makeDecision()]);
+    const createManyCall = createMany.mock.calls[0][0];
+
+    expect(createManyCall.data[0].invalidationRulesTriggered).toEqual(['SUPPORT_INVALIDATED']);
+    expect(createManyCall.data[0].strategyName).toBe('Trend Momentum');
+    expect(createManyCall.data[0].strategyDefinitionSource).toBe('PERSISTED');
+    expect(createManyCall.data[0].strategyDefinitionDrift).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'CHECKSUM_MISMATCH' }),
+    ]));
+    expect(transaction).toHaveBeenCalledWith([
+      expect.objectContaining({ operation: 'deleteMany' }),
+      expect.objectContaining({ operation: 'createMany' }),
+    ]);
   });
 
   it('uses safe sort fallback and includes legacy EQUITY rows for STOCK scope', async () => {

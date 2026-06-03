@@ -232,7 +232,7 @@ type HistoricalStoreOptions = {
   skipLatestPriceUpdate?: boolean;
 };
 type ExchangeDailyImportSummary = {
-  status: 'COMPLETED' | 'SKIPPED_DUPLICATE' | 'FAILED';
+  status: 'COMPLETED' | 'SKIPPED_DUPLICATE' | 'FAILED' | 'NOT_AVAILABLE';
   source: 'NSE' | 'BSE';
   segment: string;
   tradingDate: string;
@@ -701,7 +701,7 @@ type TrustedBaselineSnapshot = {
   listingDate: string | null;
   listingDateStatus: TrustedBaselineListingDateStatus;
   providerFallbackState: TrustedBaselineProviderFallbackState;
-  primarySourceAttempted: 'YAHOO' | null;
+  primarySourceAttempted: 'NSE_BSE_EXCHANGE_EOD' | 'YAHOO' | null;
   fallbackSourcesAttempted: string[];
   sourceFallbackReason: string | null;
 };
@@ -1231,7 +1231,12 @@ export class MarketDataFoundationService {
     const statsBySymbol = activeSnapshot?.statsBySymbol ?? readinessAndStats!.statsBySymbol;
     const validationWindow = activeSnapshot?.validationWindow ?? this.providerValidationWindow(scope);
     const latestStoredEodDate = this.latestDateFromReadiness(readinessBySymbol);
-    const expectedLatestTradingDate = latestCompletedTradingDateForRegion(scope.region);
+    const expectedLatestTradingDate = this.reviewDataThroughDatePolicy(
+      scope,
+      stocks,
+      statsBySymbol,
+      latestCompletedTradingDateForRegion(scope.region)
+    ).requiredDataThroughDate;
     const priceBackfillBlockedStockIds = activeSnapshot?.priceBackfillBlockedStockIds ?? await this.blockedPriceBackfillStockIds(scope);
     const generatedAt = new Date().toISOString();
     const counts = this.emptyUniverseCounts();
@@ -1241,7 +1246,6 @@ export class MarketDataFoundationService {
     for (const stock of stocks) {
       const readiness = readinessBySymbol.get(stock.symbol);
       if (!readiness) continue;
-      let hasRequiredHistoryCoverage = true;
       counts.totalCatalogInstruments += 1;
       counts[readiness.universeState] += 1;
       counts.byUniverseState[readiness.universeState] += 1;
@@ -1292,7 +1296,6 @@ export class MarketDataFoundationService {
         if (providerStatus === 'SUPPORTED') {
           const historyDiagnostics = this.requiredHistoryDiagnostics(stock, validationWindow, this.priceStatsForStock(statsBySymbol, stock));
           if (!historyDiagnostics.requiredHistoryComplete) {
-            hasRequiredHistoryCoverage = false;
             counts.historyCoverageIncomplete = (counts.historyCoverageIncomplete || 0) + 1;
             if (readiness.priceReadiness === 'READY') recordSupportedPriceBackfillNeed();
           }
@@ -1310,7 +1313,7 @@ export class MarketDataFoundationService {
           counts.contextReady += 1;
           counts.readiness.contextReady += 1;
         }
-        if (readiness.isReviewReady && hasRequiredHistoryCoverage) {
+        if (readiness.isReviewReady) {
           counts.reviewReady += 1;
           counts.readiness.reviewReady += 1;
         }
@@ -1638,7 +1641,7 @@ export class MarketDataFoundationService {
       listingDate: baselineByStockId.get(stock.id)?.listingDate ?? null,
       listingDateStatus: baselineByStockId.get(stock.id)?.listingDateStatus ?? 'MISSING_USED_15_YEAR_TARGET',
       providerFallbackState: baselineByStockId.get(stock.id)?.providerFallbackState ?? 'PROVIDER_SUPPORTED',
-      primarySourceAttempted: baselineByStockId.get(stock.id)?.primarySourceAttempted ?? 'YAHOO',
+      primarySourceAttempted: baselineByStockId.get(stock.id)?.primarySourceAttempted ?? 'NSE_BSE_EXCHANGE_EOD',
       fallbackSourcesAttempted: baselineByStockId.get(stock.id)?.fallbackSourcesAttempted ?? [],
       sourceFallbackReason: baselineByStockId.get(stock.id)?.sourceFallbackReason ?? null,
       contextGaps,
@@ -1657,12 +1660,17 @@ export class MarketDataFoundationService {
     };
     const now = options.now instanceof Date && Number.isFinite(options.now.getTime()) ? options.now : new Date();
     const stocks = snapshot?.stocks ?? await this.repository.listStocksForUniverseHealth(scope);
-    const readinessAndStats = snapshot ? null : await this.universeReadinessAndStatsForStocks(stocks, scope);
+    const readinessAndStats = snapshot ? null : await this.universeReadinessAndStatsForStocks(stocks, { ...scope, now });
     const readinessBySymbol = snapshot?.readinessBySymbol ?? readinessAndStats!.readinessBySymbol;
     const statsBySymbol = snapshot?.statsBySymbol ?? readinessAndStats!.statsBySymbol;
     const reviewDatePolicy = this.trustedReviewDatePolicy(scope.region, now);
-    const validationWindow = snapshot?.validationWindow ?? this.providerValidationWindow(scope, now);
-    const expectedLatestTradingDate = reviewDatePolicy.requiredDataThroughDate;
+    const reviewDataThroughPolicy = this.reviewDataThroughDatePolicy(
+      scope,
+      stocks,
+      statsBySymbol,
+      reviewDatePolicy.requiredDataThroughDate
+    );
+    const expectedLatestTradingDate = reviewDataThroughPolicy.requiredDataThroughDate;
     const minLiteCount = Math.max(this.readPositiveNumber(process.env.TRUSTED_REVIEW_MIN_LITE, 100), 1);
     const minFullCount = Math.max(this.readPositiveNumber(process.env.TRUSTED_REVIEW_MIN_FULL, 300), minLiteCount);
     const excludedCounts = this.emptyTrustedReviewExcludedCounts();
@@ -1676,7 +1684,7 @@ export class MarketDataFoundationService {
     }> = [];
     let providerSupportedCount = 0;
     let dataThroughDate: string | null = null;
-    let storedDataThroughDate: string | null = null;
+    let storedDataThroughDate: string | null = reviewDataThroughPolicy.storedDataThroughDate;
 
     for (const stock of stocks) {
       const readiness = readinessBySymbol.get(stock.symbol);
@@ -1689,16 +1697,21 @@ export class MarketDataFoundationService {
       }
 
       const providerStatus = normalizeProviderStatus(stock.providerSupportStatus);
-      if (providerStatus === 'UNKNOWN') {
+      const supportEvidence = this.trustedReviewSupportEvidence(stock, stats, providerStatus);
+      if (!supportEvidence.supported && providerStatus === 'UNKNOWN') {
         excludedCounts.providerUnknown += 1;
         continue;
       }
-      if (providerStatus === 'VALIDATION_FAILED') {
+      if (!supportEvidence.supported && providerStatus === 'VALIDATION_FAILED') {
         excludedCounts.providerRetryFailed += 1;
         continue;
       }
-      if (providerStatus === 'UNSUPPORTED') {
+      if (!supportEvidence.supported && providerStatus === 'UNSUPPORTED') {
         excludedCounts.providerUnsupported += 1;
+        continue;
+      }
+      if (!supportEvidence.supported) {
+        excludedCounts.providerUnknown += 1;
         continue;
       }
 
@@ -1722,11 +1735,6 @@ export class MarketDataFoundationService {
       }
       if (readiness.readinessBlockers.includes('CRITICAL_CORPORATE_ACTION_PRICE_WARNING')) {
         excludedCounts.corporateActionBlocked += 1;
-        continue;
-      }
-      const historyDiagnostics = this.requiredHistoryDiagnostics(stock, validationWindow, stats);
-      if (!historyDiagnostics.requiredHistoryComplete) {
-        excludedCounts.requiredHistoryIncomplete += 1;
         continue;
       }
       if (readiness.priceHistoryBars < 252) excludedCounts.insufficientBarsUnder252 += 1;
@@ -1773,10 +1781,13 @@ export class MarketDataFoundationService {
       warnings.push(`${excludedCounts.insufficientBarsUnder252} trusted instruments have fewer than 252 bars and are limited to lite evidence.`);
     }
     if (excludedCounts.requiredHistoryIncomplete > 0) {
-      warnings.push(`${excludedCounts.requiredHistoryIncomplete} provider-supported instruments are excluded until they have 15 years of daily OHLCV, or listing-date-to-latest coverage for newer listings.`);
+      warnings.push(`${excludedCounts.requiredHistoryIncomplete} instruments have incomplete strict signoff history, but Lite review eligibility is based on the current 120-bar OHLCV window.`);
     }
     if (storedDataThroughDate && expectedLatestTradingDate && storedDataThroughDate < expectedLatestTradingDate) {
       warnings.push(`Stored data-through date ${storedDataThroughDate} is older than required data-through date ${expectedLatestTradingDate}.`);
+    }
+    if (reviewDataThroughPolicy.latestCompletedDataThroughDate && expectedLatestTradingDate && expectedLatestTradingDate < reviewDataThroughPolicy.latestCompletedDataThroughDate) {
+      warnings.push(`Official exchange EOD for ${reviewDataThroughPolicy.latestCompletedDataThroughDate} is not available in SourceFileImport/PriceTick evidence; review readiness is using stored exchange data through ${expectedLatestTradingDate}.`);
     }
 
     return {
@@ -1784,7 +1795,7 @@ export class MarketDataFoundationService {
         scope,
         asOfDate: now.toISOString().slice(0, 10),
         targetTradingDate: reviewDatePolicy.targetTradingDate,
-        requiredDataThroughDate: reviewDatePolicy.requiredDataThroughDate,
+        requiredDataThroughDate: expectedLatestTradingDate,
         storedDataThroughDate,
         catalogCount: stocks.length,
         providerSupportedCount,
@@ -1996,7 +2007,7 @@ export class MarketDataFoundationService {
     }
 
     const warnings: string[] = [];
-    if (providerValidationNeeded > 0) warnings.push(`${providerValidationNeeded} UNKNOWN instruments need provider validation before review workflows can trust them.`);
+    if (providerValidationNeeded > 0) warnings.push(`${providerValidationNeeded} instruments still carry legacy UNKNOWN provider status; NSE/BSE review readiness uses exchange-file evidence, but full-catalog provider signoff remains incomplete.`);
     if (retryFailedValidations > 0) warnings.push(`${retryFailedValidations} failed provider validations need explicit retry or provider diagnosis.`);
     if (providerRetryBlocked > 0) warnings.push(`${providerRetryBlocked} provider validations are retry-blocked until cooldown expires.`);
     if (providerManualRepairRequired > 0) warnings.push(`${providerManualRepairRequired} provider validations require manual symbol/source repair.`);
@@ -4495,6 +4506,8 @@ export class MarketDataFoundationService {
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'NSE CM UDiFF download or parse failed';
+      const notAvailable = this.isNotAvailableErrorMessage(message);
+      const warning = `NSE CM UDiFF file ${fileName} for ${tradingDateText} is not available yet (${message}).`;
       const failureHash = createHash('sha256')
         .update(JSON.stringify({
           source: 'NSE_UDIFF_CM_BHAVCOPY',
@@ -4513,7 +4526,7 @@ export class MarketDataFoundationService {
           fileUrl: fileUrl || null,
           fileHash: failureHash,
           fileSize: 0,
-          status: 'FAILED',
+          status: notAvailable ? 'NOT_AVAILABLE' : 'FAILED',
           rowsRaw: 0,
           rowsAccepted: 0,
           rowsRejected: 0,
@@ -4522,7 +4535,7 @@ export class MarketDataFoundationService {
         }).catch(() => null)
         : null;
       return {
-        status: 'FAILED',
+        status: notAvailable ? 'NOT_AVAILABLE' : 'FAILED',
         source: 'NSE',
         segment: 'CM',
         tradingDate: tradingDateText,
@@ -4530,16 +4543,16 @@ export class MarketDataFoundationService {
         fileName,
         fileUrl: fileUrl || null,
         sourceFileImportId: failedImport?.id ?? null,
-        sourceFingerprint: `nse-cm-udiff-failed:${failureHash.slice(0, 16)}`,
+        sourceFingerprint: notAvailable ? null : `nse-cm-udiff-failed:${failureHash.slice(0, 16)}`,
         rowsRead: 0,
         rowsParsed: 0,
         rowsInserted: 0,
         rowsUpdated: 0,
         rowsNoOp: 0,
         rowsSkipped: 0,
-        warningCount: 0,
-        warnings: [],
-        errors: [message],
+        warningCount: notAvailable ? 1 : 0,
+        warnings: notAvailable ? [warning] : [],
+        errors: notAvailable ? [] : [message],
         changedSymbols: [],
         downstreamSymbols: [],
       };
@@ -7371,23 +7384,36 @@ export class MarketDataFoundationService {
       const importSummary = assetType === 'INDEX'
         ? await this.importNseIndexOfficialDaily({ tradingDate: targetTradingDate })
         : await this.importNseCmUdiffDaily({ tradingDate: targetTradingDate });
+      const importNotAvailable = importSummary.status === 'NOT_AVAILABLE';
+      const latestValidDataThroughDate = importNotAvailable
+        ? await this.repository.latestStoredTradingDateForRegion(region, assetType).catch(() => null)
+        : targetTradingDate;
+      const effectiveDataThroughDate = latestValidDataThroughDate || (importNotAvailable ? null : targetTradingDate);
+      const availabilityWarnings = importNotAvailable
+        ? [
+          effectiveDataThroughDate
+            ? `NSE EOD file for ${targetTradingDate} is not available yet; using latest stored dataThroughDate ${effectiveDataThroughDate} for downstream refresh.`
+            : `NSE EOD file for ${targetTradingDate} is not available yet and no prior stored dataThroughDate is available for downstream refresh.`,
+        ]
+        : [];
       const changedInstrumentIds = this.instrumentIdsForImportedSymbols(tasks, importSummary.changedSymbols || []);
       const matchedInstrumentIds = this.instrumentIdsForImportedSymbols(tasks, importSummary.downstreamSymbols || importSummary.changedSymbols || []);
       const downstreamInstrumentIds = matchedInstrumentIds;
 
+      summary.dataThroughDate = effectiveDataThroughDate;
       summary.instrumentsProcessed = importSummary.rowsParsed;
       summary.rowsReceived = importSummary.rowsParsed;
       summary.rowsInserted = importSummary.rowsInserted;
       summary.rowsUpdated = importSummary.rowsUpdated;
       summary.rowsSkipped = importSummary.rowsSkipped;
       summary.rowsNoOp = importSummary.rowsNoOp;
-      summary.warningCount = importSummary.warningCount;
-      summary.warnings = importSummary.warnings.slice(0, 10);
+      summary.warningCount = importSummary.warningCount + availabilityWarnings.length;
+      summary.warnings = [...importSummary.warnings, ...availabilityWarnings].slice(0, 10);
       summary.errors = importSummary.errors.slice(0, 10);
       summary.sourceFingerprint = importSummary.sourceFingerprint || this.scheduledRegionSourceFingerprint({
         region,
         assetType,
-        dataThroughDate: targetTradingDate,
+        dataThroughDate: effectiveDataThroughDate || targetTradingDate,
         rowsInserted: importSummary.rowsInserted,
         rowsUpdated: importSummary.rowsUpdated,
         changedInstrumentIds,
@@ -7405,14 +7431,18 @@ export class MarketDataFoundationService {
         sourceUrl: importSummary.fileUrl,
         sourceFileName: importSummary.fileName,
         targetTradingDate,
-        sourceFingerprint: importSummary.sourceFingerprint,
+        sourceFingerprint: importSummary.status === 'NOT_AVAILABLE' ? null : importSummary.sourceFingerprint,
         rowsRead: importSummary.rowsRead,
         rowsParsed: importSummary.rowsParsed,
         matchedInstruments: matchedInstrumentIds.length,
         rowsInserted: importSummary.rowsInserted,
         rowsUpdated: importSummary.rowsUpdated,
         rowsNoOp: importSummary.rowsNoOp,
-        fallbackReason: importSummary.status === 'SKIPPED_DUPLICATE' ? 'SOURCE_FILE_ALREADY_IMPORTED' : null,
+        fallbackReason: importSummary.status === 'SKIPPED_DUPLICATE'
+          ? 'SOURCE_FILE_ALREADY_IMPORTED'
+          : importSummary.status === 'NOT_AVAILABLE'
+            ? 'OFFICIAL_EOD_NOT_AVAILABLE'
+            : null,
         warnings: importSummary.warnings.slice(0, 10),
       };
 
@@ -9688,10 +9718,9 @@ export class MarketDataFoundationService {
 
   private async universeReadinessAndStatsForStocks(
     stocks: any[],
-    options: Pick<PaginationOptions, 'region' | 'assetType'> = {}
+    options: Pick<PaginationOptions, 'region' | 'assetType'> & { now?: Date } = {}
   ): Promise<{ readinessBySymbol: Map<string, InstrumentUniverseReadiness>; statsBySymbol: Map<string, any> }> {
     if (stocks.length === 0) return { readinessBySymbol: new Map(), statsBySymbol: new Map() };
-    const expectedLatestTradingDate = latestCompletedTradingDateForRegion(options.region || 'IN');
     const identitySymbols = [...new Set(stocks.flatMap((stock) => [
       stock.symbol,
       stock.providerSymbol,
@@ -9702,6 +9731,15 @@ export class MarketDataFoundationService {
       ? await this.repository.priceReadinessStatsForSymbols(identitySymbols)
       : new Map<string, never>();
     await this.repairProviderSupportFromStoredPrices(stocks, statsBySymbol as Map<string, any>);
+    const expectedLatestTradingDate = this.reviewDataThroughDatePolicy(
+      {
+        region: options.region?.trim().toUpperCase() || 'IN',
+        assetType: options.assetType?.trim().toUpperCase() || 'STOCK',
+      },
+      stocks,
+      statsBySymbol as Map<string, any>,
+      latestCompletedTradingDateForRegion(options.region || 'IN', options.now)
+    ).requiredDataThroughDate;
     const readinessBySymbol = new Map(stocks.map((stock) => {
       const priceStats = this.priceStatsForStock(statsBySymbol as Map<string, any>, stock);
       const readiness = classifyInstrumentUniverseReadiness({
@@ -9751,7 +9789,9 @@ export class MarketDataFoundationService {
     for (const stock of stocks) {
       const readiness = readinessBySymbol.get(stock.symbol);
       if (!readiness) continue;
-      const historyDiagnostics = this.requiredHistoryDiagnostics(stock, validationWindow, this.priceStatsForStock(statsBySymbol, stock));
+      const stats = this.priceStatsForStock(statsBySymbol, stock);
+      const supportEvidence = this.trustedReviewSupportEvidence(stock, stats, normalizeProviderStatus(stock.providerSupportStatus));
+      const historyDiagnostics = this.requiredHistoryDiagnostics(stock, validationWindow, stats);
       const repairStates = this.repairStateLookup(repairStatesByStockId.get(stock.id));
       const sourceFallbackReason = this.sourceFallbackReasonForBaseline(repairStates.priceBackfill);
       const requiredHistoryStatus = this.requiredHistoryStatusForBaseline(historyDiagnostics, sourceFallbackReason);
@@ -9760,7 +9800,8 @@ export class MarketDataFoundationService {
         stock,
         repairStates.providerValidation,
         sourceFallbackReason,
-        requiredHistoryStatus
+        requiredHistoryStatus,
+        supportEvidence.supported
       );
       const residualState = this.residualStateForBaseline(
         stock,
@@ -9769,7 +9810,8 @@ export class MarketDataFoundationService {
         listingDateStatus,
         providerFallbackState,
         requiredHistoryStatus,
-        sourceFallbackReason
+        sourceFallbackReason,
+        supportEvidence.supported
       );
       const fallbackSourcesAttempted = this.fallbackSourcesAttemptedForBaseline(repairStates.priceBackfill, sourceFallbackReason);
       const blockerCodes = this.trustedBaselineBlockerCodes(
@@ -9779,7 +9821,8 @@ export class MarketDataFoundationService {
         requiredHistoryStatus,
         listingDateStatus,
         providerFallbackState,
-        sourceFallbackReason
+        sourceFallbackReason,
+        supportEvidence.supported
       );
       baselineByStockId.set(stock.id, {
         trustedBaselineResidualState: residualState,
@@ -9797,7 +9840,7 @@ export class MarketDataFoundationService {
         listingDate: historyDiagnostics.listingDate,
         listingDateStatus,
         providerFallbackState,
-        primarySourceAttempted: 'YAHOO',
+        primarySourceAttempted: 'NSE_BSE_EXCHANGE_EOD',
         fallbackSourcesAttempted,
         sourceFallbackReason,
       });
@@ -9841,9 +9884,10 @@ export class MarketDataFoundationService {
     stock: any,
     providerValidationState: any,
     sourceFallbackReason: string | null,
-    requiredHistoryStatus: TrustedBaselineRequiredHistoryStatus
+    requiredHistoryStatus: TrustedBaselineRequiredHistoryStatus,
+    exchangeEvidenceSupported = false
   ): TrustedBaselineProviderFallbackState {
-    if (stock.isActive === false || stock.isDelisted === true || normalizeProviderStatus(stock.providerSupportStatus) === 'UNSUPPORTED') {
+    if (stock.isActive === false || stock.isDelisted === true || (normalizeProviderStatus(stock.providerSupportStatus) === 'UNSUPPORTED' && !exchangeEvidenceSupported)) {
       return 'PROVIDER_UNSUPPORTED_OR_INACTIVE';
     }
     const providerStatus = normalizeProviderStatus(stock.providerSupportStatus);
@@ -9854,6 +9898,7 @@ export class MarketDataFoundationService {
     }
     if (sourceFallbackReason === 'YAHOO_ZERO_ROWS') return 'YAHOO_INSUFFICIENT_FALLBACK_REQUIRED';
     if (sourceFallbackReason || requiredHistoryStatus === 'FALLBACK_REQUIRED') return 'FALLBACK_ATTEMPTED_STILL_INCOMPLETE';
+    if (exchangeEvidenceSupported) return 'PROVIDER_SUPPORTED';
     return 'PROVIDER_SUPPORTED';
   }
 
@@ -9864,19 +9909,20 @@ export class MarketDataFoundationService {
     listingDateStatus: TrustedBaselineListingDateStatus,
     providerFallbackState: TrustedBaselineProviderFallbackState,
     requiredHistoryStatus: TrustedBaselineRequiredHistoryStatus,
-    sourceFallbackReason: string | null
+    sourceFallbackReason: string | null,
+    exchangeEvidenceSupported = false
   ): TrustedBaselineResidualState {
-    if (stock.isActive === false || stock.isDelisted === true || normalizeProviderStatus(stock.providerSupportStatus) === 'UNSUPPORTED') {
+    if (stock.isActive === false || stock.isDelisted === true || (normalizeProviderStatus(stock.providerSupportStatus) === 'UNSUPPORTED' && !exchangeEvidenceSupported)) {
       return 'UNSUPPORTED_OR_INACTIVE_EXCLUDED';
     }
     if (providerFallbackState === 'RETRY_BLOCKED_PROVIDER_VALIDATION') return 'RETRY_BLOCKED_PROVIDER_VALIDATION';
-    if (providerFallbackState === 'PROVIDER_UNKNOWN' || providerFallbackState === 'PROVIDER_VALIDATION_FAILED') return 'PROVIDER_VALIDATION_PENDING';
+    if (!exchangeEvidenceSupported && (providerFallbackState === 'PROVIDER_UNKNOWN' || providerFallbackState === 'PROVIDER_VALIDATION_FAILED')) return 'PROVIDER_VALIDATION_PENDING';
     if (sourceFallbackReason === 'YAHOO_ZERO_ROWS') return 'FALLBACK_REQUIRED_AFTER_YAHOO_ZERO_ROWS';
     if (providerFallbackState === 'FALLBACK_ATTEMPTED_STILL_INCOMPLETE') return 'FALLBACK_ATTEMPTED_STILL_INCOMPLETE';
-    if (listingDateStatus === 'MISSING_USED_15_YEAR_TARGET') return 'LISTING_DATE_MISSING_REQUIRED_15Y';
     if (this.needsCatalogIdentityRepair(stock)) return 'CATALOG_IDENTITY_REPAIR_REQUIRED';
-    if (requiredHistoryStatus !== 'COMPLETE') return 'REQUIRED_HISTORY_INCOMPLETE';
-    if (readiness.priceReadiness !== 'READY' || !historyDiagnostics.requiredHistoryComplete) return 'REQUIRED_HISTORY_INCOMPLETE';
+    if (!exchangeEvidenceSupported && listingDateStatus === 'MISSING_USED_15_YEAR_TARGET') return 'LISTING_DATE_MISSING_REQUIRED_15Y';
+    if (!exchangeEvidenceSupported && requiredHistoryStatus !== 'COMPLETE') return 'REQUIRED_HISTORY_INCOMPLETE';
+    if (readiness.priceReadiness !== 'READY' || (!exchangeEvidenceSupported && !historyDiagnostics.requiredHistoryComplete)) return 'REQUIRED_HISTORY_INCOMPLETE';
     return 'REVIEW_READY';
   }
 
@@ -9887,15 +9933,16 @@ export class MarketDataFoundationService {
     requiredHistoryStatus: TrustedBaselineRequiredHistoryStatus,
     listingDateStatus: TrustedBaselineListingDateStatus,
     providerFallbackState: TrustedBaselineProviderFallbackState,
-    sourceFallbackReason: string | null
+    sourceFallbackReason: string | null,
+    exchangeEvidenceSupported = false
   ): string[] {
     const blockers = new Set<string>(readiness.readinessBlockers);
-    if (requiredHistoryStatus !== 'COMPLETE') blockers.add('REQUIRED_HISTORY_INCOMPLETE');
-    if (listingDateStatus === 'MISSING_USED_15_YEAR_TARGET') blockers.add('LISTING_DATE_MISSING_REQUIRED_15Y');
+    if (!exchangeEvidenceSupported && requiredHistoryStatus !== 'COMPLETE') blockers.add('REQUIRED_HISTORY_INCOMPLETE');
+    if (!exchangeEvidenceSupported && listingDateStatus === 'MISSING_USED_15_YEAR_TARGET') blockers.add('LISTING_DATE_MISSING_REQUIRED_15Y');
     if (sourceFallbackReason === 'YAHOO_ZERO_ROWS') blockers.add('FALLBACK_REQUIRED_AFTER_YAHOO_ZERO_ROWS');
     if (providerFallbackState === 'FALLBACK_ATTEMPTED_STILL_INCOMPLETE') blockers.add('FALLBACK_ATTEMPTED_STILL_INCOMPLETE');
     if (providerFallbackState === 'RETRY_BLOCKED_PROVIDER_VALIDATION') blockers.add('RETRY_BLOCKED_PROVIDER_VALIDATION');
-    if (providerFallbackState === 'PROVIDER_UNKNOWN' || providerFallbackState === 'PROVIDER_VALIDATION_FAILED') blockers.add('PROVIDER_VALIDATION_PENDING');
+    if (!exchangeEvidenceSupported && (providerFallbackState === 'PROVIDER_UNKNOWN' || providerFallbackState === 'PROVIDER_VALIDATION_FAILED')) blockers.add('PROVIDER_VALIDATION_PENDING');
     if (this.needsCatalogIdentityRepair(stock)) blockers.add('CATALOG_IDENTITY_REPAIR_REQUIRED');
     if (residualState !== 'REVIEW_READY') blockers.add(residualState);
     return Array.from(blockers);
@@ -10047,6 +10094,104 @@ export class MarketDataFoundationService {
     };
   }
 
+  private reviewDataThroughDatePolicy(
+    scope: { region: string; assetType: string },
+    stocks: any[],
+    statsBySymbol: Map<string, any>,
+    latestCompletedDataThroughDate: string | null
+  ) {
+    const storedDataThroughDate = this.latestApprovedExchangeDataThroughDate(stocks, statsBySymbol)
+      || this.latestStoredPriceDataThroughDate(stocks, statsBySymbol);
+    let requiredDataThroughDate = latestCompletedDataThroughDate || storedDataThroughDate;
+
+    if (storedDataThroughDate && latestCompletedDataThroughDate && storedDataThroughDate < latestCompletedDataThroughDate) {
+      const previousTradingDate = this.previousConfiguredTradingDate(scope.region, latestCompletedDataThroughDate);
+      if (previousTradingDate && storedDataThroughDate >= previousTradingDate) {
+        requiredDataThroughDate = storedDataThroughDate;
+      }
+    }
+
+    return {
+      latestCompletedDataThroughDate,
+      requiredDataThroughDate,
+      storedDataThroughDate,
+    };
+  }
+
+  private latestApprovedExchangeDataThroughDate(stocks: any[], statsBySymbol: Map<string, any>): string | null {
+    let latest: string | null = null;
+    for (const stock of stocks) {
+      const stats = this.priceStatsForStock(statsBySymbol, stock);
+      const date = this.approvedExchangeLatestPriceDate(stats);
+      if (date && (!latest || date > latest)) latest = date;
+    }
+    return latest;
+  }
+
+  private latestStoredPriceDataThroughDate(stocks: any[], statsBySymbol: Map<string, any>): string | null {
+    let latest: string | null = null;
+    for (const stock of stocks) {
+      const stats = this.priceStatsForStock(statsBySymbol, stock);
+      const date = this.normalizeDateString(stats?.latestPriceDate);
+      if (date && (!latest || date > latest)) latest = date;
+    }
+    return latest;
+  }
+
+  private approvedExchangeLatestPriceDate(stats: any): string | null {
+    const approvedDate = this.normalizeDateString(stats?.approvedExchangeLatestPriceDate);
+    if (approvedDate) return approvedDate;
+    if (stats && stats.approvedExchangePriceRows === undefined && stats.sourceFileImportPriceRows === undefined) {
+      return this.normalizeDateString(stats.latestPriceDate);
+    }
+    return null;
+  }
+
+  private trustedReviewSupportEvidence(stock: any, stats: any, providerStatus: string) {
+    if (providerStatus === 'SUPPORTED') return { supported: true, source: 'PROVIDER_SUPPORTED' };
+    const hasExchangeIdentity = this.hasApprovedExchangeIdentity(stock);
+    const approvedRows = Number(stats?.approvedExchangePriceRows || 0);
+    const sourceFileRows = Number(stats?.sourceFileImportPriceRows || 0);
+    const latestDate = this.normalizeDateString(stats?.latestPriceDate);
+    const approvedLatestDate = this.approvedExchangeLatestPriceDate(stats);
+    const latestSnapshotDate = this.normalizeDateString(stats?.latestSnapshotDate);
+    const snapshotMatches = !latestSnapshotDate || !latestDate || latestSnapshotDate >= latestDate;
+    const latestHasApprovedEvidence = Boolean(
+      approvedLatestDate
+      && latestDate
+      && approvedLatestDate >= latestDate
+      && (stats?.approvedExchangeLatestSource || stats?.approvedExchangeLatestSourceFileImportId || stats?.latestSourceFileImportId)
+    );
+    const supported = hasExchangeIdentity
+      && snapshotMatches
+      && (approvedRows > 0 || sourceFileRows > 0)
+      && latestHasApprovedEvidence;
+    return {
+      supported,
+      source: supported ? 'NSE_BSE_EXCHANGE_EVIDENCE' : 'MISSING_NSE_BSE_EXCHANGE_EVIDENCE',
+    };
+  }
+
+  private hasApprovedExchangeIdentity(stock: any): boolean {
+    const directExchange = String(stock?.exchange || '').trim().toUpperCase();
+    if (directExchange === 'NSE' || directExchange === 'BSE') return true;
+    const identities = Array.isArray(stock?.exchangeIdentities) ? stock.exchangeIdentities : [];
+    return identities.some((identity: any) => {
+      const exchange = String(identity?.exchange || '').trim().toUpperCase();
+      const status = String(identity?.status || '').trim().toUpperCase();
+      return (exchange === 'NSE' || exchange === 'BSE') && (!status || !['DELISTED', 'INACTIVE', 'UNSUPPORTED'].includes(status));
+    });
+  }
+
+  private normalizeDateString(value: unknown): string | null {
+    if (!value) return null;
+    if (value instanceof Date && Number.isFinite(value.getTime())) return value.toISOString().slice(0, 10);
+    const text = String(value).trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+    const date = new Date(text);
+    return Number.isNaN(date.getTime()) ? null : date.toISOString().slice(0, 10);
+  }
+
   private isConfiguredTradingDate(region: string, date: string) {
     const config = getMarketSessionConfig(region);
     if (!config) return false;
@@ -10061,6 +10206,18 @@ export class MarketDataFoundationService {
     const cursor = this.utcDateAtNoon(date);
     for (let i = 0; i < 10; i += 1) {
       cursor.setUTCDate(cursor.getUTCDate() + 1);
+      const candidate = cursor.toISOString().slice(0, 10);
+      if (config.weekdays.includes(cursor.getUTCDay()) && !config.holidays.includes(candidate)) return candidate;
+    }
+    return null;
+  }
+
+  private previousConfiguredTradingDate(region: string, date: string) {
+    const config = getMarketSessionConfig(region);
+    if (!config) return null;
+    const cursor = this.utcDateAtNoon(date);
+    for (let i = 0; i < 10; i += 1) {
+      cursor.setUTCDate(cursor.getUTCDate() - 1);
       const candidate = cursor.toISOString().slice(0, 10);
       if (config.weekdays.includes(cursor.getUTCDay()) && !config.holidays.includes(candidate)) return candidate;
     }
@@ -10095,14 +10252,13 @@ export class MarketDataFoundationService {
     const boundedRequest = { batchSize: 50, region: scope.region, assetType: scope.assetType };
     const providerUnknown = repairPlan.providerUnknownValidationNeeded ?? repairPlan.providerValidationNeeded ?? 0;
     const providerRetry = repairPlan.providerRetryValidationNeeded ?? repairPlan.retryFailedValidations ?? 0;
-    const providerActionCode = providerUnknown > 0 ? 'VALIDATE_PROVIDERS' : 'RETRY_FAILED_PROVIDERS';
     add({
       category: 'PROVIDER_VALIDATION',
-      severity: 'HARD_BLOCKER',
+      severity: 'CONTEXT_GAP',
       affectedCount: providerUnknown + providerRetry,
-      explanation: 'Provider support is not proven for part of the scoped catalog, so those instruments are excluded from review.',
-      nextActionCode: providerActionCode,
-      nextActionLabel: this.repairRunActionLabel(providerActionCode),
+      explanation: 'Legacy provider status is not authoritative for NSE/BSE review readiness; rows without exchange-file evidence remain outside the trusted set until official prices or exchange identity are present.',
+      nextActionCode: 'REVIEW_REPAIR_PLAN',
+      nextActionLabel: 'Review exchange evidence',
       actionRoute: '/market-data?tab=data-health',
       boundedRequest,
     });
@@ -10118,9 +10274,11 @@ export class MarketDataFoundationService {
     });
     add({
       category: 'PRICE_BACKFILL',
-      severity: 'HARD_BLOCKER',
+      severity: reviewUniverse.mode === 'NO_REVIEW' ? 'HARD_BLOCKER' : 'CONTEXT_GAP',
       affectedCount: repairPlan.supportedPriceBackfillNeeded ?? repairPlan.priceBackfillNeeded ?? 0,
-      explanation: 'Provider-supported instruments need bounded EOD price backfill before they can join the trusted review universe.',
+      explanation: reviewUniverse.mode === 'NO_REVIEW'
+        ? 'Official EOD evidence is insufficient for the minimum trusted review universe.'
+        : 'Additional historical/backfill work remains for strict signoff, but the trusted review universe already has enough official EOD evidence for review.',
       nextActionCode: 'BACKFILL_PRICES',
       nextActionLabel: this.repairRunActionLabel('BACKFILL_PRICES'),
       actionRoute: '/market-data?tab=data-health',
@@ -10179,7 +10337,18 @@ export class MarketDataFoundationService {
   }
 
   private reviewReadinessNextAction(blockers: ReviewReadinessBlocker[]): ReviewReadinessNextAction | null {
-    const blocker = blockers.find((item) => !['WAIT', 'REVIEW_REPAIR_PLAN'].includes(item.nextActionCode)) || blockers.find((item) => item.nextActionCode !== 'WAIT') || blockers[0];
+    const actionPriority = ['BACKFILL_PRICES', 'CATALOG_IDENTITY_REPAIR', 'PROVIDER_BUSINESS_METADATA_REPAIR', 'MANUAL_METADATA_IMPORT', 'REVIEW_REPAIR_PLAN', 'WAIT'];
+    const ordered = [...blockers].sort((left, right) => {
+      const severityRank = { HARD_BLOCKER: 0, LIMITED_REVIEW: 1, CONTEXT_GAP: 2 };
+      const leftActionRank = actionPriority.indexOf(left.nextActionCode);
+      const rightActionRank = actionPriority.indexOf(right.nextActionCode);
+      return severityRank[left.severity] - severityRank[right.severity]
+        || (leftActionRank === -1 ? actionPriority.length : leftActionRank) - (rightActionRank === -1 ? actionPriority.length : rightActionRank)
+        || right.affectedCount - left.affectedCount;
+    });
+    const blocker = ordered.find((item) => !['WAIT', 'REVIEW_REPAIR_PLAN'].includes(item.nextActionCode))
+      || ordered.find((item) => item.nextActionCode !== 'WAIT')
+      || ordered[0];
     if (!blocker) return null;
     return {
       code: blocker.nextActionCode,
@@ -11696,7 +11865,7 @@ export class MarketDataFoundationService {
   ): Promise<UniverseComputationSnapshot> {
     const stocks = await this.repository.listStocksForUniverseHealth(scope);
     const [readinessAndStats, repairStatesByStockId] = await Promise.all([
-      this.universeReadinessAndStatsForStocks(stocks, scope),
+      this.universeReadinessAndStatsForStocks(stocks, { ...scope, now }),
       this.repairStatesByStockId(scope, stocks),
     ]);
     return {

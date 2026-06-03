@@ -1,6 +1,7 @@
 /// <reference types="@types/jest" />
 import { StrategyDecisionEngineService } from '../../../src/modules/strategy-decision-engine';
-import { StrategyFrameworkRegistry } from '../../../src/modules/strategy-framework';
+import { StrategyFrameworkRegistry, StrategyFrameworkService } from '../../../src/modules/strategy-framework';
+import type { StrategyDefinition } from '../../../src/modules/strategy-framework';
 
 const makePrices = (days = 260, start = '2025-01-01', first = 50, slope = 1) => {
   const startDate = new Date(start);
@@ -253,6 +254,51 @@ describe('StrategyDecisionEngineService', () => {
     });
 
   describe('Strategy Framework migration', () => {
+    const registry = new StrategyFrameworkRegistry();
+
+    const clonedStrategy = (
+      code: string,
+      overrides: Partial<StrategyDefinition> = {}
+    ): StrategyDefinition => {
+      const strategy = registry.get(code);
+      if (!strategy) throw new Error(`Missing registry fixture ${code}`);
+      return {
+        ...strategy,
+        entryRules: strategy.entryRules.map((rule) => ({ ...rule })),
+        exitRules: strategy.exitRules.map((rule) => ({ ...rule })),
+        invalidationRules: strategy.invalidationRules.map((rule) => ({ ...rule })),
+        noiseFilters: strategy.noiseFilters.map((rule) => ({ ...rule })),
+        riskRules: strategy.riskRules.map((rule) => ({ ...rule })),
+        marketGateRules: strategy.marketGateRules.map((rule) => ({ ...rule })),
+        parameters: { ...strategy.parameters },
+        strategyRating: strategy.strategyRating ? { ...strategy.strategyRating } : strategy.strategyRating,
+        examples: {
+          triggers: [...strategy.examples.triggers],
+          blocks: [...strategy.examples.blocks],
+        },
+        ...overrides,
+      };
+    };
+
+    const createStrategyFrameworkService = (options: {
+      definitions?: StrategyDefinition[];
+      performanceRows?: any[];
+    } = {}) => {
+      const repo = {
+        listDefinitions: jest.fn().mockResolvedValue(options.definitions ?? []),
+        latestPerformanceForStrategies: jest.fn().mockResolvedValue([]),
+        performance: jest.fn().mockResolvedValue(options.performanceRows ?? [{
+          ratingScore: 66,
+          ratingGrade: 'GOOD',
+          readinessLabel: 'PAPER_TEST_CANDIDATE',
+        }]),
+      };
+      return {
+        service: new StrategyFrameworkService(repo as any, registry, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any),
+        repo,
+      };
+    };
+
     const createFrameworkBackedService = (overrides: any = {}) => {
       const marketData = {
         getInstrument: jest.fn().mockResolvedValue({
@@ -311,13 +357,7 @@ describe('StrategyDecisionEngineService', () => {
         stock: jest.fn().mockResolvedValue({ status: 'ACCUMULATION', smartMoneyScore: 75 }),
         ...overrides.smartMoney,
       };
-      const frameworkService = {
-        performance: jest.fn().mockResolvedValue([{
-          ratingScore: 66,
-          ratingGrade: 'GOOD',
-          readinessLabel: 'PAPER_TEST_CANDIDATE',
-        }]),
-      };
+      const frameworkService = overrides.frameworkService ?? createStrategyFrameworkService().service;
       return new StrategyDecisionEngineService(
         {} as any,
         marketData as any,
@@ -328,7 +368,6 @@ describe('StrategyDecisionEngineService', () => {
         smartMoney as any,
         { getPortfolioDetail: jest.fn().mockResolvedValue(null) } as any,
         {} as any,
-        new StrategyFrameworkRegistry(),
         frameworkService as any
       );
     };
@@ -355,6 +394,87 @@ describe('StrategyDecisionEngineService', () => {
       expect(result?.riskPlan?.targetPrice).toBeNull();
       expect(result?.riskPlan?.exitRules).not.toContain('Target price achieved.');
       expect(result?.riskPlan?.rationale).toContain('rule-based');
+    });
+
+    it('uses persisted-first Strategy Framework definition metadata when available', async () => {
+      const persistedTrend = clonedStrategy('TREND_MOMENTUM', {
+        name: 'Persisted Trend Momentum',
+        version: '9.9.0',
+        readinessLabel: 'WATCHLIST_CANDIDATE',
+        strategyRating: {
+          ratingScore: 72,
+          ratingGrade: 'GOOD',
+          readinessLabel: 'WATCHLIST_CANDIDATE',
+        },
+        effectiveAt: '2026-06-01T00:00:00.000Z',
+      });
+      const { service: frameworkService } = createStrategyFrameworkService({
+        definitions: [persistedTrend],
+        performanceRows: [],
+      });
+      const svc = createFrameworkBackedService({ frameworkService });
+
+      const result = await svc.evaluateInstrumentStrategy('stock-1', 'TREND_MOMENTUM', {
+        marketCondition: 'HEALTHY',
+        marketGate: 'OPEN',
+        allowedActions: ['NEW_LONG_TRADES_ALLOWED'],
+        marketScore: 80,
+        reasons: [],
+        blockers: [],
+        dataStatus: 'COMPLETE',
+        updatedAt: new Date().toISOString(),
+      });
+
+      expect(result).toMatchObject({
+        frameworkBacked: true,
+        strategy: 'TREND_MOMENTUM',
+        strategyName: 'Persisted Trend Momentum',
+        strategyVersion: '9.9.0',
+        readinessLabel: 'WATCHLIST_CANDIDATE',
+        strategyDefinitionSource: 'PERSISTED',
+        strategyRating: {
+          ratingScore: 72,
+          ratingGrade: 'GOOD',
+          readinessLabel: 'WATCHLIST_CANDIDATE',
+        },
+      });
+      expect(result?.strategyDefinitionDrift).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          type: 'PERSISTED_VERSION_DIFFERS_FROM_REGISTRY',
+          persistedVersion: '9.9.0',
+          registryVersion: registry.get('TREND_MOMENTUM')?.version,
+        }),
+      ]));
+    });
+
+    it('falls back to registry definitions through Strategy Framework provider diagnostics', async () => {
+      const { service: frameworkService } = createStrategyFrameworkService({ definitions: [] });
+      const svc = createFrameworkBackedService({ frameworkService });
+
+      const result = await svc.evaluateInstrumentStrategy('stock-1', 'TREND_MOMENTUM', {
+        marketCondition: 'HEALTHY',
+        marketGate: 'OPEN',
+        allowedActions: ['NEW_LONG_TRADES_ALLOWED'],
+        marketScore: 80,
+        reasons: [],
+        blockers: [],
+        dataStatus: 'COMPLETE',
+        updatedAt: new Date().toISOString(),
+      });
+
+      expect(result).toMatchObject({
+        frameworkBacked: true,
+        strategy: 'TREND_MOMENTUM',
+        strategyName: registry.get('TREND_MOMENTUM')?.name,
+        strategyVersion: registry.get('TREND_MOMENTUM')?.version,
+        strategyDefinitionSource: 'REGISTRY_FALLBACK',
+      });
+      expect(result?.strategyDefinitionDrift).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          type: 'MISSING_PERSISTED_DEFINITION',
+          registryVersion: registry.get('TREND_MOMENTUM')?.version,
+        }),
+      ]));
     });
 
     it('uses Strategy Framework evaluator for PULLBACK_IN_UPTREND', async () => {
@@ -471,6 +591,30 @@ describe('StrategyDecisionEngineService', () => {
       expect(evaluatableCodes).not.toContain('RISK_OFF_AVOIDANCE');
       expect(evaluatableCodes).not.toContain('LOW_QUALITY_DATA_REJECTION');
       expect(evaluatableCodes).not.toContain('QUALITY_TREND');
+    });
+
+    it('uses persisted-first Strategy Framework definitions in the decision model', async () => {
+      const persistedTrend = clonedStrategy('TREND_MOMENTUM', {
+        name: 'Persisted Trend Momentum',
+        version: '9.9.0',
+        effectiveAt: '2026-06-01T00:00:00.000Z',
+      });
+      const { service: frameworkService } = createStrategyFrameworkService({ definitions: [persistedTrend] });
+      const svc = createFrameworkBackedService({ frameworkService });
+
+      const model = await svc.model();
+      const trend = model.strategies.find((strategy: any) => strategy.code === 'TREND_MOMENTUM');
+
+      expect(trend).toMatchObject({
+        code: 'TREND_MOMENTUM',
+        name: 'Persisted Trend Momentum',
+        version: '9.9.0',
+        evaluationSupported: true,
+        strategyDefinitionSource: 'PERSISTED',
+      });
+      expect(trend!.strategyDefinitionDrift).toEqual(expect.arrayContaining([
+        expect.objectContaining({ type: 'PERSISTED_VERSION_DIFFERS_FROM_REGISTRY' }),
+      ]));
     });
 
     it('blocks new long candidates when market gate is CLOSED', async () => {
@@ -641,9 +785,7 @@ describe('StrategyDecisionEngineService', () => {
           smartMoneyScore: 75,
         }))),
       };
-      const frameworkService = {
-        performance: jest.fn().mockResolvedValue([{ ratingScore: 66, ratingGrade: 'GOOD', readinessLabel: 'PAPER_TEST_CANDIDATE' }]),
-      };
+      const { service: frameworkService, repo: frameworkRepo } = createStrategyFrameworkService();
       const svc = new StrategyDecisionEngineService(
         repository as any,
         marketData as any,
@@ -654,7 +796,6 @@ describe('StrategyDecisionEngineService', () => {
         smartMoney as any,
         {} as any,
         {} as any,
-        new StrategyFrameworkRegistry(),
         frameworkService as any
       );
 
@@ -680,11 +821,11 @@ describe('StrategyDecisionEngineService', () => {
       expect(smartMoney.stock).not.toHaveBeenCalled();
       expect(repository.replaceMany).toHaveBeenCalledTimes(1);
       expect(repository.replaceMany).toHaveBeenCalledWith(expect.arrayContaining([
-        expect.objectContaining({ instrumentId: 'stock-1' }),
-        expect.objectContaining({ instrumentId: 'stock-2' }),
+        expect.objectContaining({ instrumentId: 'stock-1', strategyDefinitionSource: 'REGISTRY_FALLBACK' }),
+        expect.objectContaining({ instrumentId: 'stock-2', strategyDefinitionDrift: expect.arrayContaining([expect.objectContaining({ type: 'MISSING_PERSISTED_DEFINITION' })]) }),
       ]));
       expect(repository.create).not.toHaveBeenCalled();
-      expect(frameworkService.performance).toHaveBeenCalledTimes(reviewStrategyCount);
+      expect(frameworkRepo.performance).toHaveBeenCalledTimes(reviewStrategyCount);
     });
 
     it('processes evaluate batches with bounded worker concurrency and shared batch context', async () => {
@@ -778,9 +919,7 @@ describe('StrategyDecisionEngineService', () => {
       const portfolio = {
         getPortfolioDetail: jest.fn().mockResolvedValue({ holdings: [] }),
       };
-      const frameworkService = {
-        performance: jest.fn().mockResolvedValue([{ ratingScore: 66, ratingGrade: 'GOOD', readinessLabel: 'PAPER_TEST_CANDIDATE' }]),
-      };
+      const { service: frameworkService } = createStrategyFrameworkService();
       const svc = new StrategyDecisionEngineService(
         repository as any,
         marketData as any,
@@ -791,7 +930,6 @@ describe('StrategyDecisionEngineService', () => {
         smartMoney as any,
         portfolio as any,
         {} as any,
-        new StrategyFrameworkRegistry(),
         frameworkService as any
       );
 
@@ -848,8 +986,6 @@ describe('StrategyDecisionEngineService', () => {
         {} as any,
         {} as any,
         {} as any,
-        {} as any,
-        new StrategyFrameworkRegistry(),
         {} as any
       );
 

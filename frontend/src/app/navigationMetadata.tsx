@@ -30,6 +30,7 @@ export const navGroups: NavGroup[] = [
     group: 'Trader Workflow',
     items: [
       { path: '/', label: 'Market Pulse', icon: <DashboardIcon />, aliases: ['/market-pulse'] },
+      { path: '/daily-review-shortlist', label: 'Daily Review Shortlist', icon: <FactCheckIcon /> },
       { path: '/stock-interest-radar', label: 'Stock Interest Radar', icon: <SavedSearchIcon /> },
       { path: '/earnings-intelligence', label: 'Earnings Intelligence', icon: <CalendarMonthIcon /> },
       { path: '/compounder-radar', label: 'Compounder Radar', icon: <TrendingUpIcon /> },

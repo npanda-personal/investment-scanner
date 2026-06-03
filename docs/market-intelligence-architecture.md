@@ -136,7 +136,7 @@ Scope key:
 snapshotDate + scopeRegion + scopeAssetType + symbol
 ```
 
-Purpose: materialize earnings-related research rows from persisted local evidence. Rows include result date, result date source, days to result, revenue/profit/EPS growth, margin trend, consistency score, acceleration score, reason tags, risk tags, freshness, and categories.
+Purpose: materialize earnings-related research rows from persisted local evidence. Rows include result date, result date source, period end date, validation timestamp, days to result, revenue/profit/EPS growth, margin trend, consistency score, acceleration score, reason tags, risk tags, warning metadata, freshness, and categories.
 
 Allowed categories:
 
@@ -161,6 +161,8 @@ Rules:
 - Every persisted row must have at least one allowed category.
 - Estimated result windows must carry explicit provenance through `resultDateSource`, reason tags, and risk tags.
 - Estimated result dates are limitations, not authoritative calendar events.
+- Period-end and validation timestamp fallback dates must be labelled with `PERIOD_END_DATE_FALLBACK` or `VALIDATED_AT_FALLBACK`.
+- Freshness must be evaluated from persisted `periodEndDate`, not `validatedAt`.
 
 ### StockInterestSnapshot
 

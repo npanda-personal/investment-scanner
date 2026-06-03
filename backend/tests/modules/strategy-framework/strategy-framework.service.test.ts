@@ -1,5 +1,5 @@
 import { StrategyFrameworkRegistry, StrategyFrameworkService } from '../../../src/modules/strategy-framework';
-import type { StrategyPerformanceSummaryDto } from '../../../src/modules/strategy-framework';
+import type { StrategyDefinition, StrategyPerformanceSummaryDto } from '../../../src/modules/strategy-framework';
 
 describe('Strategy Framework service', () => {
   const registry = new StrategyFrameworkRegistry();
@@ -45,6 +45,156 @@ describe('Strategy Framework service', () => {
       region: 'IN',
       assetType: 'STOCK',
     })).toThrow('QUALITY_TREND is DRAFT');
+  });
+
+  it('seeds current registry definitions through the repository source generator flow', async () => {
+    const repo = { upsertDefinitions: jest.fn().mockResolvedValue(undefined) };
+    const seedService = new StrategyFrameworkService(
+      repo as any,
+      registry,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any
+    );
+
+    await seedService.seedDefinitions();
+
+    expect(repo.upsertDefinitions).toHaveBeenCalledWith(expect.arrayContaining([
+      expect.objectContaining({
+        code: 'TREND_MOMENTUM',
+        version: registry.get('TREND_MOMENTUM')?.version,
+        invalidationRules: expect.arrayContaining([
+          expect.objectContaining({ code: 'SUPPORT_INVALIDATED' }),
+        ]),
+      }),
+    ]));
+    expect(repo.upsertDefinitions.mock.calls[0][0]).toHaveLength(registry.list().length);
+  });
+
+  it('uses persisted definitions first for runtime list, detail, and direct evaluation', async () => {
+    const persistedTrend = clonedStrategy(registry, 'TREND_MOMENTUM', {
+      name: 'Persisted Trend Momentum',
+      version: '9.9.0',
+      effectiveAt: '2026-06-01T00:00:00.000Z',
+    });
+    const repo = {
+      listDefinitions: jest.fn().mockResolvedValue([persistedTrend]),
+      latestPerformanceForStrategies: jest.fn().mockResolvedValue([]),
+      performance: jest.fn().mockResolvedValue([]),
+    };
+    const persistedService = new StrategyFrameworkService(
+      repo as any,
+      registry,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any
+    );
+
+    const rows = await persistedService.list({});
+    const listedTrend = rows.find((row) => row.code === 'TREND_MOMENTUM');
+    const detail = await persistedService.detail('TREND_MOMENTUM');
+    const [evaluation] = await persistedService.evaluateContext({
+      instrumentId: 'stock-1',
+      symbol: 'AAA',
+      latestPrice: 120,
+      sma50: 100,
+      sma200: 90,
+      rawSignal: { score: 82, direction: 'BULLISH' } as any,
+      dataQuality: {
+        signalReadinessStatus: 'READY',
+        coverageStatus: 'GOOD',
+        liquidityStatus: 'LIQUID',
+        eligibleForSignals: true,
+      },
+      marketGate: 'OPEN',
+      marketRegime: 'RISK_ON',
+      sectorLeadership: 'LEADING',
+      sectorRelativeStrengthScore: 72,
+      smartMoneyStatus: 'ACCUMULATION',
+      smartMoneyScore: 80,
+    }, 'TREND_MOMENTUM');
+
+    expect(repo.listDefinitions).toHaveBeenCalled();
+    expect(listedTrend).toMatchObject({
+      name: 'Persisted Trend Momentum',
+      version: '9.9.0',
+      definitionSource: 'PERSISTED',
+    });
+    expect(detail).toMatchObject({
+      name: 'Persisted Trend Momentum',
+      version: '9.9.0',
+      definitionSource: 'PERSISTED',
+    });
+    expect(evaluation.strategyVersion).toBe('9.9.0');
+  });
+
+  it('falls back to registry definitions when persistence has no strategy rows', async () => {
+    const repo = {
+      listDefinitions: jest.fn().mockResolvedValue([]),
+      latestPerformanceForStrategies: jest.fn().mockResolvedValue([]),
+    };
+    const fallbackService = new StrategyFrameworkService(
+      repo as any,
+      registry,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any
+    );
+
+    const rows = await fallbackService.list({});
+    const trend = rows.find((row) => row.code === 'TREND_MOMENTUM');
+
+    expect(rows).toHaveLength(registry.list().length);
+    expect(trend).toMatchObject({
+      version: registry.get('TREND_MOMENTUM')?.version,
+      definitionSource: 'REGISTRY_FALLBACK',
+    });
+    expect(trend?.definitionDrift).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'MISSING_PERSISTED_DEFINITION' }),
+    ]));
+  });
+
+  it('reports checksum drift when persisted definitions differ from registry snapshots', async () => {
+    const persistedDefinitions = registry.list().map((strategy) => clonedStrategy(registry, strategy.code));
+    persistedDefinitions[0] = { ...persistedDefinitions[0], checksum: 'stale-checksum' };
+    const repo = {
+      listDefinitions: jest.fn().mockResolvedValue(persistedDefinitions),
+      health: jest.fn().mockResolvedValue({
+        strategiesWithBacktestResults: 0,
+        missingPerformanceCount: persistedDefinitions.length,
+        activeDefinitionsCount: persistedDefinitions.filter((strategy) => strategy.status === 'ACTIVE').length,
+      }),
+    };
+    const driftService = new StrategyFrameworkService(
+      repo as any,
+      registry,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any
+    );
+
+    const health = await driftService.health();
+
+    expect(health.definitionSource).toBe('PERSISTED');
+    expect(health.definitionDriftStatus).toBe('DRIFT_DETECTED');
+    expect(health.definitionDrift).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        strategyCode: persistedDefinitions[0].code,
+        type: 'CHECKSUM_MISMATCH',
+      }),
+    ]));
   });
 
   it('marks good active entry summaries with sufficient sample as proven', () => {
@@ -316,6 +466,34 @@ describe('Strategy Framework service', () => {
     expect(result.results[0].entryRulesPassed).toContain('SMART_MONEY_ACCUMULATION');
   });
 });
+
+function clonedStrategy(
+  registry: StrategyFrameworkRegistry,
+  code: string,
+  overrides: Partial<StrategyDefinition> = {}
+): StrategyDefinition {
+  const strategy = registry.get(code);
+  if (!strategy) throw new Error(`Missing test strategy ${code}`);
+  return {
+    ...strategy,
+    assetTypes: [...strategy.assetTypes],
+    supportedRegions: [...strategy.supportedRegions],
+    requiredInputs: [...strategy.requiredInputs],
+    entryRules: strategy.entryRules.map((rule) => ({ ...rule })),
+    exitRules: strategy.exitRules.map((rule) => ({ ...rule })),
+    invalidationRules: strategy.invalidationRules.map((rule) => ({ ...rule })),
+    noiseFilters: strategy.noiseFilters.map((rule) => ({ ...rule })),
+    riskRules: strategy.riskRules.map((rule) => ({ ...rule })),
+    marketGateRules: strategy.marketGateRules.map((rule) => ({ ...rule })),
+    parameters: { ...strategy.parameters },
+    strategyRating: strategy.strategyRating ? { ...strategy.strategyRating } : strategy.strategyRating,
+    examples: {
+      triggers: [...strategy.examples.triggers],
+      blocks: [...strategy.examples.blocks],
+    },
+    ...overrides,
+  };
+}
 
 function servicePricesForWatchDecision() {
   const start = new Date('2026-05-28T00:00:00.000Z');

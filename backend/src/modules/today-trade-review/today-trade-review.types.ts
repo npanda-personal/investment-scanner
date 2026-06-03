@@ -20,6 +20,8 @@ export type TodayReviewCandidateState =
 export type TodayReviewDirection = 'LONG' | 'SHORT' | 'EXIT_RISK' | 'WATCH' | 'BLOCKED' | 'AVOID';
 export type TodayReviewGrade = 'A' | 'B' | 'C' | 'D' | 'UNPROVEN';
 export type TodayReviewTrustStatus = 'OK' | 'PARTIAL' | 'STALE' | 'FAILED';
+export type TodayReviewBoardSection = 'LONG_REVIEW' | 'WATCH_ONLY' | 'EXIT_RISK' | 'SPECIAL_CASES';
+export type TodayReviewBoardSourceType = 'STRATEGY_BACKED' | 'LITE' | 'MIXED' | 'OTHER';
 export type TodayReviewUniverseMode = 'FULL_REVIEW' | 'LIMITED_REVIEW' | 'NO_REVIEW';
 export type TodayReviewTrustedLoadStatus = 'COMPLETE' | 'CONFIGURED_PARTIAL' | 'LOAD_FAILED';
 export type TodayReviewReasonCategory =
@@ -57,7 +59,19 @@ export interface TodayReviewSourceSnapshot {
   marketContext?: MarketContextSummary | null;
   rawSignalUniverse?: Record<string, unknown> | null;
   explainability?: TodayReviewExplainability | null;
+  boardSelection?: TodayReviewBoardSelection | null;
   generatedAt: string;
+}
+
+export interface TodayReviewBoardSelection {
+  contractVersion: string;
+  quotas: Record<TodayReviewBoardSection, number>;
+  eligibleCounts: Record<TodayReviewBoardSection, number>;
+  displayedCounts: Record<TodayReviewBoardSection, number>;
+  strategyBackedCount: number;
+  liteCount: number;
+  suppressedCount: number;
+  fillBackfillReasons: string[];
 }
 
 export interface TodayReviewScanFunnel {
@@ -104,6 +118,10 @@ export interface TodayReviewCandidateDto {
   strategyProofSnapshot: Record<string, unknown> | null;
   tradePlanSnapshot: TradePlanResultDto | Record<string, unknown> | null;
   sourceSignalSnapshot: Record<string, unknown> | null;
+  boardSection?: TodayReviewBoardSection | null;
+  boardSourceType?: TodayReviewBoardSourceType | null;
+  boardReason?: string | null;
+  boardContractVersion?: string | null;
   explainability?: TodayReviewCandidateExplainability;
   createdAt?: string;
   updatedAt?: string;
@@ -209,6 +227,7 @@ export interface TodayReviewGroupedCandidates {
   shortReview: TodayReviewCandidateDto[];
   exitRiskReview: TodayReviewCandidateDto[];
   watchOnly: TodayReviewCandidateDto[];
+  specialCases: TodayReviewCandidateDto[];
   blocked: TodayReviewCandidateDto[];
   avoid: TodayReviewCandidateDto[];
   insufficientData: TodayReviewCandidateDto[];

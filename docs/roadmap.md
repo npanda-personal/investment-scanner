@@ -187,7 +187,7 @@ Market/Data Quality/Signals/Calibration/Smart Money/Market Context/Strategy Deci
 - Default scope `IN / STOCK`, with region/asset request parameters supported.
 - Candidate states: `LONG_REVIEW`, `SHORT_REVIEW`, `EXIT_RISK_REVIEW`, `WATCH_ONLY`, `BLOCKED`, `AVOID`, `INSUFFICIENT_DATA`, and `UNPROVEN`.
 - Transparent 0-100 ranking with hard blockers overriding score.
-- Candidate detail page that exposes proof, market context, data quality, trade-plan geometry, invalidation, target/reward, and support diagnostics.
+- Candidate detail page that exposes proof, market context, data quality, entry trigger context, exit condition, invalidation condition, and support diagnostics.
 
 ## Deferred Phases 2-5
 

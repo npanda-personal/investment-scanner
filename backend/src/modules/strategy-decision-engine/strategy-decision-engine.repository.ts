@@ -22,7 +22,7 @@ export class StrategyDecisionEngineRepository {
     const generatedDate = this.normalizeUtcDay(data.generatedAt);
     const instrumentId = data.instrumentId || 'GLOBAL';
     const entryZone = this.serializeEntryZone(data.entryZone);
-    const record = await this.db.strategyDecisionResult.upsert({
+    const record = await (this.db.strategyDecisionResult as any).upsert({
       where: {
         instrumentId_strategy_modelVersion_generatedDate: {
           instrumentId,
@@ -51,9 +51,13 @@ export class StrategyDecisionEngineRepository {
         frameworkAction: data.frameworkAction || null,
         entryRulesPassed: (data.entryRulesPassed as any) || Prisma.JsonNull,
         exitRulesTriggered: (data.exitRulesTriggered as any) || Prisma.JsonNull,
+        invalidationRulesTriggered: (data.invalidationRulesTriggered as any) || Prisma.JsonNull,
         noiseFiltersTriggered: (data.noiseFiltersTriggered as any) || Prisma.JsonNull,
         strategyRating: (data.strategyRating as any) || Prisma.JsonNull,
         readinessLabel: data.readinessLabel || null,
+        strategyName: data.strategyName || null,
+        strategyDefinitionSource: data.strategyDefinitionSource || null,
+        strategyDefinitionDrift: (data.strategyDefinitionDrift as any) || Prisma.JsonNull,
         generatedAt: new Date(data.generatedAt),
         country: data.country || null,
         exchange: data.exchange || null,
@@ -64,6 +68,7 @@ export class StrategyDecisionEngineRepository {
         symbol: data.symbol,
         country: data.country || null,
         exchange: data.exchange || null,
+        strategyName: data.strategyName || null,
         strategy: data.strategy,
         decision: data.decision,
         action: data.action,
@@ -84,9 +89,12 @@ export class StrategyDecisionEngineRepository {
         frameworkAction: data.frameworkAction || null,
         entryRulesPassed: (data.entryRulesPassed as any) || Prisma.JsonNull,
         exitRulesTriggered: (data.exitRulesTriggered as any) || Prisma.JsonNull,
+        invalidationRulesTriggered: (data.invalidationRulesTriggered as any) || Prisma.JsonNull,
         noiseFiltersTriggered: (data.noiseFiltersTriggered as any) || Prisma.JsonNull,
         strategyRating: (data.strategyRating as any) || Prisma.JsonNull,
         readinessLabel: data.readinessLabel || null,
+        strategyDefinitionSource: data.strategyDefinitionSource || null,
+        strategyDefinitionDrift: (data.strategyDefinitionDrift as any) || Prisma.JsonNull,
         modelVersion: data.modelVersion,
         generatedAt: new Date(data.generatedAt),
         generatedDate,
@@ -98,7 +106,7 @@ export class StrategyDecisionEngineRepository {
 
   async replaceMany(items: StrategyDecisionDto[]): Promise<StrategyDecisionDto[]> {
     if (items.length === 0) return [];
-    const rows: Prisma.StrategyDecisionResultCreateManyInput[] = items.map((data) => {
+    const rows: any[] = items.map((data) => {
       const generatedDate = this.normalizeUtcDay(data.generatedAt);
       return {
         instrumentId: data.instrumentId || null,
@@ -107,6 +115,7 @@ export class StrategyDecisionEngineRepository {
         symbol: data.symbol || null,
         country: data.country || null,
         exchange: data.exchange || null,
+        strategyName: data.strategyName || null,
         strategy: data.strategy,
         decision: data.decision,
         action: data.action,
@@ -127,9 +136,12 @@ export class StrategyDecisionEngineRepository {
         frameworkAction: data.frameworkAction || null,
         entryRulesPassed: (data.entryRulesPassed as any) || Prisma.JsonNull,
         exitRulesTriggered: (data.exitRulesTriggered as any) || Prisma.JsonNull,
+        invalidationRulesTriggered: (data.invalidationRulesTriggered as any) || Prisma.JsonNull,
         noiseFiltersTriggered: (data.noiseFiltersTriggered as any) || Prisma.JsonNull,
         strategyRating: (data.strategyRating as any) || Prisma.JsonNull,
         readinessLabel: data.readinessLabel || null,
+        strategyDefinitionSource: data.strategyDefinitionSource || null,
+        strategyDefinitionDrift: (data.strategyDefinitionDrift as any) || Prisma.JsonNull,
         modelVersion: data.modelVersion,
         generatedAt: new Date(data.generatedAt),
         generatedDate,
@@ -276,6 +288,7 @@ export class StrategyDecisionEngineRepository {
       country: record.country || undefined,
       exchange: record.exchange || undefined,
       strategy: record.strategy as any,
+      strategyName: record.strategyName || undefined,
       decision: record.decision as any,
       action: record.action as any,
       decisionScore: record.decisionScore,
@@ -295,10 +308,14 @@ export class StrategyDecisionEngineRepository {
       frameworkAction: record.frameworkAction || undefined,
       entryRulesPassed: Array.isArray(record.entryRulesPassed) ? record.entryRulesPassed : undefined,
       exitRulesTriggered: Array.isArray(record.exitRulesTriggered) ? record.exitRulesTriggered : undefined,
-      invalidationRulesTriggered: this.parseFrameworkInvalidationRules(record.riskPlan),
+      invalidationRulesTriggered: Array.isArray(record.invalidationRulesTriggered)
+        ? record.invalidationRulesTriggered
+        : this.parseFrameworkInvalidationRules(record.riskPlan),
       noiseFiltersTriggered: Array.isArray(record.noiseFiltersTriggered) ? record.noiseFiltersTriggered : undefined,
       strategyRating: record.strategyRating || undefined,
       readinessLabel: record.readinessLabel || undefined,
+      strategyDefinitionSource: record.strategyDefinitionSource || undefined,
+      strategyDefinitionDrift: Array.isArray(record.strategyDefinitionDrift) ? record.strategyDefinitionDrift : [],
       modelVersion: record.modelVersion,
       generatedAt: record.generatedAt.toISOString(),
     };

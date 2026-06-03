@@ -1,9 +1,56 @@
-import { TodayTradeReviewService, type TodayReviewCandidateDto, type TodayReviewRepository, type TodayReviewRunDto, type TodayReviewRunStatus, type TodayReviewSourceSnapshot, type TodayReviewUpstreamServices } from '../../../src/modules/today-trade-review';
+import { TodayTradeReviewRepository, TodayTradeReviewService, type TodayReviewCandidateDto, type TodayReviewRepository, type TodayReviewRunDto, type TodayReviewRunStatus, type TodayReviewSourceSnapshot, type TodayReviewUpstreamServices } from '../../../src/modules/today-trade-review';
 import type { DataQualityEvaluationDto } from '../../../src/modules/data-quality-engine';
 import type { StrategyDecisionDto } from '../../../src/modules/strategy-decision-engine';
 import type { TradePlanResultDto } from '../../../src/modules/trade-plan-risk-engine';
 
 const fixedNow = new Date('2026-05-11T06:30:00.000Z');
+
+const persistedRunRecord = (overrides: Record<string, any> = {}) => ({
+  id: 'run-record',
+  runDate: new Date('2026-06-02T00:00:00.000Z'),
+  region: 'IN',
+  assetType: 'STOCK',
+  status: 'PARTIAL',
+  dataThroughDate: new Date('2026-06-01T00:00:00.000Z'),
+  startedAt: new Date('2026-06-02T06:30:00.000Z'),
+  finishedAt: new Date('2026-06-02T06:31:00.000Z'),
+  warnings: [],
+  candidateCounts: {},
+  sourceSnapshot: {
+    generatedAt: '2026-06-02T06:30:00.000Z',
+    reviewUniverse: {
+      mode: 'NO_REVIEW',
+      trustedCount: 0,
+      catalogCount: 2937,
+      warnings: [],
+    },
+    scanFunnel: {
+      trustedUniverseCount: 0,
+      trustedInstrumentsScanned: 0,
+      trustedInstrumentsSkipped: 0,
+      scanLimit: 0,
+      scanComplete: true,
+      scanOrdering: 'recentVolumeDesc_priceHistoryCompleteness_latestFreshness_symbol',
+      trustedLoadStatus: 'COMPLETE',
+      membershipLoadFailureReason: null,
+      strategyCandidatesSeen: 0,
+      strategyCandidatesEligible: 0,
+      strategyCandidatesExcluded: 0,
+      outsideTrustedUniverse: 0,
+      setupsDetected: 0,
+      promotedCandidates: 0,
+      watchOnly: 0,
+      unproven: 0,
+      blocked: 0,
+      noSetup: 0,
+      topNoPromotionReasons: {},
+    },
+  },
+  createdAt: new Date('2026-06-02T06:30:00.000Z'),
+  updatedAt: new Date('2026-06-02T06:31:00.000Z'),
+  candidates: [],
+  ...overrides,
+});
 
 class MemoryTodayReviewRepository implements TodayReviewRepository {
   runs = new Map<string, TodayReviewRunDto>();
@@ -162,7 +209,7 @@ const tradePlan = (overrides: Partial<TradePlanResultDto> = {}): TradePlanResult
   riskGrade: 'LOW',
   entryZone: { type: 'BREAKOUT', referencePrice: 100, preferredEntryMin: 99, preferredEntryMax: 101, quality: 'STRONG', rationale: 'Breakout review zone.' },
   stopLoss: { price: 95, percentBelowEntry: 5, method: 'RECENT_SWING_LOW', quality: 'STRONG', rationale: 'Below review floor.' },
-  target: { price: 112, expectedReturnPercent: 12, method: 'REWARD_RISK_MULTIPLE', quality: 'ACCEPTABLE', rationale: 'Modeled reward range.' },
+  target: { price: 112, expectedReturnPercent: 12, method: 'REWARD_RISK_MULTIPLE', quality: 'ACCEPTABLE', rationale: 'Compatibility range retained for legacy consumers.' },
   rewardRiskRatio: 2.4,
   positionSizing: null,
   portfolioImpact: null,
@@ -171,7 +218,7 @@ const tradePlan = (overrides: Partial<TradePlanResultDto> = {}): TradePlanResult
   blockers: [],
   dataGaps: [],
   paperReadinessStatus: 'READY_FOR_PAPER_REVIEW',
-  paperReadinessReasons: ['Trade plan status is VALID.'],
+  paperReadinessReasons: ['Risk snapshot status is VALID.'],
   paperReadinessBlockers: [],
   generatedAt: fixedNow.toISOString(),
   modelVersion: 'trade-plan-risk-v1',
@@ -315,6 +362,217 @@ const services = (overrides: Partial<TodayReviewUpstreamServices> = {}): TodayRe
     latestPersistedStock: jest.fn().mockResolvedValue({ instrumentId: 'stock-1', symbol: 'ALPHA.NS', companyName: 'Alpha Ltd', sector: 'Financial Services', smartMoneyScore: 70, status: 'ACCUMULATION', confidence: 'MEDIUM', explanation: 'Accumulation support.', updatedAt: fixedNow.toISOString(), dataStatus: 'COMPLETE', source: 'test', range: '3M', latestClose: 100, latestVolume: 1000000, averageVolume20: 900000, dailyChangePercent: 1, signals: [], insiderOwnership: { insiderBuyCount: null, insiderSellCount: null, netInsiderActivity: null, institutionalOwnershipPercent: null, ownershipDataStatus: 'MISSING', source: 'test', explanation: 'Missing.' }, researchUrl: '/research/stocks/stock-1' }),
   },
   ...overrides,
+});
+
+const boardSymbol = (prefix: string, index: number) => `${prefix}${String(index).padStart(2, '0')}.NS`;
+
+const boardTrustedInstrument = (prefix: string, index: number, overrides: Record<string, any> = {}) => trustedInstrument({
+  id: `${prefix.toLowerCase()}-${index}`,
+  symbol: boardSymbol(prefix.toUpperCase(), index),
+  companyName: `${prefix} ${index} Ltd`,
+  providerSymbol: boardSymbol(prefix.toUpperCase(), index),
+  contextGaps: [],
+  warnings: [],
+  ...overrides,
+});
+
+const boardDecision = (prefix: string, index: number, overrides: Partial<StrategyDecisionDto> = {}) => decision({
+  id: `${prefix.toLowerCase()}-decision-${index}`,
+  instrumentId: `${prefix.toLowerCase()}-${index}`,
+  symbol: boardSymbol(prefix.toUpperCase(), index),
+  decisionScore: 100 - index,
+  ...overrides,
+});
+
+const boardDataQuality = (candidate: Pick<StrategyDecisionDto, 'instrumentId' | 'symbol'>) => dataQuality({
+  instrumentId: candidate.instrumentId || 'UNKNOWN',
+  symbol: candidate.symbol || 'UNKNOWN',
+  companyName: `${candidate.symbol || 'Unknown'} Ltd`,
+});
+
+function boardFixtureServices(input: {
+  instruments: any[];
+  entryDecisions?: StrategyDecisionDto[];
+  exitDecisions?: StrategyDecisionDto[];
+  signalEvidence?: boolean;
+}): TodayReviewUpstreamServices {
+  const entryDecisions = input.entryDecisions || [];
+  const exitDecisions = input.exitDecisions || [];
+  const allDecisions = [...entryDecisions, ...exitDecisions];
+  const dataQualityRows = allDecisions.map(boardDataQuality);
+  const dataQualityByInstrument = new Map(dataQualityRows.map((item) => [item.instrumentId, item]));
+  const planByInstrument = new Map(entryDecisions.map((item) => [item.instrumentId, tradePlan({
+    id: `plan-${item.instrumentId}`,
+    instrumentId: item.instrumentId || 'UNKNOWN',
+    symbol: item.symbol || 'UNKNOWN',
+    strategy: item.strategy,
+    strategyDecisionId: item.id,
+  })]));
+  const signalEvidence = input.signalEvidence !== false;
+  return services({
+    strategyDecisionService: {
+      marketGate: jest.fn().mockResolvedValue({ marketGate: 'OPEN', marketCondition: 'HEALTHY' }),
+      candidates: jest.fn().mockResolvedValue({ results: entryDecisions, total: entryDecisions.length }),
+      exits: jest.fn().mockResolvedValue(exitDecisions),
+    },
+    tradePlanService: {
+      latestForInstrument: jest.fn().mockImplementation(async (instrumentId: string) => planByInstrument.get(instrumentId) || null),
+      generatePlan: jest.fn().mockImplementation(async (request: any) => tradePlan({
+        id: `generated-plan-${request.instrumentId}`,
+        instrumentId: request.instrumentId,
+        symbol: request.symbol,
+        strategy: request.strategy || 'TREND_MOMENTUM',
+        strategyDecisionId: request.strategyDecisionId,
+      })),
+    },
+    marketDataService: {
+      latestStoredCandleInfo: jest.fn().mockResolvedValue({ latestTradingDate: '2026-05-10', finalConfirmed: true }),
+      trustedReviewUniverseHealth: jest.fn().mockResolvedValue(trustedHealth({
+        trustedCount: input.instruments.length,
+        status: 'READY',
+        mode: 'FULL_REVIEW',
+        warnings: [],
+        contextGapCounts: { missingSector: 0, missingIndustry: 0, missingMarketCap: 0, missingIsin: 0, missingListingDate: 0 },
+        scanPolicy: { scanLimit: input.instruments.length, scanComplete: true, scanOrdering: 'recentVolumeDesc_priceHistoryCompleteness_latestFreshness_symbol' },
+      })),
+      listTrustedReviewUniverseInstruments: jest.fn().mockResolvedValue(input.instruments),
+    },
+    dataQualityService: {
+      getLatestEvaluationForInstrument: jest.fn().mockImplementation(async (instrumentId: string) => dataQualityByInstrument.get(instrumentId) || null),
+      getEvaluationsForInstruments: jest.fn().mockImplementation(async (instrumentIds: string[]) => instrumentIds.map((instrumentId) => dataQualityByInstrument.get(instrumentId)).filter(Boolean)),
+    },
+    signalService: {
+      latestForInstrument: jest.fn().mockImplementation(async (instrumentId: string) => signalEvidence ? {
+        instrument_id: instrumentId,
+        symbol: boardSymbol('SIG', 1),
+        company_name: 'Signal Fixture Ltd',
+        sector: 'Financial Services',
+        country: 'India',
+        currentPrice: 100,
+        previousClose: 99,
+        dailyChange: 1,
+        dailyChangePercent: 1,
+        currency: 'INR',
+        priceTimestamp: fixedNow.toISOString(),
+        score: 77,
+        direction: 'BULLISH',
+        confidence: 'HIGH',
+        triggered_signals: [],
+        negative_signals: [],
+        explanation: 'Supportive.',
+        generated_at: fixedNow.toISOString(),
+        source: 'test',
+        data_status: 'COMPLETE',
+      } : null),
+      latestSignalUniverse: jest.fn().mockResolvedValue([]),
+    },
+    calibrationService: {
+      latestPersistedForInstrument: jest.fn().mockImplementation(async (instrumentId: string) => signalEvidence ? {
+        signalResultId: `signal-${instrumentId}`,
+        instrumentId,
+        symbol: boardSymbol('SIG', 1),
+        companyName: 'Signal Fixture Ltd',
+        sector: 'Financial Services',
+        country: 'India',
+        rawScore: 77,
+        calibratedScore: 80,
+        scoreDelta: 3,
+        rawDirection: 'BULLISH',
+        calibratedDirection: 'BULLISH',
+        rawConfidence: 'HIGH',
+        calibratedConfidence: 'HIGH',
+        boosts: [],
+        penalties: [],
+        calibrationReasons: [],
+        dataGaps: [],
+        calibrationModelVersion: 'cal-v1',
+        rawSignalModelVersion: 'sig-v1',
+        generatedAt: fixedNow.toISOString(),
+        dataStatus: 'COMPLETE',
+        researchUrl: `/research/stocks/${instrumentId}`,
+      } : null),
+    },
+  });
+}
+
+describe('TodayTradeReviewRepository latest-run visibility', () => {
+  it('skips seeded connected-chain fixture runs and returns the latest trader-visible run', async () => {
+    const fixtureRun = persistedRunRecord({
+      id: 'fixture-run',
+      runDate: new Date('2026-06-03T00:00:00.000Z'),
+      status: 'COMPLETED',
+      candidateCounts: { LONG_REVIEW: 2, WATCH_ONLY: 1 },
+      sourceSnapshot: {
+        generatedAt: '2026-06-03T09:00:00.000Z',
+        marketData: { source: 'TEST_CONNECTED_CHAIN' },
+        reviewUniverse: { mode: 'FULL_REVIEW', trustedCount: 3, catalogCount: 3, warnings: [] },
+        scanFunnel: {
+          trustedUniverseCount: 3,
+          trustedInstrumentsScanned: 3,
+          trustedInstrumentsSkipped: 0,
+          scanLimit: 3,
+          scanComplete: true,
+          scanOrdering: 'connected-chain-seeded-symbol-order',
+          trustedLoadStatus: 'COMPLETE',
+          membershipLoadFailureReason: null,
+          strategyCandidatesSeen: 24,
+          strategyCandidatesEligible: 4,
+          strategyCandidatesExcluded: 20,
+          outsideTrustedUniverse: 20,
+          setupsDetected: 1,
+          promotedCandidates: 2,
+          watchOnly: 1,
+          unproven: 1,
+          blocked: 0,
+          noSetup: 2,
+          topNoPromotionReasons: {},
+        },
+      },
+    });
+    const currentRun = persistedRunRecord({
+      id: 'current-real-run',
+      runDate: new Date('2026-06-02T00:00:00.000Z'),
+      candidateCounts: { LONG_REVIEW: 0, WATCH_ONLY: 0 },
+    });
+    const db = {
+      todayReviewRun: {
+        findMany: jest.fn().mockResolvedValue([fixtureRun, currentRun]),
+      },
+    };
+    const repository = new TodayTradeReviewRepository(db as any);
+
+    const latest = await repository.latest('IN', 'STOCK');
+
+    expect(latest?.id).toBe('current-real-run');
+    expect(latest?.reviewUniverseMode).toBe('NO_REVIEW');
+    expect(db.todayReviewRun.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { region: 'IN', assetType: 'STOCK', status: { in: ['COMPLETED', 'PARTIAL'] } },
+      take: 25,
+      skip: 0,
+    }));
+  });
+
+  it('returns no trader-visible latest run when only seeded connected-chain fixtures exist', async () => {
+    const fixtureRun = persistedRunRecord({
+      id: 'fixture-run',
+      status: 'COMPLETED',
+      sourceSnapshot: {
+        generatedAt: '2026-06-02T09:00:00.000Z',
+        marketData: { source: 'TEST_CONNECTED_CHAIN' },
+        reviewUniverse: { mode: 'FULL_REVIEW', trustedCount: 3, catalogCount: 3, warnings: [] },
+      },
+    });
+    const db = {
+      todayReviewRun: {
+        findMany: jest.fn().mockResolvedValue([fixtureRun]),
+      },
+    };
+    const repository = new TodayTradeReviewRepository(db as any);
+
+    const latest = await repository.latest('IN', 'STOCK');
+
+    expect(latest).toBeNull();
+  });
 });
 
 describe('TodayTradeReviewService', () => {
@@ -907,21 +1165,20 @@ describe('TodayTradeReviewService', () => {
 
     const result = await service.run();
 
-    expect(result.groups.blocked[0]).toEqual(expect.objectContaining({
-      state: 'BLOCKED',
-      confidenceScore: 0,
-    }));
-    expect(result.groups.blocked[0].blockers[0]).toContain('Invalid long review geometry');
+    expect(result.groups.blocked).toHaveLength(0);
+    expect(result.groups.longReview).toHaveLength(0);
+    expect(result.run?.scanFunnel?.blocked).toBe(1);
+    expect((result.run?.sourceSnapshot as any).boardSelection?.suppressedCount).toBeGreaterThanOrEqual(1);
   });
 
-  it('forces hard trade-plan blockers to BLOCKED with a zero confidence score', async () => {
+  it('forces hard exit/invalidation blockers to BLOCKED with a zero confidence score', async () => {
     const blockedPlan = tradePlan({
       planStatus: 'BLOCKED',
       riskGrade: 'HIGH',
-      blockers: ['Stop loss is inside or above the long entry zone; plan is blocked until the stop is below the planned entry floor.'],
+      blockers: ['Invalidation level is inside or above the long entry zone; evidence is blocked until the invalidation level is below the planned entry floor.'],
       paperReadinessStatus: 'BLOCKED',
       paperReadinessReasons: [],
-      paperReadinessBlockers: ['Trade plan has active blockers.'],
+      paperReadinessBlockers: ['Exit/invalidation evidence has active blockers.'],
     });
     const service = new TodayTradeReviewService(new MemoryTodayReviewRepository(), services({
       tradePlanService: {
@@ -931,19 +1188,9 @@ describe('TodayTradeReviewService', () => {
     }), () => fixedNow);
 
     const result = await service.run();
-    const candidate = result.groups.blocked[0];
-
-    expect(candidate.state).toBe('BLOCKED');
-    expect(candidate.grade).toBe('D');
-    expect(candidate.confidenceScore).toBe(0);
-    expect(candidate.blockers).toContain(blockedPlan.blockers[0]);
-    expect(candidate.reasonSummary).toContain('Blocked');
-    expect(candidate.explainability).toEqual(expect.objectContaining({
-      rankingComponents: expect.objectContaining({ hardBlockerOverride: true }),
-      blockers: expect.arrayContaining([
-        expect.objectContaining({ category: 'TRADE_PLAN_PROOF_CHAIN', severity: 'BLOCKER', sourceModule: 'Trade Plan Risk Engine' }),
-      ]),
-    }));
+    expect(result.groups.blocked).toHaveLength(0);
+    expect(result.groups.longReview).toHaveLength(0);
+    expect((result.run?.sourceSnapshot as any).boardSelection?.suppressedCount).toBeGreaterThanOrEqual(1);
   });
 
   it('blocks new long review candidates when the market gate is CLOSED', async () => {
@@ -957,8 +1204,9 @@ describe('TodayTradeReviewService', () => {
 
     const result = await service.run();
 
-    expect(result.groups.blocked[0].blockers).toContain('Market gate is CLOSED for new long review candidates.');
+    expect(result.groups.blocked).toHaveLength(0);
     expect(result.groups.longReview).toHaveLength(0);
+    expect((result.run?.sourceSnapshot as any).boardSelection?.suppressedCount).toBeGreaterThanOrEqual(1);
   });
 
   it('maps missing proof to UNPROVEN instead of A or B', async () => {
@@ -972,11 +1220,9 @@ describe('TodayTradeReviewService', () => {
 
     const result = await service.run();
 
-    expect(result.groups.unproven[0]).toEqual(expect.objectContaining({
-      state: 'UNPROVEN',
-      grade: 'UNPROVEN',
-    }));
+    expect(result.groups.unproven).toHaveLength(0);
     expect(result.groups.longReview).toHaveLength(0);
+    expect((result.run?.sourceSnapshot as any).boardSelection?.suppressedCount).toBeGreaterThanOrEqual(1);
   });
 
   it('maps missing data quality to INSUFFICIENT_DATA and clears promotion', async () => {
@@ -989,11 +1235,161 @@ describe('TodayTradeReviewService', () => {
 
     const result = await service.run();
 
-    expect(result.groups.insufficientData[0]).toEqual(expect.objectContaining({
-      state: 'INSUFFICIENT_DATA',
-      grade: 'UNPROVEN',
-    }));
+    expect(result.groups.insufficientData).toHaveLength(0);
     expect(result.groups.longReview).toHaveLength(0);
+    expect((result.run?.sourceSnapshot as any).boardSelection?.displayedCounts.LONG_REVIEW).toBe(0);
+  });
+
+  it('persists WATCH_ONLY rows when eligible watch candidates exist', async () => {
+    const longInstruments = Array.from({ length: 25 }, (_, index) => boardTrustedInstrument('lite', index + 1));
+    const watchInstruments = Array.from({ length: 15 }, (_, index) => boardTrustedInstrument('watch', index + 1, {
+      priceHistory: liteHistory(80),
+      priceHistoryBars: 80,
+      rollingWindowBars: 80,
+    }));
+    const service = new TodayTradeReviewService(new MemoryTodayReviewRepository(), boardFixtureServices({
+      instruments: [...longInstruments, ...watchInstruments],
+      entryDecisions: [],
+      exitDecisions: [],
+    }), () => fixedNow);
+
+    const result = await service.run();
+    const boardSelection = (result.run?.sourceSnapshot as any).boardSelection;
+
+    expect(result.groups.longReview).toHaveLength(20);
+    expect(result.groups.watchOnly).toHaveLength(10);
+    expect(result.groups.watchOnly.every((candidate) => candidate.boardSection === 'WATCH_ONLY')).toBe(true);
+    expect(boardSelection?.displayedCounts.WATCH_ONLY).toBe(10);
+    expect(boardSelection?.eligibleCounts.WATCH_ONLY).toBeGreaterThanOrEqual(10);
+  });
+
+  it('reserves Strategy Decision-backed LONG_REVIEW representation and prevents Lite from consuming all long slots', async () => {
+    const strategyDecisions = Array.from({ length: 12 }, (_, index) => boardDecision('strategy', index + 1));
+    const strategyInstruments = strategyDecisions.map((item, index) => boardTrustedInstrument('strategy', index + 1, {
+      id: item.instrumentId,
+      symbol: item.symbol,
+      providerSymbol: item.symbol,
+      priceHistory: liteHistory(20),
+      priceHistoryBars: 120,
+    }));
+    const liteInstruments = Array.from({ length: 30 }, (_, index) => boardTrustedInstrument('lite', index + 1));
+    const service = new TodayTradeReviewService(new MemoryTodayReviewRepository(), boardFixtureServices({
+      instruments: [...strategyInstruments, ...liteInstruments],
+      entryDecisions: strategyDecisions,
+      exitDecisions: [],
+    }), () => fixedNow);
+
+    const result = await service.run();
+    const strategyBackedLong = result.groups.longReview.filter((candidate) => candidate.boardSourceType === 'STRATEGY_BACKED');
+    const liteLong = result.groups.longReview.filter((candidate) => candidate.boardSourceType === 'LITE');
+
+    expect(result.groups.longReview).toHaveLength(20);
+    expect(strategyBackedLong.length).toBeGreaterThanOrEqual(8);
+    expect(liteLong.length).toBeLessThan(20);
+    expect((result.run?.sourceSnapshot as any).boardSelection?.strategyBackedCount).toBeGreaterThanOrEqual(8);
+  });
+
+  it('preserves EXIT_RISK_REVIEW visibility under the reserved risk section', async () => {
+    const exitDecisions = Array.from({ length: 6 }, (_, index) => boardDecision('exit', index + 1, {
+      decision: 'EXIT_CANDIDATE' as any,
+      action: 'CONSIDER_EXIT' as any,
+    }));
+    const exitInstruments = exitDecisions.map((item, index) => boardTrustedInstrument('exit', index + 1, {
+      id: item.instrumentId,
+      symbol: item.symbol,
+      providerSymbol: item.symbol,
+      priceHistory: liteHistory(20),
+      priceHistoryBars: 120,
+    }));
+    const liteInstruments = Array.from({ length: 30 }, (_, index) => boardTrustedInstrument('lite', index + 1));
+    const service = new TodayTradeReviewService(new MemoryTodayReviewRepository(), boardFixtureServices({
+      instruments: [...exitInstruments, ...liteInstruments],
+      entryDecisions: [],
+      exitDecisions,
+    }), () => fixedNow);
+
+    const result = await service.run();
+
+    expect(result.groups.exitRiskReview).toHaveLength(5);
+    expect(result.groups.exitRiskReview.every((candidate) => candidate.boardSection === 'EXIT_RISK')).toBe(true);
+    expect((result.run?.sourceSnapshot as any).boardSelection?.displayedCounts.EXIT_RISK).toBe(5);
+  });
+
+  it('selects SPECIAL_CASES from existing evidence and exposes additive API metadata', async () => {
+    const strategyDecisions = Array.from({ length: 21 }, (_, index) => boardDecision('special', index + 1));
+    const strategyInstruments = strategyDecisions.map((item, index) => boardTrustedInstrument('special', index + 1, {
+      id: item.instrumentId,
+      symbol: item.symbol,
+      providerSymbol: item.symbol,
+      priceHistory: liteHistory(20),
+      priceHistoryBars: 120,
+    }));
+    const service = new TodayTradeReviewService(new MemoryTodayReviewRepository(), boardFixtureServices({
+      instruments: strategyInstruments,
+      entryDecisions: strategyDecisions,
+      exitDecisions: [],
+      signalEvidence: false,
+    }), () => fixedNow);
+
+    const result = await service.run();
+    const special = result.groups.specialCases[0];
+
+    expect(result.groups.specialCases).toHaveLength(1);
+    expect(special.boardSection).toBe('SPECIAL_CASES');
+    expect(special.boardSourceType).toBe('STRATEGY_BACKED');
+    expect(special.boardReason).toContain('High-quality candidate with one missing evidence area');
+    expect(special.boardContractVersion).toBe('today-review-board-v1');
+    expect(result.run?.sourceSnapshot.boardSelection).toEqual(expect.objectContaining({
+      contractVersion: 'today-review-board-v1',
+      quotas: expect.objectContaining({ LONG_REVIEW: 20, WATCH_ONLY: 10, EXIT_RISK: 5, SPECIAL_CASES: 5 }),
+      displayedCounts: expect.objectContaining({ SPECIAL_CASES: 1 }),
+      suppressedCount: 0,
+    }));
+  });
+
+  it('does not duplicate persisted candidates across board sections', async () => {
+    const strategyDecisions = Array.from({ length: 12 }, (_, index) => boardDecision('mix', index + 1));
+    const strategyInstruments = strategyDecisions.map((item, index) => boardTrustedInstrument('mix', index + 1, {
+      id: item.instrumentId,
+      symbol: item.symbol,
+      providerSymbol: item.symbol,
+      priceHistory: liteHistory(20),
+      priceHistoryBars: 120,
+    }));
+    const liteInstruments = Array.from({ length: 30 }, (_, index) => boardTrustedInstrument('lite', index + 1));
+    const watchInstruments = Array.from({ length: 12 }, (_, index) => boardTrustedInstrument('watch', index + 1, {
+      priceHistory: liteHistory(80),
+      priceHistoryBars: 80,
+      rollingWindowBars: 80,
+    }));
+    const exitDecisions = Array.from({ length: 6 }, (_, index) => boardDecision('risk', index + 1, { decision: 'EXIT_CANDIDATE' as any, action: 'CONSIDER_EXIT' as any }));
+    const exitInstruments = exitDecisions.map((item, index) => boardTrustedInstrument('risk', index + 1, {
+      id: item.instrumentId,
+      symbol: item.symbol,
+      providerSymbol: item.symbol,
+      priceHistory: liteHistory(20),
+      priceHistoryBars: 120,
+    }));
+    const service = new TodayTradeReviewService(new MemoryTodayReviewRepository(), boardFixtureServices({
+      instruments: [...strategyInstruments, ...liteInstruments, ...watchInstruments, ...exitInstruments],
+      entryDecisions: strategyDecisions,
+      exitDecisions,
+    }), () => fixedNow);
+
+    const result = await service.run();
+    const boardRows = [
+      ...result.groups.longReview,
+      ...result.groups.watchOnly,
+      ...result.groups.exitRiskReview,
+      ...result.groups.shortReview,
+      ...result.groups.specialCases,
+    ];
+    const keys = boardRows.map((candidate) => `${candidate.instrumentId}:${candidate.direction}:${candidate.setupType || candidate.strategyCode}`);
+
+    expect(boardRows).toHaveLength(result.run?.candidates.length || 0);
+    expect(new Set(keys).size).toBe(keys.length);
+    expect(result.run?.candidates.length || 0).toBeLessThanOrEqual(40);
+    expect(result.run?.candidates.length || 0).toBeGreaterThan(0);
   });
 
   it('returns grouped candidates from the persisted latest run', async () => {

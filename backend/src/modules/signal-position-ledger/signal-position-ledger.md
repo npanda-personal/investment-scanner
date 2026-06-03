@@ -66,12 +66,15 @@ When price or trust basis is stale/unavailable, the row remains active and the r
 
 ## Lifecycle / Health Rules
 
-Current lifecycle states:
+Current persisted lifecycle states:
 
-- `ACTIVE`: active entry trigger candidate.
-- `CLOSED`: exit trigger detected; entry evidence remains preserved and exit trigger date, exit price, and exit reason are shown in closed history.
+- `ACTIVE`: source-proven entry trigger candidate is being monitored.
+- `RISK_WARNING`: `REDUCE_RISK` or weak non-terminal exit-rule evidence is persisted as active-like warning evidence and does not close the row.
+- `EXIT_TRIGGERED`: `EXIT_CANDIDATE` evidence exists, but close-price proof is not yet available. The row remains active-like and keeps its active slot.
+- `INVALIDATED`: terminal invalidation rule evidence exists. Invalidated rows are separate from closed history.
+- `CLOSED`: exit trigger evidence and source-proven close price evidence exist.
 
-`REDUCE_RISK` may be shown as a risk warning but does not close the row. `EXIT_CANDIDATE` closes the row.
+`REDUCE_RISK` is warning only. Non-terminal exit-rule evidence is also warning only. Terminal invalidation rule evidence has precedence over exit-candidate closure and records invalidation source decision, rule ids, and timestamp. `EXIT_CANDIDATE` closes only when persisted close evidence is source-proven with complete price status and source metadata. Missing or non-source-proven close price evidence must keep the row in `EXIT_TRIGGERED`; the module must not silently close from a fallback latest price or infer exits from price performance.
 
 ## Non-Goals In This Child
 

@@ -105,9 +105,13 @@ describe('PipelineOrchestrationRepository', () => {
       create: expect.objectContaining({
         scopeRegion: 'IN',
         scopeAssetType: 'STOCK',
+        dataThroughDate: date,
         sourceFingerprint: 'nse:abc',
         changedInstrumentCount: 12,
         warnings: ['fallback unavailable'],
+      }),
+      update: expect.objectContaining({
+        dataThroughDate: date,
       }),
     }));
     expect(saved).toMatchObject({
@@ -149,9 +153,13 @@ describe('PipelineOrchestrationRepository', () => {
       create: expect.objectContaining({
         pipelineRunId: 'run-1',
         stageKey: 'DATA_QUALITY',
+        dataThroughDate: date,
         batchSize: 100,
         cacheKey: 'dq:in:stock:2026-05-22',
         cacheStatus: 'MISS',
+      }),
+      update: expect.objectContaining({
+        dataThroughDate: date,
       }),
     }));
     expect(saved).toMatchObject({

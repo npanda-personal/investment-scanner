@@ -18,6 +18,7 @@ import { SignalPositionLedgerRepository } from './signal-position-ledger.reposit
 const SOURCE_PAGE_LIMIT = 100;
 const PRICE_STALE_DAYS = 5;
 const REFRESH_STALE_MS = 15 * 60 * 1000;
+const SOURCE_PROVEN_PRICE_STATUS = 'COMPLETE';
 
 type LedgerRefreshState = {
   scopeKey: string;
@@ -190,6 +191,8 @@ export class SignalPositionLedgerService {
 
     const returnProjection = this.currentReturnProjection(triggerContract.trigger_price as number, latestPrice, quality);
     const healthState = this.healthStateForDecision(exitDecision?.decision);
+    const status = this.statusForHealthState(healthState);
+    const exitEvidence = this.exitEvidenceForDecision(exitDecision);
 
     return {
       ledgerKey: this.lifecycleKey({
@@ -198,7 +201,7 @@ export class SignalPositionLedgerService {
         instrumentId: signal.instrument_id,
         entryTriggerTimestamp: triggerContract.trigger_timestamp as string,
       }),
-      status: 'ACTIVE',
+      status,
       signalId: triggerContract.signal_id || signal.id || null,
       instrumentId: signal.instrument_id,
       symbol: signal.symbol,
@@ -221,10 +224,15 @@ export class SignalPositionLedgerService {
       currentReturnStatus: returnProjection.currentReturnStatus,
       currentDataQualityStatus: quality?.signalReadinessStatus ?? null,
       healthState,
-      lifecycleEvidenceStatus: healthState ? 'EXIT_TRIGGERED' : 'ACTIVE_ENTRY',
+      lifecycleEvidenceStatus: healthState === 'RISK_WARNING'
+        ? 'RISK_WARNING'
+        : healthState === 'EXIT_TRIGGERED'
+          ? 'EXIT_TRIGGERED'
+          : 'ACTIVE_ENTRY',
       trustEvidenceStatus: returnProjection.trustEvidenceStatus,
       calibrationEvidenceStatus: primaryStrategy?.readinessLabel || primaryStrategy?.ratingGrade ? 'AVAILABLE' : 'UNAVAILABLE',
       displayWarnings: this.displayWarnings(primaryStrategy, quality, returnProjection.currentReturnStatus),
+      ...exitEvidence,
     };
   }
 
@@ -262,7 +270,7 @@ export class SignalPositionLedgerService {
     if (row.triggerType !== 'bullish_entry_trigger') return false;
     if (row.strategyDecision !== 'ENTRY_CANDIDATE') return false;
     if (row.currentDataQualityStatus !== 'READY') return false;
-    if (row.healthState === 'EXIT_TRIGGERED') return false;
+    if (row.status === 'EXIT_TRIGGERED' || row.healthState === 'EXIT_TRIGGERED') return false;
     return true;
   }
 
@@ -321,6 +329,51 @@ export class SignalPositionLedgerService {
     if (decision === 'EXIT_CANDIDATE') return 'EXIT_TRIGGERED';
     if (decision === 'REDUCE_RISK') return 'RISK_WARNING';
     return null;
+  }
+
+  private statusForHealthState(healthState: SignalPositionLedgerActiveRow['healthState']): SignalPositionLedgerActiveRow['status'] {
+    if (healthState === 'RISK_WARNING') return 'RISK_WARNING';
+    if (healthState === 'EXIT_TRIGGERED') return 'EXIT_TRIGGERED';
+    return 'ACTIVE';
+  }
+
+  private isActiveLikeStatus(status: SignalPositionLedgerActiveRow['status']): boolean {
+    return status === 'ACTIVE' || status === 'RISK_WARNING' || status === 'EXIT_TRIGGERED';
+  }
+
+  private hasInvalidationEvidence(exitDecision: SignalPositionLedgerRowSnapshots['exitDecision']): boolean {
+    return (exitDecision?.invalidationRulesTriggered || []).length > 0;
+  }
+
+  private hasRiskWarningEvidence(exitDecision: SignalPositionLedgerRowSnapshots['exitDecision']): boolean {
+    if (!exitDecision) return false;
+    if (exitDecision.decision === 'REDUCE_RISK') return true;
+    if (exitDecision.decision === 'EXIT_CANDIDATE') return false;
+    return (exitDecision.exitRulesTriggered || []).length > 0;
+  }
+
+  private exitEvidenceForDecision(exitDecision: SignalPositionLedgerRowSnapshots['exitDecision']): Partial<SignalPositionLedgerActiveRow> {
+    if (!exitDecision) {
+      return {
+        closePriceStatus: 'UNAVAILABLE',
+        exitRuleIds: [],
+        invalidationRuleIds: [],
+      };
+    }
+    const exitRuleIds = exitDecision.exitRulesTriggered || [];
+    const invalidationRuleIds = exitDecision.invalidationRulesTriggered || [];
+    return {
+      exitStrategyId: exitDecision.strategy || null,
+      exitStrategyVersion: exitDecision.strategyVersion || null,
+      exitSourceDecisionId: exitDecision.id || null,
+      exitRuleId: exitRuleIds[0] ?? null,
+      exitRuleIds,
+      exitDecision: exitDecision.decision,
+      closePriceStatus: 'UNAVAILABLE',
+      invalidationSourceDecisionId: invalidationRuleIds.length > 0 ? exitDecision.id ?? null : null,
+      invalidationRuleIds,
+      invalidationTimestamp: invalidationRuleIds.length > 0 ? exitDecision.generatedAt : null,
+    };
   }
 
   private displayWarnings(
@@ -450,21 +503,40 @@ export class SignalPositionLedgerService {
 
         const snapshots = await this.loadRowSnapshots(candidates, query);
         for (const candidate of candidates) {
-          const row = this.toActiveRow(candidate, snapshots.get(candidate.signal.instrument_id) ?? this.emptySnapshots());
+          const rowSnapshots = snapshots.get(candidate.signal.instrument_id) ?? this.emptySnapshots();
+          const row = this.toActiveRow(candidate, rowSnapshots);
           touchedInstruments.add(row.instrumentId);
           const existingActive = this.activeRowForStock(state, row) ?? this.activeRowForInstrument(state, row.instrumentId);
           if (existingActive && existingActive.ledgerKey !== row.ledgerKey) {
-            const refreshed = this.withCurrentEvidence(existingActive, snapshots.get(candidate.signal.instrument_id) ?? this.emptySnapshots());
+            const lifecycleRow = await this.lifecycleRow(existingActive, rowSnapshots, query);
+            const refreshed = lifecycleRow ?? this.withCurrentEvidence(existingActive, rowSnapshots);
+            if (refreshed.status === 'CLOSED' || refreshed.status === 'INVALIDATED') {
+              await this.persistTerminalRow(refreshed);
+              state.rows.delete(refreshed.ledgerKey);
+              if (refreshed.status === 'CLOSED') state.closedRows.set(refreshed.ledgerKey, refreshed);
+              state.succeededCount += 1;
+              continue;
+            }
             await this.persistActiveRow(refreshed);
             state.rows.set(refreshed.ledgerKey, refreshed);
             state.skippedCount += 1;
             continue;
           }
-          if (this.shouldCloseForExit(snapshots.get(candidate.signal.instrument_id)?.exitDecision ?? null)) {
-            const closed = await this.closedRow(existingActive ?? row, snapshots.get(candidate.signal.instrument_id) ?? this.emptySnapshots(), query);
-            await this.persistClosedRow(closed);
-            state.rows.delete(closed.ledgerKey);
-            state.closedRows.set(closed.ledgerKey, closed);
+          const lifecycleRow = await this.lifecycleRow(existingActive ?? row, rowSnapshots, query);
+          if (lifecycleRow) {
+            if (!existingActive && (lifecycleRow.status === 'CLOSED' || lifecycleRow.status === 'INVALIDATED' || lifecycleRow.status === 'EXIT_TRIGGERED')) {
+              state.skippedCount += 1;
+              continue;
+            }
+            if (lifecycleRow.status === 'CLOSED' || lifecycleRow.status === 'INVALIDATED') {
+              await this.persistTerminalRow(lifecycleRow);
+              state.rows.delete(lifecycleRow.ledgerKey);
+              if (lifecycleRow.status === 'CLOSED') state.closedRows.set(lifecycleRow.ledgerKey, lifecycleRow);
+              state.succeededCount += 1;
+              continue;
+            }
+            state.rows.set(this.rowKey(lifecycleRow), lifecycleRow);
+            await this.persistActiveRow(lifecycleRow);
             state.succeededCount += 1;
             continue;
           }
@@ -577,12 +649,12 @@ export class SignalPositionLedgerService {
   }
 
   private activeRowForInstrument(state: LedgerRefreshState, instrumentId: string): SignalPositionLedgerActiveRow | null {
-    return [...state.rows.values()].find((row) => row.instrumentId === instrumentId && row.status === 'ACTIVE') ?? null;
+    return [...state.rows.values()].find((row) => row.instrumentId === instrumentId && this.isActiveLikeStatus(row.status)) ?? null;
   }
 
   private activeRowForStock(state: LedgerRefreshState, row: SignalPositionLedgerActiveRow): SignalPositionLedgerActiveRow | null {
     const key = this.stockKey(row.symbol);
-    return [...state.rows.values()].find((existing) => existing.status === 'ACTIVE' && this.stockKey(existing.symbol) === key) ?? null;
+    return [...state.rows.values()].find((existing) => this.isActiveLikeStatus(existing.status) && this.stockKey(existing.symbol) === key) ?? null;
   }
 
   private stockKey(symbol: string): string {
@@ -655,46 +727,99 @@ export class SignalPositionLedgerService {
     };
   }
 
-  private shouldCloseForExit(exitDecision: SignalPositionLedgerRowSnapshots['exitDecision']): boolean {
-    return exitDecision?.decision === 'EXIT_CANDIDATE';
+  private async lifecycleRow(
+    row: SignalPositionLedgerActiveRow,
+    snapshots: SignalPositionLedgerRowSnapshots,
+    query: Pick<SignalPositionLedgerActiveQuery, 'region' | 'assetType'>,
+  ): Promise<SignalPositionLedgerActiveRow | null> {
+    const exitDecision = snapshots.exitDecision;
+    if (!exitDecision) return null;
+    if (this.hasInvalidationEvidence(exitDecision)) return this.invalidatedRow(row, snapshots);
+    if (exitDecision.decision === 'EXIT_CANDIDATE') return this.exitLifecycleRow(row, snapshots, query);
+    if (this.hasRiskWarningEvidence(exitDecision)) return this.riskWarningRow(row, snapshots);
+    return null;
   }
 
-  private async closedRow(
+  private async exitLifecycleRow(
     row: SignalPositionLedgerActiveRow,
     snapshots: SignalPositionLedgerRowSnapshots,
     query: Pick<SignalPositionLedgerActiveQuery, 'region' | 'assetType'>,
   ): Promise<SignalPositionLedgerActiveRow> {
     const exitDecision = snapshots.exitDecision;
     const exitDate = exitDecision?.generatedAt || new Date().toISOString();
-    const exitPrice = await this.exitPrice(row.instrumentId, exitDate, snapshots.latestPrice, query);
-    const finalReturn = exitPrice && row.entryTriggerPrice > 0
-      ? Number((((exitPrice.adjustedClose - row.entryTriggerPrice) / row.entryTriggerPrice) * 100).toFixed(4))
+    const exitPrice = await this.exitPrice(row.instrumentId, exitDate, query);
+    const closePrice = this.sourceProvenClosePrice(exitPrice);
+    const exitEvidence = this.exitEvidenceForDecision(exitDecision);
+    const finalReturn = closePrice !== null && row.entryTriggerPrice > 0
+      ? Number((((closePrice - row.entryTriggerPrice) / row.entryTriggerPrice) * 100).toFixed(4))
       : row.currentReturnPercent;
     const exitReason = exitDecision?.reasons?.length
       ? exitDecision.reasons.join(' ')
       : 'Exit trigger generated by strategy exit rules.';
+    const baseRow = {
+      ...this.withCurrentEvidence(row, snapshots),
+      ...exitEvidence,
+      healthState: 'EXIT_TRIGGERED' as const,
+      lifecycleEvidenceStatus: 'EXIT_TRIGGERED' as const,
+      exitTriggerTimestamp: exitDate,
+      exitReasonSummary: exitReason,
+      exitDecision: exitDecision?.decision ?? 'EXIT_CANDIDATE',
+    };
+    if (!exitPrice || closePrice === null) {
+      return {
+        ...baseRow,
+        status: 'EXIT_TRIGGERED',
+        exitTriggerPrice: null,
+        closePriceStatus: 'UNAVAILABLE',
+        closedAt: null,
+      };
+    }
+    return {
+      ...baseRow,
+      status: 'CLOSED',
+      lifecycleEvidenceStatus: 'CLOSED',
+      currentReturnPercent: finalReturn,
+      currentReturnStatus: 'CURRENT',
+      latestTrustedPriceDate: exitPrice.date,
+      latestTrustedPrice: closePrice,
+      exitTriggerPrice: closePrice,
+      closePriceStatus: 'SOURCE_PROVEN',
+      closedAt: new Date().toISOString(),
+    };
+  }
+
+  private invalidatedRow(row: SignalPositionLedgerActiveRow, snapshots: SignalPositionLedgerRowSnapshots): SignalPositionLedgerActiveRow {
+    const exitDecision = snapshots.exitDecision;
     return {
       ...this.withCurrentEvidence(row, snapshots),
-      status: 'CLOSED',
-      healthState: 'EXIT_TRIGGERED',
-      lifecycleEvidenceStatus: 'EXIT_TRIGGERED',
-      currentReturnPercent: finalReturn,
-      currentReturnStatus: exitPrice ? 'CURRENT' : row.currentReturnStatus,
-      latestTrustedPriceDate: exitPrice?.date ?? row.latestTrustedPriceDate,
-      latestTrustedPrice: exitPrice?.adjustedClose ?? row.latestTrustedPrice,
-      exitTriggerTimestamp: exitDate,
-      exitTriggerPrice: exitPrice?.adjustedClose ?? null,
-      exitReasonSummary: exitReason,
-      exitRuleId: exitDecision?.exitRulesTriggered?.[0] ?? null,
-      exitDecision: exitDecision?.decision ?? 'EXIT_CANDIDATE',
-      closedAt: new Date().toISOString(),
+      ...this.exitEvidenceForDecision(exitDecision),
+      status: 'INVALIDATED',
+      healthState: null,
+      lifecycleEvidenceStatus: 'INVALIDATED',
+      closePriceStatus: 'UNAVAILABLE',
+      exitTriggerPrice: null,
+      invalidationSourceDecisionId: exitDecision?.id ?? null,
+      invalidationRuleIds: exitDecision?.invalidationRulesTriggered ?? [],
+      invalidationTimestamp: exitDecision?.generatedAt ?? new Date().toISOString(),
+      closedAt: null,
+    };
+  }
+
+  private riskWarningRow(row: SignalPositionLedgerActiveRow, snapshots: SignalPositionLedgerRowSnapshots): SignalPositionLedgerActiveRow {
+    return {
+      ...this.withCurrentEvidence(row, snapshots),
+      ...this.exitEvidenceForDecision(snapshots.exitDecision),
+      status: 'RISK_WARNING',
+      healthState: 'RISK_WARNING',
+      lifecycleEvidenceStatus: 'RISK_WARNING',
+      closePriceStatus: 'UNAVAILABLE',
+      closedAt: null,
     };
   }
 
   private async exitPrice(
     instrumentId: string,
     exitDate: string,
-    fallback: SignalPositionLatestPriceSnapshot | null,
     query: Pick<SignalPositionLedgerActiveQuery, 'region' | 'assetType'>,
   ): Promise<SignalPositionLatestPriceSnapshot | null> {
     const repositoryWithExitPrice = this.repository as SignalPositionLedgerRepository & {
@@ -704,10 +829,20 @@ export class SignalPositionLedgerService {
         scope: Pick<SignalPositionLedgerActiveQuery, 'region' | 'assetType'>,
       ) => Promise<SignalPositionLatestPriceSnapshot | null>;
     };
-    if (typeof repositoryWithExitPrice.priceAtOrBeforeInstrumentId !== 'function') return fallback;
+    if (typeof repositoryWithExitPrice.priceAtOrBeforeInstrumentId !== 'function') return null;
     const date = new Date(exitDate);
-    if (!Number.isFinite(date.getTime())) return fallback;
-    return await repositoryWithExitPrice.priceAtOrBeforeInstrumentId(instrumentId, date, query) ?? fallback;
+    if (!Number.isFinite(date.getTime())) return null;
+    return await repositoryWithExitPrice.priceAtOrBeforeInstrumentId(instrumentId, date, query) ?? null;
+  }
+
+  private sourceProvenClosePrice(price: SignalPositionLatestPriceSnapshot | null): number | null {
+    if (!price) return null;
+    const priceDate = Date.parse(price.date);
+    if (!Number.isFinite(priceDate)) return null;
+    if (price.dataStatus !== SOURCE_PROVEN_PRICE_STATUS) return null;
+    if (!price.source) return null;
+    const closePrice = price.adjustedClose || price.close;
+    return Number.isFinite(closePrice) && closePrice > 0 ? closePrice : null;
   }
 
   private async refreshUntouchedActiveRows(
@@ -731,11 +866,14 @@ export class SignalPositionLedgerService {
     );
     for (const row of untouched) {
       const rowSnapshots = snapshots.get(row.instrumentId) ?? this.emptySnapshots();
-      if (this.shouldCloseForExit(rowSnapshots.exitDecision)) {
-        const closed = await this.closedRow(row, rowSnapshots, query);
-        await this.persistClosedRow(closed);
-        state.rows.delete(row.ledgerKey);
-        state.closedRows.set(row.ledgerKey, closed);
+      const lifecycleRow = await this.lifecycleRow(row, rowSnapshots, query);
+      if (lifecycleRow?.status === 'CLOSED' || lifecycleRow?.status === 'INVALIDATED') {
+        await this.persistTerminalRow(lifecycleRow);
+        state.rows.delete(lifecycleRow.ledgerKey);
+        if (lifecycleRow.status === 'CLOSED') state.closedRows.set(lifecycleRow.ledgerKey, lifecycleRow);
+      } else if (lifecycleRow) {
+        await this.persistActiveRow(lifecycleRow);
+        state.rows.set(lifecycleRow.ledgerKey, lifecycleRow);
       } else {
         const refreshed = this.withCurrentEvidence(row, rowSnapshots);
         await this.persistActiveRow(refreshed);
@@ -752,7 +890,7 @@ export class SignalPositionLedgerService {
     await repositoryWithLedger.upsertActiveLedgerRow(row);
   }
 
-  private async persistClosedRow(row: SignalPositionLedgerActiveRow): Promise<void> {
+  private async persistTerminalRow(row: SignalPositionLedgerActiveRow): Promise<void> {
     const repositoryWithLedger = this.repository as SignalPositionLedgerRepository & {
       closeLedgerRow?: (row: SignalPositionLedgerActiveRow) => Promise<void>;
     };

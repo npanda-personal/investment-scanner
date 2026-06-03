@@ -19,7 +19,7 @@ import type React from 'react';
 import { Link as RouterLink, useParams } from 'react-router-dom';
 import { PageHeader } from '@/shared/components/PageHeader';
 import { useTodayReviewCandidate } from '../hooks/useTodayReview';
-import type { TodayReviewCandidateDataQualitySnapshot } from '../types';
+import type { TodayReviewCandidate, TodayReviewCandidateDataQualitySnapshot } from '../types';
 
 export function TodayReviewCandidateDetailPage() {
   const { candidateId } = useParams();
@@ -76,18 +76,18 @@ export function TodayReviewCandidateDetailPage() {
         <CardContent>
           <Stack spacing={1.5}>
             <Typography variant="h6">Business reason</Typography>
-            <Typography>{candidate.reasonSummary}</Typography>
+            <Typography>{safeReviewText(candidate.reasonSummary)}</Typography>
             <Divider />
             <Grid container spacing={2}>
               <Fact label="Direction" value={stateLabel(candidate.direction)} />
               <Fact label="Setup type" value={candidate.setupType || candidate.strategyCode} />
               <Fact label="Confidence score (conservative view)" value={confidence} />
-              <Fact label="Preferred entry zone" value={formatEntry(plan)} />
-              <Fact label="Stop / invalidation" value={formatStop(plan)} />
-              <Fact label="Target 1 / Target 2 or reward range" value={formatTarget(plan)} />
-              <Fact label="Reward/risk" value={formatRatio(plan?.rewardRiskRatio)} />
-              <Fact label="Failure condition" value={candidate.blockers[0] || plan?.invalidationRules?.[0] || 'Evidence weakens or invalidation is reached.'} />
-              <Fact label="Do nothing unless" value={plan?.doNothingUnless || (candidate.state === 'LONG_REVIEW' ? 'The entry zone, invalidation, proof, and data quality remain valid.' : 'Blockers or data gaps are resolved in a later review.')} />
+              <Fact label="Entry trigger context" value={formatEntryTrigger(candidate, plan)} />
+              <Fact label="Exit condition" value={formatExitCondition(plan)} />
+              <Fact label="Invalidation condition" value={formatInvalidationCondition(plan)} />
+              <Fact label="Data quality status" value={dataQualityStatus(dataQuality)} />
+              <Fact label="Failure condition" value={safeReviewText(candidate.blockers[0] || plan?.invalidationRules?.[0] || 'Evidence weakens or invalidation is reached.')} />
+              <Fact label="Do nothing unless" value={safeReviewText(plan?.doNothingUnless || (candidate.state === 'LONG_REVIEW' ? 'The entry trigger, invalidation condition, proof, and data quality remain valid.' : 'Blockers or data gaps are resolved in a later review.'))} />
             </Grid>
           </Stack>
         </CardContent>
@@ -95,7 +95,7 @@ export function TodayReviewCandidateDetailPage() {
 
       {(candidate.blockers.length > 0 || candidate.watchReasons.length > 0) && (
         <Alert severity={candidate.blockers.length > 0 ? 'error' : 'warning'}>
-          {[...candidate.blockers, ...candidate.watchReasons].join(' ')}
+          {[...candidate.blockers, ...candidate.watchReasons].map(safeReviewText).join(' ')}
         </Alert>
       )}
       {dqTierContext.missingTierContext && (
@@ -117,7 +117,7 @@ export function TodayReviewCandidateDetailPage() {
           <Panel title="Ranking components">
             <FactStack items={[
               ['Strategy proof', formatNumber(explainability.rankingComponents.strategyProof)],
-              ['Trade plan', formatNumber(explainability.rankingComponents.tradePlan)],
+              ['Exit/invalidation evidence', formatNumber(explainability.rankingComponents.tradePlan)],
               ['Market regime', formatNumber(explainability.rankingComponents.marketRegime)],
               ['Sector alignment', formatNumber(explainability.rankingComponents.sectorAlignment)],
               ['Signal calibration', formatNumber(explainability.rankingComponents.signalCalibration)],
@@ -139,8 +139,8 @@ export function TodayReviewCandidateDetailPage() {
             ['Framework-backed', proof?.frameworkBacked ? 'Yes' : 'No'],
             ['Proof rating', proof?.strategyRating?.ratingGrade || proof?.evidenceLabel || plan?.strategyRating || 'Unproven'],
             ['Sample size', formatNumber(proof?.sampleSize)],
-            ['Readiness', proof?.readinessLabel || plan?.readinessLabel || 'Unavailable'],
-            ['Decision', proof?.decision || 'Unavailable'],
+            ['Readiness', formatReadinessLabel(proof?.readinessLabel || plan?.readinessLabel)],
+            ['Decision', formatDecisionLabel(proof?.decision)],
           ]} />
         </Panel>
         <Panel title="Market context">
@@ -175,13 +175,13 @@ export function TodayReviewCandidateDetailPage() {
             ['Trusted baseline blocker codes', dataQuality?.tierEvidence?.trustedBaselineBlockerCodes?.join(', ') || 'Unavailable'],
           ]} />
         </Panel>
-        <Panel title="Trade plan">
+        <Panel title="Exit/invalidation evidence">
           <FactStack items={[
-            ['Plan status', plan?.planStatus || 'Unavailable'],
-            ['Risk grade', plan?.riskGrade || 'Unavailable'],
-            ['Entry trigger', formatEntry(plan)],
-            ['Stop / invalidation', formatStop(plan)],
-            ['Reward range', formatTarget(plan)],
+            ['Snapshot status', formatReadinessLabel(plan?.planStatus)],
+            ['Risk warning', plan?.riskGrade || 'Unavailable'],
+            ['Entry trigger context', formatEntryTrigger(candidate, plan)],
+            ['Exit condition', formatExitCondition(plan)],
+            ['Invalidation condition', formatInvalidationCondition(plan)],
           ]} />
         </Panel>
       </Grid>
@@ -193,7 +193,7 @@ export function TodayReviewCandidateDetailPage() {
           ['Smart-money support', signals?.smartMoney?.status || 'Unavailable'],
           ['Readiness evidence', explainability?.upstreamEvidence?.readiness ? 'Available' : 'Unavailable'],
           ['Strategy proof evidence', explainability?.upstreamEvidence?.strategyProof ? 'Available' : 'Unavailable'],
-          ['Trade-plan proof-chain', explainability?.upstreamEvidence?.tradePlanProofChain ? 'Available' : 'Unavailable'],
+          ['Exit/invalidation evidence', explainability?.upstreamEvidence?.tradePlanProofChain ? 'Available' : 'Unavailable'],
         ]} />
       </Panel>
 
@@ -249,15 +249,19 @@ function ReasonList({ reasons }: { reasons: Array<{ code: string; label: string;
   if (reasons.length === 0) return <Typography color="text.secondary">No candidate reasons were stored for this panel.</Typography>;
   return (
     <List dense disablePadding>
-      {reasons.map((reason) => (
-        <ListItem key={`${reason.severity}:${reason.code}`} disableGutters>
-          <ListItemText
-            primary={`${reason.category} / ${reason.severity}`}
-            secondary={`${reason.label} Source: ${reason.sourceModule}${reason.evidenceDate ? `; Evidence: ${formatDateTime(reason.evidenceDate)}` : ''}`}
-            secondaryTypographyProps={{ sx: { overflowWrap: 'anywhere' } }}
-          />
-        </ListItem>
-      ))}
+      {reasons.map((reason) => {
+        const category = reasonCategoryLabel(reason.category);
+        const source = reasonSourceLabel(reason.sourceModule);
+        return (
+          <ListItem key={`${reason.severity}:${reason.code}`} disableGutters>
+            <ListItemText
+              primary={`${category} / ${reason.severity}`}
+              secondary={`${safeReviewText(reason.label)} Source: ${source}${reason.evidenceDate ? `; Evidence: ${formatDateTime(reason.evidenceDate)}` : ''}`}
+              secondaryTypographyProps={{ sx: { overflowWrap: 'anywhere' } }}
+            />
+          </ListItem>
+        );
+      })}
     </List>
   );
 }
@@ -331,19 +335,40 @@ function formatEntry(plan: any) {
   return `${formatCurrency(Number(plan.entryZone.preferredEntryMin))} - ${formatCurrency(Number(plan.entryZone.preferredEntryMax))}`;
 }
 
-function formatStop(plan: any) {
+function formatEntryTrigger(candidate: TodayReviewCandidate, plan: any) {
+  const trigger = safeReviewText(plan?.entryTrigger || '');
+  const entry = formatEntry(plan);
+  if (trigger && entry !== 'Unavailable') return `${trigger}; entry context ${entry}`;
+  if (trigger) return trigger;
+  if (entry !== 'Unavailable') return `Entry context ${entry}`;
+  return safeReviewText(candidate.reasonSummary || 'Unavailable');
+}
+
+function formatExitCondition(plan: any) {
+  const exitRule = plan?.exitRules?.[0] || plan?.exitConditions?.[0];
+  return exitRule ? safeReviewText(exitRule) : 'Exit condition unavailable in this snapshot.';
+}
+
+function formatInvalidationCondition(plan: any) {
   if (!plan?.stopLoss) return 'Unavailable';
-  return `${formatCurrency(Number(plan.stopLoss.price))}; ${plan.invalidationRules?.[0] || 'Invalidation unavailable'}`;
+  return `${formatCurrency(Number(plan.stopLoss.price))}; ${safeReviewText(plan.invalidationRules?.[0] || 'Invalidation unavailable')}`;
 }
 
-function formatTarget(plan: any) {
-  if (!plan?.target) return 'Unavailable';
-  const target2 = typeof plan.target.target2 === 'number' ? ` / ${formatCurrency(plan.target.target2)}` : '';
-  return `${formatCurrency(Number(plan.target.price))}${target2}; ${formatNumber(plan.target.expectedReturnPercent)}% modeled reward`;
+function dataQualityStatus(dataQuality: TodayReviewCandidateDataQualitySnapshot | null) {
+  if (!dataQuality) return 'Missing';
+  return [dataQuality.coverageStatus, dataQuality.signalReadinessStatus, dataQuality.liquidityStatus]
+    .filter(Boolean)
+    .join(' / ') || 'Unavailable';
 }
 
-function formatRatio(value?: number) {
-  return typeof value === 'number' && Number.isFinite(value) ? value.toFixed(2) : 'Unavailable';
+function formatReadinessLabel(value?: string | null) {
+  return safeReviewText(value || 'Unavailable').replace(/_/g, ' ');
+}
+
+function formatDecisionLabel(value?: string | null) {
+  return safeReviewText(value || 'Unavailable')
+    .replace(/TRADE_CANDIDATE/g, 'REVIEW_CANDIDATE')
+    .replace(/_/g, ' ');
 }
 
 function formatNumber(value?: number) {
@@ -357,4 +382,41 @@ function formatPercent(value?: number) {
 function formatDateTime(value?: string | null) {
   if (!value) return 'Unavailable';
   return new Date(value).toLocaleString();
+}
+
+function reasonCategoryLabel(category: string) {
+  if (category === 'TRADE_PLAN_PROOF_CHAIN') return 'Exit/invalidation evidence';
+  return stateLabel(category);
+}
+
+function reasonSourceLabel(sourceModule: string) {
+  if (/trade plan/i.test(sourceModule)) return 'Today Review evidence';
+  return sourceModule;
+}
+
+function safeReviewText(value: string) {
+  return String(value || '')
+    .replace(/PAPER_TEST_CANDIDATE/g, 'RESEARCH_REVIEW_CANDIDATE')
+    .replace(/READY_FOR_PAPER_REVIEW/g, 'RESEARCH_REVIEW_READY')
+    .replace(/Trade-plan proof-chain snapshot supports paper-review research\./gi, 'Exit and invalidation evidence is available for research review.')
+    .replace(/Paper review readiness is BLOCKED by the trade-plan snapshot\./gi, 'Exit/invalidation evidence is BLOCKED by the risk snapshot.')
+    .replace(/Reward\/risk is below the paper review threshold\./gi, 'Exit/invalidation evidence is incomplete for research review.')
+    .replace(/Reward\/risk is incomplete for paper review\./gi, 'Exit/invalidation evidence is incomplete for research review.')
+    .replace(/Trade-plan snapshot/gi, 'Exit/invalidation evidence snapshot')
+    .replace(/Trade plan has active blockers/gi, 'Exit/invalidation evidence has active blockers')
+    .replace(/Trade plan status/gi, 'Risk snapshot status')
+    .replace(/Trade plan/gi, 'Risk evidence')
+    .replace(/trade plan/gi, 'risk evidence')
+    .replace(/trade-plan/gi, 'risk-evidence')
+    .replace(/Stop loss/gi, 'Invalidation level')
+    .replace(/stop loss/gi, 'invalidation level')
+    .replace(/stop level/gi, 'invalidation level')
+    .replace(/paper-readiness/gi, 'research-readiness')
+    .replace(/paper review/gi, 'research review')
+    .replace(/paper-review/gi, 'research-review')
+    .replace(/reward\/risk/gi, 'exit/invalidation evidence')
+    .replace(/modeled reward/gi, 'modeled compatibility range')
+    .replace(/target\/reward/gi, 'exit/invalidation')
+    .replace(/target price/gi, 'compatibility price')
+    .replace(/price target/gi, 'compatibility price');
 }

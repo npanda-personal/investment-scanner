@@ -100,6 +100,8 @@ export interface EarningsIntelligenceSnapshot {
   symbol: string;
   resultDate: string | null;
   resultDateSource: string;
+  periodEndDate?: string | null;
+  validatedAt?: string | null;
   daysToResult?: number | null;
   revenueGrowth: number | null;
   profitGrowth: number | null;
@@ -110,6 +112,7 @@ export interface EarningsIntelligenceSnapshot {
   categories: string[];
   reasonTags: string[];
   riskTags: string[];
+  warnings?: string[];
   freshness?: string | null;
 }
 

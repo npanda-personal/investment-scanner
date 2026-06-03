@@ -1532,6 +1532,147 @@ describe('PipelineOrchestrationService', () => {
     expect(result.status).toBe('COMPLETED');
   });
 
+  it('runs full daily downstream catch-up from latest valid dataThroughDate when expected NSE file is not available', async () => {
+    const repository = {
+      findActiveRun: jest.fn().mockResolvedValue(null),
+    };
+    const marketDataService = {
+      syncScheduledRegion: jest.fn().mockResolvedValue({
+        region: 'IN',
+        assetType: 'STOCK',
+        tradingDate: '2026-05-27',
+        dataThroughDate: '2026-05-26',
+        sourceFingerprint: 'scheduled-region:not-available-fallback',
+        instrumentsProcessed: 0,
+        rowsReceived: 0,
+        rowsInserted: 0,
+        rowsUpdated: 0,
+        rowsSkipped: 0,
+        rowsNoOp: 0,
+        changedInstrumentIds: [],
+        downstreamInstrumentIds: [],
+        changedInstrumentCount: 0,
+        dqStageEligible: false,
+        warningCount: 2,
+        warnings: [
+          'NSE CM UDiFF file is not available yet (HTTP 404).',
+          'NSE EOD file for 2026-05-27 is not available yet; using latest stored dataThroughDate 2026-05-26 for downstream refresh.',
+        ],
+        errors: [],
+        officialEodBulk: {
+          enabled: true,
+          attempted: true,
+          sourceName: 'NSE_UDIFF_CM_BHAVCOPY',
+          sourceUrl: 'https://nsearchives.nseindia.com/content/cm/BhavCopy_NSE_CM_0_0_0_20260527_F_0000.csv.zip',
+          sourceFileName: 'BhavCopy_NSE_CM_0_0_0_20260527_F_0000.csv.zip',
+          targetTradingDate: '2026-05-27',
+          sourceFingerprint: null,
+          rowsRead: 0,
+          rowsParsed: 0,
+          matchedInstruments: 0,
+          rowsInserted: 0,
+          rowsUpdated: 0,
+          rowsNoOp: 0,
+          fallbackReason: 'OFFICIAL_EOD_NOT_AVAILABLE',
+          warnings: ['NSE CM UDiFF file is not available yet (HTTP 404).'],
+        },
+      }),
+      listDailyRefreshEligibleInstrumentIds: jest.fn().mockResolvedValue({
+        region: 'IN',
+        assetType: 'STOCK',
+        dataThroughDate: '2026-05-26',
+        source: 'LATEST_PRICE',
+        instrumentIds: ['stock-1', 'stock-2'],
+        instrumentCount: 2,
+      }),
+    };
+    const service = serviceWithMarketData(repository, marketDataService);
+    const completedStage = marketDataStageRecord({
+      status: 'COMPLETED',
+      totalCount: 2,
+      processedCount: 0,
+      succeededCount: 0,
+      changedInstrumentCount: 0,
+      warnings: [
+        'NSE CM UDiFF file is not available yet (HTTP 404).',
+        'NSE EOD file for 2026-05-27 is not available yet; using latest stored dataThroughDate 2026-05-26 for downstream refresh.',
+      ],
+      metadata: {
+        marketDataAvailabilityStatus: 'NOT_AVAILABLE',
+        downstreamInstrumentCount: 2,
+        downstreamEligibilitySource: 'LATEST_PRICE',
+      },
+    });
+    const recordSnapshot = jest.spyOn(service, 'recordMarketDataStageSnapshot')
+      .mockResolvedValueOnce({ ...completedStage, status: 'RUNNING', completedAt: null, warnings: [] } as any)
+      .mockResolvedValueOnce(completedStage as any);
+    const catchUp = jest.spyOn(service, 'runScheduledPipelineCatchUpFromMarketDataSummary')
+      .mockResolvedValue({
+        status: 'COMPLETED',
+        pipelineRunId: 'run-dq-not-available',
+        stageRunId: 'stage-dq-not-available',
+        stageKey: 'DATA_QUALITY',
+        scope: { region: 'IN', assetType: 'STOCK', timeframe: '1d', pipelineKey: 'market-intelligence' },
+        triggerType: 'scheduled',
+        dataThroughDate: '2026-05-26',
+        inputFingerprint: 'dq-input-not-available',
+        outputFingerprint: 'dq-output-not-available',
+        batch: { totalInstrumentCount: 2, processedCount: 2, batchSize: 2, nextOffset: null, hasMore: false },
+        counts: { totalCount: 2, processedCount: 2, succeededCount: 2, partialCount: 0, failedCount: 0, skippedCount: 0, unchangedCount: 0 },
+        warnings: [],
+        errors: [],
+        startedAt: '2026-05-27T13:00:02.000Z',
+        completedAt: '2026-05-27T13:00:03.000Z',
+      } as any);
+
+    const result = await service.executeCommand({
+      commandKey: 'PIPELINE_RUN_ALL',
+      region: 'IN',
+      assetType: 'STOCK',
+      timeframe: '1d',
+      pipelineKey: 'market-intelligence',
+      runMode: 'full_latest_trading_date',
+      batchSize: 100,
+      offset: 0,
+      idempotencyKey: 'manual-daily-current-file-not-available',
+      force: false,
+    }, { requestedByUserId: 'local-manual-operator' }, new Date('2026-05-27T13:00:00.000Z'));
+
+    expect(marketDataService.listDailyRefreshEligibleInstrumentIds).toHaveBeenCalledWith({
+      region: 'IN',
+      assetType: 'STOCK',
+      dataThroughDate: '2026-05-26',
+      limit: 10000,
+    });
+    expect(catchUp).toHaveBeenCalledWith(expect.objectContaining({
+      dataThroughDate: '2026-05-26',
+      downstreamInstrumentIds: ['stock-1', 'stock-2'],
+      downstreamEligibilitySource: 'LATEST_PRICE',
+      dqStageEligible: true,
+    }), expect.any(Date), { allowCompletedTerminal: true });
+    expect(recordSnapshot).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      status: 'COMPLETED',
+      dataThroughDate: '2026-05-26',
+      warnings: expect.arrayContaining([
+        expect.stringContaining('not available yet'),
+        expect.stringContaining('using latest stored dataThroughDate 2026-05-26'),
+      ]),
+      errors: [],
+      metadata: expect.objectContaining({
+        officialEodBulk: expect.objectContaining({
+          fallbackReason: 'OFFICIAL_EOD_NOT_AVAILABLE',
+          targetTradingDate: '2026-05-27',
+        }),
+        marketDataAvailabilityStatus: 'NOT_AVAILABLE',
+        downstreamInstrumentCount: 2,
+        downstreamEligibilitySource: 'LATEST_PRICE',
+        downstreamStatus: 'COMPLETED',
+        downstreamAlreadyExecuted: true,
+      }),
+    }));
+    expect(result.status).toBe('COMPLETED');
+  });
+
   it('keeps incremental no-change pipeline runs changed-only without daily eligibility fallback', async () => {
     const repository = {
       findActiveRun: jest.fn().mockResolvedValue(null),

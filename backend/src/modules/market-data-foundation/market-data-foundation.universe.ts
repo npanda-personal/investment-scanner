@@ -25,6 +25,14 @@ export interface UniversePriceStats {
   latestVolume?: bigint | number | string | null;
   latestAdjustedClose?: unknown;
   latestClose?: unknown;
+  latestSource?: string | null;
+  latestSourceFileImportId?: string | null;
+  latestSnapshotDate?: string | null;
+  approvedExchangePriceRows?: number;
+  approvedExchangeLatestPriceDate?: string | null;
+  approvedExchangeLatestSource?: string | null;
+  approvedExchangeLatestSourceFileImportId?: string | null;
+  sourceFileImportPriceRows?: number;
   rollingWindowBars?: number;
   rollingWindowCoveragePercent?: number;
   maxPriceGapDays?: number | null;

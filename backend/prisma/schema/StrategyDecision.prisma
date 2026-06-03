@@ -7,6 +7,7 @@ model StrategyDecisionResult {
   country          String?
   exchange         String?
   strategy         String   // TREND_MOMENTUM, PULLBACK_IN_UPTREND, DEFENSIVE_EXIT
+  strategyName     String?
   decision         String   // TRADE_CANDIDATE, WATCH, WAIT, AVOID, EXIT_CANDIDATE, etc.
   action           String   // CONSIDER_ENTRY, WAIT_FOR_PULLBACK, etc.
   decisionScore    Int
@@ -20,6 +21,18 @@ model StrategyDecisionResult {
   blockers         Json
   warnings         Json
   dataGaps         Json
+  strategyVersion  String?
+  frameworkBacked  Boolean  @default(false)
+  frameworkDecision String?
+  frameworkAction  String?
+  entryRulesPassed Json?
+  exitRulesTriggered Json?
+  invalidationRulesTriggered Json?
+  noiseFiltersTriggered Json?
+  strategyRating   Json?
+  readinessLabel   String?
+  strategyDefinitionSource String?
+  strategyDefinitionDrift Json?
   modelVersion     String   @default("strategy-decision-v1")
   generatedAt      DateTime @default(now())
   generatedDate    DateTime // Normalized to UTC midnight for idempotency
@@ -30,5 +43,6 @@ model StrategyDecisionResult {
   @@index([instrumentId])
   @@index([portfolioId])
   @@index([strategy])
+  @@index([strategyDefinitionSource])
   @@map("strategy_decision_results")
 }

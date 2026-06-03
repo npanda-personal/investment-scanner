@@ -46,6 +46,7 @@ export {
 } from './market-data-foundation.universe';
 export {
   MANUAL_VERIFIED_FUNDAMENTALS_EXPORT_HEADERS,
+  NSE_XBRL_FACT_NAME_ALIASES,
   NSE_XBRL_FACT_NAMES,
   NseOfficialFinancialResultsClient,
   NseXbrlFundamentalsCsvExporter,

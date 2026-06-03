@@ -2,12 +2,13 @@ import type { SignalResultDto } from '../signal-generation-engine';
 
 export type SignalPositionTriggerType = 'bullish_entry_trigger' | 'bearish_trigger';
 export type SignalPositionReturnStatus = 'CURRENT' | 'STALE' | 'UNAVAILABLE';
-export type SignalPositionLedgerStatus = 'ACTIVE' | 'CLOSED';
+export type SignalPositionLedgerStatus = 'ACTIVE' | 'RISK_WARNING' | 'EXIT_TRIGGERED' | 'INVALIDATED' | 'CLOSED';
 export type SignalPositionLedgerSortBy = 'entryTriggerTimestamp' | 'currentReturnPercent';
 export type SignalPositionLedgerSortDirection = 'asc' | 'desc';
 export type SignalPositionHealthState = 'EXIT_TRIGGERED' | 'RISK_WARNING' | null;
-export type SignalPositionLifecycleEvidenceStatus = 'ACTIVE_ENTRY' | 'EXIT_TRIGGERED' | 'UNAVAILABLE';
+export type SignalPositionLifecycleEvidenceStatus = 'ACTIVE_ENTRY' | 'RISK_WARNING' | 'EXIT_TRIGGERED' | 'INVALIDATED' | 'CLOSED' | 'UNAVAILABLE';
 export type SignalPositionCalibrationEvidenceStatus = 'AVAILABLE' | 'UNAVAILABLE';
+export type SignalPositionClosePriceStatus = 'SOURCE_PROVEN' | 'UNAVAILABLE';
 export type SignalPositionTrustEvidenceStatus =
   | 'SOURCE_PROVEN'
   | 'SOURCE_PROVEN_PRICE_STALE'
@@ -91,11 +92,14 @@ export interface SignalPositionDataQualitySnapshot {
 }
 
 export interface SignalPositionExitDecisionSnapshot {
+  id?: string | null;
   strategy: string;
+  strategyVersion?: string | null;
   decision: string;
   generatedAt: string;
   reasons?: string[];
   exitRulesTriggered?: string[];
+  invalidationRulesTriggered?: string[];
 }
 
 export interface SignalPositionLedgerRowSnapshots {
@@ -134,11 +138,19 @@ export interface SignalPositionLedgerActiveRow {
   calibrationEvidenceStatus: SignalPositionCalibrationEvidenceStatus;
   displayWarnings: string[];
   exitSignalId?: string | null;
+  exitStrategyId?: string | null;
+  exitStrategyVersion?: string | null;
+  exitSourceDecisionId?: string | null;
   exitTriggerTimestamp?: string | null;
   exitTriggerPrice?: number | null;
+  closePriceStatus?: SignalPositionClosePriceStatus;
   exitReasonSummary?: string | null;
   exitRuleId?: string | null;
+  exitRuleIds?: string[];
   exitDecision?: string | null;
+  invalidationSourceDecisionId?: string | null;
+  invalidationRuleIds?: string[];
+  invalidationTimestamp?: string | null;
   closedAt?: string | null;
 }
 
