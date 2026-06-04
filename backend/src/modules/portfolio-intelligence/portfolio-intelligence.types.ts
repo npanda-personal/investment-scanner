@@ -5,6 +5,18 @@ export type HoldingDecisionLabel = 'GOOD' | 'WATCH' | 'REVIEW' | 'HIGH_RISK';
 export type HoldingActionSuggestion = 'HOLD' | 'REVIEW' | 'REDUCE_RISK';
 export type RedFlagSeverity = 'LOW' | 'MEDIUM' | 'HIGH';
 
+/** Portfolio-level capital posture context derived from persisted market snapshots. */
+export interface MarketPosture {
+  /** RISK_ON | NEUTRAL | RISK_OFF, or null when no persisted snapshot is available. */
+  postureLabel: string | null;
+  /** Human-readable context note using research-support language. */
+  contextNote: string;
+  /** Region the posture was derived for. */
+  region: string;
+  /** ISO timestamp when the posture snapshot was assembled (wall-clock read only). */
+  assembledAt: string | null;
+}
+
 export interface PortfolioIntelligenceThresholds {
   lossThreshold: number;
   dailyDropThreshold: number;
@@ -104,6 +116,8 @@ export interface PortfolioIntelligenceResponse {
   reviewRanking: ReviewItem[];
   groupedSummary: GoodBadNeedsAttentionSummary;
   signalOverlay: SignalOverlaySummary;
+  /** Portfolio-level market regime context. Always present; contextNote is honest when unavailable. */
+  marketPosture: MarketPosture;
   thresholds: PortfolioIntelligenceThresholds;
   source: string;
   dataStatus: string;

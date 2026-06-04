@@ -19,6 +19,7 @@ export type {
   HoldingDecisionLabel,
   HoldingIntelligence,
   LatestSignalSummary,
+  MarketPosture,
   PortfolioHealthStatus,
   PortfolioIntelligenceResponse,
   PortfolioIntelligenceThresholds,

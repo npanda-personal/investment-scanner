@@ -10,6 +10,7 @@ import type {
   HoldingActionSuggestion,
   HoldingDecisionLabel,
   HoldingIntelligence,
+  MarketPosture,
   PortfolioIntelligenceResponse,
   PortfolioIntelligenceThresholds,
   RedFlag,
@@ -25,10 +26,27 @@ import {
 const SIGNAL_ORDER: Record<string, number> = { BEARISH: 0, NEUTRAL: 1, BULLISH: 2 };
 const DECISION_ORDER: Record<HoldingDecisionLabel, number> = { HIGH_RISK: 0, REVIEW: 1, WATCH: 2, GOOD: 3 };
 
+/** Minimal duck-type for the subset of CapitalPostureService used here. */
+interface CapitalPostureLike {
+  capitalPosture(region: string): Promise<{
+    availability: 'READY' | 'UNAVAILABLE';
+    postureLabel: string | null;
+    assembledAt: string;
+    message: string;
+  }>;
+}
+
 export class PortfolioIntelligenceService {
+  /**
+   * capitalPostureService is optionally injected to avoid a circular-module
+   * dependency.  When not supplied the class lazy-requires the specific file
+   * '../market-context-intelligence/capital-posture.service' at runtime so the
+   * module graph stays acyclic.
+   */
   constructor(
     private readonly portfolioService = new PortfolioManagementService(),
-    private readonly thresholds: PortfolioIntelligenceThresholds = DEFAULT_PORTFOLIO_INTELLIGENCE_THRESHOLDS
+    private readonly thresholds: PortfolioIntelligenceThresholds = DEFAULT_PORTFOLIO_INTELLIGENCE_THRESHOLDS,
+    private readonly capitalPostureService?: CapitalPostureLike
   ) {}
 
   async intelligence(portfolioId: string, userId = 'default-user'): Promise<PortfolioIntelligenceResponse | null> {
@@ -49,7 +67,7 @@ export class PortfolioIntelligenceService {
     return result?.reviewRanking ?? null;
   }
 
-  buildIntelligence(summary: PortfolioSummaryDto, allocation: PortfolioAllocationDto): PortfolioIntelligenceResponse {
+  async buildIntelligence(summary: PortfolioSummaryDto, allocation: PortfolioAllocationDto): Promise<PortfolioIntelligenceResponse> {
     const holdings = summary.holdings.map((holding) => this.classifyHolding(holding));
     const redFlags = this.detectRedFlags(summary, allocation);
     const scoreBreakdown = this.scoreBreakdown(summary, allocation, holdings);
@@ -62,6 +80,7 @@ export class PortfolioIntelligenceService {
     ));
     const status = statusForHealthScore(healthScore);
     const reviewRanking = this.reviewRanking(holdings);
+    const marketPosture = await this.resolveMarketPosture(summary.holdings);
 
     return {
       portfolioId: summary.portfolio.id,
@@ -75,6 +94,7 @@ export class PortfolioIntelligenceService {
       reviewRanking,
       groupedSummary: this.groupedSummary(holdings),
       signalOverlay: this.signalOverlay(summary.holdings),
+      marketPosture,
       thresholds: this.thresholds,
       source: 'portfolio-intelligence',
       dataStatus: summary.dataStatus,
@@ -324,6 +344,79 @@ export class PortfolioIntelligenceService {
       bullishMarketValuePercent: totalValue > 0 ? bullishValue / totalValue : 0,
       bearishMarketValuePercent: totalValue > 0 ? bearishValue / totalValue : 0,
     };
+  }
+
+  /**
+   * Derives the portfolio-level market regime context from persisted snapshots.
+   *
+   * Cycle-safe: does NOT static-import the market-context-intelligence index.
+   * Instead it uses the optionally-injected capitalPostureService, falling back
+   * to a lazy require of the specific file so the module graph stays acyclic.
+   *
+   * Region is derived from holdings; defaults to 'IN'.
+   */
+  private async resolveMarketPosture(holdings: HoldingValuationDto[]): Promise<MarketPosture> {
+    // Derive region: use the most common country across holdings, fallback 'IN'
+    const region = this.deriveRegion(holdings);
+
+    let svc: CapitalPostureLike | undefined = this.capitalPostureService;
+    if (!svc) {
+      // Lazy-require the specific file — NOT the market-context-intelligence index
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const { CapitalPostureService } = require('../market-context-intelligence/capital-posture.service') as {
+        CapitalPostureService: new () => CapitalPostureLike;
+      };
+      svc = new CapitalPostureService();
+    }
+
+    try {
+      const dto = await svc.capitalPosture(region);
+      if (dto.availability === 'UNAVAILABLE' || dto.postureLabel === null) {
+        return {
+          postureLabel: null,
+          contextNote: 'Market regime is currently unavailable — no persisted snapshot found. Portfolio context cannot be derived from market conditions at this time.',
+          region,
+          assembledAt: dto.assembledAt ?? null,
+        };
+      }
+
+      const label = dto.postureLabel;
+      let contextNote: string;
+      if (label === 'RISK_OFF') {
+        contextNote = `Market regime is RISK_OFF — environment warrants caution; consider reviewing exposure and reducing positions in weaker holdings.`;
+      } else if (label === 'RISK_ON') {
+        contextNote = `Market regime is RISK_ON — environment is broadly supportive; high-conviction positions may warrant continued holding, subject to individual holding signals.`;
+      } else {
+        contextNote = `Market regime is NEUTRAL — selective environment; review each holding on its own merits and avoid aggressive additions until regime strengthens.`;
+      }
+
+      return {
+        postureLabel: label,
+        contextNote,
+        region,
+        assembledAt: dto.assembledAt ?? null,
+      };
+    } catch {
+      return {
+        postureLabel: null,
+        contextNote: 'Market regime context could not be read at this time. Portfolio intelligence is based on holding-level data only.',
+        region,
+        assembledAt: null,
+      };
+    }
+  }
+
+  /** Derives region from holdings' country field; defaults to 'IN'. */
+  private deriveRegion(holdings: HoldingValuationDto[]): string {
+    if (holdings.length === 0) return 'IN';
+    const counts: Record<string, number> = {};
+    for (const h of holdings) {
+      const c = (h as any).country as string | undefined;
+      if (c) counts[c] = (counts[c] ?? 0) + 1;
+    }
+    const entries = Object.entries(counts);
+    if (entries.length === 0) return 'IN';
+    return entries.sort((a, b) => b[1] - a[1])[0][0];
   }
 
   private scoreBreakdown(summary: PortfolioSummaryDto, allocation: PortfolioAllocationDto, holdings: HoldingIntelligence[]): ScoreBreakdown {
