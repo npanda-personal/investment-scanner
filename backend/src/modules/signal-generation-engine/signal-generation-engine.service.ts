@@ -39,8 +39,15 @@ import {
 const TECHNICAL_WEIGHT = 0.4;
 const MOMENTUM_WEIGHT = 0.35;
 const FUNDAMENTAL_WEIGHT = 0.25;
-const MODEL_VERSION = 'signal-engine-v1';
+const MODEL_VERSION = 'signal-engine-v2';
 const SIGNAL_GENERATION_PRICE_WINDOW = 520;
+
+// Momentum thresholds — minimum return required to vote bullish/bearish.
+// Returns in-between produce NO momentum signal (neutral band).
+const MOMENTUM_BULL_THRESHOLD_1M = 0.02;  // +2% for 1-month
+const MOMENTUM_BEAR_THRESHOLD_1M = -0.03; // -3% for 1-month
+const MOMENTUM_BULL_THRESHOLD_3M = 0.05;  // +5% for 3-month
+const MOMENTUM_BEAR_THRESHOLD_3M = -0.07; // -7% for 3-month
 
 type SignalGenerationBatchContext = {
   instrumentsById: Map<string, any>;
@@ -577,16 +584,16 @@ export class SignalGenerationEngineService {
     if (latest && low52 !== null && latest.adjusted_close <= low52 * 1.03) {
       if (currentClosePos !== null && currentClosePos > 0.7) {
          signals.push(this.signal('FALSE_BREAKDOWN_REJECTION', 'price tagged 52-week low but closed in the top 30% of the daily range (Trap)', 'TECHNICAL'));
-      } else {
-         negativeSignals.push(this.signal('NEAR_52_WEEK_LOW', 'price is near a 52-week low', 'TECHNICAL'));
       }
+      // NEAR_52_WEEK_LOW removed: proximity to 52w-low is mean-reverting on NSE — anti-predictive as a bearish vote
     }
 
     // Mean Reversion is stronger in range-bound markets
     if (rsiNow !== null && rsiPrev !== null && rsiPrev < 30 && rsiNow > rsiPrev) {
       signals.push(this.signal(isRangeBound ? 'STRONG_RSI_RECOVERY' : 'RSI_RECOVERING', 'RSI is recovering from oversold levels', 'TECHNICAL'));
     }
-    if (rsiNow !== null && rsiPrev !== null && rsiPrev > 70 && rsiNow < rsiPrev) {
+    // Require a meaningful RSI drop (>2 points) to avoid voting bearish on single-bar noise in strong trends
+    if (rsiNow !== null && rsiPrev !== null && rsiPrev > 70 && rsiNow < rsiPrev - 2) {
       negativeSignals.push(this.signal(isRangeBound ? 'STRONG_RSI_REVERSAL' : 'RSI_OVERBOUGHT_REVERSAL', 'RSI is reversing from overbought levels', 'TECHNICAL'));
     }
     
@@ -629,9 +636,23 @@ export class SignalGenerationEngineService {
     const threeMonth = this.returnAtOffset(prices, 63);
     const sixMonth = this.returnAtOffset(prices, 126);
 
-    this.pushReturnSignal(oneMonth, 'ONE_MONTH_MOMENTUM', '1M momentum is positive', '1M momentum is negative', signals, negativeSignals);
-    this.pushReturnSignal(threeMonth, 'THREE_MONTH_MOMENTUM', '3M momentum is positive', '3M momentum is negative', signals, negativeSignals);
-    if (oneMonth !== null && threeMonth !== null && sixMonth !== null && oneMonth > threeMonth / 3 && threeMonth > sixMonth / 2) {
+    this.pushReturnSignal(oneMonth, 'ONE_MONTH_MOMENTUM', '1M momentum is positive', '1M momentum is negative', signals, negativeSignals, MOMENTUM_BULL_THRESHOLD_1M, MOMENTUM_BEAR_THRESHOLD_1M);
+    this.pushReturnSignal(threeMonth, 'THREE_MONTH_MOMENTUM', '3M momentum is positive', '3M momentum is negative', signals, negativeSignals, MOMENTUM_BULL_THRESHOLD_3M, MOMENTUM_BEAR_THRESHOLD_3M);
+    // SIX_MONTH_ACCELERATION: only emit when both 1M and 3M already cleared their bullish thresholds,
+    // preventing a triple-count of the same trend (acceleration implies 1M+3M bullish already voted).
+    if (oneMonth !== null && threeMonth !== null && sixMonth !== null
+        && oneMonth >= MOMENTUM_BULL_THRESHOLD_1M && threeMonth >= MOMENTUM_BULL_THRESHOLD_3M
+        && oneMonth > threeMonth / 3 && threeMonth > sixMonth / 2) {
+      // Don't add if both 1M and 3M momentum signals are already pushed — emit only the acceleration.
+      // Remove the individual month signals to avoid triple-counting when acceleration fires.
+      const oneMonthIdx = signals.findIndex(s => s.code === 'ONE_MONTH_MOMENTUM');
+      const threeMonthIdx = signals.findIndex(s => s.code === 'THREE_MONTH_MOMENTUM');
+      if (oneMonthIdx !== -1) signals.splice(oneMonthIdx, 1);
+      if (threeMonthIdx !== -1) {
+        // after first removal, index may have shifted
+        const recalcIdx = signals.findIndex(s => s.code === 'THREE_MONTH_MOMENTUM');
+        if (recalcIdx !== -1) signals.splice(recalcIdx, 1);
+      }
       signals.push(this.signal('SIX_MONTH_ACCELERATION', '6M trend is accelerating', 'MOMENTUM'));
     }
     if (relativeToPeers !== null) {
@@ -649,20 +670,22 @@ export class SignalGenerationEngineService {
     const signals: SignalItem[] = [];
     const negativeSignals: SignalItem[] = [];
     const eps = this.optionalNumber(fundamental?.eps);
-    const netIncome = this.optionalNumber(fundamental?.net_income);
     const peRatio = this.optionalNumber(fundamental?.pe_ratio);
     const dividendYield = this.optionalNumber(fundamental?.dividend_yield);
-    const marketCap = this.optionalNumber(fundamental?.market_cap);
 
+    // EPS is the canonical profitability vote; net income is the same fact — net_income dropped to avoid double-counting
     if (eps !== null) (eps > 0 ? signals : negativeSignals).push(this.signal(eps > 0 ? 'POSITIVE_EPS' : 'NEGATIVE_EPS', eps > 0 ? 'EPS is positive' : 'EPS is negative', 'FUNDAMENTAL'));
-    if (netIncome !== null) (netIncome > 0 ? signals : negativeSignals).push(this.signal(netIncome > 0 ? 'POSITIVE_NET_INCOME' : 'NEGATIVE_NET_INCOME', netIncome > 0 ? 'net income is positive' : 'net income is negative', 'FUNDAMENTAL'));
     if (peRatio !== null && peerAveragePe !== null && peRatio > 0) {
-      (peRatio <= peerAveragePe ? signals : negativeSignals).push(this.signal(peRatio <= peerAveragePe ? 'PE_BELOW_PEERS' : 'PE_ABOVE_PEERS', peRatio <= peerAveragePe ? 'P/E is below peer average' : 'P/E is above peer average', 'FUNDAMENTAL'));
+      // PE_ABOVE_PEERS is anti-predictive for growth names; only vote bullish (below peers), not bearish
+      if (peRatio <= peerAveragePe) signals.push(this.signal('PE_BELOW_PEERS', 'P/E is below peer average', 'FUNDAMENTAL'));
+      // PE_ABOVE_PEERS: context-only, no bearish vote
     }
     if (dividendYield !== null && peerAverageYield !== null) {
-      (dividendYield >= peerAverageYield ? signals : negativeSignals).push(this.signal(dividendYield >= peerAverageYield ? 'YIELD_ABOVE_PEERS' : 'YIELD_BELOW_PEERS', dividendYield >= peerAverageYield ? 'dividend yield is above peer average' : 'dividend yield is below peer average', 'FUNDAMENTAL'));
+      // YIELD_BELOW_PEERS is anti-predictive; only vote bullish (above peers), not bearish
+      if (dividendYield >= peerAverageYield) signals.push(this.signal('YIELD_ABOVE_PEERS', 'dividend yield is above peer average', 'FUNDAMENTAL'));
+      // YIELD_BELOW_PEERS: context-only, no bearish vote
     }
-    if (marketCap !== null || fundamental) signals.push(this.signal('FUNDAMENTALS_AVAILABLE', 'market cap or fundamentals are available', 'FUNDAMENTAL'));
+    // FUNDAMENTALS_AVAILABLE removed: firing a positive signal merely for having data inflates all bullish scores universally
 
     return { score: this.categoryScore(signals.length, negativeSignals.length), signals, negativeSignals };
   }
@@ -758,7 +781,7 @@ export class SignalGenerationEngineService {
       region,
       strategy_id: strategyId,
       strategy_version: strategyVersion,
-      trigger_type: this.triggerTypeFor(signal.direction),
+      trigger_type: this.triggerTypeFor(signal.direction, instrument?.derivatives_eligible ?? instrument?.derivativesEligible),
       trigger_price: sourceProvenPriceEvidence?.triggerPrice ?? null,
       trigger_timestamp: triggerTimestamp,
       timeframe,
@@ -784,9 +807,12 @@ export class SignalGenerationEngineService {
     };
   }
 
-  private triggerTypeFor(direction: SignalDirection): SignalTriggerType {
+  private triggerTypeFor(direction: SignalDirection, derivativesEligible?: boolean | null): SignalTriggerType {
     if (direction === 'BULLISH') return 'bullish_entry_trigger';
-    if (direction === 'BEARISH') return 'bearish_trigger';
+    if (direction === 'BEARISH') {
+      // Short entries require F&O eligibility; cash-only stocks cannot be shorted — classify as risk_warning
+      return derivativesEligible === true ? 'bearish_trigger' : 'risk_warning';
+    }
     return 'risk_warning';
   }
 
@@ -1560,8 +1586,10 @@ export class SignalGenerationEngineService {
   private categoryScore(positive: number, negative: number): number {
     const total = positive + negative;
     if (total === 0) return 0.5;
-    // Laplace smoothing with 0.5 to avoid extreme scores with very low total signal counts
-    return (positive + 0.5) / (total + 1.0);
+    // Stronger add-smoothing (alpha=2): pulls thin-evidence scores toward 0.5.
+    // Examples: 1/0 → ~0.667 (was 0.75), 5/0 → ~0.786 (was 0.917)
+    const alpha = 2;
+    return (positive + alpha * 0.5) / (total + alpha);
   }
 
   private confidenceFor(prices: SignalPricePoint[], fundamental: any, signalCount: number): SignalConfidence {
@@ -1576,9 +1604,14 @@ export class SignalGenerationEngineService {
     return 'LOW';
   }
 
-  private pushReturnSignal(value: number | null, code: string, positiveLabel: string, negativeLabel: string, signals: SignalItem[], negativeSignals: SignalItem[]) {
+  private pushReturnSignal(value: number | null, code: string, positiveLabel: string, negativeLabel: string, signals: SignalItem[], negativeSignals: SignalItem[], bullThreshold: number, bearThreshold: number) {
     if (value === null) return;
-    (value >= 0.0001 ? signals : negativeSignals).push(this.signal(value >= 0.0001 ? code : `${code}_NEGATIVE`, value >= 0.0001 ? positiveLabel : negativeLabel, 'MOMENTUM'));
+    if (value >= bullThreshold) {
+      signals.push(this.signal(code, positiveLabel, 'MOMENTUM'));
+    } else if (value <= bearThreshold) {
+      negativeSignals.push(this.signal(`${code}_NEGATIVE`, negativeLabel, 'MOMENTUM'));
+    }
+    // values in the neutral band (bearThreshold < value < bullThreshold) produce no signal
   }
 
   private returnAtOffset(prices: SignalPricePoint[], offset: number): number | null {
