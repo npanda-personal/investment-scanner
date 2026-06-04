@@ -1598,3 +1598,15 @@ Optimize for:
 - future B2C/B2B readiness
 
 Do not optimize for theoretical perfection.
+
+---
+
+# 36. Execution & Orchestration Defaults
+
+Standing operating directives (owner, 2026-06-04):
+
+- **Parallel-first.** Decompose backlog work into independent units and run multiple agents concurrently to finish faster. When parallel agents would touch shared files, give each disjoint new files and do shared-file wiring centrally, or isolate via worktrees.
+- **Main loop reviews.** Agents produce; the orchestrator verifies correctness, tests, and constraints before accepting outputs.
+- **Decide, don't over-ask.** Proceed autonomously; reserve owner questions for genuinely critical, irreversible, or product-domain decisions only the owner can make.
+- **Cost-appropriate models.** Use the cheapest model that fits: lightweight for search/read/summary, mid-tier for analysis/implementation, top-tier only for hard synthesis or correctness-critical reasoning. Efficiency over expense.
+- Iterative discipline still applies — parallelism speeds each small, reviewable iteration; it does not replace it.
