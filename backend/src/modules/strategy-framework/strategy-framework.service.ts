@@ -1,5 +1,9 @@
 import { DataQualityEngineService } from '../data-quality-engine';
 import { MarketContextIntelligenceService } from '../market-context-intelligence';
+import {
+  BREADTH_WEAK_THRESHOLD,
+  BREADTH_VERY_WEAK_THRESHOLD,
+} from '../market-context-intelligence/capital-posture.types';
 import { MarketDataFoundationService } from '../market-data-foundation';
 import { SignalCalibrationEngineService } from '../signal-calibration-engine';
 import { SignalGenerationEngineService } from '../signal-generation-engine';
@@ -487,9 +491,20 @@ export class StrategyFrameworkService {
     return `INSTRUMENTS:${(universe.instrumentIds || []).sort().join(',')}`;
   }
 
+  /**
+   * Derives a marketGate string from regime + breadth.
+   *
+   * Thresholds are sourced exclusively from capital-posture.types.ts (Capital Posture
+   * is the single source of truth for regime/breadth gate thresholds).
+   *
+   *   OPEN      ← RISK_ON AND breadth ≥ BREADTH_WEAK_THRESHOLD (0.40)
+   *   CLOSED    ← RISK_OFF OR breadth < BREADTH_VERY_WEAK_THRESHOLD (0.25)
+   *   SELECTIVE ← everything else (NEUTRAL / weak-breadth RISK_ON)
+   *   UNKNOWN   ← no regime data
+   */
   private marketGate(regime?: string | null, breadthAbove50?: number | null) {
-    if (regime === 'RISK_ON' && (breadthAbove50 ?? 0) >= 0.6) return 'OPEN';
-    if (regime === 'RISK_OFF' || (breadthAbove50 ?? 1) <= 0.3) return 'CLOSED';
+    if (regime === 'RISK_ON' && (breadthAbove50 ?? 0) >= BREADTH_WEAK_THRESHOLD) return 'OPEN';
+    if (regime === 'RISK_OFF' || (breadthAbove50 ?? 1) < BREADTH_VERY_WEAK_THRESHOLD) return 'CLOSED';
     if (regime) return 'SELECTIVE';
     return 'UNKNOWN';
   }

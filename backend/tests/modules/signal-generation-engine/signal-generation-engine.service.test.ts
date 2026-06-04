@@ -2625,6 +2625,52 @@ function persistedMarketContextService() {
   };
 }
 
+// ─── CP-constants consistency: marketGateFromPersistedContext ─────────────────
+//
+// These tests verify that breadth values in the previously-divergent band
+// (between old 0.6/0.3 and the CP constants 0.40/0.25) now produce the correct
+// gate.  Capital Posture is the single source of truth for these thresholds.
+
+describe('SignalGenerationEngineService.marketGateFromPersistedContext: CP-constant thresholds (divergent-band)', () => {
+  const makeSvc = () => new SignalGenerationEngineService(
+    {} as any, {} as any, {} as any, {} as any,
+  ) as any;
+
+  const makeCtx = (regime: string | null, percentAboveSma50: number | null) => ({
+    regime: regime ? { regime } : null,
+    breadth: percentAboveSma50 !== null ? { percentAboveSma50 } : null,
+  });
+
+  it('RISK_ON + breadth 0.42 → OPEN (old 0.60 threshold would have returned SELECTIVE)', () => {
+    expect(makeSvc().marketGateFromPersistedContext(makeCtx('RISK_ON', 0.42))).toBe('OPEN');
+  });
+
+  it('RISK_ON + breadth 0.40 (exact CP threshold) → OPEN', () => {
+    expect(makeSvc().marketGateFromPersistedContext(makeCtx('RISK_ON', 0.40))).toBe('OPEN');
+  });
+
+  it('RISK_ON + breadth 0.39 → SELECTIVE', () => {
+    expect(makeSvc().marketGateFromPersistedContext(makeCtx('RISK_ON', 0.39))).toBe('SELECTIVE');
+  });
+
+  it('RISK_ON + breadth 0.28 → SELECTIVE (old 0.30 threshold would have returned CLOSED)', () => {
+    expect(makeSvc().marketGateFromPersistedContext(makeCtx('RISK_ON', 0.28))).toBe('SELECTIVE');
+  });
+
+  it('breadth 0.24 (below BREADTH_VERY_WEAK_THRESHOLD 0.25) → CLOSED regardless of regime', () => {
+    expect(makeSvc().marketGateFromPersistedContext(makeCtx('RISK_ON', 0.24))).toBe('CLOSED');
+    expect(makeSvc().marketGateFromPersistedContext(makeCtx('NEUTRAL', 0.24))).toBe('CLOSED');
+  });
+
+  it('RISK_OFF + any breadth → CLOSED', () => {
+    expect(makeSvc().marketGateFromPersistedContext(makeCtx('RISK_OFF', 0.50))).toBe('CLOSED');
+  });
+
+  it('null context → UNKNOWN', () => {
+    expect(makeSvc().marketGateFromPersistedContext(null)).toBe('UNKNOWN');
+  });
+});
+
 function persistedSmartMoneyService(instrumentId: string) {
   return {
     latestPersistedStocks: jest.fn().mockResolvedValue([{ instrumentId, status: 'ACCUMULATION', smartMoneyScore: 78 }]),

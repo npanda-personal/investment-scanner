@@ -375,6 +375,82 @@ describe('preloadRegimeSnapshots: called once per simulate, not per-bar', () => 
   });
 });
 
+// ─── CP-constants consistency: divergent-band breadth values ─────────────────
+//
+// These tests validate that breadth values in the band that used to diverge
+// between the old 0.6/0.3 thresholds and the new CP constants (0.40/0.25) now
+// produce the CORRECT gate across all backtest paths:
+//
+//   breadth 0.42 (in [0.40, 0.60) old-band): OPEN when RISK_ON (CP: ≥ BREADTH_WEAK_THRESHOLD)
+//   breadth 0.28 (in (0.25, 0.30] old-band): SELECTIVE not CLOSED (CP: < BREADTH_VERY_WEAK_THRESHOLD is 0.25)
+//
+// Before this fix, 0.42 with RISK_ON → SELECTIVE (missed OPEN) and
+// 0.28 with any regime → CLOSED (incorrectly gated).
+
+describe('CP-constants: divergent-band breadth values now classify correctly', () => {
+  it('RISK_ON + breadth 0.42 (old SELECTIVE, new OPEN) → OPEN via strategyContextFromBars', () => {
+    const { service } = makeService([]);
+    const svcAny = service as any;
+
+    const bars = makePrices('2021-01-01', 260).map((p) => ({
+      date: new Date(p.date).toISOString().slice(0, 10),
+      close: p.close,
+      volume: p.volume,
+    }));
+    const regimeIndex = [{ dateKey: '2021-01-01', regime: 'RISK_ON', breadthAbove50: 0.42 }];
+    const barDate = '2021-06-15';
+    const index = bars.findIndex((b) => b.date === barDate);
+    const config: BacktestStrategyConfig = {
+      universe: { type: 'SYMBOLS', symbols: ['TST'] },
+      entryRule: { type: 'PRICE_ABOVE_SMA50' },
+      exitRule: { type: 'FIXED_HOLDING_PERIOD', holdingDays: 10 },
+      startDate: '2021-01-01',
+      endDate: '2021-12-31',
+      initialCapital: 100000,
+      positionSizeType: 'EQUAL_WEIGHT',
+      maxPositions: 1,
+      transactionCostPercent: 0.001,
+    };
+
+    const regimeRow = svcAny.regimeAsOf(regimeIndex, barDate);
+    expect(regimeRow).not.toBeNull();
+    const ctx = svcAny.strategyContextFromBars(bars, index, config, undefined, regimeRow);
+    // 0.42 >= BREADTH_WEAK_THRESHOLD (0.40) AND RISK_ON → OPEN
+    expect(ctx.marketGate).toBe('OPEN');
+  });
+
+  it('RISK_ON + breadth 0.28 (in old CLOSED band, new SELECTIVE) → SELECTIVE via strategyContextFromBars', () => {
+    const { service } = makeService([]);
+    const svcAny = service as any;
+
+    const bars = makePrices('2021-01-01', 260).map((p) => ({
+      date: new Date(p.date).toISOString().slice(0, 10),
+      close: p.close,
+      volume: p.volume,
+    }));
+    const regimeIndex = [{ dateKey: '2021-01-01', regime: 'RISK_ON', breadthAbove50: 0.28 }];
+    const barDate = '2021-06-15';
+    const index = bars.findIndex((b) => b.date === barDate);
+    const config: BacktestStrategyConfig = {
+      universe: { type: 'SYMBOLS', symbols: ['TST'] },
+      entryRule: { type: 'PRICE_ABOVE_SMA50' },
+      exitRule: { type: 'FIXED_HOLDING_PERIOD', holdingDays: 10 },
+      startDate: '2021-01-01',
+      endDate: '2021-12-31',
+      initialCapital: 100000,
+      positionSizeType: 'EQUAL_WEIGHT',
+      maxPositions: 1,
+      transactionCostPercent: 0.001,
+    };
+
+    const regimeRow = svcAny.regimeAsOf(regimeIndex, barDate);
+    expect(regimeRow).not.toBeNull();
+    const ctx = svcAny.strategyContextFromBars(bars, index, config, undefined, regimeRow);
+    // 0.28 >= BREADTH_VERY_WEAK_THRESHOLD (0.25) AND not RISK_OFF → SELECTIVE (not CLOSED)
+    expect(ctx.marketGate).toBe('SELECTIVE');
+  });
+});
+
 // ─── 4. Integration: RISK_OFF_AVOIDANCE strategy gates entries on RISK_OFF ───
 
 describe('TREND_MOMENTUM strategy: RISK_OFF regime blocks entry (marketGate=CLOSED)', () => {

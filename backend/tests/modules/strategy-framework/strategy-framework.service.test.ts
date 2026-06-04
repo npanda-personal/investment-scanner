@@ -540,6 +540,49 @@ function strategyPerformanceSummary(overrides: Partial<StrategyPerformanceSummar
   };
 }
 
+// ─── CP-constants consistency: StrategyFrameworkService.marketGate ───────────
+//
+// These tests verify that breadth values in the previously-divergent band
+// (between old 0.6/0.3 and the CP constants 0.40/0.25) now produce the correct
+// gate. Capital Posture is the single source of truth for these thresholds.
+
+describe('StrategyFrameworkService.marketGate: CP-constant thresholds (divergent-band)', () => {
+  const svc = new StrategyFrameworkService(
+    {} as any, new StrategyFrameworkRegistry(),
+    {} as any, {} as any, {} as any, {} as any, {} as any, {} as any,
+  ) as any;
+
+  it('RISK_ON + breadth 0.42 → OPEN (old threshold 0.60 would have returned SELECTIVE)', () => {
+    expect(svc.marketGate('RISK_ON', 0.42)).toBe('OPEN');
+  });
+
+  it('RISK_ON + breadth 0.40 (exact threshold) → OPEN', () => {
+    expect(svc.marketGate('RISK_ON', 0.40)).toBe('OPEN');
+  });
+
+  it('RISK_ON + breadth 0.39 (just below BREADTH_WEAK_THRESHOLD) → SELECTIVE', () => {
+    expect(svc.marketGate('RISK_ON', 0.39)).toBe('SELECTIVE');
+  });
+
+  it('RISK_ON + breadth 0.28 → SELECTIVE (old threshold 0.30 would have returned CLOSED)', () => {
+    // 0.28 >= BREADTH_VERY_WEAK_THRESHOLD (0.25), so not CLOSED — SELECTIVE
+    expect(svc.marketGate('RISK_ON', 0.28)).toBe('SELECTIVE');
+  });
+
+  it('RISK_OFF + any breadth → CLOSED', () => {
+    expect(svc.marketGate('RISK_OFF', 0.50)).toBe('CLOSED');
+  });
+
+  it('breadth 0.24 (below BREADTH_VERY_WEAK_THRESHOLD 0.25) → CLOSED regardless of regime', () => {
+    expect(svc.marketGate('RISK_ON', 0.24)).toBe('CLOSED');
+    expect(svc.marketGate('NEUTRAL', 0.24)).toBe('CLOSED');
+  });
+
+  it('null regime → UNKNOWN', () => {
+    expect(svc.marketGate(null, 0.50)).toBe('UNKNOWN');
+  });
+});
+
 function strategyServiceBreakoutPrices() {
   const latestDate = new Date('2026-04-28T00:00:00.000Z');
   return Array.from({ length: 260 }, (_unused, index) => {

@@ -3,6 +3,10 @@ import { SubscriptionBillingService } from '../subscription-billing';
 import { WatchlistManagementService } from '../watchlist-management';
 import { DataQualityEngineService } from '../data-quality-engine';
 import { StrategyFrameworkEvaluator, StrategyFrameworkRegistry, StrategyFrameworkService } from '../strategy-framework';
+import {
+  BREADTH_WEAK_THRESHOLD,
+  BREADTH_VERY_WEAK_THRESHOLD,
+} from '../market-context-intelligence/capital-posture.types';
 // Lazy import to keep the dependency one-directional (historical-context-snapshots
 // does NOT import backtesting-strategy-lab, so no cycle risk here).
 import { HistoricalContextSnapshotsRepository } from '../historical-context-snapshots/historical-context-snapshots.repository';
@@ -37,18 +41,20 @@ interface RegimeSnapshotRow {
 
 /**
  * Derives the marketGate string from a persisted regime + breadth value.
- * Mirrors the IDENTICAL logic in StrategyFrameworkService.marketGate()
- * (strategy-framework/strategy-framework.service.ts:490) — reused verbatim,
- * not invented here, so the two paths stay consistent.
  *
- * OPEN      = RISK_ON  + breadth ≥ 60 %
- * CLOSED    = RISK_OFF OR breadth ≤ 30 %
- * SELECTIVE = any known regime that is not OPEN/CLOSED
- * UNKNOWN   = no regime data
+ * Thresholds are sourced exclusively from capital-posture.types.ts (Capital Posture
+ * is the single source of truth for regime/breadth gate thresholds).  This aligns
+ * the backtest path with strategy-decision-engine's marketGateFromSummary so that
+ * the same breadth value produces the same gate in every code path.
+ *
+ *   OPEN      ← RISK_ON AND breadth ≥ BREADTH_WEAK_THRESHOLD (0.40)
+ *   CLOSED    ← RISK_OFF OR breadth < BREADTH_VERY_WEAK_THRESHOLD (0.25)
+ *   SELECTIVE ← everything else (NEUTRAL / weak-breadth RISK_ON)
+ *   UNKNOWN   ← no regime data
  */
 function marketGateFromRegime(regime: string | null | undefined, breadthAbove50: number | null | undefined): string {
-  if (regime === 'RISK_ON' && (breadthAbove50 ?? 0) >= 0.6) return 'OPEN';
-  if (regime === 'RISK_OFF' || (breadthAbove50 ?? 1) <= 0.3) return 'CLOSED';
+  if (regime === 'RISK_ON' && (breadthAbove50 ?? 0) >= BREADTH_WEAK_THRESHOLD) return 'OPEN';
+  if (regime === 'RISK_OFF' || (breadthAbove50 ?? 1) < BREADTH_VERY_WEAK_THRESHOLD) return 'CLOSED';
   if (regime) return 'SELECTIVE';
   return 'UNKNOWN';
 }
