@@ -526,11 +526,39 @@ export class BacktestingStrategyLabService {
       enter: registered.decision === 'ENTRY_CANDIDATE' && registered.eligibleForBacktest && registered.eligibleForSignalGeneration,
       reasons: this.uniqueStrings([...registered.entryRulesPassed, ...registered.reasons]),
     };
-    const signal = this.signalProxy(bars, index);
-    if (config.entryRule.type === 'SIGNAL_SCORE_ABOVE') return { enter: signal.score > Number(config.entryRule.threshold), reasons: [`Signal score ${signal.score}`] };
-    if (config.entryRule.type === 'SIGNAL_DIRECTION_BULLISH') return { enter: signal.direction === 'BULLISH', reasons: [`Signal direction ${signal.direction}`] };
-    if (config.entryRule.type === 'PRICE_ABOVE_SMA50') return { enter: this.priceAboveSma(bars, index, 50), reasons: ['Price above SMA50'] };
-    return { enter: this.sma(bars, index, 50) !== null && this.sma(bars, index, 200) !== null && this.sma(bars, index, 50)! > this.sma(bars, index, 200)!, reasons: ['SMA50 above SMA200'] };
+    // Edge-triggered entry: a custom entry rule fires only on the BAR THE CONDITION
+    // BECOMES TRUE (false at index-1 -> true at index), not on every bar it stays true.
+    // State-checking re-entered on the bar after every exit while the condition still
+    // held (e.g. SMA50>SMA200 stays true through a price<SMA50 exit), producing massive
+    // whipsaw (hundreds of round-trips) and noisy near-zero returns.
+    const enterNow = this.customEntrySatisfied(config, bars, index);
+    const enterPrev = index > 0 && this.customEntrySatisfied(config, bars, index - 1);
+    const reasons: Record<string, string> = {
+      SIGNAL_SCORE_ABOVE: `Signal score crossed above ${Number(config.entryRule.threshold)}`,
+      SIGNAL_DIRECTION_BULLISH: 'Signal direction turned BULLISH',
+      PRICE_ABOVE_SMA50: 'Price crossed above SMA50',
+      SMA50_ABOVE_SMA200: 'SMA50 crossed above SMA200 (golden cross)',
+    };
+    return { enter: enterNow && !enterPrev, reasons: [reasons[config.entryRule.type] ?? 'Entry condition met'] };
+  }
+
+  /** Evaluates whether a CUSTOM entry rule's condition holds at a given bar (state, not edge). */
+  private customEntrySatisfied(config: BacktestStrategyConfig, bars: HistoricalBar[], index: number): boolean {
+    if (index < 0 || index >= bars.length) return false;
+    switch (config.entryRule.type) {
+      case 'SIGNAL_SCORE_ABOVE':
+        return this.signalProxy(bars, index).score > Number(config.entryRule.threshold);
+      case 'SIGNAL_DIRECTION_BULLISH':
+        return this.signalProxy(bars, index).direction === 'BULLISH';
+      case 'PRICE_ABOVE_SMA50':
+        return this.priceAboveSma(bars, index, 50);
+      case 'SMA50_ABOVE_SMA200':
+      default: {
+        const sma50 = this.sma(bars, index, 50);
+        const sma200 = this.sma(bars, index, 200);
+        return sma50 !== null && sma200 !== null && sma50 > sma200;
+      }
+    }
   }
 
   shouldExit(config: BacktestStrategyConfig, bars: HistoricalBar[], index: number, position: Position): boolean {
