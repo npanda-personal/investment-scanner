@@ -15,6 +15,23 @@ import type {
 const DISCLAIMER = 'For research support only, not financial advice.';
 
 export class AiInvestmentCopilotService {
+  /**
+   * Lazily-resolved strategy-decision service instance.
+   * Populated on first call when strategyDecisionService is not injected.
+   * Cycle-safe: requires the specific service file, not the module index.
+   */
+  private defaultStrategyDecisionServiceInstance?: any;
+  /**
+   * Lazily-resolved trade-plan service instance.
+   * Cycle-safe: requires the specific service file, not the module index.
+   */
+  private defaultTradePlanServiceInstance?: any;
+  /**
+   * Lazily-resolved today-review service instance.
+   * Cycle-safe: requires the specific service file, not the module index.
+   */
+  private defaultTodayReviewServiceInstance?: any;
+
   constructor(
     private readonly dependencies: CopilotDependencies = {
       stockResearchService: new StockResearchWorkbenchService(),
@@ -29,60 +46,288 @@ export class AiInvestmentCopilotService {
     }
   ) {}
 
+  /**
+   * Lazy-require the strategy-decision-engine service (specific file, not index).
+   * Returns null when explicitly disabled via injection of null.
+   */
+  private resolveStrategyDecisionService(): any | null {
+    if (this.dependencies.strategyDecisionService === null) return null;
+    if (this.dependencies.strategyDecisionService !== undefined) return this.dependencies.strategyDecisionService;
+    if (this.defaultStrategyDecisionServiceInstance) return this.defaultStrategyDecisionServiceInstance;
+    try {
+      const { StrategyDecisionEngineService } = require('../strategy-decision-engine/strategy-decision-engine.service') as typeof import('../strategy-decision-engine/strategy-decision-engine.service');
+      this.defaultStrategyDecisionServiceInstance = new StrategyDecisionEngineService();
+    } catch {
+      return null;
+    }
+    return this.defaultStrategyDecisionServiceInstance ?? null;
+  }
+
+  /**
+   * Lazy-require the trade-plan-risk-engine service (specific file, not index).
+   * Returns null when explicitly disabled via injection of null.
+   */
+  private resolveTradePlanService(): any | null {
+    if (this.dependencies.tradePlanService === null) return null;
+    if (this.dependencies.tradePlanService !== undefined) return this.dependencies.tradePlanService;
+    if (this.defaultTradePlanServiceInstance) return this.defaultTradePlanServiceInstance;
+    try {
+      const { TradePlanRiskEngineService } = require('../trade-plan-risk-engine/trade-plan-risk-engine.service') as typeof import('../trade-plan-risk-engine/trade-plan-risk-engine.service');
+      this.defaultTradePlanServiceInstance = new TradePlanRiskEngineService();
+    } catch {
+      return null;
+    }
+    return this.defaultTradePlanServiceInstance ?? null;
+  }
+
+  /**
+   * Lazy-require the today-trade-review service (specific file, not index).
+   * Returns null when explicitly disabled via injection of null.
+   */
+  private resolveTodayReviewService(): any | null {
+    if (this.dependencies.todayReviewService === null) return null;
+    if (this.dependencies.todayReviewService !== undefined) return this.dependencies.todayReviewService;
+    if (this.defaultTodayReviewServiceInstance) return this.defaultTodayReviewServiceInstance;
+    try {
+      const { TodayTradeReviewService } = require('../today-trade-review/today-trade-review.service') as typeof import('../today-trade-review/today-trade-review.service');
+      this.defaultTodayReviewServiceInstance = new TodayTradeReviewService();
+    } catch {
+      return null;
+    }
+    return this.defaultTodayReviewServiceInstance ?? null;
+  }
+
   async stockSummary(instrumentId: string, userId = 'default-user'): Promise<CopilotSummaryResponse> {
     await this.guardCopilotUsage(userId);
-    const [research, signal, smartMoney, marketContext] = await Promise.all([
+
+    // -- Resolve optional pipeline services (lazy, cycle-safe) --
+    const strategyDecisionSvc = this.resolveStrategyDecisionService();
+    const tradePlanSvc = this.resolveTradePlanService();
+    const todayReviewSvc = this.resolveTodayReviewService();
+
+    const [research, signal, smartMoney, marketContext, strategyDecision, tradePlan, todayRun] = await Promise.all([
       this.safe(() => this.dependencies.stockResearchService.workbench(instrumentId, '1Y')),
       this.safe(() => this.dependencies.signalService.latestForInstrument(instrumentId)),
       this.safe(() => this.dependencies.smartMoneyService.stock(instrumentId)),
       this.safe(() => this.dependencies.marketContextService.summary()),
+      strategyDecisionSvc
+        ? this.safe(() => strategyDecisionSvc.latestForInstrument(instrumentId))
+        : Promise.resolve(null),
+      tradePlanSvc
+        ? this.safe(() => tradePlanSvc.latestForInstrument(instrumentId))
+        : Promise.resolve(null),
+      todayReviewSvc
+        ? this.safe(() => todayReviewSvc.latest())
+        : Promise.resolve(null),
     ]);
+
+    // -- Today-review: find this instrument in the latest run's candidates --
+    const todayCandidate = (todayRun?.candidates ?? []).find(
+      (c: any) => c.instrumentId === instrumentId || c.symbol === instrumentId
+    ) ?? null;
+
     const overview = research?.overview ?? {};
     const performance = research?.performance ?? {};
     const fundamentals = research?.fundamentals?.latest ?? research?.fundamentals ?? null;
+
+    // -- Strategy Decision explanation (restate persisted decision + reasons) --
+    const strategyDecisionLines: string[] = [];
+    const strategyDecisionBullish: string[] = [];
+    const strategyDecisionBearish: string[] = [];
+    if (strategyDecision) {
+      const decision: string = strategyDecision.decision ?? 'UNKNOWN';
+      const strategy: string = strategyDecision.strategy ?? 'UNKNOWN';
+      const score: number = strategyDecision.decisionScore ?? 0;
+      const confidence: string = strategyDecision.confidence ?? 'UNKNOWN';
+      strategyDecisionLines.push(
+        `Persisted strategy decision is ${decision} under ${strategy} strategy (score ${score}, confidence ${confidence.toLowerCase()}).`
+      );
+      const reasons: string[] = strategyDecision.reasons ?? [];
+      if (reasons.length > 0) {
+        strategyDecisionLines.push(`Decision rule(s) that fired: ${reasons.slice(0, 3).join(' ')}`);
+      }
+      const blockers: string[] = strategyDecision.blockers ?? [];
+      if (blockers.length > 0) {
+        strategyDecisionLines.push(`Active blocker(s): ${blockers.slice(0, 2).join(' ')}`);
+      }
+      if (['TRADE_CANDIDATE', 'WATCH'].includes(decision)) {
+        strategyDecisionBullish.push(...strategyDecisionLines);
+      } else if (['AVOID', 'EXIT_CANDIDATE', 'REDUCE_RISK'].includes(decision)) {
+        strategyDecisionBearish.push(...strategyDecisionLines);
+      }
+    }
+
+    // -- Trade Plan explanation (restate geometry from persisted plan) --
+    const tradePlanLines: string[] = [];
+    const tradePlanBullish: string[] = [];
+    if (tradePlan) {
+      const planStatus: string = tradePlan.planStatus ?? 'UNKNOWN';
+      const riskGrade: string = tradePlan.riskGrade ?? 'UNDEFINED';
+      const rr: number | null = typeof tradePlan.rewardRiskRatio === 'number' ? tradePlan.rewardRiskRatio : null;
+      if (planStatus === 'VALID' || planStatus === 'WATCH') {
+        const entryZone = tradePlan.entryZone;
+        const stopLoss = tradePlan.stopLoss;
+        const target = tradePlan.target;
+        const entryLine = entryZone
+          ? `Entry zone: ${entryZone.type} (${this.priceRange(entryZone.preferredEntryMin, entryZone.preferredEntryMax)}).`
+          : 'Entry zone is not specified in the persisted plan.';
+        const stopLine = stopLoss?.price
+          ? `Invalidation/stop level: ${stopLoss.price.toFixed(2)} (${stopLoss.method}).`
+          : 'No stop level on record.';
+        const targetLine = target?.price
+          ? `Target: ${target.price.toFixed(2)} (${target.method}).`
+          : 'No target on record.';
+        const rrLine = rr !== null ? `Reward:risk ratio on record: ${rr}.` : null;
+        tradePlanLines.push(`Trade plan status is ${planStatus} with risk grade ${riskGrade}.`);
+        tradePlanLines.push(entryLine);
+        tradePlanLines.push(stopLine);
+        tradePlanLines.push(targetLine);
+        if (rrLine) tradePlanLines.push(rrLine);
+        tradePlanBullish.push(...tradePlanLines);
+      } else if (planStatus === 'BLOCKED' || planStatus === 'INSUFFICIENT_DATA') {
+        const firstBlocker = (tradePlan.blockers ?? [])[0];
+        tradePlanLines.push(
+          `Persisted trade plan is ${planStatus}${firstBlocker ? ': ' + firstBlocker : '.'}`
+        );
+      } else {
+        tradePlanLines.push(`Trade plan status is ${planStatus} with risk grade ${riskGrade}.`);
+      }
+    }
+
+    // -- Today Review explanation (restate persisted classification) --
+    const todayReviewLines: string[] = [];
+    const todayReviewBullish: string[] = [];
+    const todayReviewBearish: string[] = [];
+    if (todayCandidate) {
+      const state: string = todayCandidate.state ?? 'UNKNOWN';
+      const direction: string = todayCandidate.direction ?? 'UNKNOWN';
+      const grade: string = todayCandidate.grade ?? 'UNKNOWN';
+      const score: number = todayCandidate.confidenceScore ?? 0;
+      const reasonSummary: string = todayCandidate.reasonSummary ?? '';
+      todayReviewLines.push(
+        `This instrument appears in today's review with classification ${state} (direction ${direction}, grade ${grade}, score ${score}).`
+      );
+      if (reasonSummary) {
+        todayReviewLines.push(`Today review reason: ${reasonSummary}`);
+      }
+      const watchReasons: string[] = todayCandidate.watchReasons ?? [];
+      if (watchReasons.length > 0) {
+        todayReviewLines.push(`Watch notes: ${watchReasons.slice(0, 2).join(' ')}`);
+      }
+      if (['LONG_REVIEW', 'WATCH_ONLY'].includes(state)) {
+        todayReviewBullish.push(...todayReviewLines);
+      } else if (['SHORT_REVIEW', 'EXIT_RISK_REVIEW', 'AVOID', 'BLOCKED'].includes(state)) {
+        todayReviewBearish.push(...todayReviewLines);
+      }
+    }
+
     const bullish = [
       signal?.direction === 'BULLISH' ? `Signal direction is bullish with score ${signal.score}.` : null,
       smartMoney?.status === 'ACCUMULATION' ? `Smart money status indicates accumulation with score ${smartMoney.smartMoneyScore}.` : null,
       typeof performance.return_1y === 'number' && performance.return_1y > 0 ? `One-year performance is positive at ${this.percent(performance.return_1y)}.` : null,
       fundamentals?.net_income && Number(fundamentals.net_income) > 0 ? 'Latest persisted fundamentals show positive net income.' : null,
+      ...strategyDecisionBullish,
+      ...tradePlanBullish,
+      ...todayReviewBullish,
     ].filter(Boolean) as string[];
+
     const bearish = [
       signal?.direction === 'BEARISH' ? `Signal direction is bearish with score ${signal.score}.` : null,
       smartMoney?.status === 'DISTRIBUTION' ? `Smart money status indicates distribution with score ${smartMoney.smartMoneyScore}.` : null,
       typeof performance.max_drawdown === 'number' && performance.max_drawdown < -0.2 ? `Historical drawdown is notable at ${this.percent(performance.max_drawdown)}.` : null,
+      ...strategyDecisionBearish,
+      ...todayReviewBearish,
     ].filter(Boolean) as string[];
+
     const gaps = [
       !research ? 'Stock research workbench data is unavailable.' : null,
       !signal ? 'Latest signal result is unavailable.' : null,
       !smartMoney ? 'Smart money summary is unavailable.' : null,
       smartMoney?.insiderOwnership?.ownershipDataStatus === 'MISSING' ? 'Insider and institutional ownership data is unavailable in the free MVP provider.' : null,
       marketContext?.macro?.dataStatus === 'MISSING' ? 'Macro provider data is not configured yet.' : null,
+      !strategyDecision ? 'No current strategy decision on record.' : null,
+      !tradePlan ? 'No current trade plan on record.' : null,
+      !todayCandidate ? 'Instrument is not in the latest today-review candidate set.' : null,
     ].filter(Boolean) as string[];
+
+    // -- Structured pipeline fields (optional on the response) --
+    const pipelineExplanation = {
+      strategyDecision: strategyDecision
+        ? {
+            decision: strategyDecision.decision ?? null,
+            strategy: strategyDecision.strategy ?? null,
+            score: strategyDecision.decisionScore ?? null,
+            confidence: strategyDecision.confidence ?? null,
+            reasons: (strategyDecision.reasons ?? []).slice(0, 5),
+            blockers: (strategyDecision.blockers ?? []).slice(0, 3),
+          }
+        : null,
+      tradePlan: tradePlan
+        ? {
+            planStatus: tradePlan.planStatus ?? null,
+            riskGrade: tradePlan.riskGrade ?? null,
+            entryMin: tradePlan.entryZone?.preferredEntryMin ?? null,
+            entryMax: tradePlan.entryZone?.preferredEntryMax ?? null,
+            stopPrice: tradePlan.stopLoss?.price ?? null,
+            targetPrice: tradePlan.target?.price ?? null,
+            rewardRiskRatio: tradePlan.rewardRiskRatio ?? null,
+          }
+        : null,
+      todayReview: todayCandidate
+        ? {
+            state: todayCandidate.state ?? null,
+            direction: todayCandidate.direction ?? null,
+            grade: todayCandidate.grade ?? null,
+            confidenceScore: todayCandidate.confidenceScore ?? null,
+            reasonSummary: todayCandidate.reasonSummary ?? null,
+          }
+        : null,
+    };
+
+    const sourceModules: string[] = ['stock-research-workbench', 'signal-generation-engine', 'smart-money-intelligence', 'market-context-intelligence'];
+    if (strategyDecision) sourceModules.push('strategy-decision-engine');
+    if (tradePlan) sourceModules.push('trade-plan-risk-engine');
+    if (todayCandidate) sourceModules.push('today-trade-review');
 
     return this.response({
       title: `${overview.symbol || 'Stock'} Copilot Summary`,
-      summary: `${DISCLAIMER} ${overview.company_name || overview.symbol || 'This stock'} has ${signal ? `a ${signal.direction.toLowerCase()} signal` : 'no current signal'} and ${smartMoney ? `a smart money status of ${smartMoney.status.toLowerCase()}` : 'limited smart money context'}.`,
+      summary: `${DISCLAIMER} ${overview.company_name || overview.symbol || 'This stock'} has ${signal ? `a ${signal.direction.toLowerCase()} signal` : 'no current signal'} and ${smartMoney ? `a smart money status of ${smartMoney.status.toLowerCase()}` : 'limited smart money context'}${strategyDecision ? `, with a persisted strategy decision of ${strategyDecision.decision}` : ''}.`,
       keyTakeaways: [
         `Latest price context: ${overview.latest_price ?? 'not available'}.`,
         signal ? `Signal score is ${signal.score} with ${signal.confidence?.toLowerCase?.() || 'unknown'} confidence.` : 'Signal context is missing.',
         smartMoney ? `Smart money score is ${smartMoney.smartMoneyScore} and data status is ${smartMoney.dataStatus}.` : 'Smart money context is missing.',
         marketContext?.regime ? `Market regime is ${marketContext.regime.regime}.` : 'Market regime is unavailable.',
+        strategyDecision
+          ? `Strategy decision is ${strategyDecision.decision} (score ${strategyDecision.decisionScore ?? 'n/a'}).`
+          : 'No current strategy decision on record.',
+        tradePlan && tradePlan.planStatus === 'VALID'
+          ? `Trade plan is VALID with risk grade ${tradePlan.riskGrade} and R:R ${tradePlan.rewardRiskRatio ?? 'n/a'}.`
+          : tradePlan
+          ? `Trade plan is ${tradePlan.planStatus}.`
+          : 'No current trade plan on record.',
+        todayCandidate
+          ? `In today's review as ${todayCandidate.state} (grade ${todayCandidate.grade}).`
+          : 'Not in today\'s review candidate set.',
       ],
       bullishFactors: bullish,
       bearishFactors: bearish,
       riskFactors: [
         ...bearish,
         smartMoney?.dataStatus === 'PARTIAL' ? 'Smart money analysis is partial because ownership data is missing.' : null,
+        tradePlan?.planStatus === 'BLOCKED' ? `Trade plan is BLOCKED: ${(tradePlan.blockers ?? [])[0] ?? 'see blockers.'}` : null,
       ].filter(Boolean) as string[],
       dataGaps: gaps,
       suggestedNextReviews: [
         'Review the stock research page for price trend, fundamentals, and peer context.',
         'Compare signal reasons against smart money price-volume signals.',
         'Check whether missing fundamentals or ownership data changes the confidence level.',
+        strategyDecision ? 'Review the strategy decision detail for the full rule breakdown.' : 'Run strategy evaluation to generate a strategy decision.',
+        tradePlan && tradePlan.planStatus === 'VALID' ? 'Review the trade plan page for full entry/stop/target geometry.' : 'Run trade plan generation for this instrument.',
       ],
-      sourceModules: ['stock-research-workbench', 'signal-generation-engine', 'smart-money-intelligence', 'market-context-intelligence'],
-      dataStatus: gaps.length > 0 ? 'PARTIAL' : 'COMPLETE',
-    });
+      sourceModules,
+      dataStatus: gaps.filter((g) => !g.startsWith('No current') && !g.startsWith('Instrument is not')).length > 0 ? 'PARTIAL' : 'COMPLETE',
+      pipelineExplanation,
+    } as any);
   }
 
   async portfolioSummary(portfolioId: string, userId = 'default-user'): Promise<CopilotSummaryResponse> {
@@ -260,6 +505,11 @@ export class AiInvestmentCopilotService {
 
   private percent(value: number): string {
     return `${(value * 100).toFixed(1)}%`;
+  }
+
+  private priceRange(min: number | null | undefined, max: number | null | undefined): string {
+    if (min === null || min === undefined || max === null || max === undefined) return 'range not available';
+    return `${Number(min).toFixed(2)} – ${Number(max).toFixed(2)}`;
   }
 
   private safeLanguage(value: string): string {

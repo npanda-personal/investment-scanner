@@ -36,4 +36,22 @@ export interface CopilotDependencies {
   watchlistManagementService: any;
   alertsMonitoringService: any;
   subscriptionService?: any;
+  /**
+   * Optional strategy-decision-engine service.
+   * When omitted the production default is lazy-required (cycle-safe).
+   * Pass null explicitly to disable strategy-decision enrichment.
+   */
+  strategyDecisionService?: any | null;
+  /**
+   * Optional trade-plan-risk-engine service.
+   * When omitted the production default is lazy-required (cycle-safe).
+   * Pass null explicitly to disable trade-plan enrichment.
+   */
+  tradePlanService?: any | null;
+  /**
+   * Optional today-trade-review service.
+   * When omitted the production default is lazy-required (cycle-safe).
+   * Pass null explicitly to disable today-review enrichment.
+   */
+  todayReviewService?: any | null;
 }

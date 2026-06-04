@@ -78,6 +78,17 @@ const createService = (overrides: any = {}) => new AiInvestmentCopilotService({
     ]),
     ...overrides.alertsMonitoringService,
   },
+  // Pipeline enrichment services: optional, passed through directly.
+  // Explicitly null disables lazy-require fallback (no DB calls in unit tests).
+  strategyDecisionService: overrides.strategyDecisionService !== undefined
+    ? overrides.strategyDecisionService
+    : null,
+  tradePlanService: overrides.tradePlanService !== undefined
+    ? overrides.tradePlanService
+    : null,
+  todayReviewService: overrides.todayReviewService !== undefined
+    ? overrides.todayReviewService
+    : null,
 });
 
 describe('AiInvestmentCopilotService', () => {
@@ -150,6 +161,251 @@ describe('AiInvestmentCopilotService', () => {
     const text = JSON.stringify(result).toLowerCase();
     expect(text).not.toContain('buy now');
     expect(text).not.toContain('guaranteed');
+  });
+
+  // -----------------------------------------------------------------------
+  // Pipeline enrichment tests (strategy-decision, trade-plan, today-review)
+  // -----------------------------------------------------------------------
+
+  describe('pipeline enrichment — strategy-decision', () => {
+    it('includes strategy-decision rationale when present', async () => {
+      const strategyDecisionService = {
+        latestForInstrument: jest.fn().mockResolvedValue({
+          decision: 'TRADE_CANDIDATE',
+          strategy: 'TREND_MOMENTUM',
+          decisionScore: 85,
+          confidence: 'HIGH',
+          reasons: ['Market gate is OPEN.', 'Price is above SMA50 with bullish Multi-Timeframe Alignment (Macro Uptrend).'],
+          blockers: [],
+        }),
+      };
+      const result = await createService({ strategyDecisionService }).stockSummary('stock-1');
+
+      const allText = JSON.stringify(result);
+      expect(allText).toContain('TRADE_CANDIDATE');
+      expect(allText).toContain('TREND_MOMENTUM');
+      expect(result.bullishFactors.join(' ')).toContain('TRADE_CANDIDATE');
+      expect(result.keyTakeaways.join(' ')).toContain('Strategy decision is TRADE_CANDIDATE');
+      expect(result.sourceModules).toContain('strategy-decision-engine');
+      // No fabricated buy/sell wording
+      expect(allText.toLowerCase()).not.toMatch(/\bbuy\b|\bsell\b/);
+    });
+
+    it('reports AVOID decision in bearishFactors', async () => {
+      const strategyDecisionService = {
+        latestForInstrument: jest.fn().mockResolvedValue({
+          decision: 'AVOID',
+          strategy: 'TREND_MOMENTUM',
+          decisionScore: 22,
+          confidence: 'LOW',
+          reasons: ['Price is below SMA50 support.'],
+          blockers: ['Market gate is CLOSED; no new long candidates.'],
+        }),
+      };
+      const result = await createService({ strategyDecisionService }).stockSummary('stock-1');
+
+      expect(result.bearishFactors.join(' ')).toContain('AVOID');
+      expect(result.bearishFactors.join(' ')).toContain('TREND_MOMENTUM');
+    });
+
+    it('gracefully omits strategy-decision with honest note when source returns null', async () => {
+      const strategyDecisionService = {
+        latestForInstrument: jest.fn().mockResolvedValue(null),
+      };
+      const result = await createService({ strategyDecisionService }).stockSummary('stock-1');
+
+      expect(result.dataGaps).toContain('No current strategy decision on record.');
+      expect(result.keyTakeaways.join(' ')).toContain('No current strategy decision on record.');
+      expect(result.sourceModules).not.toContain('strategy-decision-engine');
+      // No fabricated numbers
+      expect(result.bullishFactors.join(' ')).not.toMatch(/score \d+.*strategy/i);
+    });
+  });
+
+  describe('pipeline enrichment — trade-plan', () => {
+    it('includes trade-plan geometry when present and valid', async () => {
+      const tradePlanService = {
+        latestForInstrument: jest.fn().mockResolvedValue({
+          planStatus: 'VALID',
+          riskGrade: 'MEDIUM',
+          entryZone: { type: 'PULLBACK', preferredEntryMin: 480.0, preferredEntryMax: 495.0 },
+          stopLoss: { price: 462.5, method: 'SMA50' },
+          target: { price: 540.0, method: 'REWARD_RISK_MULTIPLE' },
+          rewardRiskRatio: 2.12,
+          blockers: [],
+        }),
+      };
+      const result = await createService({ tradePlanService }).stockSummary('stock-1');
+
+      const allText = JSON.stringify(result);
+      expect(allText).toContain('480');
+      expect(allText).toContain('462.5');
+      expect(allText).toContain('540');
+      expect(allText).toContain('2.12');
+      expect(result.keyTakeaways.join(' ')).toContain('Trade plan is VALID');
+      expect(result.sourceModules).toContain('trade-plan-risk-engine');
+    });
+
+    it('notes BLOCKED plan in risk factors', async () => {
+      const tradePlanService = {
+        latestForInstrument: jest.fn().mockResolvedValue({
+          planStatus: 'BLOCKED',
+          riskGrade: 'HIGH',
+          entryZone: null,
+          stopLoss: null,
+          target: null,
+          rewardRiskRatio: 0,
+          blockers: ['No Strategy Decision found for instrument.'],
+        }),
+      };
+      const result = await createService({ tradePlanService }).stockSummary('stock-1');
+
+      expect(result.riskFactors.join(' ')).toContain('BLOCKED');
+      expect(result.keyTakeaways.join(' ')).toContain('BLOCKED');
+    });
+
+    it('gracefully omits trade-plan with honest note when source returns null', async () => {
+      const tradePlanService = {
+        latestForInstrument: jest.fn().mockResolvedValue(null),
+      };
+      const result = await createService({ tradePlanService }).stockSummary('stock-1');
+
+      expect(result.dataGaps).toContain('No current trade plan on record.');
+      expect(result.keyTakeaways.join(' ')).toContain('No current trade plan on record.');
+      expect(result.sourceModules).not.toContain('trade-plan-risk-engine');
+      // No fabricated prices
+      const allText = JSON.stringify(result);
+      expect(allText).not.toMatch(/entry.*\d{3,}/i);
+    });
+  });
+
+  describe('pipeline enrichment — today-review', () => {
+    it('notes today-review classification when instrument is present', async () => {
+      const todayReviewService = {
+        latest: jest.fn().mockResolvedValue({
+          candidates: [
+            {
+              instrumentId: 'stock-1',
+              symbol: 'AAA',
+              state: 'LONG_REVIEW',
+              direction: 'LONG',
+              grade: 'B',
+              confidenceScore: 72,
+              reasonSummary: 'Long review candidate from price-action setup and proven OHLCV evidence.',
+              watchReasons: [],
+            },
+          ],
+        }),
+      };
+      const result = await createService({ todayReviewService }).stockSummary('stock-1');
+
+      const allText = JSON.stringify(result);
+      expect(allText).toContain('LONG_REVIEW');
+      expect(allText).toContain('grade');
+      expect(result.bullishFactors.join(' ')).toContain('LONG_REVIEW');
+      expect(result.keyTakeaways.join(' ')).toContain('LONG_REVIEW');
+      expect(result.sourceModules).toContain('today-trade-review');
+    });
+
+    it('puts SHORT_REVIEW in bearishFactors', async () => {
+      const todayReviewService = {
+        latest: jest.fn().mockResolvedValue({
+          candidates: [
+            {
+              instrumentId: 'stock-1',
+              symbol: 'AAA',
+              state: 'SHORT_REVIEW',
+              direction: 'SHORT',
+              grade: 'C',
+              confidenceScore: 45,
+              reasonSummary: 'Short review candidate.',
+              watchReasons: ['Exit/bearish setup detected.'],
+            },
+          ],
+        }),
+      };
+      const result = await createService({ todayReviewService }).stockSummary('stock-1');
+
+      expect(result.bearishFactors.join(' ')).toContain('SHORT_REVIEW');
+    });
+
+    it('gracefully omits today-review with honest note when instrument is absent from run', async () => {
+      const todayReviewService = {
+        latest: jest.fn().mockResolvedValue({
+          candidates: [
+            { instrumentId: 'other-stock', symbol: 'ZZZ', state: 'LONG_REVIEW', direction: 'LONG', grade: 'A', confidenceScore: 90, reasonSummary: '', watchReasons: [] },
+          ],
+        }),
+      };
+      const result = await createService({ todayReviewService }).stockSummary('stock-1');
+
+      expect(result.dataGaps).toContain('Instrument is not in the latest today-review candidate set.');
+      expect(result.sourceModules).not.toContain('today-trade-review');
+    });
+
+    it('gracefully omits today-review when service returns null', async () => {
+      const todayReviewService = {
+        latest: jest.fn().mockResolvedValue(null),
+      };
+      const result = await createService({ todayReviewService }).stockSummary('stock-1');
+
+      expect(result.dataGaps).toContain('Instrument is not in the latest today-review candidate set.');
+      expect(result.sourceModules).not.toContain('today-trade-review');
+    });
+  });
+
+  describe('pipeline enrichment — no buy/sell wording + no fabricated numbers', () => {
+    it('never outputs buy/sell advice wording in any enrichment path', async () => {
+      const strategyDecisionService = {
+        latestForInstrument: jest.fn().mockResolvedValue({
+          decision: 'TRADE_CANDIDATE',
+          strategy: 'TREND_MOMENTUM',
+          decisionScore: 88,
+          confidence: 'HIGH',
+          reasons: ['Price is above SMA50.'],
+          blockers: [],
+        }),
+      };
+      const tradePlanService = {
+        latestForInstrument: jest.fn().mockResolvedValue({
+          planStatus: 'VALID',
+          riskGrade: 'LOW',
+          entryZone: { type: 'BREAKOUT', preferredEntryMin: 500, preferredEntryMax: 510 },
+          stopLoss: { price: 475, method: 'SMA50' },
+          target: { price: 555, method: 'REWARD_RISK_MULTIPLE' },
+          rewardRiskRatio: 2.2,
+          blockers: [],
+        }),
+      };
+      const todayReviewService = {
+        latest: jest.fn().mockResolvedValue({
+          candidates: [
+            { instrumentId: 'stock-1', symbol: 'AAA', state: 'LONG_REVIEW', direction: 'LONG', grade: 'A', confidenceScore: 85, reasonSummary: 'Strategy-backed candidate.', watchReasons: [] },
+          ],
+        }),
+      };
+      const result = await createService({ strategyDecisionService, tradePlanService, todayReviewService }).stockSummary('stock-1');
+
+      const allText = JSON.stringify(result).toLowerCase();
+      expect(allText).not.toMatch(/\bbuy\b|\bsell\b/);
+      expect(allText).toContain('for research support only');
+    });
+
+    it('does not fabricate entry/stop/target numbers when all pipeline sources are empty', async () => {
+      const strategyDecisionService = { latestForInstrument: jest.fn().mockResolvedValue(null) };
+      const tradePlanService = { latestForInstrument: jest.fn().mockResolvedValue(null) };
+      const todayReviewService = { latest: jest.fn().mockResolvedValue(null) };
+
+      const result = await createService({ strategyDecisionService, tradePlanService, todayReviewService }).stockSummary('stock-1');
+
+      const allText = JSON.stringify(result);
+      // No price numbers appearing from fabrication (only 100 which is the mocked latest_price)
+      const noFabricatedGeometry = !allText.match(/entry zone:.*\d{3,}/i) && !allText.match(/stop.*\d{3,}/i);
+      expect(noFabricatedGeometry).toBe(true);
+      expect(result.dataGaps).toContain('No current strategy decision on record.');
+      expect(result.dataGaps).toContain('No current trade plan on record.');
+      expect(result.dataGaps).toContain('Instrument is not in the latest today-review candidate set.');
+    });
   });
 
   describe('COPILOT_USAGE_UNLIMITED env gate (BUG 4 regression)', () => {
