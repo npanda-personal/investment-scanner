@@ -153,11 +153,11 @@ export class SignalQualityLabRepository {
     const ids = [...new Set(instrumentIds.map((id) => String(id || '').trim()).filter(Boolean))];
     if (ids.length === 0) return 0;
 
-    // Earliest signalGeneratedDate that could possibly be affected:
-    // signal window ends at signalDate + 60 calendar days, so any signal
-    // generated at least 60 days before fromDate is completely unaffected.
-    const MAX_HORIZON_DAYS = 60;
-    const earliestAffectedDate = new Date(fromDate.getTime() - MAX_HORIZON_DAYS * 24 * 60 * 60 * 1000);
+    // Fix 4: 60 trading-day horizon ≈ 84 calendar days.  Using 60 calendar days
+    // would miss signals whose window overlaps [fromDate-84d, fromDate-60d].
+    // Use 90 calendar days as a safe buffer (rounds up the worst-case ~85 cal days).
+    const MAX_HORIZON_CALENDAR_DAYS = 90;
+    const earliestAffectedDate = new Date(fromDate.getTime() - MAX_HORIZON_CALENDAR_DAYS * 24 * 60 * 60 * 1000);
 
     const result = await this.db.signalOutcome.updateMany({
       where: {
@@ -454,12 +454,15 @@ export class SignalQualityLabRepository {
       case 'sector':
         return { groupExpr: "COALESCE(sector, 'Unknown')", labelExpr: 'a.group_key' };
       case 'scoreBucket':
+        // Fix 5: CANONICAL score-bucket boundaries (same as calibration engine + service SCORE_BUCKETS).
+        // Previously this case used 40-59/60-79/80-100, which differed from the service (40-69/70-84/85-100)
+        // and calibrationScoreBucket (already correct below).  Unified to 0-39/40-69/70-84/85-100.
         return {
           groupExpr: `CASE
             WHEN score >= 0  AND score <= 39  THEN '0-39'
-            WHEN score >= 40 AND score <= 59  THEN '40-59'
-            WHEN score >= 60 AND score <= 79  THEN '60-79'
-            WHEN score >= 80 AND score <= 100 THEN '80-100'
+            WHEN score >= 40 AND score <= 69  THEN '40-69'
+            WHEN score >= 70 AND score <= 84  THEN '70-84'
+            WHEN score >= 85 AND score <= 100 THEN '85-100'
             ELSE 'Unknown'
           END`,
           labelExpr: 'a.group_key',

@@ -93,10 +93,11 @@ describe('SignalQualityLabRepository.markStaleByInstrumentsFromDate', () => {
 
   const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
-  it('uses a signalGeneratedDate >= (fromDate - 60 days) filter for window intersection', async () => {
+  it('uses a signalGeneratedDate >= (fromDate - 90 days) filter for window intersection (Fix 4: 60 trading days ≈ 85 calendar days)', async () => {
     const { repo, updateMany } = makeRepo();
     const fromDate = new Date('2025-06-01T00:00:00.000Z');
-    const expectedEarliestDate = new Date(fromDate.getTime() - 60 * MS_PER_DAY);
+    // Fix 4: window is 90 calendar days, not 60 — covers the ~85 cal-day span of 60 trading days
+    const expectedEarliestDate = new Date(fromDate.getTime() - 90 * MS_PER_DAY);
 
     await repo.markStaleByInstrumentsFromDate(['stock-1'], fromDate);
 
@@ -107,28 +108,28 @@ describe('SignalQualityLabRepository.markStaleByInstrumentsFromDate', () => {
   });
 
   it('outcomes whose window ends BEFORE fromDate are NOT selected (non-overlapping excluded)', async () => {
-    // A signal generated 61+ days before fromDate has its entire window before fromDate.
-    // The filter (signalGeneratedDate >= fromDate - 60d) excludes such rows.
+    // A signal generated 91+ days before fromDate has its entire window before fromDate
+    // (even with the 90-day lookback buffer).
     const { repo, updateMany } = makeRepo();
     const fromDate = new Date('2025-06-01T00:00:00.000Z');
 
     await repo.markStaleByInstrumentsFromDate(['stock-1'], fromDate);
 
     const { where } = updateMany.mock.calls[0][0];
-    // Signals generated 61+ days before fromDate must be excluded:
-    const tooOldSignalDate = new Date(fromDate.getTime() - 61 * MS_PER_DAY);
+    // Signals generated 91+ days before fromDate must be excluded:
+    const tooOldSignalDate = new Date(fromDate.getTime() - 91 * MS_PER_DAY);
     expect(tooOldSignalDate < where.signalGeneratedDate.gte).toBe(true);
   });
 
-  it('outcomes generated AT fromDate - 60d ARE selected (boundary: window touches fromDate exactly)', async () => {
+  it('outcomes generated AT fromDate - 90d ARE selected (boundary: window touches fromDate exactly)', async () => {
     const { repo, updateMany } = makeRepo();
     const fromDate = new Date('2025-06-01T00:00:00.000Z');
-    const boundaryDate = new Date(fromDate.getTime() - 60 * MS_PER_DAY);
+    const boundaryDate = new Date(fromDate.getTime() - 90 * MS_PER_DAY);
 
     await repo.markStaleByInstrumentsFromDate(['stock-1'], fromDate);
 
     const { where } = updateMany.mock.calls[0][0];
-    // The boundary date (fromDate - 60d) satisfies gte so it IS included.
+    // The boundary date (fromDate - 90d) satisfies gte so it IS included.
     expect(boundaryDate.getTime()).toBe(where.signalGeneratedDate.gte.getTime());
   });
 

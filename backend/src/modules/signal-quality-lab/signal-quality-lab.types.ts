@@ -92,6 +92,24 @@ export interface ForwardOutcome {
   priceAtSignal: number | null;
   futurePrice: number | null;
   futureDate: string | null;
+  /**
+   * Max favorable excursion over the [0, horizonRows] price window.
+   * Null when the horizon is not yet available.
+   * (Fix 6: scoped to this horizon's row count, not the full 61-row window.)
+   */
+  maxFavorableExcursion: number | null;
+  /**
+   * Max adverse excursion over the [0, horizonRows] price window.
+   * Null when the horizon is not yet available.
+   * (Fix 6: scoped to this horizon's row count, not the full 61-row window.)
+   */
+  maxAdverseExcursion: number | null;
+  /**
+   * Max drawdown from peak over the [0, horizonRows] price window.
+   * Null when the horizon is not yet available.
+   * (Fix 6: scoped to this horizon's row count, not the full 61-row window.)
+   */
+  maxDrawdown: number | null;
 }
 
 export interface SignalOutcomeSet {

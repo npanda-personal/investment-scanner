@@ -1,6 +1,6 @@
 import { HistoricalContextSnapshotsService } from '../historical-context-snapshots';
 import { SignalGenerationEngineService, type SignalResultDto } from '../signal-generation-engine';
-import { SignalQualityLabService, type NoisySignalItem, type QualityHorizon, type QualityMetricGroup, type SignalTypePerformance } from '../signal-quality-lab';
+import { SignalQualityLabService, SCORE_BUCKETS, type NoisySignalItem, type QualityHorizon, type QualityMetricGroup, type SignalTypePerformance } from '../signal-quality-lab';
 import type { PersistedQualityMetrics } from '../signal-quality-lab';
 import { DataQualityEngineService, type DataQualityEvaluationDto } from '../data-quality-engine';
 import { SignalCalibrationEngineRepository } from './signal-calibration-engine.repository';
@@ -69,6 +69,12 @@ type BatchQualityMetrics = {
   noisyIssueTypesByInstrumentId: Map<string, string[]>;
   /** Which data path produced these metrics. */
   metricsSource: MetricsSource;
+  /**
+   * Fix 2: real matureCount from countMatureByHorizon, carried through from
+   * tryPersistedMetrics so syntheticSummaryFromPersistedMetrics uses it instead
+   * of the MAX-of-sub-groups proxy.  Undefined on the ON_DEMAND path.
+   */
+  persistedMatureCount?: number;
 };
 
 type BatchLookupCache = {
@@ -173,9 +179,13 @@ export class SignalCalibrationEngineService {
     // When the persisted path succeeded, synthesize a minimal summary so that
     // calibrate() sees non-zero evaluatedForHorizon (derived from matureCount)
     // and does not short-circuit to passthrough mode.
-    const effectiveSummary = (resolvedBatchMetrics.metricsSource === 'PERSISTED_OUTCOMES')
+    // Fix 2: syntheticSummaryFromPersistedMetrics returns null when matureCount==0
+    // (which should not happen here since tryPersistedMetrics gates on MIN_PERSISTED_SAMPLES,
+    // but guard defensively) — fall back to globalSummary in that case.
+    const syntheticSummary = (resolvedBatchMetrics.metricsSource === 'PERSISTED_OUTCOMES')
       ? this.syntheticSummaryFromPersistedMetrics(horizon, resolvedBatchMetrics, globalSummary)
-      : globalSummary;
+      : null;
+    const effectiveSummary = syntheticSummary ?? globalSummary;
     // Skip historical context lookups only when both on-demand AND persisted paths produce empty metrics.
     const skipCalibrationEvidenceWork = resolvedBatchMetrics.metricsSource === 'ON_DEMAND'
       && resolvedBatchMetrics.byType.length === 0
@@ -420,13 +430,20 @@ export class SignalCalibrationEngineService {
     this.metricAdjustment(context.scoreBucketMetric, 'SCORE_BUCKET', 'Raw score bucket', add);
     this.metricAdjustment(context.sectorMetric, 'SECTOR', 'Sector history', add);
     
-    // For non-metric context, we don't strict-filter by MIN_GROUP_SAMPLES because they apply fixed heuristics 
+    // For non-metric context, we don't strict-filter by MIN_GROUP_SAMPLES because they apply fixed heuristics
     // unless baseConfidence is INSUFFICIENT, in which case they are capped strictly anyway.
     this.regimeAdjustment(signal, context.regime, add, context.dataGaps);
     this.sectorLeadershipAdjustment(signal, context.sectorLeadership, add, context.dataGaps);
     this.smartMoneyAdjustment(signal, context.smartMoneyStatus, add, context.dataGaps);
-    this.dataQualityAdjustment(signal, context.dataQuality, add, context.dataGaps);
-    this.persistedDataQualityAdjustment(context.dataQualityEvaluation || null, add, context.dataGaps);
+    // Fix 7: dataQualityAdjustment (historical snapshot) and persistedDataQualityAdjustment (DQE)
+    // must NOT both fire on the same signal — that stacks up to -14 of the -25 cap on DQ gaps alone.
+    // DQE is the authoritative source: apply it when available and skip the historical snapshot path.
+    // Fall back to the historical snapshot ONLY when no DQE evaluation is present.
+    if (context.dataQualityEvaluation) {
+      this.persistedDataQualityAdjustment(context.dataQualityEvaluation, add, context.dataGaps);
+    } else {
+      this.dataQualityAdjustment(signal, context.dataQuality, add, context.dataGaps);
+    }
     
     for (const issue of context.noisyIssueTypes) add({ type: 'NOISE', label: `Noise flag detected: ${issue}.`, delta: issue.includes('FAILED') ? -6 : -3, evidence: { issue } });
 
@@ -602,20 +619,32 @@ export class SignalCalibrationEngineService {
    * short-circuit to passthrough mode. The real on-demand summary (if any)
    * is preserved for its diagnostic fields; only the evaluated-signal counts
    * are overridden to reflect the persisted matureCount.
+   *
+   * Fix 2: use the REAL matureCount from PersistedQualityMetrics (countMatureByHorizon).
+   * Previously this used the MAX directional sample across sub-groups as a proxy
+   * (under-counts because sub-groups can't exceed the total), and fell back to the
+   * fabricated MIN_PERSISTED_SAMPLES (200) when empty — which would make a truly
+   * empty persisted set look like it has 200 samples, inflating the confidence tier.
+   *
+   * Correct behaviour: when matureCount == 0, return null so the on-demand path runs
+   * (empty → passthrough, not empty → fabricated-200 → INSUFFICIENT_SAMPLE upgrade).
    */
   private syntheticSummaryFromPersistedMetrics(
     horizon: QualityHorizon,
-    metrics: BatchQualityMetrics,
+    metrics: BatchQualityMetrics & { persistedMatureCount?: number },
     onDemandSummary: any
   ): any {
-    // Determine matureCount from the byScore array (which is populated from persisted outcomes).
-    // Use the max directional sample across score buckets as a proxy for total evaluated signals.
-    const matureCount = Math.max(
+    // Fix 2: use the real mature count that was fetched in tryPersistedMetrics.
+    // If it is 0, the caller should NOT be calling this method (tryPersistedMetrics
+    // already gates on MIN_PERSISTED_SAMPLES), but guard defensively anyway.
+    const matureCount = metrics.persistedMatureCount ?? Math.max(
       0,
       ...metrics.byScore.map((item) => item.sampleSize),
       ...metrics.bySector.map((item) => item.sampleSize),
       ...metrics.byType.map((item) => item.sampleSize),
-    ) || MIN_PERSISTED_SAMPLES;
+    );
+    // No fabricated fallback — zero means zero (INSUFFICIENT_SAMPLE path).
+    if (matureCount === 0) return null;
 
     const horizonEntry = { eligible: matureCount, evaluated: matureCount, insufficientFuturePrice: 0 };
     const baseHorizonAvailability = SUPPORTED_HORIZONS.reduce((acc, h) => {
@@ -649,19 +678,18 @@ export class SignalCalibrationEngineService {
    * persisted count is >= MIN_PERSISTED_SAMPLES; returns null to trigger the
    * on-demand fallback otherwise.
    */
-  private async tryPersistedMetrics(horizon: QualityHorizon): Promise<BatchQualityMetrics | null> {
+  private async tryPersistedMetrics(horizon: QualityHorizon): Promise<BatchQualityMetrics & { persistedMatureCount: number } | null> {
     try {
       const matureCount = await this.qualityService.countMatureByHorizon(horizon);
       if (matureCount < MIN_PERSISTED_SAMPLES) return null;
 
       const metrics: PersistedQualityMetrics = await this.qualityService.qualityMetricsFromPersistedOutcomes({ horizon });
-      return this.prepareQualityMetrics(
-        metrics.byType,
-        metrics.byScore,
-        metrics.bySector,
-        metrics.noisy,
-        'PERSISTED_OUTCOMES'
-      );
+      // Fix 2: carry the real matureCount into the BatchQualityMetrics so
+      // syntheticSummaryFromPersistedMetrics can use it without re-fetching.
+      return {
+        ...this.prepareQualityMetrics(metrics.byType, metrics.byScore, metrics.bySector, metrics.noisy, 'PERSISTED_OUTCOMES'),
+        persistedMatureCount: matureCount,
+      };
     } catch {
       // Any error: fall back to on-demand path
       return null;
@@ -1289,11 +1317,12 @@ export class SignalCalibrationEngineService {
     return 'BEARISH';
   }
 
+  /**
+   * Fix 5: use canonical SCORE_BUCKETS from signal-quality-lab (single source of truth).
+   * Previously this method was an inline copy; now it delegates to the shared constant.
+   */
   private scoreBucket(score: number): string {
-    if (score < 40) return '0-39';
-    if (score < 70) return '40-69';
-    if (score < 85) return '70-84';
-    return '85-100';
+    return SCORE_BUCKETS.find((bucket) => score >= bucket.min && score <= bucket.max)?.label ?? 'UNKNOWN';
   }
 
   private clamp(value: number, min: number, max: number): number {

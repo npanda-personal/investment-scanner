@@ -162,9 +162,17 @@ describe('signal calibration engine service', () => {
     expect(result.dataQuality).toMatchObject({ coverageStatus: 'UNUSABLE', signalReadinessStatus: 'NOT_READY', liquidityStatus: 'ILLIQUID' });
   });
 
-  it('adds a data gap without penalty when data quality evaluation is missing', () => {
+  it('falls back to historical snapshot adjustment when DQE is missing (Fix 7: no stacking)', () => {
+    // When dataQualityEvaluation=null, the code falls back to dataQualityAdjustment (historical).
+    // With a good historical snapshot (hasLatestPrice=true, 260 days, fundamentals), no penalty fires.
     const result = service().instance.calibrate(rawSignal(), context({ dataQualityEvaluation: null }));
-    expect(result.dataGaps).toContain('Missing latest Data Quality Engine evaluation.');
+    // No DQ penalty since historical snapshot is clean
+    expect(result.penalties.filter((p: any) => p.type === 'DATA_QUALITY')).toHaveLength(0);
+  });
+
+  it('adds a data gap when both DQE and historical snapshot are missing', () => {
+    const result = service().instance.calibrate(rawSignal(), context({ dataQualityEvaluation: null, dataQuality: null }));
+    expect(result.dataGaps.some((g: string) => g.toLowerCase().includes('data quality') || g.toLowerCase().includes('snapshot'))).toBe(true);
   });
 
   it('clamps calibrated score to 0-100 and total delta to bounds', () => {

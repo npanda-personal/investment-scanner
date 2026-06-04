@@ -6,7 +6,7 @@ export {
 } from './signal-quality-lab.router';
 export { SignalQualityLabController } from './signal-quality-lab.controller';
 export { SignalQualityLabRepository } from './signal-quality-lab.repository';
-export { SignalQualityLabService } from './signal-quality-lab.service';
+export { SignalQualityLabService, SCORE_BUCKETS } from './signal-quality-lab.service';
 export { QUALITY_DIRECTIONS, QUALITY_HORIZONS, parseHorizon, parseQualityQuery, parseQualityRecalculateRequest, parseScorecardQuery, requireInstrumentId } from './signal-quality-lab.validation';
 export type {
   EvidenceUsability,

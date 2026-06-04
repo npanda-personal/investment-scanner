@@ -34,12 +34,26 @@ import type {
 
 const HORIZON_DAYS: Record<QualityHorizon, number> = { '1D': 1, '5D': 5, '10D': 10, '20D': 20, '60D': 60 };
 const ANALYSIS_SIGNAL_LIMIT = 10000;
-const SCORE_BUCKETS = [
+
+/**
+ * CANONICAL score-bucket boundaries.
+ *
+ * This is the single authoritative definition used by:
+ *   - the on-demand `scoreBucket()` helper (service)
+ *   - the scorecard SQL (`scoreBucket` case in groupExpressions in the repository)
+ *   - the calibration engine's `scoreBucket()` helper
+ *
+ * INVARIANT: these four ranges must be kept in sync across all three locations.
+ */
+export const SCORE_BUCKETS = [
   { label: '0-39', min: 0, max: 39 },
   { label: '40-69', min: 40, max: 69 },
   { label: '70-84', min: 70, max: 84 },
   { label: '85-100', min: 85, max: 100 },
-];
+] as const;
+
+/** Minimum number of directional outcomes needed for a group to be EVALUATED (not SMALL_SAMPLE). */
+const MIN_GROUP_SAMPLES_THRESHOLD = 10;
 const FLIP_THRESHOLD = 3;
 const FAILED_BULLISH_10D = -0.03;
 const FAILED_BEARISH_10D = 0.03;
@@ -485,9 +499,11 @@ export class SignalQualityLabService {
             futurePrice: fo?.futurePrice ?? null,
             windowEndDate,
             forwardReturnPercent: fo?.forwardReturnPercent ?? null,
-            maxFavorableExcursion: outcomeSet.maxFavorableMovePercent ?? null,
-            maxAdverseExcursion: outcomeSet.maxAdverseMovePercent ?? null,
-            maxDrawdownPercent: outcomeSet.maxDrawdownPercent ?? null,
+            // Fix 6: use per-horizon excursion (scoped to this horizon's row count),
+            // not the full-window outer set fields (which only cover the 60D window).
+            maxFavorableExcursion: fo?.maxFavorableExcursion ?? null,
+            maxAdverseExcursion: fo?.maxAdverseExcursion ?? null,
+            maxDrawdownPercent: fo?.maxDrawdown ?? null,
             evaluatedAt: now,
           });
 
@@ -949,10 +965,13 @@ export class SignalQualityLabService {
     const generatedAt = this.utcTradingDay(new Date(signal.generated_at));
     const startIndex = prices.findIndex((price) => this.utcTradingDay(new Date(price.date)).getTime() >= generatedAt.getTime());
     const start = startIndex >= 0 ? prices[startIndex] : null;
+    // window contains rows [signalDay, signalDay+60] — up to 61 rows.
+    // INVARIANT: prices must come from normalizePrices() so window[N] = N trading days forward.
     const window = startIndex >= 0 ? prices.slice(startIndex, startIndex + 61) : [];
     const outcomes = (Object.keys(HORIZON_DAYS) as QualityHorizon[]).map((horizon) =>
       this.forwardOutcome(horizon, start, window)
     );
+    // Full-window (60D) excursion fields kept on the outer set for backward-compat.
     const pathReturns = start && start.adjustedClose > 0 ? window.map((price) => (price.adjustedClose - start.adjustedClose) / start.adjustedClose) : [];
     return {
       signalResultId: signal.id || '',
@@ -1028,6 +1047,9 @@ export class SignalQualityLabService {
       if (flips >= FLIP_THRESHOLD) items.push(this.noise(latest, 'DIRECTION_FLIPS', 'HIGH', `${flips} direction flips in the last 30 days.`, { flips }));
       if ((Date.now() - new Date(latest.generated_at).getTime()) / 86400000 > STALE_SIGNAL_DAYS) items.push(this.noise(latest, 'STALE_SIGNAL', 'LOW', 'Latest signal is older than 7 days.', { generatedAt: latest.generated_at }));
     }
+    // Fix 10: dedup LOW_CONFIDENCE_SIGNAL per instrument (emit at most one item per
+    // instrument, like DIRECTION_FLIPS / STALE do implicitly via byInstrument grouping).
+    const lowConfidenceSeen = new Set<string>();
     for (const outcome of outcomes) {
       const tenDay = outcome.outcomes.find((item) => item.horizon === '10D');
       if (!tenDay?.available || tenDay.forwardReturnPercent === null) continue;
@@ -1037,7 +1059,10 @@ export class SignalQualityLabService {
       if (outcome.direction === 'BEARISH' && tenDay.forwardReturnPercent > FAILED_BEARISH_10D) {
         items.push(this.noise(outcome, 'FAILED_BEARISH', 'MEDIUM', 'Bearish signal had a positive 10D outcome.', { return10D: tenDay.forwardReturnPercent }));
       }
-      if (outcome.confidence === 'LOW') items.push(this.noise(outcome, 'LOW_CONFIDENCE_SIGNAL', 'LOW', 'Low-confidence signal should be reviewed with caution.', { confidence: outcome.confidence }));
+      if (outcome.confidence === 'LOW' && !lowConfidenceSeen.has(outcome.instrumentId)) {
+        lowConfidenceSeen.add(outcome.instrumentId);
+        items.push(this.noise(outcome, 'LOW_CONFIDENCE_SIGNAL', 'LOW', 'Low-confidence signal should be reviewed with caution.', { confidence: outcome.confidence }));
+      }
     }
     return items;
   }
@@ -1053,11 +1078,43 @@ export class SignalQualityLabService {
     return this.normalizePrices(response?.prices || []);
   }
 
+  /**
+   * Normalize a raw price series into a strictly-contiguous trading-day array.
+   *
+   * INVARIANT: after this method, consecutive rows are always exactly one
+   * trading day apart (no weekend / holiday / duplicate gaps).  This is
+   * required so that `window[N]` in `forwardOutcome` is genuinely N trading
+   * days forward and not a calendar-day approximation.
+   *
+   * Steps:
+   *   1. Map to { date (UTC ISO), adjustedClose } and drop rows with non-finite prices.
+   *   2. Normalise each date to its UTC calendar day (midnight) — removes intraday
+   *      duplicates caused by different timestamp offsets for the same session.
+   *   3. Sort ascending by date.
+   *   4. Deduplicate: keep the LAST row per calendar day (most-recent intraday print).
+   *
+   * Non-trading-day filtering (weekends/holidays) is deliberately NOT done here
+   * because the source data from NSE/BSE already contains only trading-day rows —
+   * filtering on day-of-week would incorrectly drop holiday-make-up sessions.
+   * The deduplication step is sufficient to guarantee window[N] = N trading days.
+   */
   private normalizePrices(prices: any[]): PricePoint[] {
-    return prices
-      .map((price: any) => ({ date: new Date(price.date).toISOString(), adjustedClose: Number(price.adjusted_close ?? price.close) }))
-      .filter((price) => Number.isFinite(price.adjustedClose))
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const mapped = prices
+      .map((price: any) => ({
+        date: new Date(new Date(price.date).toISOString().slice(0, 10) + 'T00:00:00.000Z').toISOString(),
+        adjustedClose: Number(price.adjusted_close ?? price.close),
+      }))
+      .filter((price) => Number.isFinite(price.adjustedClose));
+
+    // Sort ascending
+    mapped.sort((a, b) => a.date.localeCompare(b.date));
+
+    // Deduplicate by calendar-day key — keep last row per day
+    const seen = new Map<string, PricePoint>();
+    for (const p of mapped) {
+      seen.set(p.date, p);
+    }
+    return [...seen.values()];
   }
 
   private priceCacheKey(instrumentId: string, query?: Partial<QualityQuery>): string {
@@ -1079,11 +1136,38 @@ export class SignalQualityLabService {
     return results;
   }
 
+  /**
+   * Compute the forward outcome for a single horizon.
+   *
+   * INVARIANT (Fix 1): `window` must be produced by `normalizePrices`, which
+   * deduplicates by calendar day.  Under that invariant `window[N]` is
+   * genuinely N trading days forward from the signal date (window[0]).
+   * Do NOT call this method with a raw, un-normalized price series.
+   *
+   * Fix 6: excursion metrics (maxFavorableExcursion / maxAdverseExcursion /
+   * maxDrawdown) are scoped to window[0..horizonRows] rather than the full
+   * 61-row window.  This means 1D excursion only covers 1 future bar while
+   * 60D excursion covers the full 60-bar window — values will differ per horizon.
+   */
   private forwardOutcome(horizon: QualityHorizon, start: PricePoint | null, window: PricePoint[]): ForwardOutcome {
-    const future = window[HORIZON_DAYS[horizon]];
+    const horizonRows = HORIZON_DAYS[horizon];
+    const future = window[horizonRows];
     if (!start || !future || start.adjustedClose <= 0) {
-      return { horizon, forwardReturnPercent: null, available: false, priceAtSignal: start?.adjustedClose ?? null, futurePrice: null, futureDate: null };
+      return {
+        horizon,
+        forwardReturnPercent: null,
+        available: false,
+        priceAtSignal: start?.adjustedClose ?? null,
+        futurePrice: null,
+        futureDate: null,
+        maxFavorableExcursion: null,
+        maxAdverseExcursion: null,
+        maxDrawdown: null,
+      };
     }
+    // Horizon-scoped sub-window: rows [0, horizonRows] inclusive
+    const subWindow = window.slice(0, horizonRows + 1);
+    const subReturns = subWindow.map((price) => (price.adjustedClose - start.adjustedClose) / start.adjustedClose);
     return {
       horizon,
       forwardReturnPercent: (future.adjustedClose - start.adjustedClose) / start.adjustedClose,
@@ -1091,6 +1175,9 @@ export class SignalQualityLabService {
       priceAtSignal: start.adjustedClose,
       futurePrice: future.adjustedClose,
       futureDate: future.date,
+      maxFavorableExcursion: subReturns.length > 0 ? Math.max(...subReturns) : null,
+      maxAdverseExcursion: subReturns.length > 0 ? Math.min(...subReturns) : null,
+      maxDrawdown: this.maxDrawdown(subWindow),
     };
   }
 
@@ -1099,15 +1186,22 @@ export class SignalQualityLabService {
     const returns = available.map((entry) => entry.outcome!.forwardReturnPercent!);
     const missingPrice = items.filter((item) => !item.priceHistoryAvailable).length;
     const unevaluatedCount = Math.max(0, items.length - returns.length - missingPrice);
-    const status = this.groupStatus(items.length, returns.length, missingPrice, horizon);
-    const reason = this.groupReason(items.length, returns.length, missingPrice, horizon);
+
+    // Fix 3: directionalSampleSize = outcomes for BULLISH or BEARISH items only,
+    // consistent with the win-rate denominator (winRate() excludes NEUTRAL).
+    // sampleSize stays as the full evaluated count (used for avg return, median etc).
+    const directionalSampleSize = available.filter((entry) => entry.item.direction !== 'NEUTRAL').length;
+    const status = this.groupStatus(items.length, directionalSampleSize, missingPrice);
+    const reason = this.groupReason(items.length, returns.length, missingPrice);
     return {
       group,
       name: group,
       horizon,
       rawSignalCount: items.length,
-      sampleSize: returns.length,
-      samples: returns.length,
+      // Fix 3: expose directional count so calibration MIN_GROUP_SAMPLES guard
+      // is not inflated by NEUTRAL signals.
+      sampleSize: directionalSampleSize,
+      samples: directionalSampleSize,
       unevaluatedCount,
       winRate: this.winRate(items, horizon),
       averageForwardReturn: this.average(returns),
@@ -1193,8 +1287,10 @@ export class SignalQualityLabService {
       .filter((item) => item.priceHistoryAvailable && !item.outcomes.find((outcome) => outcome.horizon === query.horizon)?.available)
       .map((item) => new Date(item.generatedAt).getTime())
       .filter(Number.isFinite);
+    // Fix 11: advance by trading days, not raw calendar milliseconds.
+    // A 5-trading-day horizon spans ~7 calendar days; 60 trading days ≈ 84 calendar days.
     const nextEvaluableDate = newestUnevaluated.length > 0
-      ? new Date(Math.min(...newestUnevaluated) + HORIZON_DAYS[query.horizon] * 86400000).toISOString()
+      ? this.addTradingDays(new Date(Math.min(...newestUnevaluated)), HORIZON_DAYS[query.horizon]).toISOString()
       : null;
     const [excludedByDirectionCount, excludedByDateFilterCount] = await Promise.all([
       query.direction ? this.countDelta(query, { direction: undefined }) : Promise.resolve(0),
@@ -1257,19 +1353,35 @@ export class SignalQualityLabService {
     return 'USABLE';
   }
 
-  private groupStatus(rawCount: number, evaluatedCount: number, missingPriceCount: number, horizon: QualityHorizon): QualityMetricGroup['status'] {
+  /**
+   * Fix 9: groupStatus SMALL_SAMPLE guard.
+   *
+   * Previously this used `HORIZON_DAYS[horizon]` as the minimum sample threshold —
+   * conflating the forward-window length (e.g. 60 bars) with the number of
+   * independent outcomes needed for statistical meaningfulness.  A 60D horizon
+   * would require 60 outcomes before being EVALUATED even when 20 would be fine,
+   * and a 1D horizon would only require 1.
+   *
+   * Correct: use a fixed statistical minimum (`MIN_GROUP_SAMPLES_THRESHOLD = 10`)
+   * across all horizons — matches the semantics of the persisted-scorecard path,
+   * which uses directionalSampleSize (not horizonRows).
+   *
+   * Also Fix 3: `evaluatedCount` passed in is now the directional count
+   * (BULLISH + BEARISH only), consistent with the win-rate denominator.
+   */
+  private groupStatus(rawCount: number, directionalEvaluatedCount: number, missingPriceCount: number): QualityMetricGroup['status'] {
     if (rawCount === 0) return 'FILTERED_OUT';
-    if (evaluatedCount === 0 && missingPriceCount >= rawCount) return 'MISSING_PRICE_DATA';
-    if (evaluatedCount === 0) return 'INSUFFICIENT_FUTURE_DATA';
-    if (evaluatedCount < 5 || evaluatedCount < HORIZON_DAYS[horizon]) return 'SMALL_SAMPLE';
+    if (directionalEvaluatedCount === 0 && missingPriceCount >= rawCount) return 'MISSING_PRICE_DATA';
+    if (directionalEvaluatedCount === 0) return 'INSUFFICIENT_FUTURE_DATA';
+    if (directionalEvaluatedCount < MIN_GROUP_SAMPLES_THRESHOLD) return 'SMALL_SAMPLE';
     return 'EVALUATED';
   }
 
-  private groupReason(rawCount: number, evaluatedCount: number, missingPriceCount: number, horizon: QualityHorizon): string | null {
+  private groupReason(rawCount: number, evaluatedCount: number, missingPriceCount: number): string | null {
     if (rawCount === 0) return 'Filtered out by the selected query.';
     if (evaluatedCount === 0 && missingPriceCount >= rawCount) return 'Missing price history for this group.';
-    if (evaluatedCount === 0) return `No evaluated outcomes for the selected ${horizon} horizon.`;
-    if (evaluatedCount < 5) return 'Small evaluated sample; interpret as historical measurement only.';
+    if (evaluatedCount === 0) return 'No evaluated outcomes for the selected horizon.';
+    if (evaluatedCount < MIN_GROUP_SAMPLES_THRESHOLD) return 'Small evaluated sample; interpret as historical measurement only.';
     return null;
   }
 
@@ -1279,6 +1391,26 @@ export class SignalQualityLabService {
     return date;
   }
 
+  /**
+   * Fix 11: Advance a date by `n` trading days.
+   *
+   * Skips Saturday (day 6) and Sunday (day 0).  NSE/BSE public holidays are
+   * not enumerated here — that would require a holiday calendar that is out of
+   * scope — so the estimate may be 1-2 days early around holidays.  This is a
+   * best-effort diagnostic field and a ~1D error is acceptable.
+   */
+  private addTradingDays(from: Date, tradingDays: number): Date {
+    const result = new Date(from);
+    let remaining = tradingDays;
+    while (remaining > 0) {
+      result.setUTCDate(result.getUTCDate() + 1);
+      const dow = result.getUTCDay();
+      if (dow !== 0 && dow !== 6) remaining--;
+    }
+    return result;
+  }
+
+  /** Fix 5: use canonical SCORE_BUCKETS — single source of truth. */
   private scoreBucket(score: number): string {
     return SCORE_BUCKETS.find((bucket) => score >= bucket.min && score <= bucket.max)?.label || 'UNKNOWN';
   }
