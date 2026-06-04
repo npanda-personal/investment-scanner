@@ -138,31 +138,26 @@ async function upsertPriceTick(
   prisma: PrismaClient,
   row: { date: string; open: number; high: number; low: number; close: number },
 ): Promise<boolean> {
-  // date is 'YYYY-MM-DD'; append T00:00:00Z for Postgres timestamptz
-  const ts = `${row.date}T00:00:00.000Z`;
-
-  const query = Prisma.sql`
-    INSERT INTO price_ticks
-      (symbol, timestamp, open, high, low, close, "adjustedClose",
-       source, region, exchange, "dataStatus")
-    VALUES (
-      ${NSE_INDEX_EOD_SYMBOL},
-      ${ts}::timestamptz,
-      ${new Prisma.Decimal(row.open)},
-      ${new Prisma.Decimal(row.high)},
-      ${new Prisma.Decimal(row.low)},
-      ${new Prisma.Decimal(row.close)},
-      ${new Prisma.Decimal(row.close)},
-      ${NSE_INDEX_EOD_SOURCE},
-      ${'IN'},
-      ${'NSE'},
-      ${'COMPLETE'}
-    )
-    ON CONFLICT (symbol, timestamp) DO NOTHING
-  `;
-
-  const affected: number = await prisma.$executeRaw(query);
-  return affected > 0;
+  // Use prisma.createMany (not raw SQL) so the client fills its managed columns
+  // (id cuid, ingestionTimestamp, lastUpdatedTimestamp — none of which have DB-level
+  // defaults). skipDuplicates gives the same ON CONFLICT (symbol,timestamp) DO NOTHING.
+  const res = await prisma.priceTick.createMany({
+    data: [{
+      symbol: NSE_INDEX_EOD_SYMBOL,
+      timestamp: new Date(`${row.date}T00:00:00.000Z`),
+      open: new Prisma.Decimal(row.open),
+      high: new Prisma.Decimal(row.high),
+      low: new Prisma.Decimal(row.low),
+      close: new Prisma.Decimal(row.close),
+      adjustedClose: new Prisma.Decimal(row.close),
+      source: NSE_INDEX_EOD_SOURCE,
+      region: 'IN',
+      exchange: 'NSE',
+      dataStatus: 'COMPLETE',
+    }],
+    skipDuplicates: true,
+  });
+  return res.count > 0;
 }
 
 // ---------------------------------------------------------------------------
