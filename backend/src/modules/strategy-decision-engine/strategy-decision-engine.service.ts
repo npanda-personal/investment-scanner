@@ -337,10 +337,19 @@ export class StrategyDecisionEngineService {
     const frameworkDecision = await this.evaluateWithStrategyFramework(strategyName, context).catch(() => null);
     if (frameworkDecision) return frameworkDecision;
 
-    if (strategyName === 'TREND_MOMENTUM') return this.evaluateTrendMomentum(context);
-    if (strategyName === 'PULLBACK_IN_UPTREND') return this.evaluatePullback(context);
+    // Fix #6: Legacy evaluators fire as fallback — label results clearly.
+    if (strategyName === 'TREND_MOMENTUM') {
+      const result = this.evaluateTrendMomentum(context);
+      result.warnings = ['[LEGACY-EVALUATOR] Result produced by legacy heuristic evaluator, not the Strategy Framework.', ...(result.warnings ?? [])];
+      return result;
+    }
+    if (strategyName === 'PULLBACK_IN_UPTREND') {
+      const result = this.evaluatePullback(context);
+      result.warnings = ['[LEGACY-EVALUATOR] Result produced by legacy heuristic evaluator, not the Strategy Framework.', ...(result.warnings ?? [])];
+      return result;
+    }
     if (strategyName === 'DEFENSIVE_EXIT') return this.evaluateDefensiveExit(context);
-    
+
     return null;
   }
 
@@ -385,10 +394,20 @@ export class StrategyDecisionEngineService {
     const frameworkDecision = await this.evaluateWithStrategyFramework(strategyName, context, strategyRatings).catch(() => null);
     if (frameworkDecision) return frameworkDecision;
 
-    if (strategyName === 'TREND_MOMENTUM') return this.evaluateTrendMomentum(context);
-    if (strategyName === 'PULLBACK_IN_UPTREND') return this.evaluatePullback(context);
+    // Fix #6: Legacy evaluators fire as fallback — label results clearly so callers can distinguish
+    // framework-backed decisions from the older heuristic path.
+    if (strategyName === 'TREND_MOMENTUM') {
+      const result = this.evaluateTrendMomentum(context);
+      result.warnings = ['[LEGACY-EVALUATOR] Result produced by legacy heuristic evaluator, not the Strategy Framework.', ...(result.warnings ?? [])];
+      return result;
+    }
+    if (strategyName === 'PULLBACK_IN_UPTREND') {
+      const result = this.evaluatePullback(context);
+      result.warnings = ['[LEGACY-EVALUATOR] Result produced by legacy heuristic evaluator, not the Strategy Framework.', ...(result.warnings ?? [])];
+      return result;
+    }
     if (strategyName === 'DEFENSIVE_EXIT') return this.evaluateDefensiveExit(context);
-    
+
     return null;
   }
 
@@ -492,6 +511,12 @@ export class StrategyDecisionEngineService {
 
   private toStrategyFrameworkContext(ctx: any): StrategyContext {
     const closes = ctx.prices as number[];
+    // Resolve F&O / derivatives eligibility from the instrument record.
+    // Support both camelCase (derivativesEligible) and snake_case (derivatives_eligible)
+    // variants so that partial migration in the data layer does not silently hide short setups.
+    const rawEligible = ctx.instrument?.derivativesEligible ?? ctx.instrument?.derivatives_eligible ?? null;
+    const derivativesEligible: boolean | null =
+      rawEligible === true || rawEligible === false ? rawEligible : null;
     return {
       instrumentId: ctx.instrument.id,
       symbol: ctx.instrument.symbol,
@@ -540,6 +565,7 @@ export class StrategyDecisionEngineService {
         unrealizedPnLPercent: ctx.holding.unrealizedPnLPercent,
         allocationPercent: ctx.holding.allocationPercent,
       } : null,
+      derivativesEligible,
     };
   }
 
@@ -554,7 +580,13 @@ export class StrategyDecisionEngineService {
     const warnings = [...result.warnings];
     const blockers = [...result.blockers];
 
-    if (ctx.gate.marketGate === 'CLOSED' && result.strategyCode !== 'DEFENSIVE_EXIT') {
+    // SHORT-style strategies (e.g. BREAKDOWN_MOMENTUM) have their strongest thesis when the
+    // market gate is CLOSED / RISK_OFF — do NOT veto them with the long-entry CLOSED override.
+    const isShortStrategy =
+      result.strategyCode === 'BREAKDOWN_MOMENTUM' ||
+      definition.style?.toUpperCase().includes('SHORT');
+
+    if (ctx.gate.marketGate === 'CLOSED' && result.strategyCode !== 'DEFENSIVE_EXIT' && !isShortStrategy) {
       if (!blockers.some((item) => item.includes('Market gate'))) blockers.push('Market gate is closed; no new long candidates.');
       mapped.decision = 'AVOID';
       mapped.action = 'AVOID_NEW_ENTRY';
@@ -969,7 +1001,9 @@ export class StrategyDecisionEngineService {
     let smartMoneyDataWarningsScore = 0;
 
     // 1. Bearish Signal (Weight: 30)
-    if (ctx.rawSignal?.direction === 'BEARISH') {
+    // Prefer calibrated direction (consistent with signalDirection() in the evaluator); fall back to raw.
+    const signalDirection = ctx.calibrated?.calibratedDirection ?? ctx.rawSignal?.direction ?? 'NEUTRAL';
+    if (signalDirection === 'BEARISH') {
       bearishSignalReliabilityScore = 30;
       reasons.push('Bearish signal crossover detected.');
     }
@@ -1004,12 +1038,26 @@ export class StrategyDecisionEngineService {
     // sum correctly to reflect exit urgency without injecting phantom points.
     const holding = ctx.holding ?? null;
     if (holding !== null) {
-      const pnlPct   = typeof holding.unrealizedPnLPercent === 'number' && Number.isFinite(holding.unrealizedPnLPercent)
+      let rawPnl   = typeof holding.unrealizedPnLPercent === 'number' && Number.isFinite(holding.unrealizedPnLPercent)
         ? holding.unrealizedPnLPercent
         : null;
-      const allocPct = typeof holding.allocationPercent === 'number' && Number.isFinite(holding.allocationPercent)
+      let rawAlloc = typeof holding.allocationPercent === 'number' && Number.isFinite(holding.allocationPercent)
         ? holding.allocationPercent
         : null;
+
+      // Guard against percent-integer inputs (e.g. -20 instead of -0.20).
+      // Thresholds assume the fractional range [-1, 1] for P&L and [0, 1] for allocation.
+      // If a value is outside [-1, 1] we treat it as a percent-integer and normalise.
+      if (rawPnl !== null && (rawPnl < -1 || rawPnl > 1)) {
+        rawPnl = rawPnl / 100;
+        warnings.push(`unrealizedPnLPercent appeared to be a percent-integer; normalised to ${rawPnl.toFixed(4)}.`);
+      }
+      if (rawAlloc !== null && (rawAlloc < 0 || rawAlloc > 1)) {
+        rawAlloc = rawAlloc / 100;
+        warnings.push(`allocationPercent appeared to be a percent-integer; normalised to ${rawAlloc.toFixed(4)}.`);
+      }
+      const pnlPct   = rawPnl;
+      const allocPct = rawAlloc;
 
       // P&L sub-score (0–10): deeper loss → higher urgency.
       //   pnlPct < -20% → 10, -10% to -20% → 7, -5% to -10% → 4, 0 to -5% → 2, > 0 → 0

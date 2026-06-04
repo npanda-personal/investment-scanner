@@ -236,8 +236,8 @@ export class StrategyFrameworkEvaluator implements StrategyEvaluator {
     if (this.isAbove(context.latestPrice, context.sma50)) this.add(state, 15, 'Price has reclaimed SMA50.', 'RECLAIM_SMA50');
     if (this.isAbove(context.latestPrice, context.previousClose)) this.add(state, 10, 'Latest close confirms a bounce from the pullback.', 'BOUNCE_CONFIRMATION');
     else state.warnings.push('Bounce confirmation is missing.');
-    if (context.rsi !== null && context.rsi !== undefined && context.rsi >= 40 && context.rsi <= 65) this.add(state, 15, 'RSI has recovered into the preferred pullback-reclaim zone.', 'RSI_RECOVERY');
-    else state.warnings.push('RSI has not recovered into the preferred 40-65 pullback-reclaim zone.');
+    if (context.rsi !== null && context.rsi !== undefined && context.rsi >= 40 && context.rsi <= 60) this.add(state, 15, 'RSI has recovered into the preferred pullback-reclaim zone.', 'RSI_RECOVERY');
+    else state.warnings.push('RSI has not recovered into the preferred 40-60 pullback-reclaim zone.');
     if (['OPEN', 'SELECTIVE'].includes(String(context.marketGate || ''))) this.add(state, 10, 'Market is healthy enough for selective pullbacks.', 'MARKET_HEALTHY');
   }
 
@@ -250,7 +250,7 @@ export class StrategyFrameworkEvaluator implements StrategyEvaluator {
     const priorHigh = bars.length > 1 ? Math.max(...bars.slice(1, 252).map((bar) => bar.close)) : null;
     const clearsResistance = typeof context.latestPrice === 'number' && typeof priorHigh === 'number'
       ? context.latestPrice > priorHigh
-      : Boolean(context.latestPrice && context.high52Week && context.latestPrice >= context.high52Week * 0.99);
+      : Boolean(context.latestPrice && context.high52Week && context.latestPrice >= context.high52Week * 1.00);
     if (clearsResistance) this.add(state, 20, 'Close clears prior resistance/high.', 'RESISTANCE_CLOSE');
     else state.dataGaps.push('Resistance-close breakout evidence is missing or not confirmed.');
     const latestVolume = context.prices?.[0]?.volume ?? context.bars?.[0]?.volume ?? null;
@@ -332,8 +332,9 @@ export class StrategyFrameworkEvaluator implements StrategyEvaluator {
    * Language: entry/stop/cover — no buy/sell wording.
    */
   private scoreBreakdownMomentum(context: StrategyContext, state: MutableState) {
-    // F&O gate: derivativesEligible must be explicitly true; block cash-only instruments
-    const derivativesEligible = (context as any).derivativesEligible;
+    // F&O gate: derivativesEligible must be explicitly true; block cash-only instruments.
+    // context.derivativesEligible is populated by toStrategyFrameworkContext from the instrument record.
+    const derivativesEligible = context.derivativesEligible;
     if (derivativesEligible === false) {
       this.block(state, 'NOT_DERIVATIVES_ELIGIBLE', 'Cash-only (non-derivatives-eligible) instrument cannot be short-reviewed.');
       return;
@@ -347,8 +348,10 @@ export class StrategyFrameworkEvaluator implements StrategyEvaluator {
     // Downtrend evidence
     if (this.isBelow(context.latestPrice, context.sma50)) this.add(state, 15, 'Price is below SMA50 — downtrend evidence.', 'PRICE_BELOW_SMA50');
     else state.blockers.push('Price is above SMA50; downtrend evidence is absent for short-review.');
+    // Fix #3: Promote PRICE_BELOW_SMA200 to a proper block (consistent with TREND_MOMENTUM's SMA treatment)
+    // so long-term downtrend confirmation actually gates the strategy.
     if (this.isBelow(context.latestPrice, context.sma200)) this.add(state, 15, 'Price is below SMA200 — long-term downtrend confirmation.', 'PRICE_BELOW_SMA200');
-    else state.warnings.push('Price is above SMA200; long-term downtrend is not confirmed.');
+    else this.block(state, 'PRICE_ABOVE_SMA200', 'Price is above SMA200; long-term downtrend is not confirmed — short setup is not valid.');
     // Bearish signal
     if (this.signalDirection(context) === 'BEARISH') this.add(state, 20, 'Bearish signal aligns with breakdown strategy.', 'BEARISH_SIGNAL');
     if (this.signalScore(context) >= 70) this.add(state, 10, 'Signal score is strong enough for short-review.', 'SIGNAL_STRENGTH');
@@ -357,23 +360,27 @@ export class StrategyFrameworkEvaluator implements StrategyEvaluator {
   }
 
   private scoreShortSectorAndSmartMoney(context: StrategyContext, state: MutableState) {
-    // For shorts, lagging sector supports setup; leading sector contradicts it
+    // For shorts, lagging sector supports setup; leading sector contradicts it.
+    // Fix #3: NEUTRAL/unknown sector is a soft warning (data-gap), NOT a hard block —
+    // otherwise the strategy is stricter than any long strategy on context availability.
     if (['LAGGING', 'WEAKENING'].includes(String(context.sectorLeadership || ''))) {
       this.add(state, 10, 'Sector is lagging or weakening — supports short-review setup.', 'SECTOR_NOT_LEADING');
     } else if (['LEADING', 'IMPROVING'].includes(String(context.sectorLeadership || ''))) {
       state.warnings.push('Sector is leading or improving, which contradicts the short-review setup.');
     } else {
-      state.dataGaps.push('Sector context is missing.');
-      this.block(state, 'SECTOR_CONTEXT_MISSING', 'Sector context is missing.');
+      // Unknown / neutral sector: record as a data-gap / warning, but do NOT hard-block.
+      state.dataGaps.push('Sector context is missing or neutral; short setup has reduced confidence.');
+      state.warnings.push('Sector context is missing or neutral; supporting evidence is weaker.');
     }
-    // Distribution supports short; accumulation blocks it
+    // Distribution supports short; accumulation blocks it.
+    // Fix #3: Missing smart-money context is also a soft warning, not a hard block.
     if (context.smartMoneyStatus === 'DISTRIBUTION') {
       this.add(state, 10, 'Smart-money distribution supports short-review setup.', 'SMART_MONEY_DISTRIBUTION');
     } else if (context.smartMoneyStatus === 'ACCUMULATION') {
       this.block(state, 'ACCUMULATION', 'Smart-money accumulation contradicts short-entry setup.');
     } else if (!context.smartMoneyStatus) {
-      state.dataGaps.push('Smart-money context is missing.');
-      this.block(state, 'SMART_MONEY_CONTEXT_MISSING', 'Smart-money context is missing.');
+      state.dataGaps.push('Smart-money context is missing; short setup scored without distribution confirmation.');
+      state.warnings.push('Smart-money context is missing for short-review.');
     }
   }
 
@@ -450,7 +457,10 @@ export class StrategyFrameworkEvaluator implements StrategyEvaluator {
       this.requireDeclaredInput(context, state, 'sectorRelativeStrengthScore', 'SECTOR_RS_MISSING', 'Sector relative-strength score is missing.');
       this.requireDeclaredInput(context, state, 'smartMoneyStatus', 'SMART_MONEY_CONTEXT_MISSING', 'Smart-money context is missing.');
     }
-    if (!options.skipClosedMarketBlock && context.marketGate === 'CLOSED' && this.definition.category === 'ENTRY') this.block(state, 'MARKET_CLOSED', 'Market gate is closed.');
+    // SHORT-style entry strategies (e.g. BREAKDOWN_MOMENTUM) are strongest in a CLOSED/RISK_OFF gate —
+    // do NOT apply the CLOSED market block to them.  Long strategies continue to be blocked.
+    const isShortEntryStrategy = this.definition.style?.toUpperCase().includes('SHORT');
+    if (!options.skipClosedMarketBlock && context.marketGate === 'CLOSED' && this.definition.category === 'ENTRY' && !isShortEntryStrategy) this.block(state, 'MARKET_CLOSED', 'Market gate is closed.');
     if (context.reliability?.status === 'LOW' || context.reliability?.noiseLevel === 'HIGH') this.block(state, 'LOW_RELIABILITY', 'Signal reliability is low/noisy.');
   }
 

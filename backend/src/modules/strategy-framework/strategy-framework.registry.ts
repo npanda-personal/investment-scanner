@@ -105,7 +105,7 @@ export const REGISTERED_STRATEGIES: StrategyDefinition[] = [
       rule('NEAR_SMA50', 'Price is within 5% of SMA50.', 'latestPrice/sma50', 'SCORES', 0.05, 20),
       rule('RECLAIM_SMA50', 'Close reclaims or holds above SMA50 after pullback.', 'latestPrice/sma50', 'REQUIRES', true, 15),
       rule('BOUNCE_CONFIRMATION', 'Latest close confirms a bounce versus previous close.', 'latestPrice/previousClose', 'SCORES', true, 10),
-      rule('RSI_RECOVERY', 'RSI recovers above 40 and remains below overheated levels.', 'rsi', 'SCORES', '40-65', 15),
+      rule('RSI_RECOVERY', 'RSI recovers above 40 and remains below overheated levels.', 'rsi', 'SCORES', '40-60', 15),
     ],
     exitRules: COMMON_LONG_EXIT_RULES,
     invalidationRules: [...COMMON_LONG_INVALIDATION_RULES, rule('RECLAIM_FAILED', 'Invalidate pullback if price fails to reclaim SMA50.', 'latestPrice/sma50', 'BLOCKS')],
@@ -250,7 +250,7 @@ export const REGISTERED_STRATEGIES: StrategyDefinition[] = [
       rule('FOO_GATE', 'Requires derivativesEligible=true; cash-only instruments cannot be short-reviewed.', 'derivativesEligible', 'REQUIRES', true),
     ],
     marketGateRules: [rule('RISK_OFF_OR_SELECTIVE', 'Market gate should be selective or closed (short-review is counter-trend; blocked in strong risk-on).', 'marketRegime', 'REQUIRES', 'RISK_OFF|SELECTIVE')],
-    parameters: { minScore: 70, backtestEntryRule: 'SIGNAL_DIRECTION_BEARISH', backtestExitRule: 'PRICE_ABOVE_SMA50', maxHoldingDays: 90, trailingStopPercent: 0.1, requiresDerivativesEligible: true },
+    parameters: { minScore: 65, backtestEntryRule: 'SIGNAL_DIRECTION_BEARISH', backtestExitRule: 'PRICE_ABOVE_SMA50', maxHoldingDays: 90, trailingStopPercent: 0.1, requiresDerivativesEligible: true },
     explanationTemplate: 'Triggered when bearish trend, signal strength, and F&O eligibility align for a short-review setup.',
     examples: {
       triggers: ['Price below SMA50/SMA200 with bearish signal and derivatives-eligible instrument.'],

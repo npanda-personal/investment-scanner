@@ -130,6 +130,13 @@ export interface StrategyContext {
     unrealizedPnLPercent?: number | null;
     allocationPercent?: number | null;
   } | null;
+  /**
+   * Whether the instrument is eligible for F&O / derivatives (required for short-entry strategies).
+   * Populated by toStrategyFrameworkContext from ctx.instrument.derivativesEligible or
+   * ctx.instrument.derivatives_eligible.  null means eligibility was not available in the
+   * instrument record; false means explicitly cash-only.
+   */
+  derivativesEligible?: boolean | null;
   backtestDate?: string | null;
   executionAssumptions?: Record<string, unknown>;
 }
