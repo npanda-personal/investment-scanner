@@ -70,11 +70,13 @@ const TODAY_REVIEW_SCHEDULED_STAGE_VERSION = 'scheduled-today-review-v2';
 const SIGNAL_POSITION_LEDGER_SCHEDULED_STAGE_VERSION = 'scheduled-signal-position-ledger-v1';
 const SECTOR_INTELLIGENCE_SCHEDULED_STAGE_VERSION = 'scheduled-sector-intelligence-v1';
 const EARNINGS_INTELLIGENCE_SCHEDULED_STAGE_VERSION = 'scheduled-earnings-intelligence-v1';
+const MARKET_CONTEXT_SNAPSHOT_SCHEDULED_STAGE_VERSION = 'scheduled-market-context-snapshot-v1';
 const SCHEDULED_DOWNSTREAM_STAGE_KEYS = [
   'DATA_QUALITY',
   'RAW_SIGNALS',
   'SIGNAL_CALIBRATION',
   'MARKET_CONTEXT',
+  'MARKET_CONTEXT_SNAPSHOT_REFRESH',
   'SMART_MONEY',
   'CONTEXT_SNAPSHOTS',
   'SIGNAL_QUALITY',
@@ -136,6 +138,7 @@ const PIPELINE_COMMAND_POLICIES: PipelineCommandPolicy[] = [
   commandPolicy('SIGNAL_CALIBRATION_REFRESH_SCOPE', 'SIGNAL_CALIBRATION', 4, 'Signal Calibration', 'Calibration refresh', 'DEFERRED', 'Manual command is deferred; scheduler-only persisted-signal automation is active.'),
   commandPolicy('CONTEXT_SNAPSHOTS_GENERATE_SCOPE', 'CONTEXT_SNAPSHOTS', 5, 'Context Snapshots', 'Historical context snapshot generation', 'DEFERRED', 'Manual command is deferred; scheduler-only persisted-context automation is active.'),
   commandPolicy('MARKET_CONTEXT_REFRESH_REGION', 'MARKET_CONTEXT', 6, 'Market Context', 'Market context refresh', 'DEFERRED', 'Manual command is deferred; scheduler-only market-context automation is active.'),
+  commandPolicy('MARKET_CONTEXT_SNAPSHOT_REFRESH', 'MARKET_CONTEXT_SNAPSHOT_REFRESH', 6, 'Market Context', 'Market Context regime snapshot persist', 'DEFERRED', 'Manual command deferred; scheduler-only regime snapshot automation is active.'),
   commandPolicy('MARKET_PULSE_REFRESH', 'MARKET_PULSE', 7, 'Market Context', 'Market Pulse snapshot refresh', 'ENABLED', null),
   commandPolicy('SECTOR_INTELLIGENCE_REFRESH', 'SECTOR_INTELLIGENCE_REFRESH', 7, 'Market Context', 'Sector intelligence snapshot refresh', 'ENABLED', null),
   commandPolicy('SIGNAL_QUALITY_DIAGNOSTICS_REFRESH', 'SIGNAL_QUALITY', 7, 'Signal Quality', 'Signal quality diagnostics refresh', 'DEFERRED', 'Manual command is deferred; scheduler-only diagnostics refresh is active.'),
@@ -3395,6 +3398,41 @@ export class PipelineOrchestrationService {
     }, now);
 
     if (response.status === 'COMPLETED') {
+      response.downstream = await this.runScheduledMarketContextSnapshotStage({
+        ...request,
+        sourceFingerprint: response.outputFingerprint || request.sourceFingerprint,
+        upstreamStageRunId: response.stageRunId,
+      }).catch((error) => this.logScheduledDownstreamFailure('Market Context Snapshot', response.stageKey, request, error));
+    }
+    return response;
+  }
+
+  async runScheduledMarketContextSnapshotStage(request: ScheduledPipelineStageRequest, now = new Date()): Promise<ScheduledPipelineStageResponse> {
+    const response = await this.runScheduledPipelineStage(request, {
+      stageKey: 'MARKET_CONTEXT_SNAPSHOT_REFRESH',
+      stageOrder: 6,
+      stageSlug: 'scheduled-market-context-snapshot',
+      stageVersion: MARKET_CONTEXT_SNAPSHOT_SCHEDULED_STAGE_VERSION,
+      sourceStage: 'MARKET_CONTEXT',
+      adapter: 'MarketContextIntelligenceService.runAsOf',
+    }, async ({ normalizedScope }) => {
+      // Persist today's regime snapshot so historical lookups by date work for backtests.
+      // This calls runAsOf with no asOf → uses today as snapshotDate (same as run()).
+      const result = await this.marketContextService.runAsOf(normalizedScope.region, undefined);
+      const succeeded = result?.status === 'success';
+      return {
+        totalCount: 1,
+        processedCount: 1,
+        succeededCount: succeeded ? 1 : 0,
+        failedCount: succeeded ? 0 : 1,
+        skippedCount: 0,
+        unchangedCount: 0,
+        errors: succeeded ? [] : ['Market Context Snapshot persist did not report success.'],
+        metadata: { adapterStatus: result?.status ?? null },
+      };
+    }, now);
+
+    if (response.status === 'COMPLETED' || response.status === 'PARTIAL' || response.status === 'SKIPPED') {
       response.downstream = await this.runScheduledSmartMoneyStage({
         ...request,
         sourceFingerprint: response.outputFingerprint || request.sourceFingerprint,

@@ -326,8 +326,10 @@ export class MarketContextIntelligenceRepository {
     };
   }
 
-  async saveSnapshot(summary: MarketContextSummary, region: string = 'GLOBAL'): Promise<void> {
-    const today = new Date();
+  async saveSnapshot(summary: MarketContextSummary, region: string = 'GLOBAL', asOf?: Date): Promise<void> {
+    // When asOf is provided, persist the snapshot under that historical date (point-in-time).
+    // When omitted, use today (existing behaviour for scheduled/live runs).
+    const today = asOf ? new Date(asOf) : new Date();
     today.setUTCHours(0, 0, 0, 0);
 
     await this.db.$transaction([

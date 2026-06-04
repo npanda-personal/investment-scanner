@@ -36,15 +36,28 @@ export class MarketContextIntelligenceService {
   ) {}
 
   async run(region?: string): Promise<{ status: string }> {
-    const [items, signals] = await Promise.all([this.loadContextInstruments(region), this.loadSignalMap(region)]);
+    return this.runAsOf(region, undefined);
+  }
+
+  /**
+   * Generate + persist a MarketContextSnapshot.
+   * When `asOf` is set, all price data is sliced to <= asOf (point-in-time, no look-ahead)
+   * and the snapshot is stored with snapshotDate = asOf instead of today.
+   * When `asOf` is omitted the behaviour is identical to the previous `run()` method.
+   */
+  async runAsOf(region?: string, asOf?: Date): Promise<{ status: string }> {
+    const [items, signals] = await Promise.all([
+      this.loadContextInstruments(region, asOf),
+      this.loadSignalMap(region),
+    ]);
     const enriched = items.map((item) => ({ ...item, ...signals.get(item.instrumentId) }));
-    
+
     const regime = this.calculateRegime(enriched);
     const sectors = this.rankSectors(enriched);
     const breadth = this.calculateBreadth(enriched);
     const countries = this.rankCountries(enriched);
     const macro = this.macro();
-    
+
     const summary: MarketContextSummary = {
       regime,
       topSectors: sectors.slice(0, 5),
@@ -53,11 +66,13 @@ export class MarketContextIntelligenceService {
       countryStrength: countries.slice(0, 8),
       macro,
       explanation: this.takeaways(regime, sectors, breadth, macro),
-      updatedAt: new Date().toISOString(),
+      updatedAt: (asOf ?? new Date()).toISOString(),
       dataStatus: items.length >= 30 ? 'PARTIAL' : items.length > 0 ? 'PARTIAL' : 'MISSING',
     };
 
-    await this.repository.saveSnapshot(summary, region || 'GLOBAL');
+    // When asOf is set, persist the snapshot under that historical date so downstream
+    // consumers (backtests, quality-lab by-regime) can look it up by date.
+    await this.repository.saveSnapshot(summary, region || 'GLOBAL', asOf);
     return { status: 'success' };
   }
 
@@ -366,11 +381,16 @@ export class MarketContextIntelligenceService {
 
 
 
-  private async loadContextInstruments(region?: string): Promise<ContextInstrument[]> {
+  private async loadContextInstruments(region?: string, asOf?: Date): Promise<ContextInstrument[]> {
     const response = await this.marketDataService.listInstruments({ page: 1, pageSize: SAMPLE_SIZE, region });
     const instruments = response.instruments || [];
+    // When asOf is set, cap price history to that date so no future prices leak in.
+    // listPricesByInstrumentId(id, limit, startDate?, endDate?) — pass asOf as endDate.
+    const endDate = asOf ? this.startOfUtcDay(asOf) : undefined;
     const rows = await Promise.all(instruments.map(async (instrument: any) => {
-      const pricesResponse = await this.marketDataService.listPricesByInstrumentId(instrument.id, 260).catch(() => null);
+      const pricesResponse = await this.marketDataService
+        .listPricesByInstrumentId(instrument.id, 260, undefined, endDate)
+        .catch(() => null);
       const prices = (pricesResponse?.prices || [])
         .map((price: any) => Number(price.adjusted_close ?? price.close))
         .filter((value: number) => Number.isFinite(value));

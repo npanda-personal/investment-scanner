@@ -148,7 +148,7 @@ describe('MarketContextIntelligenceService', () => {
     expect(repository.saveSnapshot).toHaveBeenCalledWith(expect.objectContaining({
       regime: expect.any(Object),
       breadth: expect.any(Object),
-    }), 'IN');
+    }), 'IN', undefined);
   });
 
   it('summary loads the requested region and re-reads that region after generation', async () => {
@@ -180,7 +180,7 @@ describe('MarketContextIntelligenceService', () => {
 
     expect(repository.latestSnapshot).toHaveBeenNthCalledWith(1, 'IN');
     expect(repository.latestSnapshot).toHaveBeenNthCalledWith(2, 'IN');
-    expect(repository.saveSnapshot).toHaveBeenCalledWith(expect.any(Object), 'IN');
+    expect(repository.saveSnapshot).toHaveBeenCalledWith(expect.any(Object), 'IN', undefined);
     expect(result).toBe(summary);
   });
 

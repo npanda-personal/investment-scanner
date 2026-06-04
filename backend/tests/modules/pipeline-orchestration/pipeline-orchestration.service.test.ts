@@ -3244,6 +3244,7 @@ describe('PipelineOrchestrationService', () => {
     });
     const marketContext = {
       run: jest.fn().mockResolvedValue({ status: 'success' }),
+      runAsOf: jest.fn().mockResolvedValue({ status: 'success' }),
       refreshSectorSnapshots: jest.fn().mockResolvedValue({
         totalCount: 2,
         processedCount: 2,
@@ -3399,6 +3400,7 @@ describe('PipelineOrchestrationService', () => {
     expect(calibration?.stageKey).toBe('SIGNAL_CALIBRATION');
     expect(downstreamKeys).toEqual([
       'MARKET_CONTEXT',
+      'MARKET_CONTEXT_SNAPSHOT_REFRESH',
       'SMART_MONEY',
       'CONTEXT_SNAPSHOTS',
       'SIGNAL_QUALITY',
@@ -4020,7 +4022,7 @@ describe('PipelineOrchestrationService', () => {
       {} as any,
       {} as any,
       {} as any,
-      { run: marketRun } as any,
+      { run: marketRun, runAsOf: jest.fn().mockResolvedValue({ status: 'success' }) } as any,
       {} as any,
       {} as any,
       {} as any,
@@ -4028,24 +4030,25 @@ describe('PipelineOrchestrationService', () => {
       {} as any,
       {} as any
     );
-    const downstream = {
+    const snapshotDownstream = {
       status: 'COMPLETED',
-      pipelineRunId: 'run-smart-money',
-      stageRunId: 'stage-smart-money',
-      stageKey: 'SMART_MONEY',
+      pipelineRunId: 'run-mcs',
+      stageRunId: 'stage-mcs',
+      stageKey: 'MARKET_CONTEXT_SNAPSHOT_REFRESH',
       scope: { region: 'IN', assetType: 'STOCK', timeframe: '1d', pipelineKey: 'market-intelligence' },
       triggerType: 'scheduled',
       dataThroughDate: '2026-05-25',
-      inputFingerprint: 'smart-money-input',
-      outputFingerprint: 'smart-money-output',
+      inputFingerprint: 'mcs-input',
+      outputFingerprint: 'mcs-output',
       batch: { totalInstrumentCount: 2, processedCount: 2, batchSize: 2, nextOffset: null, hasMore: false },
-      counts: { totalCount: 2, processedCount: 2, succeededCount: 2, partialCount: 0, failedCount: 0, skippedCount: 0, unchangedCount: 0 },
+      counts: { totalCount: 1, processedCount: 1, succeededCount: 1, partialCount: 0, failedCount: 0, skippedCount: 0, unchangedCount: 0 },
       warnings: [],
       errors: [],
       startedAt: '2026-05-25T03:00:04.000Z',
       completedAt: '2026-05-25T03:00:05.000Z',
     } as any;
-    const smartMoneySpy = jest.spyOn(service, 'runScheduledSmartMoneyStage').mockResolvedValue(downstream);
+    const snapshotSpy = jest.spyOn(service, 'runScheduledMarketContextSnapshotStage').mockResolvedValue(snapshotDownstream);
+    const smartMoneySpy = jest.spyOn(service, 'runScheduledSmartMoneyStage');
 
     const response = await service.runScheduledMarketContextStage({
       region: 'IN',
@@ -4063,13 +4066,15 @@ describe('PipelineOrchestrationService', () => {
 
     expect(response.status).toBe('COMPLETED');
     expect(response.stageKey).toBe('MARKET_CONTEXT');
-    expect(response.downstream?.stageKey).toBe('SMART_MONEY');
+    expect(response.downstream?.stageKey).toBe('MARKET_CONTEXT_SNAPSHOT_REFRESH');
     expect(marketRun).toHaveBeenCalledWith('IN');
-    expect(smartMoneySpy).toHaveBeenCalledWith(expect.objectContaining({
+    expect(snapshotSpy).toHaveBeenCalledWith(expect.objectContaining({
       sourceFingerprint: 'market-context-output',
       changedInstrumentIds: ['stock-2', 'stock-1'],
       upstreamStageRunId: 'stage-market-context',
     }));
+    // smartMoneySpy is not called directly from runScheduledMarketContextStage anymore
+    expect(smartMoneySpy).not.toHaveBeenCalled();
     expect(repository.upsertStage).toHaveBeenCalledWith(expect.objectContaining({
       stageKey: 'MARKET_CONTEXT',
       stageOrder: 6,
