@@ -128,3 +128,40 @@ export interface PortfolioTransactionDto {
   updatedAt: string;
 }
 
+// ── Portfolio "what changed" diff ─────────────────────────────────────────────
+
+export interface HoldingSignalFlip {
+  holdingId: string;
+  instrumentId: string;
+  symbol: string;
+  companyName: string | null;
+  priorDirection: string;
+  currentDirection: string;
+  priorScore: number;
+  currentScore: number;
+  currentSignalDate: string;
+  note: string;
+}
+
+export interface HoldingLossCrossing {
+  holdingId: string;
+  instrumentId: string;
+  symbol: string;
+  companyName: string | null;
+  averageCost: number;
+  currentPrice: number;
+  unrealizedPnLPercent: number;
+  thresholdPercent: number;
+  note: string;
+}
+
+export interface PortfolioChangesDto {
+  portfolioId: string;
+  referenceNote: string;
+  signalFlips: HoldingSignalFlip[];
+  lossCrossings: HoldingLossCrossing[];
+  marketGateChange: { from: string; to: string } | null;
+  warnings: string[];
+  generatedAt: string;
+}
+

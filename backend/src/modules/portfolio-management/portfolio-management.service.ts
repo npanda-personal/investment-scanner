@@ -7,8 +7,11 @@ import type {
   CreateHoldingRequest,
   CreatePortfolioRequest,
   CreateTransactionRequest,
+  HoldingLossCrossing,
+  HoldingSignalFlip,
   HoldingValuationDto,
   PortfolioAllocationDto,
+  PortfolioChangesDto,
   PortfolioSummaryDto,
   UpdateHoldingRequest,
   UpdatePortfolioRequest,
@@ -134,6 +137,110 @@ export class PortfolioManagementService {
       if (!instrument) throw new Error('Instrument not found');
     }
     return this.repository.createTransaction(portfolioId, input);
+  }
+
+  /**
+   * Diffs persisted signals and prices for each holding to surface what changed.
+   * Persisted-read only — never recomputes signals live.
+   *
+   * @param lossThresholdPercent  Fraction loss below average cost that triggers a crossing alert.
+   *                              Default -0.10 (-10%).
+   */
+  async portfolioChanges(
+    portfolioId: string,
+    userId = 'default-user',
+    lossThresholdPercent = -0.10,
+  ): Promise<PortfolioChangesDto | null> {
+    const portfolio = await this.repository.getPortfolio(portfolioId, userId);
+    if (!portfolio) return null;
+
+    const holdings = await this.repository.listHoldings(portfolioId);
+    if (holdings.length === 0) {
+      return {
+        portfolioId,
+        referenceNote: 'Portfolio has no holdings.',
+        signalFlips: [],
+        lossCrossings: [],
+        marketGateChange: null,
+        warnings: [],
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const signalFlips: HoldingSignalFlip[] = [];
+    const lossCrossings: HoldingLossCrossing[] = [];
+    const warnings: string[] = [];
+    let anyHasPrior = false;
+    let anyLacksPrior = false;
+
+    await Promise.all(holdings.map(async (holding) => {
+      // --- Signal direction flip detection (persisted read) ---
+      const signals = await this.repository.twoMostRecentSignals(holding.instrumentId).catch(() => []);
+      if (signals.length >= 2) {
+        anyHasPrior = true;
+        const [current, prior] = signals;
+        if (current.direction !== prior.direction) {
+          signalFlips.push({
+            holdingId: holding.id,
+            instrumentId: holding.instrumentId,
+            symbol: holding.symbol,
+            companyName: holding.companyName,
+            priorDirection: prior.direction,
+            currentDirection: current.direction,
+            priorScore: prior.score,
+            currentScore: current.score,
+            currentSignalDate: current.generatedAt.toISOString(),
+            note: `Signal direction changed from ${prior.direction} to ${current.direction} (score: ${prior.score.toFixed(0)} → ${current.score.toFixed(0)}).`,
+          });
+        }
+      } else {
+        // 0 or 1 signals — no prior to compare
+        anyLacksPrior = true;
+      }
+
+      // --- Loss threshold crossing (persisted price read) ---
+      const priceRow = await this.repository.latestPrice(holding.instrumentId).catch(() => null);
+      const currentPrice = priceRow?.adjustedClose ?? priceRow?.close ?? null;
+      if (currentPrice !== null && holding.averageCost > 0) {
+        const pnlPct = (currentPrice - holding.averageCost) / holding.averageCost;
+        if (pnlPct <= lossThresholdPercent) {
+          lossCrossings.push({
+            holdingId: holding.id,
+            instrumentId: holding.instrumentId,
+            symbol: holding.symbol,
+            companyName: holding.companyName,
+            averageCost: holding.averageCost,
+            currentPrice,
+            unrealizedPnLPercent: pnlPct,
+            thresholdPercent: lossThresholdPercent,
+            note: `Holding has declined ${(pnlPct * 100).toFixed(1)}% from average cost of ${holding.averageCost.toFixed(2)}.`,
+          });
+        }
+      }
+    }));
+
+    let referenceNote: string;
+    if (!anyHasPrior && anyLacksPrior) {
+      referenceNote = 'No prior persisted signal to compare yet; run the signal pipeline to establish a baseline.';
+    } else if (anyLacksPrior) {
+      referenceNote = 'Diff is based on the two most-recent persisted signal rows per holding. Some holdings lack a prior signal for comparison.';
+    } else {
+      referenceNote = 'Diff is based on the two most-recent persisted signal rows per holding instrument.';
+    }
+
+    if (warnings.length === 0 && signalFlips.length === 0 && lossCrossings.length === 0 && anyHasPrior) {
+      warnings.push('No signal direction changes or loss threshold crossings detected since the prior persisted signal run.');
+    }
+
+    return {
+      portfolioId,
+      referenceNote,
+      signalFlips,
+      lossCrossings,
+      marketGateChange: null, // portfolio-level gate change is surfaced via research-hub; not duplicated here
+      warnings,
+      generatedAt: new Date().toISOString(),
+    };
   }
 
   async valueHolding(holding: any): Promise<HoldingValuationDto> {

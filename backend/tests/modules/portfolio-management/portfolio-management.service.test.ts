@@ -28,11 +28,13 @@ const createService = (overrides: any = {}) => {
   const repository = {
     getPortfolio: jest.fn().mockResolvedValue(portfolio),
     listHoldings: jest.fn().mockResolvedValue([holding]),
-    createPortfolio: jest.fn(async (input) => ({ ...portfolio, ...input })),
+    createPortfolio: jest.fn(async (input: any) => ({ ...portfolio, ...input })),
     listPortfolios: jest.fn().mockResolvedValue([portfolio]),
-    addHolding: jest.fn(async (_portfolioId, input) => ({ ...holding, ...input })),
+    addHolding: jest.fn(async (_portfolioId: any, input: any) => ({ ...holding, ...input })),
     listTransactions: jest.fn().mockResolvedValue([]),
-    createTransaction: jest.fn(async (_portfolioId, input) => ({ id: 'transaction-1', portfolioId: 'portfolio-1', ...input })),
+    createTransaction: jest.fn(async (_portfolioId: any, input: any) => ({ id: 'transaction-1', portfolioId: 'portfolio-1', ...input })),
+    twoMostRecentSignals: jest.fn().mockResolvedValue([]),
+    latestPrice: jest.fn().mockResolvedValue(null),
     ...overrides.repository,
   };
   const marketDataService = {
@@ -135,5 +137,155 @@ describe('PortfolioManagementService', () => {
     });
 
     expect(repository.createTransaction).toHaveBeenCalledTimes(2);
+  });
+
+  // ── portfolioChanges tests ─────────────────────────────────────────────────
+
+  describe('portfolioChanges', () => {
+    const makeSignalRow = (direction: string, score: number, daysAgo: number) => ({
+      id: `sig-${direction}-${daysAgo}`,
+      direction,
+      score,
+      generatedAt: new Date(Date.now() - daysAgo * 86400_000),
+    });
+
+    it('detects a signal direction flip from persisted data', async () => {
+      const { service } = createService({
+        repository: {
+          twoMostRecentSignals: jest.fn().mockResolvedValue([
+            makeSignalRow('BEARISH', 35, 0),   // current
+            makeSignalRow('BULLISH', 78, 1),    // prior
+          ]),
+          latestPrice: jest.fn().mockResolvedValue({ adjustedClose: 85, close: 85 }),
+        },
+      });
+
+      const result = await service.portfolioChanges('portfolio-1');
+
+      expect(result).not.toBeNull();
+      expect(result!.signalFlips).toHaveLength(1);
+      expect(result!.signalFlips[0].symbol).toBe('ABC');
+      expect(result!.signalFlips[0].priorDirection).toBe('BULLISH');
+      expect(result!.signalFlips[0].currentDirection).toBe('BEARISH');
+      // Research-support language: must not mention buy/sell in notes
+      expect(result!.signalFlips[0].note.toLowerCase()).not.toMatch(/\b(buy|sell|purchase|order)\b/);
+    });
+
+    it('detects a loss threshold crossing', async () => {
+      // averageCost = 80, currentPrice = 65 → -18.75% < -10% threshold
+      const { service } = createService({
+        repository: {
+          twoMostRecentSignals: jest.fn().mockResolvedValue([
+            makeSignalRow('BULLISH', 72, 0),
+            makeSignalRow('BULLISH', 75, 1),
+          ]),
+          latestPrice: jest.fn().mockResolvedValue({ adjustedClose: 65, close: 65 }),
+        },
+      });
+
+      const result = await service.portfolioChanges('portfolio-1', 'default-user', -0.10);
+
+      expect(result).not.toBeNull();
+      expect(result!.lossCrossings).toHaveLength(1);
+      expect(result!.lossCrossings[0].symbol).toBe('ABC');
+      expect(result!.lossCrossings[0].unrealizedPnLPercent).toBeLessThan(-0.10);
+      expect(result!.lossCrossings[0].note.toLowerCase()).not.toMatch(/\b(buy|sell|purchase|order)\b/);
+    });
+
+    it('returns no flips when direction is unchanged between the two persisted signals', async () => {
+      const { service } = createService({
+        repository: {
+          twoMostRecentSignals: jest.fn().mockResolvedValue([
+            makeSignalRow('BULLISH', 80, 0),
+            makeSignalRow('BULLISH', 75, 1),
+          ]),
+          latestPrice: jest.fn().mockResolvedValue({ adjustedClose: 85, close: 85 }),
+        },
+      });
+
+      const result = await service.portfolioChanges('portfolio-1');
+
+      expect(result!.signalFlips).toHaveLength(0);
+    });
+
+    it('returns empty with honest note when only one persisted signal exists (no prior to compare)', async () => {
+      const { service } = createService({
+        repository: {
+          twoMostRecentSignals: jest.fn().mockResolvedValue([
+            makeSignalRow('BULLISH', 80, 0),
+          ]),
+          latestPrice: jest.fn().mockResolvedValue({ adjustedClose: 85, close: 85 }),
+        },
+      });
+
+      const result = await service.portfolioChanges('portfolio-1');
+
+      expect(result).not.toBeNull();
+      expect(result!.signalFlips).toHaveLength(0);
+      // Honest note — references "prior" somewhere, does not fabricate a diff
+      expect(result!.referenceNote.toLowerCase()).toContain('prior');
+    });
+
+    it('returns empty with honest note when no signals exist at all', async () => {
+      const { service } = createService({
+        repository: {
+          twoMostRecentSignals: jest.fn().mockResolvedValue([]),
+          latestPrice: jest.fn().mockResolvedValue(null),
+        },
+      });
+
+      const result = await service.portfolioChanges('portfolio-1');
+
+      expect(result).not.toBeNull();
+      expect(result!.signalFlips).toHaveLength(0);
+      expect(result!.lossCrossings).toHaveLength(0);
+      expect(result!.referenceNote.toLowerCase()).toContain('no prior persisted signal');
+    });
+
+    it('returns null when portfolio is not found', async () => {
+      const { service } = createService({
+        repository: {
+          getPortfolio: jest.fn().mockResolvedValue(null),
+        },
+      });
+
+      const result = await service.portfolioChanges('nonexistent', 'default-user');
+      expect(result).toBeNull();
+    });
+
+    it('does not recompute signals live — reads from repository only', async () => {
+      const signalServiceMock = { latestForInstrument: jest.fn() };
+      const { service } = createService({
+        signalService: signalServiceMock,
+        repository: {
+          twoMostRecentSignals: jest.fn().mockResolvedValue([
+            makeSignalRow('BULLISH', 80, 0),
+            makeSignalRow('NEUTRAL', 50, 1),
+          ]),
+          latestPrice: jest.fn().mockResolvedValue({ adjustedClose: 85, close: 85 }),
+        },
+      });
+
+      await service.portfolioChanges('portfolio-1');
+
+      // Signal generation service must NOT be called
+      expect(signalServiceMock.latestForInstrument).not.toHaveBeenCalled();
+    });
+
+    it('does not contain buy/sell language anywhere in the output', async () => {
+      const { service } = createService({
+        repository: {
+          twoMostRecentSignals: jest.fn().mockResolvedValue([
+            makeSignalRow('BEARISH', 30, 0),
+            makeSignalRow('BULLISH', 80, 1),
+          ]),
+          latestPrice: jest.fn().mockResolvedValue({ adjustedClose: 60, close: 60 }),
+        },
+      });
+
+      const result = await service.portfolioChanges('portfolio-1');
+      const json = JSON.stringify(result).toLowerCase();
+      expect(json).not.toMatch(/\b(buy|sell|purchase|order)\b/);
+    });
   });
 });

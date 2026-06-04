@@ -18,6 +18,7 @@ export const createPortfolioManagementRouter = (
   router.delete('/portfolios/:id/holdings/:holdingId', controller.removeHolding);
   router.get('/portfolios/:id/summary', controller.summary);
   router.get('/portfolios/:id/allocation', controller.allocation);
+  router.get('/portfolios/:id/changes', controller.portfolioChanges);
   router.get('/portfolios/:id/transactions', controller.listTransactions);
   router.post('/portfolios/:id/transactions', controller.createTransaction);
 

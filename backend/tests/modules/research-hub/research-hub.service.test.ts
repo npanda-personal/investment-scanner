@@ -340,4 +340,155 @@ describe('ResearchHubService', () => {
       expect(result.marketReadiness.allowedActions).toEqual([]);
     });
   });
+
+  // ── whatChanged diff tests ──────────────────────────────────────────────────
+
+  describe('whatChanged (real diff)', () => {
+    const makePriorOverview = (tradeCandidates: any[], marketGate = 'OPEN') => ({
+      metadata: {
+        version: 'research-overview-v1',
+        overview: {
+          researchPriorities: { tradeCandidates, watchCandidates: [], avoidCandidates: [], exitCandidates: [] },
+          marketReadiness: { marketGate },
+          whatChanged: { newTradeCandidates: [], downgradedCandidates: [], marketGateChange: null, warnings: [] },
+          dataGaps: [],
+          generatedAt: new Date(Date.now() - 86400_000).toISOString(),
+        },
+      },
+    });
+
+    const setupLiveMocks = (candidates: any[], gate = 'OPEN') => {
+      strategyService.marketGate.mockResolvedValue({ marketGate: gate, marketCondition: 'HEALTHY', reasons: [], blockers: [], allowedActions: [], dataStatus: 'COMPLETE' } as any);
+      strategyService.candidates.mockResolvedValue({ results: candidates } as any);
+      strategyService.exits.mockResolvedValue([] as any);
+      signalService.funnelDiagnostics.mockResolvedValue({ total: 0, bullish: 0, bearish: 0, neutral: 0, byDirection: {} } as any);
+      smartMoneyService.top.mockResolvedValue({ results: [], total: 0 } as any);
+      strategyFrameworkService.performance.mockResolvedValue([{ timeframe: '3Y', cagr: 0.1, maxDrawdown: -0.1, sharpe: 1, winRate: 0.6, profitFactor: 1.5, tradeCount: 30, ratingGrade: 'GOOD', generatedAt: new Date().toISOString() }] as any);
+    };
+
+    it('detects a new trade candidate that was absent from the prior snapshot', async () => {
+      const priorCandidates: any[] = [];
+      const currentCandidate = {
+        instrumentId: 'inst-1', symbol: 'RELIANCE', strategy: 'TREND_MOMENTUM', strategyVersion: '1.0',
+        frameworkBacked: true, decision: 'TRADE_CANDIDATE', action: 'CONSIDER_ENTRY',
+        decisionScore: 85, confidence: 'HIGH', marketGate: 'OPEN', marketCondition: 'HEALTHY',
+        reasons: ['Breakout'], blockers: [], warnings: [], dataGaps: [], modelVersion: 'sdv1',
+        generatedAt: new Date().toISOString(),
+      };
+      setupLiveMocks([currentCandidate]);
+
+      const db = {
+        pipelineRun: {
+          // With live: true, loadCachedOverview is NOT called.
+          // saveCachedOverview is also NOT called (only refreshOverview does that).
+          // The only findFirst call is loadPriorOverview.
+          findFirst: jest.fn().mockResolvedValue(makePriorOverview(priorCandidates)),
+          upsert: jest.fn().mockResolvedValue({}),
+        },
+      };
+
+      const svc = new ResearchHubService(strategyService, contextService, signalService, smartMoneyService, strategyFrameworkService, db as any);
+      const result = await svc.overview({ live: true });
+
+      expect(result.whatChanged.newTradeCandidates).toContain('RELIANCE');
+      expect(result.whatChanged.downgradedCandidates).toHaveLength(0);
+      expect(result.whatChanged.marketGateChange).toBeNull();
+      // Must not fabricate — only what the diff found
+      expect(result.whatChanged.newTradeCandidates).toHaveLength(1);
+    });
+
+    it('detects a downgraded candidate that fell out of trade candidates', async () => {
+      const priorCandidate = {
+        instrumentId: 'inst-2', symbol: 'INFY', strategy: 'TREND_MOMENTUM',
+        frameworkBacked: true, decision: 'TRADE_CANDIDATE', action: 'CONSIDER_ENTRY',
+        decisionScore: 80, confidence: 'HIGH', marketGate: 'OPEN', marketCondition: 'HEALTHY',
+        reasons: ['Was strong'], blockers: [], warnings: [], dataGaps: [],
+        backtestSummary: { ratingGrade: 'GOOD', timeframe: '3Y', tradeCount: 30, availabilityStatus: 'AVAILABLE', generatedAt: new Date().toISOString(), cagr: 0.1, maxDrawdown: -0.1, sharpe: 1, winRate: 0.6, profitFactor: 1.5 },
+        proofWarnings: [], primaryNextAction: 'Review', targetRoute: '/s', strategyRoute: '/sr',
+        modelVersion: 'sdv1', generatedAt: new Date().toISOString(),
+      };
+      // Current: no trade candidates (the stock fell out)
+      setupLiveMocks([]);
+
+      const db = {
+        pipelineRun: {
+          findFirst: jest.fn().mockResolvedValue(makePriorOverview([priorCandidate])),
+          upsert: jest.fn().mockResolvedValue({}),
+        },
+      };
+
+      const svc = new ResearchHubService(strategyService, contextService, signalService, smartMoneyService, strategyFrameworkService, db as any);
+      const result = await svc.overview({ live: true });
+
+      expect(result.whatChanged.downgradedCandidates).toContain('INFY');
+      expect(result.whatChanged.newTradeCandidates).toHaveLength(0);
+    });
+
+    it('detects a market gate change between snapshots', async () => {
+      const priorCandidate = {
+        instrumentId: 'inst-3', symbol: 'TCS', strategy: 'TREND_MOMENTUM',
+        frameworkBacked: true, decision: 'TRADE_CANDIDATE', action: 'CONSIDER_ENTRY',
+        decisionScore: 85, confidence: 'HIGH', marketGate: 'OPEN', marketCondition: 'HEALTHY',
+        reasons: [], blockers: [], warnings: [], dataGaps: [],
+        backtestSummary: { ratingGrade: 'GOOD', timeframe: '3Y', tradeCount: 30, availabilityStatus: 'AVAILABLE', generatedAt: new Date().toISOString(), cagr: 0.1, maxDrawdown: -0.1, sharpe: 1, winRate: 0.6, profitFactor: 1.5 },
+        proofWarnings: [], primaryNextAction: 'Review', targetRoute: '/s', strategyRoute: '/sr',
+        modelVersion: 'sdv1', generatedAt: new Date().toISOString(),
+      };
+      // Now gate is CLOSED
+      setupLiveMocks([], 'CLOSED');
+
+      const db = {
+        pipelineRun: {
+          findFirst: jest.fn().mockResolvedValue(makePriorOverview([priorCandidate], 'OPEN')),
+          upsert: jest.fn().mockResolvedValue({}),
+        },
+      };
+
+      const svc = new ResearchHubService(strategyService, contextService, signalService, smartMoneyService, strategyFrameworkService, db as any);
+      const result = await svc.overview({ live: true });
+
+      expect(result.whatChanged.marketGateChange).toEqual({ from: 'OPEN', to: 'CLOSED' });
+    });
+
+    it('returns empty arrays with honest note when no prior snapshot exists — does not fabricate', async () => {
+      setupLiveMocks([{
+        instrumentId: 'inst-4', symbol: 'WIPRO', strategy: 'TREND_MOMENTUM', strategyVersion: '1.0',
+        frameworkBacked: true, decision: 'TRADE_CANDIDATE', action: 'CONSIDER_ENTRY',
+        decisionScore: 90, confidence: 'HIGH', marketGate: 'OPEN', marketCondition: 'HEALTHY',
+        reasons: [], blockers: [], warnings: [], dataGaps: [], modelVersion: 'sdv1',
+        generatedAt: new Date().toISOString(),
+      }]);
+
+      const db = {
+        pipelineRun: {
+          // No prior snapshot exists → loadPriorOverview returns null
+          findFirst: jest.fn().mockResolvedValue(null),
+          upsert: jest.fn().mockResolvedValue({}),
+        },
+      };
+
+      const svc = new ResearchHubService(strategyService, contextService, signalService, smartMoneyService, strategyFrameworkService, db as any);
+      const result = await svc.overview({ live: true });
+
+      expect(result.whatChanged.newTradeCandidates).toHaveLength(0);
+      expect(result.whatChanged.downgradedCandidates).toHaveLength(0);
+      expect(result.whatChanged.marketGateChange).toBeNull();
+      // Must have an honest note, not a fabricated list
+      expect(result.whatChanged.warnings.some(w => w.toLowerCase().includes('no prior snapshot'))).toBe(true);
+    });
+
+    it('does not contain buy/sell language in whatChanged output', async () => {
+      setupLiveMocks([]);
+      const db = {
+        pipelineRun: {
+          findFirst: jest.fn().mockResolvedValue(null),
+          upsert: jest.fn().mockResolvedValue({}),
+        },
+      };
+      const svc = new ResearchHubService(strategyService, contextService, signalService, smartMoneyService, strategyFrameworkService, db as any);
+      const result = await svc.overview({ live: true });
+      const json = JSON.stringify(result.whatChanged).toLowerCase();
+      expect(json).not.toMatch(/\b(buy|sell|purchase|order)\b/);
+    });
+  });
 });

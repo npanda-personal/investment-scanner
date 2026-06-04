@@ -123,6 +123,45 @@ export class PortfolioManagementRepository {
     return this.toTransactionDto(transaction);
   }
 
+  /**
+   * Returns the two most-recent persisted signal rows for a given instrument,
+   * ordered by generatedAt descending.  Index [0] = current, [1] = prior.
+   * Persisted-read only — never recomputes signals.
+   */
+  async twoMostRecentSignals(instrumentId: string): Promise<Array<{ id: string; direction: string; score: number; generatedAt: Date }>> {
+    const rows = await (this.db as any).signalResult.findMany({
+      where: { instrumentId },
+      orderBy: { generatedAt: 'desc' },
+      take: 2,
+      select: { id: true, direction: true, score: true, generatedAt: true },
+    });
+    return Array.isArray(rows) ? rows : [];
+  }
+
+  /**
+   * Returns the most-recent persisted price for the given instrument.
+   * Used for loss-threshold crossing detection.
+   */
+  async latestPrice(instrumentId: string): Promise<{ close: number; adjustedClose: number } | null> {
+    // Prices live in PriceTick (price_ticks), keyed by symbol/timestamp — there is
+    // no stockEodPrice model. Resolve the instrument's symbol, then read the latest tick.
+    const stock = await (this.db as any).stock.findUnique({
+      where: { id: instrumentId },
+      select: { symbol: true },
+    });
+    if (!stock?.symbol) return null;
+    const row = await (this.db as any).priceTick.findFirst({
+      where: { symbol: stock.symbol },
+      orderBy: { timestamp: 'desc' },
+      select: { close: true, adjustedClose: true },
+    });
+    if (!row) return null;
+    const close = row.close === null || row.close === undefined ? null : Number(row.close);
+    const adjustedClose = row.adjustedClose === null || row.adjustedClose === undefined ? close : Number(row.adjustedClose);
+    if (close === null) return null;
+    return { close, adjustedClose: adjustedClose ?? close };
+  }
+
   private ownerWhere(userId: string) {
     return { OR: [{ userId }, { userId: null }] };
   }

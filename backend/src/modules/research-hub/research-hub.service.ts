@@ -22,6 +22,7 @@ import type {
 
 const RESEARCH_OVERVIEW_PIPELINE_KEY = 'research-hub-overview';
 const RESEARCH_OVERVIEW_CACHE_VERSION = 'research-overview-v1';
+const RESEARCH_OVERVIEW_PRIOR_KEY_PREFIX = 'research-overview-v1-prior';
 
 export class ResearchHubService {
   constructor(
@@ -153,13 +154,13 @@ export class ResearchHubService {
       }
     };
 
-    // 4. What Changed (Simulated for MVP until snapshots are tracked for deltas)
-    const whatChanged: ResearchWhatChanged = {
-      newTradeCandidates: priorities.tradeCandidates.slice(0, 2).map(c => c.symbol || ''),
-      downgradedCandidates: [],
-      marketGateChange: null,
-      warnings: gate?.blockers?.length ? ['Market entry is restricted by active blockers.'] : [],
-    };
+    // 4. What Changed — diff against the previous persisted snapshot
+    const whatChanged: ResearchWhatChanged = await this.buildWhatChanged(
+      priorities,
+      marketReadiness,
+      region,
+      assetType,
+    );
 
     // 5. Next Actions
     const nextActions: NextAction[] = this.generateNextActions(marketReadiness, priorities, dataGaps, strategyProofSummary);
@@ -200,6 +201,55 @@ export class ResearchHubService {
   private async saveCachedOverview(region: string, assetType: string, overview: ResearchOverview): Promise<void> {
     if (typeof (this.db as any).pipelineRun?.upsert !== 'function') return;
     const idempotencyKey = [RESEARCH_OVERVIEW_CACHE_VERSION, region, assetType].join(':');
+
+    // Before overwriting, copy the current snapshot to the "prior" slot so that
+    // buildWhatChanged can diff the two most-recent materialised overviews.
+    const priorKey = [RESEARCH_OVERVIEW_PRIOR_KEY_PREFIX, region, assetType].join(':');
+    const existing = await (this.db as any).pipelineRun.findFirst({
+      where: { idempotencyKey },
+      orderBy: { updatedAt: 'desc' },
+    });
+    if (existing) {
+      await (this.db as any).pipelineRun.upsert({
+        where: { idempotencyKey: priorKey },
+        create: {
+          pipelineKey: RESEARCH_OVERVIEW_PIPELINE_KEY,
+          scopeRegion: region,
+          scopeAssetType: assetType,
+          timeframe: '1d',
+          triggerType: 'scheduled',
+          status: existing.status,
+          totalCount: existing.totalCount,
+          processedCount: existing.processedCount,
+          succeededCount: existing.succeededCount,
+          partialCount: existing.partialCount,
+          failedCount: existing.failedCount,
+          skippedCount: existing.skippedCount,
+          unchangedCount: existing.unchangedCount,
+          warnings: existing.warnings,
+          errors: existing.errors,
+          idempotencyKey: priorKey,
+          startedAt: existing.startedAt,
+          completedAt: existing.completedAt,
+          metadata: existing.metadata,
+        },
+        update: {
+          status: existing.status,
+          totalCount: existing.totalCount,
+          processedCount: existing.processedCount,
+          succeededCount: existing.succeededCount,
+          partialCount: existing.partialCount,
+          failedCount: existing.failedCount,
+          skippedCount: existing.skippedCount,
+          unchangedCount: existing.unchangedCount,
+          warnings: existing.warnings,
+          errors: existing.errors,
+          completedAt: existing.completedAt,
+          metadata: existing.metadata,
+        },
+      });
+    }
+
     await (this.db as any).pipelineRun.upsert({
       where: { idempotencyKey },
       create: {
@@ -238,6 +288,100 @@ export class ResearchHubService {
         metadata: { version: RESEARCH_OVERVIEW_CACHE_VERSION, overview } as any,
       },
     });
+  }
+
+  /**
+   * Computes a real diff between the current priorities/gate and the previous
+   * persisted research-hub snapshot.  Never fabricates — if no prior snapshot
+   * exists it returns empty arrays and an honest note.
+   */
+  private async buildWhatChanged(
+    currentPriorities: ResearchPriorities,
+    currentReadiness: MarketReadiness,
+    region: string,
+    assetType: string,
+  ): Promise<ResearchWhatChanged> {
+    const priorOverview = await this.loadPriorOverview(region, assetType);
+    if (!priorOverview) {
+      return {
+        newTradeCandidates: [],
+        downgradedCandidates: [],
+        marketGateChange: null,
+        warnings: ['No prior snapshot to compare yet; run the pipeline again to see what changed.'],
+      };
+    }
+
+    const priorTradeCandidates = priorOverview.researchPriorities?.tradeCandidates || [];
+    const currentCandidates = currentPriorities.tradeCandidates;
+
+    // Keys: instrumentId-strategy (stable enough for diff; symbol alone could collide for multi-strategy)
+    const priorKeySet = new Set<string>(
+      priorTradeCandidates.map(c => this.candidateKey(c))
+    );
+    const currentKeySet = new Set<string>(
+      currentCandidates.map(c => this.candidateKey(c))
+    );
+
+    // New: present in current but absent from prior
+    const newTradeCandidates = currentCandidates
+      .filter(c => !priorKeySet.has(this.candidateKey(c)))
+      .map(c => c.symbol || '');
+
+    // Downgraded:
+    //   (a) Was a trade candidate before, is no longer in trade candidates now
+    //   (b) Was in trade candidates before, decisionScore / readinessLabel dropped
+    const downgradedCandidates: string[] = [];
+
+    for (const priorCand of priorTradeCandidates) {
+      const key = this.candidateKey(priorCand);
+      const currentCand = currentKeySet.has(key)
+        ? currentCandidates.find(c => this.candidateKey(c) === key)
+        : undefined;
+
+      if (!currentCand) {
+        // Fell out of the actionable set entirely
+        downgradedCandidates.push(priorCand.symbol || '');
+        continue;
+      }
+
+      // Score dropped meaningfully (>= 10 points) or readiness declined
+      const scoreDrop = (priorCand.decisionScore ?? 0) - (currentCand.decisionScore ?? 0);
+      const readinessDropped =
+        this.readinessRank(priorCand.readinessLabel) > this.readinessRank(currentCand.readinessLabel);
+      if (scoreDrop >= 10 || readinessDropped) {
+        downgradedCandidates.push(currentCand.symbol || '');
+      }
+    }
+
+    // Market gate change
+    const priorGate = priorOverview.marketReadiness?.marketGate;
+    const currentGate = currentReadiness.marketGate;
+    const marketGateChange: ResearchWhatChanged['marketGateChange'] =
+      priorGate && currentGate && priorGate !== currentGate
+        ? { from: priorGate, to: currentGate }
+        : null;
+
+    const warnings: string[] = [];
+    if (currentReadiness.blockers?.length) {
+      warnings.push('Research environment has active blockers; review diagnostics.');
+    }
+
+    return { newTradeCandidates, downgradedCandidates, marketGateChange, warnings };
+  }
+
+  private candidateKey(c: ResearchPriorityCandidate): string {
+    return `${c.instrumentId || c.symbol}-${c.strategy}`;
+  }
+
+  private async loadPriorOverview(region: string, assetType: string): Promise<ResearchOverview | null> {
+    if (typeof (this.db as any).pipelineRun?.findFirst !== 'function') return null;
+    const priorKey = [RESEARCH_OVERVIEW_PRIOR_KEY_PREFIX, region, assetType].join(':');
+    const row = await (this.db as any).pipelineRun.findFirst({
+      where: { idempotencyKey: priorKey },
+      orderBy: { updatedAt: 'desc' },
+    });
+    const overview = (row?.metadata as any)?.overview;
+    return overview && typeof overview === 'object' ? overview as ResearchOverview : null;
   }
 
   private emptyOverview(dataGaps: string[]): ResearchOverview {

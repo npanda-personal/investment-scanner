@@ -14,6 +14,7 @@ describe('portfolio management routes', () => {
       removeHolding: jest.fn(),
       summary: jest.fn(),
       allocation: jest.fn(),
+      portfolioChanges: jest.fn(),
       listTransactions: jest.fn(),
       createTransaction: jest.fn(),
     };
@@ -33,6 +34,7 @@ describe('portfolio management routes', () => {
       'DELETE /portfolios/:id/holdings/:holdingId',
       'GET /portfolios/:id/summary',
       'GET /portfolios/:id/allocation',
+      'GET /portfolios/:id/changes',
       'GET /portfolios/:id/transactions',
       'POST /portfolios/:id/transactions',
     ]);

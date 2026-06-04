@@ -95,6 +95,23 @@ export class PortfolioManagementController {
     }
   };
 
+  portfolioChanges = async (req: Request, res: Response) => {
+    try {
+      const lossThreshold = req.query.lossThreshold !== undefined
+        ? parseFloat(String(req.query.lossThreshold))
+        : undefined;
+      const result = await this.service.portfolioChanges(
+        getParam(req.params.id),
+        currentUserId(req),
+        lossThreshold,
+      );
+      if (!result) return res.status(404).json({ error: 'Portfolio not found' });
+      return res.json(result);
+    } catch (error) {
+      return this.error(res, error, 'Failed to load portfolio changes');
+    }
+  };
+
   listTransactions = async (req: Request, res: Response) => {
     try {
       return res.json({ transactions: await this.service.listTransactions(getParam(req.params.id), currentUserId(req)) });
