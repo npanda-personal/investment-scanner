@@ -1,6 +1,19 @@
 /// <reference types="@types/jest" />
 import { AiInvestmentCopilotService } from '../../../src/modules/ai-investment-copilot';
 
+const createServiceWithBilling = (subscriptionService: any, overrides: any = {}) => new AiInvestmentCopilotService({
+  stockResearchService: { workbench: jest.fn().mockResolvedValue({ overview: { symbol: 'AAA', company_name: 'AAA Co', latest_price: 100 }, performance: {}, fundamentals: {} }) },
+  signalService: { latestForInstrument: jest.fn().mockResolvedValue(null) },
+  smartMoneyService: { stock: jest.fn().mockResolvedValue(null), sectors: jest.fn().mockResolvedValue([]) },
+  marketContextService: { summary: jest.fn().mockResolvedValue({ regime: { regime: 'NEUTRAL', explanation: 'neutral' }, topSectors: [], weakSectors: [], breadth: { percentAboveSma50: null, advanceDeclineRatio: null }, macro: { macroStatus: 'UNKNOWN', dataStatus: 'MISSING' } }) },
+  portfolioManagementService: { summary: jest.fn().mockResolvedValue({ numberOfHoldings: 0, totalValue: 0, dataStatus: 'COMPLETE', holdings: [] }) },
+  portfolioIntelligenceService: { intelligence: jest.fn().mockResolvedValue({ healthScore: 0, status: 'UNKNOWN', redFlags: [], groupedSummary: { strongHoldings: [], weakHoldings: [] }, signalOverlay: null }) },
+  watchlistManagementService: { detail: jest.fn().mockResolvedValue({ watchlist: { name: 'Test' }, items: [] }) },
+  alertsMonitoringService: { listEvents: jest.fn().mockResolvedValue([]) },
+  subscriptionService,
+  ...overrides,
+});
+
 const createService = (overrides: any = {}) => new AiInvestmentCopilotService({
   stockResearchService: {
     workbench: jest.fn().mockResolvedValue({
@@ -137,5 +150,40 @@ describe('AiInvestmentCopilotService', () => {
     const text = JSON.stringify(result).toLowerCase();
     expect(text).not.toContain('buy now');
     expect(text).not.toContain('guaranteed');
+  });
+
+  describe('COPILOT_USAGE_UNLIMITED env gate (BUG 4 regression)', () => {
+    afterEach(() => {
+      delete process.env.COPILOT_USAGE_UNLIMITED;
+    });
+
+    it('does NOT call assertAllowed by default (flag defaults to unlimited)', async () => {
+      delete process.env.COPILOT_USAGE_UNLIMITED; // ensure default
+      const assertAllowed = jest.fn().mockRejectedValue(new Error('Copilot summaries today limit reached'));
+      const recordUsage = jest.fn().mockResolvedValue(undefined);
+      const service = createServiceWithBilling({ assertAllowed, recordUsage });
+      // Must NOT throw even though assertAllowed would reject
+      await expect(service.marketBrief('user-1')).resolves.toBeDefined();
+      expect(assertAllowed).not.toHaveBeenCalled();
+      expect(recordUsage).toHaveBeenCalledWith('RUN_COPILOT_SUMMARY', 'user-1');
+    });
+
+    it('does NOT call assertAllowed when COPILOT_USAGE_UNLIMITED=true', async () => {
+      process.env.COPILOT_USAGE_UNLIMITED = 'true';
+      const assertAllowed = jest.fn().mockRejectedValue(new Error('limit reached'));
+      const recordUsage = jest.fn().mockResolvedValue(undefined);
+      const service = createServiceWithBilling({ assertAllowed, recordUsage });
+      await expect(service.marketBrief('user-1')).resolves.toBeDefined();
+      expect(assertAllowed).not.toHaveBeenCalled();
+    });
+
+    it('enforces assertAllowed when COPILOT_USAGE_UNLIMITED=false (original gating)', async () => {
+      process.env.COPILOT_USAGE_UNLIMITED = 'false';
+      const assertAllowed = jest.fn().mockRejectedValue(new Error('Copilot summaries today limit reached for FREE'));
+      const recordUsage = jest.fn().mockResolvedValue(undefined);
+      const service = createServiceWithBilling({ assertAllowed, recordUsage });
+      await expect(service.marketBrief('user-1')).rejects.toThrow('limit reached');
+      expect(assertAllowed).toHaveBeenCalledWith('RUN_COPILOT_SUMMARY', 'user-1');
+    });
   });
 });

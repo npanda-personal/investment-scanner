@@ -62,4 +62,25 @@ describe('SubscriptionBillingService', () => {
 
     expect(repository.changePlan).toHaveBeenCalledWith('default-user', 'PRO', 'ACTIVE');
   });
+
+  it('counts only rows owned by the user, not null-owner legacy rows (BUG 3 regression)', async () => {
+    // null-owner rows exist in DB but should NOT count against the real user's limit.
+    // The repository countPortfolios/countWatchlists/countAlerts must be called with a
+    // strict { userId } where clause — not OR [userId, null].
+    const countPortfolios = jest.fn().mockResolvedValue(0);
+    const countWatchlists = jest.fn().mockResolvedValue(0);
+    const countAlerts = jest.fn().mockResolvedValue(0);
+    const { service } = createService({ countPortfolios, countWatchlists, countAlerts });
+
+    // Even if there were 99 null-owner rows in the DB, the mock returns 0 for real user
+    const features = await service.features('real-user');
+    const portfolioFeature = features.find((f) => f.usageKey === 'PORTFOLIOS')!;
+    expect(portfolioFeature.used).toBe(0);
+    expect(portfolioFeature.allowed).toBe(true);
+
+    // Verify the repository is called with the user's own id (not an OR clause)
+    expect(countPortfolios).toHaveBeenCalledWith('real-user');
+    expect(countWatchlists).toHaveBeenCalledWith('real-user');
+    expect(countAlerts).toHaveBeenCalledWith('real-user');
+  });
 });

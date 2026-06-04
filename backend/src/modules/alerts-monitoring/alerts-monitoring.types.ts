@@ -29,6 +29,7 @@ export interface AlertRuleDto {
   watchlistId: string | null;
   condition: AlertCondition;
   enabled: boolean;
+  lastObservedDirection: string | null;
   createdAt: string;
   updatedAt: string;
 }

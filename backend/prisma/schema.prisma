@@ -645,23 +645,24 @@ model Watchlist {
 }
 
 model AlertRule {
-  id          String       @id @default(cuid())
-  userId      String?
-  user        AppUser?     @relation(fields: [userId], references: [id], onDelete: SetNull)
-  name        String
-  type        String
-  scope       String
-  instrumentId String?
-  stock       Stock?       @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
-  portfolioId String?
-  portfolio   Portfolio?   @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
-  watchlistId String?
-  watchlist   Watchlist?   @relation(fields: [watchlistId], references: [id], onDelete: Cascade)
-  condition   Json
-  enabled     Boolean      @default(true)
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  events      AlertEvent[]
+  id                    String       @id @default(cuid())
+  userId                String?
+  user                  AppUser?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  name                  String
+  type                  String
+  scope                 String
+  instrumentId          String?
+  stock                 Stock?       @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+  portfolioId           String?
+  portfolio             Portfolio?   @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  watchlistId           String?
+  watchlist             Watchlist?   @relation(fields: [watchlistId], references: [id], onDelete: Cascade)
+  condition             Json
+  enabled               Boolean      @default(true)
+  lastObservedDirection String?
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+  events                AlertEvent[]
 
   @@index([userId])
   @@index([type, scope])

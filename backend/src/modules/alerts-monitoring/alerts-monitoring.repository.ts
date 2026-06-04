@@ -121,6 +121,10 @@ export class AlertsMonitoringRepository {
     return { alertRule: { is: { userId } } } as any;
   }
 
+  async updateRuleState(id: string, lastObservedDirection: string): Promise<void> {
+    await this.db.alertRule.update({ where: { id }, data: { lastObservedDirection } });
+  }
+
   private toRuleDto(record: any): AlertRuleDto {
     return {
       id: record.id,
@@ -132,6 +136,7 @@ export class AlertsMonitoringRepository {
       watchlistId: record.watchlistId,
       condition: record.condition || {},
       enabled: record.enabled,
+      lastObservedDirection: record.lastObservedDirection ?? null,
       createdAt: record.createdAt.toISOString(),
       updatedAt: record.updatedAt.toISOString(),
     };

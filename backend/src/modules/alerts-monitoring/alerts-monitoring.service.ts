@@ -106,7 +106,21 @@ export class AlertsMonitoringService {
     if (rule.type === 'DAILY_MOVE_ABOVE' && dailyMove !== null && dailyMove > threshold) return [this.event(rule, 'INFO', `${symbol} daily move is above threshold`, `Daily move is ${(dailyMove * 100).toFixed(1)}%.`, { dailyMove, threshold })];
     if (rule.type === 'DAILY_MOVE_BELOW' && dailyMove !== null && dailyMove < threshold) return [this.event(rule, 'WARNING', `${symbol} daily move is below threshold`, `Daily move is ${(dailyMove * 100).toFixed(1)}%.`, { dailyMove, threshold })];
     if (rule.type === 'SIGNAL_SCORE_ABOVE' && signal && signal.score > threshold) return [this.event(rule, 'INFO', `${symbol} signal score is above ${threshold}`, `Signal score is ${signal.score}.`, { score: signal.score, threshold, direction: signal.direction })];
-    if (rule.type === 'SIGNAL_DIRECTION_CHANGED' && signal && signal.direction !== rule.condition.direction) return [this.event(rule, 'WARNING', `${symbol} signal direction changed`, `Signal direction is now ${signal.direction}.`, { direction: signal.direction, previousDirection: rule.condition.direction || null })];
+    if (rule.type === 'SIGNAL_DIRECTION_CHANGED' && signal) {
+      const prior = rule.lastObservedDirection ?? null;
+      const current = signal.direction;
+      // Always persist the latest observed direction so the next cycle has a baseline.
+      await this.repository.updateRuleState(rule.id, current);
+      // Fire only on an actual transition: prior must be known AND different from current.
+      // Optional target filter: if rule.condition.direction is set, only fire when the
+      // transition lands on that specific direction.
+      const isTransition = prior !== null && prior !== current;
+      const matchesTarget = !rule.condition.direction || current === rule.condition.direction;
+      if (isTransition && matchesTarget) {
+        return [this.event(rule, 'WARNING', `${symbol} signal direction changed`, `Signal direction changed from ${prior} to ${current}.`, { direction: current, previousDirection: prior })];
+      }
+      return [];
+    }
     return [];
   }
 

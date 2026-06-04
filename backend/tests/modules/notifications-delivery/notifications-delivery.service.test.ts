@@ -149,4 +149,15 @@ describe('notifications delivery service', () => {
     expect(status.activeChannel).toBe('EMAIL_LOG');
     expect(status.smtpAvailable).toBe(false);
   });
+
+  it('sendAlertDigest passes the correct userId to listEvents (BUG 1 regression)', async () => {
+    const repo = repository();
+    // Use a fresh mock so we can track exactly what userId was passed
+    const alertsWithSpy = { listEvents: jest.fn().mockResolvedValue([]) };
+    const service = new NotificationsDeliveryService(repo as any, new LogEmailProvider(), alertsWithSpy as any, copilot as any);
+    await service.sendAlertDigest('user-x');
+    expect(alertsWithSpy.listEvents).toHaveBeenCalledWith('user-x');
+    expect(alertsWithSpy.listEvents).not.toHaveBeenCalledWith(); // not called with no args
+    expect(alertsWithSpy.listEvents).not.toHaveBeenCalledWith('default-user');
+  });
 });

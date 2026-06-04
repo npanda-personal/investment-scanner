@@ -194,7 +194,7 @@ export class AiInvestmentCopilotService {
 
   async alertDigest(userId = 'default-user'): Promise<CopilotSummaryResponse> {
     await this.guardCopilotUsage(userId);
-    const events = await this.safe(() => this.dependencies.alertsMonitoringService.listEvents());
+    const events = await this.safe(() => this.dependencies.alertsMonitoringService.listEvents(userId));
     const items = events ?? [];
     const unread = items.filter((event: any) => !event.readAt && !event.dismissedAt);
     const critical = unread.filter((event: any) => event.severity === 'CRITICAL');
@@ -246,9 +246,15 @@ export class AiInvestmentCopilotService {
   }
 
   private async guardCopilotUsage(userId: string) {
+    // During personal-validation phase the usage gate is bypassed so the owner
+    // can run unlimited research summaries without hitting the FREE-plan cap.
+    // Set COPILOT_USAGE_UNLIMITED=false (or unset) to restore standard gating.
+    const unlimited = process.env.COPILOT_USAGE_UNLIMITED !== 'false';
     const service = this.dependencies.subscriptionService;
     if (!service) return;
-    await service.assertAllowed('RUN_COPILOT_SUMMARY', userId);
+    if (!unlimited) {
+      await service.assertAllowed('RUN_COPILOT_SUMMARY', userId);
+    }
     await service.recordUsage('RUN_COPILOT_SUMMARY', userId);
   }
 

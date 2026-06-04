@@ -11,6 +11,7 @@ const rule = (overrides: any = {}) => ({
   watchlistId: overrides.watchlistId ?? null,
   condition: overrides.condition || { threshold: 100 },
   enabled: true,
+  lastObservedDirection: overrides.lastObservedDirection ?? null,
   createdAt: '2026-04-28T00:00:00.000Z',
   updatedAt: '2026-04-28T00:00:00.000Z',
 });
@@ -34,6 +35,7 @@ const createService = (rules: any[], overrides: any = {}) => {
     markRead: jest.fn(),
     dismiss: jest.fn(),
     markAllRead: jest.fn(),
+    updateRuleState: jest.fn().mockResolvedValue(undefined),
     ...overrides.repository,
   };
   const marketDataService = {
@@ -101,5 +103,69 @@ describe('AlertsMonitoringService', () => {
     expect(repository.markRead).toHaveBeenCalledWith('event-1', 'user-a');
     expect(repository.dismiss).toHaveBeenCalledWith('event-1', 'user-a');
     expect(repository.markAllRead).toHaveBeenCalledWith('user-a');
+  });
+
+  describe('SIGNAL_DIRECTION_CHANGED prior-state logic (BUG 2 regression)', () => {
+    it('does not fire on first-ever observation (no prior)', async () => {
+      const { service, repository } = createService([
+        rule({ type: 'SIGNAL_DIRECTION_CHANGED', condition: {} }),
+      ], {
+        signalService: { latestForInstrument: jest.fn().mockResolvedValue({ score: 70, direction: 'BULLISH', symbol: 'ABC' }) },
+      });
+      const result = await service.evaluate();
+      expect(result.created).toBe(0);
+      // State should be persisted for next cycle
+      expect(repository.updateRuleState).toHaveBeenCalledWith('rule-1', 'BULLISH');
+    });
+
+    it('does not fire when direction is unchanged across cycles', async () => {
+      // lastObservedDirection is already BULLISH; current is still BULLISH
+      const { service, repository } = createService([
+        rule({ type: 'SIGNAL_DIRECTION_CHANGED', condition: {}, lastObservedDirection: 'BULLISH' }),
+      ], {
+        signalService: { latestForInstrument: jest.fn().mockResolvedValue({ score: 70, direction: 'BULLISH', symbol: 'ABC' }) },
+      });
+      const result = await service.evaluate();
+      expect(result.created).toBe(0);
+      expect(repository.updateRuleState).toHaveBeenCalledWith('rule-1', 'BULLISH');
+    });
+
+    it('fires exactly once on an actual direction transition', async () => {
+      // Prior is BULLISH; current changes to BEARISH
+      const { service, repository } = createService([
+        rule({ type: 'SIGNAL_DIRECTION_CHANGED', condition: {}, lastObservedDirection: 'BULLISH' }),
+      ], {
+        signalService: { latestForInstrument: jest.fn().mockResolvedValue({ score: 30, direction: 'BEARISH', symbol: 'ABC' }) },
+      });
+      const result = await service.evaluate();
+      expect(result.created).toBe(1);
+      expect(result.events[0].metadata).toMatchObject({ direction: 'BEARISH', previousDirection: 'BULLISH' });
+      // Updated state must be persisted
+      expect(repository.updateRuleState).toHaveBeenCalledWith('rule-1', 'BEARISH');
+    });
+
+    it('respects optional target-direction filter when set on condition', async () => {
+      // Prior is BEARISH → transitions to BULLISH, but rule only cares about BEARISH transitions
+      const { service } = createService([
+        rule({ type: 'SIGNAL_DIRECTION_CHANGED', condition: { direction: 'BEARISH' }, lastObservedDirection: 'BEARISH' }),
+      ], {
+        signalService: { latestForInstrument: jest.fn().mockResolvedValue({ score: 80, direction: 'BULLISH', symbol: 'ABC' }) },
+      });
+      // Transition occurred (BEARISH→BULLISH) but target direction is BEARISH, current is BULLISH → no fire
+      const result = await service.evaluate();
+      expect(result.created).toBe(0);
+    });
+
+    it('fires when transition matches the optional target-direction filter', async () => {
+      // Prior is BULLISH → transitions to BEARISH, and rule targets BEARISH
+      const { service } = createService([
+        rule({ type: 'SIGNAL_DIRECTION_CHANGED', condition: { direction: 'BEARISH' }, lastObservedDirection: 'BULLISH' }),
+      ], {
+        signalService: { latestForInstrument: jest.fn().mockResolvedValue({ score: 20, direction: 'BEARISH', symbol: 'ABC' }) },
+      });
+      const result = await service.evaluate();
+      expect(result.created).toBe(1);
+      expect(result.events[0].metadata).toMatchObject({ direction: 'BEARISH', previousDirection: 'BULLISH' });
+    });
   });
 });

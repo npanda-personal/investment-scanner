@@ -51,7 +51,7 @@ export class NotificationsDeliveryService {
 
   async sendAlertDigest(userId: string): Promise<NotificationEventDto> {
     const preferences = await this.preferences(userId);
-    const events = await this.safe(() => this.alertsService.listEvents(), [] as AlertEventDto[]);
+    const events = await this.safe(() => this.alertsService.listEvents(userId), [] as AlertEventDto[]);
     const unread = events.filter((event) => !event.readAt && !event.dismissedAt);
     const critical = unread.filter((event) => event.severity === 'CRITICAL');
     const warning = unread.filter((event) => event.severity === 'WARNING');

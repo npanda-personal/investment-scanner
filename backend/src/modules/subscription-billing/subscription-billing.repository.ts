@@ -51,15 +51,15 @@ export class SubscriptionBillingRepository {
   }
 
   countPortfolios(userId = DEFAULT_USER_ID) {
-    return this.db.portfolio.count({ where: { OR: [{ userId }, { userId: null }] } });
+    return this.db.portfolio.count({ where: { userId } });
   }
 
   countWatchlists(userId = DEFAULT_USER_ID) {
-    return this.db.watchlist.count({ where: { OR: [{ userId }, { userId: null }] } });
+    return this.db.watchlist.count({ where: { userId } });
   }
 
   countAlerts(userId = DEFAULT_USER_ID) {
-    return this.db.alertRule.count({ where: { OR: [{ userId }, { userId: null }] } });
+    return this.db.alertRule.count({ where: { userId } });
   }
 
   async getCounter(userId: string, key: UsageKey, periodStart: Date) {
