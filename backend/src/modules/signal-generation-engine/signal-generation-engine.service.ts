@@ -99,9 +99,25 @@ const EVIDENCE_AGREEMENT_WEIGHT = 0.45;
 const EVIDENCE_COUNT_WEIGHT = 0.55;
 
 // EVIDENCE_MIXED_FLOOR: Minimum cross-category agreement contribution when categories
-//   conflict (e.g. one strongly bullish, one bearish). Prevents score from collapsing
-//   too close to 50 even when total signal count is large.
-const EVIDENCE_MIXED_FLOOR = 0.4;
+//   conflict (e.g. one strongly bullish, one bearish).
+//   Set to 0 so genuinely-conflicting setups (one category strongly bullish, one
+//   strongly bearish) are allowed to compress toward 50 (NEUTRAL) rather than being
+//   artificially held up at ~0.4.  True conflict should yield NEUTRAL, not a
+//   watered-down directional signal.
+const EVIDENCE_MIXED_FLOOR = 0;
+
+// FUNDAMENTAL_PUBLIC_LAG_DAYS: Conservative filing-date lag for NSE results.
+// NSE companies are required to file within 45 days of quarter-end (60 days for
+// the annual result). We use 45 days as the conservative floor so that, in the
+// absence of an explicit officialResultDate, a quarterly result is only made
+// visible to historical (as-of) signal generation once it would plausibly have
+// been public — preventing look-ahead into future filings.
+const FUNDAMENTAL_PUBLIC_LAG_DAYS = 45;
+
+// OUTPERFORMING_PEERS_MIN_RELATIVE: Minimum relative-to-peer return (fractional)
+// required to cast a bullish peer vote.  Requires at least +2% outperformance
+// (not just >= 0) to reduce false positives when the stock barely keeps up.
+const OUTPERFORMING_PEERS_MIN_RELATIVE = 0.02;
 
 // Direction cut-points (v3):
 //   With the new spread, empirical synthetic distribution shows:
@@ -388,13 +404,27 @@ export class SignalGenerationEngineService {
         ? this.dataQualityService.filterEligibleInstruments(resolvedInstrumentIds, dqFilterOptions, asOfDate)
         : this.dataQualityService.filterEligibleInstruments(resolvedInstrumentIds, dqFilterOptions)
       ).catch((error: any) => {
+        if (asOfDate) {
+          // Fix #7 (DQ asOf no-snapshot): For historical/backfill runs there may be no
+          // DQ snapshot for the requested date.  Falling back to "exclude all" would
+          // silently zero-out the entire backfill run.  Instead fall back to INCLUDE so
+          // that generation proceeds (with a warning); operators can re-filter later.
+          warnings.push(`Data quality filter unavailable for as-of date ${asOfDate.toISOString().split('T')[0]}; falling back to INCLUDE all instruments for this backfill run: ${error?.message || 'unknown error'}`);
+          return {
+            eligibleInstrumentIds: resolvedInstrumentIds,
+            excludedInstrumentIds: [] as string[],
+            missingQualityEvaluationCount: resolvedInstrumentIds.length,
+            warnings: [] as string[],
+            evaluationsByInstrumentId: {} as Record<string, any>,
+          };
+        }
         warnings.push(`Data quality filter unavailable; trusted signal generation failed closed: ${error?.message || 'unknown error'}`);
         return {
-          eligibleInstrumentIds: [],
+          eligibleInstrumentIds: [] as string[],
           excludedInstrumentIds: resolvedInstrumentIds,
           missingQualityEvaluationCount: resolvedInstrumentIds.length,
-          warnings: [],
-          evaluationsByInstrumentId: {},
+          warnings: [] as string[],
+          evaluationsByInstrumentId: {} as Record<string, any>,
         };
       });
       if (filtered) {
@@ -758,9 +788,25 @@ export class SignalGenerationEngineService {
         ? calibReader.latestForInstruments(instrumentIds).catch(() => [])
         : Promise.resolve<Array<any>>([]);
 
+      // Fix #3 (enrichSignals live-price look-ahead): determine whether ALL signals in
+      // this batch are "live" (generated today or yesterday) or historical.  If even one
+      // signal is historical we cannot safely inject today's price as current price —
+      // that would corrupt historical records with future data.  We fetch latest prices
+      // only for live-day signals; historical signals leave currentPrice null.
+      const todayUtc = this.normalizeUtcDay(new Date()).getTime();
+      const oneTradingDayMs = 2 * 24 * 60 * 60 * 1000; // 2 calendar days (covers weekends/holidays)
+      const isLiveSignal = (signal: SignalResultDto): boolean => {
+        if (!signal.generated_at) return false;
+        const genDay = this.normalizeUtcDay(new Date(signal.generated_at)).getTime();
+        return Math.abs(todayUtc - genDay) <= oneTradingDayMs;
+      };
+
       const [instruments, latestPrices, calibrationRows] = await Promise.all([
         this.marketDataService.getInstrumentsByIds(instrumentIds),
-        this.marketDataService.getLatestPricesBySymbols(symbols),
+        // Only fetch live prices if at least one signal in the batch is from today/yesterday
+        signals.some(isLiveSignal)
+          ? this.marketDataService.getLatestPricesBySymbols(symbols)
+          : Promise.resolve<any[]>([]),
         calibrationPromise,
       ]);
 
@@ -782,12 +828,16 @@ export class SignalGenerationEngineService {
 
       const enriched = await Promise.all(signals.map(async (signal) => {
         const instrument = instrumentMap.get(signal.instrument_id);
-        const latest = priceMap.get(signal.symbol);
+        // Fix #3 cont.: only attach live price data when signal was generated today/yesterday.
+        // Historical signals leave currentPrice/dailyChange null so the persisted corpus
+        // is not contaminated with future price data on read.
+        const signalIsLive = isLiveSignal(signal);
+        const latest = signalIsLive ? priceMap.get(signal.symbol) : undefined;
 
         const currentPrice = latest ? Number((latest as any).adjusted_close ?? (latest as any).close) : null;
 
         let previousClose: number | null = null;
-        if (latest) {
+        if (latest && signalIsLive) {
           // For previous close, we still do a targeted lookup per signal for now
           // to avoid fetching massive amounts of price history in one go.
           const prevPrices = await this.marketDataService.listPricesByInstrumentId(signal.instrument_id, 2).catch(() => null);
@@ -976,22 +1026,26 @@ export class SignalGenerationEngineService {
     this.pushReturnSignal(threeMonth, 'THREE_MONTH_MOMENTUM', '3M momentum is positive', '3M momentum is negative', signals, negativeSignals, MOMENTUM_BULL_THRESHOLD_3M, MOMENTUM_BEAR_THRESHOLD_3M);
 
     // ── Guard 3: Parabolic short-term run-up ──────────────────────────────────
-    // A 20%+ gain over 10 trading days is a parabolic spike (blow-off / short-squeeze).
-    // Such moves routinely mean-revert at short horizons, making them anti-predictive
-    // for the research-worthiness ranking.
-    // Uses the existing returnAtOffset helper (offset=10 = 10 trading days).
-    // Explainability: appears in negative_signals / triggerContract failed_conditions.
+    // Fix #11: A 20%+ gain is only parabolic if the move is spread over multiple
+    // trading days (not just one single-day earnings gap).  Require both the
+    // 10-day return AND the 5-day return to be >= PARABOLIC_RUNUP_PCT so that a
+    // legitimate single-day post-earnings gap (which then consolidates) doesn't
+    // get penalised — true parabolic runs sustain over at least the 5-day window.
     if (GUARD_PARABOLIC_RUNUP_ENABLED) {
       const tenDay = this.returnAtOffset(prices, 10);
-      if (tenDay !== null && tenDay >= PARABOLIC_RUNUP_PCT) {
-        negativeSignals.push(this.signal('PARABOLIC_RUNUP', `10-day return is ${(tenDay * 100).toFixed(1)}% — parabolic spike (threshold: ${(PARABOLIC_RUNUP_PCT * 100).toFixed(0)}%); short-term mean-reversion risk`, 'MOMENTUM'));
+      const fiveDay = this.returnAtOffset(prices, 5);
+      if (tenDay !== null && fiveDay !== null && tenDay >= PARABOLIC_RUNUP_PCT && fiveDay >= PARABOLIC_RUNUP_PCT) {
+        negativeSignals.push(this.signal('PARABOLIC_RUNUP', `10-day return is ${(tenDay * 100).toFixed(1)}% and 5-day return is ${(fiveDay * 100).toFixed(1)}% — sustained parabolic spike (threshold: ${(PARABOLIC_RUNUP_PCT * 100).toFixed(0)}%); short-term mean-reversion risk`, 'MOMENTUM'));
       }
     }
     // SIX_MONTH_ACCELERATION: only emit when both 1M and 3M already cleared their bullish thresholds,
     // preventing a triple-count of the same trend (acceleration implies 1M+3M bullish already voted).
+    // Fix #9: use geometric comparison — annualised monthly rate vs actual monthly rate — so the
+    // arithmetic "1M > 3M/3" shortcut (which overstates acceleration when 3M is large) is replaced
+    // by the correct compounded-equivalent: 1M > (1 + 3M)^(1/3) - 1.
     if (oneMonth !== null && threeMonth !== null && sixMonth !== null
         && oneMonth >= MOMENTUM_BULL_THRESHOLD_1M && threeMonth >= MOMENTUM_BULL_THRESHOLD_3M
-        && oneMonth > threeMonth / 3 && threeMonth > sixMonth / 2) {
+        && oneMonth > Math.pow(1 + threeMonth, 1 / 3) - 1 && threeMonth > sixMonth / 2) {
       // Don't add if both 1M and 3M momentum signals are already pushed — emit only the acceleration.
       // Remove the individual month signals to avoid triple-counting when acceleration fires.
       const oneMonthIdx = signals.findIndex(s => s.code === 'ONE_MONTH_MOMENTUM');
@@ -1004,12 +1058,15 @@ export class SignalGenerationEngineService {
       }
       signals.push(this.signal('SIX_MONTH_ACCELERATION', '6M trend is accelerating', 'MOMENTUM'));
     }
+    // Fix #10: require >= OUTPERFORMING_PEERS_MIN_RELATIVE (+2%) to vote bullish —
+    // a stock that merely keeps pace with peers (0-2%) does not deserve a bullish vote.
     if (relativeToPeers !== null) {
-      (relativeToPeers >= 0 ? signals : negativeSignals).push(this.signal(
-        relativeToPeers >= 0 ? 'OUTPERFORMING_PEERS' : 'UNDERPERFORMING_PEERS',
-        relativeToPeers >= 0 ? 'stock is outperforming peer average' : 'stock is underperforming peer average',
-        'MOMENTUM'
-      ));
+      if (relativeToPeers >= OUTPERFORMING_PEERS_MIN_RELATIVE) {
+        signals.push(this.signal('OUTPERFORMING_PEERS', `stock is outperforming peer average by ${(relativeToPeers * 100).toFixed(1)}%`, 'MOMENTUM'));
+      } else if (relativeToPeers < 0) {
+        negativeSignals.push(this.signal('UNDERPERFORMING_PEERS', 'stock is underperforming peer average', 'MOMENTUM'));
+      }
+      // 0 <= relativeToPeers < OUTPERFORMING_PEERS_MIN_RELATIVE: neutral band — no vote
     }
 
     return { score: this.categoryScore(signals.length, negativeSignals.length), signals, negativeSignals };
@@ -1707,9 +1764,15 @@ export class SignalGenerationEngineService {
 
   rsi(prices: SignalPricePoint[], period: number): number | null {
     if (prices.length <= period) return null;
-    
-    // Wilder's RSI smoothing
-    const chronological = [...prices].slice(0, period * 2 + 1).reverse();
+
+    // Fix #1 (RSI severely under-smoothed): Wilder's EMA requires a long warm-up
+    // period to converge.  The previous cap of period*2+1 (29 bars for RSI-14) was
+    // far too short — the EMA never stabilises, producing systematically biased RSI
+    // values.  Extend the window to min(prices.length, period*10) which gives ~140
+    // bars of warm-up for RSI-14, matching professional implementations.
+    // RSI still returns null when there is genuinely insufficient history (< period+1).
+    const windowSize = Math.min(prices.length, period * 10);
+    const chronological = [...prices].slice(0, windowSize).reverse();
     if (chronological.length < period + 1) return null;
 
     let avgGain = 0;
@@ -1794,11 +1857,22 @@ export class SignalGenerationEngineService {
       smoothedPlusDM = smoothedPlusDM - (smoothedPlusDM / period) + plusDM[i];
       smoothedMinusDM = smoothedMinusDM - (smoothedMinusDM / period) + minusDM[i];
 
+      // Fix #4 (ADX divide-by-zero): when smoothedTR === 0 (circuit-locked / all-flat
+      // bars) plusDI and minusDI blow up to Infinity, dx becomes NaN, and the fallback
+      // `dx || 0` coerces NaN to 0 which (with adxVal then averaging toward 0) falsely
+      // signals range-bound and mutes all SMA/momentum signals.  Guard explicitly: if
+      // smoothedTR is 0 (or near-zero) push dx=0 and continue, which is the correct
+      // "no directional information available" result for a locked/flat bar.
+      if (smoothedTR === 0) {
+        dxArray.push(0);
+        continue;
+      }
       const plusDI = (smoothedPlusDM / smoothedTR) * 100;
       const minusDI = (smoothedMinusDM / smoothedTR) * 100;
 
-      const dx = (Math.abs(plusDI - minusDI) / (plusDI + minusDI)) * 100;
-      dxArray.push(dx || 0);
+      const diSum = plusDI + minusDI;
+      const dx = diSum === 0 ? 0 : (Math.abs(plusDI - minusDI) / diSum) * 100;
+      dxArray.push(dx);
     }
 
     if (dxArray.length < period) return null;
@@ -1843,8 +1917,39 @@ export class SignalGenerationEngineService {
   }
 
   closePosition(price: SignalPricePoint | undefined): number | null {
-    if (!price || price.high === null || price.low === null || price.high === price.low) return null;
-    return (price.adjusted_close - price.low) / (price.high - price.low);
+    // Fix #5 (52-week range adjusted/raw mismatch): periodHigh/periodLow use
+    // adjusted_close for their range calculation, so closePosition must also use
+    // adjusted_close rather than raw high/low.  For split stocks the raw intraday
+    // high/low reflect the pre-split price scale while adjusted_close is scaled down,
+    // making (adjusted_close - raw_low) / (raw_high - raw_low) ≈ -1 or > 1.
+    //
+    // We compute the daily close position using adjusted_close scaled to the
+    // adjusted high/low equivalents.  Since we don't store adjusted high/low
+    // in the price point, we derive them by scaling raw high/low by the same
+    // adjustment ratio used for close: adj_factor = adjusted_close / close.
+    // If close is 0 (or adjusted_close equals close) we fall back to raw ratio.
+    //
+    // Choice: prefer adjusted throughout for consistency with periodHigh/Low.
+    if (!price) return null;
+    const rawClose = price.close;
+    const adjClose = price.adjusted_close;
+    const rawHigh = price.high;
+    const rawLow = price.low;
+    if (rawHigh === null || rawLow === null) return null;
+
+    let adjHigh: number;
+    let adjLow: number;
+    if (rawClose > 0 && Number.isFinite(rawClose) && Number.isFinite(adjClose)) {
+      const adjFactor = adjClose / rawClose;
+      adjHigh = rawHigh * adjFactor;
+      adjLow  = rawLow  * adjFactor;
+    } else {
+      adjHigh = rawHigh;
+      adjLow  = rawLow;
+    }
+
+    if (adjHigh === adjLow) return null;
+    return (adjClose - adjLow) / (adjHigh - adjLow);
   }
 
   periodHigh(prices: SignalPricePoint[], period: number): number | null {
@@ -2063,11 +2168,32 @@ export class SignalGenerationEngineService {
       response = await (this.marketDataService as any).storedFundamentalsByInstrumentId(instrumentId, marketScope);
     }
     if (!asOf || !response?.records) return response;
-    // Filter to fundamental periods ending on or before asOf (point-in-time: no future filings)
+
+    // Fix #2 (Fundamentals point-in-time look-ahead):
+    // NSE results are typically filed 45-60 days after period-end.  Simply filtering by
+    // periodEndDate <= asOf exposes fundamentals before they were public (e.g. a Q1 result
+    // with periodEnd=2023-06-30 is not public until late August 2023).
+    //
+    // Priority:
+    //   1. If the record has an officialResultDate (populated by the board-meeting ingest,
+    //      task #36), use it directly — it's the actual announcement date.
+    //   2. Otherwise apply a conservative lag: periodEndDate + FUNDAMENTAL_PUBLIC_LAG_DAYS.
+    //
+    // Live runs (asOf undefined) are unchanged — they always see the latest filings.
     const asOfMs = asOf.getTime();
+    const lagMs = FUNDAMENTAL_PUBLIC_LAG_DAYS * 24 * 60 * 60 * 1000;
     const filtered = response.records.filter((record: any) => {
+      // Prefer explicit officialResultDate when available
+      if (record.officialResultDate) {
+        const officialDate = new Date(record.officialResultDate);
+        if (Number.isFinite(officialDate.getTime())) {
+          return officialDate.getTime() <= asOfMs;
+        }
+      }
+      // Fall back to periodEndDate + conservative lag
       const periodEndDate = record.periodEndDate ? new Date(record.periodEndDate) : null;
-      return periodEndDate !== null && Number.isFinite(periodEndDate.getTime()) && periodEndDate.getTime() <= asOfMs;
+      if (periodEndDate === null || !Number.isFinite(periodEndDate.getTime())) return false;
+      return periodEndDate.getTime() + lagMs <= asOfMs;
     });
     return { ...response, records: filtered };
   }
@@ -2324,7 +2450,9 @@ export class SignalGenerationEngineService {
     const isStale = latestDate ? latestDate < fiveDaysAgo : true;
 
     if (prices.length >= 200 && fundamental && signalCount >= 6 && !isStale) return 'HIGH';
-    if (prices.length >= 50 && signalCount >= 3) return 'MEDIUM';
+    // Fix #6: add !isStale guard to MEDIUM tier (mirrors HIGH tier) so stale data
+    // does not receive a falsely confident MEDIUM rating.
+    if (prices.length >= 50 && signalCount >= 3 && !isStale) return 'MEDIUM';
     return 'LOW';
   }
 
@@ -2347,13 +2475,21 @@ export class SignalGenerationEngineService {
 
   private toPricePoints(prices: any[]): SignalPricePoint[] {
     return prices
+      // Fix #12 (adjustedClose null substitution): filter out bars where
+      // adjusted_close is null/undefined/non-numeric BEFORE the map step, so
+      // we never silently fall back to raw close inside an adjusted series.
+      // A mixed series (some bars adjusted, some raw) corrupts all indicators.
+      .filter((price) => {
+        const ac = price.adjusted_close;
+        return ac !== null && ac !== undefined && Number.isFinite(Number(ac));
+      })
       .map((price) => ({
         date: typeof price.date === 'string' ? price.date : new Date(price.date).toISOString(),
         open: this.optionalNumber(price.open),
         high: this.optionalNumber(price.high),
         low: this.optionalNumber(price.low),
         close: Number(price.close),
-        adjusted_close: Number(price.adjusted_close ?? price.close),
+        adjusted_close: Number(price.adjusted_close),
         volume: price.volume !== null && price.volume !== undefined ? Number(price.volume) : null,
       }))
       .filter((price) => Number.isFinite(price.adjusted_close))

@@ -6,7 +6,9 @@
  * EXIT THRESHOLD RATIONALE
  * ========================
  * EXIT_SCORE_THRESHOLD = 45
- *   The engine emits BULLISH at score >= 70, NEUTRAL at >= 40, BEARISH below 40.
+ *   The engine emits BULLISH at score >= 60, NEUTRAL at >= 41, BEARISH at <= 40.
+ *   (v3 direction cuts: BULLISH >= 60, BEARISH <= 40, deadband [41-59] = NEUTRAL.
+ *    Updated from the legacy v1/v2 cut of 70/30.)
  *   45 sits 5 points above the BEARISH boundary — it's the "wobble band" where
  *   a previously-strong BULLISH signal has shed meaningful strength but hasn't
  *   yet crossed into unambiguous BEARISH territory.  Anything at or below 45
