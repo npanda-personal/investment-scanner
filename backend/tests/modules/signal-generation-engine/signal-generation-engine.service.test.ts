@@ -1843,7 +1843,7 @@ describe('SignalGenerationEngineService v2 accuracy fixes', () => {
   });
 
   // ── Fix 9: F&O short-gating ───────────────────────────────────────────────
-  it('fix9: BEARISH signal on F&O-eligible stock maps to bearish_trigger', async () => {
+  it('fix9: BEARISH signal on F&O-eligible stock maps to bearish_trigger (regime gate disabled)', async () => {
     const repository = {
       createSignalResult: jest.fn(async (result: any) => ({ ...result, id: 'signal-fno' })),
     };
@@ -1862,7 +1862,12 @@ describe('SignalGenerationEngineService v2 accuracy fixes', () => {
       fundamentalsByInstrumentId: jest.fn().mockResolvedValue({ records: [] }),
       storedFundamentalsByInstrumentId: jest.fn().mockResolvedValue({ records: [] }),
     };
-    const service = new SignalGenerationEngineService(repository as any, marketDataService as any, { workbench: jest.fn().mockResolvedValue(null) } as any);
+    // Pass null for capitalPostureService to disable the regime gate (isolates F&O eligibility check).
+    // The regime-gate interaction is covered by signal-regime-gate.test.ts.
+    const service = new SignalGenerationEngineService(
+      repository as any, marketDataService as any, { workbench: jest.fn().mockResolvedValue(null) } as any,
+      {} as any, undefined, undefined, undefined, undefined, null,
+    );
     const result = await service.generateForInstrument('fno-stock');
     if (result?.direction === 'BEARISH') {
       expect(result.triggerContract?.trigger_type).toBe('bearish_trigger');

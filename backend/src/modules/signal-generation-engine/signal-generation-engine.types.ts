@@ -59,6 +59,17 @@ export interface SignalResultDto {
   lifecycleState?: SignalLifecycleState | null;
   /** Composite score from the immediately prior persisted run (null for ENTRY signals). */
   priorScore?: number | null;
+  /**
+   * Regime-gate annotation attached during signal generation.
+   * Populated when REGIME_GATE_SHORTS_ENABLED=true and direction is BEARISH.
+   * null when the gate was not consulted (BULLISH/NEUTRAL signals, or gate disabled).
+   */
+  regimeGateNote?: string | null;
+  /**
+   * True when a tradable bearish_trigger was suppressed to risk_warning by the regime gate.
+   * False/absent when the gate allowed the signal, or the gate was not consulted.
+   */
+  regimeGateSuppressed?: boolean;
   strategyMatches?: SignalStrategyMatchSummary[];
   blockedStrategies?: SignalBlockedStrategySummary[];
   writeStatus?: SignalWriteStatus;

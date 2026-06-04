@@ -45,6 +45,17 @@ const TECHNICAL_WEIGHT = 0.4;
 const MOMENTUM_WEIGHT = 0.35;
 const FUNDAMENTAL_WEIGHT = 0.25;
 const MODEL_VERSION = 'signal-engine-v3';
+
+// ── Regime Gate Toggle ────────────────────────────────────────────────────────
+//
+// When true, bearish/short signals are gated by the current market regime:
+//   - RISK_ON  → tradable bearish_trigger suppressed → forced to risk_warning
+//   - RISK_OFF / contextualShortsOnly → bearish_trigger preserved (F&O eligible names only)
+//   - null gate (no persisted snapshot) → no gating; signal passes through unchanged
+//
+// Empirical motivation: 5D short win-rate was 3.6 %/13 % during the 2024–25 bull run
+// but 86 %/90 % in the late-2025 weak tape.  Set to false to disable entirely.
+const REGIME_GATE_SHORTS_ENABLED = true;
 const SIGNAL_GENERATION_PRICE_WINDOW = 520;
 
 // Momentum thresholds — minimum return required to vote bullish/bearish.
@@ -143,8 +154,35 @@ type StrategyFrameworkSignalGenerationService = {
   evaluateContextWithDefinitions?(context: StrategyContext, strategyCode?: string): Promise<StrategyFrameworkContextEvaluation[]>;
 };
 
+/**
+ * Thin structural interface for the regime-gate provider.
+ *
+ * Defined here (rather than importing capital-posture.types) to avoid a circular
+ * module dependency: market-context-intelligence's index/service DOES statically
+ * import signal-generation-engine (market-context-intelligence.service.ts), so a
+ * static import of the market-context index from here would create a load-time
+ * cycle. We therefore (a) declare this structural interface locally, and (b) in
+ * defaultCapitalPostureService() lazy-require the SPECIFIC file
+ * '../market-context-intelligence/capital-posture.service' (which has no back-import
+ * to signal-generation-engine), keeping the boundary cycle-free. Mirrors the
+ * SignalOutcomeStalenessInvalidator pattern in market-data-foundation.
+ *
+ * Shape mirrors RegimeGateResult from capital-posture.types.ts.
+ */
+export interface RegimeGateProvider {
+  regimeGate(region: string): Promise<{
+    longsDiscouraged: boolean;
+    contextualShortsOnly: boolean;
+    posture: 'RISK_ON' | 'NEUTRAL' | 'RISK_OFF';
+    breadthAbove50Pct: number | null;
+    note: string;
+  } | null>;
+}
+
 export class SignalGenerationEngineService {
   private defaultStrategyFrameworkServiceInstance?: StrategyFrameworkSignalGenerationService;
+  /** Lazily resolved when not injected; see defaultCapitalPostureService(). */
+  private defaultCapitalPostureServiceInstance?: RegimeGateProvider;
 
   constructor(
     private readonly repository = new SignalGenerationEngineRepository(),
@@ -154,7 +192,14 @@ export class SignalGenerationEngineService {
     private readonly strategyFrameworkServiceOrLegacyRegistry?: unknown,
     private readonly strategyFrameworkService?: StrategyFrameworkSignalGenerationService,
     private readonly marketContextService?: { latestPersistedSummary?(region?: string): Promise<any | null> },
-    private readonly smartMoneyService?: { latestPersistedStocks?(instrumentIds: string[], range?: string): Promise<any[]> }
+    private readonly smartMoneyService?: { latestPersistedStocks?(instrumentIds: string[], range?: string): Promise<any[]> },
+    /**
+     * Optional capital-posture service used to gate bearish/short signals by regime.
+     * When omitted the production default (CapitalPostureService) is lazy-required to
+     * avoid a static circular import at module load time.
+     * Pass `null` explicitly to disable regime gating for a specific instance.
+     */
+    private readonly capitalPostureService?: RegimeGateProvider | null,
   ) {}
 
   async topSignals(query: SignalQuery): Promise<PaginatedSignalResponse> {
@@ -557,7 +602,25 @@ export class SignalGenerationEngineService {
       fundamentals.signals.length, fundamentals.negativeSignals.length,
     );
     const direction = this.directionForScore(score);
-    const confidence = this.confidenceFor(prices, latestFundamental, totalEvaluated, asOfDate ?? undefined);
+    const rawConfidence = this.confidenceFor(prices, latestFundamental, totalEvaluated, asOfDate ?? undefined);
+
+    // ── Regime gate (bearish/short suppression) ────────────────────────────────
+    // Consult the current market regime before surfacing bearish signals.
+    // The gate is additive / conservative-only:
+    //   • Long signals: untouched.
+    //   • asOfDate set (backfill): no gating — no persisted snapshot exists for past dates.
+    //   • Gate null (no snapshot today): no gating, unavailable note added.
+    //   • RISK_ON: tradable bearish_trigger suppressed → risk_warning, confidence lowered.
+    //   • RISK_OFF / contextualShortsOnly: allowed unchanged.
+    const signalRegion = this.canonicalRegion(options.region || instrument.region || instrument.country);
+    const regimeGateResult = await this.applyRegimeGateToShort(
+      direction,
+      instrument.derivatives_eligible ?? instrument.derivativesEligible,
+      signalRegion,
+      asOfDate,
+      rawConfidence,
+    );
+    const confidence = regimeGateResult.adjustedConfidence;
 
     const warnings: string[] = [];
     const latestDate = prices[0]?.date ? new Date(prices[0].date) : null;
@@ -570,6 +633,9 @@ export class SignalGenerationEngineService {
     }
     if (prices.length < 50) {
       warnings.push(`Insufficient price history (${prices.length} days) for reliable indicators`);
+    }
+    if (regimeGateResult.regimeGateNote) {
+      warnings.push(regimeGateResult.regimeGateNote);
     }
 
     // generatedAt / generatedDate come from asOfDate when provided (makes idempotency key correct for backfill)
@@ -606,6 +672,8 @@ export class SignalGenerationEngineService {
       sourcePriceDate: latestDate?.toISOString() ?? null,
       scoringInputSummary: this.scoringInputSummary(prices, latestFundamental, useFullResearchContext || Boolean(options.includeStrategyMatches)),
       dataQualityEligibility: this.dataQualityEligibilityFor(instrumentId, options),
+      regimeGateNote: regimeGateResult.regimeGateNote ?? undefined,
+      regimeGateSuppressed: regimeGateResult.regimeGateSuppressed || undefined,
       generationRunId: options.generationRunId ?? null,
       source: 'signal-generation-engine',
       data_status: prices.length >= 50 ? (prices.length >= 200 ? 'COMPLETE' : 'PARTIAL') : 'MISSING',
@@ -1011,7 +1079,7 @@ export class SignalGenerationEngineService {
       region,
       strategy_id: strategyId,
       strategy_version: strategyVersion,
-      trigger_type: this.triggerTypeFor(signal.direction, instrument?.derivatives_eligible ?? instrument?.derivativesEligible),
+      trigger_type: this.triggerTypeFor(signal.direction, instrument?.derivatives_eligible ?? instrument?.derivativesEligible, signal.regimeGateSuppressed),
       trigger_price: sourceProvenPriceEvidence?.triggerPrice ?? null,
       trigger_timestamp: triggerTimestamp,
       timeframe,
@@ -1037,10 +1105,13 @@ export class SignalGenerationEngineService {
     };
   }
 
-  private triggerTypeFor(direction: SignalDirection, derivativesEligible?: boolean | null): SignalTriggerType {
+  private triggerTypeFor(direction: SignalDirection, derivativesEligible?: boolean | null, regimeGateSuppressed?: boolean): SignalTriggerType {
     if (direction === 'BULLISH') return 'bullish_entry_trigger';
     if (direction === 'BEARISH') {
-      // Short entries require F&O eligibility; cash-only stocks cannot be shorted — classify as risk_warning
+      // Short entries require F&O eligibility; cash-only stocks cannot be shorted — classify as risk_warning.
+      // Additionally: when the regime gate suppressed this short (RISK_ON regime), force risk_warning
+      // even for F&O-eligible names — tradable short is not appropriate contra-trend.
+      if (regimeGateSuppressed === true) return 'risk_warning';
       return derivativesEligible === true ? 'bearish_trigger' : 'risk_warning';
     }
     return 'risk_warning';
@@ -1388,6 +1459,125 @@ export class SignalGenerationEngineService {
     const { StrategyFrameworkService } = require('../strategy-framework/strategy-framework.service') as typeof import('../strategy-framework/strategy-framework.service');
     this.defaultStrategyFrameworkServiceInstance = new StrategyFrameworkService();
     return this.defaultStrategyFrameworkServiceInstance;
+  }
+
+  /**
+   * Lazy-require default for the regime gate provider.
+   *
+   * Importing CapitalPostureService statically would create a risk of circular
+   * module-graph issues since the module tree is large; the lazy-require pattern
+   * (identical to SignalOutcomeStalenessInvalidator in market-data-foundation)
+   * defers the require to the first actual call.
+   *
+   * Returns null when `capitalPostureService` was explicitly set to null (opt-out).
+   */
+  private defaultCapitalPostureService(): RegimeGateProvider | null {
+    // Explicit null → caller opted out of regime gating
+    if (this.capitalPostureService === null) return null;
+    if (this.capitalPostureService !== undefined) return this.capitalPostureService;
+    if (this.defaultCapitalPostureServiceInstance) return this.defaultCapitalPostureServiceInstance;
+    const { CapitalPostureService } = require('../market-context-intelligence/capital-posture.service') as typeof import('../market-context-intelligence/capital-posture.service');
+    this.defaultCapitalPostureServiceInstance = new CapitalPostureService();
+    return this.defaultCapitalPostureServiceInstance;
+  }
+
+  /**
+   * Applies the regime gate to a bearish signal.
+   *
+   * Rules:
+   *  1. Gate is off (REGIME_GATE_SHORTS_ENABLED=false) → pass through unchanged.
+   *  2. asOfDate is set (historical backfill) → skip regime read entirely (no persisted
+   *     snapshot for past dates); attach unavailable note and pass through unchanged.
+   *  3. Gate provider returns null (no persisted snapshot for today) → same: pass through
+   *     with unavailable note.  NEVER fabricate a regime.
+   *  4. contextualShortsOnly=true (RISK_OFF or weak-breadth NEUTRAL) → allow; the
+   *     existing triggerTypeFor result stands (F&O → bearish_trigger, cash → risk_warning).
+   *  5. contextualShortsOnly=false (RISK_ON) → suppress: force triggerType to risk_warning
+   *     and lower confidence one notch.  Signal is KEPT — still visible as risk_warning/avoid
+   *     so the explainability note surfaces in the UI.
+   *  6. Long signals: untouched.
+   *  7. Cash-bearish signals: already risk_warning from triggerTypeFor; gate never promotes
+   *     them, only ever forces F&O names to risk_warning when RISK_ON.
+   *
+   * Returns an annotation object that is merged into warnings[].
+   */
+  private async applyRegimeGateToShort(
+    direction: SignalDirection,
+    derivativesEligible: boolean | null | undefined,
+    region: string,
+    asOfDate: Date | null,
+    confidence: SignalConfidence,
+  ): Promise<{
+    regimeGateSuppressed: boolean;
+    regimeGateNote: string | null;
+    adjustedConfidence: SignalConfidence;
+  }> {
+    // Only gate bearish signals
+    if (direction !== 'BEARISH') {
+      return { regimeGateSuppressed: false, regimeGateNote: null, adjustedConfidence: confidence };
+    }
+
+    // Toggle — gate entirely disabled (REGIME_GATE_SHORTS_ENABLED=false OR explicit null injection)
+    if (!REGIME_GATE_SHORTS_ENABLED || this.capitalPostureService === null) {
+      return { regimeGateSuppressed: false, regimeGateNote: null, adjustedConfidence: confidence };
+    }
+
+    // Historical / backfill runs: regime snapshot for past dates does not exist —
+    // do NOT gate.  Attach a note so the record is transparent.
+    if (asOfDate) {
+      return {
+        regimeGateSuppressed: false,
+        regimeGateNote: 'Regime context unavailable for as-of date (historical/backfill run); short signal passes through unmodified.',
+        adjustedConfidence: confidence,
+      };
+    }
+
+    // Resolve regime gate from the provider (injected or lazily defaulted)
+    let gate: Awaited<ReturnType<RegimeGateProvider['regimeGate']>>;
+    try {
+      const provider = this.defaultCapitalPostureService();
+      gate = provider ? await provider.regimeGate(region) : null;
+    } catch {
+      // Best-effort — a regime-gate failure must never fail signal generation
+      gate = null;
+    }
+
+    // Provider returned null → no persisted snapshot for today.
+    // Pass through with unavailable note; do NOT fabricate a regime.
+    if (!gate) {
+      return {
+        regimeGateSuppressed: false,
+        regimeGateNote: 'Regime context unavailable (no persisted market-context snapshot); short signal passes through unmodified. Regime is not fabricated.',
+        adjustedConfidence: confidence,
+      };
+    }
+
+    // RISK_OFF / weak-breadth NEUTRAL (contextualShortsOnly=true) → allow the short
+    if (gate.contextualShortsOnly) {
+      return {
+        regimeGateSuppressed: false,
+        regimeGateNote: gate.note,
+        adjustedConfidence: confidence,
+      };
+    }
+
+    // RISK_ON (contextualShortsOnly=false) → suppress tradable shorts, force to risk_warning
+    // Cash-bearish names were already risk_warning from triggerTypeFor — no change needed,
+    // but we still attach the suppression note for transparency.
+    const isTradableShort = derivativesEligible === true;
+    const suppressionNote = `Short suppressed: market regime is ${gate.posture} (contextualShortsOnly=false). Shorts are contra-trend in the current regime; only contextually sensible in RISK_OFF/weak breadth. Signal retained as risk_warning/avoid for reference.`;
+
+    const confidenceOrder: SignalConfidence[] = ['HIGH', 'MEDIUM', 'LOW'];
+    const currentIdx = confidenceOrder.indexOf(confidence);
+    const adjustedConfidence: SignalConfidence = currentIdx < confidenceOrder.length - 1
+      ? confidenceOrder[currentIdx + 1]
+      : confidence;
+
+    return {
+      regimeGateSuppressed: isTradableShort, // only log as "suppressed" for names that would have been bearish_trigger
+      regimeGateNote: suppressionNote,
+      adjustedConfidence,
+    };
   }
 
   sma(prices: SignalPricePoint[], period: number): number | null {
