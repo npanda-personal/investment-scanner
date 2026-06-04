@@ -1,6 +1,7 @@
 import { HistoricalContextSnapshotsService } from '../historical-context-snapshots';
 import { SignalGenerationEngineService, type SignalResultDto } from '../signal-generation-engine';
 import { SignalQualityLabService, type NoisySignalItem, type QualityHorizon, type QualityMetricGroup, type SignalTypePerformance } from '../signal-quality-lab';
+import type { PersistedQualityMetrics } from '../signal-quality-lab';
 import { DataQualityEngineService, type DataQualityEvaluationDto } from '../data-quality-engine';
 import { SignalCalibrationEngineRepository } from './signal-calibration-engine.repository';
 import type {
@@ -31,6 +32,14 @@ const DEFAULT_HORIZON: QualityHorizon = '20D';
 const MIN_OVERALL_SAMPLES = 50;
 const MIN_GROUP_SAMPLES = 20;
 
+/**
+ * Minimum number of mature (dataComplete=true) signal_outcomes rows required
+ * before the persisted-outcomes path is preferred over on-demand recomputation.
+ * Set comfortably above MIN_OVERALL_SAMPLES to ensure the persisted data is
+ * statistically meaningful before it is trusted as the quality source.
+ */
+const MIN_PERSISTED_SAMPLES = 200;
+
 const THRESHOLDS = {
   HIGH: { overall: 200, group: 50 },
   MEDIUM: { overall: 100, group: 30 },
@@ -47,6 +56,8 @@ const CAPS = {
 const TOTAL_DELTA_CAP = 25;
 const RUN_CONCURRENCY = 4;
 
+type MetricsSource = 'PERSISTED_OUTCOMES' | 'ON_DEMAND';
+
 type BatchQualityMetrics = {
   byType: SignalTypePerformance[];
   byScore: QualityMetricGroup[];
@@ -56,6 +67,8 @@ type BatchQualityMetrics = {
   scoreBucketMetrics: Map<string, QualityMetricGroup>;
   sectorMetrics: Map<string, QualityMetricGroup>;
   noisyIssueTypesByInstrumentId: Map<string, string[]>;
+  /** Which data path produced these metrics. */
+  metricsSource: MetricsSource;
 };
 
 type BatchLookupCache = {
@@ -151,8 +164,25 @@ export class SignalCalibrationEngineService {
     const summaryQuery = { horizon, limit: 1, minSampleSize: 0, sector: request.sector, country: request.country, region: request.region, assetType: request.assetType };
     const qualityWarning = 'Signal Quality diagnostics unavailable; using raw score because calibration evidence is missing.';
     const globalSummary = await this.qualityService.summary(summaryQuery).catch(() => null);
-    const skipCalibrationEvidenceWork = this.shouldSkipCalibrationEvidenceWork(globalSummary, horizon);
-    const batchQualityMetrics = skipCalibrationEvidenceWork ? this.emptyQualityMetrics() : await this.batchQualityMetrics(summaryQuery);
+    const skipOnDemandEvidenceWork = this.shouldSkipCalibrationEvidenceWork(globalSummary, horizon);
+    // Even when the on-demand summary lacks evaluated outcomes, the persisted path may
+    // have sufficient mature rows — try it before falling back to empty metrics.
+    const resolvedBatchMetrics = skipOnDemandEvidenceWork
+      ? await this.tryPersistedMetrics(horizon) ?? this.emptyQualityMetrics()
+      : await this.batchQualityMetrics(summaryQuery);
+    // When the persisted path succeeded, synthesize a minimal summary so that
+    // calibrate() sees non-zero evaluatedForHorizon (derived from matureCount)
+    // and does not short-circuit to passthrough mode.
+    const effectiveSummary = (resolvedBatchMetrics.metricsSource === 'PERSISTED_OUTCOMES')
+      ? this.syntheticSummaryFromPersistedMetrics(horizon, resolvedBatchMetrics, globalSummary)
+      : globalSummary;
+    // Skip historical context lookups only when both on-demand AND persisted paths produce empty metrics.
+    const skipCalibrationEvidenceWork = resolvedBatchMetrics.metricsSource === 'ON_DEMAND'
+      && resolvedBatchMetrics.byType.length === 0
+      && resolvedBatchMetrics.byScore.length === 0
+      && resolvedBatchMetrics.bySector.length === 0
+      && skipOnDemandEvidenceWork;
+    const batchQualityMetrics = resolvedBatchMetrics;
     const batchLookupCache: BatchLookupCache = {
       qualityMetrics: batchQualityMetrics,
       dataQualityEvaluationsByInstrumentId: await this.batchDataQualityEvaluations(signals),
@@ -168,8 +198,8 @@ export class SignalCalibrationEngineService {
             warning: `${signal.instrument_id}: outside requested market scope (${request.region} / ${request.assetType || 'ALL'}).`,
           };
         }
-        const calibrated = await this.calibrateAndPersist(signal, horizon, globalSummary, { region: request.region, assetType: request.assetType }, batchLookupCache);
-        if (!globalSummary) {
+        const calibrated = await this.calibrateAndPersist(signal, horizon, effectiveSummary, { region: request.region, assetType: request.assetType }, batchLookupCache);
+        if (!effectiveSummary) {
           calibrated.dataGaps.push(qualityWarning);
           calibrated.calibrationEvidence?.evidenceWarnings.push(qualityWarning);
         }
@@ -198,8 +228,8 @@ export class SignalCalibrationEngineService {
       warnings.push(`${missingExplicitSignalCount} requested instruments did not have persisted raw signals for calibration.`);
     }
     const skipped = Math.max(0, signals.length - results.length - errors.length) + missingExplicitSignalCount;
-    const runEvidence = this.runEvidenceFromSummary(horizon, globalSummary, results);
-    const runReadiness = this.aggregateReadiness(results, horizon, runEvidence, Boolean(globalSummary));
+    const runEvidence = this.runEvidenceFromSummary(horizon, effectiveSummary, results);
+    const runReadiness = this.aggregateReadiness(results, horizon, runEvidence, Boolean(effectiveSummary));
     return {
       generated: results.length,
       skipped,
@@ -220,7 +250,7 @@ export class SignalCalibrationEngineService {
       skippedCount: skipped,
       failedCount: errors.length,
       outOfScopeSkipped,
-      warnings: [...(globalSummary ? [] : [qualityWarning]), ...warnings, ...errors],
+      warnings: [...(effectiveSummary ? [] : [qualityWarning]), ...warnings, ...errors],
       durationMs: Date.now() - started,
     };
   }
@@ -410,11 +440,15 @@ export class SignalCalibrationEngineService {
 
     const calibrationApplied = boosts.length > 0 || penalties.length > 0;
     const sampleSizePenaltyApplied = confidenceTier === 'INSUFFICIENT_SAMPLE' || confidenceTier === 'LOW';
-    const evidenceBasis = this.calibrationEvidenceBasis(context.horizon, {
-      generatedAt: context.signalQualityGeneratedAt ?? null,
-      evaluationDiagnostics: context.evaluationDiagnostics || null,
-      horizonAvailability: context.horizonAvailability || null,
-    });
+    const evidenceBasis = this.calibrationEvidenceBasis(
+      context.horizon,
+      {
+        generatedAt: context.signalQualityGeneratedAt ?? null,
+        evaluationDiagnostics: context.evaluationDiagnostics || null,
+        horizonAvailability: context.horizonAvailability || null,
+      },
+      { metricsSource: context.metricsSource }
+    );
     const calibrationEvidence = this.calibrationEvidence({
       horizon: context.horizon,
       overallEvaluatedSamples,
@@ -425,6 +459,7 @@ export class SignalCalibrationEngineService {
       evidenceReasons: reasons,
       evidenceWarnings,
       evidenceBasis,
+      metricsSource: context.metricsSource,
     });
     const calibrationReadiness = this.calibrationReadiness({
       evidenceStatus: finalEvidenceStatus,
@@ -531,34 +566,114 @@ export class SignalCalibrationEngineService {
       evaluationDiagnostics: globalSummary?.evaluationDiagnostics || null,
       signalQualityGeneratedAt: globalSummary?.generatedAt || null,
       horizon,
+      metricsSource: qualityMetrics.metricsSource,
     };
   }
 
   private async batchQualityMetrics(query: { horizon: QualityHorizon; limit: number; minSampleSize: number; sector?: string; country?: string; region?: string; assetType?: string }): Promise<BatchQualityMetrics> {
+    const persisted = await this.tryPersistedMetrics(query.horizon);
+    if (persisted) return persisted;
+
     const [byType, byScore, bySector, noisy] = await Promise.all([
       this.qualityService.byType(query).catch(() => []),
       this.qualityService.byScoreBucket(query).catch(() => []),
       this.qualityService.bySector(query).catch(() => []),
       this.qualityService.noisy({ ...query, limit: 5000 }).catch(() => []),
     ]);
-    return this.prepareQualityMetrics(byType as SignalTypePerformance[], byScore as QualityMetricGroup[], bySector as QualityMetricGroup[], noisy as NoisySignalItem[]);
+    return this.prepareQualityMetrics(byType as SignalTypePerformance[], byScore as QualityMetricGroup[], bySector as QualityMetricGroup[], noisy as NoisySignalItem[], 'ON_DEMAND');
   }
 
   private async qualityMetrics(query: { horizon: QualityHorizon; limit: number; minSampleSize: number; sector?: string; country?: string; region?: string; assetType?: string }): Promise<BatchQualityMetrics> {
+    const persisted = await this.tryPersistedMetrics(query.horizon);
+    if (persisted) return persisted;
+
     const [byType, byScore, bySector, noisy] = await Promise.all([
       this.qualityService.byType(query).catch(() => []),
       this.qualityService.byScoreBucket(query).catch(() => []),
       this.qualityService.bySector(query).catch(() => []),
       this.qualityService.noisy({ ...query, limit: 250 }).catch(() => []),
     ]);
-    return this.prepareQualityMetrics(byType as SignalTypePerformance[], byScore as QualityMetricGroup[], bySector as QualityMetricGroup[], noisy as NoisySignalItem[]);
+    return this.prepareQualityMetrics(byType as SignalTypePerformance[], byScore as QualityMetricGroup[], bySector as QualityMetricGroup[], noisy as NoisySignalItem[], 'ON_DEMAND');
+  }
+
+  /**
+   * Build a minimal globalSummary-like object from persisted metrics so that
+   * the calibration path sees non-zero evaluatedForHorizon and does not
+   * short-circuit to passthrough mode. The real on-demand summary (if any)
+   * is preserved for its diagnostic fields; only the evaluated-signal counts
+   * are overridden to reflect the persisted matureCount.
+   */
+  private syntheticSummaryFromPersistedMetrics(
+    horizon: QualityHorizon,
+    metrics: BatchQualityMetrics,
+    onDemandSummary: any
+  ): any {
+    // Determine matureCount from the byScore array (which is populated from persisted outcomes).
+    // Use the max directional sample across score buckets as a proxy for total evaluated signals.
+    const matureCount = Math.max(
+      0,
+      ...metrics.byScore.map((item) => item.sampleSize),
+      ...metrics.bySector.map((item) => item.sampleSize),
+      ...metrics.byType.map((item) => item.sampleSize),
+    ) || MIN_PERSISTED_SAMPLES;
+
+    const horizonEntry = { eligible: matureCount, evaluated: matureCount, insufficientFuturePrice: 0 };
+    const baseHorizonAvailability = SUPPORTED_HORIZONS.reduce((acc, h) => {
+      acc[h] = h === horizon ? horizonEntry : { eligible: 0, evaluated: 0, insufficientFuturePrice: 0 };
+      return acc;
+    }, {} as Record<string, any>);
+
+    return {
+      // Preserve on-demand diagnostic fields if available (for date references)
+      ...(onDemandSummary ?? {}),
+      // Override evaluated signal counts to reflect persisted data
+      evaluationDiagnostics: {
+        ...(onDemandSummary?.evaluationDiagnostics ?? {}),
+        evaluatedSignals: matureCount,
+        latestAvailablePriceDate: onDemandSummary?.evaluationDiagnostics?.latestAvailablePriceDate ?? null,
+        nextEvaluableDate: null,
+      },
+      horizonAvailability: {
+        ...(onDemandSummary?.horizonAvailability ?? {}),
+        ...baseHorizonAvailability,
+        [horizon]: horizonEntry,
+      },
+      dataStatus: 'PARTIAL',
+      generatedAt: onDemandSummary?.generatedAt ?? new Date().toISOString(),
+    };
+  }
+
+  /**
+   * Attempt to build quality metrics from persisted signal_outcomes.
+   * Returns a BatchQualityMetrics with source=PERSISTED_OUTCOMES when the
+   * persisted count is >= MIN_PERSISTED_SAMPLES; returns null to trigger the
+   * on-demand fallback otherwise.
+   */
+  private async tryPersistedMetrics(horizon: QualityHorizon): Promise<BatchQualityMetrics | null> {
+    try {
+      const matureCount = await this.qualityService.countMatureByHorizon(horizon);
+      if (matureCount < MIN_PERSISTED_SAMPLES) return null;
+
+      const metrics: PersistedQualityMetrics = await this.qualityService.qualityMetricsFromPersistedOutcomes({ horizon });
+      return this.prepareQualityMetrics(
+        metrics.byType,
+        metrics.byScore,
+        metrics.bySector,
+        metrics.noisy,
+        'PERSISTED_OUTCOMES'
+      );
+    } catch {
+      // Any error: fall back to on-demand path
+      return null;
+    }
   }
 
   private prepareQualityMetrics(
     byType: SignalTypePerformance[],
     byScore: QualityMetricGroup[],
     bySector: QualityMetricGroup[],
-    noisy: NoisySignalItem[]
+    noisy: NoisySignalItem[],
+    metricsSource: MetricsSource = 'ON_DEMAND'
   ): BatchQualityMetrics {
     const signalTypeMetrics = new Map<string, { winRate: number | null; averageForwardReturn: number | null; sampleSize: number }>();
     for (const metric of byType) signalTypeMetrics.set(metric.signalType, metric);
@@ -570,11 +685,11 @@ export class SignalCalibrationEngineService {
       existing.push(item.issueType);
       noisyIssueTypesByInstrumentId.set(item.instrumentId, existing);
     }
-    return { byType, byScore, bySector, noisy, signalTypeMetrics, scoreBucketMetrics, sectorMetrics, noisyIssueTypesByInstrumentId };
+    return { byType, byScore, bySector, noisy, signalTypeMetrics, scoreBucketMetrics, sectorMetrics, noisyIssueTypesByInstrumentId, metricsSource };
   }
 
   private emptyQualityMetrics(): BatchQualityMetrics {
-    return this.prepareQualityMetrics([], [], [], []);
+    return this.prepareQualityMetrics([], [], [], [], 'ON_DEMAND');
   }
 
   private shouldSkipCalibrationEvidenceWork(globalSummary: any, horizon: QualityHorizon): boolean {
@@ -675,6 +790,7 @@ export class SignalCalibrationEngineService {
     evidenceReasons: string[];
     evidenceWarnings: string[];
     evidenceBasis: CalibrationEvidenceBasis;
+    metricsSource?: 'PERSISTED_OUTCOMES' | 'ON_DEMAND';
   }): CalibrationEvidence {
     return {
       horizon: input.horizon,
@@ -691,6 +807,7 @@ export class SignalCalibrationEngineService {
       evidenceWarnings: input.evidenceWarnings,
       warnings: input.evidenceWarnings,
       evidenceBasis: input.evidenceBasis,
+      metricsSource: input.metricsSource,
     };
   }
 
@@ -848,18 +965,45 @@ export class SignalCalibrationEngineService {
     };
   }
 
-  private calibrationEvidenceBasis(horizon: QualityHorizon | string, summary: any): CalibrationEvidenceBasis {
+  private calibrationEvidenceBasis(
+    horizon: QualityHorizon | string,
+    summary: any,
+    opts?: { metricsSource?: 'PERSISTED_OUTCOMES' | 'ON_DEMAND' }
+  ): CalibrationEvidenceBasis {
+    const metricsSource = opts?.metricsSource;
+
     const latestMeasurablePriceDate = summary?.evaluationDiagnostics?.latestAvailablePriceDate ?? null;
     const nextEvaluableDate = summary?.evaluationDiagnostics?.nextEvaluableDate ?? null;
     const signalQualityGeneratedAt = summary?.generatedAt ?? null;
     const horizonAvailability = summary?.horizonAvailability?.[horizon];
     if (!summary || !latestMeasurablePriceDate) {
+      // If metrics came from persisted outcomes, the summary will be null but evidence is still present
+      if (metricsSource === 'PERSISTED_OUTCOMES') {
+        return {
+          status: 'MEASURED_FROM_PERSISTED_OUTCOMES',
+          signalQualityGeneratedAt: null,
+          latestMeasurablePriceDate: null,
+          nextEvaluableDate: null,
+          reasonSummary: `Quality metrics for ${horizon} are sourced from persisted signal outcome records (dataComplete=true).`,
+        };
+      }
       return {
         status: 'MISSING_SIGNAL_QUALITY_EVIDENCE',
         signalQualityGeneratedAt,
         latestMeasurablePriceDate,
         nextEvaluableDate,
         reasonSummary: `Signal Quality evidence basis is missing for ${horizon}.`,
+      };
+    }
+
+    // If persisted metrics were used alongside a valid summary (e.g., both run), prefer persisted label
+    if (metricsSource === 'PERSISTED_OUTCOMES') {
+      return {
+        status: 'MEASURED_FROM_PERSISTED_OUTCOMES',
+        signalQualityGeneratedAt,
+        latestMeasurablePriceDate,
+        nextEvaluableDate,
+        reasonSummary: `Quality metrics for ${horizon} are sourced from persisted signal outcome records (dataComplete=true); measured through ${latestMeasurablePriceDate}.`,
       };
     }
 

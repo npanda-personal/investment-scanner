@@ -7,6 +7,8 @@ import type {
   ForwardOutcome,
   NoisySignalItem,
   ParsedSignalType,
+  PersistedOutcomeMetricsQuery,
+  PersistedQualityMetrics,
   PricePoint,
   QualityHorizon,
   QualityMetricGroup,
@@ -213,6 +215,15 @@ export class SignalQualityLabService {
   // ---------------------------------------------------------------------------
 
   /**
+   * Count mature (dataComplete=true) signal_outcomes rows for the given horizon.
+   * Used by the calibration engine to decide whether persisted outcomes are
+   * sufficient to skip on-demand price-history recomputation.
+   */
+  async countMatureByHorizon(horizon: QualityHorizon): Promise<number> {
+    return this.repository.countMatureByHorizon(horizon);
+  }
+
+  /**
    * Return scorecard rows grouped by `horizon × groupBy`.
    * Delegates SQL aggregation to the repository; applies minSampleSize after.
    */
@@ -241,6 +252,103 @@ export class SignalQualityLabService {
   async scorecardSummary(query: ScorecardQuery): Promise<ScorecardSummary[]> {
     const normalizedQuery = this.normalizeScorecardQuery(query);
     return this.repository.scorecardSummary(normalizedQuery);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Persisted-outcome quality metrics (Slice 3)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Derive calibration quality metrics entirely from persisted signal_outcomes
+   * (dataComplete=true), avoiding re-fetching price series on every calibration
+   * run.
+   *
+   * Returns the same four arrays consumed by the calibration engine:
+   *   byType  — per signal-type-code win rate / avg return (via SQL join to signal_results)
+   *   byScore — per score-bucket metrics (calibration-compatible bucket boundaries)
+   *   bySector — per sector metrics
+   *   noisy   — always empty; noisy detection requires in-memory signal history
+   *
+   * Win-rate is direction-aware (BULLISH / BEARISH only; NEUTRAL excluded),
+   * matching the on-demand path and the Slice-2 scorecard semantics.
+   *
+   * matureCount is the number of dataComplete=true rows for the horizon —
+   * callers should gate on this before trusting the metrics.
+   */
+  async qualityMetricsFromPersistedOutcomes(query: PersistedOutcomeMetricsQuery): Promise<PersistedQualityMetrics> {
+    const scorecardBase: ScorecardQuery = {
+      horizon: query.horizon,
+      modelVersion: query.modelVersion,
+      minSampleSize: 0,
+    };
+
+    const [scoreBucketRows, sectorRows, signalTypeRows, matureCount] = await Promise.all([
+      this.repository.scorecard({ ...scorecardBase, groupBy: 'calibrationScoreBucket' as any }),
+      this.repository.scorecard({ ...scorecardBase, groupBy: 'sector' }),
+      this.repository.signalTypeMetricsFromPersistedOutcomes({ horizon: query.horizon, modelVersion: query.modelVersion }),
+      this.repository.countMatureByHorizon(query.horizon),
+    ]);
+
+    const byScore: QualityMetricGroup[] = scoreBucketRows.map((row) => this.scorecardRowToMetricGroup(row, query.horizon));
+    const bySector: QualityMetricGroup[] = sectorRows.map((row) => this.scorecardRowToMetricGroup(row, query.horizon));
+
+    const byType: SignalTypePerformance[] = signalTypeRows.map((row) => ({
+      group: row.signalTypeCode,
+      name: row.signalTypeCode,
+      horizon: query.horizon,
+      rawSignalCount: row.sampleSize,
+      sampleSize: row.directionalSampleSize,
+      samples: row.directionalSampleSize,
+      unevaluatedCount: 0,
+      winRate: row.winRate,
+      averageForwardReturn: row.avgReturnPercent,
+      averageReturn: row.avgReturnPercent,
+      medianForwardReturn: null,
+      medianReturn: null,
+      averageMaxDrawdown: null,
+      bestReturn: null,
+      worstReturn: null,
+      positiveCount: 0,
+      negativeCount: 0,
+      status: (row.directionalSampleSize >= 5 ? 'EVALUATED' : 'SMALL_SAMPLE') as QualityMetricGroup['status'],
+      reason: row.directionalSampleSize < 5 ? 'Small evaluated sample; interpret as historical measurement only.' : null,
+      signalType: row.signalTypeCode,
+      category: 'UNKNOWN',
+    }));
+
+    return { byType, byScore, bySector, noisy: [], matureCount };
+  }
+
+  /**
+   * Map a ScorecardRow (persisted aggregate) to the QualityMetricGroup shape
+   * that the calibration engine consumes.
+   *
+   * sampleSize is set to directionalSampleSize so that the calibration engine's
+   * MIN_GROUP_SAMPLES guard (which checks sampleSize) uses the directional count —
+   * matching the semantics of the on-demand path which only counts evaluated outcomes.
+   */
+  private scorecardRowToMetricGroup(row: import('./signal-quality-lab.types').ScorecardRow, horizon: QualityHorizon): QualityMetricGroup {
+    return {
+      group: row.groupKey,
+      name: row.groupKey,
+      horizon,
+      rawSignalCount: row.sampleSize,
+      sampleSize: row.directionalSampleSize,
+      samples: row.directionalSampleSize,
+      unevaluatedCount: 0,
+      winRate: row.winRate,
+      averageForwardReturn: row.avgReturnPercent,
+      averageReturn: row.avgReturnPercent,
+      medianForwardReturn: row.medianReturnPercent,
+      medianReturn: row.medianReturnPercent,
+      averageMaxDrawdown: row.avgMaxAdverseExcursion,
+      bestReturn: row.bestReturnPercent,
+      worstReturn: row.worstReturnPercent,
+      positiveCount: 0,
+      negativeCount: 0,
+      status: (row.directionalSampleSize >= 5 ? 'EVALUATED' : 'SMALL_SAMPLE') as QualityMetricGroup['status'],
+      reason: row.directionalSampleSize < 5 ? 'Small evaluated sample; interpret as historical measurement only.' : null,
+    };
   }
 
   private normalizeScorecardQuery(query: ScorecardQuery): ScorecardQuery & { groupBy: ScorecardGroupBy; minSampleSize: number } {

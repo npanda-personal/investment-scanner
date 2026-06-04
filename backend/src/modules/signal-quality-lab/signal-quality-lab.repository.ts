@@ -1,6 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import prisma from '../../db/prisma';
-import type { OutcomeBatchResult, QualityHorizon, ScorecardQuery, ScorecardRow, ScorecardSummary, SignalOutcomeUpsert } from './signal-quality-lab.types';
+import type { OutcomeBatchResult, PersistedOutcomeMetricsQuery, PersistedSignalTypeRow, QualityHorizon, ScorecardQuery, ScorecardRow, ScorecardSummary, SignalOutcomeUpsert } from './signal-quality-lab.types';
 
 /** Maximum rows per Prisma transaction chunk (keeps individual txn fast). */
 const UPSERT_CHUNK_SIZE = 200;
@@ -332,7 +332,7 @@ export class SignalQualityLabRepository {
   // Private SQL-building helpers
   // ---------------------------------------------------------------------------
 
-  private groupExpressions(groupBy: 'direction' | 'sector' | 'scoreBucket'): { groupExpr: string; labelExpr: string } {
+  private groupExpressions(groupBy: 'direction' | 'sector' | 'scoreBucket' | 'calibrationScoreBucket'): { groupExpr: string; labelExpr: string } {
     switch (groupBy) {
       case 'direction':
         return { groupExpr: 'direction', labelExpr: 'a.group_key' };
@@ -345,6 +345,22 @@ export class SignalQualityLabRepository {
             WHEN score >= 40 AND score <= 59  THEN '40-59'
             WHEN score >= 60 AND score <= 79  THEN '60-79'
             WHEN score >= 80 AND score <= 100 THEN '80-100'
+            ELSE 'Unknown'
+          END`,
+          labelExpr: 'a.group_key',
+        };
+      case 'calibrationScoreBucket':
+        // Matches the scoreBucket() logic in SignalCalibrationEngineService:
+        //   score < 40  → '0-39'
+        //   score < 70  → '40-69'
+        //   score < 85  → '70-84'
+        //   otherwise   → '85-100'
+        return {
+          groupExpr: `CASE
+            WHEN score >= 0  AND score <= 39  THEN '0-39'
+            WHEN score >= 40 AND score <= 69  THEN '40-69'
+            WHEN score >= 70 AND score <= 84  THEN '70-84'
+            WHEN score >= 85 AND score <= 100 THEN '85-100'
             ELSE 'Unknown'
           END`,
           labelExpr: 'a.group_key',
@@ -398,6 +414,96 @@ export class SignalQualityLabRepository {
       throw new Error(`Invalid filter value for SQL literal: "${value}"`);
     }
     return value;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Persisted signal-type metrics (Slice 3)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Aggregate persisted signal_outcomes by signal-type code, joining to
+   * signal_results to expand the triggeredSignals JSON array.
+   *
+   * Win-rate semantics (matches scorecard):
+   *   - denominator = BULLISH + BEARISH rows (NEUTRAL excluded)
+   *   - win = BULLISH row with forwardReturnPercent > 0 OR BEARISH row < 0
+   *
+   * Only dataComplete = true rows are included.
+   */
+  async signalTypeMetricsFromPersistedOutcomes(query: PersistedOutcomeMetricsQuery): Promise<PersistedSignalTypeRow[]> {
+    const whereParts: string[] = [`so."dataComplete" = true`];
+
+    if (query.horizon) {
+      whereParts.push(`so.horizon = '${this.escapeString(query.horizon)}'`);
+    }
+    if (query.modelVersion) {
+      whereParts.push(`so."modelVersion" = '${this.escapeString(query.modelVersion)}'`);
+    }
+
+    const whereClause = whereParts.join(' AND ');
+
+    const sql = `
+      WITH expanded AS (
+        SELECT
+          so.horizon,
+          so.direction,
+          so."forwardReturnPercent",
+          (ts_item->>'code') AS signal_type_code
+        FROM signal_outcomes so
+        JOIN signal_results sr ON sr.id = so."signalResultId"
+        CROSS JOIN LATERAL jsonb_array_elements(
+          CASE WHEN jsonb_typeof(sr."triggeredSignals") = 'array'
+               THEN sr."triggeredSignals"
+               ELSE '[]'::jsonb
+          END
+        ) AS ts_item
+        WHERE ${whereClause}
+      ),
+      directional AS (
+        SELECT
+          horizon,
+          signal_type_code,
+          COUNT(*) FILTER (WHERE direction IN ('BULLISH','BEARISH')) AS directional_sample,
+          COUNT(*) FILTER (
+            WHERE (direction = 'BULLISH' AND "forwardReturnPercent" > 0)
+               OR (direction = 'BEARISH' AND "forwardReturnPercent" < 0)
+          ) AS wins
+        FROM expanded
+        GROUP BY horizon, signal_type_code
+      ),
+      aggregated AS (
+        SELECT
+          horizon,
+          signal_type_code,
+          COUNT(*) AS sample_size,
+          AVG("forwardReturnPercent") AS avg_return
+        FROM expanded
+        GROUP BY horizon, signal_type_code
+      )
+      SELECT
+        a.horizon,
+        a.signal_type_code,
+        a.sample_size::int AS sample_size,
+        COALESCE(d.directional_sample, 0)::int AS directional_sample_size,
+        CASE WHEN COALESCE(d.directional_sample, 0) = 0 THEN NULL
+             ELSE ROUND((d.wins::numeric / d.directional_sample::numeric), 6)
+        END AS win_rate,
+        ROUND(a.avg_return::numeric, 6) AS avg_return_percent
+      FROM aggregated a
+      LEFT JOIN directional d ON a.horizon = d.horizon AND a.signal_type_code = d.signal_type_code
+      ORDER BY a.horizon, a.signal_type_code
+    `;
+
+    const rows = await this.db.$queryRawUnsafe<any[]>(sql);
+
+    return rows.map((row) => ({
+      horizon: row.horizon as QualityHorizon,
+      signalTypeCode: String(row.signal_type_code ?? ''),
+      sampleSize: Number(row.sample_size),
+      directionalSampleSize: Number(row.directional_sample_size),
+      winRate: row.win_rate !== null && row.win_rate !== undefined ? Number(row.win_rate) : null,
+      avgReturnPercent: row.avg_return_percent !== null && row.avg_return_percent !== undefined ? Number(row.avg_return_percent) : null,
+    }));
   }
 
   // ---------------------------------------------------------------------------

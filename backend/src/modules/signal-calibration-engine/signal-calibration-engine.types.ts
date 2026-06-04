@@ -5,7 +5,11 @@ export type CalibrationDataStatus = 'COMPLETE' | 'PARTIAL' | 'MISSING' | 'ERROR'
 export type CalibrationAdjustmentType = 'SIGNAL_TYPE' | 'SCORE_BUCKET' | 'REGIME' | 'SECTOR' | 'SMART_MONEY' | 'DATA_QUALITY' | 'NOISE';
 export type CalibrationConfidenceLevel = SignalConfidence | 'INSUFFICIENT_SAMPLE';
 export type CalibrationEvidenceStatus = 'SUFFICIENT' | 'LOW_SAMPLE' | 'INSUFFICIENT' | 'MISSING';
-export type CalibrationEvidenceBasisStatus = 'MEASURED' | 'HORIZON_LIMITED' | 'MISSING_SIGNAL_QUALITY_EVIDENCE';
+export type CalibrationEvidenceBasisStatus =
+  | 'MEASURED'
+  | 'MEASURED_FROM_PERSISTED_OUTCOMES'
+  | 'HORIZON_LIMITED'
+  | 'MISSING_SIGNAL_QUALITY_EVIDENCE';
 export type CalibrationReadinessStatus = 'USABLE' | 'LIMITED' | 'UNAVAILABLE';
 export type CalibrationDownstreamInfluence = 'NORMAL' | 'LIMITED' | 'NONE';
 export type CalibrationAuthoritativeScore = 'CALIBRATED_SCORE' | 'RAW_SCORE' | 'NO_SCORE';
@@ -32,6 +36,8 @@ export interface CalibrationEvidence {
   evidenceWarnings: string[];
   warnings: string[];
   evidenceBasis: CalibrationEvidenceBasis;
+  /** Indicates whether quality metrics came from persisted outcomes or on-demand recomputation. */
+  metricsSource?: 'PERSISTED_OUTCOMES' | 'ON_DEMAND';
 }
 
 export interface CalibrationEvidenceBasis {
@@ -245,6 +251,8 @@ export interface CalibrationContext {
   evaluationDiagnostics?: any | null;
   signalQualityGeneratedAt?: string | null;
   horizon: string;
+  /** Source of quality metrics used for calibration adjustments. */
+  metricsSource?: 'PERSISTED_OUTCOMES' | 'ON_DEMAND';
 }
 
 export interface SignalLikeForCalibration {

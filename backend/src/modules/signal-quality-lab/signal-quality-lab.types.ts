@@ -353,3 +353,44 @@ export interface ScorecardResponse {
   /** Per-horizon summary (one entry per horizon present in rows, or all 5 when horizon is null). */
   summary: ScorecardSummary[];
 }
+
+// ---------------------------------------------------------------------------
+// Persisted-outcome metrics types (Slice 3)
+// ---------------------------------------------------------------------------
+
+/**
+ * Query parameters for deriving calibration quality metrics from persisted
+ * signal_outcomes (dataComplete=true) rows.
+ */
+export interface PersistedOutcomeMetricsQuery {
+  horizon: QualityHorizon;
+  modelVersion?: string;
+}
+
+/**
+ * One signal-type row from the persisted-outcome signal-type aggregation.
+ */
+export interface PersistedSignalTypeRow {
+  horizon: QualityHorizon;
+  signalTypeCode: string;
+  sampleSize: number;
+  directionalSampleSize: number;
+  winRate: number | null;
+  avgReturnPercent: number | null;
+}
+
+/**
+ * The same grouping arrays consumed by the calibration engine's
+ * prepareQualityMetrics helper, but sourced from persisted signal_outcomes.
+ * noisy is always empty — noisy detection requires in-memory signal history
+ * and is not derivable from persisted outcomes.
+ */
+export interface PersistedQualityMetrics {
+  byType: SignalTypePerformance[];
+  byScore: QualityMetricGroup[];
+  bySector: QualityMetricGroup[];
+  /** Always empty: noisy detection requires signal history, not outcome rows. */
+  noisy: NoisySignalItem[];
+  /** Number of mature (dataComplete=true) outcome rows for the selected horizon. */
+  matureCount: number;
+}
