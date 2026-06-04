@@ -98,6 +98,39 @@ const EVIDENCE_MIXED_FLOOR = 0.4;
 const DIRECTION_BULLISH_THRESHOLD = 60;
 const DIRECTION_BEARISH_THRESHOLD = 40;
 
+// ── v3 Overextension / Mean-Reversion Guards ─────────────────────────────────
+//
+// Empirical finding: the top score bucket (80-100) is anti-predictive at short
+// horizons (1D -2.13%, 5D -0.42%/49.8% win) because extreme technical+momentum
+// signals preferentially surface over-extended / overbought names that mean-revert.
+// These guards push NEGATIVE signals through the existing categoryScore mechanism
+// so over-extended names get demoted — no ad-hoc penalty; the category proportion
+// lowers the composite score in the same way any other negative signal does.
+//
+// All thresholds are standard / textbook TA values; none are fit to any sample.
+// Each guard is independently toggle-able; all ON by default.
+//
+// Guard 1 — Overbought RSI (TECHNICAL):
+//   RSI(14) >= 70 is the textbook overbought threshold (Wilder, 1978).
+//   An extreme level at >= 80 adds a second, stronger demotion.
+const GUARD_OVERBOUGHT_RSI_ENABLED = true;
+const RSI_OVERBOUGHT = 70;          // textbook: above 70 = overbought
+const RSI_EXTREME_OVERBOUGHT = 80;  // extreme: above 80 = strongly overbought
+
+// Guard 2 — Extended above SMA50 (TECHNICAL):
+//   Price more than 15% above SMA50 signals a parabolic stretch from the medium-
+//   term trend line. Textbook "channel deviation" studies use 10-20% as the
+//   danger zone; 15% is the midpoint of that range.
+const GUARD_SMA50_STRETCH_ENABLED = true;
+const SMA50_STRETCH_PCT = 0.15;     // 15% above SMA50 = over-extended
+
+// Guard 3 — Parabolic short-term run-up (MOMENTUM):
+//   A 20%+ gain over 10 trading days (~2 calendar weeks) is a parabolic spike
+//   well beyond normal momentum. Textbook short-squeeze / blow-off tops
+//   are typically identified by 15-25% 10-day moves; 20% is the centre.
+const GUARD_PARABOLIC_RUNUP_ENABLED = true;
+const PARABOLIC_RUNUP_PCT = 0.20;   // 20% 10-day run = parabolic
+
 type SignalGenerationBatchContext = {
   instrumentsById: Map<string, any>;
   priceWindowsByInstrumentId: Map<string, any[]>;
@@ -754,6 +787,32 @@ export class SignalGenerationEngineService {
     if (rsiNow !== null && rsiPrev !== null && rsiPrev > 70 && rsiNow < rsiPrev - 2) {
       negativeSignals.push(this.signal(isRangeBound ? 'STRONG_RSI_REVERSAL' : 'RSI_OVERBOUGHT_REVERSAL', 'RSI is reversing from overbought levels', 'TECHNICAL'));
     }
+
+    // ── Guard 1: Overbought RSI ───────────────────────────────────────────────
+    // Demote over-extended names where RSI(14) is in overbought territory.
+    // Standard textbook levels: 70 = overbought, 80 = extreme overbought.
+    // Fires independently of the reversal check above (that fires only after RSI
+    // has already turned down; this fires while RSI is still elevated).
+    // Explainability: these signals appear in negative_signals / triggerContract
+    // failed_conditions so the user sees WHY a name was demoted.
+    if (GUARD_OVERBOUGHT_RSI_ENABLED && rsiNow !== null) {
+      if (rsiNow >= RSI_EXTREME_OVERBOUGHT) {
+        negativeSignals.push(this.signal('RSI_EXTREME_OVERBOUGHT', `RSI(14) is ${rsiNow.toFixed(1)} — extremely overbought (>=${RSI_EXTREME_OVERBOUGHT}); mean-reversion risk is elevated`, 'TECHNICAL'));
+      } else if (rsiNow >= RSI_OVERBOUGHT) {
+        negativeSignals.push(this.signal('RSI_OVERBOUGHT', `RSI(14) is ${rsiNow.toFixed(1)} — overbought (>=${RSI_OVERBOUGHT}); upside momentum is stretched`, 'TECHNICAL'));
+      }
+    }
+
+    // ── Guard 2: Extended above SMA50 ─────────────────────────────────────────
+    // Demote names that are trading more than SMA50_STRETCH_PCT (15%) above their
+    // 50-day moving average — a parabolic stretch from the medium-term trend line.
+    // Skipped cleanly if SMA50 is unavailable (insufficient data).
+    if (GUARD_SMA50_STRETCH_ENABLED && latest && sma50 !== null && sma50 > 0) {
+      const stretchPct = (latest.adjusted_close - sma50) / sma50;
+      if (stretchPct >= SMA50_STRETCH_PCT) {
+        negativeSignals.push(this.signal('EXTENDED_ABOVE_SMA50', `price is ${(stretchPct * 100).toFixed(1)}% above SMA50 — over-extended from trend (threshold: ${(SMA50_STRETCH_PCT * 100).toFixed(0)}%)`, 'TECHNICAL'));
+      }
+    }
     
     // Volatility-Adjusted Volume Breakout with Institutional Footprint (OBV)
     const averageVolume = this.average(prices.slice(1, 21).map((price) => price.volume).filter((value): value is number => typeof value === 'number'));
@@ -796,6 +855,19 @@ export class SignalGenerationEngineService {
 
     this.pushReturnSignal(oneMonth, 'ONE_MONTH_MOMENTUM', '1M momentum is positive', '1M momentum is negative', signals, negativeSignals, MOMENTUM_BULL_THRESHOLD_1M, MOMENTUM_BEAR_THRESHOLD_1M);
     this.pushReturnSignal(threeMonth, 'THREE_MONTH_MOMENTUM', '3M momentum is positive', '3M momentum is negative', signals, negativeSignals, MOMENTUM_BULL_THRESHOLD_3M, MOMENTUM_BEAR_THRESHOLD_3M);
+
+    // ── Guard 3: Parabolic short-term run-up ──────────────────────────────────
+    // A 20%+ gain over 10 trading days is a parabolic spike (blow-off / short-squeeze).
+    // Such moves routinely mean-revert at short horizons, making them anti-predictive
+    // for the research-worthiness ranking.
+    // Uses the existing returnAtOffset helper (offset=10 = 10 trading days).
+    // Explainability: appears in negative_signals / triggerContract failed_conditions.
+    if (GUARD_PARABOLIC_RUNUP_ENABLED) {
+      const tenDay = this.returnAtOffset(prices, 10);
+      if (tenDay !== null && tenDay >= PARABOLIC_RUNUP_PCT) {
+        negativeSignals.push(this.signal('PARABOLIC_RUNUP', `10-day return is ${(tenDay * 100).toFixed(1)}% — parabolic spike (threshold: ${(PARABOLIC_RUNUP_PCT * 100).toFixed(0)}%); short-term mean-reversion risk`, 'MOMENTUM'));
+      }
+    }
     // SIX_MONTH_ACCELERATION: only emit when both 1M and 3M already cleared their bullish thresholds,
     // preventing a triple-count of the same trend (acceleration implies 1M+3M bullish already voted).
     if (oneMonth !== null && threeMonth !== null && sixMonth !== null
