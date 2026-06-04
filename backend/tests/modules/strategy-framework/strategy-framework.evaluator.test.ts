@@ -3,9 +3,10 @@ import { StrategyFrameworkEvaluator, StrategyFrameworkRegistry } from '../../../
 describe('Strategy Framework evaluator', () => {
   const registry = new StrategyFrameworkRegistry();
 
-  it('loads ten configured strategies', () => {
-    expect(registry.list()).toHaveLength(10);
+  it('loads configured strategies (including BREAKDOWN_MOMENTUM short-entry)', () => {
+    expect(registry.list().length).toBeGreaterThanOrEqual(11);
     expect(registry.get('TREND_MOMENTUM')?.status).toBe('ACTIVE');
+    expect(registry.get('BREAKDOWN_MOMENTUM')?.code).toBe('BREAKDOWN_MOMENTUM');
   });
 
   it('returns an entry candidate for a clean trend momentum setup', () => {

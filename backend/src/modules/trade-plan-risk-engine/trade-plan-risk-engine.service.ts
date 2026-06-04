@@ -6,7 +6,7 @@ import { MarketDataFoundationService } from '../market-data-foundation/market-da
 import { PortfolioManagementService } from '../portfolio-management';
 import { DataQualityEngineService } from '../data-quality-engine';
 import { StrategyFrameworkService } from '../strategy-framework';
-import { applyLongPlanGeometryGuards, canonicalizeTradePlanReadiness } from './trade-plan-risk-engine.geometry';
+import { applyLongPlanGeometryGuards, applyShortPlanGeometryGuards, canonicalizeTradePlanReadiness } from './trade-plan-risk-engine.geometry';
 
 type ProofBlockerDefinition = {
   code: string;
@@ -194,7 +194,6 @@ export class TradePlanRiskEngineService {
 
     let forceStatusWatch = false;
     let forceRiskHigh = false;
-    let isLong = true; // Assume long trades for now
 
     try {
       // 1. Fetch Decision
@@ -219,6 +218,15 @@ export class TradePlanRiskEngineService {
       result.strategyVersion = decision.strategyVersion || '1.0.0';
       result.strategyDecisionId = decision.id;
 
+      // Derive plan direction from decision signal direction or strategy category
+      const decisionDirection: string = (decision.direction || decision.signalDirection || '').toUpperCase();
+      const isShortStrategy = (decision.strategy || '').includes('SHORT') || decisionDirection === 'BEARISH' || (decision.category || '').toUpperCase() === 'SHORT_ENTRY';
+      const isLong = !isShortStrategy;
+      result.direction = isLong ? 'LONG' : 'SHORT';
+
+      // F&O gate: short plans require derivativesEligible
+      const derivativesEligible = request.derivativesEligible ?? Boolean(decision.derivativesEligible);
+
       if (decision.blockers?.length > 0) {
         result.planStatus = 'BLOCKED';
         result.blockers.push('Hard Strategy Decision blockers exist.');
@@ -235,8 +243,13 @@ export class TradePlanRiskEngineService {
       }
 
       if (decision.marketGateStatus === 'CLOSED') {
-        result.planStatus = 'BLOCKED';
-        result.blockers.push('Market gate is CLOSED for long entries.');
+        if (isLong) {
+          result.planStatus = 'BLOCKED';
+          result.blockers.push('Market gate is CLOSED for long entries.');
+        } else {
+          // Short entries are not blocked by a closed long-entry gate per se, but we still warn
+          result.warnings.push('Market gate is CLOSED; short-review setups are limited to derivatives-eligible instruments only.');
+        }
       }
 
       // Proof Integration
@@ -400,7 +413,7 @@ export class TradePlanRiskEngineService {
       entryZone = this.normalizeEntryZone(entryZone, currentPrice, result);
       result.entryZone = entryZone;
 
-      // 4. Stop Loss
+      // 4. Stop Loss — direction-aware
       let stopLoss: StopLoss = {
          price: 0,
          percentBelowEntry: 0,
@@ -408,87 +421,147 @@ export class TradePlanRiskEngineService {
          quality: 'UNKNOWN',
          rationale: '',
       };
-      
+
       const entryPrice = this.planningEntryPrice(currentPrice, entryZone);
 
-      let recentSwingLow = currentPrice;
-      if (prices.length >= 10) {
-         recentSwingLow = Math.min(...prices.slice(0, 10).map((p: any) => Number(p.low)));
-      }
+      if (isLong) {
+        // ---- LONG stop: below entry, swing-low based ----
+        let recentSwingLow = currentPrice;
+        if (prices.length >= 10) {
+          recentSwingLow = Math.min(...prices.slice(0, 10).map((p: any) => Number(p.low)));
+        }
 
-      if (recentSwingLow < entryPrice * 0.995 && recentSwingLow > entryPrice * 0.8) {
-         stopLoss = {
-            price: recentSwingLow * 0.99, // slightly below swing low
+        if (recentSwingLow < entryPrice * 0.995 && recentSwingLow > entryPrice * 0.8) {
+          stopLoss = {
+            price: recentSwingLow * 0.99,
             percentBelowEntry: (entryPrice - (recentSwingLow * 0.99)) / entryPrice * 100,
             method: 'RECENT_SWING_LOW',
             quality: 'STRONG',
             rationale: 'Stop placed slightly below recent 10-day swing low.',
-         };
-      } else if (sma50 && sma50 < entryPrice * 0.99 && sma50 > entryPrice * 0.8) {
-         stopLoss = {
+          };
+        } else if (sma50 && sma50 < entryPrice * 0.99 && sma50 > entryPrice * 0.8) {
+          stopLoss = {
             price: sma50 * 0.99,
             percentBelowEntry: (entryPrice - (sma50 * 0.99)) / entryPrice * 100,
             method: 'SMA50',
             quality: 'ACCEPTABLE',
             rationale: 'Stop placed 1% below SMA50 support.',
-         };
-      } else if (volatility > 0 && (entryPrice - (volatility * 2)) > entryPrice * 0.8) {
-         const stopPrice = entryPrice - (volatility * 2);
-         stopLoss = {
+          };
+        } else if (volatility > 0 && (entryPrice - (volatility * 2)) > entryPrice * 0.8) {
+          const stopPrice = entryPrice - (volatility * 2);
+          stopLoss = {
             price: stopPrice,
             percentBelowEntry: (entryPrice - stopPrice) / entryPrice * 100,
             method: 'ATR',
             quality: 'WEAK',
             rationale: 'Stop placed 2x ATR approximation below entry.',
-         };
-      } else {
-         const fallbackPercent = 0.05;
-         stopLoss = {
+          };
+        } else {
+          const fallbackPercent = 0.05;
+          stopLoss = {
             price: entryPrice * (1 - fallbackPercent),
             percentBelowEntry: fallbackPercent * 100,
             method: 'FIXED_PERCENT',
             quality: 'FALLBACK',
             rationale: 'Fallback fixed percentage stop loss used due to insufficient structure.',
-         };
-         result.warnings.push('Fallback fixed percentage stop used.');
-         forceRiskHigh = true;
-      }
-      
-      if (stopLoss.percentBelowEntry < 1.0) {
-        result.warnings.push('Stop loss is very close to entry, high chance of wicking.');
-        forceRiskHigh = true;
-      }
-      if (stopLoss.percentBelowEntry > 15.0) {
-        result.warnings.push('Stop loss is very far from entry, requiring smaller position size.');
-      }
-      
-      if (isLong && stopLoss.price >= entryPrice) {
-        result.planStatus = 'BLOCKED';
-        result.blockers.push('Stop loss is above or equal to entry price for a long plan.');
-      }
-      
-      result.stopLoss = stopLoss;
-      applyLongPlanGeometryGuards(result, { currentPrice, plannedEntry: entryPrice });
+          };
+          result.warnings.push('Fallback fixed percentage stop used.');
+          forceRiskHigh = true;
+        }
 
-      // 5. Target
-      const riskPerShare = entryPrice - stopLoss.price;
+        if (stopLoss.percentBelowEntry < 1.0) {
+          result.warnings.push('Stop loss is very close to entry, high chance of wicking.');
+          forceRiskHigh = true;
+        }
+        if (stopLoss.percentBelowEntry > 15.0) {
+          result.warnings.push('Stop loss is very far from entry, requiring smaller position size.');
+        }
+        if (stopLoss.price >= entryPrice) {
+          result.planStatus = 'BLOCKED';
+          result.blockers.push('Stop loss is above or equal to entry price for a long plan.');
+        }
+
+        result.stopLoss = stopLoss;
+        applyLongPlanGeometryGuards(result, { currentPrice, plannedEntry: entryPrice });
+      } else {
+        // ---- SHORT stop: ABOVE entry, swing-high based ----
+        let recentSwingHigh = currentPrice;
+        if (prices.length >= 10) {
+          recentSwingHigh = Math.max(...prices.slice(0, 10).map((p: any) => Number(p.high)));
+        }
+
+        if (recentSwingHigh > entryPrice * 1.005 && recentSwingHigh < entryPrice * 1.2) {
+          stopLoss = {
+            price: recentSwingHigh * 1.01, // slightly above swing high
+            percentBelowEntry: (recentSwingHigh * 1.01 - entryPrice) / entryPrice * 100,
+            method: 'RECENT_SWING_HIGH',
+            quality: 'STRONG',
+            rationale: 'Stop placed slightly above recent 10-day swing high (short-review stop).',
+          };
+        } else if (volatility > 0 && (entryPrice + (volatility * 2)) < entryPrice * 1.2) {
+          const stopPrice = entryPrice + (volatility * 2);
+          stopLoss = {
+            price: stopPrice,
+            percentBelowEntry: (stopPrice - entryPrice) / entryPrice * 100,
+            method: 'ATR',
+            quality: 'WEAK',
+            rationale: 'Stop placed 2x ATR approximation above entry (short-review stop).',
+          };
+        } else {
+          const fallbackPercent = 0.05;
+          stopLoss = {
+            price: entryPrice * (1 + fallbackPercent),
+            percentBelowEntry: fallbackPercent * 100,
+            method: 'FIXED_PERCENT',
+            quality: 'FALLBACK',
+            rationale: 'Fallback fixed percentage stop (short) due to insufficient structure.',
+          };
+          result.warnings.push('Fallback fixed percentage stop used.');
+          forceRiskHigh = true;
+        }
+
+        if (stopLoss.percentBelowEntry < 1.0) {
+          result.warnings.push('Stop loss is very close to entry, high chance of wicking.');
+          forceRiskHigh = true;
+        }
+        if (stopLoss.percentBelowEntry > 15.0) {
+          result.warnings.push('Stop loss is very far from entry, requiring smaller position size.');
+        }
+        if (stopLoss.price <= entryPrice) {
+          result.planStatus = 'BLOCKED';
+          result.blockers.push('Stop loss is below or equal to entry price for a short-review plan.');
+        }
+
+        result.stopLoss = stopLoss;
+        applyShortPlanGeometryGuards(result, { currentPrice, plannedEntry: entryPrice, derivativesEligible });
+      }
+
+      // 5. Target — direction-aware
+      // For LONG: risk = entry - stop (positive). For SHORT: risk = stop - entry (positive).
+      const riskPerShare = isLong
+        ? entryPrice - stopLoss.price
+        : stopLoss.price - entryPrice;
       if (riskPerShare <= 0) {
          result.planStatus = 'BLOCKED';
          result.blockers.push('Invalid stop loss geometry. Cannot compute risk safely.');
       }
-      
+
       const tRr = targetRewardRisk || rules.defaultRewardRiskTarget;
-      let targetPrice = entryPrice + (riskPerShare * tRr);
+      // For LONG: target is above entry. For SHORT: target (cover level) is BELOW entry.
+      let targetPrice = isLong
+        ? entryPrice + (riskPerShare * tRr)
+        : entryPrice - (riskPerShare * tRr);
       let targetQuality: Quality = 'FALLBACK';
       let targetMethod: Target['method'] = 'REWARD_RISK_MULTIPLE';
+      const dirLabel = isLong ? '' : ' (short-cover level)';
       let targetRationale = tRr === rules.defaultRewardRiskTarget
-        ? 'Target is modeled at 2R by default.'
-        : `Target is modeled at ${tRr}R as a reward/risk multiple.`;
+        ? `Target${dirLabel} is modeled at 2R by default.`
+        : `Target${dirLabel} is modeled at ${tRr}R as a reward/risk multiple.`;
 
       // Target Realism checks
       if (volatility > 0) {
-         const expectedMove = targetPrice - entryPrice;
-         if (expectedMove > volatility * 10) { // e.g. requires 10 days of straight up movement
+         const expectedMove = Math.abs(targetPrice - entryPrice);
+         if (expectedMove > volatility * 10) {
             result.warnings.push('Target requires an unrealistic move relative to recent volatility.');
             targetQuality = 'WEAK';
             forceRiskHigh = true;
@@ -499,10 +572,17 @@ export class TradePlanRiskEngineService {
         result.planStatus = 'BLOCKED';
         result.blockers.push('Target is below or equal to entry price for a long plan.');
       }
+      if (!isLong && targetPrice >= entryPrice) {
+        result.planStatus = 'BLOCKED';
+        result.blockers.push('Cover target is above or equal to entry price for a short-review plan.');
+      }
       
       const target: Target = {
          price: targetPrice,
-         expectedReturnPercent: (targetPrice - entryPrice) / entryPrice * 100,
+         // For SHORT, expectedReturnPercent is the gain from cover price being below entry price
+         expectedReturnPercent: isLong
+           ? (targetPrice - entryPrice) / entryPrice * 100
+           : (entryPrice - targetPrice) / entryPrice * 100,
          method: targetMethod,
          quality: targetQuality,
          rationale: targetRationale,
@@ -510,9 +590,12 @@ export class TradePlanRiskEngineService {
       result.target = target;
 
       // 6. Reward/Risk
+      // For LONG: reward = target - entry. For SHORT: reward = entry - target (both positive).
       let rrRatio = 0;
       if (riskPerShare > 0) {
-         rrRatio = (target.price - entryPrice) / riskPerShare;
+        rrRatio = isLong
+          ? (target.price - entryPrice) / riskPerShare
+          : (entryPrice - target.price) / riskPerShare;
       }
       result.rewardRiskRatio = Number(rrRatio.toFixed(2));
 
@@ -617,9 +700,13 @@ export class TradePlanRiskEngineService {
          }
       }
 
-      // 9. Invalidation Rules
+      // 9. Invalidation Rules — direction-aware
       if (stopLoss.price > 0) {
-        result.invalidationRules.push(`Daily close below stop loss level of ${stopLoss.price.toFixed(2)}.`);
+        if (isLong) {
+          result.invalidationRules.push(`Daily close below stop level of ${stopLoss.price.toFixed(2)}.`);
+        } else {
+          result.invalidationRules.push(`Daily close above stop level of ${stopLoss.price.toFixed(2)} (short-review stop).`);
+        }
       }
       if (decision.strategy === 'BREAKOUT_CONFIRMATION') {
          result.invalidationRules.push('Breakout fails and price closes back inside the previous range base.');
@@ -627,7 +714,10 @@ export class TradePlanRiskEngineService {
       if (decision.strategy === 'PULLBACK_IN_UPTREND') {
          result.invalidationRules.push('Uptrend structure breaks (e.g. lower low is formed).');
       }
-      
+      if (decision.strategy === 'BREAKDOWN_MOMENTUM' || decision.strategy === 'TREND_LOSS_SHORT') {
+        result.invalidationRules.push('Breakdown reverses — price reclaims breakdown level (short-review invalidated).');
+      }
+
       if (result.blockers.length > 0) {
          result.invalidationRules.push('Plan is currently blocked. Consider review later.');
       }

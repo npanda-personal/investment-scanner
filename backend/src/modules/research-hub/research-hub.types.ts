@@ -58,6 +58,12 @@ export interface ResearchPriorities {
   watchCandidates: ResearchPriorityCandidate[];
   avoidCandidates: ResearchPriorityCandidate[];
   exitCandidates: ResearchPriorityCandidate[];
+  /**
+   * Short-review candidates: bearish F&O/derivatives-eligible setups from short-entry strategies.
+   * Research-support framing — never buy/sell language; uses entry/stop/cover language.
+   * Gated to derivativesEligible instruments only.
+   */
+  shortReviewCandidates: ResearchPriorityCandidate[];
 }
 
 export interface ResearchBacktestSummary {

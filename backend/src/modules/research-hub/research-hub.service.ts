@@ -59,7 +59,7 @@ export class ResearchHubService {
     const assetType = query.assetType || 'STOCK';
 
     // Aggregate data from all core research modules with individual error handling
-    const [gate, context, strategyCandidates, strategyExits, signalDiagnostics, smartMoneyRes] = await Promise.all([
+    const [gate, context, strategyCandidates, strategyExits, strategyShortCandidates, signalDiagnostics, smartMoneyRes] = await Promise.all([
       this.strategyService.marketGate(region).catch(err => {
         console.error('Market gate error:', err);
         dataGaps.push('Market gate status unavailable');
@@ -78,6 +78,11 @@ export class ResearchHubService {
       this.strategyService.exits(undefined, region, assetType).catch(err => {
         console.error('Strategy exits error:', err);
         dataGaps.push('Strategy exit candidates unavailable');
+        return [];
+      }),
+      this.fetchShortReviewCandidates({ region, assetType }).catch(err => {
+        console.error('Short-review candidates error:', err);
+        dataGaps.push('Short-review candidates unavailable');
         return [];
       }),
       this.signalService.funnelDiagnostics({ region, assetType }).catch(err => {
@@ -107,10 +112,11 @@ export class ResearchHubService {
 
     const enriched = await this.enrichCandidates(strategyCandidates, region, assetType, dataGaps);
     const enrichedExits = await this.enrichCandidates(strategyExits || [], region, assetType, dataGaps, true);
+    const enrichedShorts = await this.enrichCandidates(strategyShortCandidates || [], region, assetType, dataGaps);
 
     // 2. Research Priorities
-    const priorities = this.bucketPriorities(enriched, enrichedExits, marketReadiness);
-    const strategyProofSummary = this.buildStrategyProofSummary([...priorities.tradeCandidates, ...priorities.watchCandidates, ...priorities.avoidCandidates], marketReadiness);
+    const priorities = this.bucketPriorities(enriched, enrichedExits, enrichedShorts, marketReadiness);
+    const strategyProofSummary = this.buildStrategyProofSummary([...priorities.tradeCandidates, ...priorities.watchCandidates, ...priorities.avoidCandidates, ...priorities.shortReviewCandidates], marketReadiness);
 
     // 3. Confirmation Summary
     const signalDirectionCounts = (signalDiagnostics.byDirection || {}) as Record<string, number>;
@@ -399,6 +405,7 @@ export class ResearchHubService {
       watchCandidates: [],
       avoidCandidates: [],
       exitCandidates: [],
+      shortReviewCandidates: [],
     };
     const confirmationSummary: ConfirmationSummary = {
       signalSummary: {
@@ -681,6 +688,27 @@ export class ResearchHubService {
     });
   }
 
+  /**
+   * Fetches bearish F&O-eligible candidates from short-entry strategies.
+   * Uses TRADE_CANDIDATE decisions from strategies whose category/name signals a short setup.
+   * Downstream: only derivativesEligible instruments surface in the short-review bucket.
+   */
+  private async fetchShortReviewCandidates(query: StrategyQuery): Promise<StrategyDecisionDto[]> {
+    const shortStrategyCodes = ['BREAKDOWN_MOMENTUM', 'TREND_LOSS_SHORT'];
+    const responses = await Promise.all(
+      shortStrategyCodes.map((strategyCode) =>
+        this.strategyService.candidates({ ...query, strategy: strategyCode, decision: 'TRADE_CANDIDATE' as any, limit: 10, offset: 0 }).catch(() => ({ results: [] }))
+      )
+    );
+    const seen = new Set<string>();
+    return responses.flatMap((response) => response.results || []).filter((candidate) => {
+      const key = candidate.id || `${candidate.instrumentId}-${candidate.strategy}-${candidate.decision}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
+
   private async enrichCandidates(candidates: StrategyDecisionDto[], region: string, assetType: string, dataGaps: string[], isExit = false): Promise<ResearchPriorityCandidate[]> {
     const uniqueStrategies = [...new Set(candidates.map((candidate) => candidate.strategy).filter(Boolean))];
     const performanceByStrategy = new Map<string, ResearchBacktestSummary | null>();
@@ -723,7 +751,7 @@ export class ResearchHubService {
     });
   }
 
-  private bucketPriorities(candidates: ResearchPriorityCandidate[], exits: ResearchPriorityCandidate[], readiness: MarketReadiness): ResearchPriorities {
+  private bucketPriorities(candidates: ResearchPriorityCandidate[], exits: ResearchPriorityCandidate[], shorts: ResearchPriorityCandidate[], readiness: MarketReadiness): ResearchPriorities {
     const sorted = [...candidates].sort((a, b) => this.priorityScore(b, readiness) - this.priorityScore(a, readiness));
     const tradeCandidates = readiness.marketGate === 'CLOSED'
       ? []
@@ -739,12 +767,39 @@ export class ResearchHubService {
       .filter((candidate) => candidate.decision === 'AVOID' || candidate.blockers.length > 0 || readiness.marketGate === 'CLOSED' || candidate.readinessLabel === 'NOT_AUTOMATION_READY')
       .slice(0, 5);
 
+    // Short-review bucket: bearish F&O-eligible setups from short-entry strategies.
+    // Distinct from long trade candidates; gated to derivativesEligible instruments.
+    // Research-support framing: entry/stop/cover — no buy/sell language.
+    const shortReviewCandidates = shorts
+      .filter((candidate) => this.isShortReviewCandidate(candidate))
+      .sort((a, b) => this.priorityScore(b, readiness) - this.priorityScore(a, readiness))
+      .slice(0, 5);
+
     return {
       tradeCandidates,
       watchCandidates,
       avoidCandidates,
       exitCandidates: exits.sort((a, b) => b.decisionScore - a.decisionScore).slice(0, 5),
+      shortReviewCandidates,
     };
+  }
+
+  /**
+   * Short-review candidate: must come from a short-entry strategy, be framework-backed,
+   * have a bearish decision, and be derivatives-eligible (F&O gate enforced here).
+   */
+  private isShortReviewCandidate(candidate: ResearchPriorityCandidate): boolean {
+    const strategy = String(candidate.strategy || '').toUpperCase();
+    const isShortStrategy = strategy.includes('SHORT') || strategy === 'BREAKDOWN_MOMENTUM' || strategy === 'TREND_LOSS_SHORT';
+    // Also accept any candidate where direction is explicitly bearish
+    const isBearishDecision = (candidate as any).direction === 'BEARISH' || String((candidate as any).signalDirection || '').toUpperCase() === 'BEARISH';
+    if (!isShortStrategy && !isBearishDecision) return false;
+    // Must be derivatives-eligible
+    if ((candidate as any).derivativesEligible === false) return false;
+    // Must be a trade/entry candidate with no hard blockers
+    return Boolean(candidate.frameworkBacked)
+      && ['TRADE_CANDIDATE', 'ENTRY_CANDIDATE'].includes(candidate.decision)
+      && candidate.blockers.length === 0;
   }
 
   private isTradeCandidate(candidate: ResearchPriorityCandidate, readiness: MarketReadiness) {
@@ -853,6 +908,14 @@ export class ResearchHubService {
         label: 'Monitor Watchlist Review Candidates',
         priority: 'LOW',
         targetRoute: '/strategy'
+      });
+    }
+
+    if (priorities.shortReviewCandidates.length > 0) {
+      actions.push({
+        label: `Review ${priorities.shortReviewCandidates.length} short-review candidate(s) — F&O/derivatives-eligible only`,
+        priority: 'MEDIUM',
+        targetRoute: '/strategy?direction=short'
       });
     }
 

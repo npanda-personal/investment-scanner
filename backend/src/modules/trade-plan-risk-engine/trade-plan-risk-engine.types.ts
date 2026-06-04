@@ -2,6 +2,7 @@ export type PlanStatus = 'VALID' | 'WATCH' | 'BLOCKED' | 'INSUFFICIENT_DATA';
 export type RiskGrade = 'LOW' | 'MEDIUM' | 'HIGH' | 'UNDEFINED';
 export type Quality = 'STRONG' | 'ACCEPTABLE' | 'WEAK' | 'FALLBACK' | 'UNKNOWN';
 export type PaperReadinessStatus = 'READY_FOR_PAPER_REVIEW' | 'WATCH_ONLY' | 'BLOCKED' | 'INSUFFICIENT_DATA';
+export type PlanDirection = 'LONG' | 'SHORT';
 export type ProofStatus = 'AVAILABLE' | 'MISSING' | 'PARTIAL' | 'UNPROVEN';
 export type PaperReadinessProofStage =
   | 'DATA_QUALITY'
@@ -94,8 +95,9 @@ export interface EntryZone {
 
 export interface StopLoss {
   price: number;
+  /** For LONG: stop % below entry. For SHORT: stop % above entry (positive value). */
   percentBelowEntry: number;
-  method: 'SMA50' | 'ATR' | 'RECENT_SWING_LOW' | 'FIXED_PERCENT' | 'UNKNOWN';
+  method: 'SMA50' | 'ATR' | 'RECENT_SWING_LOW' | 'RECENT_SWING_HIGH' | 'FIXED_PERCENT' | 'UNKNOWN';
   quality: Quality;
   rationale: string;
 }
@@ -131,6 +133,7 @@ export interface TradePlanResultDto {
   symbol: string;
   strategy: string;
   strategyVersion: string;
+  direction?: PlanDirection;
   strategyDecisionId?: string | null;
   portfolioId?: string | null;
   region?: string | null;
@@ -179,6 +182,8 @@ export interface GenerateTradePlanRequest {
   riskPercent?: number;
   capitalBase?: number;
   targetRewardRisk?: number;
+  /** Whether the instrument is eligible for F&O / derivatives (required for SHORT plans). */
+  derivativesEligible?: boolean;
 }
 
 export interface BatchGenerateTradePlanRequest {

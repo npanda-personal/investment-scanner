@@ -4,6 +4,8 @@ export const STRATEGY_TIMEFRAMES: StrategyTimeframe[] = ['1Y', '3Y', '5Y', '10Y'
 
 const commonAssetTypes = ['STOCK'];
 const commonRegions = ['IN'];
+/** Instruments eligible for F&O/derivatives — short-entry strategies are restricted to this set. */
+const derivativesEligibleOnly = ['STOCK'];  // gated at runtime by derivativesEligible flag on the decision
 
 const rule = (code: string, label: string, input: string, kind: 'REQUIRES' | 'BLOCKS' | 'SCORES' | 'WARNS' = 'REQUIRES', threshold?: number | string | boolean, weight?: number) => ({
   code,
@@ -23,10 +25,29 @@ export const COMMON_LONG_EXIT_RULES = [
   rule('SIGNAL_DECAY_EXIT', 'Exit review when signal score or confidence decays.', 'signal.score', 'WARNS'),
 ];
 
+/** Short-entry cover rules — research-support framing; no buy/sell language. */
+export const COMMON_SHORT_COVER_RULES = [
+  rule('DQ_FAIL_COVER', 'Cover review if data quality becomes unusable or not ready.', 'dataQuality', 'BLOCKS'),
+  rule('BREAKDOWN_REVERSAL_COVER', 'Cover review if price reclaims breakdown level — setup is invalidated.', 'latestPrice/sma50', 'WARNS'),
+  rule('MARKET_REGIME_SHIFT_COVER', 'Cover review if market regime shifts from risk-off to risk-on.', 'marketRegime', 'WARNS'),
+  rule('BEARISH_SIGNAL_DECAY_COVER', 'Cover review when bearish signal score or direction weakens.', 'signal.score', 'WARNS'),
+  rule('DISTRIBUTION_ENDS_COVER', 'Cover review when price-volume distribution ends.', 'smartMoneyStatus', 'WARNS'),
+];
+
 export const COMMON_LONG_INVALIDATION_RULES = [
   rule('DQ_EVIDENCE_INVALIDATED', 'Invalidate entry evidence when data quality is missing, unusable, or not ready.', 'dataQuality', 'BLOCKS'),
   rule('SUPPORT_INVALIDATED', 'Invalidate the setup when price loses rule support.', 'latestPrice/sma50', 'BLOCKS'),
   rule('MARKET_GATE_INVALIDATED', 'Invalidate new long-entry review when market gate closes.', 'marketGate', 'BLOCKS'),
+];
+
+/**
+ * Short-entry invalidation rules — bearish setup is voided when breakdown reverses.
+ * Only applies to derivativesEligible instruments.
+ */
+export const COMMON_SHORT_INVALIDATION_RULES = [
+  rule('DQ_EVIDENCE_INVALIDATED', 'Invalidate short evidence when data quality is missing, unusable, or not ready.', 'dataQuality', 'BLOCKS'),
+  rule('BREAKDOWN_RECLAIM_INVALIDATED', 'Invalidate short setup when price reclaims the breakdown support level.', 'latestPrice/sma50', 'BLOCKS'),
+  rule('REGIME_SHIFT_INVALIDATED', 'Invalidate short entry when market regime shifts to risk-on.', 'marketRegime', 'BLOCKS'),
 ];
 
 export const REGISTERED_STRATEGIES: StrategyDefinition[] = [
@@ -182,6 +203,59 @@ export const REGISTERED_STRATEGIES: StrategyDefinition[] = [
     parameters: { minScore: 75, backtestEntryRule: 'SMA50_ABOVE_SMA200', backtestExitRule: 'PRICE_BELOW_SMA50' },
     explanationTemplate: 'Triggered when stock momentum aligns with sector leadership.',
     examples: { triggers: ['Bullish stock inside leading sector.'], blocks: ['Sector lagging.'] },
+  },
+  {
+    /**
+     * SHORT_ENTRY strategy: Breakdown Momentum
+     *
+     * Mirrors the structure of TREND_MOMENTUM (long) but for bearish setups.
+     * Entry rules: bearish signal + price below SMA50/SMA200 + distribution context.
+     * Stop: swing-high based (above entry).  Cover target: computed at 2R below entry.
+     * RESTRICTED to derivativesEligible instruments — enforced at trade-plan generation.
+     * Language: review / entry / stop / target / cover (no buy/sell).
+     */
+    code: 'BREAKDOWN_MOMENTUM',
+    name: 'Breakdown Momentum (Short Review)',
+    description: 'Bearish momentum breakdown review where absolute downtrend, bearish signal, market regime, and DQ/liquidity evidence align. Applicable ONLY to F&O/derivatives-eligible instruments.',
+    category: 'ENTRY',
+    style: 'SHORT_MOMENTUM',
+    timeframe: 'DAILY_SWING',
+    assetTypes: derivativesEligibleOnly,
+    supportedRegions: commonRegions,
+    version: '1.0.0',
+    status: 'DRAFT',
+    requiredInputs: ['latestPrice', 'sma50', 'sma200', 'rawSignal', 'dataQuality', 'marketGate', 'marketRegime', 'sectorLeadership', 'sectorRelativeStrengthScore', 'smartMoneyStatus', 'reliability', 'derivativesEligible'],
+    entryRules: [
+      rule('PRICE_BELOW_SMA50', 'Price is below SMA50 — downtrend evidence.', 'latestPrice/sma50', 'SCORES', true, 15),
+      rule('PRICE_BELOW_SMA200', 'Price is below SMA200 — long-term downtrend confirmation.', 'latestPrice/sma200', 'SCORES', true, 15),
+      rule('BEARISH_SIGNAL', 'Raw or calibrated signal is bearish.', 'signal.direction', 'SCORES', 'BEARISH', 20),
+      rule('SIGNAL_STRENGTH', 'Signal score is strong enough for short-review.', 'signal.score', 'SCORES', 70, 10),
+      rule('SECTOR_NOT_LEADING', 'Sector is lagging or weakening — supports bearish setup.', 'sectorLeadership', 'SCORES', true, 10),
+      rule('SMART_MONEY_DISTRIBUTION', 'Smart money distribution supports bearish setup.', 'smartMoneyStatus', 'SCORES', 'DISTRIBUTION', 10),
+      rule('DERIVATIVES_ELIGIBLE', 'Instrument must be F&O/derivatives eligible for short-review plans.', 'derivativesEligible', 'REQUIRES', true, 0),
+    ],
+    exitRules: COMMON_SHORT_COVER_RULES,
+    invalidationRules: COMMON_SHORT_INVALIDATION_RULES,
+    noiseFilters: [
+      rule('DATA_NOT_READY', 'Data quality is not ready — short-review requires clean data.', 'dataQuality.signalReadinessStatus', 'BLOCKS', 'NOT_READY'),
+      rule('MARKET_RISK_ON', 'Risk-on regime blocks new short-review entries.', 'marketRegime', 'BLOCKS', 'RISK_ON'),
+      rule('LOW_RELIABILITY', 'Signal reliability is low or noisy.', 'reliability.status', 'BLOCKS', 'LOW'),
+      rule('ACCUMULATION', 'Smart money accumulation contradicts short-entry.', 'smartMoneyStatus', 'BLOCKS', 'ACCUMULATION'),
+      rule('NOT_DERIVATIVES_ELIGIBLE', 'Cash-only instruments are excluded from short-review plans.', 'derivativesEligible', 'BLOCKS', false),
+    ],
+    riskRules: [
+      rule('MAX_POSITIONS', 'Use bounded position count in backtests.', 'maxPositions', 'REQUIRES', 10),
+      rule('DEFAULT_MAX_HOLDING', 'Default max holding period for short-review is 90 trading days.', 'maxHoldingDays', 'REQUIRES', 90),
+      rule('DEFAULT_TRAILING_STOP', 'Short-review trailing stop (stop above entry) is conservative.', 'trailingStopPercent', 'WARNS', 0.1),
+      rule('FOO_GATE', 'Requires derivativesEligible=true; cash-only instruments cannot be short-reviewed.', 'derivativesEligible', 'REQUIRES', true),
+    ],
+    marketGateRules: [rule('RISK_OFF_OR_SELECTIVE', 'Market gate should be selective or closed (short-review is counter-trend; blocked in strong risk-on).', 'marketRegime', 'REQUIRES', 'RISK_OFF|SELECTIVE')],
+    parameters: { minScore: 70, backtestEntryRule: 'SIGNAL_DIRECTION_BEARISH', backtestExitRule: 'PRICE_ABOVE_SMA50', maxHoldingDays: 90, trailingStopPercent: 0.1, requiresDerivativesEligible: true },
+    explanationTemplate: 'Triggered when bearish trend, signal strength, and F&O eligibility align for a short-review setup.',
+    examples: {
+      triggers: ['Price below SMA50/SMA200 with bearish signal and derivatives-eligible instrument.'],
+      blocks: ['Cash-only (non-derivatives-eligible) instrument; accumulation pattern; risk-on regime; data not ready.'],
+    },
   },
   {
     code: 'DEFENSIVE_EXIT',

@@ -52,6 +52,9 @@ export class StrategyFrameworkEvaluator implements StrategyEvaluator {
       case 'LOW_QUALITY_DATA_REJECTION':
         this.scoreDataQualityFilter(context, state);
         break;
+      case 'BREAKDOWN_MOMENTUM':
+        this.scoreBreakdownMomentum(context, state);
+        break;
       default:
         state.dataGaps.push('Strategy evaluator is not implemented.');
     }
@@ -319,6 +322,59 @@ export class StrategyFrameworkEvaluator implements StrategyEvaluator {
     if (context.dataQuality.liquidityStatus === 'THIN') this.block(state, 'THIN_LIQUIDITY', 'Liquidity is thin.');
     if (!context.dataQuality.liquidityStatus || context.dataQuality.liquidityStatus === 'UNKNOWN') this.block(state, 'LIQUIDITY_UNKNOWN', 'Liquidity evidence is unknown.');
     if (state.blockers.length === 0) this.add(state, 80, 'Data quality is usable for downstream strategies.', 'DATA_QUALITY_READY');
+  }
+
+  /**
+   * SHORT_ENTRY: Breakdown Momentum
+   *
+   * Mirror of scoreTrendMomentum but for bearish setups.
+   * F&O gate: the `derivativesEligible` field on the context is treated as a noise filter.
+   * Language: entry/stop/cover — no buy/sell wording.
+   */
+  private scoreBreakdownMomentum(context: StrategyContext, state: MutableState) {
+    // F&O gate: derivativesEligible must be explicitly true; block cash-only instruments
+    const derivativesEligible = (context as any).derivativesEligible;
+    if (derivativesEligible === false) {
+      this.block(state, 'NOT_DERIVATIVES_ELIGIBLE', 'Cash-only (non-derivatives-eligible) instrument cannot be short-reviewed.');
+      return;
+    }
+    // When derivativesEligible is undefined/null (not provided), block as well — short review requires explicit F&O eligibility
+    if (derivativesEligible == null) {
+      this.block(state, 'NOT_DERIVATIVES_ELIGIBLE', 'Derivatives eligibility is not confirmed; short-review requires F&O-eligible instruments.');
+      return;
+    }
+
+    // Downtrend evidence
+    if (this.isBelow(context.latestPrice, context.sma50)) this.add(state, 15, 'Price is below SMA50 — downtrend evidence.', 'PRICE_BELOW_SMA50');
+    else state.blockers.push('Price is above SMA50; downtrend evidence is absent for short-review.');
+    if (this.isBelow(context.latestPrice, context.sma200)) this.add(state, 15, 'Price is below SMA200 — long-term downtrend confirmation.', 'PRICE_BELOW_SMA200');
+    else state.warnings.push('Price is above SMA200; long-term downtrend is not confirmed.');
+    // Bearish signal
+    if (this.signalDirection(context) === 'BEARISH') this.add(state, 20, 'Bearish signal aligns with breakdown strategy.', 'BEARISH_SIGNAL');
+    if (this.signalScore(context) >= 70) this.add(state, 10, 'Signal score is strong enough for short-review.', 'SIGNAL_STRENGTH');
+    // Sector and smart money context
+    this.scoreShortSectorAndSmartMoney(context, state);
+  }
+
+  private scoreShortSectorAndSmartMoney(context: StrategyContext, state: MutableState) {
+    // For shorts, lagging sector supports setup; leading sector contradicts it
+    if (['LAGGING', 'WEAKENING'].includes(String(context.sectorLeadership || ''))) {
+      this.add(state, 10, 'Sector is lagging or weakening — supports short-review setup.', 'SECTOR_NOT_LEADING');
+    } else if (['LEADING', 'IMPROVING'].includes(String(context.sectorLeadership || ''))) {
+      state.warnings.push('Sector is leading or improving, which contradicts the short-review setup.');
+    } else {
+      state.dataGaps.push('Sector context is missing.');
+      this.block(state, 'SECTOR_CONTEXT_MISSING', 'Sector context is missing.');
+    }
+    // Distribution supports short; accumulation blocks it
+    if (context.smartMoneyStatus === 'DISTRIBUTION') {
+      this.add(state, 10, 'Smart-money distribution supports short-review setup.', 'SMART_MONEY_DISTRIBUTION');
+    } else if (context.smartMoneyStatus === 'ACCUMULATION') {
+      this.block(state, 'ACCUMULATION', 'Smart-money accumulation contradicts short-entry setup.');
+    } else if (!context.smartMoneyStatus) {
+      state.dataGaps.push('Smart-money context is missing.');
+      this.block(state, 'SMART_MONEY_CONTEXT_MISSING', 'Smart-money context is missing.');
+    }
   }
 
   private scoreSectorAndSmartMoney(context: StrategyContext, state: MutableState) {
