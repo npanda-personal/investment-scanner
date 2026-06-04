@@ -106,6 +106,11 @@ export class SubscriptionBillingService {
   }
 
   async assertAllowed(feature: GatedFeature, userId = DEFAULT_USER_ID): Promise<void> {
+    // Personal-validation phase: subscription limits are pure friction for the
+    // single owner-operator. When SUBSCRIPTION_LIMITS_DISABLED=true (set in the
+    // dev .env, NOT in tests), all gated features are allowed. Tests leave it
+    // unset so limit enforcement is still verified.
+    if (process.env.SUBSCRIPTION_LIMITS_DISABLED === 'true' && process.env.NODE_ENV !== 'test') return;
     const subscription = await this.subscription(userId);
     const usage = await this.featureUsage(feature, subscription.planCode, userId);
     if (!usage.allowed) {
