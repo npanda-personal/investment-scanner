@@ -122,6 +122,75 @@ export class SignalQualityLabRepository {
     return result.count;
   }
 
+  /**
+   * Window-intersection staleness marking.
+   *
+   * When a corporate-action recompute touches adjustedClose prices on or after
+   * `fromDate`, only SignalOutcome rows whose forward-return window **overlaps**
+   * that re-adjusted date range are stale. A row's window is:
+   *
+   *   [signalGeneratedDate,  signalGeneratedDate + MAX_HORIZON_DAYS (60)]
+   *
+   * For the window to overlap [fromDate, ∞) we need:
+   *
+   *   signalGeneratedDate + MAX_HORIZON_DAYS >= fromDate
+   *   ⟺  signalGeneratedDate >= fromDate − MAX_HORIZON_DAYS
+   *
+   * Rows with signalGeneratedDate strictly before (fromDate − 60 days) cannot
+   * be affected: their entire price window pre-dates the re-adjustment.
+   *
+   * Returns the number of rows invalidated.
+   */
+  async markStaleByInstrumentsFromDate(instrumentIds: string[], fromDate: Date): Promise<number> {
+    const ids = [...new Set(instrumentIds.map((id) => String(id || '').trim()).filter(Boolean))];
+    if (ids.length === 0) return 0;
+
+    // Earliest signalGeneratedDate that could possibly be affected:
+    // signal window ends at signalDate + 60 calendar days, so any signal
+    // generated at least 60 days before fromDate is completely unaffected.
+    const MAX_HORIZON_DAYS = 60;
+    const earliestAffectedDate = new Date(fromDate.getTime() - MAX_HORIZON_DAYS * 24 * 60 * 60 * 1000);
+
+    const result = await this.db.signalOutcome.updateMany({
+      where: {
+        instrumentId: { in: ids },
+        dataComplete: true,
+        signalGeneratedDate: { gte: earliestAffectedDate },
+      },
+      data: {
+        dataComplete: false,
+        forwardReturnPercent: null,
+        futurePrice: null,
+      },
+    });
+
+    return result.count;
+  }
+
+  /**
+   * Return the distinct instrumentIds that currently have at least one stale
+   * (dataComplete=false) outcome row with a windowEndDate in the past — i.e.
+   * outcomes that should have been evaluated by now but have not been.
+   *
+   * Used by the ops refresh script to enumerate work that needs doing.
+   *
+   * @param limit Maximum number of distinct instrumentIds to return (default 500).
+   */
+  async findStaleOutcomeInstrumentIds(limit = 500): Promise<string[]> {
+    const now = new Date();
+    const rows = await this.db.signalOutcome.findMany({
+      where: {
+        dataComplete: false,
+        windowEndDate: { not: null, lte: now },
+      },
+      select: { instrumentId: true },
+      distinct: ['instrumentId'],
+      take: limit,
+      orderBy: { windowEndDate: 'asc' },
+    });
+    return rows.map((row) => row.instrumentId);
+  }
+
   // ---------------------------------------------------------------------------
   // Read / diagnostic helpers
   // ---------------------------------------------------------------------------

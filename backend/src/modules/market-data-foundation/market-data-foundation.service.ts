@@ -792,9 +792,17 @@ type NseTradingHolidayCacheEntry = {
  * adjustedClose prices change. Implemented by SignalQualityLabRepository;
  * declared structurally here to avoid importing that module (which depends on
  * this one) and creating a circular dependency.
+ *
+ * Two variants:
+ *  - markStaleByInstrumentIds      — invalidates ALL complete rows for the instruments
+ *    (safe fallback when the earliest-changed date is unknown)
+ *  - markStaleByInstrumentsFromDate — window-intersection variant; only rows
+ *    whose [signalDate, signalDate+60d] window overlaps [fromDate, ∞)
+ *    (preferred; avoids over-invalidation of historically-distant outcomes)
  */
 export interface SignalOutcomeStalenessInvalidator {
   markStaleByInstrumentIds(instrumentIds: string[]): Promise<number>;
+  markStaleByInstrumentsFromDate?(instrumentIds: string[], fromDate: Date): Promise<number>;
 }
 
 export class MarketDataFoundationService {
@@ -834,8 +842,14 @@ export class MarketDataFoundationService {
    * Best-effort invalidation of persisted signal_outcomes for instruments whose
    * adjustedClose prices just changed. Never throws — a stale-outcome failure
    * must not fail a price recompute. Returns the number of rows invalidated.
+   *
+   * When `fromDate` is supplied the window-intersection variant is used:
+   * only outcomes whose [signalDate, signalDate+60d] window overlaps
+   * [fromDate, ∞) are invalidated. This avoids over-invalidation of
+   * historically-distant outcomes that were computed from prices that
+   * pre-date the corporate action.
    */
-  private async invalidateSignalOutcomes(instrumentIds: string[]): Promise<number> {
+  private async invalidateSignalOutcomes(instrumentIds: string[], fromDate?: Date): Promise<number> {
     const ids = [...new Set(instrumentIds.map((id) => String(id || '').trim()).filter(Boolean))];
     if (ids.length === 0) return 0;
     try {
@@ -843,6 +857,10 @@ export class MarketDataFoundationService {
         // Lazy require avoids a static circular import at module load time.
         const { SignalQualityLabRepository } = require('../signal-quality-lab/signal-quality-lab.repository');
         this.signalOutcomeInvalidator = new SignalQualityLabRepository();
+      }
+      // Prefer the window-intersection variant when an earliest-changed date is available.
+      if (fromDate && typeof this.signalOutcomeInvalidator!.markStaleByInstrumentsFromDate === 'function') {
+        return await this.signalOutcomeInvalidator!.markStaleByInstrumentsFromDate!(ids, fromDate);
       }
       return await this.signalOutcomeInvalidator!.markStaleByInstrumentIds(ids);
     } catch {
@@ -12709,8 +12727,14 @@ export class MarketDataFoundationService {
     // adjustedClose drives forwardReturnPercent/futurePrice in persisted
     // signal_outcomes — invalidate them so the maturity sweep / next recalculate
     // re-evaluates with fresh prices. Best-effort; only when prices changed.
+    //
+    // Pass the earliest date in the re-adjusted range so only outcomes whose
+    // forward-return window [signalDate, signalDate+60d] overlaps that range
+    // are marked stale (window-intersection, avoids over-invalidation).
     if (updated > 0) {
-      await this.invalidateSignalOutcomes([instrumentId]);
+      const allDates = updates.map((u) => u.date.getTime()).filter(Number.isFinite);
+      const earliestAdjustedDate = allDates.length > 0 ? new Date(Math.min(...allDates)) : undefined;
+      await this.invalidateSignalOutcomes([instrumentId], earliestAdjustedDate);
     }
 
     return { instrumentId, symbol, bars: adjustedBars.length, updated, warnings };
