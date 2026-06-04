@@ -74,6 +74,8 @@ export const createMarketDataV1Router = (
   router.post('/market-data/exchange-files/nse-index-eod/import', controller.importNseIndexEodDaily);
   router.post('/market-data/exchange-files/nse-fo-udiff/import', controller.importNseFoUdiffDaily);
   router.post('/market-data/exchange-files/nse-delivery/import', controller.importNseDeliveryDaily);
+  router.post('/market-data/exchange-files/nse-corporate-actions/import', controller.importNseCorporateActions);
+  router.post('/market-data/adjusted-close/recompute', controller.recomputeAdjustedClose);
   router.post('/market-data/exchange-files/nse-delivery/refresh', controller.refreshNseDeliveryDaily);
   router.post('/market-data/exchange-files/nse-delivery/backfill', controller.runNseDeliveryHistoricalBackfill);
   router.post('/market-data/exchange-files/historical-backfill', controller.runExchangeHistoricalBackfill);

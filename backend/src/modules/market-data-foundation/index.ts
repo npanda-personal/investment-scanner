@@ -73,6 +73,30 @@ export type {
   NseXbrlParsedFact,
   NseXbrlParsedFacts,
 } from './market-data-foundation.nse-xbrl-fundamentals-exporter';
+export {
+  parseNseCorporateActions,
+  parseNseSubject,
+  parseNseExDate,
+  buildCorporateActionNaturalKey,
+  buildNseCorporateActionsUrl,
+  NSE_CORPORATE_ACTIONS_SOURCE,
+} from './market-data-foundation.corporate-actions-source';
+export type {
+  NseCorporateActionRow,
+  ParsedCorporateAction,
+  ParseNseCorporateActionsOptions,
+  ParseNseCorporateActionsResult,
+} from './market-data-foundation.corporate-actions-source';
+export {
+  computeAdjustedCloses,
+} from './market-data-foundation.corporate-adjustment';
+export type {
+  AdjustmentAction,
+  AdjustmentActionType,
+  AdjustedBar,
+  RawBar,
+  ComputeAdjustedClosesResult,
+} from './market-data-foundation.corporate-adjustment';
 export type {
   CorporateAction,
   CorporateActionType,

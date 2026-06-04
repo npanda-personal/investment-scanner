@@ -2996,6 +2996,93 @@ export class MarketDataFoundationRepository {
     return Promise.all(operations);
   }
 
+  /**
+   * Load raw price bars (date + close) for a stock by its symbol.
+   * Returns chronological rows — cheapest projection needed for back-adjustment.
+   */
+  async listRawPriceBarsForStock(symbol: string): Promise<Array<{ date: Date; close: number }>> {
+    const rows = await this.prisma.priceTick.findMany({
+      where: { symbol },
+      orderBy: { timestamp: 'asc' },
+      select: { timestamp: true, close: true },
+    });
+    return rows.map((row) => ({ date: row.timestamp, close: Number(row.close) }));
+  }
+
+  /**
+   * Write back adjusted-close values onto PriceTick rows identified by
+   * (symbol, timestamp).  Only rows where the stored adjustedClose differs
+   * from the incoming value are touched (set-based, bounded, no full-table scan).
+   *
+   * @returns count of rows actually updated (differs from provided)
+   */
+  async updateAdjustedCloses(
+    symbol: string,
+    updates: Array<{ date: Date; adjustedClose: number }>
+  ): Promise<number> {
+    if (updates.length === 0) return 0;
+
+    // Normalise every incoming date to UTC midnight so it matches stored timestamps.
+    const normalised = updates.map((u) => ({
+      timestamp: this.normalizeUtcDay(u.date),
+      adjustedClose: u.adjustedClose,
+    }));
+
+    // Fetch existing rows to diff — same pattern as storeHistoricalBulk.
+    const timestamps = normalised.map((u) => u.timestamp);
+    const existing = await this.prisma.priceTick.findMany({
+      where: { symbol, timestamp: { in: timestamps } },
+      select: { timestamp: true, adjustedClose: true },
+    });
+    const existingByTs = new Map(
+      existing.map((row) => [row.timestamp.toISOString(), row.adjustedClose])
+    );
+
+    const toUpdate = normalised.filter((u) => {
+      const stored = existingByTs.get(u.timestamp.toISOString());
+      if (stored === undefined) return false; // no price row for this date — skip
+      if (stored === null || stored === undefined) return true; // no value yet → write it
+      return !this.sameDecimal(stored, u.adjustedClose);
+    });
+
+    if (toUpdate.length === 0) return 0;
+
+    const batchSize = this.exchangeBulkWriteBatchSize();
+    for (let i = 0; i < toUpdate.length; i += batchSize) {
+      const batch = toUpdate.slice(i, i + batchSize);
+      await this.prisma.$transaction(async (tx: any) => {
+        for (const row of batch) {
+          await tx.priceTick.update({
+            where: { symbol_timestamp: { symbol, timestamp: row.timestamp } },
+            data: { adjustedClose: new Prisma.Decimal(row.adjustedClose) },
+          });
+        }
+      }, { maxWait: 30000, timeout: 60000 });
+    }
+
+    return toUpdate.length;
+  }
+
+  /**
+   * List stocks scoped to region/assetType, paginated, for batch recompute.
+   */
+  async listStocksForAdjustedCloseRecompute(
+    options: Pick<PaginationOptions, 'region' | 'assetType'> & { batchSize: number; offset: number }
+  ): Promise<{ stocks: Array<{ id: string; symbol: string }>; total: number }> {
+    const where = this.stockWhere({ region: options.region, assetType: options.assetType });
+    const [stocks, total] = await Promise.all([
+      this.prisma.stock.findMany({
+        where,
+        orderBy: { symbol: 'asc' },
+        skip: options.offset,
+        take: options.batchSize,
+        select: { id: true, symbol: true },
+      }),
+      this.prisma.stock.count({ where }),
+    ]);
+    return { stocks, total };
+  }
+
   async listCorporateActions(stockId: string) {
     const rows = await (this.prisma as any).corporateAction.findMany({
       where: { stockId },

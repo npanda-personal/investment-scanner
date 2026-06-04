@@ -1045,4 +1045,53 @@ export class MarketDataFoundationController {
   syncFxRates = async (_req: Request, res: Response) => {
     return this.providerDisabledResponse(res, 'Provider FX-rate sync');
   };
+
+  // ---------------------------------------------------------------------------
+  // NSE Corporate-Actions import
+  // ---------------------------------------------------------------------------
+
+  importNseCorporateActions = async (req: Request, res: Response) => {
+    try {
+      const result = await this.service.importNseCorporateActionsFile({
+        csvOrJsonText: typeof req.body?.csvOrJsonText === 'string' ? req.body.csvOrJsonText : undefined,
+        rows: Array.isArray(req.body?.rows) ? req.body.rows : undefined,
+        region: typeof req.body?.region === 'string' ? req.body.region : typeof req.query.region === 'string' ? req.query.region : undefined,
+        assetType: typeof req.body?.assetType === 'string' ? req.body.assetType : typeof req.query.assetType === 'string' ? req.query.assetType : undefined,
+        source: typeof req.body?.source === 'string' ? req.body.source : undefined,
+        force: req.body?.force === true || req.query.force === 'true',
+      });
+      return res.status(result.status === 'FAILED' ? 500 : 200).json(result);
+    } catch (error) {
+      console.error('Error importing NSE corporate actions:', error);
+      return res.status(500).json({ error: this.errorMessage(error, 'NSE corporate-actions import failed') });
+    }
+  };
+
+  // ---------------------------------------------------------------------------
+  // Adjusted-close recompute
+  // ---------------------------------------------------------------------------
+
+  recomputeAdjustedClose = async (req: Request, res: Response) => {
+    try {
+      const instrumentId = req.body?.instrumentId || req.query.instrumentId;
+      const batchMode = req.body?.batch === true || req.query.batch === 'true' || (!instrumentId);
+
+      if (!batchMode && instrumentId) {
+        const result = await this.service.recomputeAdjustedClosesForInstrument(String(instrumentId));
+        return res.json(result);
+      }
+
+      // Batch mode.
+      const result = await this.service.recomputeAdjustedClosesBatch({
+        region: typeof req.body?.region === 'string' ? req.body.region : typeof req.query.region === 'string' ? req.query.region : undefined,
+        assetType: typeof req.body?.assetType === 'string' ? req.body.assetType : typeof req.query.assetType === 'string' ? req.query.assetType : undefined,
+        batchSize: req.body?.batchSize !== undefined ? Number(req.body.batchSize) : req.query.batchSize !== undefined ? Number(req.query.batchSize) : undefined,
+        offset: req.body?.offset !== undefined ? Number(req.body.offset) : req.query.offset !== undefined ? Number(req.query.offset) : undefined,
+      });
+      return res.json(result);
+    } catch (error) {
+      console.error('Error recomputing adjusted closes:', error);
+      return res.status(500).json({ error: this.errorMessage(error, 'Adjusted-close recompute failed') });
+    }
+  };
 }
