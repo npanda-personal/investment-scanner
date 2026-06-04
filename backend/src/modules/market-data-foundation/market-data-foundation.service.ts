@@ -1716,6 +1716,8 @@ export class MarketDataFoundationService {
       contextGaps,
       warnings,
       priceHistory: historyBySymbol.get(stock.symbol) || [],
+      /** derivativesEligible: sourced from the stock record when available; null means not yet populated. */
+      derivativesEligible: (stock as any).derivativesEligible ?? null,
     }));
   }
 

@@ -21,6 +21,7 @@ import type {
   TodayReviewExplainability,
   TodayReviewGrade,
   TodayReviewGroupedCandidates,
+  TodayReviewMarketPosture,
   TodayReviewReasonCategory,
   TodayReviewQuery,
   TodayReviewRepository,
@@ -78,6 +79,11 @@ interface BoardAssemblyResult {
   boardSelection: TodayReviewBoardSelection;
 }
 
+/** Minimal interface for capital posture — used for cycle-safe optional injection. */
+interface CapitalPostureServiceLike {
+  capitalPosture(region: string): Promise<{ availability: string; postureLabel: string | null; action: string | null; message: string }>;
+}
+
 export class TodayTradeReviewService {
   constructor(
     private readonly repository: TodayReviewRepository = new TodayTradeReviewRepository(),
@@ -91,7 +97,13 @@ export class TodayTradeReviewService {
       calibrationService: new SignalCalibrationEngineService(),
       smartMoneyService: new SmartMoneyIntelligenceService(),
     },
-    private readonly clock: () => Date = () => new Date()
+    private readonly clock: () => Date = () => new Date(),
+    /**
+     * Optional CapitalPostureService injection.
+     * Cycle-safe: injected at construction or resolved via lazy-require of the SPECIFIC file
+     * (never the market-context-intelligence index, which imports signal-generation-engine).
+     */
+    private readonly capitalPostureService?: CapitalPostureServiceLike | null
   ) {}
 
   async run(request: TodayReviewRunRequest = {}): Promise<TodayReviewRunResponse> {
@@ -112,7 +124,10 @@ export class TodayTradeReviewService {
     });
 
     try {
-      const sources = await this.loadRunSources(scope, warnings);
+      const [sources, marketPosture] = await Promise.all([
+        this.loadRunSources(scope, warnings),
+        this.loadMarketPosture(scope.region),
+      ]);
       sourceSnapshot.marketData = sources.marketData;
       sourceSnapshot.reviewReadiness = sources.reviewReadiness;
       sourceSnapshot.reviewUniverse = sources.reviewUniverse;
@@ -124,7 +139,7 @@ export class TodayTradeReviewService {
       sourceSnapshot.scanFunnel = liteResult.scanFunnel;
       const candidateSources = sources.reviewUniverse?.mode === 'NO_REVIEW'
         ? []
-        : await this.buildCandidateSources(sources.entryDecisions, sources.exitDecisions, sources, scope, warnings, Boolean(request.skipTradePlanGeneration));
+        : await this.buildCandidateSources(sources.entryDecisions, sources.exitDecisions, sources, scope, warnings, Boolean(request.skipTradePlanGeneration), sources.trustedInstruments);
       const strategyCandidates = candidateSources.map((candidateSource) => this.mapCandidate(candidateSource));
       const board = this.assembleBoardCandidates(this.mergeCandidates([...liteResult.candidates, ...strategyCandidates]));
       sourceSnapshot.boardSelection = board.boardSelection;
@@ -142,7 +157,7 @@ export class TodayTradeReviewService {
         sourceSnapshot,
         candidates,
       });
-      return this.toRunResponse(completed, scope);
+      return this.toRunResponse(completed, scope, marketPosture);
     } catch (error: any) {
       warnings.push(`Today review run failed: ${error?.message || 'unknown error'}`);
       const failed = await this.repository.completeRun({
@@ -502,8 +517,19 @@ export class TodayTradeReviewService {
     },
     scope: { region: string; assetType: string },
     warnings: string[],
-    skipTradePlanGeneration = false
+    skipTradePlanGeneration = false,
+    trustedInstruments: TrustedReviewUniverseInstrument[] = []
   ): Promise<TodayReviewCandidateSource[]> {
+    // Build derivativesEligible lookup by instrumentId and symbol for F&O gating
+    const derivativesEligibleById = new Map<string, boolean | null>(
+      trustedInstruments.map((instrument) => [instrument.id, instrument.derivativesEligible])
+    );
+    const derivativesEligibleBySymbol = new Map<string, boolean | null>(
+      trustedInstruments.flatMap((instrument) => [
+        [instrument.symbol, instrument.derivativesEligible],
+        ...(instrument.providerSymbol ? [[instrument.providerSymbol, instrument.derivativesEligible] as [string, boolean | null]] : []),
+      ])
+    );
     const decisions = this.dedupeDecisions([
       ...entryDecisions.map((decision) => ({ decision, sourceKind: 'ENTRY' as const })),
       ...exitDecisions.map((decision) => ({ decision, sourceKind: 'EXIT' as const })),
@@ -546,6 +572,9 @@ export class TodayTradeReviewService {
           ? Promise.resolve(smartMoneyByInstrument.get(instrumentId) || null)
           : this.safe(() => this.services.smartMoneyService.latestPersistedStock(instrumentId, '3M'), `${item.decision.symbol} smart-money support is unavailable.`, warnings),
       ]);
+      const derivativesEligible = derivativesEligibleById.get(instrumentId)
+        ?? derivativesEligibleBySymbol.get(item.decision.symbol || '')
+        ?? null;
       result.push({
         decision: item.decision,
         dataQuality: dataQualityByInstrument.get(instrumentId) || null,
@@ -556,6 +585,7 @@ export class TodayTradeReviewService {
         calibration,
         smartMoney,
         sourceKind: item.sourceKind,
+        derivativesEligible,
       });
     }
     return result;
@@ -651,11 +681,22 @@ export class TodayTradeReviewService {
         state = 'WATCH_ONLY';
         scanFunnel.watchOnly += 1;
         this.incrementReason(scanFunnel, 'exit/invalidation evidence incomplete');
+      } else if (setup.direction === 'SHORT') {
+        // F&O-gate (#28a): short candidates are only actionable on F&O/derivatives-eligible names.
+        // Cash-only (non-F&O) bearish setups are classified as AVOID (caution/exit-review context),
+        // never SHORT_REVIEW, since shorts are not executable in the cash segment in India.
+        if (instrument.derivativesEligible === true) {
+          state = 'SHORT_REVIEW';
+        } else {
+          state = 'AVOID';
+          this.incrementReason(scanFunnel, 'non-F&O name: short review reclassified as avoid/caution');
+        }
+        scanFunnel.promotedCandidates += 1;
       } else {
-        state = setup.direction === 'SHORT' ? 'SHORT_REVIEW' : 'LONG_REVIEW';
+        state = 'LONG_REVIEW';
         scanFunnel.promotedCandidates += 1;
       }
-      const score = state === 'BLOCKED' ? 0 : this.liteScore(setup, evidence, tradePlan.rewardRiskRatio, instrument, contextGapPenalty);
+      const score = state === 'BLOCKED' || state === 'AVOID' ? 0 : this.liteScore(setup, evidence, tradePlan.rewardRiskRatio, instrument, contextGapPenalty);
       const watchReasons = [
         ...(state === 'WATCH_ONLY' && evidence.label === 'UNPROVEN' ? ['Historical evidence is UNPROVEN; keep as watch only until more occurrences are available.'] : []),
         ...(tradePlan.rewardRiskRatio < 1.2 ? ['Exit/invalidation evidence is incomplete for research review.'] : []),
@@ -666,7 +707,7 @@ export class TodayTradeReviewService {
         instrumentId: instrument.id,
         symbol: instrument.symbol,
         companyName: instrument.companyName,
-        direction: state === 'BLOCKED' ? 'BLOCKED' : state === 'WATCH_ONLY' ? 'WATCH' : setup.direction,
+        direction: state === 'BLOCKED' ? 'BLOCKED' : state === 'AVOID' ? 'AVOID' : state === 'WATCH_ONLY' ? 'WATCH' : setup.direction,
         state,
         setupType: setup.type,
         strategyCode: 'TODAY_REVIEW_LITE',
@@ -927,6 +968,7 @@ export class TodayTradeReviewService {
     if (state === 'BLOCKED') return `Blocked: ${blockers[0] || 'hard blocker exists.'}`;
     if (state === 'WATCH_ONLY') return `Watch only: ${watchReasons[0] || 'lite evidence is not strong enough for research review.'}`;
     if (state === 'SHORT_REVIEW') return `Short review candidate from price-action setup and ${evidence.label.toLowerCase()} OHLCV evidence across ${evidence.sampleSize} prior occurrences.`;
+    if (state === 'AVOID') return 'Caution/avoid context: bearish setup detected but instrument is not F&O-eligible; short is not executable in the cash segment. Review for risk context only.';
     return `Long review candidate from price-action setup and ${evidence.label.toLowerCase()} OHLCV evidence across ${evidence.sampleSize} prior occurrences.`;
   }
 
@@ -1066,6 +1108,8 @@ export class TodayTradeReviewService {
     if (!source.marketContext) add('Market context snapshot is missing.');
     if (source.decision.confidence === 'LOW') add('Strategy Decision confidence is LOW.');
     if (source.tradePlan?.rewardRiskRatio !== undefined && source.tradePlan.rewardRiskRatio < 1.5) add('Exit/invalidation evidence is incomplete for research review.');
+    // F&O-gate (#28a): surface caution note on exit/bearish decisions for non-F&O names in the strategy path
+    if (source.sourceKind === 'EXIT' && source.derivativesEligible !== true) add('Exit/bearish setup detected but instrument is not F&O-eligible; short is not executable in the cash segment. Treat as exit-risk context only, not short review.');
     for (const warning of source.decision.warnings || []) add(warning);
     for (const warning of source.tradePlan?.warnings || []) add(warning);
     return [...reasons];
@@ -1249,7 +1293,9 @@ export class TodayTradeReviewService {
 
     const longPool = ordered.filter((candidate) => candidate.state === 'LONG_REVIEW');
     const watchPool = ordered.filter((candidate) => candidate.state === 'WATCH_ONLY');
-    const exitRiskPool = ordered.filter((candidate) => candidate.state === 'EXIT_RISK_REVIEW' || candidate.state === 'SHORT_REVIEW');
+    // EXIT_RISK section includes SHORT_REVIEW (F&O-eligible bearish), EXIT_RISK_REVIEW (strategy exits),
+    // and AVOID (non-F&O bearish setups reclassified for caution/exit context — #28a).
+    const exitRiskPool = ordered.filter((candidate) => candidate.state === 'EXIT_RISK_REVIEW' || candidate.state === 'SHORT_REVIEW' || candidate.state === 'AVOID');
     const specialPool = ordered.filter((candidate) => specialReasons.has(this.boardCandidateKey(candidate)));
 
     const select = (
@@ -1291,7 +1337,9 @@ export class TodayTradeReviewService {
     select(exitRiskPool, 'EXIT_RISK', TODAY_REVIEW_BOARD_QUOTAS.EXIT_RISK, (candidate) => (
       candidate.state === 'SHORT_REVIEW'
         ? 'SHORT_REVIEW visibility reserved by board contract.'
-        : 'EXIT_RISK_REVIEW visibility reserved by board contract.'
+        : candidate.state === 'AVOID'
+          ? 'AVOID/caution context surfaced by board contract: bearish setup on non-F&O name — not executable as a short in cash segment.'
+          : 'EXIT_RISK_REVIEW visibility reserved by board contract.'
     ));
     select(specialPool, 'SPECIAL_CASES', TODAY_REVIEW_BOARD_QUOTAS.SPECIAL_CASES, (candidate) => specialReasons.get(this.boardCandidateKey(candidate)) || 'Special-case evidence overlap selected by board contract.');
 
@@ -1641,12 +1689,55 @@ export class TodayTradeReviewService {
     }, {});
   }
 
-  private toRunResponse(run: TodayReviewRunDto | null, scope: { region: string; assetType: string }): TodayReviewRunResponse {
+  private toRunResponse(run: TodayReviewRunDto | null, scope: { region: string; assetType: string }, marketPosture?: TodayReviewMarketPosture | null): TodayReviewRunResponse {
     return {
       run,
       groups: this.groupCandidates(run?.candidates || []),
       scope,
+      marketPosture: marketPosture ?? null,
     };
+  }
+
+  /**
+   * Loads Capital Posture from persisted snapshots.
+   * Cycle-safe: uses lazy-require of the SPECIFIC file, never the market-context-intelligence index.
+   * If posture is unavailable (no snapshot), returns an honest UNAVAILABLE note — never fabricates.
+   */
+  private async loadMarketPosture(region: string): Promise<TodayReviewMarketPosture> {
+    try {
+      // Resolve the injected service or lazy-require the specific file to avoid cycles with signal-generation-engine
+      const svc: CapitalPostureServiceLike = this.capitalPostureService
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        ?? new (require('../market-context-intelligence/capital-posture.service').CapitalPostureService)();
+      const posture = await svc.capitalPosture(region);
+      if (posture.availability === 'UNAVAILABLE' || !posture.postureLabel) {
+        return {
+          availability: 'UNAVAILABLE',
+          postureLabel: null,
+          action: null,
+          note: posture.message || 'Capital Posture regime is unavailable — no persisted snapshot exists for this scope.',
+        };
+      }
+      const postureLabel = posture.postureLabel as 'RISK_ON' | 'NEUTRAL' | 'RISK_OFF';
+      const postureNotes: Record<'RISK_ON' | 'NEUTRAL' | 'RISK_OFF', string> = {
+        RISK_ON: 'RISK_ON — broad deployment environment favored; long setups are contextually supported.',
+        NEUTRAL: 'NEUTRAL — selective deployment acceptable; review entries carefully; avoid aggressive new positions.',
+        RISK_OFF: 'RISK_OFF — favor caution; long entries are discouraged; short context is only valid selectively on F&O-eligible names.',
+      };
+      return {
+        availability: 'READY',
+        postureLabel,
+        action: (posture.action as 'DEPLOY' | 'HOLD' | 'RAISE_CASH' | 'STAY_OUT') ?? null,
+        note: postureNotes[postureLabel],
+      };
+    } catch {
+      return {
+        availability: 'UNAVAILABLE',
+        postureLabel: null,
+        action: null,
+        note: 'Capital Posture regime is unavailable — posture service could not be reached.',
+      };
+    }
   }
 
   private dedupeDecisions(items: Array<{ decision: StrategyDecisionDto; sourceKind: 'ENTRY' | 'EXIT' }>) {

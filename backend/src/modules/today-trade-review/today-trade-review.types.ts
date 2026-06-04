@@ -234,6 +234,18 @@ export interface TodayReviewGroupedCandidates {
   unproven: TodayReviewCandidateDto[];
 }
 
+/** Research-support market posture context surfaced on the today-review output. */
+export interface TodayReviewMarketPosture {
+  /** Posture label derived from persisted regime + health snapshots. Null when unavailable. */
+  postureLabel: 'RISK_ON' | 'NEUTRAL' | 'RISK_OFF' | null;
+  /** Recommended action (research-support vocabulary). Null when unavailable. */
+  action: 'DEPLOY' | 'HOLD' | 'RAISE_CASH' | 'STAY_OUT' | null;
+  /** Human-readable note for context. Always present — never fabricated. */
+  note: string;
+  /** Whether posture data was available from persisted snapshots. */
+  availability: 'READY' | 'UNAVAILABLE';
+}
+
 export interface TodayReviewRunResponse {
   run: TodayReviewRunDto | null;
   groups: TodayReviewGroupedCandidates;
@@ -241,6 +253,8 @@ export interface TodayReviewRunResponse {
     region: string;
     assetType: string;
   };
+  /** Capital Posture / regime context for this review session. Present when posture data is available. */
+  marketPosture?: TodayReviewMarketPosture | null;
 }
 
 export interface TodayReviewRunHistoryResponse {
@@ -327,4 +341,6 @@ export interface TodayReviewCandidateSource {
   calibration: SignalCalibrationResultDto | null;
   smartMoney: SmartMoneyStockSummary | null;
   sourceKind: 'ENTRY' | 'EXIT';
+  /** Whether this instrument is F&O/derivatives-eligible on NSE/BSE. Null = not available (treated as non-F&O). */
+  derivativesEligible: boolean | null;
 }
