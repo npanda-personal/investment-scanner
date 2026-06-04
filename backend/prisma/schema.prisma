@@ -751,8 +751,39 @@ model AppUser {
   backtestStrategies BacktestStrategy[]
   notificationPreferences NotificationPreference?
   notificationEvents NotificationEvent[]
+  tradeJournalEntries TradeJournalEntry[]
 
   @@map("app_users")
+}
+
+model TradeJournalEntry {
+  id                String    @id @default(cuid())
+  userId            String
+  user              AppUser   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  instrumentId      String?   // optional FK to stocks.id — not enforced at DB level to allow deleted/delisted instruments
+  symbol            String    // NSE/BSE symbol snapshot, normalized uppercase
+  sourceSignalId    String?   // optional: the SignalResult id that prompted this review
+  direction         String    // LONG | SHORT
+  decision          String    // ACTED | SKIPPED | WATCHING
+  reviewedAt        DateTime  // when the human reviewed this signal/opportunity
+  entryPrice        Decimal?  // price at which position was entered (ACTED entries)
+  stopPrice         Decimal?  // planned stop loss price
+  targetPrice       Decimal?  // planned target price
+  thesis            String?   // free-text rationale
+  conviction        Decimal?  // 1–10 self-rated conviction at time of decision
+  outcomeStatus     String?   // OPEN | CLOSED | INVALIDATED | null
+  exitPrice         Decimal?  // price at which position was exited
+  exitAt            DateTime? // when the position was exited
+  realizedReturnPct Decimal?  // computed: LONG=(exit-entry)/entry; SHORT=(entry-exit)/entry
+  notes             String?   // free-text post-mortem notes
+  tags              Json?     // string[] — user-defined labels
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([userId, reviewedAt])
+  @@index([instrumentId])
+  @@map("trade_journal_entries")
 }
 
 model NotificationPreference {
