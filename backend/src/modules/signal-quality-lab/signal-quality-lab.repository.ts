@@ -339,6 +339,9 @@ export class SignalQualityLabRepository {
       sampleSize: Number(row.sample_size),
       directionalSampleSize: Number(row.directional_sample_size),
       winRate: row.win_rate !== null && row.win_rate !== undefined ? Number(row.win_rate) : null,
+      // winRateConfidence is a READ-side computed label — set to null here;
+      // the service layer injects the correct value after this mapping.
+      winRateConfidence: null,
       avgReturnPercent: row.avg_return_percent !== null && row.avg_return_percent !== undefined ? Number(row.avg_return_percent) : null,
       medianReturnPercent: row.median_return_percent !== null && row.median_return_percent !== undefined ? Number(row.median_return_percent) : null,
       expectancy: row.expectancy !== null && row.expectancy !== undefined ? Number(row.expectancy) : null,
@@ -432,6 +435,9 @@ export class SignalQualityLabRepository {
       sampleSize: Number(row.sample_size),
       directionalSampleSize: Number(row.directional_sample_size),
       winRate: row.win_rate !== null && row.win_rate !== undefined ? Number(row.win_rate) : null,
+      // winRateConfidence is a READ-side computed label — set to null here;
+      // the service layer injects the correct value after this mapping.
+      winRateConfidence: null,
       avgReturnPercent: row.avg_return_percent !== null && row.avg_return_percent !== undefined ? Number(row.avg_return_percent) : null,
       medianReturnPercent: row.median_return_percent !== null && row.median_return_percent !== undefined ? Number(row.median_return_percent) : null,
       expectancy: row.expectancy !== null && row.expectancy !== undefined ? Number(row.expectancy) : null,

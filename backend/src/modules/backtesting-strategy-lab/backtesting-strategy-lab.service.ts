@@ -85,6 +85,27 @@ const EXIT_REASONS = {
   STRATEGY_EXIT: 'STRATEGY_EXIT',
 } as const;
 
+/**
+ * Strategy codes whose entry scoring depends on sectorLeadership or
+ * smartMoneyStatus context — both of which are approximated from price
+ * proxies in the backtest path (not real sector-RS or institutional data).
+ * A PRICE_PROXY_CONTEXT warning is surfaced whenever one of these strategies
+ * is under test.
+ */
+const PRICE_PROXY_DEPENDENT_STRATEGIES: ReadonlySet<string> = new Set([
+  'SECTOR_LEADER_MOMENTUM',
+  'SMART_MONEY_ACCUMULATION',
+  'TREND_MOMENTUM',         // scoreSectorAndSmartMoney is called for TREND_MOMENTUM too
+  'BREAKOUT_CONFIRMATION',  // requireContext for sectorLeadership + smartMoneyStatus
+]);
+
+/**
+ * Minimum number of bars of price history before signalReadinessStatus
+ * transitions from LIMITED → READY in strategyContextFromBars.
+ * Entry strategies are blocked for READY-only in the common-noise gate.
+ */
+const SIGNAL_READINESS_WARM_UP_BARS = 200;
+
 export class BacktestingStrategyLabService {
   constructor(
     private readonly repository = new BacktestingStrategyLabRepository(),
@@ -284,6 +305,15 @@ export class BacktestingStrategyLabService {
     let regimeMissingBarCount = 0;
     let totalBarCount = 0;
 
+    // Honest-labeling #48: count instrument-bars that are in warm-up
+    // (barIndex + 1 < SIGNAL_READINESS_WARM_UP_BARS) — entries are blocked
+    // during this window, so short windows understate live performance.
+    let warmUpBarCount = 0;
+    // Honest-labeling #48: count instrument-bars where liquidityStatus=UNKNOWN
+    // (averageVolume20 === null) — entries are blocked by the LIQUIDITY_UNKNOWN
+    // gate; this is sparse-volume data, not true illiquidity.
+    let liquidityUnknownBarCount = 0;
+
     // pendingEntries: signals evaluated on bar[T], filled at bar[T+1] open
     // (Fix #3: next-bar fill — 1-bar lag between signal and fill).
     // Each entry holds the signal date, fill-bar index, entry reasons.
@@ -382,6 +412,20 @@ export class BacktestingStrategyLabService {
         if (positions.size >= config.maxPositions) continue;
         const barIndex = history.bars.findIndex((bar) => bar.date === date);
         if (barIndex < 0) continue;
+
+        // Honest-labeling #48: tally warm-up and liquidity-unknown bars.
+        // barIndex+1 = number of available closes at this point (the current bar inclusive).
+        const closesAvailableAtBar = barIndex + 1;
+        if (closesAvailableAtBar < SIGNAL_READINESS_WARM_UP_BARS) warmUpBarCount += 1;
+        // Count liquidity-unknown only when we have prior bars but they ALL have
+        // null volume — this mirrors averageVolume20 === null from strategyContextFromBars
+        // and flags sparse volume DATA (not the unavoidable first-bar warm-up edge case).
+        if (barIndex > 0) {
+          const recentBars = history.bars.slice(Math.max(0, barIndex - 20), barIndex);
+          const recentVolumes = recentBars.map((b) => b.volume).filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
+          if (recentVolumes.length === 0) liquidityUnknownBarCount += 1;
+        }
+
         const entry = this.entryDecision(config, history.bars, barIndex, regimeIndex);
         if (!entry.enter) continue;
         // Schedule fill at next date (T+1); if this is the last date, skip
@@ -462,7 +506,7 @@ export class BacktestingStrategyLabService {
         dataCoverage,
         dataCoveragePercent: this.coverageScore(dataCoverage),
         benchmarkComparison,
-        realismWarnings: this.realismWarnings(trades, benchmarkComparison, dataCoverage, baseMetrics, config, regimeMissingBarCount, totalBarCount),
+        realismWarnings: this.realismWarnings(trades, benchmarkComparison, dataCoverage, baseMetrics, config, regimeMissingBarCount, totalBarCount, warmUpBarCount, liquidityUnknownBarCount),
         availabilityStatus: this.availabilityStatus(config, histories.size, insufficientHistoryCount, missingPriceHistoryCount),
         universeSummary,
         ...(walkForward !== undefined ? { walkForward } : {}),
@@ -1284,6 +1328,8 @@ export class BacktestingStrategyLabService {
     config?: BacktestStrategyConfig,
     regimeMissingBarCount?: number,
     totalBarCount?: number,
+    warmUpBarCount?: number,
+    liquidityUnknownBarCount?: number,
   ) {
     const warnings: string[] = [];
     const diagnostics = this.exitDiagnostics(trades);
@@ -1301,6 +1347,37 @@ export class BacktestingStrategyLabService {
     // Fix #11: CRITICAL survivorship warning when universe ALL is used
     if (config?.universe?.type === 'ALL') {
       warnings.push('CRITICAL: universe ALL uses only currently-active instruments (today\'s survivors). Delisted or failed stocks are excluded. Results are subject to survivorship bias and may materially overstate historical performance.');
+    }
+    // Honest-labeling #48(1): PRICE_PROXY_CONTEXT warning for strategies that depend
+    // on sectorLeadership / smartMoneyStatus — both are approximated from price proxies
+    // in the backtest path. Live scoring uses real sector-RS and institutional data.
+    if (config?.strategyCode && PRICE_PROXY_DEPENDENT_STRATEGIES.has(config.strategyCode)) {
+      warnings.push(
+        `PRICE_PROXY_CONTEXT: strategy "${config.strategyCode}" uses sectorLeadership and/or smartMoneyStatus context. ` +
+        'In this backtest both fields are derived from price proxies (price-vs-SMA score and volume direction), ' +
+        'not real sector relative-strength data or institutional flow data. ' +
+        'Live signal generation uses richer inputs — backtest entry/exit decisions for this strategy may differ from live behavior.'
+      );
+    }
+    // Honest-labeling #48(2): WARM_UP_DRAG warning — instrument-bars in warm-up
+    // are blocked from entry (signalReadinessStatus=LIMITED|NOT_READY). Short windows
+    // understates performance vs a live stock with full history.
+    if (warmUpBarCount !== undefined && warmUpBarCount > 0) {
+      warnings.push(
+        `WARM_UP_DRAG: ${warmUpBarCount} instrument-bar(s) were in signal warm-up ` +
+        `(fewer than ${SIGNAL_READINESS_WARM_UP_BARS} bars of history) and were blocked from entry. ` +
+        'Short backtest windows or newly-listed instruments understate potential entries vs a live stock with full history.'
+      );
+    }
+    // Honest-labeling #48(3): LIQUIDITY_UNKNOWN note — instrument-bars where
+    // liquidityStatus=UNKNOWN (volume data absent in DB) block entries. This reflects
+    // missing volume data, not confirmed illiquidity.
+    if (liquidityUnknownBarCount !== undefined && liquidityUnknownBarCount > 0) {
+      warnings.push(
+        `LIQUIDITY_UNKNOWN: ${liquidityUnknownBarCount} instrument-bar(s) had no volume data in the database ` +
+        '(liquidityStatus=UNKNOWN), causing those entry opportunities to be skipped. ' +
+        'This reflects sparse volume data, not confirmed illiquidity — the live universe filter may differ.'
+      );
     }
     return warnings;
   }

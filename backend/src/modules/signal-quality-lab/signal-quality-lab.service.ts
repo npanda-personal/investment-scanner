@@ -30,6 +30,11 @@ import type {
   SignalOutcomeSet,
   SignalOutcomeUpsert,
   SignalTypePerformance,
+  WinRateConfidence,
+} from './signal-quality-lab.types';
+import {
+  WIN_RATE_CONFIDENCE_HIGH_THRESHOLD,
+  WIN_RATE_CONFIDENCE_MEDIUM_THRESHOLD,
 } from './signal-quality-lab.types';
 
 const HORIZON_DAYS: Record<QualityHorizon, number> = { '1D': 1, '5D': 5, '10D': 10, '20D': 20, '60D': 60 };
@@ -263,6 +268,10 @@ export class SignalQualityLabService {
   /**
    * Return scorecard rows grouped by `horizon × groupBy`.
    * Delegates SQL aggregation to the repository; applies minSampleSize after.
+   *
+   * Each row carries `winRateConfidence` computed from `directionalSampleSize`
+   * (honest-labeling #48): HIGH ≥ 100, MEDIUM ≥ 30, LOW < 30, null when
+   * directionalSampleSize = 0 (no directional win-rate).
    */
   async scorecard(query: ScorecardQuery): Promise<ScorecardResponse> {
     const normalizedQuery = this.normalizeScorecardQuery(query);
@@ -272,23 +281,51 @@ export class SignalQualityLabService {
     ]);
 
     const minSample = normalizedQuery.minSampleSize ?? 1;
-    const filteredRows = rows.filter((row) => row.directionalSampleSize >= minSample);
+    const filteredRows = rows
+      .filter((row) => row.directionalSampleSize >= minSample)
+      .map((row) => ({ ...row, winRateConfidence: this.computeWinRateConfidence(row.directionalSampleSize) }));
+
+    const annotatedSummary = summaryRows.map((row) => ({
+      ...row,
+      winRateConfidence: this.computeWinRateConfidence(row.directionalSampleSize),
+    }));
 
     return {
       groupBy: normalizedQuery.groupBy as ScorecardGroupBy,
       horizon: normalizedQuery.horizon ?? null,
       rows: filteredRows,
-      summary: summaryRows,
+      summary: annotatedSummary,
     };
   }
 
   /**
    * Return per-horizon summary stats only (no secondary group-by).
    * Useful for a quick "what's the overall 5D win-rate?" query.
+   *
+   * Each summary row carries `winRateConfidence` (honest-labeling #48).
    */
   async scorecardSummary(query: ScorecardQuery): Promise<ScorecardSummary[]> {
     const normalizedQuery = this.normalizeScorecardQuery(query);
-    return this.repository.scorecardSummary(normalizedQuery);
+    const rows = await this.repository.scorecardSummary(normalizedQuery);
+    return rows.map((row) => ({ ...row, winRateConfidence: this.computeWinRateConfidence(row.directionalSampleSize) }));
+  }
+
+  /**
+   * Compute win-rate confidence from directionalSampleSize.
+   *
+   * Thresholds are sourced from WIN_RATE_CONFIDENCE_HIGH/MEDIUM_THRESHOLD constants —
+   * do NOT hard-code numbers anywhere that uses this classification.
+   *
+   *   HIGH   — directionalSampleSize >= WIN_RATE_CONFIDENCE_HIGH_THRESHOLD   (≥ 100)
+   *   MEDIUM — directionalSampleSize >= WIN_RATE_CONFIDENCE_MEDIUM_THRESHOLD (≥  30)
+   *   LOW    — directionalSampleSize <  WIN_RATE_CONFIDENCE_MEDIUM_THRESHOLD (<  30)
+   *   null   — directionalSampleSize === 0 (no directional win-rate available)
+   */
+  private computeWinRateConfidence(directionalSampleSize: number): WinRateConfidence | null {
+    if (directionalSampleSize <= 0) return null;
+    if (directionalSampleSize >= WIN_RATE_CONFIDENCE_HIGH_THRESHOLD) return 'HIGH';
+    if (directionalSampleSize >= WIN_RATE_CONFIDENCE_MEDIUM_THRESHOLD) return 'MEDIUM';
+    return 'LOW';
   }
 
   // ---------------------------------------------------------------------------

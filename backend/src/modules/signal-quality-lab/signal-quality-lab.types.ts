@@ -1,6 +1,27 @@
 import type { SignalConfidence, SignalDirection, SignalItem, SignalResultDto } from '../signal-generation-engine';
 
 export type QualityHorizon = '1D' | '5D' | '10D' | '20D' | '60D';
+
+// ---------------------------------------------------------------------------
+// Win-rate confidence thresholds (honest-labeling #48)
+// ---------------------------------------------------------------------------
+
+/**
+ * Directional sample-size thresholds for win-rate confidence classification.
+ * Apply to `directionalSampleSize` (BULLISH + BEARISH rows only; NEUTRAL excluded).
+ *
+ *   HIGH   — directionalSampleSize >= WIN_RATE_CONFIDENCE_HIGH_THRESHOLD   (≥ 100)
+ *   MEDIUM — directionalSampleSize >= WIN_RATE_CONFIDENCE_MEDIUM_THRESHOLD (≥  30)
+ *   LOW    — directionalSampleSize <  WIN_RATE_CONFIDENCE_MEDIUM_THRESHOLD (<  30)
+ *
+ * Named constants are the single source of truth — tests and service code
+ * must reference these rather than hard-coding magic numbers.
+ */
+export const WIN_RATE_CONFIDENCE_HIGH_THRESHOLD = 100;
+export const WIN_RATE_CONFIDENCE_MEDIUM_THRESHOLD = 30;
+
+/** Additive confidence label on win-rate rows; present wherever winRate is surfaced. */
+export type WinRateConfidence = 'HIGH' | 'MEDIUM' | 'LOW';
 export type NoiseSeverity = 'LOW' | 'MEDIUM' | 'HIGH';
 export type EvidenceUsability = 'USABLE' | 'LIMITED' | 'UNAVAILABLE';
 
@@ -326,6 +347,14 @@ export interface ScorecardRow {
    * null when directionalSampleSize === 0.
    */
   winRate: number | null;
+  /**
+   * Confidence label for the win rate, computed from directionalSampleSize.
+   * HIGH (≥ 100 samples), MEDIUM (≥ 30), LOW (< 30).
+   * null when directionalSampleSize === 0 (no directional win-rate available).
+   * Consumers must display this alongside any winRate figure — a 60% win rate
+   * from 22 samples (LOW) should not be treated the same as one from 500 (HIGH).
+   */
+  winRateConfidence: WinRateConfidence | null;
   avgReturnPercent: number | null;
   medianReturnPercent: number | null;
   /**
@@ -353,6 +382,8 @@ export interface ScorecardSummary {
   sampleSize: number;
   directionalSampleSize: number;
   winRate: number | null;
+  /** See ScorecardRow.winRateConfidence — same semantics applied to the horizon-level rollup. */
+  winRateConfidence: WinRateConfidence | null;
   avgReturnPercent: number | null;
   medianReturnPercent: number | null;
   expectancy: number | null;
