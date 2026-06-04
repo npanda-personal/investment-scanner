@@ -9,7 +9,7 @@ generator client {
 }
 
 model PriceTick {
-  id                   String   @id @default(cuid())
+  id                   String            @id @default(cuid())
   symbol               String
   region               String? // e.g., "US", "EU", "ASIA"
   exchange             String? // e.g., "NASDAQ", "NYSE"
@@ -23,9 +23,9 @@ model PriceTick {
   source               String? // e.g., "yahoo", "coinbase"
   sourceFileImportId   String?
   sourceFileImport     SourceFileImport? @relation(fields: [sourceFileImportId], references: [id], onDelete: SetNull)
-  ingestionTimestamp   DateTime @default(now())
-  lastUpdatedTimestamp DateTime @updatedAt
-  dataStatus           String   @default("COMPLETE")
+  ingestionTimestamp   DateTime          @default(now())
+  lastUpdatedTimestamp DateTime          @updatedAt
+  dataStatus           String            @default("COMPLETE")
 
   @@unique([symbol, timestamp])
   @@index([symbol, timestamp])
@@ -45,57 +45,57 @@ model LatestPrice {
 }
 
 model Stock {
-  id                           String   @id @default(cuid())
-  symbol                       String   @unique
-  name                         String
-  region                       String   // IN, US, EU, UK, CN
-  exchange                     String?
-  country                      String?
-  sector                       String?
-  industry                     String?
-  currency                     String?
-  marketCap                    Decimal?
-  assetType                    String?
-  instrumentSegment            String?
-  displaySymbol                String?
-  providerSymbol               String?
-  sourceSymbol                 String?
-  catalogSource                String?
-  providerSupportStatus        String?
-  providerError                String?
-  derivativesEligible          Boolean  @default(false)
-  underlyingSymbol             String?
-  expiryDate                   DateTime?
-  contractMonth                String?
-  lotSize                      Int?
-  contractStatus               String?
-  isDelisted                   Boolean  @default(false)
-  ipoDate                      DateTime?
-  isin                         String?
-  source                       String   @default("database")
-  dataStatus                   String   @default("PARTIAL")
-  isActive                     Boolean  @default(true)
+  id                              String                         @id @default(cuid())
+  symbol                          String                         @unique
+  name                            String
+  region                          String // IN, US, EU, UK, CN
+  exchange                        String?
+  country                         String?
+  sector                          String?
+  industry                        String?
+  currency                        String?
+  marketCap                       Decimal?
+  assetType                       String?
+  instrumentSegment               String?
+  displaySymbol                   String?
+  providerSymbol                  String?
+  sourceSymbol                    String?
+  catalogSource                   String?
+  providerSupportStatus           String?
+  providerError                   String?
+  derivativesEligible             Boolean                        @default(false)
+  underlyingSymbol                String?
+  expiryDate                      DateTime?
+  contractMonth                   String?
+  lotSize                         Int?
+  contractStatus                  String?
+  isDelisted                      Boolean                        @default(false)
+  ipoDate                         DateTime?
+  isin                            String?
+  source                          String                         @default("database")
+  dataStatus                      String                         @default("PARTIAL")
+  isActive                        Boolean                        @default(true)
   lastSuccessfulDataLoadTimestamp DateTime?
-  createdAt                    DateTime @default(now())
-  updatedAt                    DateTime @updatedAt
-  fundamentals                 Fundamental[]
-  corporateActions             CorporateAction[]
-  signalResults                SignalResult[]
-  dataQualityEvaluations       DataQualityEvaluation[]
-  portfolioHoldings            PortfolioHolding[]
-  portfolioTransactions        PortfolioTransaction[]
-  watchlistItems                WatchlistItem[]
-  alertRules                    AlertRule[]
-  alertEvents                   AlertEvent[]
-  smartMoneySnapshots           SmartMoneyContextSnapshot[]
-  strategyDecisions             StrategyDecisionResult[]
-  marketDataRepairAttempts      MarketDataRepairAttempt[]
-  marketDataRepairStates        MarketDataRepairState[]
-  signalPositionLedgerEntries   SignalPositionLedgerEntry[]
-  exchangeIdentities            InstrumentExchangeIdentity[]
-  deliverySnapshots             MarketDeliverySnapshot[]
-  stockInterestSnapshots         StockInterestSnapshot[]
-  earningsIntelligenceSnapshots EarningsIntelligenceSnapshot[]
+  createdAt                       DateTime                       @default(now())
+  updatedAt                       DateTime                       @updatedAt
+  fundamentals                    Fundamental[]
+  corporateActions                CorporateAction[]
+  signalResults                   SignalResult[]
+  dataQualityEvaluations          DataQualityEvaluation[]
+  portfolioHoldings               PortfolioHolding[]
+  portfolioTransactions           PortfolioTransaction[]
+  watchlistItems                  WatchlistItem[]
+  alertRules                      AlertRule[]
+  alertEvents                     AlertEvent[]
+  smartMoneySnapshots             SmartMoneyContextSnapshot[]
+  strategyDecisions               StrategyDecisionResult[]
+  marketDataRepairAttempts        MarketDataRepairAttempt[]
+  marketDataRepairStates          MarketDataRepairState[]
+  signalPositionLedgerEntries     SignalPositionLedgerEntry[]
+  exchangeIdentities              InstrumentExchangeIdentity[]
+  deliverySnapshots               MarketDeliverySnapshot[]
+  stockInterestSnapshots          StockInterestSnapshot[]
+  earningsIntelligenceSnapshots   EarningsIntelligenceSnapshot[]
 
   @@index([region, assetType, symbol], map: "stocks_region_assetType_symbol_idx")
   @@index([region, assetType, providerSupportStatus, isActive, isDelisted], map: "stocks_region_assetType_providerSupport_active_delisted_idx")
@@ -103,7 +103,7 @@ model Stock {
 }
 
 model SourceFileImport {
-  id                           String   @id @default(cuid())
+  id                           String                       @id @default(cuid())
   source                       String
   segment                      String
   tradingDate                  DateTime
@@ -112,14 +112,14 @@ model SourceFileImport {
   fileHash                     String
   fileSize                     Int?
   status                       String
-  rowsRaw                      Int      @default(0)
-  rowsAccepted                 Int      @default(0)
-  rowsRejected                 Int      @default(0)
+  rowsRaw                      Int                          @default(0)
+  rowsAccepted                 Int                          @default(0)
+  rowsRejected                 Int                          @default(0)
   parserVersion                String
-  importedAt                   DateTime @default(now())
+  importedAt                   DateTime                     @default(now())
   errorMessage                 String?
-  createdAt                    DateTime @default(now())
-  updatedAt                    DateTime @updatedAt
+  createdAt                    DateTime                     @default(now())
+  updatedAt                    DateTime                     @updatedAt
   priceTicks                   PriceTick[]
   instrumentExchangeIdentities InstrumentExchangeIdentity[]
   deliverySnapshots            MarketDeliverySnapshot[]
@@ -130,9 +130,9 @@ model SourceFileImport {
 }
 
 model InstrumentExchangeIdentity {
-  id                 String   @id @default(cuid())
+  id                 String            @id @default(cuid())
   stockId            String
-  stock              Stock    @relation(fields: [stockId], references: [id], onDelete: Cascade)
+  stock              Stock             @relation(fields: [stockId], references: [id], onDelete: Cascade)
   exchange           String
   isin               String?
   exchangeSymbol     String
@@ -142,8 +142,8 @@ model InstrumentExchangeIdentity {
   status             String
   sourceFileImportId String?
   sourceFileImport   SourceFileImport? @relation(fields: [sourceFileImportId], references: [id], onDelete: SetNull)
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
 
   @@unique([stockId, exchange, exchangeSymbol])
   @@index([exchange, exchangeSymbol])
@@ -153,11 +153,11 @@ model InstrumentExchangeIdentity {
 }
 
 model MarketDeliverySnapshot {
-  id                  String   @id @default(cuid())
+  id                  String            @id @default(cuid())
   stockId             String
-  stock               Stock    @relation(fields: [stockId], references: [id], onDelete: Cascade)
+  stock               Stock             @relation(fields: [stockId], references: [id], onDelete: Cascade)
   symbol              String
-  exchange            String   @default("NSE")
+  exchange            String            @default("NSE")
   tradingDate         DateTime
   tradedQuantity      BigInt?
   deliverableQuantity BigInt?
@@ -165,8 +165,8 @@ model MarketDeliverySnapshot {
   source              String
   sourceFileImportId  String?
   sourceFileImport    SourceFileImport? @relation(fields: [sourceFileImportId], references: [id], onDelete: SetNull)
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
 
   @@unique([stockId, exchange, tradingDate, source])
   @@index([symbol, tradingDate])
@@ -176,16 +176,16 @@ model MarketDeliverySnapshot {
 }
 
 model EarningsIntelligenceSnapshot {
-  id                 String   @id @default(cuid())
+  id                 String    @id @default(cuid())
   snapshotDate       DateTime
   dataThroughDate    DateTime?
   stockId            String
-  stock              Stock    @relation(fields: [stockId], references: [id], onDelete: Cascade)
+  stock              Stock     @relation(fields: [stockId], references: [id], onDelete: Cascade)
   symbol             String
   scopeRegion        String
   scopeAssetType     String
   resultDate         DateTime?
-  resultDateSource   String   @default("UNKNOWN")
+  resultDateSource   String    @default("UNKNOWN")
   periodEndDate      DateTime?
   validatedAt        DateTime?
   daysToResult       Int?
@@ -195,14 +195,14 @@ model EarningsIntelligenceSnapshot {
   marginTrend        Float?
   consistencyScore   Float
   accelerationScore  Float
-  reasonTags         Json     @default("[]")
-  riskTags           Json     @default("[]")
-  warnings           Json     @default("[]")
+  reasonTags         Json      @default("[]")
+  riskTags           Json      @default("[]")
+  warnings           Json      @default("[]")
   freshness          String
-  categories         Json     @default("[]")
-  calculationVersion String   @default("earnings-intelligence-v1")
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  categories         Json      @default("[]")
+  calculationVersion String    @default("earnings-intelligence-v1")
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   @@unique([snapshotDate, scopeRegion, scopeAssetType, symbol], map: "earnings_intel_snapshot_scope_symbol_key")
   @@index([scopeRegion, scopeAssetType, snapshotDate], map: "earnings_intel_snapshot_scope_date_idx")
@@ -212,28 +212,28 @@ model EarningsIntelligenceSnapshot {
 }
 
 model StockInterestSnapshot {
-  id                 String   @id @default(cuid())
+  id                 String    @id @default(cuid())
   snapshotDate       DateTime
   dataThroughDate    DateTime?
-  generatedAt        DateTime @default(now())
+  generatedAt        DateTime  @default(now())
   stockId            String
-  stock              Stock    @relation(fields: [stockId], references: [id], onDelete: Cascade)
+  stock              Stock     @relation(fields: [stockId], references: [id], onDelete: Cascade)
   symbol             String
   company            String
   sector             String?
-  scopeRegion        String   @default("IN")
-  scopeAssetType     String   @default("STOCK")
-  timeframe          String   @default("1d")
+  scopeRegion        String    @default("IN")
+  scopeAssetType     String    @default("STOCK")
+  timeframe          String    @default("1d")
   category           String
   score              Float
   direction          String
-  reasonTags         Json     @default("[]")
-  riskTags           Json     @default("[]")
+  reasonTags         Json      @default("[]")
+  riskTags           Json      @default("[]")
   freshness          String
-  warnings           Json     @default("[]")
-  calculationVersion String   @default("stock-interest-v1")
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  warnings           Json      @default("[]")
+  calculationVersion String    @default("stock-interest-v1")
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   @@unique([snapshotDate, scopeRegion, scopeAssetType, timeframe, category, symbol], map: "stock_interest_snapshot_scope_category_symbol_key")
   @@index([scopeRegion, scopeAssetType, timeframe, snapshotDate], map: "stock_interest_snapshot_scope_date_idx")
@@ -243,21 +243,21 @@ model StockInterestSnapshot {
 }
 
 model MarketDataRepairAttempt {
-  id                   String   @id @default(cuid())
+  id                   String    @id @default(cuid())
   stockId              String
-  stock                Stock    @relation(fields: [stockId], references: [id], onDelete: Cascade)
+  stock                Stock     @relation(fields: [stockId], references: [id], onDelete: Cascade)
   region               String
   assetType            String?
   repairType           String
   status               String
   provider             String?
-  attemptedAt          DateTime @default(now())
+  attemptedAt          DateTime  @default(now())
   completedAt          DateTime?
   fieldsFilledJson     Json?
   error                String?
   manualRequiredReason String?
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
   @@index([stockId, repairType, status, attemptedAt])
   @@index([region, assetType, repairType, status])
@@ -265,9 +265,9 @@ model MarketDataRepairAttempt {
 }
 
 model MarketDataRepairState {
-  id                   String   @id @default(cuid())
+  id                   String    @id @default(cuid())
   stockId              String
-  stock                Stock    @relation(fields: [stockId], references: [id], onDelete: Cascade)
+  stock                Stock     @relation(fields: [stockId], references: [id], onDelete: Cascade)
   region               String
   assetType            String?
   repairType           String
@@ -278,11 +278,11 @@ model MarketDataRepairState {
   error                String?
   manualRequiredReason String?
   nextRetryAt          DateTime?
-  firstDetectedAt      DateTime @default(now())
+  firstDetectedAt      DateTime  @default(now())
   lastAttemptedAt      DateTime?
   resolvedAt           DateTime?
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
   @@unique([stockId, repairType])
   @@index([region, assetType, repairType, status])
@@ -313,40 +313,40 @@ model MarketDataRepairRun {
 }
 
 model SignalResult {
-  id               String   @id @default(cuid())
-  instrumentId     String
-  stock            Stock    @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
-  generationRunId  String?
-  generationRun    SignalGenerationRun? @relation(fields: [generationRunId], references: [id], onDelete: SetNull)
-  symbol           String
-  companyName      String?
-  sector           String?
-  country          String?
-  score            Float
-  direction        String
-  confidence       String
-  triggeredSignals Json
-  negativeSignals  Json
-  explanation      String
-  generatedAt      DateTime @default(now())
-  generatedDate    DateTime?
-  modelVersion     String   @default("signal-engine-v1")
-  rulesetVersion   String?
-  sourceDataDate   DateTime?
-  sourcePriceDate  DateTime?
-  scoringInputSummary Json?
+  id                             String               @id @default(cuid())
+  instrumentId                   String
+  stock                          Stock                @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+  generationRunId                String?
+  generationRun                  SignalGenerationRun? @relation(fields: [generationRunId], references: [id], onDelete: SetNull)
+  symbol                         String
+  companyName                    String?
+  sector                         String?
+  country                        String?
+  score                          Float
+  direction                      String
+  confidence                     String
+  triggeredSignals               Json
+  negativeSignals                Json
+  explanation                    String
+  generatedAt                    DateTime             @default(now())
+  generatedDate                  DateTime?
+  modelVersion                   String               @default("signal-engine-v1")
+  rulesetVersion                 String?
+  sourceDataDate                 DateTime?
+  sourcePriceDate                DateTime?
+  scoringInputSummary            Json?
   dataQualityEligibilitySnapshot Json?
-  source           String   @default("signal-generation-engine")
-  dataStatus       String   @default("PARTIAL")
-  reliabilityTier  String?
+  source                         String               @default("signal-generation-engine")
+  dataStatus                     String               @default("PARTIAL")
+  reliabilityTier                String?
   /// EXIT-candidate lifecycle state: ENTRY | ACTIVE | EXIT | EXPIRED (nullable for pre-migration rows)
-  lifecycleState   String?
+  lifecycleState                 String?
   /// Score from the immediately prior persisted run for the same instrument+modelVersion (nullable)
-  priorScore       Float?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  priorScore                     Float?
+  createdAt                      DateTime             @default(now())
+  updatedAt                      DateTime             @updatedAt
 
-  signalOutcomes   SignalOutcome[]
+  signalOutcomes SignalOutcome[]
 
   @@unique([instrumentId, modelVersion, generatedDate])
   @@index([generationRunId])
@@ -360,35 +360,35 @@ model SignalResult {
 }
 
 model SignalOutcome {
-  id                    String    @id @default(cuid())
-  signalResultId        String
-  signalResult          SignalResult @relation(fields: [signalResultId], references: [id], onDelete: Cascade)
+  id             String       @id @default(cuid())
+  signalResultId String
+  signalResult   SignalResult @relation(fields: [signalResultId], references: [id], onDelete: Cascade)
 
   // Denormalized for fast analytic queries (avoid join to SignalResult every time)
-  instrumentId          String
-  symbol                String
-  direction             String
-  score                 Float
-  sector                String?
-  country               String?
-  modelVersion          String
-  signalGeneratedDate   DateTime
+  instrumentId        String
+  symbol              String
+  direction           String
+  score               Float
+  sector              String?
+  country             String?
+  modelVersion        String
+  signalGeneratedDate DateTime
 
-  horizon               String    // '1D' | '5D' | '10D' | '20D' | '60D'
+  horizon String // '1D' | '5D' | '10D' | '20D' | '60D'
 
-  dataComplete          Boolean   @default(false)
-  priceAtSignal         Float?
-  futurePrice           Float?
-  windowEndDate         DateTime?
-  forwardReturnPercent  Float?
+  dataComplete         Boolean   @default(false)
+  priceAtSignal        Float?
+  futurePrice          Float?
+  windowEndDate        DateTime?
+  forwardReturnPercent Float?
 
   maxFavorableExcursion Float?
   maxAdverseExcursion   Float?
   maxDrawdownPercent    Float?
 
-  evaluatedAt           DateTime  @default(now())
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  evaluatedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@unique([signalResultId, horizon])
   @@index([instrumentId, horizon, signalGeneratedDate])
@@ -400,34 +400,34 @@ model SignalOutcome {
 }
 
 model SignalGenerationRun {
-  id                             String   @id @default(cuid())
-  region                         String
-  assetType                      String
-  requestedByUserId              String
-  status                         String
-  modelVersion                   String
-  rulesetVersion                 String
-  sourceDataDate                 DateTime?
-  generatedDate                  DateTime
-  batchSize                      Int
-  offset                         Int
-  totalCount                     Int       @default(0)
-  processedCount                 Int       @default(0)
-  generatedCount                 Int       @default(0)
-  updatedCount                   Int       @default(0)
-  noOpCount                      Int       @default(0)
-  duplicateOrIdempotentCount     Int       @default(0)
-  skippedCount                   Int       @default(0)
-  failedCount                    Int       @default(0)
-  excludedByDataQuality          Int       @default(0)
-  missingQualityEvaluationCount  Int       @default(0)
-  durationMs                     Int       @default(0)
-  warnings                       Json
-  startedAt                      DateTime  @default(now())
-  completedAt                    DateTime?
-  createdAt                      DateTime  @default(now())
-  updatedAt                      DateTime  @updatedAt
-  signalResults                  SignalResult[]
+  id                            String         @id @default(cuid())
+  region                        String
+  assetType                     String
+  requestedByUserId             String
+  status                        String
+  modelVersion                  String
+  rulesetVersion                String
+  sourceDataDate                DateTime?
+  generatedDate                 DateTime
+  batchSize                     Int
+  offset                        Int
+  totalCount                    Int            @default(0)
+  processedCount                Int            @default(0)
+  generatedCount                Int            @default(0)
+  updatedCount                  Int            @default(0)
+  noOpCount                     Int            @default(0)
+  duplicateOrIdempotentCount    Int            @default(0)
+  skippedCount                  Int            @default(0)
+  failedCount                   Int            @default(0)
+  excludedByDataQuality         Int            @default(0)
+  missingQualityEvaluationCount Int            @default(0)
+  durationMs                    Int            @default(0)
+  warnings                      Json
+  startedAt                     DateTime       @default(now())
+  completedAt                   DateTime?
+  createdAt                     DateTime       @default(now())
+  updatedAt                     DateTime       @updatedAt
+  signalResults                 SignalResult[]
 
   @@index([region, assetType, modelVersion, generatedDate])
   @@index([status, startedAt])
@@ -435,29 +435,29 @@ model SignalGenerationRun {
 }
 
 model SignalCalibrationResult {
-  id                       String   @id @default(cuid())
-  signalResultId           String
-  instrumentId             String
-  symbol                   String
-  companyName              String?
-  sector                   String?
-  country                  String?
-  rawScore                 Float
-  calibratedScore          Float
-  scoreDelta               Float
-  rawDirection             String
-  calibratedDirection      String
-  rawConfidence            String
-  calibratedConfidence     String
-  boosts                   Json
-  penalties                Json
-  calibrationReasons       Json
-  dataGaps                 Json
-  calibrationModelVersion  String
-  rawSignalModelVersion    String?
-  generatedAt              DateTime @default(now())
-  createdAt                DateTime @default(now())
-  updatedAt                DateTime @updatedAt
+  id                      String   @id @default(cuid())
+  signalResultId          String
+  instrumentId            String
+  symbol                  String
+  companyName             String?
+  sector                  String?
+  country                 String?
+  rawScore                Float
+  calibratedScore         Float
+  scoreDelta              Float
+  rawDirection            String
+  calibratedDirection     String
+  rawConfidence           String
+  calibratedConfidence    String
+  boosts                  Json
+  penalties               Json
+  calibrationReasons      Json
+  dataGaps                Json
+  calibrationModelVersion String
+  rawSignalModelVersion   String?
+  generatedAt             DateTime @default(now())
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
 
   @@unique([signalResultId, calibrationModelVersion])
   @@index([instrumentId, generatedAt])
@@ -468,31 +468,31 @@ model SignalCalibrationResult {
 }
 
 model DataQualityEvaluation {
-  id                    String   @id @default(cuid())
-  instrumentId          String   @unique
-  stock                 Stock    @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
-  symbol                String
-  companyName           String?
-  sector                String?
-  industry              String?
-  country               String?
-  currency              String?
-  coverageScore         Float
-  coverageStatus        String
-  signalReadinessScore  Float
-  signalReadinessStatus String
-  liquidityScore        Float
-  liquidityStatus       String
-  eligibleForSignals    Boolean
+  id                     String   @id @default(cuid())
+  instrumentId           String   @unique
+  stock                  Stock    @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+  symbol                 String
+  companyName            String?
+  sector                 String?
+  industry               String?
+  country                String?
+  currency               String?
+  coverageScore          Float
+  coverageStatus         String
+  signalReadinessScore   Float
+  signalReadinessStatus  String
+  liquidityScore         Float
+  liquidityStatus        String
+  eligibleForSignals     Boolean
   eligibleForBacktesting Boolean
   eligibleForCalibration Boolean
-  dataGaps              Json
-  warnings              Json
-  readinessReasons      Json
-  readinessBlockers     Json
-  evaluatedAt           DateTime @default(now())
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  dataGaps               Json
+  warnings               Json
+  readinessReasons       Json
+  readinessBlockers      Json
+  evaluatedAt            DateTime @default(now())
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
 
   @@index([coverageStatus])
   @@index([signalReadinessStatus])
@@ -504,9 +504,9 @@ model DataQualityEvaluation {
 }
 
 model Fundamental {
-  id                   String   @id @default(cuid())
+  id                   String    @id @default(cuid())
   stockId              String
-  stock                Stock    @relation(fields: [stockId], references: [id], onDelete: Cascade)
+  stock                Stock     @relation(fields: [stockId], references: [id], onDelete: Cascade)
   revenue              Decimal?
   eps                  Decimal?
   netIncome            Decimal?
@@ -527,9 +527,9 @@ model Fundamental {
   sourceUrl            String?
   validatedBy          String?
   validatedAt          DateTime?
-  ingestionTimestamp   DateTime @default(now())
-  lastUpdatedTimestamp DateTime @updatedAt
-  dataStatus           String   @default("PARTIAL")
+  ingestionTimestamp   DateTime  @default(now())
+  lastUpdatedTimestamp DateTime  @updatedAt
+  dataStatus           String    @default("PARTIAL")
 
   @@unique([stockId, periodType, periodEndDate, source])
   @@index([stockId, periodEndDate])
@@ -538,9 +538,9 @@ model Fundamental {
 }
 
 model CorporateAction {
-  id                   String   @id @default(cuid())
+  id                   String    @id @default(cuid())
   stockId              String
-  stock                Stock    @relation(fields: [stockId], references: [id], onDelete: Cascade)
+  stock                Stock     @relation(fields: [stockId], references: [id], onDelete: Cascade)
   actionType           String
   effectiveDate        DateTime
   declaredDate         DateTime?
@@ -549,10 +549,10 @@ model CorporateAction {
   splitRatio           Decimal?
   currency             String?
   source               String
-  naturalKey           String   @unique
-  ingestionTimestamp   DateTime @default(now())
-  lastUpdatedTimestamp DateTime @updatedAt
-  dataStatus           String   @default("COMPLETE")
+  naturalKey           String    @unique
+  ingestionTimestamp   DateTime  @default(now())
+  lastUpdatedTimestamp DateTime  @updatedAt
+  dataStatus           String    @default("COMPLETE")
 
   @@index([stockId, effectiveDate])
   @@map("corporate_actions")
@@ -581,8 +581,8 @@ model Portfolio {
   name         String
   baseCurrency String
   description  String?
-  createdAt    DateTime              @default(now())
-  updatedAt    DateTime              @updatedAt
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
   holdings     PortfolioHolding[]
   transactions PortfolioTransaction[]
   alertRules   AlertRule[]
@@ -593,19 +593,19 @@ model Portfolio {
 }
 
 model PortfolioHolding {
-  id          String    @id @default(cuid())
-  portfolioId String
-  portfolio   Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  id           String    @id @default(cuid())
+  portfolioId  String
+  portfolio    Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
   instrumentId String
-  stock       Stock     @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
-  symbol      String
-  companyName String?
-  quantity    Decimal
-  averageCost Decimal
-  currency    String
-  notes       String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  stock        Stock     @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+  symbol       String
+  companyName  String?
+  quantity     Decimal
+  averageCost  Decimal
+  currency     String
+  notes        String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   @@unique([portfolioId, instrumentId])
   @@index([portfolioId])
@@ -626,8 +626,8 @@ model PortfolioTransaction {
   currency        String
   transactionDate DateTime
   notes           String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   @@index([portfolioId, transactionDate])
   @@index([instrumentId])
@@ -680,23 +680,23 @@ model AlertRule {
 }
 
 model AlertEvent {
-  id            String     @id @default(cuid())
-  alertRuleId   String
-  alertRule     AlertRule  @relation(fields: [alertRuleId], references: [id], onDelete: Cascade)
-  type          String
-  severity      String
-  title         String
-  message       String
-  instrumentId  String?
-  stock         Stock?      @relation(fields: [instrumentId], references: [id], onDelete: SetNull)
-  portfolioId   String?
-  portfolio     Portfolio?  @relation(fields: [portfolioId], references: [id], onDelete: SetNull)
-  watchlistId   String?
-  watchlist     Watchlist?  @relation(fields: [watchlistId], references: [id], onDelete: SetNull)
-  metadata      Json
-  triggeredAt   DateTime    @default(now())
-  readAt        DateTime?
-  dismissedAt   DateTime?
+  id           String     @id @default(cuid())
+  alertRuleId  String
+  alertRule    AlertRule  @relation(fields: [alertRuleId], references: [id], onDelete: Cascade)
+  type         String
+  severity     String
+  title        String
+  message      String
+  instrumentId String?
+  stock        Stock?     @relation(fields: [instrumentId], references: [id], onDelete: SetNull)
+  portfolioId  String?
+  portfolio    Portfolio? @relation(fields: [portfolioId], references: [id], onDelete: SetNull)
+  watchlistId  String?
+  watchlist    Watchlist? @relation(fields: [watchlistId], references: [id], onDelete: SetNull)
+  metadata     Json
+  triggeredAt  DateTime   @default(now())
+  readAt       DateTime?
+  dismissedAt  DateTime?
 
   @@index([alertRuleId, triggeredAt])
   @@index([readAt])
@@ -720,19 +720,19 @@ model BacktestStrategy {
 }
 
 model BacktestRun {
-  id           String            @id @default(cuid())
-  userId       String?
-  user         AppUser?          @relation(fields: [userId], references: [id], onDelete: SetNull)
-  strategyId   String?
-  strategy     BacktestStrategy? @relation(fields: [strategyId], references: [id], onDelete: SetNull)
-  config       Json
-  status       String
-  startedAt    DateTime          @default(now())
-  completedAt  DateTime?
-  metrics      Json?
-  equityCurve  Json?
-  trades       Json?
-  error        String?
+  id          String            @id @default(cuid())
+  userId      String?
+  user        AppUser?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+  strategyId  String?
+  strategy    BacktestStrategy? @relation(fields: [strategyId], references: [id], onDelete: SetNull)
+  config      Json
+  status      String
+  startedAt   DateTime          @default(now())
+  completedAt DateTime?
+  metrics     Json?
+  equityCurve Json?
+  trades      Json?
+  error       String?
 
   @@index([userId])
   @@index([strategyId])
@@ -741,23 +741,23 @@ model BacktestRun {
 }
 
 model AppUser {
-  id              String             @id @default(cuid())
-  email           String?            @unique
-  displayName     String?
-  passwordHash    String?
-  lastLoginAt     DateTime?
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
-  subscription    UserSubscription?
-  usageCounters   UsageCounter[]
-  portfolios      Portfolio[]
-  watchlists      Watchlist[]
-  alertRules      AlertRule[]
-  backtestRuns    BacktestRun[]
-  backtestStrategies BacktestStrategy[]
+  id                      String                  @id @default(cuid())
+  email                   String?                 @unique
+  displayName             String?
+  passwordHash            String?
+  lastLoginAt             DateTime?
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
+  subscription            UserSubscription?
+  usageCounters           UsageCounter[]
+  portfolios              Portfolio[]
+  watchlists              Watchlist[]
+  alertRules              AlertRule[]
+  backtestRuns            BacktestRun[]
+  backtestStrategies      BacktestStrategy[]
   notificationPreferences NotificationPreference?
-  notificationEvents NotificationEvent[]
-  tradeJournalEntries TradeJournalEntry[]
+  notificationEvents      NotificationEvent[]
+  tradeJournalEntries     TradeJournalEntry[]
 
   @@map("app_users")
 }
@@ -766,23 +766,23 @@ model TradeJournalEntry {
   id                String    @id @default(cuid())
   userId            String
   user              AppUser   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  instrumentId      String?   // optional FK to stocks.id — not enforced at DB level to allow deleted/delisted instruments
-  symbol            String    // NSE/BSE symbol snapshot, normalized uppercase
-  sourceSignalId    String?   // optional: the SignalResult id that prompted this review
-  direction         String    // LONG | SHORT
-  decision          String    // ACTED | SKIPPED | WATCHING
-  reviewedAt        DateTime  // when the human reviewed this signal/opportunity
-  entryPrice        Decimal?  // price at which position was entered (ACTED entries)
-  stopPrice         Decimal?  // planned stop loss price
-  targetPrice       Decimal?  // planned target price
-  thesis            String?   // free-text rationale
-  conviction        Decimal?  // 1–10 self-rated conviction at time of decision
-  outcomeStatus     String?   // OPEN | CLOSED | INVALIDATED | null
-  exitPrice         Decimal?  // price at which position was exited
+  instrumentId      String? // optional FK to stocks.id — not enforced at DB level to allow deleted/delisted instruments
+  symbol            String // NSE/BSE symbol snapshot, normalized uppercase
+  sourceSignalId    String? // optional: the SignalResult id that prompted this review
+  direction         String // LONG | SHORT
+  decision          String // ACTED | SKIPPED | WATCHING
+  reviewedAt        DateTime // when the human reviewed this signal/opportunity
+  entryPrice        Decimal? // price at which position was entered (ACTED entries)
+  stopPrice         Decimal? // planned stop loss price
+  targetPrice       Decimal? // planned target price
+  thesis            String? // free-text rationale
+  conviction        Decimal? // 1–10 self-rated conviction at time of decision
+  outcomeStatus     String? // OPEN | CLOSED | INVALIDATED | null
+  exitPrice         Decimal? // price at which position was exited
   exitAt            DateTime? // when the position was exited
-  realizedReturnPct Decimal?  // computed: LONG=(exit-entry)/entry; SHORT=(entry-exit)/entry
-  notes             String?   // free-text post-mortem notes
-  tags              Json?     // string[] — user-defined labels
+  realizedReturnPct Decimal? // computed: LONG=(exit-entry)/entry; SHORT=(entry-exit)/entry
+  notes             String? // free-text post-mortem notes
+  tags              Json? // string[] — user-defined labels
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
@@ -793,25 +793,25 @@ model TradeJournalEntry {
 }
 
 model NotificationPreference {
-  id                         String   @id @default(cuid())
-  userId                     String   @unique
-  user                       AppUser  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  emailNotificationsEnabled  Boolean  @default(false)
-  alertEmailsEnabled         Boolean  @default(false)
-  dailyDigestEnabled         Boolean  @default(false)
-  weeklyDigestEnabled        Boolean  @default(false)
-  quietHoursStart            String?
-  quietHoursEnd              String?
-  createdAt                  DateTime @default(now())
-  updatedAt                  DateTime @updatedAt
+  id                        String   @id @default(cuid())
+  userId                    String   @unique
+  user                      AppUser  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emailNotificationsEnabled Boolean  @default(false)
+  alertEmailsEnabled        Boolean  @default(false)
+  dailyDigestEnabled        Boolean  @default(false)
+  weeklyDigestEnabled       Boolean  @default(false)
+  quietHoursStart           String?
+  quietHoursEnd             String?
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
 
   @@map("notification_preferences")
 }
 
 model NotificationEvent {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   userId    String
-  user      AppUser  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      AppUser   @relation(fields: [userId], references: [id], onDelete: Cascade)
   type      String
   channel   String
   title     String
@@ -819,7 +819,7 @@ model NotificationEvent {
   payload   Json
   status    String
   error     String?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
   sentAt    DateTime?
 
   @@index([userId, createdAt])
@@ -828,22 +828,22 @@ model NotificationEvent {
 }
 
 model MarketContextSnapshot {
-  id                       String   @id @default(cuid())
-  snapshotDate             DateTime
-  region                   String   @default("GLOBAL")
-  regime                   String
-  regimeScore              Float
-  breadthPercentAboveSma50 Float?
+  id                        String   @id @default(cuid())
+  snapshotDate              DateTime
+  region                    String   @default("GLOBAL")
+  regime                    String
+  regimeScore               Float
+  breadthPercentAboveSma50  Float?
   breadthPercentAboveSma200 Float?
-  advanceDeclineRatio      Float?
-  newHighCount             Int?
-  newLowCount              Int?
-  macroStatus              String?
-  explanation              String?
-  source                   String
-  dataStatus               String
-  createdAt                DateTime @default(now())
-  updatedAt                DateTime @updatedAt
+  advanceDeclineRatio       Float?
+  newHighCount              Int?
+  newLowCount               Int?
+  macroStatus               String?
+  explanation               String?
+  source                    String
+  dataStatus                String
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
 
   @@unique([snapshotDate, region])
   @@index([snapshotDate])
@@ -851,32 +851,32 @@ model MarketContextSnapshot {
 }
 
 model MarketPulseSnapshot {
-  id                           String   @id @default(cuid())
-  snapshotDate                 DateTime
-  dataThroughDate              DateTime
-  generatedAt                  DateTime @default(now())
-  region                       String   @default("IN")
-  assetType                    String   @default("STOCK")
-  timeframe                    String   @default("1d")
-  status                       String
-  marketHealthScore            Float
-  marketHealthLabel            String
-  indexTrendScore              Float
-  sectorStrengthScore          Float
-  breadthScore                 Float
-  deliveryParticipationScore   Float
-  dataFreshnessScore           Float
-  topIndicesJson               Json     @default("[]")
-  strongSectorsJson            Json     @default("[]")
-  weakSectorsJson              Json     @default("[]")
-  breadthSummaryJson           Json     @default("{}")
-  deliverySummaryJson          Json     @default("{}")
-  candidateCount               Int      @default(0)
-  warningsJson                 Json     @default("[]")
-  sourceSummaryJson            Json     @default("{}")
-  pipelineRunId                String?
-  createdAt                    DateTime @default(now())
-  updatedAt                    DateTime @updatedAt
+  id                         String   @id @default(cuid())
+  snapshotDate               DateTime
+  dataThroughDate            DateTime
+  generatedAt                DateTime @default(now())
+  region                     String   @default("IN")
+  assetType                  String   @default("STOCK")
+  timeframe                  String   @default("1d")
+  status                     String
+  marketHealthScore          Float
+  marketHealthLabel          String
+  indexTrendScore            Float
+  sectorStrengthScore        Float
+  breadthScore               Float
+  deliveryParticipationScore Float
+  dataFreshnessScore         Float
+  topIndicesJson             Json     @default("[]")
+  strongSectorsJson          Json     @default("[]")
+  weakSectorsJson            Json     @default("[]")
+  breadthSummaryJson         Json     @default("{}")
+  deliverySummaryJson        Json     @default("{}")
+  candidateCount             Int      @default(0)
+  warningsJson               Json     @default("[]")
+  sourceSummaryJson          Json     @default("{}")
+  pipelineRunId              String?
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
 
   @@unique([snapshotDate, region, assetType, timeframe])
   @@index([region, assetType, timeframe, snapshotDate])
@@ -909,23 +909,23 @@ model SectorContextSnapshot {
 }
 
 model SectorSnapshot {
-  id             String   @id @default(cuid())
-  snapshotDate   DateTime
+  id              String   @id @default(cuid())
+  snapshotDate    DateTime
   dataThroughDate DateTime
-  scopeRegion    String   @default("IN")
-  scopeAssetType String   @default("STOCK")
-  sector         String
-  classification String
-  sectorScore    Int
-  return1W       Float?
-  return1M       Float?
-  return3M       Float?
-  trendScore     Int
-  reasonTags     Json     @default("[]")
-  warnings       Json     @default("[]")
-  source         String   @default("sector-intelligence")
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  scopeRegion     String   @default("IN")
+  scopeAssetType  String   @default("STOCK")
+  sector          String
+  classification  String
+  sectorScore     Int
+  return1W        Float?
+  return1M        Float?
+  return3M        Float?
+  trendScore      Int
+  reasonTags      Json     @default("[]")
+  warnings        Json     @default("[]")
+  source          String   @default("sector-intelligence")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   @@unique([snapshotDate, scopeRegion, scopeAssetType, sector])
   @@index([scopeRegion, scopeAssetType, snapshotDate])
@@ -957,31 +957,31 @@ model CountryContextSnapshot {
 }
 
 model SmartMoneyContextSnapshot {
-  id                       String   @id @default(cuid())
-  snapshotDate             DateTime
-  instrumentId             String
-  stock                    Stock    @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
-  symbol                   String
-  companyName              String?
-  sector                   String?
-  smartMoneyScore          Float
-  status                   String
-  confidence               String
-  accumulationSignalCount  Int
-  distributionSignalCount  Int
-  unusualVolumeDetected    Boolean
-  explanation              String?
-  source                   String
-  dataStatus               String
-  latestClose              Float?
-  latestVolume             Float?
-  averageVolume20          Float?
-  dailyChangePercent       Float?
-  signals                  Json?
-  insiderOwnership         Json?
-  range                    String   @default("3M")
-  createdAt                DateTime @default(now())
-  updatedAt                DateTime @updatedAt
+  id                      String   @id @default(cuid())
+  snapshotDate            DateTime
+  instrumentId            String
+  stock                   Stock    @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+  symbol                  String
+  companyName             String?
+  sector                  String?
+  smartMoneyScore         Float
+  status                  String
+  confidence              String
+  accumulationSignalCount Int
+  distributionSignalCount Int
+  unusualVolumeDetected   Boolean
+  explanation             String?
+  source                  String
+  dataStatus              String
+  latestClose             Float?
+  latestVolume            Float?
+  averageVolume20         Float?
+  dailyChangePercent      Float?
+  signals                 Json?
+  insiderOwnership        Json?
+  range                   String   @default("3M")
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
 
   @@unique([snapshotDate, instrumentId, range])
   @@index([snapshotDate])
@@ -1013,25 +1013,25 @@ model DataQualitySnapshot {
 }
 
 model MarketDataSyncState {
-  id               String   @id @default(cuid())
-  region           String
-  assetType        String
-  scopeType        String   @default("CATALOG")
-  scopeKey         String   @default("DEFAULT")
-  timeframe        String   @default("1D")
-  tradingDate      DateTime
-  status           String
-  lastCheckedAt    DateTime?
+  id                  String    @id @default(cuid())
+  region              String
+  assetType           String
+  scopeType           String    @default("CATALOG")
+  scopeKey            String    @default("DEFAULT")
+  timeframe           String    @default("1D")
+  tradingDate         DateTime
+  status              String
+  lastCheckedAt       DateTime?
   lastProviderFetchAt DateTime?
-  lastRunAt        DateTime?
-  lastInsertedCount Int     @default(0)
-  lastUpdatedCount Int      @default(0)
-  lastNoOpCount    Int      @default(0)
-  lastSkippedCount Int      @default(0)
-  lastWarningCount Int      @default(0)
-  lastSummary      Json?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  lastRunAt           DateTime?
+  lastInsertedCount   Int       @default(0)
+  lastUpdatedCount    Int       @default(0)
+  lastNoOpCount       Int       @default(0)
+  lastSkippedCount    Int       @default(0)
+  lastWarningCount    Int       @default(0)
+  lastSummary         Json?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
   @@unique([region, assetType, scopeType, scopeKey, timeframe, tradingDate])
   @@index([region, assetType, scopeType, timeframe, status])
@@ -1050,14 +1050,14 @@ model SubscriptionPlan {
 }
 
 model UserSubscription {
-  id        String   @id @default(cuid())
-  userId    String   @unique
-  user      AppUser  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id        String    @id @default(cuid())
+  userId    String    @unique
+  user      AppUser   @relation(fields: [userId], references: [id], onDelete: Cascade)
   planCode  String
   status    String
-  startedAt DateTime @default(now())
+  startedAt DateTime  @default(now())
   expiresAt DateTime?
-  updatedAt DateTime @updatedAt
+  updatedAt DateTime  @updatedAt
 
   @@index([planCode])
   @@map("user_subscriptions")
@@ -1098,46 +1098,46 @@ model WatchlistItem {
 }
 
 model StrategyDecisionResult {
-  id               String   @id @default(cuid())
-  instrumentId     String?
-  stock            Stock?    @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
-  portfolioId      String?
-  holdingId        String?
-  symbol           String?
-  country          String?
-  exchange         String?
-  strategy         String   // TREND_MOMENTUM, PULLBACK_IN_UPTREND, DEFENSIVE_EXIT
-  strategyName     String?
-  decision         String   // TRADE_CANDIDATE, WATCH, WAIT, AVOID, EXIT_CANDIDATE, etc.
-  action           String   // CONSIDER_ENTRY, WAIT_FOR_PULLBACK, etc.
-  decisionScore    Int
-  confidence       String   // LOW, MEDIUM, HIGH
-  marketCondition  String
-  marketGate       String
-  entryZone        String?
-  riskPlan         Json?
-  scoreBreakdown   Json?
-  reasons          Json
-  blockers         Json
-  warnings         Json
-  dataGaps         Json
-  strategyVersion  String?
-  frameworkBacked  Boolean  @default(false)
-  frameworkDecision String?
-  frameworkAction  String?
-  entryRulesPassed Json?
-  exitRulesTriggered Json?
+  id                         String   @id @default(cuid())
+  instrumentId               String?
+  stock                      Stock?   @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+  portfolioId                String?
+  holdingId                  String?
+  symbol                     String?
+  country                    String?
+  exchange                   String?
+  strategy                   String // TREND_MOMENTUM, PULLBACK_IN_UPTREND, DEFENSIVE_EXIT
+  strategyName               String?
+  decision                   String // TRADE_CANDIDATE, WATCH, WAIT, AVOID, EXIT_CANDIDATE, etc.
+  action                     String // CONSIDER_ENTRY, WAIT_FOR_PULLBACK, etc.
+  decisionScore              Int
+  confidence                 String // LOW, MEDIUM, HIGH
+  marketCondition            String
+  marketGate                 String
+  entryZone                  String?
+  riskPlan                   Json?
+  scoreBreakdown             Json?
+  reasons                    Json
+  blockers                   Json
+  warnings                   Json
+  dataGaps                   Json
+  strategyVersion            String?
+  frameworkBacked            Boolean  @default(false)
+  frameworkDecision          String?
+  frameworkAction            String?
+  entryRulesPassed           Json?
+  exitRulesTriggered         Json?
   invalidationRulesTriggered Json?
-  noiseFiltersTriggered Json?
-  strategyRating   Json?
-  readinessLabel   String?
-  strategyDefinitionSource String?
-  strategyDefinitionDrift Json?
-  modelVersion     String   @default("strategy-decision-v1")
-  generatedAt      DateTime @default(now())
-  generatedDate    DateTime // Normalized to UTC midnight for idempotency
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  noiseFiltersTriggered      Json?
+  strategyRating             Json?
+  readinessLabel             String?
+  strategyDefinitionSource   String?
+  strategyDefinitionDrift    Json?
+  modelVersion               String   @default("strategy-decision-v1")
+  generatedAt                DateTime @default(now())
+  generatedDate              DateTime // Normalized to UTC midnight for idempotency
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
 
   @@unique([instrumentId, strategy, modelVersion, generatedDate])
   @@index([instrumentId])
@@ -1228,48 +1228,48 @@ model StrategyPerformanceSummary {
 }
 
 model TradePlanResult {
-  id                 String   @id @default(cuid())
-  instrumentId       String
-  strategyDecisionId String?
-  portfolioId        String?
-  portfolioKey       String   @default("NO_PORTFOLIO")
-  symbol             String
-  region             String?
-  assetType          String?
-  strategy           String
-  strategyVersion    String
-  strategyRating     String?
-  readinessLabel     String?
-  backtestTimeframe  String?
-  backtestSummary    Json?
-  strategyProofSnapshot Json?
+  id                       String    @id @default(cuid())
+  instrumentId             String
+  strategyDecisionId       String?
+  portfolioId              String?
+  portfolioKey             String    @default("NO_PORTFOLIO")
+  symbol                   String
+  region                   String?
+  assetType                String?
+  strategy                 String
+  strategyVersion          String
+  strategyRating           String?
+  readinessLabel           String?
+  backtestTimeframe        String?
+  backtestSummary          Json?
+  strategyProofSnapshot    Json?
   strategyDecisionSnapshot Json?
-  latestPrice        Float?
-  latestPriceTimestamp DateTime?
-  marketDataSnapshot Json?
-  dataQualitySnapshot Json?
-  paperReadinessStatus String?
-  paperReadinessReasons Json?
-  paperReadinessBlockers Json?
-  proofGeneratedAt   DateTime?
-  snapshotVersion    String?
-  planStatus         String
-  riskGrade          String
-  entryZone          Json?
-  stopLoss           Json?
-  target             Json?
-  rewardRiskRatio    Float
-  positionSizing     Json?
-  portfolioImpact    Json?
-  invalidationRules  Json?
-  warnings           Json?
-  blockers           Json?
-  dataGaps           Json?
-  modelVersion       String
-  generatedAt        DateTime @default(now())
-  generatedDate      DateTime
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  latestPrice              Float?
+  latestPriceTimestamp     DateTime?
+  marketDataSnapshot       Json?
+  dataQualitySnapshot      Json?
+  paperReadinessStatus     String?
+  paperReadinessReasons    Json?
+  paperReadinessBlockers   Json?
+  proofGeneratedAt         DateTime?
+  snapshotVersion          String?
+  planStatus               String
+  riskGrade                String
+  entryZone                Json?
+  stopLoss                 Json?
+  target                   Json?
+  rewardRiskRatio          Float
+  positionSizing           Json?
+  portfolioImpact          Json?
+  invalidationRules        Json?
+  warnings                 Json?
+  blockers                 Json?
+  dataGaps                 Json?
+  modelVersion             String
+  generatedAt              DateTime  @default(now())
+  generatedDate            DateTime
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
 
   @@unique([instrumentId, strategy, modelVersion, generatedDate, region, assetType, portfolioKey], map: "trade_plan_results_scope_portfolio_day_key")
   @@index([instrumentId])
@@ -1284,19 +1284,19 @@ model TradePlanResult {
 }
 
 model TodayReviewRun {
-  id              String   @id @default(cuid())
+  id              String                 @id @default(cuid())
   runDate         DateTime
   region          String
   assetType       String
   status          String
   dataThroughDate DateTime?
-  startedAt       DateTime @default(now())
+  startedAt       DateTime               @default(now())
   finishedAt      DateTime?
   warnings        Json
   candidateCounts Json
   sourceSnapshot  Json
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
   candidates      TodayReviewCandidate[]
 
   @@unique([runDate, region, assetType])
@@ -1305,7 +1305,7 @@ model TodayReviewRun {
 }
 
 model TodayReviewCandidate {
-  id                    String   @id @default(cuid())
+  id                    String         @id @default(cuid())
   runId                 String
   run                   TodayReviewRun @relation(fields: [runId], references: [id], onDelete: Cascade)
   instrumentId          String
@@ -1327,8 +1327,8 @@ model TodayReviewCandidate {
   strategyProofSnapshot Json?
   tradePlanSnapshot     Json?
   sourceSignalSnapshot  Json?
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
 
   @@unique([runId, instrumentId, strategyCode, direction])
   @@index([runId, rank])
@@ -1373,60 +1373,60 @@ model PipelineRun {
 }
 
 model SignalPositionLedgerEntry {
-  id                        String   @id @default(cuid())
-  ledgerKey                 String   @unique
-  scopeRegion               String
-  scopeAssetType            String
-  instrumentId              String
-  stock                     Stock    @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
-  stockKey                  String   @default("")
-  activeSlot                String?
-  symbol                    String
-  companyName               String?
-  status                    String   @default("ACTIVE")
-  entrySignalId             String?
-  entryTriggerType          String   @default("bullish_entry_trigger")
-  entryTriggerTimestamp     DateTime
-  entryTriggerPrice         Float
-  entryReasonSummary        String
-  strategyId                String?
-  strategyVersion           String?
-  strategyDecision          String?
-  strategyReadinessLabel    String?
-  strategyRatingGrade       String?
-  entryRuleId               String?
-  latestTrustedPriceDate    DateTime?
-  latestTrustedPrice        Float?
-  currentReturnPercent      Float?
-  currentReturnStatus       String   @default("UNAVAILABLE")
-  currentDataQualityStatus  String?
-  lifecycleEvidenceStatus   String   @default("ACTIVE_ENTRY")
-  trustEvidenceStatus       String   @default("SOURCE_PROVEN_PRICE_UNAVAILABLE")
-  calibrationEvidenceStatus String   @default("UNAVAILABLE")
-  displayWarnings           Json     @default("[]")
-  exitSignalId              String?
-  exitStrategyId            String?
-  exitStrategyVersion       String?
-  exitSourceDecisionId      String?
-  exitTriggerTimestamp      DateTime?
-  exitTriggerPrice          Float?
-  closePriceStatus          String   @default("UNAVAILABLE")
-  exitReasonSummary         String?
-  exitRuleId                String?
-  exitRuleIds               Json     @default("[]")
-  exitDecision              String?
+  id                           String    @id @default(cuid())
+  ledgerKey                    String    @unique
+  scopeRegion                  String
+  scopeAssetType               String
+  instrumentId                 String
+  stock                        Stock     @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+  stockKey                     String    @default("")
+  activeSlot                   String?
+  symbol                       String
+  companyName                  String?
+  status                       String    @default("ACTIVE")
+  entrySignalId                String?
+  entryTriggerType             String    @default("bullish_entry_trigger")
+  entryTriggerTimestamp        DateTime
+  entryTriggerPrice            Float
+  entryReasonSummary           String
+  strategyId                   String?
+  strategyVersion              String?
+  strategyDecision             String?
+  strategyReadinessLabel       String?
+  strategyRatingGrade          String?
+  entryRuleId                  String?
+  latestTrustedPriceDate       DateTime?
+  latestTrustedPrice           Float?
+  currentReturnPercent         Float?
+  currentReturnStatus          String    @default("UNAVAILABLE")
+  currentDataQualityStatus     String?
+  lifecycleEvidenceStatus      String    @default("ACTIVE_ENTRY")
+  trustEvidenceStatus          String    @default("SOURCE_PROVEN_PRICE_UNAVAILABLE")
+  calibrationEvidenceStatus    String    @default("UNAVAILABLE")
+  displayWarnings              Json      @default("[]")
+  exitSignalId                 String?
+  exitStrategyId               String?
+  exitStrategyVersion          String?
+  exitSourceDecisionId         String?
+  exitTriggerTimestamp         DateTime?
+  exitTriggerPrice             Float?
+  closePriceStatus             String    @default("UNAVAILABLE")
+  exitReasonSummary            String?
+  exitRuleId                   String?
+  exitRuleIds                  Json      @default("[]")
+  exitDecision                 String?
   invalidationSourceDecisionId String?
-  invalidationRuleIds       Json     @default("[]")
-  invalidationTimestamp     DateTime?
-  closedAt                  DateTime?
-  lastEvaluatedAt           DateTime?
-  createdAt                 DateTime @default(now())
-  updatedAt                 DateTime @updatedAt
+  invalidationRuleIds          Json      @default("[]")
+  invalidationTimestamp        DateTime?
+  closedAt                     DateTime?
+  lastEvaluatedAt              DateTime?
+  createdAt                    DateTime  @default(now())
+  updatedAt                    DateTime  @updatedAt
 
+  @@unique([scopeRegion, scopeAssetType, activeSlot], map: "spl_entries_one_active_stock_key")
   @@index([scopeRegion, scopeAssetType, status, entryTriggerTimestamp], map: "spl_entries_scope_status_entry_idx")
   @@index([scopeRegion, scopeAssetType, status, exitTriggerTimestamp], map: "spl_entries_scope_status_exit_idx")
   @@index([instrumentId, status], map: "spl_entries_instrument_status_idx")
-  @@unique([scopeRegion, scopeAssetType, activeSlot], map: "spl_entries_one_active_stock_key")
   @@map("signal_position_ledger_entries")
 }
 
@@ -1477,10 +1477,3 @@ model PipelineStageRun {
   @@index([stageKey, status, leaseExpiresAt])
   @@map("pipeline_stage_runs")
 }
-
-
-
-
-
-
-
