@@ -332,10 +332,15 @@ describe('SignalGenerationEngineRepository', () => {
       where: expect.objectContaining({
         sector: { contains: 'tech', mode: 'insensitive' },
         country: { contains: 'us', mode: 'insensitive' },
-        OR: [
-          { symbol: { contains: 'app', mode: 'insensitive' } },
-          { companyName: { contains: 'app', mode: 'insensitive' } },
-        ],
+        // search and reliability filters are merged into AND to avoid key collision
+        AND: expect.arrayContaining([
+          expect.objectContaining({
+            OR: [
+              { symbol: { contains: 'app', mode: 'insensitive' } },
+              { companyName: { contains: 'app', mode: 'insensitive' } },
+            ],
+          }),
+        ]),
       }),
     }));
     expect(findMany.mock.calls[0][0].where.direction).toBeUndefined();

@@ -12,6 +12,7 @@ import { normalizeMarketRegion } from '../../shared/utils/market-scope';
 import { SignalGenerationEngineRepository } from './signal-generation-engine.repository';
 import type {
   PaginatedSignalResponse,
+  ReliabilityTier,
   SignalConfidence,
   SignalDirection,
   SignalHistoryQuery,
@@ -211,6 +212,31 @@ export class SignalGenerationEngineService {
       }
     }
 
+    // Fundamentals eligibility gate (non-as-of only):
+    // Mainboard instruments (catalogSource='NSE_EQUITY_SECURITIES') with NO fundamentals record
+    // are excluded from generation — they'll be picked up once fundamentals are ingested.
+    // SME instruments (catalogSource='NSE_SME_EQUITY_SECURITIES') are always included.
+    // For as-of/historical runs the gate is skipped since historical fundamentals don't exist.
+    let excludedByFundamentalsGate = 0;
+    if (!asOfDate && instrumentIds.length > 0) {
+      const gateResult = await this.applyFundamentalsEligibilityGate(instrumentIds);
+      if (gateResult.excluded.length > 0) {
+        excludedByFundamentalsGate = gateResult.excluded.length;
+        instrumentIds = instrumentIds.filter((id) => !gateResult.excluded.includes(id));
+        if (gateResult.excluded.length > 0) {
+          warnings.push(`Fundamentals gate excluded ${gateResult.excluded.length} mainboard instrument(s) with no fundamentals record.`);
+        }
+        // Update dataQuality totals
+        dataQuality = {
+          ...dataQuality,
+          afterFilter: instrumentIds.length,
+          eligibleInstrumentCount: instrumentIds.length,
+          attemptedGenerationCount: instrumentIds.length,
+          excludedByFundamentalsGate,
+        };
+      }
+    }
+
     const scope = this.scopeFor(request);
     const runAudit = await this.repository.createRunAudit({
       region: scope.region,
@@ -289,7 +315,7 @@ export class SignalGenerationEngineService {
       skipped: skippedCount,
       errors,
       warnings,
-      dataQuality,
+      dataQuality: { ...dataQuality, excludedByFundamentalsGate },
       results,
       runAudit: completedRunAudit,
       generated_at: generatedAt,
@@ -419,6 +445,10 @@ export class SignalGenerationEngineService {
     const generatedAt = asOfDate ? asOfDate.toISOString() : new Date().toISOString();
     const generatedDate = asOfDate ? asOfDate.toISOString() : this.normalizeUtcDay(new Date()).toISOString();
 
+    // Reliability tier + SME segment
+    const isSme = this.isSmeInstrument(instrument);
+    const reliabilityTier = this.computeReliabilityTier(instrument, latestFundamental);
+
     let result: SignalResultDto = {
       instrument_id: instrument.id,
       symbol: instrument.symbol,
@@ -448,6 +478,8 @@ export class SignalGenerationEngineService {
       generationRunId: options.generationRunId ?? null,
       source: 'signal-generation-engine',
       data_status: prices.length >= 50 ? (prices.length >= 200 ? 'COMPLETE' : 'PARTIAL') : 'MISSING',
+      reliabilityTier,
+      isSme,
       warnings,
     };
 
@@ -1585,6 +1617,8 @@ export class SignalGenerationEngineService {
       excludeNoiseFiltered: query.excludeNoiseFiltered,
       hasStrategyMatch: query.hasStrategyMatch,
       hasBlockedStrategies: query.hasBlockedStrategies,
+      excludeSme: query.excludeSme,
+      reliabilityTier: query.reliabilityTier,
     }).filter(([, value]) => value !== undefined && value !== ''));
   }
 
@@ -1609,6 +1643,64 @@ export class SignalGenerationEngineService {
       && dataQuality?.filterApplied === true
       && dataQuality.eligible === true
       && dataQuality.signalReadinessStatus === 'READY';
+  }
+
+  /** Returns true if the instrument belongs to the NSE SME segment. */
+  private isSmeInstrument(instrument: any): boolean {
+    return instrument?.catalogSource === 'NSE_SME_EQUITY_SECURITIES' ||
+      instrument?.instrumentSegment === 'SME';
+  }
+
+  /**
+   * Computes the reliability tier for a signal:
+   * FULL  = mainboard (NSE_EQUITY_SECURITIES) AND has fundamentals AND has sector
+   * PARTIAL = SME, OR missing fundamentals, OR missing sector
+   */
+  private computeReliabilityTier(instrument: any, latestFundamental: any): ReliabilityTier {
+    const isSme = this.isSmeInstrument(instrument);
+    if (isSme) return 'PARTIAL';
+    const hasFundamentals = Boolean(latestFundamental);
+    const hasSector = Boolean(instrument?.sector?.trim?.());
+    if (hasFundamentals && hasSector) return 'FULL';
+    return 'PARTIAL';
+  }
+
+  /**
+   * Applies the fundamentals eligibility gate for non-as-of batch runs.
+   * Mainboard instruments with NO fundamentals record are excluded.
+   * SME instruments are always included.
+   * Returns { excluded: string[] } — instrument IDs to skip.
+   */
+  private async applyFundamentalsEligibilityGate(instrumentIds: string[]): Promise<{ excluded: string[] }> {
+    if (instrumentIds.length === 0) return { excluded: [] };
+    try {
+      const serviceAny = this.marketDataService as any;
+      const instruments: any[] = typeof serviceAny.getInstrumentsByIds === 'function'
+        ? await serviceAny.getInstrumentsByIds(instrumentIds).catch(() => [])
+        : [];
+      const fundamentalsMap: Map<string, any> = typeof serviceAny.storedFundamentalsByInstrumentIds === 'function'
+        ? await serviceAny.storedFundamentalsByInstrumentIds(instrumentIds).catch(() => new Map())
+        : new Map();
+      const excluded: string[] = [];
+      for (const instrument of instruments) {
+        const isSme = this.isSmeInstrument(instrument);
+        if (isSme) continue; // SME always included
+        const isMainboard = instrument.catalogSource === 'NSE_EQUITY_SECURITIES';
+        if (!isMainboard) continue; // non-SME non-mainboard: don't apply gate
+        const fundamentals = fundamentalsMap.get(instrument.id);
+        const hasFundamentals = fundamentals && (
+          (typeof fundamentals === 'object' && 'records' in fundamentals)
+            ? Array.isArray(fundamentals.records) && fundamentals.records.length > 0
+            : (fundamentals instanceof Map ? false : Boolean(fundamentals))
+        );
+        if (!hasFundamentals) {
+          excluded.push(instrument.id);
+        }
+      }
+      return { excluded };
+    } catch {
+      return { excluded: [] };
+    }
   }
 
   private clampInt(value: unknown, fallback: number, min: number, max: number) {

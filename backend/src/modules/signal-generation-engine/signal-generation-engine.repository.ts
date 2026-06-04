@@ -1,6 +1,6 @@
 import { Prisma } from '@prisma/client';
 import prisma from '../../db/prisma';
-import type { SignalGenerationRunAudit, SignalHistoryQuery, SignalQuery, SignalResultDto, SignalWriteResult, SignalWriteStatus } from './signal-generation-engine.types';
+import type { ReliabilityTier, SignalGenerationRunAudit, SignalHistoryQuery, SignalQuery, SignalResultDto, SignalWriteResult, SignalWriteStatus } from './signal-generation-engine.types';
 import { resolveMarketRegionFilter } from '../../shared/utils/market-scope';
 
 export interface SignalFunnelDiagnosticsQuery {
@@ -46,6 +46,7 @@ export class SignalGenerationEngineRepository {
       dataQualityEligibilitySnapshot: result.dataQualityEligibility as unknown as Prisma.InputJsonValue,
       source: result.source,
       dataStatus: result.data_status,
+      reliabilityTier: result.reliabilityTier ?? null,
     };
     const where = {
       instrumentId_modelVersion_generatedDate: {
@@ -263,7 +264,35 @@ export class SignalGenerationEngineRepository {
 
   private buildWhere(query: SignalQuery & SignalFunnelDiagnosticsQuery): Prisma.SignalResultWhereInput {
     const generatedDate = query.generatedDate ? this.normalizeUtcDay(new Date(query.generatedDate)) : undefined;
-    
+
+    // Read filters for reliability tier / SME exclusion.
+    // Both are additive and default to no-filter (backward-compatible).
+    let reliabilityFilter: Prisma.SignalResultWhereInput | undefined;
+    if (query.reliabilityTier) {
+      // Exact tier match
+      reliabilityFilter = { reliabilityTier: query.reliabilityTier };
+    } else if (query.excludeSme) {
+      // Exclude PARTIAL-tier signals; preserve legacy NULL records for backward-compat
+      reliabilityFilter = {
+        OR: [
+          { reliabilityTier: { equals: 'FULL' } },
+          { reliabilityTier: null },
+        ],
+      };
+    }
+
+    // Search filter uses OR; reliability filter may also use OR. Merge with AND to avoid overwrite.
+    const searchFilter: Prisma.SignalResultWhereInput | undefined = query.search
+      ? { OR: [
+          { symbol: { contains: query.search, mode: 'insensitive' } },
+          { companyName: { contains: query.search, mode: 'insensitive' } },
+        ] }
+      : undefined;
+
+    const andClauses: Prisma.SignalResultWhereInput[] = [];
+    if (searchFilter) andClauses.push(searchFilter);
+    if (reliabilityFilter) andClauses.push(reliabilityFilter);
+
     return {
       ...this.relatedMarketScopeFilter(query.region, query.assetType),
       direction: query.direction,
@@ -277,10 +306,7 @@ export class SignalGenerationEngineRepository {
       sector: query.sector ? { contains: query.sector, mode: 'insensitive' } : undefined,
       country: query.country ? { contains: query.country, mode: 'insensitive' } : undefined,
       modelVersion: query.modelVersion,
-      OR: query.search ? [
-        { symbol: { contains: query.search, mode: 'insensitive' } },
-        { companyName: { contains: query.search, mode: 'insensitive' } },
-      ] : undefined,
+      AND: andClauses.length > 0 ? andClauses : undefined,
     };
   }
 
@@ -518,7 +544,8 @@ export class SignalGenerationEngineRepository {
       JSON.stringify(existing.scoringInputSummary || null) === JSON.stringify(data.scoringInputSummary || null) &&
       JSON.stringify(existing.dataQualityEligibilitySnapshot || null) === JSON.stringify(data.dataQualityEligibilitySnapshot || null) &&
       existing.source === data.source &&
-      existing.dataStatus === data.dataStatus;
+      existing.dataStatus === data.dataStatus &&
+      (existing.reliabilityTier ?? null) === (data.reliabilityTier ?? null);
     return same ? 'NO_OP' : 'UPDATED';
   }
 
@@ -559,6 +586,9 @@ export class SignalGenerationEngineRepository {
       generationRunId: record.generationRunId ?? null,
       source: record.source,
       data_status: record.dataStatus,
+      reliabilityTier: (record.reliabilityTier as ReliabilityTier | null) ?? null,
+      // isSme is not persisted separately; callers should use reliabilityTier for read-filter decisions.
+      // For freshly-generated DTOs it is set by generateForInstrument (instrument field is available there).
     };
   }
 

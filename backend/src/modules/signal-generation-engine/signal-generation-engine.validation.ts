@@ -1,4 +1,4 @@
-import type { SignalConfidence, SignalDirection, SignalQuery, SignalRunRequest } from './signal-generation-engine.types';
+import type { ReliabilityTier, SignalConfidence, SignalDirection, SignalQuery, SignalRunRequest } from './signal-generation-engine.types';
 import { normalizeMarketRegion } from '../../shared/utils/market-scope';
 import {
   signal_generation_engine_batch_size,
@@ -7,6 +7,7 @@ import {
 
 const DIRECTIONS: SignalDirection[] = ['BULLISH', 'NEUTRAL', 'BEARISH'];
 const CONFIDENCES: SignalConfidence[] = ['LOW', 'MEDIUM', 'HIGH'];
+const RELIABILITY_TIERS: ReliabilityTier[] = ['FULL', 'PARTIAL'];
 const SORT_FIELDS = ['score', 'symbol', 'companyName', 'generatedAt', 'direction', 'confidence', 'dailyChangePercent'];
 
 const first = (value: unknown): unknown => Array.isArray(value) ? value[0] : value;
@@ -67,6 +68,11 @@ export function parseSignalQuery(query: Record<string, unknown>): SignalQuery {
     hasStrategyMatch: first(query.hasStrategyMatch) === 'true' || first(query.hasStrategyMatch) === true,
     hasBlockedStrategies: first(query.hasBlockedStrategies) === 'true' || first(query.hasBlockedStrategies) === true,
     frameworkBackedDecisionAvailable: first(query.frameworkBackedDecisionAvailable) === 'true' || first(query.frameworkBackedDecisionAvailable) === true,
+    excludeSme: first(query.excludeSme) === 'true' || first(query.excludeSme) === true,
+    reliabilityTier: (() => {
+      const v = String(first(query.reliabilityTier) || '').trim().toUpperCase() as ReliabilityTier;
+      return RELIABILITY_TIERS.includes(v) ? v : undefined;
+    })(),
   };
 }
 

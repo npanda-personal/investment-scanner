@@ -4,6 +4,7 @@ import type { StrategyDecision, StrategyDefinitionDrift, StrategyDefinitionSourc
 export type SignalDirection = 'BULLISH' | 'NEUTRAL' | 'BEARISH';
 export type SignalConfidence = 'LOW' | 'MEDIUM' | 'HIGH';
 export type SignalCategory = 'TECHNICAL' | 'MOMENTUM' | 'FUNDAMENTAL';
+export type ReliabilityTier = 'FULL' | 'PARTIAL';
 
 export interface SignalItem {
   code: string;
@@ -42,6 +43,8 @@ export interface SignalResultDto {
   generationRunId?: string | null;
   source: string;
   data_status: MarketDataStatus;
+  reliabilityTier?: ReliabilityTier | null;
+  isSme?: boolean;
   warnings?: string[];
   strategyMatches?: SignalStrategyMatchSummary[];
   blockedStrategies?: SignalBlockedStrategySummary[];
@@ -284,6 +287,10 @@ export interface SignalQuery {
   hasStrategyMatch?: boolean;
   hasBlockedStrategies?: boolean;
   frameworkBackedDecisionAvailable?: boolean;
+  /** When true, exclude SME-segment signals from results. Default: false (include all). */
+  excludeSme?: boolean;
+  /** When provided, only return signals matching this reliability tier. Default: include all. */
+  reliabilityTier?: ReliabilityTier;
 }
 
 export interface SignalHistoryQuery extends SignalQuery {
@@ -305,6 +312,7 @@ export interface SignalRunResponse {
     missingQualityEvaluationCount: number;
     eligibleInstrumentCount?: number;
     attemptedGenerationCount?: number;
+    excludedByFundamentalsGate?: number;
   };
   results: SignalResultDto[];
   runAudit?: SignalGenerationRunAudit;
