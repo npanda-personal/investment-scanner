@@ -38,6 +38,30 @@ Legend: TYPE · TRADER-JOB (1 trade-now / 2 watch-today / 3 plan / 4 trust / 5 h
 
 ---
 
+## Execution waves (CONFIRMED 2026-06-04 — owner chose TRUST/CORRECTNESS FIRST)
+
+Re-prioritized post-pivot (signals have no proven alpha; this is a daily personal-validation tool).
+Order: **trust → daily-loop → honest-evidence → completeness.**
+
+- **Wave 1 — Trust & correctness (cheap; protects daily use):** #26 (P0 bug bundle), #27 (persisted-read
+  enforcement), #35a (calendar-aware staleness — stop false-BLOCKING valid stocks on NSE holidays).
+- **Wave 2 — Daily validation loop:** #33 (Trade Journal + post-mortem), #32 (what-changed digest),
+  #28a (F&O-gate shorts in today-review), #30 (surface calibration/track-record evidence on the shortlist),
+  #35b (Capital Posture/regime in portfolio + today-review).
+- **Wave 3 — Honest evidence:** #29 (scheduled historical regime snapshots — unblocker), #28b (backtest
+  regime realism, depends on #29), #31 (real Nifty benchmark → alpha vs beta), recalibrate v3-stale thresholds.
+- **Wave 4 — Capability completeness:** #34 (full short pipeline), #36 (official earnings dates),
+  portfolio health-weight reframe, copilot wiring.
+- **Wave 5 — #37 P2 refinements / tech-debt** (ongoing).
+
+Track-record note (broader backfill, 800×27 quarterly 2019-2025, 21,600 signals / 73k mature outcomes):
+BULLISH modestly beats NEUTRAL at 10-20D (10D 61.2%/+3.15% vs 58.7%/+2.56%; 20D 58%/+3.8% vs 53.9%/+2.72%)
+but returns are ABSOLUTE (bull-market beta) — alpha-vs-beta needs the Nifty benchmark (#31). Fine-grained
+score gradient still unvalidated; bearish/short still anti-predictive. So: "modest directional edge at
+10-20D pending benchmark-relative confirmation" — score stays a research-worthiness ranking.
+
+---
+
 ## P0 — correctness bugs & hard-constraint violations (small effort, do soon)
 
 - **[notifications-delivery] Alert digest fetches `default-user`, not the caller** — Bug · platform · High · S.
