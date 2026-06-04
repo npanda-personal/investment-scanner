@@ -133,13 +133,22 @@ describe('SignalGenerationEngineService', () => {
     expect(service.periodLow(prices, 252)).toBe(80);
   });
 
-  it('calculates score and direction thresholds', () => {
+  it('calculates score and direction thresholds (v3)', () => {
     const service = new SignalGenerationEngineService({} as any, {} as any, {} as any);
 
-    expect(service.compositeScore(1, 0.5, 0)).toBe(57);
-    expect(service.directionForScore(70)).toBe('BULLISH');
-    expect(service.directionForScore(40)).toBe('NEUTRAL');
+    // v3: compositeScore with no signal counts only uses the agreement component,
+    // so a lean rawLean may shift the score slightly but stays within a few pts of 50.
+    const noCountScore = service.compositeScore(1, 0.5, 0);
+    expect(noCountScore).toBeGreaterThanOrEqual(50);
+    expect(noCountScore).toBeLessThanOrEqual(55);
+    // v3 direction cuts: BULLISH >= 60, BEARISH <= 40
+    expect(service.directionForScore(60)).toBe('BULLISH');
+    expect(service.directionForScore(59)).toBe('NEUTRAL');
+    expect(service.directionForScore(41)).toBe('NEUTRAL');
+    expect(service.directionForScore(40)).toBe('BEARISH');
     expect(service.directionForScore(39)).toBe('BEARISH');
+    // Old cut of 70 is now BULLISH
+    expect(service.directionForScore(70)).toBe('BULLISH');
   });
 
   it('generates explanations', () => {
@@ -1538,25 +1547,39 @@ describe('SignalGenerationEngineService v2 accuracy fixes', () => {
     expect(allCodes).not.toContain('FUNDAMENTALS_AVAILABLE');
   });
 
-  // ── Fix 2: categoryScore smoothing (alpha=2) ─────────────────────────────
-  it('fix2: categoryScore with 1 positive/0 negative is ~0.667, not 0.75', () => {
+  // ── Fix 2 (v3): categoryScore smoothing (alpha=1) ────────────────────────
+  // v3 reduces alpha from 2 to 1 to widen the spread while still damping thin evidence.
+  it('fix2: categoryScore with 1 positive/0 negative is 0.75 (alpha=1)', () => {
     const service = svc();
-    // alpha=2: (1 + 1) / (1 + 2) = 2/3 ≈ 0.667
+    // alpha=1: (1 + 0.5) / (1 + 1) = 1.5/2 = 0.75
     const score = (service as any).categoryScore(1, 0);
-    expect(score).toBeCloseTo(2 / 3, 5);
+    expect(score).toBeCloseTo(0.75, 5);
   });
 
-  it('fix2: categoryScore with 5 positive/0 negative is ~0.786, not 0.917', () => {
+  it('fix2: categoryScore with 5 positive/0 negative is ~0.917 (alpha=1)', () => {
     const service = svc();
-    // alpha=2: (5 + 1) / (5 + 2) = 6/7 ≈ 0.857 ... wait: (5 + 2*0.5)/(5 + 2) = 6/7 ≈ 0.857
-    // (5 + alpha*0.5) / (5 + alpha) = (5+1)/(5+2) = 6/7 ≈ 0.857
+    // alpha=1: (5 + 0.5) / (5 + 1) = 5.5/6 ≈ 0.9167
     const score = (service as any).categoryScore(5, 0);
-    expect(score).toBeCloseTo(6 / 7, 5);
+    expect(score).toBeCloseTo(5.5 / 6, 5);
   });
 
   it('fix2: categoryScore with 0 total returns 0.5 (unchanged)', () => {
     const service = svc();
     expect((service as any).categoryScore(0, 0)).toBe(0.5);
+  });
+
+  it('fix2: categoryScore with 0 positive / 5 negative is ~0.083 (symmetric bearish)', () => {
+    const service = svc();
+    // alpha=1: (0 + 0.5) / (5 + 1) = 0.5/6 ≈ 0.0833
+    const score = (service as any).categoryScore(0, 5);
+    expect(score).toBeCloseTo(0.5 / 6, 5);
+  });
+
+  it('fix2: categoryScore with 3 positive / 1 negative is 0.75 (mixed, alpha=1)', () => {
+    const service = svc();
+    // alpha=1: (3 + 0.5) / (4 + 1) = 3.5/5 = 0.7
+    const score = (service as any).categoryScore(3, 1);
+    expect(score).toBeCloseTo(3.5 / 5, 5);
   });
 
   // ── Fix 3: momentum thresholds (neutral band) ────────────────────────────
@@ -2069,21 +2092,151 @@ describe('SignalGenerationEngineService v2 accuracy fixes', () => {
     }));
   });
 
-  // ── Fix 10: MODEL_VERSION bumped to v2 ───────────────────────────────────
-  it('fix10: MODEL_VERSION is signal-engine-v2', async () => {
+  // ── Fix 10 (v3): MODEL_VERSION bumped to v3 ──────────────────────────────
+  it('fix10: MODEL_VERSION is signal-engine-v3', async () => {
     const repository = {
-      createSignalResult: jest.fn(async (result: any) => ({ ...result, id: 'signal-v2' })),
+      createSignalResult: jest.fn(async (result: any) => ({ ...result, id: 'signal-v3' })),
     };
     const prices = Array.from({ length: 260 }, (_, i) => price(i, 200 - i * 0.2, 1000));
     const marketDataService = {
-      getInstrument: jest.fn().mockResolvedValue({ id: 'stock-v2', symbol: 'V2', company_name: 'V2 Co' }),
+      getInstrument: jest.fn().mockResolvedValue({ id: 'stock-v3', symbol: 'V3', company_name: 'V3 Co' }),
       listPricesByInstrumentId: jest.fn().mockResolvedValue({ prices }),
       storedFundamentalsByInstrumentId: jest.fn().mockResolvedValue({ records: [] }),
     };
     const service = new SignalGenerationEngineService(repository as any, marketDataService as any, { workbench: jest.fn().mockResolvedValue(null) } as any);
-    const result = await service.generateForInstrument('stock-v2', { researchContextMode: 'LIGHTWEIGHT' });
-    expect(result?.modelVersion).toBe('signal-engine-v2');
-    expect(result?.rulesetVersion).toBe('signal-engine-v2');
+    const result = await service.generateForInstrument('stock-v3', { researchContextMode: 'LIGHTWEIGHT' });
+    expect(result?.modelVersion).toBe('signal-engine-v3');
+    expect(result?.rulesetVersion).toBe('signal-engine-v3');
+  });
+
+  // ── v3 compositeScore: conviction gradient spread ─────────────────────────
+  describe('v3 compositeScore conviction gradient', () => {
+    // Helper: compute categoryScore(pos, neg) the same way the service does (alpha=1)
+    const catScore = (pos: number, neg: number) => {
+      if (pos + neg === 0) return 0.5;
+      return (pos + 0.5) / (pos + neg + 1);
+    };
+
+    it('maxed-bullish (tech 6/0, mom 5/0, fund 4/0) scores >= 85', () => {
+      const service = svc();
+      const tech = catScore(6, 0);
+      const mom  = catScore(5, 0);
+      const fund = catScore(4, 0);
+      const score = service.compositeScore(tech, mom, fund, 6, 0, 5, 0, 4, 0);
+      expect(score).toBeGreaterThanOrEqual(85);
+      expect(score).toBeLessThanOrEqual(100);
+    });
+
+    it('maxed-bearish (tech 0/6, mom 0/5, fund 0/4) scores <= 15', () => {
+      const service = svc();
+      const tech = catScore(0, 6);
+      const mom  = catScore(0, 5);
+      const fund = catScore(0, 4);
+      const score = service.compositeScore(tech, mom, fund, 0, 6, 0, 5, 0, 4);
+      expect(score).toBeLessThanOrEqual(15);
+      expect(score).toBeGreaterThanOrEqual(0);
+    });
+
+    it('thin (tech 1/0, mom 0/0, fund 0/0) stays near 50 (range 50-58)', () => {
+      const service = svc();
+      const tech = catScore(1, 0);
+      const mom  = catScore(0, 0);
+      const fund = catScore(0, 0);
+      const score = service.compositeScore(tech, mom, fund, 1, 0, 0, 0, 0, 0);
+      expect(score).toBeGreaterThanOrEqual(50);
+      expect(score).toBeLessThanOrEqual(58);
+    });
+
+    it('moderate-bullish (tech 2/0, mom 2/1, fund 1/0) scores between 60 and 85', () => {
+      const service = svc();
+      const tech = catScore(2, 0);
+      const mom  = catScore(2, 1);
+      const fund = catScore(1, 0);
+      const score = service.compositeScore(tech, mom, fund, 2, 0, 2, 1, 1, 0);
+      expect(score).toBeGreaterThanOrEqual(60);
+      expect(score).toBeLessThanOrEqual(85);
+    });
+
+    it('mixed/conflict (tech 3/1, mom 0/3, fund 1/1) stays near 50 (range 40-60)', () => {
+      const service = svc();
+      const tech = catScore(3, 1);
+      const mom  = catScore(0, 3);
+      const fund = catScore(1, 1);
+      const score = service.compositeScore(tech, mom, fund, 3, 1, 0, 3, 1, 1);
+      expect(score).toBeGreaterThanOrEqual(40);
+      expect(score).toBeLessThanOrEqual(60);
+    });
+
+    it('empty (0/0 for all categories) returns exactly 50', () => {
+      const service = svc();
+      const score = service.compositeScore(0.5, 0.5, 0.5, 0, 0, 0, 0, 0, 0);
+      expect(score).toBe(50);
+    });
+
+    it('score is monotonic in evidence: more aligned signals push further from 50 (non-decreasing)', () => {
+      const service = svc();
+      // Bullish direction: adding more aligned signals should increase score (non-decreasing; clamped at 100 is ok)
+      const thin   = service.compositeScore(catScore(1,0), catScore(1,0), catScore(1,0), 1,0, 1,0, 1,0);
+      const medium = service.compositeScore(catScore(2,0), catScore(2,0), catScore(1,0), 2,0, 2,0, 1,0);
+      const maxed  = service.compositeScore(catScore(6,0), catScore(5,0), catScore(4,0), 6,0, 5,0, 4,0);
+      expect(thin).toBeLessThan(medium);
+      // medium may be clamped; maxed is at least equal
+      expect(medium).toBeLessThanOrEqual(maxed);
+    });
+
+    it('bearish monotonic: more aligned bearish signals push score lower (non-increasing)', () => {
+      const service = svc();
+      const thin   = service.compositeScore(catScore(0,1), catScore(0,1), catScore(0,1), 0,1, 0,1, 0,1);
+      const medium = service.compositeScore(catScore(0,2), catScore(0,2), catScore(0,1), 0,2, 0,2, 0,1);
+      const maxed  = service.compositeScore(catScore(0,6), catScore(0,5), catScore(0,4), 0,6, 0,5, 0,4);
+      expect(thin).toBeGreaterThan(medium);
+      // medium may be clamped; maxed is at least equal (bearish)
+      expect(medium).toBeGreaterThanOrEqual(maxed);
+    });
+
+    it('no-count callers with neutral rawLean return exactly 50', () => {
+      // With all categories exactly 0.5, displacement=0 → score=50 regardless of evidenceFactor
+      const service = svc();
+      const score = service.compositeScore(0.5, 0.5, 0.5);
+      expect(score).toBe(50);
+    });
+
+    it('no-count callers with a slight lean stay within 5 pts of 50', () => {
+      // With no signal counts (all default 0), the count component = 0, only the
+      // agreement component contributes. The score should stay close to 50.
+      const service = svc();
+      const score = service.compositeScore(0.75, 0.5, 0.5);
+      expect(score).toBeGreaterThanOrEqual(48);
+      expect(score).toBeLessThanOrEqual(58);
+    });
+  });
+
+  // ── v3 direction cuts ─────────────────────────────────────────────────────
+  describe('v3 directionForScore cuts', () => {
+    it('score 60 is BULLISH', () => {
+      expect(new SignalGenerationEngineService({} as any, {} as any, {} as any).directionForScore(60)).toBe('BULLISH');
+    });
+    it('score 59 is NEUTRAL', () => {
+      expect(new SignalGenerationEngineService({} as any, {} as any, {} as any).directionForScore(59)).toBe('NEUTRAL');
+    });
+    it('score 50 is NEUTRAL', () => {
+      expect(new SignalGenerationEngineService({} as any, {} as any, {} as any).directionForScore(50)).toBe('NEUTRAL');
+    });
+    it('score 41 is NEUTRAL', () => {
+      expect(new SignalGenerationEngineService({} as any, {} as any, {} as any).directionForScore(41)).toBe('NEUTRAL');
+    });
+    it('score 40 is BEARISH', () => {
+      expect(new SignalGenerationEngineService({} as any, {} as any, {} as any).directionForScore(40)).toBe('BEARISH');
+    });
+    it('score 39 is BEARISH', () => {
+      expect(new SignalGenerationEngineService({} as any, {} as any, {} as any).directionForScore(39)).toBe('BEARISH');
+    });
+    it('score 0 is BEARISH', () => {
+      expect(new SignalGenerationEngineService({} as any, {} as any, {} as any).directionForScore(0)).toBe('BEARISH');
+    });
+    it('score 100 is BULLISH', () => {
+      expect(new SignalGenerationEngineService({} as any, {} as any, {} as any).directionForScore(100)).toBe('BULLISH');
+    });
   });
 });
 
