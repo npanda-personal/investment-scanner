@@ -39,6 +39,12 @@ import {
 
 const HORIZON_DAYS: Record<QualityHorizon, number> = { '1D': 1, '5D': 5, '10D': 10, '20D': 20, '60D': 60 };
 const ANALYSIS_SIGNAL_LIMIT = 10000;
+// Noisy-signal detection recomputes outcomes from price history per signal, so it must
+// NOT run over the full ANALYSIS_SIGNAL_LIMIT set (that is O(corpus) price fetches and
+// made the persisted dashboard/summary path ~24s on a 20k+ signal corpus). The noisy
+// rules (direction flips, stale, failed-high-score) are recent-signal concerns, so a
+// bounded most-recent window is both fast and sufficient. signalHistory is generatedAt-desc.
+const NOISY_SIGNAL_LIMIT = 500;
 
 /**
  * CANONICAL score-bucket boundaries.
@@ -252,6 +258,21 @@ export class SignalQualityLabService {
     return this.detectNoisySignals(signals, await this.outcomesForSignals(signals, query));
   }
 
+  /**
+   * Bounded noisy detection: same rules as noisy(), but over the most-recent
+   * `limit` signals only (bypassing analysisQuery's 10k floor). Used by the
+   * persisted dashboard/summary/calibration path so noisy detection stays O(1)
+   * in corpus size instead of recomputing outcomes from prices for 10k signals.
+   */
+  private async noisyBounded(query: QualityQuery, limit: number): Promise<NoisySignalItem[]> {
+    const bounded: QualityQuery = { ...query, limit };
+    const signals = await this.applyDataQualityFilters(
+      await this.signalService.signalHistory(bounded as any),
+      bounded,
+    );
+    return this.detectNoisySignals(signals, await this.outcomesForSignals(signals, bounded));
+  }
+
   // ---------------------------------------------------------------------------
   // Scorecard API (Slice 2)
   // ---------------------------------------------------------------------------
@@ -358,12 +379,13 @@ export class SignalQualityLabService {
       minSampleSize: 0,
     };
 
-    // Noisy-signal detection query — mirrors the limit used by batchQualityMetrics
-    // in the calibration engine (5000 signals). Runs concurrently with scorecard SQL.
+    // Noisy-signal detection over a BOUNDED most-recent window (NOISY_SIGNAL_LIMIT),
+    // not the full corpus — recomputing outcomes from prices for 10k signals made this
+    // path ~24s on a 20k+ corpus. Runs concurrently with the scorecard SQL aggregates.
     const noisyQuery: QualityQuery = {
       horizon: query.horizon,
       modelVersion: query.modelVersion,
-      limit: 5000,
+      limit: NOISY_SIGNAL_LIMIT,
       minSampleSize: 0,
     };
 
@@ -372,7 +394,7 @@ export class SignalQualityLabService {
       this.repository.scorecard({ ...scorecardBase, groupBy: 'sector' }),
       this.repository.signalTypeMetricsFromPersistedOutcomes({ horizon: query.horizon, modelVersion: query.modelVersion }),
       this.repository.countMatureByHorizon(query.horizon),
-      this.noisy(noisyQuery).catch(() => [] as NoisySignalItem[]),
+      this.noisyBounded(noisyQuery, NOISY_SIGNAL_LIMIT).catch(() => [] as NoisySignalItem[]),
     ]);
 
     const byScore: QualityMetricGroup[] = scoreBucketRows.map((row) => this.scorecardRowToMetricGroup(row, query.horizon));
