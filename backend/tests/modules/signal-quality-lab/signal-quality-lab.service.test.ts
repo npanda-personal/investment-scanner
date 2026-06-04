@@ -574,3 +574,161 @@ describe('signal quality lab service', () => {
     expect(noisy.map((item) => item.issueType)).toEqual(expect.arrayContaining(['DIRECTION_FLIPS', 'FAILED_HIGH_SCORE_BULLISH', 'FAILED_BEARISH', 'LOW_CONFIDENCE_SIGNAL']));
   });
 });
+
+// ---------------------------------------------------------------------------
+// Persisted-read constraint: summary() / dashboard() must read from
+// persisted SignalOutcome rows (scorecardSummary + qualityMetricsFromPersistedOutcomes),
+// NOT call per-signal price fetches (outcomesForSignals / listPricesByInstrumentId).
+// When matureCount === 0, return an explicit pending state instead of recomputing.
+// ---------------------------------------------------------------------------
+
+describe('signal quality lab service — persisted-read constraint for summary() and dashboard()', () => {
+
+  const horizonSummaryRows = [
+    { horizon: '1D', sampleSize: 100, directionalSampleSize: 90, winRate: 0.62, avgReturnPercent: 0.008, medianReturnPercent: 0.006, expectancy: 0.003, profitFactor: 1.4, avgMaxAdverseExcursion: -0.02, avgMaxFavorableExcursion: 0.025, bestReturnPercent: 0.15, worstReturnPercent: -0.08 },
+    { horizon: '5D', sampleSize: 100, directionalSampleSize: 90, winRate: 0.58, avgReturnPercent: 0.018, medianReturnPercent: 0.014, expectancy: 0.007, profitFactor: 1.3, avgMaxAdverseExcursion: -0.03, avgMaxFavorableExcursion: 0.04, bestReturnPercent: 0.22, worstReturnPercent: -0.12 },
+    { horizon: '10D', sampleSize: 100, directionalSampleSize: 90, winRate: 0.55, avgReturnPercent: 0.025, medianReturnPercent: 0.02, expectancy: 0.009, profitFactor: 1.2, avgMaxAdverseExcursion: -0.04, avgMaxFavorableExcursion: 0.055, bestReturnPercent: 0.28, worstReturnPercent: -0.15 },
+    { horizon: '20D', sampleSize: 100, directionalSampleSize: 90, winRate: 0.53, avgReturnPercent: 0.04, medianReturnPercent: 0.033, expectancy: 0.012, profitFactor: 1.15, avgMaxAdverseExcursion: -0.06, avgMaxFavorableExcursion: 0.07, bestReturnPercent: 0.35, worstReturnPercent: -0.18 },
+    { horizon: '60D', sampleSize: 100, directionalSampleSize: 90, winRate: 0.50, avgReturnPercent: 0.06, medianReturnPercent: 0.05, expectancy: 0.01, profitFactor: 1.05, avgMaxAdverseExcursion: -0.10, avgMaxFavorableExcursion: 0.12, bestReturnPercent: 0.55, worstReturnPercent: -0.25 },
+  ] as any[];
+
+  const directionRows = [
+    { horizon: '5D', groupKey: 'BULLISH', sampleSize: 60, directionalSampleSize: 60, winRate: 0.63, avgReturnPercent: 0.02, medianReturnPercent: 0.015, expectancy: 0.008, profitFactor: 1.5, avgMaxAdverseExcursion: -0.025, avgMaxFavorableExcursion: 0.045, bestReturnPercent: 0.22, worstReturnPercent: -0.10 },
+    { horizon: '5D', groupKey: 'BEARISH', sampleSize: 30, directionalSampleSize: 30, winRate: 0.47, avgReturnPercent: 0.012, medianReturnPercent: 0.009, expectancy: 0.003, profitFactor: 1.1, avgMaxAdverseExcursion: -0.035, avgMaxFavorableExcursion: 0.03, bestReturnPercent: 0.18, worstReturnPercent: -0.12 },
+  ] as any[];
+
+  function makePersistedService(matureCount: number) {
+    const listPricesByInstrumentId = jest.fn();
+    const signalHistory = jest.fn();
+
+    const repository = {
+      scorecardSummary: jest.fn().mockResolvedValue(horizonSummaryRows),
+      scorecard: jest.fn().mockResolvedValue(directionRows),
+      signalTypeMetricsFromPersistedOutcomes: jest.fn().mockResolvedValue([]),
+      countMatureByHorizon: jest.fn().mockResolvedValue(matureCount),
+    } as any;
+
+    const service = new SignalQualityLabService(
+      repository,
+      { signalHistory, signalHistoryCount: jest.fn().mockResolvedValue(0) } as any,
+      { listPricesByInstrumentId } as any,
+      { regimeForDate: jest.fn().mockResolvedValue('RISK_ON') } as any,
+      { getEvaluationsForInstruments: jest.fn().mockResolvedValue([]) } as any,
+    );
+
+    return { service, listPricesByInstrumentId, signalHistory, repository };
+  }
+
+  it('summary() reads from persisted outcomes — scorecardSummary and countMatureByHorizon are called, NOT per-signal price fetches', async () => {
+    const { service, listPricesByInstrumentId, repository } = makePersistedService(100);
+
+    const result = await service.summary({ horizon: '5D', limit: 10, minSampleSize: 0 });
+
+    // Must read from persisted path
+    expect(repository.scorecardSummary).toHaveBeenCalled();
+    expect(repository.countMatureByHorizon).toHaveBeenCalledWith('5D');
+    // Must NOT trigger live price fetches (the critical constraint for trader pages)
+    expect(listPricesByInstrumentId).not.toHaveBeenCalled();
+    // DTO shape is preserved
+    expect(result).toMatchObject({
+      selectedHorizon: '5D',
+      dataStatus: 'COMPLETE',
+      generatedAt: expect.any(String),
+      evaluationDiagnostics: expect.objectContaining({ selectedHorizon: '5D' }),
+      horizonAvailability: expect.objectContaining({ '5D': expect.any(Object) }),
+    });
+    expect(typeof result.evidenceUsability).toBe('string');
+    expect(result.warnings).toBeInstanceOf(Array);
+  });
+
+  it('summary() returns explicit pending state (MISSING / UNAVAILABLE / warning) when matureCount is zero — no live recompute', async () => {
+    const { service, listPricesByInstrumentId } = makePersistedService(0);
+
+    const result = await service.summary({ horizon: '5D', limit: 10, minSampleSize: 0 });
+
+    // Must NOT trigger any live price fetches
+    expect(listPricesByInstrumentId).not.toHaveBeenCalled();
+    // Explicit pending state
+    expect(result.dataStatus).toBe('MISSING');
+    expect(result.evidenceUsability).toBe('UNAVAILABLE');
+    expect(result.matureSignals).toBe(0);
+    expect(result.evaluatedSignals).toBe(0);
+    expect(result.warnings).toEqual(expect.arrayContaining([
+      expect.stringContaining('No persisted mature outcomes'),
+    ]));
+    expect(result.recommendedAction).toContain('recalculate');
+  });
+
+  it('dashboard() reads from persisted outcomes — no price fetches, DTO shape preserved', async () => {
+    const { service, listPricesByInstrumentId, repository } = makePersistedService(100);
+
+    const result = await service.dashboard({ horizon: '5D', limit: 10, minSampleSize: 0 });
+
+    expect(repository.scorecardSummary).toHaveBeenCalled();
+    expect(repository.countMatureByHorizon).toHaveBeenCalledWith('5D');
+    // Must NOT trigger live price fetches (the critical constraint)
+    expect(listPricesByInstrumentId).not.toHaveBeenCalled();
+    // DTO shape preserved
+    expect(result).toMatchObject({
+      summary: expect.objectContaining({ selectedHorizon: '5D', dataStatus: 'COMPLETE' }),
+      byType: expect.any(Array),
+      bySector: expect.any(Array),
+      byRegime: expect.any(Array),
+      byDataQuality: expect.any(Array),
+      noisy: expect.any(Array),
+    });
+  });
+
+  it('dashboard() returns explicit pending state when matureCount is zero — no live recompute', async () => {
+    const { service, listPricesByInstrumentId } = makePersistedService(0);
+
+    const result = await service.dashboard({ horizon: '5D', limit: 10, minSampleSize: 0 });
+
+    expect(listPricesByInstrumentId).not.toHaveBeenCalled();
+    expect(result.summary.dataStatus).toBe('MISSING');
+    expect(result.summary.evidenceUsability).toBe('UNAVAILABLE');
+    expect(result.summary.warnings).toEqual(expect.arrayContaining([
+      expect.stringContaining('No persisted mature outcomes'),
+    ]));
+    expect(result.byType).toEqual([]);
+    expect(result.bySector).toEqual([]);
+    expect(result.byRegime).toEqual([]);
+    expect(result.byDataQuality).toEqual([]);
+    expect(result.noisy).toEqual([]);
+  });
+
+  it('summary() win rates and averages are sourced from persisted scorecard rows (BULLISH/BEARISH direction rows)', async () => {
+    const { service } = makePersistedService(100);
+
+    const result = await service.summary({ horizon: '5D', limit: 10, minSampleSize: 0 });
+
+    // overallBullishWinRate / overallBearishWinRate come from direction-grouped scorecard rows
+    expect(result.overallBullishWinRate).toBe(0.63);
+    expect(result.overallBearishWinRate).toBe(0.47);
+    // average5DReturn / average20DReturn from scorecardSummary
+    expect(result.average5DReturn).toBe(0.018);
+    expect(result.average20DReturn).toBe(0.04);
+  });
+
+  it('recalculate() with persistOutcomes=true still invokes outcomesForSignals (live recompute path kept)', async () => {
+    // recalculate is the explicit recompute entrypoint; it must still work
+    const service = new SignalQualityLabService(
+      { upsertOutcomeBatch: jest.fn().mockResolvedValue({ upserted: 0 }) } as any,
+      {
+        signalHistory: jest.fn().mockResolvedValue([baseSignal({ id: 's1' })]),
+        signalHistoryCount: jest.fn().mockResolvedValue(1),
+      } as any,
+      {
+        listPricesByInstrumentId: jest.fn().mockResolvedValue({
+          prices: prices.map((p) => ({ date: p.date, adjusted_close: p.adjustedClose })),
+        }),
+      } as any,
+      { regimeForDate: jest.fn().mockResolvedValue(null) } as any,
+    );
+
+    const result = await service.recalculate({ batchSize: 1, offset: 0, horizon: '5D', persistOutcomes: true } as any);
+
+    expect(result.outcomesPersisted).toBe(true);
+    expect(result.processedCount).toBe(1);
+  });
+});

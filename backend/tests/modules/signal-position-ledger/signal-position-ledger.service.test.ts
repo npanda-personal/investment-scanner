@@ -1290,3 +1290,79 @@ describe('SignalPositionLedgerService', () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// Persisted-read constraint: trader GET path (listPersistedActiveRows)
+// must NEVER call ensureRefreshStarted or enrichSignals — even when the
+// persisted store is empty.
+// ---------------------------------------------------------------------------
+
+describe('SignalPositionLedgerService — trader GET persisted-read constraint', () => {
+  const makeRepository = (items: any[] = [], totalCount = 0) => ({
+    listLedgerRows: jest.fn().mockResolvedValue({ items, totalCount, hasMore: false, nextOffset: null }),
+    loadLatestMaterializedSnapshot: jest.fn(),
+    listLatestSignals: jest.fn(),
+    listAllLedgerRows: jest.fn(),
+    saveMaterializedSnapshot: jest.fn(),
+    upsertActiveLedgerRow: jest.fn(),
+    closeLedgerRow: jest.fn(),
+  });
+
+  it('listPersistedActiveRows (trader GET) serves persisted rows without triggering enrichSignals', async () => {
+    const enrichSignals = jest.fn();
+    const repository = makeRepository([], 0);
+    const service = new SignalPositionLedgerService(repository as any, { enrichSignals } as any);
+    const query = { region: 'IN', assetType: 'STOCK', limit: 25, offset: 0 };
+
+    const result = await service.listPersistedActiveRows(query);
+
+    expect(enrichSignals).not.toHaveBeenCalled();
+    expect(repository.listLatestSignals).not.toHaveBeenCalled();
+    expect(repository.loadLatestMaterializedSnapshot).not.toHaveBeenCalled();
+    expect(repository.saveMaterializedSnapshot).not.toHaveBeenCalled();
+    expect(repository.listAllLedgerRows).not.toHaveBeenCalled();
+    expect(repository.listLedgerRows).toHaveBeenCalledWith({ ...query, status: 'ACTIVE' });
+    expect(result.items).toEqual([]);
+    expect(result.totalCount).toBe(0);
+    // Explicit empty/"pending refresh" state — NOT an error, NOT a recompute
+    expect(result.warnings).toEqual(expect.arrayContaining([
+      expect.stringContaining('No persisted Signal Position Ledger entries'),
+    ]));
+  });
+
+  it('listPersistedActiveRows returns persisted rows when they exist, without any live enrichment', async () => {
+    const enrichSignals = jest.fn();
+    const persistedRow = activeLedgerRow({ instrumentId: 'stock-1', symbol: 'ABC' });
+    const repository = makeRepository([persistedRow], 1);
+    const service = new SignalPositionLedgerService(repository as any, { enrichSignals } as any);
+    const query = { region: 'IN', assetType: 'STOCK', limit: 25, offset: 0 };
+
+    const result = await service.listPersistedActiveRows(query);
+
+    expect(enrichSignals).not.toHaveBeenCalled();
+    expect(repository.listLatestSignals).not.toHaveBeenCalled();
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0].symbol).toBe('ABC');
+    expect(result.totalCount).toBe(1);
+    expect(result.warnings).toEqual([]);
+  });
+
+  it('refreshActiveRows (POST path) still calls enrichSignals for live enrichment', async () => {
+    const enrichSignals = jest.fn().mockResolvedValue([]);
+    const repository = {
+      ...makeRepository([], 0),
+      listAllLedgerRows: jest.fn().mockResolvedValue([]),
+    };
+    const service = new SignalPositionLedgerService(repository as any, { enrichSignals } as any);
+    const query = { region: 'IN', assetType: 'STOCK', limit: 25, offset: 0 };
+    // listLatestSignals must return something to trigger enrichSignals
+    (repository.listLatestSignals as jest.Mock).mockResolvedValue({
+      items: [{ ...trustedSignal }], totalCount: 1, limit: 100, offset: 0, nextOffset: null, hasMore: false,
+    });
+
+    await service.refreshActiveRows(query, { force: true, wait: true });
+
+    // The live enrichment path (enrichSignals) IS called via POST refresh
+    expect(enrichSignals).toHaveBeenCalled();
+  });
+});
+

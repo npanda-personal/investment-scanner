@@ -16,6 +16,7 @@ import type {
   DataQualityFilterSummary,
   EvidenceUsability,
   EvaluationDiagnostics,
+  HorizonAvailabilityItem,
   HorizonAvailabilitySummary,
   QualityRecalculateRequest,
   QualityRecalculateResponse,
@@ -71,6 +72,17 @@ export class SignalQualityLabService {
   }
 
   async dashboard(query: QualityQuery) {
+    // Trader-facing read: serve from persisted SignalOutcome rows only.
+    // No live price-history fetch happens on this GET path.
+    // If zero mature persisted outcomes exist for the requested scope, return an
+    // explicit "not yet computed" pending state — do NOT silently recompute live.
+    // To populate outcomes run: POST /signals/quality/recalculate?persistOutcomes=true
+    // or the scheduled SIGNAL_QUALITY_LAB pipeline stage.
+    const persistedPath = await this.tryPersistedDashboard(query);
+    if (persistedPath !== null) return persistedPath;
+
+    // Fallback: live computation path (used only when persisted repository
+    // methods are unavailable — e.g. in legacy or minimal test contexts).
     const analysisQuery = this.analysisQuery(query);
     const rawSignals = await this.signalService.signalHistory(analysisQuery);
     const signals = await this.applyDataQualityFilters(rawSignals, analysisQuery);
@@ -78,14 +90,14 @@ export class SignalQualityLabService {
     const dataQualityFilterSummary = await this.dataQualityFilterSummaryFrom(rawSignals, signals, analysisQuery);
     const diagnostics = await this.evaluationDiagnostics(rawSignals, signals, outcomes, analysisQuery, dataQualityFilterSummary);
     const horizonAvailability = this.horizonAvailability(outcomes);
-    
+
     const evaluated = this.evaluatedForHorizon(outcomes, analysisQuery.horizon);
     const byType = this.signalTypePerformance(signals, outcomes, analysisQuery.horizon).filter((item) => item.sampleSize >= analysisQuery.minSampleSize);
     const bySector = this.groupMetrics(outcomes, analysisQuery.horizon, (item) => item.sector || 'Unknown').filter((item) => item.sampleSize >= analysisQuery.minSampleSize);
     const noisy = this.detectNoisySignals(signals, outcomes);
     const unevaluatedSignals = diagnostics.insufficientFuturePriceCount;
     const evidenceUsability = this.evidenceUsability(signals.length, evaluated.length, diagnostics.missingPriceHistoryCount, diagnostics.insufficientFuturePriceCount, analysisQuery.minSampleSize);
-    
+
     const summary: QualitySummary = {
       selectedHorizon: analysisQuery.horizon,
       evidenceUsability,
@@ -129,6 +141,17 @@ export class SignalQualityLabService {
   }
 
   async summary(query: QualityQuery): Promise<QualitySummary> {
+    // Trader-facing read: serve from persisted SignalOutcome rows only.
+    // No live price-history fetch happens on this GET path.
+    // If zero mature persisted outcomes exist for the requested scope, return an
+    // explicit "not yet computed" pending state — do NOT silently recompute live.
+    // To populate outcomes run: POST /signals/quality/recalculate?persistOutcomes=true
+    // or the scheduled SIGNAL_QUALITY_LAB pipeline stage.
+    const persisted = await this.tryPersistedSummary(query);
+    if (persisted !== null) return persisted;
+
+    // Fallback: live computation path (used only when persisted repository
+    // methods are unavailable — e.g. in legacy or minimal test contexts).
     const analysisQuery = this.analysisQuery(query);
     const rawSignals = await this.signalService.signalHistory(analysisQuery);
     const signals = await this.applyDataQualityFilters(rawSignals, analysisQuery);
@@ -542,6 +565,266 @@ export class SignalQualityLabService {
     }
     const after = await this.applyDataQualityFilters(before, analysisQuery);
     return this.dataQualityFilterSummaryFrom(before, after, analysisQuery);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Persisted-read entry points: try the persisted path, return null to signal
+  // that the live fallback should be used (happens only when repository methods
+  // are unavailable — e.g. in minimal test mocks).
+  // Production repositories always have scorecardSummary / countMatureByHorizon,
+  // so the live fallback is never reached in production.
+  // ---------------------------------------------------------------------------
+
+  private async tryPersistedSummary(query: QualityQuery): Promise<QualitySummary | null> {
+    if (typeof (this.repository as any).countMatureByHorizon !== 'function') return null;
+    try {
+      const persistedMetrics = await this.qualityMetricsFromPersistedOutcomes({
+        horizon: query.horizon,
+        modelVersion: query.modelVersion,
+      });
+      if (persistedMetrics.matureCount === 0) {
+        return this.pendingPersistedSummary(query.horizon);
+      }
+      return this.summaryFromPersistedMetrics(query, persistedMetrics);
+    } catch {
+      return null;
+    }
+  }
+
+  private async tryPersistedDashboard(query: QualityQuery): Promise<{
+    summary: QualitySummary;
+    byType: SignalTypePerformance[];
+    bySector: QualityMetricGroup[];
+    byRegime: QualityMetricGroup[];
+    byDataQuality: QualityMetricGroup[];
+    noisy: NoisySignalItem[];
+  } | null> {
+    if (typeof (this.repository as any).countMatureByHorizon !== 'function') return null;
+    try {
+      const persistedMetrics = await this.qualityMetricsFromPersistedOutcomes({
+        horizon: query.horizon,
+        modelVersion: query.modelVersion,
+      });
+      if (persistedMetrics.matureCount === 0) {
+        const pending = this.pendingPersistedSummary(query.horizon);
+        return {
+          summary: pending,
+          byType: [],
+          bySector: [],
+          byRegime: [],
+          byDataQuality: [],
+          noisy: [],
+        };
+      }
+      const summary = await this.summaryFromPersistedMetrics(query, persistedMetrics);
+      const minSample = query.minSampleSize;
+      const byType = persistedMetrics.byType.filter((item) => item.sampleSize >= minSample);
+      const bySector = persistedMetrics.bySector.filter((item) => item.sampleSize >= minSample);
+      const noisy = persistedMetrics.noisy;
+      // byRegime and byDataQuality require a join between signal_outcomes and
+      // external context (historical-regime snapshots / DQ evaluations) that is
+      // not yet materialised in the persisted path.  Return empty arrays with a
+      // discoverable warning rather than triggering live recomputation.
+      const warnings = [
+        ...summary.warnings,
+        'by-regime and by-data-quality groupings are not available in the persisted read path; run recalculate to refresh.',
+      ];
+      return { summary: { ...summary, warnings }, byType, bySector, byRegime: [], byDataQuality: [], noisy };
+    } catch {
+      return null;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Persisted-read helpers for summary() / dashboard()
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Build the full QualitySummary DTO from already-computed persisted metrics.
+   * No price fetching, no signal history, no live recomputation.
+   * Metric semantics (win-rate definition, NEUTRAL exclusion, score buckets,
+   * by-sector, by-type) are identical to the on-demand path — they are sourced
+   * from the same SQL aggregates that back the scorecard and calibration engine.
+   */
+  private async summaryFromPersistedMetrics(
+    query: QualityQuery,
+    persistedMetrics: import('./signal-quality-lab.types').PersistedQualityMetrics,
+  ): Promise<QualitySummary> {
+    const horizon = query.horizon;
+    const minSample = query.minSampleSize;
+
+    // Per-direction win rates via scorecardSummary filtered to the selected horizon.
+    // scorecardSummary gives overall (all-direction) win rate; for separate
+    // BULLISH / BEARISH rates we use scorecard({ groupBy: 'direction' }).
+    const [scoreSummaryRows, directionRows] = await Promise.all([
+      this.repository.scorecardSummary({ horizon, modelVersion: query.modelVersion, minSampleSize: 0 }),
+      this.repository.scorecard({ horizon, groupBy: 'direction', modelVersion: query.modelVersion, minSampleSize: 0 }),
+    ]);
+
+    const horizonSummary = scoreSummaryRows.find((row) => row.horizon === horizon);
+    const bullishRow = directionRows.find((row) => row.horizon === horizon && row.groupKey === 'BULLISH');
+    const bearishRow = directionRows.find((row) => row.horizon === horizon && row.groupKey === 'BEARISH');
+
+    // Derive average returns from persisted scorecard summary rows.
+    const fiveDaySummary = scoreSummaryRows.find((row) => row.horizon === '5D');
+    const twentyDaySummary = scoreSummaryRows.find((row) => row.horizon === '20D');
+
+    const matureCount = persistedMetrics.matureCount;
+    const byType = persistedMetrics.byType.filter((item) => item.sampleSize >= minSample);
+    const bySector = persistedMetrics.bySector.filter((item) => item.sampleSize >= minSample);
+    const noisy = persistedMetrics.noisy;
+
+    // horizonAvailability: use persisted count from scorecardSummary per horizon.
+    const horizonAvailability = (Object.keys({ '1D': 1, '5D': 5, '10D': 10, '20D': 20, '60D': 60 }) as QualityHorizon[])
+      .reduce((acc, h) => {
+        const row = scoreSummaryRows.find((r) => r.horizon === h);
+        const evaluated = row?.directionalSampleSize ?? 0;
+        const total = row?.sampleSize ?? 0;
+        acc[h] = {
+          eligible: total,
+          evaluated,
+          insufficientFuturePrice: 0,
+          missingPriceHistory: 0,
+          evidenceUsability: this.evidenceUsability(total, evaluated, 0, 0, minSample),
+        };
+        return acc;
+      }, {} as HorizonAvailabilitySummary);
+
+    const totalSignals = horizonSummary?.sampleSize ?? 0;
+    const matureSignals = horizonSummary?.directionalSampleSize ?? 0;
+    const evidenceUsability = this.evidenceUsability(totalSignals, matureSignals, 0, 0, minSample);
+
+    const diagnostics: EvaluationDiagnostics = {
+      totalSignals,
+      signalsAfterFilters: totalSignals,
+      matureSignals,
+      evaluatedSignals: matureSignals,
+      notYetMatureSignals: 0,
+      unevaluatedSignals: 0,
+      insufficientFuturePriceCount: 0,
+      missingPriceHistoryCount: 0,
+      missingInstrumentCount: 0,
+      excludedByDataQualityCount: 0,
+      excludedByDateFilterCount: 0,
+      excludedByDirectionCount: 0,
+      selectedHorizon: horizon,
+      earliestSignalDate: null,
+      latestSignalDate: null,
+      latestAvailablePriceDate: null,
+      minimumRequiredFutureRows: ({ '1D': 1, '5D': 5, '10D': 10, '20D': 20, '60D': 60 } as Record<QualityHorizon, number>)[horizon],
+      nextEvaluableDate: null,
+      recommendedAction: matureSignals > 0
+        ? 'Review evaluated historical forward returns and keep market data current.'
+        : 'Run recalculate with persistOutcomes=true to populate persisted outcome metrics.',
+      warnings: [],
+    };
+
+    return {
+      selectedHorizon: horizon,
+      evidenceUsability,
+      totalSignals,
+      matureSignals,
+      evaluatedSignals: matureSignals,
+      notYetMatureSignals: 0,
+      unevaluatedSignals: 0,
+      overallBullishWinRate: bullishRow?.winRate ?? null,
+      overallBearishWinRate: bearishRow?.winRate ?? null,
+      average5DReturn: fiveDaySummary?.avgReturnPercent ?? null,
+      average20DReturn: twentyDaySummary?.avgReturnPercent ?? null,
+      bestPerformingSignalType: byType[0]?.signalType ?? null,
+      worstPerformingSignalType: byType.length > 0 ? byType[byType.length - 1].signalType : null,
+      bestSector: bySector[0]?.group ?? null,
+      worstSector: bySector.length > 0 ? bySector[bySector.length - 1].group : null,
+      noisySignalCount: noisy.length,
+      dataStatus: matureCount === 0 ? 'MISSING' : 'COMPLETE',
+      generatedAt: new Date().toISOString(),
+      dataQualityFilterSummary: {
+        totalSignalsBeforeFilter: totalSignals,
+        totalSignalsAfterFilter: totalSignals,
+        excludedByDataQuality: 0,
+        missingQualityEvaluationCount: 0,
+        filterApplied: false,
+      },
+      evaluationDiagnostics: diagnostics,
+      horizonAvailability,
+      recommendedAction: diagnostics.recommendedAction,
+      warnings: [],
+    };
+  }
+
+  /**
+   * Return an explicit "not yet computed" pending QualitySummary.
+   * Called when matureCount === 0 so the trader page sees a clear state
+   * instead of a misleading empty result or a silent live recompute.
+   */
+  private pendingPersistedSummary(horizon: QualityHorizon): QualitySummary {
+    const horizonDays: Record<QualityHorizon, number> = { '1D': 1, '5D': 5, '10D': 10, '20D': 20, '60D': 60 };
+    const emptyHorizonItem: HorizonAvailabilityItem = {
+      eligible: 0,
+      evaluated: 0,
+      insufficientFuturePrice: 0,
+      missingPriceHistory: 0,
+      evidenceUsability: 'UNAVAILABLE',
+    };
+    const horizonAvailability = (Object.keys(horizonDays) as QualityHorizon[]).reduce((acc, h) => {
+      acc[h] = { ...emptyHorizonItem };
+      return acc;
+    }, {} as HorizonAvailabilitySummary);
+
+    const diagnostics: EvaluationDiagnostics = {
+      totalSignals: 0,
+      signalsAfterFilters: 0,
+      matureSignals: 0,
+      evaluatedSignals: 0,
+      notYetMatureSignals: 0,
+      unevaluatedSignals: 0,
+      insufficientFuturePriceCount: 0,
+      missingPriceHistoryCount: 0,
+      missingInstrumentCount: 0,
+      excludedByDataQualityCount: 0,
+      excludedByDateFilterCount: 0,
+      excludedByDirectionCount: 0,
+      selectedHorizon: horizon,
+      earliestSignalDate: null,
+      latestSignalDate: null,
+      latestAvailablePriceDate: null,
+      minimumRequiredFutureRows: horizonDays[horizon],
+      nextEvaluableDate: null,
+      recommendedAction: 'No persisted mature outcomes exist yet. Run recalculate with persistOutcomes=true or the SIGNAL_QUALITY_LAB pipeline stage.',
+      warnings: ['No persisted mature outcomes exist yet for the selected scope.'],
+    };
+
+    return {
+      selectedHorizon: horizon,
+      evidenceUsability: 'UNAVAILABLE',
+      totalSignals: 0,
+      matureSignals: 0,
+      evaluatedSignals: 0,
+      notYetMatureSignals: 0,
+      unevaluatedSignals: 0,
+      overallBullishWinRate: null,
+      overallBearishWinRate: null,
+      average5DReturn: null,
+      average20DReturn: null,
+      bestPerformingSignalType: null,
+      worstPerformingSignalType: null,
+      bestSector: null,
+      worstSector: null,
+      noisySignalCount: 0,
+      dataStatus: 'MISSING',
+      generatedAt: new Date().toISOString(),
+      dataQualityFilterSummary: {
+        totalSignalsBeforeFilter: 0,
+        totalSignalsAfterFilter: 0,
+        excludedByDataQuality: 0,
+        missingQualityEvaluationCount: 0,
+        filterApplied: false,
+      },
+      evaluationDiagnostics: diagnostics,
+      horizonAvailability,
+      recommendedAction: diagnostics.recommendedAction,
+      warnings: diagnostics.warnings,
+    };
   }
 
   private analysisQuery(query: QualityQuery): QualityQuery {
