@@ -1,5 +1,6 @@
 import { EarningsIntelligenceRepository } from './earnings-intelligence.repository';
 import { EARNINGS_INTELLIGENCE_CATEGORIES } from './earnings-intelligence.validation';
+import { addTradingSessions } from '../market-data-foundation';
 import type {
   EarningsFreshness,
   EarningsFundamentalInput,
@@ -19,6 +20,20 @@ import type {
 const CALCULATION_VERSION = 'earnings-intelligence-v1';
 const UPCOMING_WINDOW_DAYS = 45;
 const RECENT_RESULT_WINDOW_DAYS = 60;
+
+/**
+ * Number of trading sessions after the result date used as the "after" bar
+ * for the price-reaction calculation.
+ *
+ * 5 trading sessions (≈ 1 calendar week of actual market days) is chosen
+ * because:
+ *  - It matches the original intent of "5 days after results" but in trading
+ *    days so that Diwali / Holi / long-weekend clusters do not shift the bar
+ *    into a different week of trading.
+ *  - Post-result price discovery in Indian markets typically stabilises
+ *    within 3–5 trading sessions.
+ */
+const PRICE_REACTION_TRADING_SESSIONS = 5;
 
 export class EarningsIntelligenceService {
   constructor(private readonly repository = new EarningsIntelligenceRepository()) {}
@@ -177,7 +192,7 @@ export class EarningsIntelligenceService {
     const accelerationScore = this.calculateAccelerationScore(fundamentals);
     const deliveryInterest = this.deliveryInterest(input.deliverySnapshots);
     const reactionDate = resultDateSource === 'OFFICIAL_CALENDAR' ? resultDate : null;
-    const priceReaction = reactionDate ? this.priceReaction(input.prices, reactionDate) : null;
+    const priceReaction = reactionDate ? this.priceReaction(input.prices, reactionDate, input.region) : null;
     const preResultPriceMove = this.priceMove(input.prices, 10);
     const freshness = this.freshness(input.snapshotDate, latest);
     const reasonTags = this.reasonTags({
@@ -462,12 +477,36 @@ export class EarningsIntelligenceService {
     return latest >= 55 || latest >= average + 10;
   }
 
-  private priceReaction(prices: EarningsPricePointInput[], resultDate: Date): number | null {
+  /**
+   * Calculate the price reaction following an earnings result.
+   *
+   * The "after" bar is the first available bar that is at or after
+   * `resultDate + PRICE_REACTION_TRADING_SESSIONS` trading sessions.
+   * Using trading sessions instead of raw calendar days means that
+   * Diwali / Holi / long-weekend clusters do not shift the comparison
+   * bar into a different trading week.
+   *
+   * Holiday calendar injection is not available at this synchronous
+   * call site.  `addTradingSessions` is called without a holiday set
+   * (weekend-only degrade) which is safe: in the worst case (a holiday
+   * cluster) the target date is 1 calendar day too early, and the
+   * `sorted.find` scan then picks the next available bar naturally.
+   */
+  private priceReaction(prices: EarningsPricePointInput[], resultDate: Date, region = 'IN'): number | null {
     const sorted = this.sortPricesAscending(prices);
     if (sorted.length < 2) return null;
     const before = [...sorted].reverse().find((price) => price.timestamp <= resultDate);
-    const after = sorted.find((price) => price.timestamp.getTime() >= resultDate.getTime() + 5 * 24 * 60 * 60 * 1000);
-    if (!before || !after || before.close <= 0) return null;
+    if (!before || before.close <= 0) return null;
+
+    // Compute target date: resultDate + PRICE_REACTION_TRADING_SESSIONS trading sessions
+    const resultDateStr = resultDate.toISOString().slice(0, 10);
+    const { date: targetDateStr } = addTradingSessions(region, resultDateStr, PRICE_REACTION_TRADING_SESSIONS);
+    const targetMs = targetDateStr
+      ? Date.parse(`${targetDateStr}T00:00:00.000Z`)
+      : resultDate.getTime() + PRICE_REACTION_TRADING_SESSIONS * 7 * 24 * 60 * 60 * 1000 / 5; // fallback: ~5 calendar days
+
+    const after = sorted.find((price) => price.timestamp.getTime() >= targetMs);
+    if (!after) return null;
     return this.round(((after.close - before.close) / before.close) * 100);
   }
 

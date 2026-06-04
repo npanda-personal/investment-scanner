@@ -29,11 +29,16 @@ export {
   startMarketDataStartupPriceBackfill,
 } from './market-data-foundation.scheduler';
 export {
+  addTradingSessions,
+  expectedLatestTradingDate,
   getMarketSessionConfig,
   latestCompletedTradingDateForRegion,
+  MARKET_CALENDAR_UNCERTAIN,
   shouldRunMarketDataSync,
   tradingDateForRegion,
+  tradingSessionsBetween,
 } from './market-data-foundation.market-session';
+export type { TradingCalendarOptions } from './market-data-foundation.market-session';
 export {
   partitionHistoricalPrices,
   validateHistoricalPrice,

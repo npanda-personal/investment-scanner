@@ -14,6 +14,154 @@ export interface MarketSessionConfig {
   skipWeekends: boolean;
 }
 
+/**
+ * Options for holiday-aware trading-calendar helpers.
+ * Pass `holidays` as a Set/array of ISO date strings (YYYY-MM-DD) to enable
+ * full holiday awareness.  When omitted the helpers degrade gracefully to
+ * weekend-only logic and set `calendarUncertain = true` on the result.
+ */
+export interface TradingCalendarOptions {
+  /** ISO date strings (YYYY-MM-DD) that are exchange holidays. */
+  holidays?: string[] | Set<string>;
+}
+
+/** Returned by expectedLatestTradingDate when the holiday calendar is absent. */
+export const MARKET_CALENDAR_UNCERTAIN = 'MARKET_CALENDAR_UNCERTAIN' as const;
+
+/**
+ * Compute the most recent completed trading date for a given region as of
+ * `asOf`, honouring explicit `holidays`.
+ *
+ * - When `holidays` is supplied the result is fully holiday-aware.
+ * - When `holidays` is absent the function degrades to weekend-only mode and
+ *   sets `calendarUncertain = true` in the returned object so callers can
+ *   propagate the MARKET_CALENDAR_UNCERTAIN signal rather than silently
+ *   misclassifying data.
+ *
+ * @returns `{ date: string | null; calendarUncertain: boolean }`
+ */
+export function expectedLatestTradingDate(
+  region: string,
+  asOf: Date = new Date(),
+  options: TradingCalendarOptions = {}
+): { date: string | null; calendarUncertain: boolean } {
+  const config = getMarketSessionConfig(region);
+  if (!config) return { date: null, calendarUncertain: true };
+
+  const holidaySet = toHolidaySet(options.holidays);
+  const calendarUncertain = holidaySet === null;
+
+  const configWithHolidays: MarketSessionConfig = {
+    ...config,
+    holidays: holidaySet ? [...holidaySet] : [],
+  };
+
+  const local = zonedParts(asOf, config.timezone);
+  const todayCloseAt = zonedDateTimeToUtc(local.date, config.regularClose, config.timezone);
+  const finalCandleExpectedAt = addMinutes(todayCloseAt, config.finalizationGraceMinutes);
+  const todayIsTradingDay =
+    config.weekdays.includes(local.weekday) &&
+    !(holidaySet?.has(local.date) ?? false);
+
+  let date: string | null;
+  if (todayIsTradingDay && asOf >= finalCandleExpectedAt) {
+    date = local.date;
+  } else {
+    date = previousTradingDate(local.date, configWithHolidays);
+  }
+
+  return { date, calendarUncertain };
+}
+
+/**
+ * Count the number of trading sessions between `fromDate` and `toDate`
+ * (both inclusive, both YYYY-MM-DD strings) for the given region.
+ *
+ * - Weekends are always excluded.
+ * - `holidays` (ISO date strings) are excluded when supplied.
+ * - When `holidays` is absent, `calendarUncertain = true` is set.
+ * - Returns `{ count: number; calendarUncertain: boolean }`.
+ * - Caps the walk at 365 days to protect against runaway iteration.
+ */
+export function tradingSessionsBetween(
+  region: string,
+  fromDate: string,
+  toDate: string,
+  options: TradingCalendarOptions = {}
+): { count: number; calendarUncertain: boolean } {
+  const config = getMarketSessionConfig(region);
+  if (!config) return { count: 0, calendarUncertain: true };
+
+  const holidaySet = toHolidaySet(options.holidays);
+  const calendarUncertain = holidaySet === null;
+
+  const [fy, fm, fd] = fromDate.split('-').map(Number);
+  const [ty, tm, td] = toDate.split('-').map(Number);
+  const fromMs = Date.UTC(fy, fm - 1, fd, 12, 0, 0);
+  const toMs = Date.UTC(ty, tm - 1, td, 12, 0, 0);
+
+  if (fromMs > toMs) return { count: 0, calendarUncertain };
+
+  let count = 0;
+  const cursor = new Date(fromMs);
+  const MAX_DAYS = 365;
+  for (let i = 0; i <= MAX_DAYS; i += 1) {
+    const local = zonedParts(cursor, config.timezone);
+    if (config.weekdays.includes(local.weekday) && !(holidaySet?.has(local.date) ?? false)) {
+      count += 1;
+    }
+    if (cursor.getTime() >= toMs) break;
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+
+  return { count, calendarUncertain };
+}
+
+/**
+ * Advance `fromDate` (YYYY-MM-DD) by exactly `sessions` trading sessions for
+ * the given region.  Weekends are always skipped; `holidays` are skipped when
+ * supplied.  When `holidays` is absent, `calendarUncertain = true`.
+ *
+ * Returns `{ date: string | null; calendarUncertain: boolean }`.
+ * Returns `null` if the walk exceeds 365 calendar days without finding enough
+ * trading sessions (degenerate input guard).
+ */
+export function addTradingSessions(
+  region: string,
+  fromDate: string,
+  sessions: number,
+  options: TradingCalendarOptions = {}
+): { date: string | null; calendarUncertain: boolean } {
+  const config = getMarketSessionConfig(region);
+  if (!config) return { date: null, calendarUncertain: true };
+  if (sessions <= 0) return { date: fromDate, calendarUncertain: toHolidaySet(options.holidays) === null };
+
+  const holidaySet = toHolidaySet(options.holidays);
+  const calendarUncertain = holidaySet === null;
+
+  const [fy, fm, fd] = fromDate.split('-').map(Number);
+  const cursor = new Date(Date.UTC(fy, fm - 1, fd + 1, 12, 0, 0));
+  let remaining = sessions;
+  const MAX_DAYS = 365;
+  for (let i = 0; i < MAX_DAYS; i += 1) {
+    const local = zonedParts(cursor, config.timezone);
+    if (config.weekdays.includes(local.weekday) && !(holidaySet?.has(local.date) ?? false)) {
+      remaining -= 1;
+      if (remaining === 0) return { date: local.date, calendarUncertain };
+    }
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return { date: null, calendarUncertain };
+}
+
+// ─── internal helpers ──────────────────────────────────────────────────────
+
+function toHolidaySet(holidays?: string[] | Set<string>): Set<string> | null {
+  if (!holidays) return null;
+  if (holidays instanceof Set) return holidays;
+  return new Set(holidays);
+}
+
 export const DEFAULT_MARKET_SESSION_CONFIGS: Record<string, Omit<MarketSessionConfig, 'syncDuringMarketHours' | 'skipWeekends'>> = {
   IN: {
     region: 'IN',

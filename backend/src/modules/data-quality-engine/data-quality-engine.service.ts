@@ -1,4 +1,4 @@
-import { MarketDataFoundationService } from '../market-data-foundation';
+import { MarketDataFoundationService, expectedLatestTradingDate, tradingSessionsBetween } from '../market-data-foundation';
 import { DataQualityEngineRepository } from './data-quality-engine.repository';
 import type {
   CoverageStatus,
@@ -19,7 +19,21 @@ import type {
 } from './data-quality-engine.types';
 
 const DAY_MS = 86_400_000;
-const STALE_PRICE_DAYS = 7;
+/**
+ * A price is considered stale only if the latest price date is more than
+ * STALE_PRICE_TRADING_SESSIONS trading sessions behind the expected latest
+ * trading date.  3 sessions is chosen because:
+ *   - 1 session of tolerance handles end-of-day data provider lag.
+ *   - 2 sessions handles a single unexpected exchange holiday not yet in the
+ *     local holiday set (graceful degrade path).
+ *   - 3 sessions keeps the threshold tight enough to catch genuinely absent
+ *     data (e.g. a provider outage that spans > 3 days) while never
+ *     false-positive on Diwali / Holi / long-weekend clusters of up to
+ *     4–5 calendar days.
+ * The legacy DAY_MS constant is kept for the fallback path used when the
+ * trading-session calendar is unavailable (MARKET_CALENDAR_UNCERTAIN).
+ */
+const STALE_PRICE_TRADING_SESSIONS = 3;
 const DEFAULT_EVALUATION_CONCURRENCY = 6;
 const MAX_EVALUATION_CONCURRENCY = 10;
 const DEFAULT_SCHEDULED_DQ_CHUNK_SIZE = 100;
@@ -363,7 +377,16 @@ export class DataQualityEngineService {
     const tierEvidence = this.tierEvidence(instrument, hasSignal);
     const priceCount = prices.length;
     const latestDate = latestPrice?.date ? new Date(latestPrice.date) : prices[0]?.date ? new Date(prices[0].date) : null;
-    const stale = !latestDate || Date.now() - latestDate.getTime() > STALE_PRICE_DAYS * DAY_MS;
+    // Trading-session-aware staleness: stale only when the latest price date is
+    // more than STALE_PRICE_TRADING_SESSIONS sessions behind the expected latest
+    // trading date.  We derive region from the instrument; default to 'IN' for
+    // NSE/BSE instruments when region is absent.
+    // Holiday calendar injection is not available at this call-site (no async
+    // context and no hot-path fetch), so we use the weekend-only degrade path.
+    // When calendarUncertain the 3-session window still provides far more
+    // tolerance than the old 7-calendar-day check: at most 3 trading days
+    // gaps back (Mon–Wed = 3 sessions without needing holiday data).
+    const stale = this.isPriceStale(latestDate, instrument);
     const volumeValues = prices.map((price) => this.optionalNumber(price.volume)).filter((value): value is number => value !== null);
     const adjustedFallbackCount = prices.filter((price) => price.adjusted_close === null || price.adjusted_close === undefined).length;
 
@@ -540,6 +563,49 @@ export class DataQualityEngineService {
     if (volumes.length >= 20) score += 10;
     score = Math.round(Math.max(0, Math.min(100, score)));
     return { score, status: score >= 70 ? 'LIQUID' : score >= 40 ? 'THIN' : 'ILLIQUID' };
+  }
+
+  /**
+   * Trading-session-aware staleness check.
+   *
+   * Returns `true` only when the latest price is more than
+   * STALE_PRICE_TRADING_SESSIONS trading sessions behind the expected latest
+   * trading date.
+   *
+   * Holiday set injection is not available on this synchronous path.
+   * `expectedLatestTradingDate` is called in weekend-only degrade mode
+   * (no holidays passed).  In that mode calendarUncertain=true, but the
+   * 3-session threshold still correctly handles Diwali/Holi clusters:
+   *   - A 4-calendar-day weekend cluster (Fri–Mon) = 0 trading sessions gap
+   *     on the first Tuesday back, so stale=false (correct).
+   *   - Genuine absence (no price for a week of trading days) exceeds 3
+   *     sessions → stale=true (correct).
+   * If expectedLatestTradingDate cannot determine a date (unknown region or
+   * severe calendar failure) we fall back to the legacy 7-calendar-day check
+   * so the function always returns a safe answer.
+   */
+  private isPriceStale(latestDate: Date | null, instrument: any): boolean {
+    if (!latestDate) return true;
+    const region =
+      this.optionalText(instrument?.region ?? instrument?.country) ?? 'IN';
+    const { date: expectedDate } = expectedLatestTradingDate(region);
+    if (!expectedDate) {
+      // Calendar lookup failed — fall back to 7-calendar-day check
+      return Date.now() - latestDate.getTime() > 7 * DAY_MS;
+    }
+    const latestDateStr = latestDate.toISOString().slice(0, 10);
+    if (latestDateStr >= expectedDate) return false;
+    // Count trading sessions the price is behind the expected date.
+    // Weekend-only (no holidays injected here); calendarUncertain flag is
+    // intentionally ignored — the 3-session threshold absorbs it.
+    const { count: sessionsBehind } = tradingSessionsBetween(
+      region,
+      latestDateStr,
+      expectedDate
+    );
+    // sessionsBehind includes both endpoints; subtract 1 so that "price IS
+    // on the expected date" → 0 sessions behind.
+    return (sessionsBehind - 1) > STALE_PRICE_TRADING_SESSIONS;
   }
 
   private coverageStatus(score: number): CoverageStatus {
