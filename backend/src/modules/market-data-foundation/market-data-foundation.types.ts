@@ -956,6 +956,9 @@ export interface TrustedReviewUniverseInstrument {
   contextGaps: string[];
   warnings: string[];
   priceHistory: TrustedReviewUniversePriceRow[];
+  /** Whether this instrument is eligible for F&O / derivatives trading on NSE/BSE.
+   *  Null means the flag was not available (treat as non-F&O for short-review gating). */
+  derivativesEligible: boolean | null;
 }
 
 export interface MarketDataRepairRequest {
