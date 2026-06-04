@@ -90,13 +90,18 @@ export class SignalQualityLabRepository {
   /**
    * Invalidate persisted outcomes for a set of instruments after their
    * adjustedClose prices have been re-derived (e.g. a corporate-action
-   * back-adjustment recompute). `forwardReturnPercent` / `futurePrice` are
-   * computed from adjustedClose, so previously-mature rows are now stale.
+   * back-adjustment recompute). forwardReturnPercent / futurePrice AND the
+   * excursion fields (maxFavorableExcursion / maxAdverseExcursion /
+   * maxDrawdownPercent) are all computed from adjustedClose, so previously-
+   * mature rows are now stale.
    *
    * Marks every dataComplete=true row for these instruments as stale:
-   *   - dataComplete        → false
-   *   - forwardReturnPercent → null
-   *   - futurePrice          → null
+   *   - dataComplete         → false
+   *   - forwardReturnPercent  → null
+   *   - futurePrice           → null
+   *   - maxFavorableExcursion → null
+   *   - maxAdverseExcursion   → null
+   *   - maxDrawdownPercent    → null
    *
    * `windowEndDate` is intentionally left intact so the maturity sweep
    * (findImmatureMatured) re-detects these rows as matured-and-ready and the
@@ -116,6 +121,9 @@ export class SignalQualityLabRepository {
         dataComplete: false,
         forwardReturnPercent: null,
         futurePrice: null,
+        maxFavorableExcursion: null,
+        maxAdverseExcursion: null,
+        maxDrawdownPercent: null,
       },
     });
 
@@ -161,6 +169,9 @@ export class SignalQualityLabRepository {
         dataComplete: false,
         forwardReturnPercent: null,
         futurePrice: null,
+        maxFavorableExcursion: null,
+        maxAdverseExcursion: null,
+        maxDrawdownPercent: null,
       },
     });
 

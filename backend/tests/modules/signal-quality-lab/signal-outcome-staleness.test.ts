@@ -42,7 +42,14 @@ describe('SignalQualityLabRepository.markStaleByInstrumentIds', () => {
     expect(updateMany).toHaveBeenCalledTimes(1);
     expect(updateMany).toHaveBeenCalledWith({
       where: { instrumentId: { in: ['stock-1', 'stock-2'] }, dataComplete: true },
-      data: { dataComplete: false, forwardReturnPercent: null, futurePrice: null },
+      data: {
+        dataComplete: false,
+        forwardReturnPercent: null,
+        futurePrice: null,
+        maxFavorableExcursion: null,
+        maxAdverseExcursion: null,
+        maxDrawdownPercent: null,
+      },
     });
   });
 
