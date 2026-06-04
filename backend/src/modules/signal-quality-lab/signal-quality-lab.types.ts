@@ -389,7 +389,12 @@ export interface PersistedQualityMetrics {
   byType: SignalTypePerformance[];
   byScore: QualityMetricGroup[];
   bySector: QualityMetricGroup[];
-  /** Always empty: noisy detection requires signal history, not outcome rows. */
+  /**
+   * Noisy-signal items detected via a lightweight on-demand pass that reuses
+   * detectNoisySignals. Win-rate/return metrics come from persisted SQL
+   * aggregates; only the noisy list is derived from in-memory signal history
+   * so that noisy penalties are never dropped when the persisted path is used.
+   */
   noisy: NoisySignalItem[];
   /** Number of mature (dataComplete=true) outcome rows for the selected horizon. */
   matureCount: number;

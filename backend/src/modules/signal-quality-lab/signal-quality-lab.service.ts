@@ -267,7 +267,9 @@ export class SignalQualityLabService {
    *   byType  — per signal-type-code win rate / avg return (via SQL join to signal_results)
    *   byScore — per score-bucket metrics (calibration-compatible bucket boundaries)
    *   bySector — per sector metrics
-   *   noisy   — always empty; noisy detection requires in-memory signal history
+   *   noisy   — populated via a lightweight on-demand pass that reuses
+   *              detectNoisySignals; keeps win-rate/return metrics from persisted
+   *              SQL aggregates while ensuring noisy penalties are never lost
    *
    * Win-rate is direction-aware (BULLISH / BEARISH only; NEUTRAL excluded),
    * matching the on-demand path and the Slice-2 scorecard semantics.
@@ -282,11 +284,21 @@ export class SignalQualityLabService {
       minSampleSize: 0,
     };
 
-    const [scoreBucketRows, sectorRows, signalTypeRows, matureCount] = await Promise.all([
+    // Noisy-signal detection query — mirrors the limit used by batchQualityMetrics
+    // in the calibration engine (5000 signals). Runs concurrently with scorecard SQL.
+    const noisyQuery: QualityQuery = {
+      horizon: query.horizon,
+      modelVersion: query.modelVersion,
+      limit: 5000,
+      minSampleSize: 0,
+    };
+
+    const [scoreBucketRows, sectorRows, signalTypeRows, matureCount, noisy] = await Promise.all([
       this.repository.scorecard({ ...scorecardBase, groupBy: 'calibrationScoreBucket' as any }),
       this.repository.scorecard({ ...scorecardBase, groupBy: 'sector' }),
       this.repository.signalTypeMetricsFromPersistedOutcomes({ horizon: query.horizon, modelVersion: query.modelVersion }),
       this.repository.countMatureByHorizon(query.horizon),
+      this.noisy(noisyQuery).catch(() => [] as NoisySignalItem[]),
     ]);
 
     const byScore: QualityMetricGroup[] = scoreBucketRows.map((row) => this.scorecardRowToMetricGroup(row, query.horizon));
@@ -316,7 +328,7 @@ export class SignalQualityLabService {
       category: 'UNKNOWN',
     }));
 
-    return { byType, byScore, bySector, noisy: [], matureCount };
+    return { byType, byScore, bySector, noisy, matureCount };
   }
 
   /**

@@ -255,6 +255,117 @@ describe('signal-calibration-engine — persisted outcomes path', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Tests: noisy flags are populated and penalties applied in the persisted path
+// ---------------------------------------------------------------------------
+
+describe('signal-calibration-engine — noisy flags in persisted path (hybrid)', () => {
+  it('applies NOISE penalty when persisted metrics include noisy flags for the signal instrument', async () => {
+    const noisyFlag: NoisySignalItem = {
+      instrumentId: 'stock-1',
+      symbol: 'TCS',
+      issueType: 'DIRECTION_FLIPS',
+      severity: 'HIGH',
+      description: '3 direction flips in the last 30 days.',
+      evidence: { flips: 3 },
+      researchUrl: '/research/stocks/stock-1',
+    };
+    const metricsWithNoisy: PersistedQualityMetrics = {
+      ...persistedMetrics,
+      noisy: [noisyFlag],
+    };
+
+    const setup = makeService({
+      qualityMetricsFromPersistedOutcomes: jest.fn().mockResolvedValue(metricsWithNoisy),
+    });
+    const result = await setup.instance.run({ batchSize: 1, offset: 0, region: 'IN', assetType: 'STOCK', horizon: '20D' });
+
+    expect(result.results.length).toBe(1);
+    const r = result.results[0];
+    // DIRECTION_FLIPS → delta: -3 (non-FAILED noise)
+    expect(r.penalties.some((p) => p.type === 'NOISE')).toBe(true);
+    expect(r.penalties.find((p) => p.type === 'NOISE')?.evidence).toMatchObject({ issue: 'DIRECTION_FLIPS' });
+  });
+
+  it('applies larger NOISE penalty for FAILED_HIGH_SCORE_BULLISH flag', async () => {
+    const noisyFlag: NoisySignalItem = {
+      instrumentId: 'stock-1',
+      symbol: 'TCS',
+      issueType: 'FAILED_HIGH_SCORE_BULLISH',
+      severity: 'MEDIUM',
+      description: 'High-score bullish signal had a negative 10D outcome.',
+      evidence: { return10D: -0.04, score: 80 },
+      researchUrl: '/research/stocks/stock-1',
+    };
+    const metricsWithNoisy: PersistedQualityMetrics = {
+      ...persistedMetrics,
+      noisy: [noisyFlag],
+    };
+
+    const setup = makeService({
+      qualityMetricsFromPersistedOutcomes: jest.fn().mockResolvedValue(metricsWithNoisy),
+    });
+    const result = await setup.instance.run({ batchSize: 1, offset: 0, region: 'IN', assetType: 'STOCK', horizon: '20D' });
+
+    const r = result.results[0];
+    const noisePenalty = r.penalties.find((p) => p.type === 'NOISE');
+    expect(noisePenalty).toBeDefined();
+    // FAILED_* noise → delta -6
+    expect(noisePenalty!.delta).toBe(-6);
+  });
+
+  it('noisy flag for a different instrument does NOT apply a penalty to the current signal', async () => {
+    const noisyFlag: NoisySignalItem = {
+      instrumentId: 'other-stock', // different instrument
+      symbol: 'OTHER',
+      issueType: 'DIRECTION_FLIPS',
+      severity: 'HIGH',
+      description: '4 direction flips in 30 days.',
+      evidence: { flips: 4 },
+      researchUrl: '/research/stocks/other-stock',
+    };
+    const metricsWithNoisy: PersistedQualityMetrics = {
+      ...persistedMetrics,
+      noisy: [noisyFlag],
+    };
+
+    const setup = makeService({
+      qualityMetricsFromPersistedOutcomes: jest.fn().mockResolvedValue(metricsWithNoisy),
+    });
+    const result = await setup.instance.run({ batchSize: 1, offset: 0, region: 'IN', assetType: 'STOCK', horizon: '20D' });
+
+    const r = result.results[0];
+    expect(r.penalties.some((p) => p.type === 'NOISE')).toBe(false);
+  });
+
+  it('persisted path with noisy flags produces a lower calibrated score than without', async () => {
+    // Baseline: no noisy flags
+    const baselineSetup = makeService({
+      qualityMetricsFromPersistedOutcomes: jest.fn().mockResolvedValue(persistedMetrics),
+    });
+    const baselineResult = await baselineSetup.instance.run({ batchSize: 1, offset: 0, region: 'IN', assetType: 'STOCK', horizon: '20D' });
+    const baselineScore = baselineResult.results[0].calibratedScore;
+
+    // With noisy flag for the same instrument
+    const noisyFlag: NoisySignalItem = {
+      instrumentId: 'stock-1',
+      symbol: 'TCS',
+      issueType: 'DIRECTION_FLIPS',
+      severity: 'HIGH',
+      description: '3 direction flips.',
+      evidence: { flips: 3 },
+      researchUrl: '/research/stocks/stock-1',
+    };
+    const noisySetup = makeService({
+      qualityMetricsFromPersistedOutcomes: jest.fn().mockResolvedValue({ ...persistedMetrics, noisy: [noisyFlag] }),
+    });
+    const noisyResult = await noisySetup.instance.run({ batchSize: 1, offset: 0, region: 'IN', assetType: 'STOCK', horizon: '20D' });
+    const noisyScore = noisyResult.results[0].calibratedScore;
+
+    expect(noisyScore).toBeLessThan(baselineScore);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Tests: on-demand fallback when matureCount < 200
 // ---------------------------------------------------------------------------
 
@@ -371,10 +482,51 @@ describe('signal-quality-lab — qualityMetricsFromPersistedOutcomes shape', () 
     expect(result.matureCount).toBe(420);
   });
 
-  it('noisy is always empty (not derivable from persisted outcomes)', async () => {
-    const { service } = makeQualityService();
-    const result = await service.qualityMetricsFromPersistedOutcomes({ horizon: '20D' });
-    expect(result.noisy).toEqual([]);
+  it('noisy is populated via the lightweight on-demand pass (hybrid path)', async () => {
+    // The persisted path now calls noisy() internally; noisy should not be empty
+    // when the signal-service returns signals with detectable issues.
+    const noisySignal = {
+      id: 'ns-1',
+      instrument_id: 'stock-noisy',
+      symbol: 'NOISYCO',
+      company_name: 'Noisy Co',
+      sector: 'Finance',
+      country: 'IN',
+      score: 75,
+      direction: 'BULLISH',
+      confidence: 'HIGH',
+      triggered_signals: [],
+      negative_signals: [],
+      // Old enough to be stale (> 7 days ago)
+      generated_at: new Date(Date.now() - 10 * 86400000).toISOString(),
+      modelVersion: 'signal-engine-v1',
+    };
+    // Build a service with a signalService that returns stale signals
+    const signalServiceWithNoise = {
+      signalHistory: jest.fn().mockResolvedValue([noisySignal]),
+      signalHistoryCount: jest.fn().mockResolvedValue(1),
+    };
+    const dataQualityService = { getEvaluationsForInstruments: jest.fn().mockResolvedValue([]) };
+    const repository = {
+      scorecard: jest.fn().mockResolvedValue([]),
+      scorecardSummary: jest.fn().mockResolvedValue([]),
+      countMatureByHorizon: jest.fn().mockResolvedValue(500),
+      signalTypeMetricsFromPersistedOutcomes: jest.fn().mockResolvedValue([]),
+    };
+    const serviceWithNoise = new SignalQualityLabService(
+      repository as any,
+      signalServiceWithNoise as any,
+      // marketDataService — noisy() path calls outcomesForSignals → pricesForSignals
+      // returns empty prices for the stale check, but stale detection only needs signal date
+      { listPricesByInstrumentId: jest.fn().mockResolvedValue({ prices: [] }) } as any,
+      {} as any,
+      dataQualityService as any,
+    );
+
+    const result = await serviceWithNoise.qualityMetricsFromPersistedOutcomes({ horizon: '20D' });
+    // STALE_SIGNAL should appear: signal is > 7 days old
+    expect(result.noisy.length).toBeGreaterThan(0);
+    expect(result.noisy.some((n) => n.issueType === 'STALE_SIGNAL')).toBe(true);
   });
 
   it('maps scorecard sector rows to QualityMetricGroup with direction-aware win rate', async () => {
@@ -467,5 +619,32 @@ describe('signal-quality-lab — qualityMetricsFromPersistedOutcomes shape', () 
     });
     const result = await service.qualityMetricsFromPersistedOutcomes({ horizon: '20D' });
     expect(result.matureCount).toBe(38000);
+  });
+
+  it('noisy defaults to empty array when signalService returns no signals (no spurious items)', async () => {
+    const { service } = makeQualityService();
+    const result = await service.qualityMetricsFromPersistedOutcomes({ horizon: '20D' });
+    // signalHistory returns [] → detectNoisySignals([], []) → []
+    expect(result.noisy).toEqual([]);
+  });
+
+  it('noisy detection gracefully handles signalService errors (returns empty, does not throw)', async () => {
+    const repository = {
+      scorecard: jest.fn().mockResolvedValue([]),
+      scorecardSummary: jest.fn().mockResolvedValue([]),
+      countMatureByHorizon: jest.fn().mockResolvedValue(500),
+      signalTypeMetricsFromPersistedOutcomes: jest.fn().mockResolvedValue([]),
+    };
+    const service = new SignalQualityLabService(
+      repository as any,
+      { signalHistory: jest.fn().mockRejectedValue(new Error('db timeout')), signalHistoryCount: jest.fn().mockResolvedValue(0) } as any,
+      {} as any,
+      {} as any,
+      { getEvaluationsForInstruments: jest.fn().mockResolvedValue([]) } as any,
+    );
+    // Should not throw; noisy falls back to empty via .catch(() => [])
+    const result = await service.qualityMetricsFromPersistedOutcomes({ horizon: '20D' });
+    expect(result.noisy).toEqual([]);
+    expect(result.matureCount).toBe(500);
   });
 });
