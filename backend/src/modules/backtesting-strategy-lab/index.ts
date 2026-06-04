@@ -25,4 +25,7 @@ export type {
   StrategyRule,
   UniverseType,
   UpdateBacktestStrategyRequest,
+  WalkForwardOptions,
+  WalkForwardResult,
+  WalkForwardSegmentResult,
 } from './backtesting-strategy-lab.types';

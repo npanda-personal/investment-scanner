@@ -7,6 +7,68 @@ export type BacktestStatus = 'COMPLETED' | 'FAILED';
 export type BacktestAvailabilityStatus = 'AVAILABLE' | 'PARTIAL' | 'INSUFFICIENT_HISTORY' | 'NOT_RUN' | 'ERROR';
 export type StrategyReadinessLabel = 'RESEARCH_ONLY' | 'WATCHLIST_CANDIDATE' | 'PAPER_TEST_CANDIDATE' | 'NOT_AUTOMATION_READY';
 
+/**
+ * Walk-forward / out-of-sample validation options.
+ * When set, the backtest splits the date range into an in-sample training
+ * window and an out-of-sample test window, runs the strategy on both, and
+ * reports metrics + an OVERFIT flag for the result.
+ *
+ * Exactly one of `splitDate` or `inSampleFraction` must be provided.
+ *
+ * Default behaviour (no option set) is unchanged: single full-period run.
+ */
+export interface WalkForwardOptions {
+  /**
+   * Explicit ISO date that splits the period: everything before this date is
+   * in-sample, everything from this date onward is out-of-sample.
+   * Takes precedence over `inSampleFraction` when both are given.
+   */
+  splitDate?: string;
+  /**
+   * Fraction of the total date range to use as in-sample (0 < f < 1).
+   * E.g. 0.7 = first 70% in-sample, last 30% out-of-sample.
+   * Default is 0.7 when neither `splitDate` nor `inSampleFraction` are given
+   * but walk-forward is requested (object is present).
+   */
+  inSampleFraction?: number;
+  /**
+   * CAGR degradation threshold that triggers the OVERFIT flag.
+   * If out-of-sample CAGR < in-sample CAGR - threshold, the result is
+   * flagged as OVERFIT. Default: 0.10 (10 pp).
+   */
+  overfitCagrThreshold?: number;
+}
+
+/** Per-segment metrics emitted by walk-forward validation. */
+export interface WalkForwardSegmentResult {
+  label: 'IN_SAMPLE' | 'OUT_OF_SAMPLE';
+  startDate: string;
+  endDate: string;
+  metrics: {
+    totalReturn: number;
+    cagr: number | null;
+    maxDrawdown: number;
+    sharpeRatio: number | null;
+    winRate: number | null;
+    numberOfTrades: number;
+  };
+}
+
+/** Walk-forward validation result attached to BacktestMetrics. */
+export interface WalkForwardResult {
+  splitDate: string;
+  inSampleFraction: number;
+  inSample: WalkForwardSegmentResult;
+  outOfSample: WalkForwardSegmentResult;
+  /**
+   * True when out-of-sample CAGR is materially worse than in-sample CAGR
+   * (difference > overfitCagrThreshold, default 10 pp).
+   */
+  overfitFlag: boolean;
+  /** CAGR difference: inSample.cagr − outOfSample.cagr (positive = degradation). */
+  cagrDegradation: number | null;
+}
+
 export interface StrategyRule<T extends string> {
   type: T;
   threshold?: number;
@@ -47,6 +109,12 @@ export interface BacktestStrategyConfig {
   excludeNotReady?: boolean;
   excludeIlliquid?: boolean;
   excludeMissingQuality?: boolean;
+  /**
+   * When set, the simulation also runs walk-forward / out-of-sample
+   * validation in addition to the full-period run.  Default behaviour is
+   * unchanged when absent.
+   */
+  walkForwardOptions?: WalkForwardOptions;
 }
 
 export interface BacktestStrategyDto {
@@ -171,6 +239,21 @@ export interface BacktestMetrics {
     repairedTradeReturnCount: number;
     aggregateStatus: 'OK' | 'LEGACY_INVALID';
     warnings: string[];
+  };
+  /**
+   * Walk-forward / out-of-sample validation result.
+   * Only present when `walkForwardOptions` was set on the config.
+   */
+  walkForward?: WalkForwardResult;
+  /**
+   * Universe cap summary surfaced at the top level for easy consumer access.
+   * Mirrors the fields in `dataCoverage` but gives a single prominent flag.
+   * Only present when the universe type is 'ALL'.
+   */
+  universeSummary?: {
+    universeCapped: boolean;
+    universeCap: number | undefined;
+    universeRequested: number | undefined;
   };
 }
 

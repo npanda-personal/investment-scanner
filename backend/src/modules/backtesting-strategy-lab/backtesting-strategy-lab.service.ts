@@ -15,6 +15,8 @@ import type {
   HistoricalBar,
   RunBacktestRequest,
   UpdateBacktestStrategyRequest,
+  WalkForwardResult,
+  WalkForwardSegmentResult,
 } from './backtesting-strategy-lab.types';
 import { validateConfig, validateStrategyInput } from './backtesting-strategy-lab.validation';
 
@@ -256,7 +258,29 @@ export class BacktestingStrategyLabService {
       };
     }
     const baseMetrics = this.metrics(config.initialCapital, curve, trades, config);
-    const benchmarkComparison = this.benchmarkComparison(config, histories, dates, baseMetrics);
+
+    // Fix 2: benchmark entry aligned to strategy's actual first-entry date,
+    // not the first available bar, so excess-return is honest.
+    const strategyFirstEntryDate = trades.length > 0
+      ? trades.reduce((earliest, t) => t.entryDate < earliest ? t.entryDate : earliest, trades[0].entryDate)
+      : undefined;
+    const benchmarkComparison = this.benchmarkComparison(config, histories, dates, baseMetrics, strategyFirstEntryDate);
+
+    // Fix 3: surface universe cap prominently at the top level.
+    const universeSummary = config.universe.type === 'ALL' ? {
+      universeCapped: universe.capped ?? false,
+      universeCap: universe.cap,
+      universeRequested: universe.totalAvailable,
+    } : undefined;
+    if (universeSummary?.universeCapped) {
+      console.warn(`[BacktestingStrategyLab] Universe ALL capped to ${universeSummary.universeCap} of ${universeSummary.universeRequested} instruments.`);
+    }
+
+    // Fix 1: walk-forward / out-of-sample validation (additive — only when option set).
+    const walkForward = config.walkForwardOptions
+      ? this.computeWalkForward(config, histories, dates)
+      : undefined;
+
     return {
       metrics: {
         ...baseMetrics,
@@ -266,6 +290,8 @@ export class BacktestingStrategyLabService {
         benchmarkComparison,
         realismWarnings: this.realismWarnings(trades, benchmarkComparison, dataCoverage, baseMetrics),
         availabilityStatus: this.availabilityStatus(config, histories.size, insufficientHistoryCount, missingPriceHistoryCount),
+        universeSummary,
+        ...(walkForward !== undefined ? { walkForward } : {}),
       },
       trades,
       equityCurve: this.sampleCurve(curve),
@@ -681,14 +707,200 @@ export class BacktestingStrategyLabService {
     };
   }
 
-  private benchmarkComparison(config: BacktestStrategyConfig, histories: Map<string, { instrumentId: string; symbol: string; bars: HistoricalBar[] }>, dates: string[], metrics: BacktestMetrics): NonNullable<BacktestMetrics['benchmarkComparison']> {
+  // ---------------------------------------------------------------------------
+  // Fix 1 – Walk-forward / out-of-sample validation helpers
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Runs the core simulation loop (entries, exits, equity curve) for a
+   * specific sub-window of dates, using the already-loaded histories map.
+   * This is a lightweight extraction of the main loop in `simulate()` so it
+   * can be called twice (in-sample + out-of-sample) without re-fetching data.
+   */
+  private runSegment(
+    config: BacktestStrategyConfig,
+    histories: Map<string, { instrumentId: string; symbol: string; bars: HistoricalBar[] }>,
+    segmentDates: string[],
+  ): { metrics: BacktestMetrics; trades: BacktestTrade[]; equityCurve: EquityCurvePoint[] } {
+    let cash = config.initialCapital;
+    let peak = config.initialCapital;
+    const positions = new Map<string, Position>();
+    const trades: BacktestTrade[] = [];
+    const curve: EquityCurvePoint[] = [];
+
+    segmentDates.forEach((date) => {
+      for (const history of histories.values()) {
+        const barIndex = history.bars.findIndex((bar) => bar.date === date);
+        if (barIndex < 0) continue;
+        const bar = history.bars[barIndex];
+        const position = positions.get(history.instrumentId);
+        if (position) position.highestClose = Math.max(position.highestClose, bar.close);
+        const exit = position ? this.exitDecision(config, history.bars, barIndex, position) : null;
+        if (position && exit?.exit) {
+          const registeredExit = exit.reason === EXIT_REASONS.STRATEGY_EXIT
+            ? this.evaluateRegisteredStrategy(config, history.bars, barIndex, true, position)
+            : null;
+          const exitReasons = registeredExit ? this.uniqueStrings([
+            ...registeredExit.exitRulesTriggered,
+            ...registeredExit.invalidationRulesTriggered,
+            ...registeredExit.reasons,
+          ]) : [];
+          const trade = this.closePosition(config, position, bar, exit.reason, exitReasons);
+          cash += this.exitCash(config, position.quantity, trade.exitPrice);
+          trades.push(trade);
+          positions.delete(history.instrumentId);
+        }
+      }
+      for (const history of histories.values()) {
+        if (positions.size >= config.maxPositions || positions.has(history.instrumentId)) continue;
+        const barIndex = history.bars.findIndex((bar) => bar.date === date);
+        if (barIndex < 0) continue;
+        const entry = this.entryDecision(config, history.bars, barIndex);
+        if (!entry.enter) continue;
+        const amount = config.positionSizeType === 'FIXED_AMOUNT' ? Number(config.fixedAmountPerTrade) : cash / Math.max(1, config.maxPositions - positions.size);
+        const costAdjustedAmount = Math.min(cash, amount);
+        const bar = history.bars[barIndex];
+        const transactionCost = costAdjustedAmount * config.transactionCostPercent;
+        const tradeAmount = costAdjustedAmount - transactionCost;
+        if (tradeAmount <= 0 || cash < costAdjustedAmount) continue;
+        const entryPrice = this.applyEntrySlippage(bar.close, config);
+        const quantity = tradeAmount / entryPrice;
+        cash -= costAdjustedAmount;
+        positions.set(history.instrumentId, { instrumentId: history.instrumentId, symbol: history.symbol, entryDate: date, entryPrice, quantity, entryBarIndex: barIndex, cost: transactionCost, committedCapital: costAdjustedAmount, entryReasons: entry.reasons, highestClose: bar.close });
+      }
+      const investedValue = [...positions.values()].reduce((sum, position) => {
+        const history = histories.get(position.instrumentId);
+        const latest = this.barAtOrBefore(history?.bars || [], date);
+        return sum + position.quantity * (latest?.close || position.entryPrice);
+      }, 0);
+      const equity = cash + investedValue;
+      peak = Math.max(peak, equity);
+      curve.push({ date, equity, cash, investedValue, drawdownPercent: peak > 0 ? (equity - peak) / peak : 0 });
+    });
+
+    const lastDate = segmentDates[segmentDates.length - 1];
+    for (const position of positions.values()) {
+      const history = histories.get(position.instrumentId);
+      const bar = lastDate ? this.barAtOrBefore(history?.bars || [], lastDate) : undefined;
+      if (bar) {
+        const trade = this.closePosition(config, position, bar, EXIT_REASONS.END_OF_TEST);
+        cash += this.exitCash(config, position.quantity, trade.exitPrice);
+        trades.push(trade);
+      }
+    }
+    if (curve.length > 0 && positions.size > 0) {
+      peak = Math.max(peak, cash);
+      curve[curve.length - 1] = { ...curve[curve.length - 1], equity: cash, cash, investedValue: 0, drawdownPercent: peak > 0 ? (cash - peak) / peak : 0 };
+    }
+
+    const segmentConfig = lastDate
+      ? { ...config, startDate: segmentDates[0] ?? config.startDate, endDate: lastDate }
+      : config;
+    return { metrics: this.metrics(config.initialCapital, curve, trades, segmentConfig), trades, equityCurve: curve };
+  }
+
+  /**
+   * Computes walk-forward / out-of-sample validation.
+   * Splits the full date list into in-sample and out-of-sample windows per
+   * `config.walkForwardOptions`, runs `runSegment` on each, and returns a
+   * `WalkForwardResult` with both metric sets and an OVERFIT flag.
+   */
+  private computeWalkForward(
+    config: BacktestStrategyConfig,
+    histories: Map<string, { instrumentId: string; symbol: string; bars: HistoricalBar[] }>,
+    dates: string[],
+  ): WalkForwardResult | undefined {
+    if (dates.length < 4) return undefined;
+
+    const opts = config.walkForwardOptions!;
+    const startMs = new Date(config.startDate).getTime();
+    const endMs = new Date(config.endDate).getTime();
+    const totalMs = endMs - startMs;
+
+    let splitDate: string;
+    if (opts.splitDate) {
+      splitDate = opts.splitDate;
+    } else {
+      const fraction = typeof opts.inSampleFraction === 'number'
+        ? Math.max(0.1, Math.min(0.9, opts.inSampleFraction))
+        : 0.7;
+      const splitMs = startMs + Math.round(totalMs * fraction);
+      splitDate = new Date(splitMs).toISOString().slice(0, 10);
+    }
+
+    const inSampleDates = dates.filter((d) => d < splitDate);
+    const outOfSampleDates = dates.filter((d) => d >= splitDate);
+
+    if (inSampleDates.length < 2 || outOfSampleDates.length < 2) return undefined;
+
+    const inSampleResult = this.runSegment(config, histories, inSampleDates);
+    const outOfSampleResult = this.runSegment(config, histories, outOfSampleDates);
+
+    const inSampleFraction = inSampleDates.length / dates.length;
+    const threshold = typeof opts.overfitCagrThreshold === 'number' ? opts.overfitCagrThreshold : 0.10;
+
+    const isCagr = inSampleResult.metrics.cagr;
+    const oosCagr = outOfSampleResult.metrics.cagr;
+    const cagrDegradation = isCagr !== null && oosCagr !== null ? isCagr - oosCagr : null;
+    const overfitFlag = cagrDegradation !== null && cagrDegradation > threshold;
+
+    const toSegment = (label: 'IN_SAMPLE' | 'OUT_OF_SAMPLE', segDates: string[], res: { metrics: BacktestMetrics }): WalkForwardSegmentResult => ({
+      label,
+      startDate: segDates[0],
+      endDate: segDates[segDates.length - 1],
+      metrics: {
+        totalReturn: res.metrics.totalReturn,
+        cagr: res.metrics.cagr ?? null,
+        maxDrawdown: res.metrics.maxDrawdown,
+        sharpeRatio: res.metrics.sharpeRatio ?? null,
+        winRate: res.metrics.winRate ?? null,
+        numberOfTrades: res.metrics.numberOfTrades,
+      },
+    });
+
+    return {
+      splitDate,
+      inSampleFraction,
+      inSample: toSegment('IN_SAMPLE', inSampleDates, inSampleResult),
+      outOfSample: toSegment('OUT_OF_SAMPLE', outOfSampleDates, outOfSampleResult),
+      overfitFlag,
+      cagrDegradation,
+    };
+  }
+
+  /**
+   * Fix 2 – Benchmark entry-date alignment.
+   *
+   * BEFORE: the benchmark always used `dates[0]` (first available price bar)
+   * as the entry point, which inflated excess CAGR when the strategy entered
+   * later and the universe happened to rise in the gap.
+   *
+   * AFTER: the benchmark entry is aligned to `strategyFirstEntryDate` (the
+   * strategy's actual first trade entry date), falling back to `dates[0]`
+   * only when no trade was ever entered (e.g. no signals fired).  This gives
+   * an honest apples-to-apples excess return comparison.
+   *
+   * The years denominator for the benchmark CAGR also uses the aligned entry
+   * date instead of `config.startDate`, so both CAGR figures span the same
+   * holding window.
+   */
+  private benchmarkComparison(
+    config: BacktestStrategyConfig,
+    histories: Map<string, { instrumentId: string; symbol: string; bars: HistoricalBar[] }>,
+    dates: string[],
+    metrics: BacktestMetrics,
+    strategyFirstEntryDate?: string,
+  ): NonNullable<BacktestMetrics['benchmarkComparison']> {
     if (histories.size === 0 || dates.length < 2) {
       return { benchmarkName: null, benchmarkTotalReturn: null, benchmarkCagr: null, excessReturn: null, excessCagr: null, benchmarkDataStatus: 'UNAVAILABLE', dataGap: 'Benchmark unavailable for selected region' };
     }
-    const firstDate = dates[0];
     const lastDate = dates[dates.length - 1];
+    // Align benchmark entry to the strategy's actual first-entry date.
+    // Fall back to the first available date when no trade was opened.
+    const alignedEntryDate = strategyFirstEntryDate ?? dates[0];
     const returns = [...histories.values()].map((history) => {
-      const first = history.bars.find((bar) => bar.date >= firstDate) ?? history.bars[0];
+      // Find the first bar at or after the aligned entry date.
+      const first = history.bars.find((bar) => bar.date >= alignedEntryDate) ?? history.bars[0];
       const last = this.barAtOrBefore(history.bars, lastDate) ?? history.bars.at(-1);
       return first && last && first.close > 0 ? (last.close - first.close) / first.close : null;
     }).filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
@@ -696,7 +908,13 @@ export class BacktestingStrategyLabService {
       return { benchmarkName: null, benchmarkTotalReturn: null, benchmarkCagr: null, excessReturn: null, excessCagr: null, benchmarkDataStatus: 'UNAVAILABLE', dataGap: 'Benchmark unavailable for selected region' };
     }
     const benchmarkTotalReturn = returns.reduce((sum, value) => sum + value, 0) / returns.length;
-    const years = (new Date(config.endDate).getTime() - new Date(config.startDate).getTime()) / (365.25 * 24 * 60 * 60 * 1000);
+    // Use the aligned entry date so the benchmark CAGR spans the same window
+    // as the strategy's holding period, not the full config date range.
+    const benchmarkEntryMs = new Date(alignedEntryDate).getTime();
+    const benchmarkExitMs = new Date(lastDate).getTime();
+    const years = benchmarkExitMs > benchmarkEntryMs
+      ? (benchmarkExitMs - benchmarkEntryMs) / (365.25 * 24 * 60 * 60 * 1000)
+      : (new Date(config.endDate).getTime() - new Date(config.startDate).getTime()) / (365.25 * 24 * 60 * 60 * 1000);
     const benchmarkCagr = years > 0 ? Math.pow(1 + benchmarkTotalReturn, 1 / years) - 1 : null;
     return {
       benchmarkName: `${config.region || 'GLOBAL'} equal-weight universe baseline`,
