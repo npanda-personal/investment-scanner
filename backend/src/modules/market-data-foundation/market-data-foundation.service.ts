@@ -4657,6 +4657,24 @@ export class MarketDataFoundationService {
         errorMessage: null,
       });
 
+      // ── Refresh adjusted closes for changed stocks that have corporate actions ──
+      // No-op in the common zero-CA case (COALESCE(adjustedClose, close) covers those);
+      // keeps adjustedClose correct for split/bonus/dividend stocks after each daily bar.
+      if (changedSymbols.length > 0) {
+        try {
+          const caStocks = await repository.listStocksWithCorporateActionsBySymbols(changedSymbols);
+          for (const caStock of caStocks) {
+            try {
+              await this.recomputeAdjustedClosesForInstrument(caStock.id);
+            } catch {
+              // best-effort; never fail the price import on a recompute error
+            }
+          }
+        } catch {
+          // best-effort; never fail the price import on a recompute error
+        }
+      }
+
       return {
         status: 'COMPLETED',
         source: 'NSE',
@@ -12364,7 +12382,8 @@ export class MarketDataFoundationService {
         : null;
 
       // ── Trigger recompute for affected stocks (best-effort) ────────────────
-      // TODO: also trigger after daily NSE CM price import (deferred — W2 slice)
+      // (The daily NSE CM price import — importNseCmUdiffDaily — also recomputes
+      //  adjustedClose for changed stocks that have corporate actions.)
       const affectedSymbols = [...affectedSymbolSet].sort();
       if (affectedSymbols.length > 0) {
         const affectedStocks = stocks.filter((s: any) => affectedSymbolSet.has(s.symbol));

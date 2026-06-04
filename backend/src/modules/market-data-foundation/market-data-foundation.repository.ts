@@ -3083,6 +3083,14 @@ export class MarketDataFoundationRepository {
     return { stocks, total };
   }
 
+  async listStocksWithCorporateActionsBySymbols(symbols: string[]): Promise<Array<{ id: string; symbol: string }>> {
+    if (symbols.length === 0) return [];
+    return this.prisma.stock.findMany({
+      where: { symbol: { in: symbols }, corporateActions: { some: {} } },
+      select: { id: true, symbol: true },
+    });
+  }
+
   async listCorporateActions(stockId: string) {
     const rows = await (this.prisma as any).corporateAction.findMany({
       where: { stockId },
