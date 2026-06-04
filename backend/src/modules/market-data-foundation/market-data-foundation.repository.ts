@@ -3047,17 +3047,19 @@ export class MarketDataFoundationRepository {
 
     if (toUpdate.length === 0) return 0;
 
-    const batchSize = this.exchangeBulkWriteBatchSize();
-    for (let i = 0; i < toUpdate.length; i += batchSize) {
-      const batch = toUpdate.slice(i, i + batchSize);
-      await this.prisma.$transaction(async (tx: any) => {
-        for (const row of batch) {
-          await tx.priceTick.update({
-            where: { symbol_timestamp: { symbol, timestamp: row.timestamp } },
-            data: { adjustedClose: new Prisma.Decimal(row.adjustedClose) },
-          });
-        }
-      }, { maxWait: 30000, timeout: 60000 });
+    // Set-based bulk update: one UPDATE ... FROM (VALUES ...) per chunk, instead
+    // of one statement per row (critical for universe-wide recompute).
+    const CHUNK = 1000;
+    for (let i = 0; i < toUpdate.length; i += CHUNK) {
+      const chunk = toUpdate.slice(i, i + CHUNK);
+      const tuples = chunk.map(
+        (row) => Prisma.sql`(${row.timestamp}::timestamptz, ${new Prisma.Decimal(row.adjustedClose)}::numeric)`,
+      );
+      await this.prisma.$executeRaw`
+        UPDATE price_ticks AS pt
+        SET "adjustedClose" = data.adj
+        FROM (VALUES ${Prisma.join(tuples)}) AS data(ts, adj)
+        WHERE pt.symbol = ${symbol} AND pt.timestamp = data.ts`;
     }
 
     return toUpdate.length;
