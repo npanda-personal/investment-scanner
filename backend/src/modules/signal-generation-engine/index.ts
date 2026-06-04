@@ -22,6 +22,7 @@ export type {
   SignalGenerationRunStatus,
   SignalHistoryQuery,
   SignalItem,
+  SignalLifecycleState,
   SignalPricePoint,
   SignalQuery,
   SignalResultDto,
@@ -31,3 +32,12 @@ export type {
   SignalWriteResult,
   SignalWriteStatus,
 } from './signal-generation-engine.types';
+export {
+  classifyLifecycle,
+  DEFAULT_LIFECYCLE_THRESHOLDS,
+} from './signal-lifecycle';
+export type {
+  LifecyclePriorSignal,
+  LifecycleCurrentSignal,
+  LifecycleThresholds,
+} from './signal-lifecycle';

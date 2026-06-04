@@ -2,7 +2,7 @@
 import { createSignalGenerationEngineRouter } from '../../../src/modules/signal-generation-engine';
 
 describe('signal generation routes', () => {
-  it('registers MVP signal endpoints', () => {
+  it('registers all signal endpoints including lifecycle', () => {
     const controller = {
       health: jest.fn(),
       top: jest.fn(),
@@ -10,6 +10,8 @@ describe('signal generation routes', () => {
       latestRun: jest.fn(),
       run: jest.fn(),
       screener: jest.fn(),
+      exitCandidates: jest.fn(),
+      lifecycle: jest.fn(),
     };
     const router = createSignalGenerationEngineRouter(controller as any);
     const routes = router.stack
@@ -21,6 +23,8 @@ describe('signal generation routes', () => {
       'GET /signals/runs/latest',
       'GET /signals/top',
       'GET /signals/screener',
+      'GET /signals/exit-candidates',
+      'GET /signals/lifecycle',
       'GET /signals/:instrumentId',
       'POST /signals/run',
     ]);

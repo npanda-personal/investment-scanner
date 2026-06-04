@@ -14,6 +14,39 @@ export class SignalGenerationEngineController {
     }
   };
 
+  /**
+   * GET /signals/exit-candidates
+   * Returns persisted signals whose lifecycleState is EXIT — instruments where
+   * a previously-active signal has now weakened.  Useful for reviewing long
+   * positions that may need attention.
+   *
+   * Supports all standard SignalQuery filters (region, sector, etc.).
+   * lifecycleState is locked to EXIT; passing it as a query param has no effect.
+   */
+  exitCandidates = async (req: Request, res: Response) => {
+    try {
+      const query = parseSignalQuery(req.query);
+      return res.json(await this.service.exitCandidates(query));
+    } catch (error) {
+      console.error('Signal exit-candidates endpoint error:', error);
+      return res.status(500).json({ error: 'Failed to load exit candidates' });
+    }
+  };
+
+  /**
+   * GET /signals/lifecycle
+   * Generic lifecycle-state–filtered signal list.  Pass ?lifecycleState=EXIT|ENTRY|ACTIVE|EXPIRED.
+   */
+  lifecycle = async (req: Request, res: Response) => {
+    try {
+      const query = parseSignalQuery(req.query);
+      return res.json(await this.service.lifecycleSignals(query));
+    } catch (error) {
+      console.error('Signal lifecycle endpoint error:', error);
+      return res.status(500).json({ error: 'Failed to load lifecycle signals' });
+    }
+  };
+
   latestForInstrument = async (req: Request, res: Response) => {
     const instrumentId = Array.isArray(req.params.instrumentId) ? req.params.instrumentId[0] : req.params.instrumentId;
     const validationError = validateInstrumentId(instrumentId);

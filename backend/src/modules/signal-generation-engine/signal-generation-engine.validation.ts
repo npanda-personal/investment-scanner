@@ -1,4 +1,4 @@
-import type { ReliabilityTier, SignalConfidence, SignalDirection, SignalQuery, SignalRunRequest } from './signal-generation-engine.types';
+import type { ReliabilityTier, SignalConfidence, SignalDirection, SignalLifecycleState, SignalQuery, SignalRunRequest } from './signal-generation-engine.types';
 import { normalizeMarketRegion } from '../../shared/utils/market-scope';
 import {
   signal_generation_engine_batch_size,
@@ -8,6 +8,7 @@ import {
 const DIRECTIONS: SignalDirection[] = ['BULLISH', 'NEUTRAL', 'BEARISH'];
 const CONFIDENCES: SignalConfidence[] = ['LOW', 'MEDIUM', 'HIGH'];
 const RELIABILITY_TIERS: ReliabilityTier[] = ['FULL', 'PARTIAL'];
+const LIFECYCLE_STATES: SignalLifecycleState[] = ['ENTRY', 'ACTIVE', 'EXIT', 'EXPIRED'];
 const SORT_FIELDS = ['score', 'symbol', 'companyName', 'generatedAt', 'direction', 'confidence', 'dailyChangePercent'];
 
 const first = (value: unknown): unknown => Array.isArray(value) ? value[0] : value;
@@ -72,6 +73,10 @@ export function parseSignalQuery(query: Record<string, unknown>): SignalQuery {
     reliabilityTier: (() => {
       const v = String(first(query.reliabilityTier) || '').trim().toUpperCase() as ReliabilityTier;
       return RELIABILITY_TIERS.includes(v) ? v : undefined;
+    })(),
+    lifecycleState: (() => {
+      const v = String(first(query.lifecycleState) || '').trim().toUpperCase() as SignalLifecycleState;
+      return LIFECYCLE_STATES.includes(v) ? v : undefined;
     })(),
   };
 }

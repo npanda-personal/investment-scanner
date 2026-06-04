@@ -1,6 +1,6 @@
 import { Prisma } from '@prisma/client';
 import prisma from '../../db/prisma';
-import type { ReliabilityTier, SignalGenerationRunAudit, SignalHistoryQuery, SignalQuery, SignalResultDto, SignalWriteResult, SignalWriteStatus } from './signal-generation-engine.types';
+import type { ReliabilityTier, SignalGenerationRunAudit, SignalHistoryQuery, SignalLifecycleState, SignalQuery, SignalResultDto, SignalWriteResult, SignalWriteStatus } from './signal-generation-engine.types';
 import { resolveMarketRegionFilter } from '../../shared/utils/market-scope';
 
 export interface SignalFunnelDiagnosticsQuery {
@@ -47,6 +47,8 @@ export class SignalGenerationEngineRepository {
       source: result.source,
       dataStatus: result.data_status,
       reliabilityTier: result.reliabilityTier ?? null,
+      lifecycleState: result.lifecycleState ?? null,
+      priorScore: result.priorScore ?? null,
     };
     const where = {
       instrumentId_modelVersion_generatedDate: {
@@ -262,6 +264,36 @@ export class SignalGenerationEngineRepository {
     });
   }
 
+  /**
+   * Returns the most-recent SignalResult for an instrument BEFORE the given
+   * generatedDate (exclusive).  Used to look up the prior score/direction for
+   * lifecycle classification during a run.
+   */
+  async priorSignalForInstrument(
+    instrumentId: string,
+    modelVersion: string,
+    beforeDate: Date,
+  ): Promise<{ score: number; direction: string } | null> {
+    const record = await this.db.signalResult.findFirst({
+      where: {
+        instrumentId,
+        modelVersion,
+        generatedDate: { lt: beforeDate },
+      },
+      orderBy: { generatedDate: 'desc' },
+      select: { score: true, direction: true },
+    });
+    return record ?? null;
+  }
+
+  /**
+   * Returns the most-recent persisted signals that have lifecycleState = 'EXIT'.
+   * This is the persisted read surface for exit-candidate trader pages.
+   */
+  async exitCandidates(query: Omit<SignalQuery, 'lifecycleState'> & { limit: number }): Promise<{ signals: SignalResultDto[]; total: number }> {
+    return this.latestSignals({ ...query, lifecycleState: 'EXIT' });
+  }
+
   private buildWhere(query: SignalQuery & SignalFunnelDiagnosticsQuery): Prisma.SignalResultWhereInput {
     const generatedDate = query.generatedDate ? this.normalizeUtcDay(new Date(query.generatedDate)) : undefined;
 
@@ -306,6 +338,7 @@ export class SignalGenerationEngineRepository {
       sector: query.sector ? { contains: query.sector, mode: 'insensitive' } : undefined,
       country: query.country ? { contains: query.country, mode: 'insensitive' } : undefined,
       modelVersion: query.modelVersion,
+      lifecycleState: query.lifecycleState ?? undefined,
       AND: andClauses.length > 0 ? andClauses : undefined,
     };
   }
@@ -545,7 +578,9 @@ export class SignalGenerationEngineRepository {
       JSON.stringify(existing.dataQualityEligibilitySnapshot || null) === JSON.stringify(data.dataQualityEligibilitySnapshot || null) &&
       existing.source === data.source &&
       existing.dataStatus === data.dataStatus &&
-      (existing.reliabilityTier ?? null) === (data.reliabilityTier ?? null);
+      (existing.reliabilityTier ?? null) === (data.reliabilityTier ?? null) &&
+      (existing.lifecycleState ?? null) === (data.lifecycleState ?? null) &&
+      (existing.priorScore ?? null) === (data.priorScore ?? null);
     return same ? 'NO_OP' : 'UPDATED';
   }
 
@@ -589,6 +624,8 @@ export class SignalGenerationEngineRepository {
       reliabilityTier: (record.reliabilityTier as ReliabilityTier | null) ?? null,
       // isSme is not persisted separately; callers should use reliabilityTier for read-filter decisions.
       // For freshly-generated DTOs it is set by generateForInstrument (instrument field is available there).
+      lifecycleState: (record.lifecycleState as SignalLifecycleState | null) ?? null,
+      priorScore: typeof record.priorScore === 'number' ? record.priorScore : null,
     };
   }
 

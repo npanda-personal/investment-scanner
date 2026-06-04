@@ -10,6 +10,9 @@ export const createSignalGenerationEngineRouter = (
   router.get('/signals/runs/latest', controller.latestRun);
   router.get('/signals/top', controller.top);
   router.get('/signals/screener', controller.screener);
+  // Lifecycle endpoints — register BEFORE /:instrumentId to avoid route shadowing
+  router.get('/signals/exit-candidates', controller.exitCandidates);
+  router.get('/signals/lifecycle', controller.lifecycle);
   router.get('/signals/:instrumentId', controller.latestForInstrument);
   router.post('/signals/run', controller.run);
 

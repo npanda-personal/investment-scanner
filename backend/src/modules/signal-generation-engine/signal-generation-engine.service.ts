@@ -31,6 +31,10 @@ import type {
   SignalTriggerType,
 } from './signal-generation-engine.types';
 import {
+  classifyLifecycle,
+  DEFAULT_LIFECYCLE_THRESHOLDS,
+} from './signal-lifecycle';
+import {
   signal_generation_engine_batch_size,
   signal_generation_engine_max_workers_count,
   signal_generation_engine_provider_throttle_ms,
@@ -132,6 +136,49 @@ export class SignalGenerationEngineService {
     const uniqueIds = [...new Set(instrumentIds.map((id) => String(id || '').trim()).filter(Boolean))];
     const results = await Promise.all(uniqueIds.map((instrumentId) => this.repository.latestForInstrument(instrumentId).catch(() => null)));
     return results.filter((result): result is SignalResultDto => Boolean(result && this.isTrustedReadSignal(result)));
+  }
+
+  /**
+   * Returns signals filtered to a specific lifecycle state.
+   * Persisted read — no live generation.  Supports all existing SignalQuery
+   * filters plus the lifecycleState filter.
+   *
+   * Research-support language: results are candidates for review/entry/exit,
+   * never labelled as buy or sell instructions.
+   */
+  async lifecycleSignals(query: SignalQuery): Promise<PaginatedSignalResponse> {
+    const [{ signals, total }, directionCounts] = await Promise.all([
+      this.repository.latestSignals(query),
+      this.directionCountsFor(query),
+    ]);
+    const enriched = await this.enrichSignals(signals, query);
+    const trusted = this.trustedReadSignals(enriched);
+    const totalCount = this.trustedReadTotal(total, enriched.length, trusted.length);
+    return {
+      signals: trusted,
+      items: trusted,
+      total: totalCount,
+      totalCount,
+      limit: query.limit,
+      offset: query.offset || 0,
+      hasMore: (query.offset || 0) + trusted.length < totalCount,
+      filtersApplied: this.filtersApplied(query),
+      scope: this.scopeFor(query),
+      directionCounts,
+    };
+  }
+
+  /**
+   * Convenience method for the exit-candidates endpoint.
+   * Returns only EXIT-state signals from the most-recent persisted run.
+   * These are instruments where a previously-active signal has now weakened —
+   * the trader should review whether to exit the long position.
+   *
+   * Note: bearish signals on cash-only stocks are risk_warnings, not tradable
+   * exit-shorts.  The triggerContract.trigger_type field carries this distinction.
+   */
+  async exitCandidates(query: Omit<SignalQuery, 'lifecycleState'> & { limit: number }): Promise<PaginatedSignalResponse> {
+    return this.lifecycleSignals({ ...query, lifecycleState: 'EXIT' });
   }
 
   async run(request: SignalRunRequest): Promise<SignalRunResponse> {
@@ -494,6 +541,13 @@ export class SignalGenerationEngineService {
       result = this.withPersistedStrategyContext(result, instrument, marketContext, persistedSmartMoney.get(instrument.id) ?? null);
       result = await this.attachStrategyMatches(result, prices, instrument, options, options.batchContext?.strategyPerformanceCache);
       if (!this.signalPassesStrategyFilters(result, options)) return null;
+    }
+
+    // Lifecycle classification: look up the immediately prior persisted signal
+    // for this instrument to determine ENTRY / ACTIVE / EXIT / EXPIRED.
+    // Skip for as-of/backfill runs to avoid cross-contaminating historical signals.
+    if (!asOfDate) {
+      result = await this.withLifecycleState(result, generatedDate, options.modelVersion || MODEL_VERSION);
     }
 
     const saved = await this.persistSignalResult(result);
@@ -1517,6 +1571,42 @@ export class SignalGenerationEngineService {
     return { ...response, records: filtered };
   }
 
+  /**
+   * Looks up the immediately-prior persisted signal for the same instrument
+   * and modelVersion, then classifies the lifecycle state using the pure
+   * classifyLifecycle helper.  Returns a new DTO with lifecycleState and
+   * priorScore populated.
+   *
+   * IMPORTANT: never called for as-of/backfill runs (see generateForInstrument).
+   */
+  private async withLifecycleState(
+    result: SignalResultDto,
+    generatedDate: string,
+    modelVersion: string,
+  ): Promise<SignalResultDto> {
+    try {
+      const beforeDate = new Date(generatedDate);
+      const prior = await this.repository.priorSignalForInstrument(
+        result.instrument_id,
+        modelVersion,
+        beforeDate,
+      );
+      const lifecycleState = classifyLifecycle(
+        prior ? { priorScore: prior.score, priorDirection: prior.direction as 'BULLISH' | 'NEUTRAL' | 'BEARISH' } : null,
+        { score: result.score, direction: result.direction },
+        DEFAULT_LIFECYCLE_THRESHOLDS,
+      );
+      return {
+        ...result,
+        lifecycleState,
+        priorScore: prior?.score ?? null,
+      };
+    } catch {
+      // Non-fatal: lifecycle state is optional — fall back gracefully.
+      return result;
+    }
+  }
+
   private async persistSignalResult(result: SignalResultDto) {
     if (typeof (this.repository as any).createSignalResultWithStatus === 'function') {
       return (this.repository as any).createSignalResultWithStatus(result);
@@ -1619,6 +1709,7 @@ export class SignalGenerationEngineService {
       hasBlockedStrategies: query.hasBlockedStrategies,
       excludeSme: query.excludeSme,
       reliabilityTier: query.reliabilityTier,
+      lifecycleState: query.lifecycleState,
     }).filter(([, value]) => value !== undefined && value !== ''));
   }
 

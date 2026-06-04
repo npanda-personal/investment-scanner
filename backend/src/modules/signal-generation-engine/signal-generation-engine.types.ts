@@ -6,6 +6,15 @@ export type SignalConfidence = 'LOW' | 'MEDIUM' | 'HIGH';
 export type SignalCategory = 'TECHNICAL' | 'MOMENTUM' | 'FUNDAMENTAL';
 export type ReliabilityTier = 'FULL' | 'PARTIAL';
 
+/**
+ * Lifecycle state of a signal candidate:
+ *  ENTRY   — new in the current run (no prior signal for this instrument+modelVersion)
+ *  ACTIVE  — was active before and still passes thresholds
+ *  EXIT    — was active, now weakened (score dropped, direction flipped, or below exit floor)
+ *  EXPIRED — was active in a prior run but generated no signal at all in the current run
+ */
+export type SignalLifecycleState = 'ENTRY' | 'ACTIVE' | 'EXIT' | 'EXPIRED';
+
 export interface SignalItem {
   code: string;
   label: string;
@@ -46,6 +55,10 @@ export interface SignalResultDto {
   reliabilityTier?: ReliabilityTier | null;
   isSme?: boolean;
   warnings?: string[];
+  /** EXIT-candidate lifecycle state populated during/after a generation run. */
+  lifecycleState?: SignalLifecycleState | null;
+  /** Composite score from the immediately prior persisted run (null for ENTRY signals). */
+  priorScore?: number | null;
   strategyMatches?: SignalStrategyMatchSummary[];
   blockedStrategies?: SignalBlockedStrategySummary[];
   writeStatus?: SignalWriteStatus;
@@ -291,6 +304,8 @@ export interface SignalQuery {
   excludeSme?: boolean;
   /** When provided, only return signals matching this reliability tier. Default: include all. */
   reliabilityTier?: ReliabilityTier;
+  /** When provided, filter signals to this lifecycle state (ENTRY | ACTIVE | EXIT | EXPIRED). */
+  lifecycleState?: SignalLifecycleState;
 }
 
 export interface SignalHistoryQuery extends SignalQuery {
