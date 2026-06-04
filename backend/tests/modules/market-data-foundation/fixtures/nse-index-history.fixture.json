@@ -1,0 +1,30 @@
+{
+  "data": {
+    "indexCloseOnlineRecords": [
+      {
+        "EOD_TIMESTAMP": "01-01-2019",
+        "EOD_INDEX_NAME": "Nifty 50",
+        "EOD_OPEN_INDEX_VAL": 10910.10,
+        "EOD_HIGH_INDEX_VAL": 10987.45,
+        "EOD_LOW_INDEX_VAL": 10850.30,
+        "EOD_CLOSING_INDEX_VAL": 10961.40
+      },
+      {
+        "EOD_TIMESTAMP": "02-01-2019",
+        "EOD_INDEX_NAME": "Nifty 50",
+        "EOD_OPEN_INDEX_VAL": 10970.25,
+        "EOD_HIGH_INDEX_VAL": 11023.80,
+        "EOD_LOW_INDEX_VAL": 10890.55,
+        "EOD_CLOSING_INDEX_VAL": 11027.70
+      },
+      {
+        "EOD_TIMESTAMP": "03-01-2019",
+        "EOD_INDEX_NAME": "Nifty 50",
+        "EOD_OPEN_INDEX_VAL": 11040.00,
+        "EOD_HIGH_INDEX_VAL": 11105.60,
+        "EOD_LOW_INDEX_VAL": 10998.20,
+        "EOD_CLOSING_INDEX_VAL": 11075.90
+      }
+    ]
+  }
+}
