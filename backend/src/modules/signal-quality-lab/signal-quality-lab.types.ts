@@ -71,6 +71,10 @@ export interface QualityRecalculateResponse {
   missingPriceHistoryInBatch: number;
   missingPriceHistoryCount: number;
   outcomesPersisted: boolean;
+  signalsProcessed?: number;
+  rowsUpserted?: number;
+  matureCount?: number;
+  immatureCount?: number;
   message: string;
   warnings: string[];
   durationMs: number;
@@ -218,4 +222,37 @@ export interface ParsedSignalType {
   label: string;
   polarity: 'POSITIVE' | 'NEGATIVE';
   item: SignalItem;
+}
+
+/** One horizon row ready to upsert into signal_outcomes. */
+export interface SignalOutcomeUpsert {
+  signalResultId: string;
+  instrumentId: string;
+  symbol: string;
+  direction: string;
+  score: number;
+  sector: string | null;
+  country: string | null;
+  modelVersion: string;
+  signalGeneratedDate: Date;
+  horizon: QualityHorizon;
+  dataComplete: boolean;
+  priceAtSignal: number | null;
+  futurePrice: number | null;
+  windowEndDate: Date | null;
+  forwardReturnPercent: number | null;
+  maxFavorableExcursion: number | null;
+  maxAdverseExcursion: number | null;
+  maxDrawdownPercent: number | null;
+  evaluatedAt: Date;
+}
+
+/** Summary returned by upsertOutcomeBatch. */
+export interface OutcomeBatchResult {
+  upserted: number;
+}
+
+/** Extended recalculate request that enables persistence. */
+export interface QualityRecalculateWithPersistRequest extends QualityRecalculateRequest {
+  persistOutcomes?: boolean;
 }

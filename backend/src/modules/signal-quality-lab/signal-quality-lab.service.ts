@@ -17,9 +17,11 @@ import type {
   HorizonAvailabilitySummary,
   QualityRecalculateRequest,
   QualityRecalculateResponse,
+  QualityRecalculateWithPersistRequest,
   QualitySummary,
   SignalHistoryItem,
   SignalOutcomeSet,
+  SignalOutcomeUpsert,
   SignalTypePerformance,
 } from './signal-quality-lab.types';
 
@@ -38,13 +40,17 @@ const STALE_SIGNAL_DAYS = 7;
 const PRICE_LOOKUP_CONCURRENCY = 8;
 
 export class SignalQualityLabService {
+  private readonly repository: SignalQualityLabRepository;
+
   constructor(
-    _repository = new SignalQualityLabRepository(),
+    repository: SignalQualityLabRepository = new SignalQualityLabRepository(),
     private readonly signalService = new SignalGenerationEngineService(),
     private readonly marketDataService = new MarketDataFoundationService(),
     private readonly historicalContextService = new HistoricalContextSnapshotsService(),
     private readonly dataQualityService = new DataQualityEngineService()
-  ) {}
+  ) {
+    this.repository = repository;
+  }
 
   async history(instrumentId: string, query: QualityQuery): Promise<SignalHistoryItem[]> {
     const rawSignals = await this.signalService.signalHistory({ ...query, instrumentId });
@@ -198,8 +204,9 @@ export class SignalQualityLabService {
     return this.detectNoisySignals(signals, await this.outcomesForSignals(signals, query));
   }
 
-  async recalculate(input: QualityRecalculateRequest): Promise<QualityRecalculateResponse> {
+  async recalculate(input: QualityRecalculateWithPersistRequest | QualityRecalculateRequest): Promise<QualityRecalculateResponse> {
     const started = Date.now();
+    const persistOutcomes = (input as QualityRecalculateWithPersistRequest).persistOutcomes === true;
     const batchSize = this.clampInt(input.batchSize, 25, 1, 100);
     const offset = this.clampInt(input.offset, 0, 0, Number.MAX_SAFE_INTEGER);
     const explicitInstrumentIds = [...new Set((input.instrumentIds || []).map((id) => String(id || '').trim()).filter(Boolean))];
@@ -246,6 +253,66 @@ export class SignalQualityLabService {
     const unevaluatedInBatch = insufficientFuturePriceInBatch;
     const evidenceUsability = this.evidenceUsability(outcomes.length, evaluatedInBatch, missingPriceHistoryInBatch, insufficientFuturePriceInBatch, 0);
     const nextOffset = offset + processedCount;
+
+    // ------------------------------------------------------------------
+    // Persist outcomes when requested
+    // ------------------------------------------------------------------
+    let rowsUpserted = 0;
+    let matureCount = 0;
+    let immatureCount = 0;
+
+    if (persistOutcomes && outcomes.length > 0) {
+      const now = new Date();
+      const horizons = Object.keys({ '1D': 1, '5D': 5, '10D': 10, '20D': 20, '60D': 60 }) as QualityHorizon[];
+      const rows: SignalOutcomeUpsert[] = [];
+
+      for (const outcomeSet of outcomes) {
+        if (!outcomeSet.signalResultId) continue;
+
+        const signalGeneratedDate = new Date(outcomeSet.generatedAt);
+        signalGeneratedDate.setUTCHours(0, 0, 0, 0);
+
+        for (const horizon of horizons) {
+          const fo = outcomeSet.outcomes.find((o) => o.horizon === horizon);
+          const dataComplete = Boolean(fo?.available && fo.forwardReturnPercent !== null);
+          const windowEndDate = fo?.futureDate ? new Date(fo.futureDate) : null;
+
+          rows.push({
+            signalResultId: outcomeSet.signalResultId,
+            instrumentId: outcomeSet.instrumentId,
+            symbol: outcomeSet.symbol,
+            direction: outcomeSet.direction,
+            score: outcomeSet.score,
+            sector: outcomeSet.sector ?? null,
+            country: outcomeSet.country ?? null,
+            modelVersion: (signals.find((s: SignalResultDto) => s.id === outcomeSet.signalResultId)?.modelVersion) || 'signal-engine-v1',
+            signalGeneratedDate,
+            horizon,
+            dataComplete,
+            priceAtSignal: fo?.priceAtSignal ?? null,
+            futurePrice: fo?.futurePrice ?? null,
+            windowEndDate,
+            forwardReturnPercent: fo?.forwardReturnPercent ?? null,
+            maxFavorableExcursion: outcomeSet.maxFavorableMovePercent ?? null,
+            maxAdverseExcursion: outcomeSet.maxAdverseMovePercent ?? null,
+            maxDrawdownPercent: outcomeSet.maxDrawdownPercent ?? null,
+            evaluatedAt: now,
+          });
+
+          if (dataComplete) matureCount++;
+          else immatureCount++;
+        }
+      }
+
+      const result = await this.repository.upsertOutcomeBatch(rows);
+      rowsUpserted = result.upserted;
+    }
+
+    const warnings: string[] = [];
+    if (missingPersistedSignalCount > 0) {
+      warnings.push(`${missingPersistedSignalCount} requested instruments did not have persisted trusted raw signals for signal-quality diagnostics.`);
+    }
+
     return {
       processedCount,
       totalCount,
@@ -272,11 +339,15 @@ export class SignalQualityLabService {
       insufficientFuturePriceCount: insufficientFuturePriceInBatch,
       missingPriceHistoryInBatch,
       missingPriceHistoryCount: missingPriceHistoryInBatch,
-      outcomesPersisted: false,
-      message: 'Outcomes are calculated on demand; recalculation refreshed diagnostics only.',
-      warnings: missingPersistedSignalCount > 0
-        ? [`${missingPersistedSignalCount} requested instruments did not have persisted trusted raw signals for signal-quality diagnostics.`]
-        : [],
+      outcomesPersisted: persistOutcomes,
+      signalsProcessed: persistOutcomes ? outcomes.length : undefined,
+      rowsUpserted: persistOutcomes ? rowsUpserted : undefined,
+      matureCount: persistOutcomes ? matureCount : undefined,
+      immatureCount: persistOutcomes ? immatureCount : undefined,
+      message: persistOutcomes
+        ? `Persisted ${rowsUpserted} outcome rows (${matureCount} mature, ${immatureCount} immature) for ${outcomes.length} signals.`
+        : 'Outcomes are calculated on demand; recalculation refreshed diagnostics only.',
+      warnings,
       durationMs: Date.now() - started,
     };
   }

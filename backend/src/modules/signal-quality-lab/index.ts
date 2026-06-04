@@ -15,6 +15,7 @@ export type {
   HorizonAvailabilitySummary,
   HorizonAvailabilityItem,
   NoisySignalItem,
+  OutcomeBatchResult,
   ParsedSignalType,
   PricePoint,
   QualityHorizon,
@@ -22,8 +23,10 @@ export type {
   QualityQuery,
   QualityRecalculateRequest,
   QualityRecalculateResponse,
+  QualityRecalculateWithPersistRequest,
   QualitySummary,
   SignalHistoryItem,
   SignalOutcomeSet,
+  SignalOutcomeUpsert,
   SignalTypePerformance,
 } from './signal-quality-lab.types';
