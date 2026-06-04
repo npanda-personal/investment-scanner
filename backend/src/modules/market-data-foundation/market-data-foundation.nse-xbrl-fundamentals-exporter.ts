@@ -18,6 +18,13 @@ export interface NormalizedNseFinancialResultMetadata {
   isConsolidated: boolean;
   isAudited: boolean;
   isCumulative: boolean;
+  /**
+   * Set to true when this record was selected as a QUARTERLY period result but
+   * only a cumulative (H1 / 9-month) filing was available.  Downstream code
+   * should treat the stored figures with caution; re-ingestion once a standalone
+   * filing becomes available is recommended.
+   */
+  isCumulativeFallback?: boolean;
   filingTimestamp: string | null;
   raw: NseFinancialResultMetadata;
 }
@@ -27,6 +34,13 @@ export interface NseXbrlParsedFact {
   factName: string;
   value: string | null;
   contextRef: string | null;
+  /**
+   * True when the filing metadata indicated this was a QUARTERLY period but only
+   * a cumulative (H1 / 9-month) result was available. The value has been stored
+   * as-is from the filing; callers should treat it with caution because it may
+   * represent more than one standalone quarter.
+   */
+  isCumulativeFallback?: boolean;
 }
 
 export interface NseXbrlParsedFacts {
@@ -351,6 +365,12 @@ export class NseXbrlFundamentalsCsvExporter {
 
           for (const filing of selected) {
             try {
+              if (filing.isCumulativeFallback) {
+                warnings.push(
+                  `${symbol} QUARTERLY ${filing.periodEndDate}: only a cumulative filing was available (${filing.xbrlUrl}). ` +
+                  `Figures may represent more than one quarter — re-ingest when a standalone filing is published.`
+                );
+              }
               const xml = await this.client.fetchXbrl(filing.xbrlUrl);
               const facts = parseNseXbrlFundamentalFacts(xml, { periodType: filing.periodType });
               const row: ManualVerifiedFundamentalsCsvRow = {
@@ -527,9 +547,20 @@ export const selectPreferredNseFinancialResults = (
     grouped.set(key, group);
   });
 
-  const selected = [...grouped.values()].map((group) => (
-    [...group].sort(comparePreferredNseFinancialResult)[0]
-  ));
+  const selected = [...grouped.values()].map((group) => {
+    const periodType = group[0].periodType;
+    const sorted = [...group].sort((a, b) => comparePreferredNseFinancialResult(a, b, periodType));
+    const best = sorted[0];
+
+    // BUG D4 fix: for QUARTERLY periods, if the winning record is cumulative
+    // (meaning no standalone quarter was available), flag it so downstream code
+    // can treat it with caution.  For ANNUAL periods, cumulative = full-year
+    // and is the correct and expected form — no flag needed.
+    if (periodType === 'QUARTERLY' && best.isCumulative) {
+      return { ...best, isCumulativeFallback: true };
+    }
+    return best;
+  });
   selected.sort((a, b) => b.periodEndDate.localeCompare(a.periodEndDate));
   return typeof maxPeriods === 'number' && maxPeriods >= 0 ? selected.slice(0, maxPeriods) : selected;
 };
@@ -572,13 +603,20 @@ const parseNseXbrlFundamentalFact = (
   options: NseXbrlFactParseOptions
 ): NseXbrlParsedFact => {
   const candidates = Array.isArray(factNames) ? factNames : [factNames];
+  // EPS is a per-share amount reported in base-unit rupees; iXBRL scale attributes
+  // do not apply (scale is always effectively 0 for EPS facts in NSE filings).
+  const isMonetary = field !== 'eps';
   const facts = candidates
     .flatMap((factName, factNameIndex) => extractXbrlFactsByLocalName(xmlText, factName)
       .map((fact) => ({
         ...fact,
         factName,
         factNameIndex,
-        value: normalizeXbrlNumericValue(fact.text),
+        value: normalizeXbrlNumericValue(
+          fact.text,
+          isMonetary ? fact.scale : null,
+          isMonetary ? fact.sign : null
+        ),
       })))
     .filter((fact) => fact.value !== null)
     .sort((a, b) => (
@@ -598,10 +636,10 @@ const parseNseXbrlFundamentalFact = (
 const extractXbrlFactsByLocalName = (
   xmlText: string,
   localName: string
-): Array<{ text: string; contextRef: string | null; order: number }> => {
+): Array<{ text: string; contextRef: string | null; scale: string | null; sign: string | null; order: number }> => {
   const escapedName = escapeRegExp(localName);
   const pattern = new RegExp(`<(?:[A-Za-z_][\\w.-]*:)?${escapedName}\\b([^>]*)>([\\s\\S]*?)<\\/(?:[A-Za-z_][\\w.-]*:)?${escapedName}>`, 'gi');
-  const facts: Array<{ text: string; contextRef: string | null; order: number }> = [];
+  const facts: Array<{ text: string; contextRef: string | null; scale: string | null; sign: string | null; order: number }> = [];
   let match: RegExpExecArray | null;
   let order = 0;
   while ((match = pattern.exec(xmlText)) !== null) {
@@ -611,6 +649,9 @@ const extractXbrlFactsByLocalName = (
       facts.push({
         text: decodeXmlEntities(stripXmlTags(match[2] || '').trim()),
         contextRef: attributes.contextRef || attributes.contextref || null,
+        // iXBRL ix:nonFraction attributes; absent on plain XBRL facts (scale=0 default)
+        scale: attributes.scale || null,
+        sign: attributes.sign || null,
         order,
       });
     }
@@ -630,13 +671,62 @@ const parseXmlAttributes = (text: string): Record<string, string> => {
   return attributes;
 };
 
-const normalizeXbrlNumericValue = (value: string): string | null => {
+/**
+ * Applies an iXBRL scale and sign attribute to a numeric value, normalizing the
+ * result to an absolute base unit (absolute INR for monetary facts, per-share INR
+ * for EPS).
+ *
+ * NSE iXBRL (ix:nonFraction) facts carry:
+ *   scale — integer exponent; the reported number must be multiplied by 10^scale
+ *             to arrive at the base-unit value.  Absent → 0 (value already in
+ *             base unit, i.e. absolute rupees).
+ *   sign  — "-" means the value should be negated after scale is applied.
+ *             Any other value (including absent) leaves the sign unchanged.
+ *
+ * Examples:
+ *   value=12826  scale=7  sign absent  → 12826 × 10^7  = 128,260,000,000 (₹128.26 bn)
+ *   value=8721   scale=7  sign="-"     → -(8721 × 10^7) = -87,210,000,000
+ *   value=6.44   scale=0  sign absent  → 6.44 (EPS already per-share rupees)
+ *
+ * This is a pure function; it does NOT parse the raw text — call
+ * normalizeXbrlNumericValue for that.
+ */
+export const applyXbrlScale = (
+  numericString: string,
+  scaleAttr: string | null,
+  signAttr: string | null
+): string | null => {
+  const trimmed = numericString.trim();
+  if (!trimmed) return null;
+  const base = Number(trimmed);
+  if (!Number.isFinite(base)) return null;
+
+  const scale = scaleAttr !== null ? parseInt(scaleAttr, 10) : 0;
+  if (!Number.isInteger(scale)) return null;
+
+  const multiplier = Math.pow(10, scale);
+  let result = base * multiplier;
+
+  if ((signAttr || '').trim() === '-') result = -result;
+
+  // Preserve reasonable decimal precision: use up to 2 decimal places for
+  // scaled results, matching the decimals="2" convention in NSE filings.
+  return result.toFixed(2);
+};
+
+const normalizeXbrlNumericValue = (
+  value: string,
+  scaleAttr: string | null = null,
+  signAttr: string | null = null
+): string | null => {
   const trimmed = value.trim();
   if (!trimmed || ['-', 'NA', 'N/A', 'NULL'].includes(trimmed.toUpperCase())) return null;
   const parenthesized = /^\((.*)\)$/.exec(trimmed);
+  // Parenthesized values "(123)" are accounting notation for negative numbers.
   const numericText = (parenthesized ? `-${parenthesized[1]}` : trimmed).replace(/[,\s]/g, '');
-  const parsed = Number(numericText);
-  return Number.isFinite(parsed) ? numericText : null;
+  if (!Number.isFinite(Number(numericText))) return null;
+
+  return applyXbrlScale(numericText, scaleAttr, signAttr);
 };
 
 const contextRefPriority = (contextRef: string | null, periodType: ManualVerifiedFundamentalsCsvPeriodType = 'QUARTERLY'): number => {
@@ -741,14 +831,35 @@ const expandYear = (yearText: string): number => {
   return year >= 70 ? 1900 + year : 2000 + year;
 };
 
+/**
+ * Compares two NSE financial result records for sort-preference (ascending — the
+ * "best" record sorts first, i.e. to index 0).
+ *
+ * Cumulative-vs-standalone rule (BUG D4 fix):
+ *   QUARTERLY — prefer standalone (non-cumulative) results.  A "cumulative"
+ *               filing for an interim quarter (H1, 9-month) represents MORE than
+ *               one quarter; storing it as a single-quarter figure inflates the
+ *               metric.  Fall back to cumulative only when no standalone exists
+ *               (selectPreferredNseFinancialResults marks that case with
+ *               isCumulativeFallback=true so it is not silently trusted).
+ *   ANNUAL    — cumulative = full-year, which is correct and expected; prefer it.
+ */
 const comparePreferredNseFinancialResult = (
   a: NormalizedNseFinancialResultMetadata,
-  b: NormalizedNseFinancialResultMetadata
+  b: NormalizedNseFinancialResultMetadata,
+  periodType: ManualVerifiedFundamentalsCsvPeriodType = 'QUARTERLY'
 ): number => {
+  // For QUARTERLY: non-cumulative (standalone quarter) is preferred → sort
+  // cumulative=true LAST (higher number = lower priority).
+  // For ANNUAL: cumulative (full-year) is preferred → sort cumulative=true FIRST.
+  const cumulativeScore = periodType === 'QUARTERLY'
+    ? Number(a.isCumulative) - Number(b.isCumulative)   // non-cumulative (0) < cumulative (1)
+    : Number(b.isCumulative) - Number(a.isCumulative);  // cumulative (1) sorts first
+
   const priorities = [
     Number(b.isConsolidated) - Number(a.isConsolidated),
     Number(b.isAudited) - Number(a.isAudited),
-    Number(b.isCumulative) - Number(a.isCumulative),
+    cumulativeScore,
     (b.filingTimestamp || '').localeCompare(a.filingTimestamp || ''),
   ];
   return priorities.find((priority) => priority !== 0) || 0;

@@ -8,6 +8,7 @@ import {
   NseFinancialResultsClient,
   NseOfficialFinancialResultsClient,
   NseXbrlFundamentalsCsvExporter,
+  applyXbrlScale,
   normalizeNseFinancialResultMetadataRows,
   parseNseXbrlFundamentalFacts,
   selectPreferredNseFinancialResults,
@@ -436,6 +437,263 @@ describe('NSE XBRL fundamentals CSV exporter', () => {
       rowsImported: 1,
       rowsRejected: 0,
       symbolsCovered: 1,
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // BUG D3 — iXBRL scale / sign normalization
+  // -------------------------------------------------------------------------
+  describe('applyXbrlScale — scale normalization pure function', () => {
+    it('scale=null (absent) leaves the value unchanged (absolute INR already)', () => {
+      expect(applyXbrlScale('1282600000000', null, null)).toBe('1282600000000.00');
+    });
+
+    it('scale=0 leaves the value unchanged', () => {
+      expect(applyXbrlScale('6.44', '0', null)).toBe('6.44');
+      expect(applyXbrlScale('100', '0', null)).toBe('100.00');
+    });
+
+    it('scale=3 (lakhs) multiplies by 1 000 — reported in thousands, normalised to INR', () => {
+      // 8721000 (thousands) * 10^3 = 8,721,000,000 absolute INR
+      expect(applyXbrlScale('8721000', '3', null)).toBe('8721000000.00');
+    });
+
+    it('scale=5 (ten-lakhs / lakhs₁₀₀k) multiplies by 100 000', () => {
+      expect(applyXbrlScale('12826', '5', null)).toBe('1282600000.00');
+    });
+
+    it('scale=7 (crores reported as 10-crore units) multiplies correctly', () => {
+      // 12826 * 10^7 = 128,260,000,000 (₹128.26 bn — crore scale in iXBRL)
+      expect(applyXbrlScale('12826', '7', null)).toBe('128260000000.00');
+    });
+
+    it('scale=7 with sign="-" negates the result (net loss)', () => {
+      expect(applyXbrlScale('8721', '7', '-')).toBe('-87210000000.00');
+    });
+
+    it('positive sign attribute (not "-") does not negate', () => {
+      expect(applyXbrlScale('100', '0', '+')).toBe('100.00');
+      expect(applyXbrlScale('100', '0', '')).toBe('100.00');
+    });
+
+    it('returns null for non-numeric input', () => {
+      expect(applyXbrlScale('abc', null, null)).toBeNull();
+      expect(applyXbrlScale('', null, null)).toBeNull();
+    });
+
+    it('returns null for a non-numeric scale attribute', () => {
+      // parseInt('abc', 10) = NaN which is not an integer → null
+      expect(applyXbrlScale('100', 'abc', null)).toBeNull();
+    });
+  });
+
+  describe('parseNseXbrlFundamentalFacts — iXBRL scale attribute applied to monetary facts', () => {
+    it('applies scale=7 to revenue and netIncome from namespaced XBRL elements with scale attribute', () => {
+      // Simulate a filing that reports figures in crore-units (scale=7).
+      // Revenue: 12826 × 10^7 = 128,260,000,000 absolute INR
+      // NetIncome: 8721 × 10^7 = 87,210,000,000 absolute INR
+      // EPS: scale attribute on EPS is intentionally ignored; raw value is used.
+      const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<xbrli:xbrl xmlns:xbrli="http://www.xbrl.org/2003/instance" xmlns:in-gaap="http://www.mca.gov.in/ind-as">
+  <in-gaap:RevenueFromOperations contextRef="OneD" scale="7" decimals="2" unitRef="INR">12826</in-gaap:RevenueFromOperations>
+  <in-gaap:ProfitLossForPeriod contextRef="OneD" scale="7" decimals="2" unitRef="INR">8721</in-gaap:ProfitLossForPeriod>
+  <in-gaap:BasicEarningsLossPerShareFromContinuingAndDiscontinuedOperations contextRef="OneD" scale="7" decimals="2" unitRef="INR">6.44</in-gaap:BasicEarningsLossPerShareFromContinuingAndDiscontinuedOperations>
+</xbrli:xbrl>`;
+
+      const facts = parseNseXbrlFundamentalFacts(xml);
+
+      expect(facts.revenue.value).toBe('128260000000.00');
+      expect(facts.netIncome.value).toBe('87210000000.00');
+      // EPS: scale attribute is intentionally ignored for per-share values
+      expect(facts.eps.value).toBe('6.44');
+    });
+
+    it('applies scale=5 (lakh-unit reporting) to monetary facts', () => {
+      const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<xbrli:xbrl xmlns:xbrli="http://www.xbrl.org/2003/instance" xmlns:in-gaap="http://www.mca.gov.in/ind-as">
+  <in-gaap:RevenueFromOperations contextRef="OneD" scale="5" decimals="2" unitRef="INR">128260</in-gaap:RevenueFromOperations>
+  <in-gaap:ProfitLossForPeriod contextRef="OneD" scale="5" decimals="2" unitRef="INR">87210</in-gaap:ProfitLossForPeriod>
+  <in-gaap:BasicEarningsLossPerShareFromContinuingAndDiscontinuedOperations contextRef="OneD" decimals="2" unitRef="INR">6.44</in-gaap:BasicEarningsLossPerShareFromContinuingAndDiscontinuedOperations>
+</xbrli:xbrl>`;
+
+      const facts = parseNseXbrlFundamentalFacts(xml);
+
+      expect(facts.revenue.value).toBe('12826000000.00');  // 128260 * 10^5
+      expect(facts.netIncome.value).toBe('8721000000.00'); // 87210 * 10^5
+      expect(facts.eps.value).toBe('6.44');
+    });
+
+    it('applies sign="-" to produce a negative net income (reported loss)', () => {
+      const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<xbrli:xbrl xmlns:xbrli="http://www.xbrl.org/2003/instance" xmlns:in-gaap="http://www.mca.gov.in/ind-as">
+  <in-gaap:RevenueFromOperations contextRef="OneD" scale="7" decimals="2" unitRef="INR">12826</in-gaap:RevenueFromOperations>
+  <in-gaap:ProfitLossForPeriod contextRef="OneD" scale="7" sign="-" decimals="2" unitRef="INR">500</in-gaap:ProfitLossForPeriod>
+  <in-gaap:BasicEarningsLossPerShareFromContinuingAndDiscontinuedOperations contextRef="OneD" sign="-" decimals="2" unitRef="INR">3.20</in-gaap:BasicEarningsLossPerShareFromContinuingAndDiscontinuedOperations>
+</xbrli:xbrl>`;
+
+      const facts = parseNseXbrlFundamentalFacts(xml);
+
+      expect(facts.revenue.value).toBe('128260000000.00');
+      expect(facts.netIncome.value).toBe('-5000000000.00'); // 500 * 10^7 negated
+      // EPS: sign attribute is ignored for EPS; raw value is used as-is
+      expect(facts.eps.value).toBe('3.20');
+    });
+
+    it('falls back to scale=0 when scale attribute is absent (plain XBRL, no iXBRL scaling)', () => {
+      // The primary XML fixture has no scale attributes → values are absolute INR already.
+      const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<xbrli:xbrl xmlns:xbrli="http://www.xbrl.org/2003/instance" xmlns:in-gaap="http://www.mca.gov.in/ind-as">
+  <in-gaap:RevenueFromOperations contextRef="OneD" decimals="2" unitRef="INR">1282600000000.00</in-gaap:RevenueFromOperations>
+  <in-gaap:ProfitLossForPeriod contextRef="OneD" decimals="2" unitRef="INR">87210000000.00</in-gaap:ProfitLossForPeriod>
+  <in-gaap:BasicEarningsLossPerShareFromContinuingAndDiscontinuedOperations contextRef="OneD" decimals="2" unitRef="INR">6.44</in-gaap:BasicEarningsLossPerShareFromContinuingAndDiscontinuedOperations>
+</xbrli:xbrl>`;
+
+      const facts = parseNseXbrlFundamentalFacts(xml);
+
+      expect(facts.revenue.value).toBe('1282600000000.00');
+      expect(facts.netIncome.value).toBe('87210000000.00');
+      expect(facts.eps.value).toBe('6.44');
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // BUG D4 — cumulative figures stored as quarterly
+  // -------------------------------------------------------------------------
+  describe('selectPreferredNseFinancialResults — cumulative vs standalone selection', () => {
+    const makeRecord = (overrides: Partial<{
+      symbol: string;
+      periodType: 'QUARTERLY' | 'ANNUAL';
+      periodEndDate: string;
+      xbrlUrl: string;
+      isConsolidated: boolean;
+      isAudited: boolean;
+      isCumulative: boolean;
+      filingTimestamp: string | null;
+    }>) => ({
+      symbol: 'TCS',
+      periodType: 'QUARTERLY' as const,
+      periodEndDate: '2024-09-30',
+      xbrlUrl: 'https://nsearchives.nseindia.com/corporate/xbrl/TCS_TEST.xml',
+      isConsolidated: true,
+      isAudited: true,
+      isCumulative: false,
+      filingTimestamp: '2024-10-15T00:00:00.000Z',
+      raw: {},
+      ...overrides,
+    });
+
+    it('prefers standalone (non-cumulative) over cumulative for QUARTERLY periods', () => {
+      const records = [
+        makeRecord({ isCumulative: true, xbrlUrl: 'https://nsearchives.nseindia.com/corporate/xbrl/TCS_CUMULATIVE.xml', filingTimestamp: '2024-10-20T00:00:00.000Z' }),
+        makeRecord({ isCumulative: false, xbrlUrl: 'https://nsearchives.nseindia.com/corporate/xbrl/TCS_STANDALONE.xml', filingTimestamp: '2024-10-15T00:00:00.000Z' }),
+      ];
+
+      const selected = selectPreferredNseFinancialResults(records);
+
+      expect(selected).toHaveLength(1);
+      expect(selected[0].xbrlUrl).toContain('TCS_STANDALONE');
+      expect(selected[0].isCumulativeFallback).toBeUndefined();
+    });
+
+    it('falls back to cumulative for QUARTERLY when no standalone exists, and sets isCumulativeFallback=true', () => {
+      const records = [
+        makeRecord({ isCumulative: true, xbrlUrl: 'https://nsearchives.nseindia.com/corporate/xbrl/TCS_CUMULATIVE.xml' }),
+      ];
+
+      const selected = selectPreferredNseFinancialResults(records);
+
+      expect(selected).toHaveLength(1);
+      expect(selected[0].xbrlUrl).toContain('TCS_CUMULATIVE');
+      expect(selected[0].isCumulativeFallback).toBe(true);
+    });
+
+    it('does NOT set isCumulativeFallback for ANNUAL cumulative filings (full-year is correct)', () => {
+      const records = [
+        makeRecord({ periodType: 'ANNUAL', periodEndDate: '2024-03-31', isCumulative: true, xbrlUrl: 'https://nsearchives.nseindia.com/corporate/xbrl/TCS_ANNUAL.xml' }),
+      ];
+
+      const selected = selectPreferredNseFinancialResults(records);
+
+      expect(selected).toHaveLength(1);
+      expect(selected[0].isCumulativeFallback).toBeUndefined();
+    });
+
+    it('prefers cumulative over standalone for ANNUAL periods (full-year consolidation)', () => {
+      const records = [
+        makeRecord({ periodType: 'ANNUAL', periodEndDate: '2024-03-31', isCumulative: false, xbrlUrl: 'https://nsearchives.nseindia.com/corporate/xbrl/TCS_ANNUAL_STANDALONE.xml', filingTimestamp: '2024-04-30T00:00:00.000Z' }),
+        makeRecord({ periodType: 'ANNUAL', periodEndDate: '2024-03-31', isCumulative: true, xbrlUrl: 'https://nsearchives.nseindia.com/corporate/xbrl/TCS_ANNUAL_CUMULATIVE.xml', filingTimestamp: '2024-04-30T00:00:00.000Z' }),
+      ];
+
+      const selected = selectPreferredNseFinancialResults(records);
+
+      expect(selected).toHaveLength(1);
+      expect(selected[0].xbrlUrl).toContain('TCS_ANNUAL_CUMULATIVE');
+      expect(selected[0].isCumulativeFallback).toBeUndefined();
+    });
+
+    it('does not flag standalone QUARTERLY results even when selected from a mixed group', () => {
+      const records = [
+        makeRecord({ isCumulative: false, xbrlUrl: 'https://nsearchives.nseindia.com/corporate/xbrl/TCS_Q_STANDALONE.xml' }),
+        makeRecord({ isCumulative: true, xbrlUrl: 'https://nsearchives.nseindia.com/corporate/xbrl/TCS_Q_CUMULATIVE.xml' }),
+      ];
+
+      const selected = selectPreferredNseFinancialResults(records);
+
+      expect(selected[0].isCumulativeFallback).toBeUndefined();
+      expect(selected[0].xbrlUrl).toContain('TCS_Q_STANDALONE');
+    });
+
+    it('consolidation preference still applies even when cumulative selection is involved', () => {
+      // Consolidated non-cumulative should beat standalone cumulative
+      const records = [
+        makeRecord({ isConsolidated: false, isCumulative: true, xbrlUrl: 'https://nsearchives.nseindia.com/corporate/xbrl/TCS_STDLN_CUM.xml' }),
+        makeRecord({ isConsolidated: true, isCumulative: false, xbrlUrl: 'https://nsearchives.nseindia.com/corporate/xbrl/TCS_CONSOL_STDLN.xml' }),
+      ];
+
+      const selected = selectPreferredNseFinancialResults(records);
+
+      expect(selected[0].xbrlUrl).toContain('TCS_CONSOL_STDLN');
+      expect(selected[0].isCumulativeFallback).toBeUndefined();
+    });
+
+    it('isCumulativeFallback warning appears in the export report', async () => {
+      // A filing that only has a cumulative quarterly result should trigger the warning
+      const client: NseFinancialResultsClient = {
+        async fetchFinancialResultsMetadata(symbol: string) {
+          return [{
+            symbol,
+            period: 'Quarterly',
+            toDate: '30-Sep-2024',
+            xbrl: 'https://nsearchives.nseindia.com/corporate/xbrl/TCS_H1_CUMULATIVE.xml',
+            consolidated: 'Consolidated',
+            audited: 'Audited',
+            cumulative: 'Cumulative',  // H1 — 6-month cumulative, no standalone available
+            broadCastDate: '15-Oct-2024 10:00:00',
+          }];
+        },
+        async fetchXbrl() {
+          return `<?xml version="1.0" encoding="UTF-8"?>
+<xbrli:xbrl xmlns:xbrli="http://www.xbrl.org/2003/instance" xmlns:in-gaap="http://www.mca.gov.in/ind-as">
+  <in-gaap:RevenueFromOperations contextRef="OneD" decimals="2" unitRef="INR">500000000.00</in-gaap:RevenueFromOperations>
+  <in-gaap:ProfitLossForPeriod contextRef="OneD" decimals="2" unitRef="INR">50000000.00</in-gaap:ProfitLossForPeriod>
+  <in-gaap:BasicEarningsLossPerShareFromContinuingAndDiscontinuedOperations contextRef="OneD" decimals="2" unitRef="INR">5.00</in-gaap:BasicEarningsLossPerShareFromContinuingAndDiscontinuedOperations>
+</xbrli:xbrl>`;
+        },
+      };
+      const exporter = new NseXbrlFundamentalsCsvExporter(client);
+
+      const result = await exporter.exportSymbols({
+        symbols: ['TCS'],
+        outputDir: require('path').resolve(process.cwd(), 'tmp', 'test-cumulative-fallback'),
+        maxQuarterlyPeriods: 1,
+        maxAnnualPeriods: 0,
+        validatedBy: 'XBRL_D4_TEST',
+        validatedAt: new Date('2026-06-04T00:00:00.000Z'),
+      });
+
+      expect(result.report.warnings.some((w) => w.includes('cumulative') && w.includes('TCS'))).toBe(true);
+      expect(result.rows).toHaveLength(1);
+      expect(result.rows[0].revenue).toBe('500000000.00');
     });
   });
 });
