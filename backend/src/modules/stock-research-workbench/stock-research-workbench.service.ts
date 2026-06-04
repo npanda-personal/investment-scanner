@@ -23,7 +23,9 @@ export class StockResearchWorkbenchService {
     const peers = await this.peerComparison(instrument, instrumentId, range);
     const valuation = this.valuationSnapshot(latestFundamental, peers, instrument.market_cap);
     const performance = this.performanceMetrics(pricePoints, selectedPrices);
-    const relativeStrength = this.relativeStrengthSnapshot(selectedPrices, peers);
+    // Fetch Nifty 50 for relative-strength; uses same time window as the selected range.
+    const nifty50PricePoints = await this.fetchNifty50PricePoints(selectedPrices);
+    const relativeStrength = this.relativeStrengthSnapshot(selectedPrices, peers, nifty50PricePoints);
     const dailyChange = this.returnBetween(pricePoints[1]?.adjusted_close, pricePoints[0]?.adjusted_close);
     const dailyChangeValue = pricePoints.length > 1 ? pricePoints[0].adjusted_close - pricePoints[1].adjusted_close : null;
 
@@ -176,19 +178,58 @@ export class StockResearchWorkbenchService {
     };
   }
 
-  private relativeStrengthSnapshot(selectedPrices: ResearchPricePoint[], peers: Array<Record<string, any>>) {
+  /**
+   * Fetches the Nifty 50 (^NSEI) EOD price series covering the same date
+   * window as `selectedPrices` (oldest to newest).  Returns an empty array
+   * when the series is unavailable or the range cannot be determined.
+   */
+  private async fetchNifty50PricePoints(selectedPrices: ResearchPricePoint[]): Promise<ResearchPricePoint[]> {
+    if (selectedPrices.length === 0) return [];
+    // selectedPrices is sorted newest-first (see toPricePoints); dates[0] is
+    // the most recent and dates[last] is the oldest.
+    const newestDate = new Date(selectedPrices[0].date);
+    const oldestDate = new Date(selectedPrices[selectedPrices.length - 1].date);
+    // Add a small buffer so we always capture the boundary bars.
+    oldestDate.setDate(oldestDate.getDate() - 5);
+    newestDate.setDate(newestDate.getDate() + 5);
+    try {
+      const raw = await this.marketDataService.listPrices('^NSEI', 5000, oldestDate, newestDate);
+      return this.toPricePoints((raw || []).map((price: any) => ({
+        date: price.timestamp ?? price.date,
+        close: Number(price.close),
+        adjusted_close: price.adjustedClose !== null && price.adjustedClose !== undefined
+          ? Number(price.adjustedClose)
+          : Number(price.close),
+        volume: price.volume !== null && price.volume !== undefined ? Number(price.volume) : null,
+      })));
+    } catch {
+      return [];
+    }
+  }
+
+  private relativeStrengthSnapshot(
+    selectedPrices: ResearchPricePoint[],
+    peers: Array<Record<string, any>>,
+    nifty50Prices: ResearchPricePoint[] = [],
+  ) {
     const stockReturn = this.periodReturn(selectedPrices);
     const peerReturns = peers.map((peer) => peer.return_selected).filter((value) => typeof value === 'number') as number[];
     const peerAverage = this.average(peerReturns);
+
+    // Use the Nifty 50 index when the series spans the selected range
+    // (at least 2 bars present after filtering to the same window).
+    const indexReturn = nifty50Prices.length >= 2 ? this.periodReturn(nifty50Prices) : null;
+    const useIndex = indexReturn !== null;
+
     return {
-      benchmark_symbol: null,
-      benchmark_return: null,
+      benchmark_symbol: useIndex ? '^NSEI' : null,
+      benchmark_return: useIndex ? indexReturn : null,
       peer_average_return: peerAverage,
       stock_return: stockReturn,
-      relative_to_benchmark: null,
+      relative_to_benchmark: useIndex && stockReturn !== null ? stockReturn - indexReturn! : null,
       relative_to_peer_average: stockReturn !== null && peerAverage !== null ? stockReturn - peerAverage : null,
-      fallback_used: 'peer_average',
-      data_status: stockReturn !== null ? 'PARTIAL' : 'MISSING',
+      fallback_used: useIndex ? 'nse_nifty_50' : 'peer_average',
+      data_status: stockReturn !== null ? (useIndex ? 'COMPLETE' : 'PARTIAL') : 'MISSING',
     };
   }
 

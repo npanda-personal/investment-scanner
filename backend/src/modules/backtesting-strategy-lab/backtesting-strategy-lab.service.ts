@@ -146,6 +146,32 @@ export class BacktestingStrategyLabService {
     return this.run({ strategyId: id }, userId);
   }
 
+  /**
+   * Fetches the Nifty 50 (^NSEI) EOD price series for the given window.
+   * Returns bars sorted ascending by date. Returns an empty array when the
+   * series is unavailable or insufficient (caller falls back to equal-weight).
+   */
+  private async fetchNifty50Bars(startDate: string, endDate: string): Promise<HistoricalBar[]> {
+    try {
+      const raw = await this.marketDataService.listPrices(
+        '^NSEI',
+        5000,
+        new Date(startDate),
+        new Date(endDate),
+      );
+      return (raw || [])
+        .map((price: any) => ({
+          date: new Date(price.timestamp ?? price.date).toISOString().slice(0, 10),
+          close: Number(price.adjustedClose ?? price.adjusted_close ?? price.close),
+          volume: price.volume !== null && price.volume !== undefined ? Number(price.volume) : null,
+        }))
+        .filter((bar: HistoricalBar) => Number.isFinite(bar.close))
+        .sort((a: HistoricalBar, b: HistoricalBar) => a.date.localeCompare(b.date));
+    } catch {
+      return [];
+    }
+  }
+
   async simulate(config: BacktestStrategyConfig): Promise<{ metrics: BacktestMetrics; trades: BacktestTrade[]; equityCurve: EquityCurvePoint[] }> {
     const universe = await this.resolveUniverse(config);
     const resolvedUniverse = universe.instruments;
@@ -264,7 +290,14 @@ export class BacktestingStrategyLabService {
     const strategyFirstEntryDate = trades.length > 0
       ? trades.reduce((earliest, t) => t.entryDate < earliest ? t.entryDate : earliest, trades[0].entryDate)
       : undefined;
-    const benchmarkComparison = this.benchmarkComparison(config, histories, dates, baseMetrics, strategyFirstEntryDate);
+
+    // Nifty 50 real benchmark: fetch for IN-scoped backtests; fall back to
+    // equal-weight when the index series is absent/insufficient for the window.
+    const isIndiaRegion = !config.region || config.region === 'IN';
+    const nifty50Bars = isIndiaRegion
+      ? await this.fetchNifty50Bars(config.startDate, config.endDate)
+      : [];
+    const benchmarkComparison = this.benchmarkComparison(config, histories, dates, baseMetrics, strategyFirstEntryDate, nifty50Bars);
 
     // Fix 3: surface universe cap prominently at the top level.
     const universeSummary = config.universe.type === 'ALL' ? {
@@ -883,6 +916,12 @@ export class BacktestingStrategyLabService {
    * The years denominator for the benchmark CAGR also uses the aligned entry
    * date instead of `config.startDate`, so both CAGR figures span the same
    * holding window.
+   *
+   * Nifty 50 real benchmark: when `nifty50Bars` covers the backtest window
+   * (at least 2 bars spanning the entry→exit period), the real index series is
+   * used and `benchmarkDataStatus` is set to `'NSE_NIFTY_50'`.  Otherwise the
+   * method falls back to the equal-weight universe baseline with status
+   * `'FALLBACK_EQUAL_WEIGHT'`, keeping the existing behaviour intact.
    */
   private benchmarkComparison(
     config: BacktestStrategyConfig,
@@ -890,6 +929,7 @@ export class BacktestingStrategyLabService {
     dates: string[],
     metrics: BacktestMetrics,
     strategyFirstEntryDate?: string,
+    nifty50Bars: HistoricalBar[] = [],
   ): NonNullable<BacktestMetrics['benchmarkComparison']> {
     if (histories.size === 0 || dates.length < 2) {
       return { benchmarkName: null, benchmarkTotalReturn: null, benchmarkCagr: null, excessReturn: null, excessCagr: null, benchmarkDataStatus: 'UNAVAILABLE', dataGap: 'Benchmark unavailable for selected region' };
@@ -898,6 +938,31 @@ export class BacktestingStrategyLabService {
     // Align benchmark entry to the strategy's actual first-entry date.
     // Fall back to the first available date when no trade was opened.
     const alignedEntryDate = strategyFirstEntryDate ?? dates[0];
+
+    // --- Try Nifty 50 real benchmark first ---
+    if (nifty50Bars.length >= 2) {
+      const firstBar = nifty50Bars.find((bar) => bar.date >= alignedEntryDate) ?? nifty50Bars[0];
+      const lastBar = this.barAtOrBefore(nifty50Bars, lastDate) ?? nifty50Bars.at(-1);
+      if (firstBar && lastBar && firstBar.close > 0 && lastBar.date >= alignedEntryDate) {
+        const benchmarkTotalReturn = (lastBar.close - firstBar.close) / firstBar.close;
+        const benchmarkEntryMs = new Date(firstBar.date).getTime();
+        const benchmarkExitMs = new Date(lastBar.date).getTime();
+        const years = benchmarkExitMs > benchmarkEntryMs
+          ? (benchmarkExitMs - benchmarkEntryMs) / (365.25 * 24 * 60 * 60 * 1000)
+          : (new Date(config.endDate).getTime() - new Date(config.startDate).getTime()) / (365.25 * 24 * 60 * 60 * 1000);
+        const benchmarkCagr = years > 0 ? Math.pow(1 + benchmarkTotalReturn, 1 / years) - 1 : null;
+        return {
+          benchmarkName: 'NIFTY 50 (^NSEI)',
+          benchmarkTotalReturn,
+          benchmarkCagr,
+          excessReturn: (metrics.totalReturn ?? 0) - benchmarkTotalReturn,
+          excessCagr: metrics.cagr !== null && benchmarkCagr !== null ? metrics.cagr - benchmarkCagr : null,
+          benchmarkDataStatus: 'NSE_NIFTY_50',
+        };
+      }
+    }
+
+    // --- Fall back to equal-weight universe baseline ---
     const returns = [...histories.values()].map((history) => {
       // Find the first bar at or after the aligned entry date.
       const first = history.bars.find((bar) => bar.date >= alignedEntryDate) ?? history.bars[0];

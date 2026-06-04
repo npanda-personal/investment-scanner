@@ -139,3 +139,144 @@ describe('StockResearchWorkbenchService metrics', () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// Nifty 50 relative-strength tests
+// ---------------------------------------------------------------------------
+
+/** Build the raw price-tick shape returned by marketDataService.listPrices */
+const indexTick = (dateStr: string, close: number) => ({
+  timestamp: new Date(dateStr).toISOString(),
+  close: close.toString(),
+  adjustedClose: close.toString(),
+  volume: '1000000',
+});
+
+const buildWorkbenchService = (overrides: {
+  indexTicks?: any[];
+  listPricesThrows?: boolean;
+}) => {
+  const mainPrices = {
+    prices: [
+      { date: '2026-04-28T00:00:00.000Z', close: 120, adjusted_close: 120, volume: 100 },
+      { date: '2025-04-28T00:00:00.000Z', close: 80, adjusted_close: 80, volume: 100 },
+    ],
+    source: 'database',
+    last_updated_timestamp: '2026-04-28T00:00:00.000Z',
+    data_status: 'COMPLETE',
+  };
+  const peerPrices = {
+    prices: [
+      { date: '2026-04-28T00:00:00.000Z', close: 110, adjusted_close: 110, volume: 100 },
+      { date: '2025-04-28T00:00:00.000Z', close: 100, adjusted_close: 100, volume: 100 },
+    ],
+    source: 'database',
+    last_updated_timestamp: '2026-04-28T00:00:00.000Z',
+    data_status: 'COMPLETE',
+  };
+
+  const listPricesMock = overrides.listPricesThrows
+    ? jest.fn().mockRejectedValue(new Error('DB error'))
+    : jest.fn().mockResolvedValue(overrides.indexTicks ?? []);
+
+  const marketDataService = {
+    getInstrument: jest.fn().mockResolvedValue({
+      id: 'main', symbol: 'MAIN', company_name: 'Main Co', exchange: 'NSE',
+      country: 'IN', sector: 'Technology', industry: 'Software',
+      currency: 'INR', market_cap: 1000, source: 'database',
+      last_updated_timestamp: '2026-04-28T00:00:00.000Z', data_status: 'COMPLETE',
+    }),
+    latestPriceByInstrumentId: jest.fn().mockResolvedValue({
+      latest: { close: 120 }, source: 'database',
+      last_updated_timestamp: '2026-04-28T00:00:00.000Z', data_status: 'COMPLETE',
+    }),
+    listPricesByInstrumentId: jest.fn(async (id: string) => id === 'main' ? mainPrices : peerPrices),
+    fundamentalsByInstrumentId: jest.fn().mockResolvedValue({ records: [{ pe_ratio: 20, dividend_yield: 0.02, data_status: 'COMPLETE', source: 'database', last_updated_timestamp: '2026-04-28T00:00:00.000Z' }] }),
+    corporateActionsByInstrumentId: jest.fn().mockResolvedValue({ actions: [] }),
+    listInstruments: jest.fn().mockResolvedValue({
+      instruments: [
+        { id: 'main', sector: 'Technology', industry: 'Software', market_cap: 1000, data_status: 'COMPLETE' },
+        { id: 'peer', symbol: 'PEER', company_name: 'Peer Co', exchange: 'NSE', sector: 'Technology', industry: 'Software', market_cap: 500, data_status: 'COMPLETE' },
+      ],
+    }),
+    listPrices: listPricesMock,
+  };
+
+  return { service: new StockResearchWorkbenchService(marketDataService as any), listPricesMock };
+};
+
+describe('StockResearchWorkbenchService – Nifty 50 relative-strength', () => {
+  it('populates benchmark_symbol and benchmark_return when index series is present', async () => {
+    const indexTicks = [
+      indexTick('2025-04-28', 22000),
+      indexTick('2026-04-28', 24200),
+    ];
+    const { service } = buildWorkbenchService({ indexTicks });
+
+    const result = await service.workbench('main', '1Y');
+    const rs = result!.relative_strength as any;
+
+    expect(rs.benchmark_symbol).toBe('^NSEI');
+    expect(rs.benchmark_return).not.toBeNull();
+    expect(Number.isFinite(rs.benchmark_return)).toBe(true);
+    expect(rs.fallback_used).toBe('nse_nifty_50');
+    expect(rs.data_status).toBe('COMPLETE');
+  });
+
+  it('computes relative_to_benchmark as stock_return minus benchmark_return', async () => {
+    // stock: 80 → 120  = +50%
+    // index: 22000 → 24200 = +10%
+    // relative = 50% - 10% = 40%
+    const indexTicks = [
+      indexTick('2025-04-25', 22000),
+      indexTick('2026-04-25', 24200),
+    ];
+    const { service } = buildWorkbenchService({ indexTicks });
+
+    const result = await service.workbench('main', '1Y');
+    const rs = result!.relative_strength as any;
+
+    expect(rs.stock_return).toBeCloseTo(0.5, 5);
+    if (rs.benchmark_return !== null) {
+      expect(rs.relative_to_benchmark).toBeCloseTo(rs.stock_return - rs.benchmark_return, 5);
+    }
+  });
+
+  it('falls back to peer_average when index series is empty', async () => {
+    const { service } = buildWorkbenchService({ indexTicks: [] });
+
+    const result = await service.workbench('main', '1Y');
+    const rs = result!.relative_strength as any;
+
+    expect(rs.benchmark_symbol).toBeNull();
+    expect(rs.benchmark_return).toBeNull();
+    expect(rs.relative_to_benchmark).toBeNull();
+    expect(rs.fallback_used).toBe('peer_average');
+    expect(rs.peer_average_return).not.toBeUndefined();
+  });
+
+  it('falls back to peer_average when listPrices throws', async () => {
+    const { service } = buildWorkbenchService({ listPricesThrows: true });
+
+    const result = await service.workbench('main', '1Y');
+    const rs = result!.relative_strength as any;
+
+    expect(rs.fallback_used).toBe('peer_average');
+    expect(rs.benchmark_symbol).toBeNull();
+  });
+
+  it('always populates peer_average_return as secondary field regardless of index availability', async () => {
+    const indexTicks = [
+      indexTick('2025-04-28', 22000),
+      indexTick('2026-04-28', 24200),
+    ];
+    const { service } = buildWorkbenchService({ indexTicks });
+
+    const result = await service.workbench('main', '1Y');
+    const rs = result!.relative_strength as any;
+
+    // peer_average_return should be present even when index is used
+    expect('peer_average_return' in rs).toBe(true);
+    expect('relative_to_peer_average' in rs).toBe(true);
+  });
+});

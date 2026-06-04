@@ -201,7 +201,7 @@ export interface BacktestMetrics {
     benchmarkCagr: number | null;
     excessReturn: number | null;
     excessCagr: number | null;
-    benchmarkDataStatus: 'AVAILABLE' | 'FALLBACK_EQUAL_WEIGHT' | 'UNAVAILABLE';
+    benchmarkDataStatus: 'AVAILABLE' | 'NSE_NIFTY_50' | 'FALLBACK_EQUAL_WEIGHT' | 'UNAVAILABLE';
     dataGap?: string;
   };
   realismWarnings?: string[];
