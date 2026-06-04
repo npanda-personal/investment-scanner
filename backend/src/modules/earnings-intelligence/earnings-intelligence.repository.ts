@@ -222,7 +222,11 @@ export class EarningsIntelligenceRepository {
       netIncome: row.netIncome !== null ? Number(row.netIncome) : null,
       periodType: row.periodType,
       periodEndDate: row.periodEndDate,
-      officialResultDate: null,
+      // Read officialResultDate from the DB row — populated by the
+      // ingest-nse-earnings-dates script. When present (non-null), the
+      // earnings-intelligence service resolves resultDateSource='OFFICIAL_CALENDAR',
+      // unlocking RESULT_WINNERS, RESULT_DISAPPOINTMENTS, and RESULT_REACTION_HISTORY.
+      officialResultDate: row.officialResultDate ?? null,
       source: row.source,
       validatedAt: row.validatedAt ?? null,
       ingestionTimestamp: row.ingestionTimestamp ?? null,

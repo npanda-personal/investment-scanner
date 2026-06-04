@@ -1,0 +1,107 @@
+[
+  {
+    "symbol": "RELIANCE",
+    "company": "RELIANCE INDUSTRIES LTD",
+    "purpose": "Quarterly Results",
+    "meetingDate": "18-Oct-2024",
+    "bm_desc": ""
+  },
+  {
+    "symbol": "INFY",
+    "company": "INFOSYS LTD",
+    "purpose": "To consider and approve Unaudited Financial Results for the quarter and half year ended September 30, 2024",
+    "meetingDate": "17-Oct-2024",
+    "bm_desc": ""
+  },
+  {
+    "symbol": "TCS",
+    "company": "TATA CONSULTANCY SERVICES LTD",
+    "purpose": "Financial Results",
+    "meetingDate": "10-Oct-2024",
+    "bm_desc": ""
+  },
+  {
+    "symbol": "HDFCBANK",
+    "company": "HDFC BANK LTD",
+    "purpose": "Quarterly Results & Dividend",
+    "meetingDate": "19-Oct-2024",
+    "bm_desc": ""
+  },
+  {
+    "symbol": "WIPRO",
+    "company": "WIPRO LTD",
+    "purpose": "Audited Financial Results for the year ended March 31, 2024",
+    "meetingDate": "24-Apr-2024",
+    "bm_desc": ""
+  },
+  {
+    "symbol": "BHARTIARTL",
+    "company": "BHARTI AIRTEL LTD",
+    "purpose": "Unaudited Standalone Financial Results for the quarter ended June 30, 2024",
+    "meetingDate": "02-Aug-2024",
+    "bm_desc": ""
+  },
+  {
+    "symbol": "NESTLEIND",
+    "company": "NESTLE INDIA LTD",
+    "purpose": "Annual Results",
+    "meetingDate": "22-Feb-2024",
+    "bm_desc": ""
+  },
+  {
+    "symbol": "TITAN",
+    "company": "TITAN COMPANY LTD",
+    "purpose": "Results for Q3 FY25",
+    "meetingDate": "31-Jan-2025",
+    "bm_desc": ""
+  },
+  {
+    "symbol": "DIVIDENDONLY",
+    "company": "DIVIDEND ONLY CORP",
+    "purpose": "Dividend",
+    "meetingDate": "01-Dec-2024",
+    "bm_desc": ""
+  },
+  {
+    "symbol": "AGMCO",
+    "company": "AGM CORP",
+    "purpose": "Annual General Meeting",
+    "meetingDate": "15-Sep-2024",
+    "bm_desc": ""
+  },
+  {
+    "symbol": "BUYBACKCO",
+    "company": "BUYBACK CORP",
+    "purpose": "Buyback of Equity Shares",
+    "meetingDate": "01-Oct-2024",
+    "bm_desc": ""
+  },
+  {
+    "symbol": "BADDATE",
+    "company": "BAD DATE CORP",
+    "purpose": "Quarterly Results",
+    "meetingDate": "NOT-A-DATE",
+    "bm_desc": ""
+  },
+  {
+    "symbol": "",
+    "company": "NO SYMBOL CORP",
+    "purpose": "Quarterly Results",
+    "meetingDate": "15-Oct-2024",
+    "bm_desc": ""
+  },
+  {
+    "symbol": "BONUSCO",
+    "company": "BONUS CORP",
+    "purpose": "Bonus Issue",
+    "meetingDate": "10-Oct-2024",
+    "bm_desc": ""
+  },
+  {
+    "symbol": "LTIM",
+    "company": "LTIMindtree LTD",
+    "purpose": "Consolidated Financial Results for the quarter ended December 31, 2024",
+    "meetingDate": "16-Jan-2025",
+    "bm_desc": ""
+  }
+]

@@ -517,6 +517,11 @@ model Fundamental {
   currency             String?
   periodType           String
   periodEndDate        DateTime
+  /// Official NSE board-meeting / result-announcement date for this period.
+  /// Populated by the ingest-nse-earnings-dates script. When set, the
+  /// earnings-intelligence pipeline resolves resultDateSource='OFFICIAL_CALENDAR',
+  /// which unlocks RESULT_WINNERS, RESULT_DISAPPOINTMENTS, and RESULT_REACTION_HISTORY.
+  officialResultDate   DateTime?
   source               String
   sourceNote           String?
   sourceUrl            String?
@@ -528,6 +533,7 @@ model Fundamental {
 
   @@unique([stockId, periodType, periodEndDate, source])
   @@index([stockId, periodEndDate])
+  @@index([stockId, officialResultDate], map: "fundamentals_stockId_officialResultDate_idx")
   @@map("fundamentals")
 }
 
