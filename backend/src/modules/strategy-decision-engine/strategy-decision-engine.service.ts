@@ -1,5 +1,9 @@
 import { MarketDataFoundationService } from '../market-data-foundation';
 import { MarketContextIntelligenceService } from '../market-context-intelligence';
+import {
+  BREADTH_WEAK_THRESHOLD,
+  BREADTH_VERY_WEAK_THRESHOLD,
+} from '../market-context-intelligence/capital-posture.types';
 import { SignalGenerationEngineService } from '../signal-generation-engine';
 import { SignalCalibrationEngineService } from '../signal-calibration-engine';
 import { DataQualityEngineService } from '../data-quality-engine';
@@ -97,6 +101,20 @@ export class StrategyDecisionEngineService {
     return this.marketGateFromSummary(summary, regime, breadth);
   }
 
+  /**
+   * Derives MarketGate from a market summary, regime, and breadth snapshot.
+   *
+   * Thresholds are imported from capital-posture.types.ts (Capital Posture is the
+   * single source of truth for regime/breadth gate thresholds).  Both modules now
+   * share BREADTH_WEAK_THRESHOLD (RISK_ON → NEUTRAL downgrade boundary) and
+   * BREADTH_VERY_WEAK_THRESHOLD (NEUTRAL → RISK_OFF downgrade boundary) so that
+   * tuning Capital Posture constants automatically propagates here.
+   *
+   * Gate mapping (mirrors Capital Posture posture derivation):
+   *   OPEN      ← RISK_ON regime AND breadth ≥ BREADTH_WEAK_THRESHOLD (0.40)
+   *   CLOSED    ← RISK_OFF regime OR breadth < BREADTH_VERY_WEAK_THRESHOLD (0.25)
+   *   SELECTIVE ← everything else (NEUTRAL / weak-breadth RISK_ON)
+   */
   private marketGateFromSummary(summary: any, regime: any, breadth: any): MarketGateResponse {
     const reasons: string[] = [];
     const blockers: string[] = [];
@@ -106,20 +124,24 @@ export class StrategyDecisionEngineService {
     const score = regime?.score ?? 0;
     const isRiskOn = regime?.regime === 'RISK_ON';
     const isRiskOff = regime?.regime === 'RISK_OFF';
+    // breadthAbove50 is a fraction in [0, 1]; use Capital Posture constants for thresholds.
     const breadthAbove50 = breadth?.percentAboveSma50 ?? 0;
 
-    if (isRiskOn && breadthAbove50 >= 0.6) {
+    if (isRiskOn && breadthAbove50 >= BREADTH_WEAK_THRESHOLD) {
+      // Capital Posture: RISK_ON posture requires regime RISK_ON AND breadth ≥ BREADTH_WEAK_THRESHOLD.
       marketCondition = 'HEALTHY';
       marketGate = 'OPEN';
       allowedActions = ['NEW_LONG_TRADES_ALLOWED', 'ONLY_HIGH_QUALITY_SETUPS'];
       reasons.push('Market regime is Risk-On and breadth is healthy.');
-    } else if (isRiskOff || breadthAbove50 <= 0.3) {
+    } else if (isRiskOff || breadthAbove50 < BREADTH_VERY_WEAK_THRESHOLD) {
+      // Capital Posture: RISK_OFF posture is triggered by RISK_OFF regime OR breadth below BREADTH_VERY_WEAK_THRESHOLD.
       marketCondition = 'BAD';
       marketGate = 'CLOSED';
       allowedActions = ['MANAGE_EXISTING_POSITIONS_ONLY'];
       blockers.push('Market regime is Risk-Off or breadth is weak.');
       if (isRiskOff) reasons.push('High bearish risk detected.');
     } else {
+      // Capital Posture: NEUTRAL posture — selective deployment.
       marketCondition = 'MIXED';
       marketGate = 'SELECTIVE';
       allowedActions = ['ONLY_HIGH_QUALITY_SETUPS', 'MANAGE_EXISTING_POSITIONS_ONLY'];
@@ -287,9 +309,10 @@ export class StrategyDecisionEngineService {
         ].filter((rule) => typeof rule.weight === 'number').map((rule) => [rule.code, rule.weight as number])),
       })),
       marketGateRules: {
-        HEALTHY: 'Risk-On regime and breadth > 60%',
-        MIXED: 'Breadth 30-60%',
-        BAD: 'Risk-Off regime or breadth < 30%'
+        // Thresholds mirror Capital Posture constants (capital-posture.types.ts).
+        HEALTHY: `Risk-On regime and breadth ≥ ${BREADTH_WEAK_THRESHOLD * 100}% above 50-DMA`,
+        MIXED:   `Breadth ${BREADTH_VERY_WEAK_THRESHOLD * 100}–${BREADTH_WEAK_THRESHOLD * 100}% or neutral regime`,
+        BAD:     `Risk-Off regime or breadth < ${BREADTH_VERY_WEAK_THRESHOLD * 100}% above 50-DMA`,
       },
       languageSafetyRules: [
         'Use "candidate", "consider review", "risk level".',
@@ -965,8 +988,62 @@ export class StrategyDecisionEngineService {
       marketSectorWeaknessScore = 10;
     }
 
-    // 4. Portfolio Risk (Weight: 15) - Placeholder for allocation/P&L logic
-    portfolioRiskScore = 5; 
+    // 4. Portfolio Risk (Weight: 15)
+    // Derived from the real holding's unrealized P&L and/or allocation weight.
+    // Scoring intent: a deeper drawdown or an over-sized position carries more exit urgency.
+    //
+    // Field availability logic:
+    //   ctx.holding.unrealizedPnLPercent  — present when the holding is loaded (portfolioId set)
+    //   ctx.holding.allocationPercent     — present when the holding is loaded
+    //
+    // If the holding is present but fields are missing/non-finite, we still derive a partial
+    // score rather than phantom-inject a constant.
+    //
+    // If no holding data is available at all (no portfolioId, or the holding was not found in
+    // the portfolio), we zero the weight and renormalize: the remaining four dimensions still
+    // sum correctly to reflect exit urgency without injecting phantom points.
+    const holding = ctx.holding ?? null;
+    if (holding !== null) {
+      const pnlPct   = typeof holding.unrealizedPnLPercent === 'number' && Number.isFinite(holding.unrealizedPnLPercent)
+        ? holding.unrealizedPnLPercent
+        : null;
+      const allocPct = typeof holding.allocationPercent === 'number' && Number.isFinite(holding.allocationPercent)
+        ? holding.allocationPercent
+        : null;
+
+      // P&L sub-score (0–10): deeper loss → higher urgency.
+      //   pnlPct < -20% → 10, -10% to -20% → 7, -5% to -10% → 4, 0 to -5% → 2, > 0 → 0
+      let pnlScore = 0;
+      if (pnlPct !== null) {
+        if (pnlPct <= -0.20)      pnlScore = 10;
+        else if (pnlPct <= -0.10) pnlScore = 7;
+        else if (pnlPct <= -0.05) pnlScore = 4;
+        else if (pnlPct <   0)    pnlScore = 2;
+        // pnlPct >= 0 → 0 (profitable position has no P&L urgency contribution)
+        reasons.push(`Holding unrealized P&L: ${(pnlPct * 100).toFixed(1)}%.`);
+      }
+
+      // Allocation sub-score (0–5): over-sized position adds concentration risk.
+      //   allocationPct > 15% → 5, 10–15% → 3, 5–10% → 1, ≤ 5% → 0
+      let allocScore = 0;
+      if (allocPct !== null) {
+        if      (allocPct > 0.15) allocScore = 5;
+        else if (allocPct > 0.10) allocScore = 3;
+        else if (allocPct > 0.05) allocScore = 1;
+      }
+
+      portfolioRiskScore = pnlScore + allocScore; // 0–15, no phantom constant
+      if (pnlPct === null && allocPct === null) {
+        // Holding present but fields genuinely unavailable — zero weight, document the gap.
+        portfolioRiskScore = 0;
+        dataGaps.push('Holding found but unrealizedPnLPercent and allocationPercent are unavailable; portfolio-risk sub-score zeroed.');
+      }
+    } else {
+      // No holding context available (no portfolioId or instrument not in portfolio).
+      // Zero the weight; do NOT inject a phantom constant.
+      portfolioRiskScore = 0;
+      dataGaps.push('No holding data available; portfolio-risk sub-score zeroed (not phantom-scored).');
+    }
 
     // 5. Smart Money / Data (Weight: 10)
     if (ctx.smartMoney?.status === 'DISTRIBUTION') {

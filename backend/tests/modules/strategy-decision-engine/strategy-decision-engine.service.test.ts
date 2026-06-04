@@ -2,6 +2,10 @@
 import { StrategyDecisionEngineService } from '../../../src/modules/strategy-decision-engine';
 import { StrategyFrameworkRegistry, StrategyFrameworkService } from '../../../src/modules/strategy-framework';
 import type { StrategyDefinition } from '../../../src/modules/strategy-framework';
+import {
+  BREADTH_WEAK_THRESHOLD,
+  BREADTH_VERY_WEAK_THRESHOLD,
+} from '../../../src/modules/market-context-intelligence/capital-posture.types';
 
 const makePrices = (days = 260, start = '2025-01-01', first = 50, slope = 1) => {
   const startDate = new Date(start);
@@ -74,6 +78,102 @@ describe('StrategyDecisionEngineService', () => {
       mockContext.breadth.mockResolvedValue({ percentAboveSma50: 0.5 });
       const gate = await service.marketGate();
       expect(gate.marketGate).toBe('SELECTIVE');
+    });
+
+    // ── Capital Posture threshold alignment ─────────────────────────────────
+    // These tests verify that marketGate uses the SAME threshold constants as
+    // Capital Posture (capital-posture.types.ts) so both modules classify
+    // identically when thresholds are tuned.
+
+    it('uses Capital Posture BREADTH_WEAK_THRESHOLD as the OPEN boundary (not a hardcoded 0.60)', () => {
+      // A breadth value AT the Capital Posture OPEN threshold must produce OPEN for RISK_ON.
+      const summaryBase = { dataStatus: 'COMPLETE' };
+      const regimeOn    = { regime: 'RISK_ON', score: 80 };
+
+      // Exactly at threshold → OPEN
+      const atThreshold = (service as any).marketGateFromSummary(
+        summaryBase,
+        regimeOn,
+        { percentAboveSma50: BREADTH_WEAK_THRESHOLD },
+      );
+      expect(atThreshold.marketGate).toBe('OPEN');
+
+      // Just below the Capital Posture threshold → SELECTIVE (not OPEN)
+      const justBelow = (service as any).marketGateFromSummary(
+        summaryBase,
+        regimeOn,
+        { percentAboveSma50: BREADTH_WEAK_THRESHOLD - 0.01 },
+      );
+      expect(justBelow.marketGate).toBe('SELECTIVE');
+    });
+
+    it('uses Capital Posture BREADTH_VERY_WEAK_THRESHOLD as the CLOSED boundary (not a hardcoded 0.30)', () => {
+      const summaryBase  = { dataStatus: 'COMPLETE' };
+      const regimeNeutral = { regime: 'NEUTRAL', score: 50 };
+
+      // Just below BREADTH_VERY_WEAK_THRESHOLD with neutral regime → CLOSED
+      const justBelow = (service as any).marketGateFromSummary(
+        summaryBase,
+        regimeNeutral,
+        { percentAboveSma50: BREADTH_VERY_WEAK_THRESHOLD - 0.01 },
+      );
+      expect(justBelow.marketGate).toBe('CLOSED');
+
+      // Exactly at BREADTH_VERY_WEAK_THRESHOLD → SELECTIVE (not CLOSED)
+      const atThreshold = (service as any).marketGateFromSummary(
+        summaryBase,
+        regimeNeutral,
+        { percentAboveSma50: BREADTH_VERY_WEAK_THRESHOLD },
+      );
+      expect(atThreshold.marketGate).toBe('SELECTIVE');
+    });
+
+    it('classifies a breadth value between old 0.60 and CP BREADTH_WEAK_THRESHOLD consistently with Capital Posture', () => {
+      // Old hardcoded threshold was 0.60.  Capital Posture BREADTH_WEAK_THRESHOLD is 0.40.
+      // A breadth of 0.50 (between old 0.60 and CP 0.40) used to be SELECTIVE under the old
+      // code but would now also be SELECTIVE (RISK_ON but breadth below OPEN threshold).
+      // The key assertion is that the exact same threshold constant drives both modules.
+      const midBreadth = (BREADTH_WEAK_THRESHOLD + 0.60) / 2; // e.g. 0.50
+      const gate = (service as any).marketGateFromSummary(
+        { dataStatus: 'COMPLETE' },
+        { regime: 'RISK_ON', score: 80 },
+        { percentAboveSma50: midBreadth },
+      );
+      // midBreadth (0.50) >= BREADTH_WEAK_THRESHOLD (0.40) → OPEN
+      // This confirms the threshold is CP's 0.40, not the old 0.60
+      expect(gate.marketGate).toBe('OPEN');
+    });
+
+    it('output contract (gate values and allowedActions) is unchanged from equivalent inputs', () => {
+      // OPEN gate still produces the same allowed-action set
+      const openGate = (service as any).marketGateFromSummary(
+        { dataStatus: 'COMPLETE' },
+        { regime: 'RISK_ON', score: 80 },
+        { percentAboveSma50: 0.70 },
+      );
+      expect(openGate.marketGate).toBe('OPEN');
+      expect(openGate.marketCondition).toBe('HEALTHY');
+      expect(openGate.allowedActions).toEqual(expect.arrayContaining(['NEW_LONG_TRADES_ALLOWED', 'ONLY_HIGH_QUALITY_SETUPS']));
+
+      // CLOSED gate still produces manage-only
+      const closedGate = (service as any).marketGateFromSummary(
+        { dataStatus: 'COMPLETE' },
+        { regime: 'RISK_OFF', score: 20 },
+        { percentAboveSma50: 0.10 },
+      );
+      expect(closedGate.marketGate).toBe('CLOSED');
+      expect(closedGate.marketCondition).toBe('BAD');
+      expect(closedGate.allowedActions).toEqual(['MANAGE_EXISTING_POSITIONS_ONLY']);
+
+      // SELECTIVE gate still produces the correct set
+      const selectiveGate = (service as any).marketGateFromSummary(
+        { dataStatus: 'COMPLETE' },
+        { regime: 'NEUTRAL', score: 50 },
+        { percentAboveSma50: 0.35 },
+      );
+      expect(selectiveGate.marketGate).toBe('SELECTIVE');
+      expect(selectiveGate.marketCondition).toBe('MIXED');
+      expect(selectiveGate.allowedActions).toEqual(expect.arrayContaining(['ONLY_HIGH_QUALITY_SETUPS', 'MANAGE_EXISTING_POSITIONS_ONLY']));
     });
   });
 
@@ -249,6 +349,108 @@ describe('StrategyDecisionEngineService', () => {
       const result = (service as any).evaluateDefensiveExit(ctx);
       expect(result.decision).toBe('EXIT_CANDIDATE');
       expect(result.action).toBe('REVIEW_EXIT');
+    });
+
+    // ── Portfolio-risk sub-score: real data, not phantom constant ───────────
+
+    it('portfolioRisk score increases with deeper unrealised loss', () => {
+      // allocationPercent: 0.08 → allocScore 1 (> 5% but ≤ 10%)
+      const makeCtx = (unrealizedPnLPercent: number, allocationPercent = 0.08) => ({
+        instrument: { id: 'test', symbol: 'TEST' },
+        prices: new Array(200).fill(100),
+        latestPrice: 100,
+        sma50: 90,
+        rawSignal: { direction: 'NEUTRAL' },
+        gate: { marketGate: 'OPEN' },
+        holding: { unrealizedPnLPercent, allocationPercent },
+      });
+
+      const flatResult    = (service as any).evaluateDefensiveExit(makeCtx(0.02));   // +2% → pnlScore 0
+      const mildLoss      = (service as any).evaluateDefensiveExit(makeCtx(-0.04));  // -4% → pnlScore 2
+      const modLoss       = (service as any).evaluateDefensiveExit(makeCtx(-0.12));  // -12% → pnlScore 7
+      const deepLoss      = (service as any).evaluateDefensiveExit(makeCtx(-0.25));  // -25% → pnlScore 10
+
+      // alloc 8% → allocScore 1 in all cases
+      expect(flatResult.scoreBreakdown.portfolioRisk).toBe(1);    // pnlScore 0 + allocScore 1
+      expect(mildLoss.scoreBreakdown.portfolioRisk).toBe(3);      // pnlScore 2 + allocScore 1
+      expect(modLoss.scoreBreakdown.portfolioRisk).toBe(8);       // pnlScore 7 + allocScore 1
+      expect(deepLoss.scoreBreakdown.portfolioRisk).toBe(11);     // pnlScore 10 + allocScore 1
+      // Deeper loss must produce a strictly higher portfolio-risk contribution
+      expect(deepLoss.scoreBreakdown.portfolioRisk).toBeGreaterThan(modLoss.scoreBreakdown.portfolioRisk);
+      expect(modLoss.scoreBreakdown.portfolioRisk).toBeGreaterThan(mildLoss.scoreBreakdown.portfolioRisk);
+    });
+
+    it('portfolioRisk score increases with larger allocation (concentration risk)', () => {
+      const makeCtx = (allocationPercent: number) => ({
+        instrument: { id: 'test', symbol: 'TEST' },
+        prices: new Array(200).fill(100),
+        latestPrice: 100,
+        sma50: 90,
+        rawSignal: { direction: 'NEUTRAL' },
+        gate: { marketGate: 'OPEN' },
+        holding: { unrealizedPnLPercent: 0, allocationPercent },
+      });
+
+      const small    = (service as any).evaluateDefensiveExit(makeCtx(0.03));  // ≤5% → allocScore 0
+      const medium   = (service as any).evaluateDefensiveExit(makeCtx(0.08));  // 5–10% → allocScore 1
+      const large    = (service as any).evaluateDefensiveExit(makeCtx(0.12));  // 10–15% → allocScore 3
+      const oversized = (service as any).evaluateDefensiveExit(makeCtx(0.20)); // >15% → allocScore 5
+
+      expect(small.scoreBreakdown.portfolioRisk).toBe(0);
+      expect(medium.scoreBreakdown.portfolioRisk).toBe(1);
+      expect(large.scoreBreakdown.portfolioRisk).toBe(3);
+      expect(oversized.scoreBreakdown.portfolioRisk).toBe(5);
+    });
+
+    it('zeroes portfolioRisk (not phantom 5) when no holding is present', () => {
+      const ctx = {
+        instrument: { id: 'test', symbol: 'TEST' },
+        prices: new Array(200).fill(100),
+        latestPrice: 95,
+        sma50: 100,
+        rawSignal: { direction: 'BEARISH' },
+        gate: { marketGate: 'CLOSED' },
+        smartMoney: { status: 'DISTRIBUTION' },
+        holding: null,
+      };
+      const result = (service as any).evaluateDefensiveExit(ctx);
+      expect(result.scoreBreakdown.portfolioRisk).toBe(0);
+      // Data-gap should be documented, not silently zeroed
+      expect(result.dataGaps.join(' ')).toContain('portfolio-risk');
+    });
+
+    it('zeroes portfolioRisk when holding fields are missing/non-finite', () => {
+      const ctx = {
+        instrument: { id: 'test', symbol: 'TEST' },
+        prices: new Array(200).fill(100),
+        latestPrice: 95,
+        sma50: 100,
+        rawSignal: { direction: 'BEARISH' },
+        gate: { marketGate: 'CLOSED' },
+        holding: { unrealizedPnLPercent: null, allocationPercent: undefined },
+      };
+      const result = (service as any).evaluateDefensiveExit(ctx);
+      expect(result.scoreBreakdown.portfolioRisk).toBe(0);
+      expect(result.dataGaps.join(' ')).toContain('portfolio-risk');
+    });
+
+    it('decision thresholds (EXIT_CANDIDATE/REDUCE_RISK/WATCH) are preserved with real portfolio data', () => {
+      // A heavily losing, oversized holding with bearish signal + CLOSED gate + DISTRIBUTION
+      // should still reach EXIT_CANDIDATE via the score threshold (>= 75)
+      const ctx = {
+        instrument: { id: 'test', symbol: 'TEST' },
+        prices: new Array(200).fill(100),
+        latestPrice: 90,
+        sma50: 100,
+        rawSignal: { direction: 'BEARISH' },
+        gate: { marketGate: 'CLOSED' },
+        smartMoney: { status: 'DISTRIBUTION' },
+        holding: { unrealizedPnLPercent: -0.25, allocationPercent: 0.20 },
+      };
+      const result = (service as any).evaluateDefensiveExit(ctx);
+      // Score: bearish(30) + trendBreak(25) + closed(20) + portfolioRisk(15) + distribution(10) = 100
+      expect(result.decision).toBe('EXIT_CANDIDATE');
+      expect(result.scoreBreakdown.portfolioRisk).toBe(15); // max: pnlScore(10) + allocScore(5)
     });
     });
     });
