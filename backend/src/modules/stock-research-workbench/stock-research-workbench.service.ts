@@ -1,10 +1,95 @@
 import { MarketDataFoundationService } from '../market-data-foundation';
-import type { ResearchPerformanceMetrics, ResearchPricePoint, ResearchRange } from './stock-research-workbench.types';
+import type { ResearchPerformanceMetrics, ResearchPricePoint, ResearchRange, SignalEvidenceSection } from './stock-research-workbench.types';
 
 const TRADING_DAYS_PER_YEAR = 252;
 
+/**
+ * Minimal structural interface for the calibration persisted-read.
+ * Defined locally to avoid a circular import (calibration imports workbench
+ * transitively via signal-generation-engine).
+ */
+export interface WorkbenchCalibrationReader {
+  latestForInstrument(
+    instrumentId: string,
+    calibrationModelVersion?: string,
+  ): Promise<{
+    calibratedScore: number;
+    calibratedDirection: string;
+    calibrationEvidence?: { horizon: string } | null;
+    overallEvaluatedSamples?: number;
+  } | null>;
+}
+
+/**
+ * Minimal structural interface for per-instrument outcome aggregate from the
+ * signal-quality-lab repository.  Defined locally to avoid circular imports.
+ */
+export interface WorkbenchOutcomeAggregateReader {
+  instrumentOutcomeAggregate(
+    instrumentId: string,
+    horizon: string,
+  ): Promise<{
+    matureCount: number;
+    directionalSampleSize: number;
+    winRate: number | null;
+    avgForwardReturn: number | null;
+  } | null>;
+}
+
+/**
+ * Minimal structural interface for reading the latest signal result's
+ * reliabilityTier without pulling in the full signal-generation-engine.
+ */
+export interface WorkbenchSignalReader {
+  latestForInstrument(instrumentId: string): Promise<{ reliabilityTier?: string | null } | null>;
+}
+
+const DEFAULT_CALIBRATION_HORIZON = '20D';
+
 export class StockResearchWorkbenchService {
-  constructor(private readonly marketDataService = new MarketDataFoundationService()) {}
+  constructor(
+    private readonly marketDataService = new MarketDataFoundationService(),
+    private readonly calibrationReader?: WorkbenchCalibrationReader | null,
+    private readonly outcomeAggregateReader?: WorkbenchOutcomeAggregateReader | null,
+    private readonly signalReader?: WorkbenchSignalReader | null,
+  ) {}
+
+  /**
+   * Lazily resolve calibration reader from SignalCalibrationEngineRepository.
+   * Uses require() to avoid static circular import.
+   */
+  private resolveCalibrationReader(): WorkbenchCalibrationReader | null {
+    if (this.calibrationReader === null) return null;
+    if (this.calibrationReader !== undefined) return this.calibrationReader;
+    try {
+      const { SignalCalibrationEngineRepository } = require('../signal-calibration-engine/signal-calibration-engine.repository') as typeof import('../signal-calibration-engine/signal-calibration-engine.repository');
+      return new SignalCalibrationEngineRepository();
+    } catch { return null; }
+  }
+
+  /**
+   * Lazily resolve outcome aggregate reader from SignalQualityLabRepository.
+   */
+  private resolveOutcomeAggregateReader(): WorkbenchOutcomeAggregateReader | null {
+    if (this.outcomeAggregateReader === null) return null;
+    if (this.outcomeAggregateReader !== undefined) return this.outcomeAggregateReader;
+    try {
+      const { SignalQualityLabRepository } = require('../signal-quality-lab/signal-quality-lab.repository') as typeof import('../signal-quality-lab/signal-quality-lab.repository');
+      return new SignalQualityLabRepository();
+    } catch { return null; }
+  }
+
+  /**
+   * Lazily resolve signal reader from SignalGenerationEngineRepository.
+   */
+  private resolveSignalReader(): WorkbenchSignalReader | null {
+    if (this.signalReader === null) return null;
+    if (this.signalReader !== undefined) return this.signalReader;
+    try {
+      const { SignalGenerationEngineRepository } = require('../signal-generation-engine/signal-generation-engine.repository') as typeof import('../signal-generation-engine/signal-generation-engine.repository');
+      return new SignalGenerationEngineRepository();
+    } catch { return null; }
+  }
 
   async workbench(instrumentId: string, range: ResearchRange = '1Y') {
     const [instrument, latest, prices, fundamentals, corporateActions] = await Promise.all([
@@ -28,6 +113,9 @@ export class StockResearchWorkbenchService {
     const relativeStrength = this.relativeStrengthSnapshot(selectedPrices, peers, nifty50PricePoints);
     const dailyChange = this.returnBetween(pricePoints[1]?.adjusted_close, pricePoints[0]?.adjusted_close);
     const dailyChangeValue = pricePoints.length > 1 ? pricePoints[0].adjusted_close - pricePoints[1].adjusted_close : null;
+
+    // Signal evidence: persisted-read only (no live recompute on GET).
+    const signalEvidence = await this.signalEvidenceFor(instrumentId);
 
     return {
       overview: {
@@ -66,6 +154,74 @@ export class StockResearchWorkbenchService {
         last_updated_timestamp: latest?.last_updated_timestamp || prices?.last_updated_timestamp || instrument.last_updated_timestamp,
         data_status: latest?.data_status || prices?.data_status || instrument.data_status,
       },
+      signalEvidence,
+    };
+  }
+
+  /**
+   * Build the signalEvidence section for the workbench.
+   *
+   * Sources (all persisted-read; no live recompute):
+   *  1. SignalCalibrationEngineRepository.latestForInstrument → calibratedScore + horizon
+   *  2. SignalQualityLabRepository.instrumentOutcomeAggregate → winRate + avgForwardReturn
+   *  3. SignalGenerationEngineRepository.latestForInstrument → reliabilityTier
+   *
+   * Graceful when any source is absent:
+   *  - No calibration row → calibrationStatus = 'CALIBRATION_PENDING', calibratedScore null
+   *  - No mature outcomes → status = 'NO_TRACK_RECORD', winRate / avgForwardReturn null
+   *  - No signal row → reliabilityTier null
+   */
+  async signalEvidenceFor(instrumentId: string): Promise<SignalEvidenceSection> {
+    const calibReader = this.resolveCalibrationReader();
+    const outcomeReader = this.resolveOutcomeAggregateReader();
+    const sigReader = this.resolveSignalReader();
+
+    const [calibRow, sigRow] = await Promise.all([
+      calibReader ? calibReader.latestForInstrument(instrumentId).catch(() => null) : Promise.resolve(null),
+      sigReader ? (sigReader as any).latestForInstrument(instrumentId).catch(() => null) : Promise.resolve(null),
+    ]);
+
+    const horizon: string = calibRow?.calibrationEvidence?.horizon ?? DEFAULT_CALIBRATION_HORIZON;
+    const outcomeAggregate = outcomeReader
+      ? await outcomeReader.instrumentOutcomeAggregate(instrumentId, horizon).catch(() => null)
+      : null;
+
+    const reliabilityTier = (sigRow as any)?.reliabilityTier ?? null;
+    const outcomeDepth = outcomeAggregate?.matureCount ?? null;
+    const winRate = outcomeAggregate?.winRate ?? null;
+    const avgForwardReturn = outcomeAggregate?.avgForwardReturn ?? null;
+    const calibratedScore = typeof calibRow?.calibratedScore === 'number' ? calibRow.calibratedScore : null;
+    const calibratedDirection = typeof calibRow?.calibratedDirection === 'string' ? calibRow.calibratedDirection : null;
+
+    // Determine status
+    const hasOutcomes = (outcomeDepth ?? 0) > 0;
+    const hasCalibration = calibRow !== null && calibRow !== undefined;
+
+    let status: SignalEvidenceSection['status'];
+    let note: string;
+
+    if (!hasOutcomes) {
+      status = 'NO_TRACK_RECORD';
+      note = 'No track record yet — outcomes will populate as signals mature over time.';
+    } else if (!hasCalibration) {
+      status = 'CALIBRATION_PENDING';
+      note = `Track record available (${outcomeDepth} mature outcomes at ${horizon}) — calibration pending for this instrument.`;
+    } else {
+      status = 'AVAILABLE';
+      const winRateStr = winRate !== null ? `${(winRate * 100).toFixed(1)}% win rate` : 'win rate pending';
+      note = `${outcomeDepth} mature outcomes at ${horizon} horizon — ${winRateStr}.`;
+    }
+
+    return {
+      status,
+      reliabilityTier: reliabilityTier as 'FULL' | 'PARTIAL' | null,
+      outcomeDepth,
+      trackRecordHorizon: hasOutcomes ? horizon : null,
+      winRate,
+      avgForwardReturn,
+      calibratedScore,
+      calibratedDirection,
+      note,
     };
   }
 

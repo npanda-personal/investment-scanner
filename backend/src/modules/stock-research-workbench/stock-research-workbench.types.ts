@@ -21,6 +21,57 @@ export interface ResearchPerformanceMetrics {
   volatility: number | null;
 }
 
+/**
+ * Signal evidence section on the stock-research workbench.
+ * All fields are sourced from PERSISTED reads only (no live recompute).
+ * status='NO_TRACK_RECORD' means no mature outcomes exist yet — never fabricated.
+ */
+export interface SignalEvidenceSection {
+  /**
+   * 'AVAILABLE'      — at least one mature (dataComplete=true) outcome row exists.
+   * 'NO_TRACK_RECORD' — zero mature outcomes persisted; track record not yet established.
+   * 'CALIBRATION_PENDING' — calibration row absent even though outcomes may exist.
+   */
+  status: 'AVAILABLE' | 'NO_TRACK_RECORD' | 'CALIBRATION_PENDING';
+  /** Reliability tier from the latest signal result for this instrument ('FULL' | 'PARTIAL' | null). */
+  reliabilityTier: 'FULL' | 'PARTIAL' | null;
+  /**
+   * Number of mature (dataComplete=true) outcome rows for the default horizon (20D).
+   * null when no outcomes exist.
+   */
+  outcomeDepth: number | null;
+  /**
+   * Evaluation horizon used for the track-record metrics below (e.g. '20D').
+   * Sourced from the calibration row's evidence when available; otherwise the
+   * default horizon used by the calibration engine.
+   */
+  trackRecordHorizon: string | null;
+  /**
+   * Win rate over directional (BULLISH + BEARISH, NEUTRAL excluded) mature outcomes
+   * for this instrument at the selected horizon.
+   * BULLISH win = forwardReturnPercent > 0; BEARISH win = forwardReturnPercent < 0.
+   * null when insufficient data.
+   */
+  winRate: number | null;
+  /** Average forward-return percent over directional mature outcomes. null when absent. */
+  avgForwardReturn: number | null;
+  /**
+   * Calibrated score from the latest persisted SignalCalibrationResult.
+   * null when no calibration row exists.
+   */
+  calibratedScore: number | null;
+  /**
+   * Calibrated direction from the latest persisted SignalCalibrationResult.
+   * null when no calibration row exists.
+   */
+  calibratedDirection: string | null;
+  /**
+   * Human-readable note explaining the evidence status.
+   * E.g. "No track record yet — outcomes will populate as signals mature."
+   */
+  note: string;
+}
+
 export interface ResearchWorkbenchResponse {
   overview: Record<string, unknown>;
   chart: {
@@ -42,4 +93,6 @@ export interface ResearchWorkbenchResponse {
     last_updated_timestamp: string | null;
     data_status: MarketDataStatus;
   };
+  /** Signal evidence section — reliability, track record and calibration (persisted-read only). */
+  signalEvidence: SignalEvidenceSection;
 }

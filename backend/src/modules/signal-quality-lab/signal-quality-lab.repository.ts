@@ -622,6 +622,59 @@ export class SignalQualityLabRepository {
   }
 
   // ---------------------------------------------------------------------------
+  // Per-instrument outcome aggregates (for workbench signalEvidence)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Return directional win-rate and avg forward-return for a single instrument
+   * at the given horizon, computed over dataComplete=true rows.
+   *
+   * Returns null when no mature rows exist (graceful absent).
+   * Win-rate semantics: denominator = BULLISH + BEARISH (NEUTRAL excluded).
+   */
+  async instrumentOutcomeAggregate(
+    instrumentId: string,
+    horizon: QualityHorizon,
+  ): Promise<{
+    matureCount: number;
+    directionalSampleSize: number;
+    winRate: number | null;
+    avgForwardReturn: number | null;
+  } | null> {
+    const sql = `
+      SELECT
+        COUNT(*) AS mature_count,
+        COUNT(*) FILTER (WHERE direction IN ('BULLISH','BEARISH')) AS directional_sample,
+        CASE WHEN COUNT(*) FILTER (WHERE direction IN ('BULLISH','BEARISH')) = 0 THEN NULL
+             ELSE ROUND(
+               COUNT(*) FILTER (
+                 WHERE (direction = 'BULLISH' AND "forwardReturnPercent" > 0)
+                    OR (direction = 'BEARISH' AND "forwardReturnPercent" < 0)
+               )::numeric
+               / COUNT(*) FILTER (WHERE direction IN ('BULLISH','BEARISH'))::numeric,
+               6
+             )
+        END AS win_rate,
+        ROUND(AVG("forwardReturnPercent")::numeric, 6) AS avg_forward_return
+      FROM signal_outcomes
+      WHERE "instrumentId" = $1
+        AND horizon = $2
+        AND "dataComplete" = true
+    `;
+    const rows = await this.db.$queryRawUnsafe<any[]>(sql, instrumentId, horizon);
+    const row = rows[0];
+    if (!row) return null;
+    const matureCount = Number(row.mature_count ?? 0);
+    if (matureCount === 0) return null;
+    return {
+      matureCount,
+      directionalSampleSize: Number(row.directional_sample ?? 0),
+      winRate: row.win_rate !== null && row.win_rate !== undefined ? Number(row.win_rate) : null,
+      avgForwardReturn: row.avg_forward_return !== null && row.avg_forward_return !== undefined ? Number(row.avg_forward_return) : null,
+    };
+  }
+
+  // ---------------------------------------------------------------------------
   // Legacy stub (kept for backward compat)
   // ---------------------------------------------------------------------------
 

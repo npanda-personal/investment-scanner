@@ -179,10 +179,32 @@ export interface RegimeGateProvider {
   } | null>;
 }
 
+/**
+ * Minimal structural interface for the calibration repository persisted-read.
+ * Defined locally (instead of importing from signal-calibration-engine) to avoid
+ * a potential circular module dependency: calibration imports signal-generation.
+ * Shape mirrors SignalCalibrationEngineRepository.latestForInstruments.
+ */
+export interface CalibrationPersistedReader {
+  latestForInstruments(
+    instrumentIds: string[],
+    calibrationModelVersion?: string,
+  ): Promise<Array<{
+    instrumentId: string;
+    calibratedScore: number;
+    calibratedDirection: string;
+    overallEvaluatedSamples?: number;
+    groupEvaluatedSamples?: number;
+    calibrationEvidence?: { horizon: string } | null;
+  }>>;
+}
+
 export class SignalGenerationEngineService {
   private defaultStrategyFrameworkServiceInstance?: StrategyFrameworkSignalGenerationService;
   /** Lazily resolved when not injected; see defaultCapitalPostureService(). */
   private defaultCapitalPostureServiceInstance?: RegimeGateProvider;
+  /** Lazily resolved when not injected; see resolvedCalibrationReader(). */
+  private defaultCalibrationReaderInstance?: CalibrationPersistedReader;
 
   constructor(
     private readonly repository = new SignalGenerationEngineRepository(),
@@ -200,6 +222,12 @@ export class SignalGenerationEngineService {
      * Pass `null` explicitly to disable regime gating for a specific instance.
      */
     private readonly capitalPostureService?: RegimeGateProvider | null,
+    /**
+     * Optional calibration persisted-reader.  When provided, enrichSignals joins
+     * the latest persisted SignalCalibrationResult per instrument (persisted-read
+     * only; never recomputes).  Omit to skip calibration overlay (graceful absent).
+     */
+    private readonly calibrationReader?: CalibrationPersistedReader | null,
   ) {}
 
   async topSignals(query: SignalQuery): Promise<PaginatedSignalResponse> {
@@ -714,19 +742,30 @@ export class SignalGenerationEngineService {
 
   async enrichSignals(signals: SignalResultDto[], options: Pick<SignalQuery, 'strategyCode' | 'includeStrategyMatches' | 'onlyStrategyEligible' | 'excludeNoiseFiltered' | 'hasStrategyMatch' | 'hasBlockedStrategies' | 'frameworkBackedDecisionAvailable' | 'region' | 'assetType'> = {}): Promise<SignalResultDto[]> {
     if (signals.length === 0) return [];
-    
+
     try {
       const instrumentIds = Array.from(new Set(signals.map(s => s.instrument_id)));
       const symbols = Array.from(new Set(signals.map(s => s.symbol)));
 
-      // Batch fetch instruments and latest prices using public service methods
-      const [instruments, latestPrices] = await Promise.all([
+      // Batch fetch instruments, latest prices, and calibration rows concurrently.
+      // Calibration read is persisted-only — never triggers a live recompute.
+      const calibReader = this.resolvedCalibrationReader();
+      const calibrationPromise = calibReader
+        ? calibReader.latestForInstruments(instrumentIds).catch(() => [])
+        : Promise.resolve<Array<any>>([]);
+
+      const [instruments, latestPrices, calibrationRows] = await Promise.all([
         this.marketDataService.getInstrumentsByIds(instrumentIds),
-        this.marketDataService.getLatestPricesBySymbols(symbols)
+        this.marketDataService.getLatestPricesBySymbols(symbols),
+        calibrationPromise,
       ]);
 
       const instrumentMap = new Map(instruments.map((i: any) => [i.id, i]));
       const priceMap = new Map(latestPrices.map((p: any) => [p.symbol, p]));
+      // Build a map of instrumentId → latest calibration row (null-safe)
+      const calibrationMap = new Map(
+        (calibrationRows as any[]).map((row: any) => [row.instrumentId, row])
+      );
       const includeStrategyContext = this.shouldAttachStrategyMatches(options);
       const ratingCache = new Map<string, Promise<StrategyPerformanceSummaryDto | null>>();
       const strategyScopeRegion = this.canonicalRegion(options.region || signals[0]?.country);
@@ -740,9 +779,9 @@ export class SignalGenerationEngineService {
       const enriched = await Promise.all(signals.map(async (signal) => {
         const instrument = instrumentMap.get(signal.instrument_id);
         const latest = priceMap.get(signal.symbol);
-        
+
         const currentPrice = latest ? Number((latest as any).adjusted_close ?? (latest as any).close) : null;
-        
+
         let previousClose: number | null = null;
         if (latest) {
           // For previous close, we still do a targeted lookup per signal for now
@@ -752,7 +791,14 @@ export class SignalGenerationEngineService {
         }
 
         const dailyChange = currentPrice !== null && previousClose !== null ? currentPrice - previousClose : null;
-        
+
+        // ── Calibration overlay (persisted-read; graceful absent) ────────────
+        // Attach the latest persisted calibration fields to the signal read.
+        // If no calibration row exists, calibrationStatus='UNAVAILABLE' and the
+        // raw score is the only authoritative value — nothing is fabricated.
+        const calibRow = calibrationMap.get(signal.instrument_id);
+        const calibrationOverlay = this.calibrationOverlayFor(calibRow);
+
         let result: SignalResultDto = {
           ...signal,
           currentPrice,
@@ -761,6 +807,7 @@ export class SignalGenerationEngineService {
           dailyChangePercent: dailyChange !== null && previousClose !== null && previousClose > 0 ? dailyChange / previousClose : null,
           currency: instrument?.currency ?? signal.currency ?? null,
           priceTimestamp: (latest as any)?.date ? new Date((latest as any).date).toISOString() : null,
+          ...calibrationOverlay,
         };
         if (includeStrategyContext) {
           result = this.withPersistedStrategyContext(result, instrument, marketContext, persistedSmartMoney.get(signal.instrument_id) ?? null);
@@ -1012,6 +1059,41 @@ export class SignalGenerationEngineService {
     if (options.frameworkBackedDecisionAvailable && matchCount === 0) return false;
     if (options.excludeNoiseFiltered && matchCount === 0 && blocked.length > 0 && blocked.every((item) => item.noiseFiltersTriggered.length > 0)) return false;
     return true;
+  }
+
+  /**
+   * Build the calibration overlay fields from a persisted calibration row.
+   *
+   * When a calibration row exists: sets calibratedScore, calibrationHorizon,
+   * selectedHorizon, calibrationStatus='CALIBRATED', and calibrationSampleSize
+   * from the row's overallEvaluatedSamples.
+   *
+   * When no row exists (null/undefined): returns calibrationStatus='UNAVAILABLE'
+   * and all calibration fields null.  The raw `score` is never touched.
+   *
+   * Design: all fields are additive — the raw `score` is always preserved as-is.
+   */
+  private calibrationOverlayFor(calibRow: any): Pick<
+    SignalResultDto,
+    'calibratedScore' | 'calibrationHorizon' | 'selectedHorizon' | 'calibrationStatus' | 'calibrationSampleSize'
+  > {
+    if (!calibRow) {
+      return {
+        calibratedScore: null,
+        calibrationHorizon: null,
+        selectedHorizon: null,
+        calibrationStatus: 'UNAVAILABLE',
+        calibrationSampleSize: null,
+      };
+    }
+    const horizon: string | null = calibRow.calibrationEvidence?.horizon ?? null;
+    return {
+      calibratedScore: typeof calibRow.calibratedScore === 'number' ? calibRow.calibratedScore : null,
+      calibrationHorizon: horizon,
+      selectedHorizon: horizon,
+      calibrationStatus: 'CALIBRATED',
+      calibrationSampleSize: typeof calibRow.overallEvaluatedSamples === 'number' ? calibRow.overallEvaluatedSamples : null,
+    };
   }
 
   private withTriggerContract(signal: SignalResultDto, instrument?: any): SignalResultDto {
@@ -1479,6 +1561,29 @@ export class SignalGenerationEngineService {
     const { CapitalPostureService } = require('../market-context-intelligence/capital-posture.service') as typeof import('../market-context-intelligence/capital-posture.service');
     this.defaultCapitalPostureServiceInstance = new CapitalPostureService();
     return this.defaultCapitalPostureServiceInstance;
+  }
+
+  /**
+   * Resolves the calibration reader.
+   *
+   * When explicitly provided (including null to opt out), that value is used.
+   * When omitted from the constructor, the production default
+   * (SignalCalibrationEngineRepository) is lazy-required to avoid a static
+   * circular import: signal-calibration-engine imports signal-generation-engine,
+   * so a static import of the calibration repository here would create a
+   * load-time cycle.  Null is returned when the require fails (e.g. test stubs).
+   */
+  private resolvedCalibrationReader(): CalibrationPersistedReader | null {
+    if (this.calibrationReader === null) return null;
+    if (this.calibrationReader !== undefined) return this.calibrationReader;
+    if (this.defaultCalibrationReaderInstance) return this.defaultCalibrationReaderInstance;
+    try {
+      const { SignalCalibrationEngineRepository } = require('../signal-calibration-engine/signal-calibration-engine.repository') as typeof import('../signal-calibration-engine/signal-calibration-engine.repository');
+      this.defaultCalibrationReaderInstance = new SignalCalibrationEngineRepository();
+      return this.defaultCalibrationReaderInstance;
+    } catch {
+      return null;
+    }
   }
 
   /**

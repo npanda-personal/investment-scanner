@@ -74,6 +74,37 @@ export interface SignalResultDto {
   blockedStrategies?: SignalBlockedStrategySummary[];
   writeStatus?: SignalWriteStatus;
   triggerContract?: SignalTriggerContractDto;
+
+  // ── Calibration overlay (additive, persisted-read only) ────────────────────
+  /**
+   * Calibration-adjusted score from the latest persisted SignalCalibrationResult
+   * for this instrument.  null when no calibration row exists yet.
+   * The raw `score` field above is always preserved as-is.
+   */
+  calibratedScore?: number | null;
+  /**
+   * The evaluation horizon used by the calibration model (e.g. '20D').
+   * Sourced from calibrationEvidence.horizon on the persisted row.
+   * null when calibration is absent.
+   */
+  calibrationHorizon?: string | null;
+  /**
+   * Convenience alias for calibrationHorizon exposed as selectedHorizon so
+   * consumers can label which time window the calibration was measured over.
+   */
+  selectedHorizon?: string | null;
+  /**
+   * 'CALIBRATED'  — a valid persisted calibration row was found and applied.
+   * 'UNAVAILABLE' — no persisted row exists; raw score is the authoritative value.
+   * Never fabricated: when absent the raw score stands unchanged.
+   */
+  calibrationStatus?: 'CALIBRATED' | 'UNAVAILABLE';
+  /**
+   * Number of mature (dataComplete=true) signal_outcomes used by the
+   * calibration engine for this instrument's model version, if available.
+   * Surfaces the outcome depth so consumers can judge confidence.
+   */
+  calibrationSampleSize?: number | null;
 }
 
 export type SignalWriteStatus = 'CREATED' | 'UPDATED' | 'NO_OP';
