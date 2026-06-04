@@ -3,6 +3,9 @@ import { SubscriptionBillingService } from '../subscription-billing';
 import { WatchlistManagementService } from '../watchlist-management';
 import { DataQualityEngineService } from '../data-quality-engine';
 import { StrategyFrameworkEvaluator, StrategyFrameworkRegistry, StrategyFrameworkService } from '../strategy-framework';
+// Lazy import to keep the dependency one-directional (historical-context-snapshots
+// does NOT import backtesting-strategy-lab, so no cycle risk here).
+import { HistoricalContextSnapshotsRepository } from '../historical-context-snapshots/historical-context-snapshots.repository';
 import { BacktestingStrategyLabRepository } from './backtesting-strategy-lab.repository';
 import type {
   BacktestMetrics,
@@ -19,6 +22,36 @@ import type {
   WalkForwardSegmentResult,
 } from './backtesting-strategy-lab.types';
 import { validateConfig, validateStrategyInput } from './backtesting-strategy-lab.validation';
+
+/**
+ * Slim row shape we pull from MarketContextSnapshot for per-bar regime lookup.
+ * Only the fields the backtest actually needs.
+ */
+interface RegimeSnapshotRow {
+  /** YYYY-MM-DD UTC date key, derived from snapshotDate */
+  dateKey: string;
+  regime: string;
+  /** breadthPercentAboveSma50 — may be null if not captured */
+  breadthAbove50: number | null;
+}
+
+/**
+ * Derives the marketGate string from a persisted regime + breadth value.
+ * Mirrors the IDENTICAL logic in StrategyFrameworkService.marketGate()
+ * (strategy-framework/strategy-framework.service.ts:490) — reused verbatim,
+ * not invented here, so the two paths stay consistent.
+ *
+ * OPEN      = RISK_ON  + breadth ≥ 60 %
+ * CLOSED    = RISK_OFF OR breadth ≤ 30 %
+ * SELECTIVE = any known regime that is not OPEN/CLOSED
+ * UNKNOWN   = no regime data
+ */
+function marketGateFromRegime(regime: string | null | undefined, breadthAbove50: number | null | undefined): string {
+  if (regime === 'RISK_ON' && (breadthAbove50 ?? 0) >= 0.6) return 'OPEN';
+  if (regime === 'RISK_OFF' || (breadthAbove50 ?? 1) <= 0.3) return 'CLOSED';
+  if (regime) return 'SELECTIVE';
+  return 'UNKNOWN';
+}
 
 interface Position { instrumentId: string; symbol: string; entryDate: string; entryPrice: number; quantity: number; entryBarIndex: number; cost: number; committedCapital: number; entryReasons?: string[]; highestClose: number }
 interface ResolvedUniverse {
@@ -45,7 +78,12 @@ export class BacktestingStrategyLabService {
     private readonly subscriptionService = new SubscriptionBillingService(),
     private readonly dataQualityService = new DataQualityEngineService(),
     private readonly strategyRegistry = new StrategyFrameworkRegistry(),
-    private readonly strategyFrameworkService = new StrategyFrameworkService()
+    private readonly strategyFrameworkService = new StrategyFrameworkService(),
+    // Optional injection for testing — defaults to the real repository.
+    // Using optional injection so that existing tests that don't supply it
+    // still compile without changes (they mock snapshot lookup via the
+    // regimeIndex argument threaded into strategyContextFromBars).
+    private readonly snapshotsRepository: HistoricalContextSnapshotsRepository = new HistoricalContextSnapshotsRepository()
   ) {}
 
   listStrategies(userId = 'default-user') { return this.repository.listStrategies(userId); }
@@ -207,6 +245,16 @@ export class BacktestingStrategyLabService {
     if (filterResult.metadata.excludedForDataQuality > 0) dataCoverage.warnings.push('Some instruments were excluded by Data Quality Engine readiness filters.');
     if (universe.capped && universe.totalAvailable && universe.cap) dataCoverage.warnings.push(`Universe ALL was capped to ${universe.cap} of ${universe.totalAvailable} instruments for bounded runtime safety.`);
     const dates = [...new Set([...histories.values()].flatMap((item) => item.bars.map((bar) => bar.date)))].sort();
+
+    // Preload persisted MarketContextSnapshot rows for this backtest's date
+    // range once.  The sorted array is then used for in-memory as-of lookups
+    // per bar — no further DB queries inside the hot loop.
+    const regimeIndex = await this.preloadRegimeSnapshots(
+      config.startDate,
+      config.endDate,
+      config.region || 'IN',
+    );
+
     let cash = config.initialCapital;
     let peak = config.initialCapital;
     const positions = new Map<string, Position>();
@@ -220,10 +268,10 @@ export class BacktestingStrategyLabService {
         const bar = history.bars[barIndex];
         const position = positions.get(history.instrumentId);
         if (position) position.highestClose = Math.max(position.highestClose, bar.close);
-        const exit = position ? this.exitDecision(config, history.bars, barIndex, position) : null;
+        const exit = position ? this.exitDecision(config, history.bars, barIndex, position, regimeIndex) : null;
         if (position && exit?.exit) {
           const registeredExit = exit.reason === EXIT_REASONS.STRATEGY_EXIT
-            ? this.evaluateRegisteredStrategy(config, history.bars, barIndex, true, position)
+            ? this.evaluateRegisteredStrategy(config, history.bars, barIndex, true, position, regimeIndex)
             : null;
           const exitReasons = registeredExit ? this.uniqueStrings([
             ...registeredExit.exitRulesTriggered,
@@ -240,7 +288,7 @@ export class BacktestingStrategyLabService {
         if (positions.size >= config.maxPositions || positions.has(history.instrumentId)) continue;
         const barIndex = history.bars.findIndex((bar) => bar.date === date);
         if (barIndex < 0) continue;
-        const entry = this.entryDecision(config, history.bars, barIndex);
+        const entry = this.entryDecision(config, history.bars, barIndex, regimeIndex);
         if (!entry.enter) continue;
         const amount = config.positionSizeType === 'FIXED_AMOUNT' ? Number(config.fixedAmountPerTrade) : cash / Math.max(1, config.maxPositions - positions.size);
         const costAdjustedAmount = Math.min(cash, amount);
@@ -311,7 +359,7 @@ export class BacktestingStrategyLabService {
 
     // Fix 1: walk-forward / out-of-sample validation (additive — only when option set).
     const walkForward = config.walkForwardOptions
-      ? this.computeWalkForward(config, histories, dates)
+      ? this.computeWalkForward(config, histories, dates, regimeIndex)
       : undefined;
 
     return {
@@ -335,8 +383,8 @@ export class BacktestingStrategyLabService {
     return this.entryDecision(config, bars, index).enter;
   }
 
-  private entryDecision(config: BacktestStrategyConfig, bars: HistoricalBar[], index: number): { enter: boolean; reasons: string[] } {
-    const registered = this.evaluateRegisteredStrategy(config, bars, index);
+  private entryDecision(config: BacktestStrategyConfig, bars: HistoricalBar[], index: number, regimeIndex?: RegimeSnapshotRow[]): { enter: boolean; reasons: string[] } {
+    const registered = this.evaluateRegisteredStrategy(config, bars, index, false, undefined, regimeIndex);
     if (registered) return {
       enter: registered.decision === 'ENTRY_CANDIDATE' && registered.eligibleForBacktest && registered.eligibleForSignalGeneration,
       reasons: this.uniqueStrings([...registered.entryRulesPassed, ...registered.reasons]),
@@ -352,14 +400,14 @@ export class BacktestingStrategyLabService {
     return this.exitDecision(config, bars, index, position).exit;
   }
 
-  private exitDecision(config: BacktestStrategyConfig, bars: HistoricalBar[], index: number, position: Position): { exit: boolean; reason: string } {
+  private exitDecision(config: BacktestStrategyConfig, bars: HistoricalBar[], index: number, position: Position, regimeIndex?: RegimeSnapshotRow[]): { exit: boolean; reason: string } {
     const close = bars[index].close;
     if (typeof config.stopLossPercent === 'number' && close <= position.entryPrice * (1 - config.stopLossPercent)) return { exit: true, reason: EXIT_REASONS.STOP_LOSS };
     if (typeof config.trailingStopPercent === 'number' && close <= position.highestClose * (1 - config.trailingStopPercent)) return { exit: true, reason: EXIT_REASONS.TRAILING_STOP };
     if (typeof config.takeProfitPercent === 'number' && close >= position.entryPrice * (1 + config.takeProfitPercent)) return { exit: true, reason: EXIT_REASONS.TAKE_PROFIT };
     if (typeof config.maxHoldingDays === 'number' && index - position.entryBarIndex >= config.maxHoldingDays) return { exit: true, reason: EXIT_REASONS.MAX_HOLDING_PERIOD };
     if (config.strategyCode) {
-      const registered = this.evaluateRegisteredStrategy(config, bars, index, true, position);
+      const registered = this.evaluateRegisteredStrategy(config, bars, index, true, position, regimeIndex);
       if (registered && ['EXIT_CANDIDATE', 'REDUCE_RISK', 'AVOID'].includes(registered.decision)) return { exit: true, reason: EXIT_REASONS.STRATEGY_EXIT };
     }
     const signal = this.signalProxy(bars, index);
@@ -434,16 +482,25 @@ export class BacktestingStrategyLabService {
     };
   }
 
-  private evaluateRegisteredStrategy(config: BacktestStrategyConfig, bars: HistoricalBar[], index: number, exit = false, position?: Position) {
+  private evaluateRegisteredStrategy(
+    config: BacktestStrategyConfig,
+    bars: HistoricalBar[],
+    index: number,
+    exit = false,
+    position?: Position,
+    regimeIndex?: RegimeSnapshotRow[],
+  ) {
     if (!this.isRegisteredConfig(config)) return null;
     const strategy = this.strategyRegistry.get(config.strategyCode!);
     if (!strategy) return null;
-    const context = this.strategyContextFromBars(bars, index, config, position);
+    const barDate = bars[index]?.date ?? null;
+    const regimeRow = (regimeIndex && barDate) ? this.regimeAsOf(regimeIndex, barDate) : null;
+    const context = this.strategyContextFromBars(bars, index, config, position, regimeRow);
     const evaluator = new StrategyFrameworkEvaluator(strategy);
     return exit ? evaluator.evaluateExit(context) : evaluator.evaluateEntry(context);
   }
 
-  private strategyContextFromBars(bars: HistoricalBar[], index: number, config: BacktestStrategyConfig, position?: Position) {
+  private strategyContextFromBars(bars: HistoricalBar[], index: number, config: BacktestStrategyConfig, position?: Position, regimeRow?: RegimeSnapshotRow | null) {
     const window = bars.slice(0, index + 1);
     const latestFirst = [...window].reverse();
     const closes = latestFirst.map((bar) => bar.close);
@@ -492,8 +549,17 @@ export class BacktestingStrategyLabService {
         eligibleForSignals: closes.length >= 200,
         eligibleForBacktesting: closes.length >= 252,
       },
-      marketGate: 'OPEN',
-      marketRegime: 'NEUTRAL',
+      // Use the persisted regime for this bar date when available.
+      // regimeRow is the nearest MarketContextSnapshot on-or-before the bar
+      // date (pre-loaded for the whole backtest, no per-bar DB query).
+      // Falls back to OPEN/NEUTRAL when no snapshot precedes the bar date
+      // (e.g. pre-2019 bars) and flags regimeContextAvailable = false so
+      // results are interpretable rather than silently wrong.
+      marketGate: regimeRow
+        ? marketGateFromRegime(regimeRow.regime, regimeRow.breadthAbove50)
+        : 'OPEN',
+      marketRegime: regimeRow ? regimeRow.regime : 'NEUTRAL',
+      regimeContextAvailable: regimeRow !== null && regimeRow !== undefined,
       sectorLeadership: proxyContextScore >= 70 ? 'LEADING' : proxyContextScore >= 55 ? 'IMPROVING' : 'NEUTRAL',
       sectorRelativeStrengthScore: proxyContextScore,
       smartMoneyStatus: signal.direction === 'BULLISH' && averageVolume20 !== null ? 'ACCUMULATION' : 'NEUTRAL',
@@ -723,6 +789,81 @@ export class BacktestingStrategyLabService {
     return quantity * exitPrice - Math.abs(quantity * exitPrice * config.transactionCostPercent);
   }
 
+  // ─── Historical regime preload & as-of lookup ──────────────────────────────
+
+  /**
+   * Preloads all MarketContextSnapshot rows for the given date range and
+   * region into a sorted array of RegimeSnapshotRow, ascending by dateKey.
+   *
+   * Only one DB query per backtest run — NOT per bar.
+   *
+   * Returns an empty array on DB error (caller falls back to OPEN/NEUTRAL).
+   */
+  private async preloadRegimeSnapshots(
+    startDate: string,
+    endDate: string,
+    region: string,
+  ): Promise<RegimeSnapshotRow[]> {
+    try {
+      // We intentionally reach into the Prisma client via the repository's
+      // underlying db accessor to avoid a per-row async call.  The repository
+      // itself only exposes paginated queries; we add a simple bulk read here
+      // by calling the inherited Prisma model directly via the exposed db field.
+      const repoAsAny = this.snapshotsRepository as any;
+      const db = repoAsAny.db;
+      if (!db || typeof db.marketContextSnapshot?.findMany !== 'function') {
+        return [];
+      }
+      // Fetch snapshotDate <= endDate AND snapshotDate >= (startDate - 90 days)
+      // to ensure we also cover bar dates that precede the first snapshot after
+      // the backtest's start date (e.g. a snapshot on 2018-12-28 is valid for
+      // a bar on 2019-01-02).
+      const from = new Date(new Date(startDate).getTime() - 90 * 24 * 60 * 60 * 1000);
+      const to = new Date(endDate);
+      const rows: Array<{ snapshotDate: Date; regime: string; breadthPercentAboveSma50: number | null }> =
+        await db.marketContextSnapshot.findMany({
+          where: {
+            region: region.toUpperCase(),
+            snapshotDate: { gte: from, lte: to },
+          },
+          select: { snapshotDate: true, regime: true, breadthPercentAboveSma50: true },
+          orderBy: { snapshotDate: 'asc' },
+        });
+      return rows.map((row) => ({
+        dateKey: row.snapshotDate.toISOString().slice(0, 10),
+        regime: row.regime,
+        breadthAbove50: row.breadthPercentAboveSma50 ?? null,
+      }));
+    } catch {
+      // Non-fatal — fallback to hardcoded OPEN/NEUTRAL with unavailable flag.
+      return [];
+    }
+  }
+
+  /**
+   * As-of (point-in-time) lookup: given a sorted array of RegimeSnapshotRow
+   * (ascending by dateKey) and a target bar date string (YYYY-MM-DD), returns
+   * the latest row whose dateKey is <= barDate, or null if none exists.
+   *
+   * O(log n) binary search — safe even for large snapshot arrays.
+   */
+  regimeAsOf(sortedRows: RegimeSnapshotRow[], barDate: string): RegimeSnapshotRow | null {
+    if (sortedRows.length === 0) return null;
+    let lo = 0;
+    let hi = sortedRows.length - 1;
+    let result: RegimeSnapshotRow | null = null;
+    while (lo <= hi) {
+      const mid = (lo + hi) >>> 1;
+      if (sortedRows[mid].dateKey <= barDate) {
+        result = sortedRows[mid];
+        lo = mid + 1;
+      } else {
+        hi = mid - 1;
+      }
+    }
+    return result;
+  }
+
   private exitDiagnostics(trades: BacktestTrade[]): NonNullable<BacktestMetrics['exitDiagnostics']> {
     const count = (reason: string) => trades.filter((trade) => trade.exitReason === reason).length;
     const endOfTestExitCount = count(EXIT_REASONS.END_OF_TEST);
@@ -754,6 +895,7 @@ export class BacktestingStrategyLabService {
     config: BacktestStrategyConfig,
     histories: Map<string, { instrumentId: string; symbol: string; bars: HistoricalBar[] }>,
     segmentDates: string[],
+    regimeIndex: RegimeSnapshotRow[] = [],
   ): { metrics: BacktestMetrics; trades: BacktestTrade[]; equityCurve: EquityCurvePoint[] } {
     let cash = config.initialCapital;
     let peak = config.initialCapital;
@@ -768,10 +910,10 @@ export class BacktestingStrategyLabService {
         const bar = history.bars[barIndex];
         const position = positions.get(history.instrumentId);
         if (position) position.highestClose = Math.max(position.highestClose, bar.close);
-        const exit = position ? this.exitDecision(config, history.bars, barIndex, position) : null;
+        const exit = position ? this.exitDecision(config, history.bars, barIndex, position, regimeIndex) : null;
         if (position && exit?.exit) {
           const registeredExit = exit.reason === EXIT_REASONS.STRATEGY_EXIT
-            ? this.evaluateRegisteredStrategy(config, history.bars, barIndex, true, position)
+            ? this.evaluateRegisteredStrategy(config, history.bars, barIndex, true, position, regimeIndex)
             : null;
           const exitReasons = registeredExit ? this.uniqueStrings([
             ...registeredExit.exitRulesTriggered,
@@ -788,7 +930,7 @@ export class BacktestingStrategyLabService {
         if (positions.size >= config.maxPositions || positions.has(history.instrumentId)) continue;
         const barIndex = history.bars.findIndex((bar) => bar.date === date);
         if (barIndex < 0) continue;
-        const entry = this.entryDecision(config, history.bars, barIndex);
+        const entry = this.entryDecision(config, history.bars, barIndex, regimeIndex);
         if (!entry.enter) continue;
         const amount = config.positionSizeType === 'FIXED_AMOUNT' ? Number(config.fixedAmountPerTrade) : cash / Math.max(1, config.maxPositions - positions.size);
         const costAdjustedAmount = Math.min(cash, amount);
@@ -842,6 +984,7 @@ export class BacktestingStrategyLabService {
     config: BacktestStrategyConfig,
     histories: Map<string, { instrumentId: string; symbol: string; bars: HistoricalBar[] }>,
     dates: string[],
+    regimeIndex: RegimeSnapshotRow[] = [],
   ): WalkForwardResult | undefined {
     if (dates.length < 4) return undefined;
 
@@ -866,8 +1009,8 @@ export class BacktestingStrategyLabService {
 
     if (inSampleDates.length < 2 || outOfSampleDates.length < 2) return undefined;
 
-    const inSampleResult = this.runSegment(config, histories, inSampleDates);
-    const outOfSampleResult = this.runSegment(config, histories, outOfSampleDates);
+    const inSampleResult = this.runSegment(config, histories, inSampleDates, regimeIndex);
+    const outOfSampleResult = this.runSegment(config, histories, outOfSampleDates, regimeIndex);
 
     const inSampleFraction = inSampleDates.length / dates.length;
     const threshold = typeof opts.overfitCagrThreshold === 'number' ? opts.overfitCagrThreshold : 0.10;
