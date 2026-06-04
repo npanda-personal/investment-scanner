@@ -15,6 +15,7 @@ describe('signal quality lab routes', () => {
       history: jest.fn(),
       outcomes: jest.fn(),
       recalculate: jest.fn(),
+      scorecard: jest.fn(),
     } as any);
     const routes = router.stack
       .filter((layer: any) => layer.route)
@@ -31,6 +32,7 @@ describe('signal quality lab routes', () => {
       'GET /signals/:instrumentId/history',
       'GET /signals/:instrumentId/outcomes',
       'POST /signals/quality/recalculate',
+      'GET /signals/quality/scorecard',
     ]);
   });
 });

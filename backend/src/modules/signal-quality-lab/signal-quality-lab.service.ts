@@ -19,6 +19,10 @@ import type {
   QualityRecalculateResponse,
   QualityRecalculateWithPersistRequest,
   QualitySummary,
+  ScorecardGroupBy,
+  ScorecardQuery,
+  ScorecardResponse,
+  ScorecardSummary,
   SignalHistoryItem,
   SignalOutcomeSet,
   SignalOutcomeUpsert,
@@ -202,6 +206,51 @@ export class SignalQualityLabService {
   async noisy(query: QualityQuery): Promise<NoisySignalItem[]> {
     const signals = await this.loadSignals(query);
     return this.detectNoisySignals(signals, await this.outcomesForSignals(signals, query));
+  }
+
+  // ---------------------------------------------------------------------------
+  // Scorecard API (Slice 2)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Return scorecard rows grouped by `horizon × groupBy`.
+   * Delegates SQL aggregation to the repository; applies minSampleSize after.
+   */
+  async scorecard(query: ScorecardQuery): Promise<ScorecardResponse> {
+    const normalizedQuery = this.normalizeScorecardQuery(query);
+    const [rows, summaryRows] = await Promise.all([
+      this.repository.scorecard(normalizedQuery),
+      this.repository.scorecardSummary(normalizedQuery),
+    ]);
+
+    const minSample = normalizedQuery.minSampleSize ?? 1;
+    const filteredRows = rows.filter((row) => row.directionalSampleSize >= minSample);
+
+    return {
+      groupBy: normalizedQuery.groupBy as ScorecardGroupBy,
+      horizon: normalizedQuery.horizon ?? null,
+      rows: filteredRows,
+      summary: summaryRows,
+    };
+  }
+
+  /**
+   * Return per-horizon summary stats only (no secondary group-by).
+   * Useful for a quick "what's the overall 5D win-rate?" query.
+   */
+  async scorecardSummary(query: ScorecardQuery): Promise<ScorecardSummary[]> {
+    const normalizedQuery = this.normalizeScorecardQuery(query);
+    return this.repository.scorecardSummary(normalizedQuery);
+  }
+
+  private normalizeScorecardQuery(query: ScorecardQuery): ScorecardQuery & { groupBy: ScorecardGroupBy; minSampleSize: number } {
+    return {
+      ...query,
+      groupBy: (query.groupBy === 'sector' || query.groupBy === 'scoreBucket') ? query.groupBy : 'direction',
+      minSampleSize: Number.isFinite(Number(query.minSampleSize)) && Number(query.minSampleSize) >= 0
+        ? Math.trunc(Number(query.minSampleSize))
+        : 1,
+    };
   }
 
   async recalculate(input: QualityRecalculateWithPersistRequest | QualityRecalculateRequest): Promise<QualityRecalculateResponse> {

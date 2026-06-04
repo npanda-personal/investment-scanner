@@ -17,6 +17,7 @@ export const createSignalQualityLabRouter = (controller = new SignalQualityLabCo
   router.get('/signals/:instrumentId/history', controller.history);
   router.get('/signals/:instrumentId/outcomes', controller.outcomes);
   router.post('/signals/quality/recalculate', controller.recalculate);
+  router.get('/signals/quality/scorecard', controller.scorecard);
 
   return router;
 };

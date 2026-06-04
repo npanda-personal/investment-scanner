@@ -256,3 +256,100 @@ export interface OutcomeBatchResult {
 export interface QualityRecalculateWithPersistRequest extends QualityRecalculateRequest {
   persistOutcomes?: boolean;
 }
+
+// ---------------------------------------------------------------------------
+// Scorecard types (Slice 2)
+// ---------------------------------------------------------------------------
+
+export type ScorecardGroupBy = 'direction' | 'sector' | 'scoreBucket';
+
+export interface ScorecardQuery {
+  /** Filter to a specific horizon; if omitted, all horizons are returned grouped by horizon. */
+  horizon?: QualityHorizon;
+  /** Dimension to group within each horizon. Default: 'direction'. */
+  groupBy?: ScorecardGroupBy;
+  /** Optional pre-filter: only include rows for this direction. */
+  direction?: 'BULLISH' | 'BEARISH' | 'NEUTRAL';
+  /** Optional pre-filter: only include rows for this sector. */
+  sector?: string;
+  /** Optional pre-filter: only include rows for this modelVersion. */
+  modelVersion?: string;
+  /** Optional date range filter on signalGeneratedDate (ISO string, inclusive). */
+  from?: string;
+  to?: string;
+  /**
+   * Minimum directionalSampleSize to include a row in the response.
+   * Rows below this threshold are filtered out. Default: 1.
+   */
+  minSampleSize?: number;
+}
+
+/**
+ * One row in the scorecard — represents one (horizon × groupKey) combination.
+ */
+export interface ScorecardRow {
+  /** The horizon this row applies to, e.g. '5D'. */
+  horizon: QualityHorizon;
+  /** The value of the groupBy dimension, e.g. 'BULLISH', 'Technology', '60-79'. */
+  groupKey: string;
+  /**
+   * Total rows with dataComplete=true in this group (includes NEUTRAL).
+   * Used for avg return etc.
+   */
+  sampleSize: number;
+  /**
+   * Rows that are BULLISH or BEARISH (excluding NEUTRAL).
+   * This is the win-rate denominator.
+   */
+  directionalSampleSize: number;
+  /**
+   * Win rate over directional rows only.
+   * BULLISH win = forwardReturnPercent > 0; BEARISH win = forwardReturnPercent < 0.
+   * null when directionalSampleSize === 0.
+   */
+  winRate: number | null;
+  avgReturnPercent: number | null;
+  medianReturnPercent: number | null;
+  /**
+   * Expectancy = (winRate × avgWin) + ((1 − winRate) × avgLoss).
+   * Computed over directional rows only. null when not enough data.
+   */
+  expectancy: number | null;
+  /**
+   * Profit factor = sum(positive returns) / |sum(negative returns)|.
+   * null when no negative returns exist (infinite profit factor treated as null).
+   */
+  profitFactor: number | null;
+  avgMaxAdverseExcursion: number | null;
+  avgMaxFavorableExcursion: number | null;
+  bestReturnPercent: number | null;
+  worstReturnPercent: number | null;
+}
+
+/**
+ * Overall (all groupBy dimensions collapsed) stats per horizon.
+ * Same fields as ScorecardRow minus groupKey.
+ */
+export interface ScorecardSummary {
+  horizon: QualityHorizon;
+  sampleSize: number;
+  directionalSampleSize: number;
+  winRate: number | null;
+  avgReturnPercent: number | null;
+  medianReturnPercent: number | null;
+  expectancy: number | null;
+  profitFactor: number | null;
+  avgMaxAdverseExcursion: number | null;
+  avgMaxFavorableExcursion: number | null;
+  bestReturnPercent: number | null;
+  worstReturnPercent: number | null;
+}
+
+export interface ScorecardResponse {
+  groupBy: ScorecardGroupBy;
+  /** Echoes back the horizon filter if one was supplied. */
+  horizon: QualityHorizon | null;
+  rows: ScorecardRow[];
+  /** Per-horizon summary (one entry per horizon present in rows, or all 5 when horizon is null). */
+  summary: ScorecardSummary[];
+}

@@ -1,4 +1,4 @@
-import type { QualityHorizon, QualityQuery } from './signal-quality-lab.types';
+import type { QualityHorizon, QualityQuery, ScorecardGroupBy, ScorecardQuery } from './signal-quality-lab.types';
 
 export const QUALITY_HORIZONS: QualityHorizon[] = ['1D', '5D', '10D', '20D', '60D'];
 export const QUALITY_DIRECTIONS = ['BULLISH', 'NEUTRAL', 'BEARISH'] as const;
@@ -35,6 +35,27 @@ export function requireInstrumentId(value: unknown): string {
     throw new Error('instrumentId is required');
   }
   return value.trim();
+}
+
+const SCORECARD_GROUP_BY_VALUES: ScorecardGroupBy[] = ['direction', 'sector', 'scoreBucket'];
+
+export function parseScorecardQuery(query: any): ScorecardQuery {
+  const horizon = QUALITY_HORIZONS.includes(query.horizon as QualityHorizon)
+    ? (query.horizon as QualityHorizon)
+    : undefined;
+
+  const groupBy: ScorecardGroupBy = SCORECARD_GROUP_BY_VALUES.includes(query.groupBy as ScorecardGroupBy)
+    ? (query.groupBy as ScorecardGroupBy)
+    : 'direction';
+
+  const direction = parseEnum(query.direction, ['BULLISH', 'BEARISH', 'NEUTRAL'] as const);
+  const sector = typeof query.sector === 'string' && query.sector.trim() ? query.sector.trim() : undefined;
+  const modelVersion = parseModelVersion(query.modelVersion);
+  const from = validDate(query.from) ? query.from : undefined;
+  const to = validDate(query.to) ? query.to : undefined;
+  const minSampleSize = clampInt(query.minSampleSize, 1, 0, 10000);
+
+  return { horizon, groupBy, direction, sector, modelVersion, from, to, minSampleSize };
 }
 
 export function parseQualityRecalculateRequest(input: any): { batchSize: number; offset: number; horizon: QualityHorizon; region: string; assetType: string; modelVersion?: string; from?: string; to?: string } {

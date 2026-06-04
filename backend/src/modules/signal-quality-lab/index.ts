@@ -7,7 +7,7 @@ export {
 export { SignalQualityLabController } from './signal-quality-lab.controller';
 export { SignalQualityLabRepository } from './signal-quality-lab.repository';
 export { SignalQualityLabService } from './signal-quality-lab.service';
-export { QUALITY_DIRECTIONS, QUALITY_HORIZONS, parseHorizon, parseQualityQuery, parseQualityRecalculateRequest, requireInstrumentId } from './signal-quality-lab.validation';
+export { QUALITY_DIRECTIONS, QUALITY_HORIZONS, parseHorizon, parseQualityQuery, parseQualityRecalculateRequest, parseScorecardQuery, requireInstrumentId } from './signal-quality-lab.validation';
 export type {
   EvidenceUsability,
   ForwardOutcome,
@@ -25,6 +25,11 @@ export type {
   QualityRecalculateResponse,
   QualityRecalculateWithPersistRequest,
   QualitySummary,
+  ScorecardGroupBy,
+  ScorecardQuery,
+  ScorecardResponse,
+  ScorecardRow,
+  ScorecardSummary,
   SignalHistoryItem,
   SignalOutcomeSet,
   SignalOutcomeUpsert,
