@@ -2933,6 +2933,81 @@ export class MarketDataFoundationRepository {
     });
   }
 
+  /**
+   * Lists active, non-delisted IN/STOCK instruments ordered by fewest existing
+   * Fundamental rows first (uncovered stocks are prioritised for bulk ingest).
+   */
+  async listStocksForFundamentalsIngestion(options: {
+    region?: string;
+    assetType?: string;
+    batchSize: number;
+    offset: number;
+  }): Promise<{ stocks: { id: string; symbol: string }[]; total: number }> {
+    const region = options.region?.trim().toUpperCase() || 'IN';
+    const assetType = options.assetType?.trim().toUpperCase() || 'STOCK';
+    const scopeFilters: Prisma.Sql[] = [
+      Prisma.sql`stocks."isActive" = TRUE`,
+      Prisma.sql`stocks."isDelisted" = FALSE`,
+    ];
+    if (region === 'IN') {
+      scopeFilters.push(Prisma.sql`(stocks.region = ${'IN'} OR UPPER(COALESCE(stocks.country,'')) IN (${Prisma.join(['IN', 'INDIA'])}))`);
+    } else {
+      scopeFilters.push(Prisma.sql`UPPER(COALESCE(stocks.region,'')) = ${region}`);
+    }
+    if (assetType === 'STOCK' || assetType === 'EQUITY') {
+      scopeFilters.push(Prisma.sql`(UPPER(COALESCE(stocks."assetType",'')) IN (${Prisma.join(['STOCK', 'EQUITY'])}) OR stocks."assetType" IS NULL)`);
+    } else {
+      scopeFilters.push(Prisma.sql`UPPER(COALESCE(stocks."assetType",'')) = ${assetType}`);
+    }
+    const whereClause = Prisma.join(scopeFilters, ' AND ');
+
+    const [rows, countRows] = await Promise.all([
+      this.prisma.$queryRaw<Array<{ id: string; symbol: string }>>(Prisma.sql`
+        SELECT
+          stocks.id,
+          stocks.symbol,
+          COUNT(f.id) AS fundamentals_count
+        FROM stocks
+        LEFT JOIN fundamentals f
+          ON f."stockId" = stocks.id
+          AND f.source = 'MANUAL_VERIFIED'
+        WHERE ${whereClause}
+        GROUP BY stocks.id, stocks.symbol
+        ORDER BY fundamentals_count ASC, stocks.symbol ASC
+        LIMIT ${options.batchSize} OFFSET ${options.offset}
+      `),
+      this.prisma.$queryRaw<Array<{ count: number | bigint }>>(Prisma.sql`
+        SELECT COUNT(*)::int AS count
+        FROM stocks
+        WHERE ${whereClause}
+      `),
+    ]);
+
+    return {
+      stocks: rows.map((row) => ({ id: row.id, symbol: row.symbol })),
+      total: Number(countRows[0]?.count || 0),
+    };
+  }
+
+  /**
+   * Returns the set of `${periodType}|${YYYY-MM-DD}` keys already present for
+   * a stock so callers can skip periods that already exist (D5 dedup protection).
+   */
+  async listExistingFundamentalPeriods(stockId: string): Promise<Set<string>> {
+    const rows = await (this.prisma as any).fundamental.findMany({
+      where: { stockId, source: 'MANUAL_VERIFIED' },
+      select: { periodType: true, periodEndDate: true },
+    });
+    const keys = new Set<string>();
+    for (const row of rows) {
+      const dateStr = row.periodEndDate instanceof Date
+        ? row.periodEndDate.toISOString().slice(0, 10)
+        : String(row.periodEndDate).slice(0, 10);
+      keys.add(`${row.periodType}|${dateStr}`);
+    }
+    return keys;
+  }
+
   async upsertCorporateActions(stockId: string, actions: CorporateAction[]) {
     const normalizedActions = new Map<string, CorporateAction & { normalizedEffectiveDate: Date; normalizedSource: string; naturalKey: string }>();
     for (const action of actions) {

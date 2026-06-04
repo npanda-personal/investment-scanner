@@ -115,6 +115,11 @@ import {
   type AdjustmentAction,
   type AdjustmentActionType,
 } from './market-data-foundation.corporate-adjustment';
+import {
+  NseXbrlFundamentalsCsvExporter,
+  toManualVerifiedFundamentalsCsv,
+  type ManualVerifiedFundamentalsCsvRow,
+} from './market-data-foundation.nse-xbrl-fundamentals-exporter';
 
 const TRUSTED_REVIEW_SCAN_ORDERING = 'recentVolumeDesc_priceHistoryCompleteness_latestFreshness_symbol';
 const MARKET_MOVER_LOOKBACK_DAYS: Record<MarketMoverRange, number> = {
@@ -4318,6 +4323,154 @@ export class MarketDataFoundationService {
       },
       durationMs: Date.now() - started,
     };
+  }
+
+  /**
+   * Bulk-ingest NSE XBRL fundamentals for the full active IN/STOCK universe.
+   *
+   * Stocks are loaded in priority order (fewest existing Fundamental rows first).
+   * For each batch the exporter fetches live NSE filings; periods that already
+   * exist in the DB (source='MANUAL_VERIFIED') are filtered out before upsert
+   * so curated data is never overwritten (D5 dedup protection).
+   *
+   * NOTE: the exporter makes real NSE HTTP calls — only invoke on-demand; never
+   * trigger at module load time.
+   */
+  async importNseXbrlFundamentalsForUniverse(options: {
+    region?: string;
+    assetType?: string;
+    symbolBatchSize?: number;
+    maxSymbols?: number;
+    maxQuarterlyPeriods?: number;
+    maxAnnualPeriods?: number;
+    delayBetweenBatchesMs?: number;
+    /** Injected for tests only; defaults to a real NseXbrlFundamentalsCsvExporter */
+    _exporter?: { exportSymbols: (opts: any) => Promise<{ rows: ManualVerifiedFundamentalsCsvRow[]; csvText: string; report: any }> };
+  } = {}): Promise<{
+    symbolsProcessed: number;
+    rowsImported: number;
+    rowsSkippedExisting: number;
+    batches: number;
+    warnings: string[];
+    errors: string[];
+  }> {
+    const region = options.region?.trim().toUpperCase() || 'IN';
+    const assetType = options.assetType?.trim().toUpperCase() || 'STOCK';
+    const symbolBatchSize = Math.max(1, Math.min(options.symbolBatchSize ?? 25, 100));
+    const maxQuarterlyPeriods = options.maxQuarterlyPeriods ?? 4;
+    const maxAnnualPeriods = options.maxAnnualPeriods ?? 2;
+    const delayBetweenBatchesMs = options.delayBetweenBatchesMs ?? 1500;
+    const maxSymbols = options.maxSymbols ?? Number.MAX_SAFE_INTEGER;
+    const exporter = options._exporter ?? new NseXbrlFundamentalsCsvExporter();
+
+    const repository = this.repository as any;
+    const outputDir = path.join(os.tmpdir(), 'nse-xbrl-bulk-ingest');
+
+    let symbolsProcessed = 0;
+    let rowsImported = 0;
+    let rowsSkippedExisting = 0;
+    let batches = 0;
+    const warnings: string[] = [];
+    const errors: string[] = [];
+
+    let offset = 0;
+    let hasMore = true;
+
+    while (hasMore && symbolsProcessed < maxSymbols) {
+      const remaining = maxSymbols - symbolsProcessed;
+      const take = Math.min(symbolBatchSize, remaining);
+
+      const { stocks, total } = await repository.listStocksForFundamentalsIngestion({
+        region,
+        assetType,
+        batchSize: take,
+        offset,
+      });
+
+      if (stocks.length === 0) {
+        hasMore = false;
+        break;
+      }
+
+      // Paginate by advancing offset by batch size; stop once we exhaust the universe
+      offset += stocks.length;
+      if (offset >= total) hasMore = false;
+
+      const symbols: string[] = stocks.map((s: { symbol: string }) => s.symbol);
+      const stockBySymbol = new Map<string, { id: string; symbol: string }>(
+        stocks.map((s: { id: string; symbol: string }) => [s.symbol.toUpperCase(), s])
+      );
+
+      batches += 1;
+
+      try {
+        const exportResult = await exporter.exportSymbols({
+          symbols,
+          outputDir,
+          maxQuarterlyPeriods,
+          maxAnnualPeriods,
+          validatedBy: 'NSE_XBRL_AUTO',
+        });
+
+        if (exportResult.report?.warnings?.length) {
+          warnings.push(...exportResult.report.warnings);
+        }
+
+        // D5 dedup: gather existing periods per stock and filter out already-stored ones
+        const existingPeriodsByStock = new Map<string, Set<string>>();
+        for (const stock of stocks) {
+          const existing = await repository.listExistingFundamentalPeriods(stock.id);
+          existingPeriodsByStock.set(stock.id, existing);
+        }
+
+        const newRows: ManualVerifiedFundamentalsCsvRow[] = [];
+        for (const row of exportResult.rows) {
+          const stock = stockBySymbol.get(row.symbol.toUpperCase());
+          if (!stock) {
+            warnings.push(`NSE_XBRL_AUTO: symbol ${row.symbol} not found in batch stock map — skipped.`);
+            continue;
+          }
+          const dedupeKey = `${row.periodType}|${row.periodEndDate}`;
+          if (existingPeriodsByStock.get(stock.id)?.has(dedupeKey)) {
+            rowsSkippedExisting += 1;
+            continue;
+          }
+          newRows.push(row);
+        }
+
+        if (newRows.length > 0) {
+          const filteredCsvText = toManualVerifiedFundamentalsCsv(newRows);
+          try {
+            const importResult = await this.importBulkManualVerifiedFundamentals({
+              csvText: filteredCsvText,
+              region,
+              assetType,
+              fileName: `nse-xbrl-auto-batch-${batches}.csv`,
+            });
+            rowsImported += importResult.rowsImported ?? 0;
+            if (importResult.rejectedRows?.length) {
+              for (const rejected of importResult.rejectedRows) {
+                warnings.push(`NSE_XBRL_AUTO batch ${batches}: row ${rejected.rowNumber} rejected — ${rejected.reason}`);
+              }
+            }
+          } catch (importError) {
+            const msg = importError instanceof Error ? importError.message : String(importError);
+            errors.push(`NSE_XBRL_AUTO batch ${batches} import failed: ${msg}`);
+          }
+        }
+      } catch (batchError) {
+        const msg = batchError instanceof Error ? batchError.message : String(batchError);
+        errors.push(`NSE_XBRL_AUTO batch ${batches} (symbols: ${symbols.join(',')}) failed: ${msg}`);
+      }
+
+      symbolsProcessed += symbols.length;
+
+      if (hasMore && symbolsProcessed < maxSymbols && delayBetweenBatchesMs > 0) {
+        await new Promise((resolve) => setTimeout(resolve, delayBetweenBatchesMs));
+      }
+    }
+
+    return { symbolsProcessed, rowsImported, rowsSkippedExisting, batches, warnings, errors };
   }
 
   async corporateActionsByInstrumentId(instrumentId: string, options: Pick<PaginationOptions, 'region' | 'assetType'> = {}) {

@@ -93,6 +93,7 @@ export const createMarketDataV1Router = (
   router.post('/market-data/metadata/manual-import', controller.importManualMetadata);
   router.post('/market-data/fundamentals/manual-verified-import', controller.importManualVerifiedFundamental);
   router.post('/market-data/fundamentals/manual-verified-bulk-import', controller.importBulkManualVerifiedFundamentals);
+  router.post('/market-data/fundamentals/nse-xbrl-bulk-ingest', controller.nseXbrlBulkIngest);
   router.post('/market-data/metadata/enrich', controller.enrichMetadata);
   router.post('/market-data/prices/backfill', controller.backfillPrices);
   router.post('/market-data/prices/backfill-runs', controller.startPriceBackfillRun);

@@ -423,6 +423,24 @@ export class MarketDataFoundationController {
     }
   };
 
+  nseXbrlBulkIngest = async (req: Request, res: Response) => {
+    try {
+      const result = await this.service.importNseXbrlFundamentalsForUniverse({
+        region: typeof req.body?.region === 'string' ? req.body.region : undefined,
+        assetType: typeof req.body?.assetType === 'string' ? req.body.assetType : undefined,
+        symbolBatchSize: req.body?.symbolBatchSize !== undefined ? Number(req.body.symbolBatchSize) : undefined,
+        maxSymbols: req.body?.maxSymbols !== undefined ? Number(req.body.maxSymbols) : undefined,
+        maxQuarterlyPeriods: req.body?.maxQuarterlyPeriods !== undefined ? Number(req.body.maxQuarterlyPeriods) : undefined,
+        maxAnnualPeriods: req.body?.maxAnnualPeriods !== undefined ? Number(req.body.maxAnnualPeriods) : undefined,
+        delayBetweenBatchesMs: req.body?.delayBetweenBatchesMs !== undefined ? Number(req.body.delayBetweenBatchesMs) : undefined,
+      });
+      return res.status(200).json(result);
+    } catch (error) {
+      console.error('NSE XBRL bulk ingest error:', error);
+      return res.status(500).json({ error: this.errorMessage(error, 'NSE XBRL bulk ingest failed') });
+    }
+  };
+
   yahooSearch = async (req: Request, res: Response) => {
     void req;
     return this.providerDisabledResponse(res, 'Yahoo Finance search');
