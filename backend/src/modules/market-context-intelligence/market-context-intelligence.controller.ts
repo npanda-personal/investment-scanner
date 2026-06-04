@@ -1,11 +1,13 @@
 import type { Request, Response } from 'express';
 import { MarketContextIntelligenceService } from './market-context-intelligence.service';
 import { MarketPulseSnapshotService } from './market-pulse-snapshot.service';
+import { CapitalPostureService } from './capital-posture.service';
 
 export class MarketContextIntelligenceController {
   constructor(
     private readonly service = new MarketContextIntelligenceService(),
-    private readonly marketPulseService = new MarketPulseSnapshotService()
+    private readonly marketPulseService = new MarketPulseSnapshotService(),
+    private readonly capitalPostureService = new CapitalPostureService(),
   ) {}
 
   summary = async (req: Request, res: Response) => this.respond(res, () => this.service.summary({ region: this.region(req) }));
@@ -64,6 +66,13 @@ export class MarketContextIntelligenceController {
       region: this.region(req),
       assetType: this.assetType(req),
     }));
+  };
+
+  capitalPosture = async (req: Request, res: Response) => {
+    res.setHeader('Cache-Control', 'no-store');
+    return this.respond(res, () =>
+      this.capitalPostureService.capitalPosture(this.region(req) || 'IN')
+    );
   };
 
   run = async (req: Request, res: Response) => this.respond(res, () => this.service.run(this.region(req)));

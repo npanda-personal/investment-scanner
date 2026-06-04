@@ -11,6 +11,23 @@ export { MarketContextIntelligenceRepository } from './market-context-intelligen
 export { MarketContextIntelligenceService } from './market-context-intelligence.service';
 export { MarketPulseSnapshotRepository } from './market-pulse-snapshot.repository';
 export { MarketPulseSnapshotService } from './market-pulse-snapshot.service';
+export { CapitalPostureService } from './capital-posture.service';
+export {
+  EXPOSURE_BANDS,
+  REGIME_SCORE_RISK_ON_MIN,
+  REGIME_SCORE_RISK_OFF_MAX,
+  HEALTH_SCORE_STRONG_MIN,
+  HEALTH_SCORE_FRAGILE_MAX,
+  BREADTH_WEAK_THRESHOLD,
+  BREADTH_VERY_WEAK_THRESHOLD,
+} from './capital-posture.types';
+export type {
+  CapitalPostureDto,
+  CapitalPostureEvidence,
+  PostureAction,
+  PostureLabel,
+  RegimeGateResult,
+} from './capital-posture.types';
 export { parseOptionalText, parseRange, SUPPORTED_CONTEXT_RANGES } from './market-context-intelligence.validation';
 export type {
   ContextInstrument,
