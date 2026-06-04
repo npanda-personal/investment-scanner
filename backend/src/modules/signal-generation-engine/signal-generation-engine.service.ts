@@ -135,8 +135,9 @@ export class SignalGenerationEngineService {
 
   async run(request: SignalRunRequest): Promise<SignalRunResponse> {
     const startedAt = Date.now();
-    const generatedAt = new Date().toISOString();
-    const generatedDate = this.normalizeUtcDay(new Date(generatedAt));
+    const asOfDate = request.asOfDate ? this.normalizeUtcDay(new Date(request.asOfDate)) : null;
+    const generatedAt = asOfDate ? asOfDate.toISOString() : new Date().toISOString();
+    const generatedDate = asOfDate ?? this.normalizeUtcDay(new Date(generatedAt));
     const modelVersion = request.modelVersion || MODEL_VERSION;
     const rulesetVersion = request.rulesetVersion || modelVersion;
     const errors: string[] = [];
@@ -174,13 +175,17 @@ export class SignalGenerationEngineService {
     };
 
     if (useDataQualityFilter) {
-      const filtered = await this.dataQualityService.filterEligibleInstruments(resolvedInstrumentIds, {
+      const dqFilterOptions = {
         minSignalReadinessScore: request.minSignalReadinessScore ?? 70,
         allowedReadinessStatuses: request.allowedReadinessStatuses,
         includeLimited: request.includeLimited,
         skipUnusable: request.skipUnusable ?? true,
         missingQualityBehavior: request.missingQualityBehavior ?? 'SKIP',
-      }).catch((error: any) => {
+      };
+      const filtered = await (asOfDate
+        ? this.dataQualityService.filterEligibleInstruments(resolvedInstrumentIds, dqFilterOptions, asOfDate)
+        : this.dataQualityService.filterEligibleInstruments(resolvedInstrumentIds, dqFilterOptions)
+      ).catch((error: any) => {
         warnings.push(`Data quality filter unavailable; trusted signal generation failed closed: ${error?.message || 'unknown error'}`);
         return {
           eligibleInstrumentIds: [],
@@ -223,7 +228,10 @@ export class SignalGenerationEngineService {
     const dataQualityEvaluationsByInstrumentId = useDataQualityFilter && filteredDataQualityResult
       ? this.getDataQualityEligibilityMap(resolvedInstrumentIds, filteredDataQualityResult)
       : {};
-    const researchContextMode: NonNullable<SignalRunRequest['researchContextMode']> = request.instrumentId || request.symbol ? 'FULL' : 'LIGHTWEIGHT';
+    // Force LIGHTWEIGHT for as-of runs: skip live workbench / peer live-price look-ahead
+    const researchContextMode: NonNullable<SignalRunRequest['researchContextMode']> = asOfDate
+      ? 'LIGHTWEIGHT'
+      : (request.instrumentId || request.symbol ? 'FULL' : 'LIGHTWEIGHT');
     const generationRequest = {
       ...request,
       useDataQualityFilter,
@@ -346,23 +354,27 @@ export class SignalGenerationEngineService {
     return this.repository.latestSignalUniverseCount(query);
   }
 
-  async generateForInstrument(instrumentId: string, options: Pick<SignalRunRequest, 'strategyCode' | 'includeStrategyMatches' | 'onlyStrategyEligible' | 'excludeNoiseFiltered' | 'researchContextMode' | 'region' | 'assetType' | 'modelVersion' | 'rulesetVersion' | 'useDataQualityFilter'> & {
+  async generateForInstrument(instrumentId: string, options: Pick<SignalRunRequest, 'strategyCode' | 'includeStrategyMatches' | 'onlyStrategyEligible' | 'excludeNoiseFiltered' | 'researchContextMode' | 'region' | 'assetType' | 'modelVersion' | 'rulesetVersion' | 'useDataQualityFilter' | 'asOfDate'> & {
     generationRunId?: string;
     dataQualityEvaluationsByInstrumentId?: Record<string, SignalDataQualityEligibility>;
     batchContext?: SignalGenerationBatchContext;
   } = {}): Promise<SignalResultDto | null> {
-    const useFullResearchContext = options.researchContextMode !== 'LIGHTWEIGHT';
+    const asOfDate = options.asOfDate ? this.normalizeUtcDay(new Date(options.asOfDate)) : null;
+    // As-of runs must use LIGHTWEIGHT to avoid live workbench look-ahead
+    const effectiveResearchContextMode = asOfDate ? 'LIGHTWEIGHT' : options.researchContextMode;
+    const useFullResearchContext = effectiveResearchContextMode !== 'LIGHTWEIGHT';
     const marketScope = { region: options.region, assetType: options.assetType };
+    const priceEndDate = asOfDate ?? undefined;
     const [instrument, pricesResponse, fundamentalsResponse, research] = await Promise.all([
       options.batchContext?.instrumentsById.has(instrumentId)
         ? Promise.resolve(options.batchContext.instrumentsById.get(instrumentId))
         : this.marketDataService.getInstrument(instrumentId, marketScope),
       options.batchContext?.priceWindowsByInstrumentId.has(instrumentId)
         ? Promise.resolve({ prices: options.batchContext.priceWindowsByInstrumentId.get(instrumentId) || [] })
-        : this.marketDataService.listPricesByInstrumentId(instrumentId, SIGNAL_GENERATION_PRICE_WINDOW, undefined, undefined, marketScope),
+        : this.marketDataService.listPricesByInstrumentId(instrumentId, SIGNAL_GENERATION_PRICE_WINDOW, undefined, priceEndDate, marketScope),
       options.batchContext?.fundamentalsByInstrumentId.has(instrumentId)
         ? Promise.resolve(options.batchContext.fundamentalsByInstrumentId.get(instrumentId))
-        : this.getFundamentalsForGeneration(instrumentId, marketScope, useFullResearchContext),
+        : this.getFundamentalsForGeneration(instrumentId, marketScope, useFullResearchContext, asOfDate ?? undefined),
       useFullResearchContext ? this.researchService.workbench(instrumentId, '3M') : Promise.resolve(null),
     ]);
 
@@ -388,11 +400,13 @@ export class SignalGenerationEngineService {
 
     const score = this.compositeScore(technical.score, momentum.score, fundamentals.score);
     const direction = this.directionForScore(score);
-    const confidence = this.confidenceFor(prices, latestFundamental, totalEvaluated);
+    const confidence = this.confidenceFor(prices, latestFundamental, totalEvaluated, asOfDate ?? undefined);
 
     const warnings: string[] = [];
     const latestDate = prices[0]?.date ? new Date(prices[0].date) : null;
-    const fiveDaysAgo = new Date();
+    // Staleness is measured relative to asOfDate when provided; otherwise relative to now
+    const stalenessAnchor = asOfDate ?? new Date();
+    const fiveDaysAgo = new Date(stalenessAnchor);
     fiveDaysAgo.setDate(fiveDaysAgo.getDate() - 5);
     if (latestDate && latestDate < fiveDaysAgo) {
       warnings.push(`Market data is stale (last update: ${latestDate.toISOString().split('T')[0]})`);
@@ -400,6 +414,10 @@ export class SignalGenerationEngineService {
     if (prices.length < 50) {
       warnings.push(`Insufficient price history (${prices.length} days) for reliable indicators`);
     }
+
+    // generatedAt / generatedDate come from asOfDate when provided (makes idempotency key correct for backfill)
+    const generatedAt = asOfDate ? asOfDate.toISOString() : new Date().toISOString();
+    const generatedDate = asOfDate ? asOfDate.toISOString() : this.normalizeUtcDay(new Date()).toISOString();
 
     let result: SignalResultDto = {
       instrument_id: instrument.id,
@@ -419,10 +437,10 @@ export class SignalGenerationEngineService {
       triggered_signals: triggeredSignals,
       negative_signals: negativeSignals,
       explanation: this.explain(direction, triggeredSignals, negativeSignals),
-      generated_at: new Date().toISOString(),
+      generated_at: generatedAt,
       modelVersion: options.modelVersion || MODEL_VERSION,
       rulesetVersion: options.rulesetVersion || options.modelVersion || MODEL_VERSION,
-      generatedDate: this.normalizeUtcDay(new Date()).toISOString(),
+      generatedDate,
       sourceDataDate: latestDate?.toISOString() ?? null,
       sourcePriceDate: latestDate?.toISOString() ?? null,
       scoringInputSummary: this.scoringInputSummary(prices, latestFundamental, useFullResearchContext || Boolean(options.includeStrategyMatches)),
@@ -434,10 +452,13 @@ export class SignalGenerationEngineService {
     };
 
     if (options.includeStrategyMatches || options.strategyCode || options.onlyStrategyEligible || options.excludeNoiseFiltered) {
-      const [marketContext, persistedSmartMoney] = await Promise.all([
-        this.latestPersistedMarketSummary(this.canonicalRegion(options.region || instrument.region || instrument.country)),
-        this.latestPersistedSmartMoney([instrument.id]),
-      ]);
+      // Skip persisted market-context and smart-money reads for as-of runs to prevent importing today's regime
+      const [marketContext, persistedSmartMoney] = asOfDate
+        ? [null, new Map<string, any>()]
+        : await Promise.all([
+          this.latestPersistedMarketSummary(this.canonicalRegion(options.region || instrument.region || instrument.country)),
+          this.latestPersistedSmartMoney([instrument.id]),
+        ]);
       result = this.withPersistedStrategyContext(result, instrument, marketContext, persistedSmartMoney.get(instrument.id) ?? null);
       result = await this.attachStrategyMatches(result, prices, instrument, options, options.batchContext?.strategyPerformanceCache);
       if (!this.signalPassesStrategyFilters(result, options)) return null;
@@ -1416,20 +1437,27 @@ export class SignalGenerationEngineService {
 
   private async loadSignalGenerationBatchContext(
     instrumentIds: string[],
-    request: Pick<SignalRunRequest, 'region' | 'assetType' | 'researchContextMode'>
+    request: Pick<SignalRunRequest, 'region' | 'assetType' | 'researchContextMode' | 'asOfDate'>
   ): Promise<SignalGenerationBatchContext | undefined> {
     if (instrumentIds.length <= 1) return undefined;
     const serviceAny = this.marketDataService as any;
     const marketScope = { region: request.region, assetType: request.assetType };
+    const asOfDate = request.asOfDate ? this.normalizeUtcDay(new Date(request.asOfDate)) : undefined;
     const [instruments, priceWindows, fundamentals] = await Promise.all([
       typeof serviceAny.getInstrumentsByIds === 'function'
         ? serviceAny.getInstrumentsByIds(instrumentIds).catch(() => [])
         : Promise.resolve([]),
       typeof serviceAny.listRecentPriceWindowsByInstrumentIds === 'function'
-        ? serviceAny.listRecentPriceWindowsByInstrumentIds(instrumentIds, SIGNAL_GENERATION_PRICE_WINDOW, marketScope).catch(() => new Map())
+        ? (asOfDate
+          ? serviceAny.listRecentPriceWindowsByInstrumentIds(instrumentIds, SIGNAL_GENERATION_PRICE_WINDOW, marketScope, asOfDate)
+          : serviceAny.listRecentPriceWindowsByInstrumentIds(instrumentIds, SIGNAL_GENERATION_PRICE_WINDOW, marketScope)
+        ).catch(() => new Map())
         : Promise.resolve(new Map()),
       request.researchContextMode === 'LIGHTWEIGHT' && typeof serviceAny.storedFundamentalsByInstrumentIds === 'function'
-        ? serviceAny.storedFundamentalsByInstrumentIds(instrumentIds, marketScope).catch(() => new Map())
+        ? (asOfDate
+          ? serviceAny.storedFundamentalsByInstrumentIds(instrumentIds, marketScope, asOfDate)
+          : serviceAny.storedFundamentalsByInstrumentIds(instrumentIds, marketScope)
+        ).catch(() => new Map())
         : Promise.resolve(new Map()),
     ]);
     return {
@@ -1440,11 +1468,21 @@ export class SignalGenerationEngineService {
     };
   }
 
-  private getFundamentalsForGeneration(instrumentId: string, marketScope: Pick<SignalRunRequest, 'region' | 'assetType'>, useFullResearchContext: boolean) {
+  private async getFundamentalsForGeneration(instrumentId: string, marketScope: Pick<SignalRunRequest, 'region' | 'assetType'>, useFullResearchContext: boolean, asOf?: Date) {
+    let response: { records?: any[] } | null;
     if (useFullResearchContext || typeof (this.marketDataService as any).storedFundamentalsByInstrumentId !== 'function') {
-      return this.marketDataService.fundamentalsByInstrumentId(instrumentId, marketScope);
+      response = await this.marketDataService.fundamentalsByInstrumentId(instrumentId, marketScope);
+    } else {
+      response = await (this.marketDataService as any).storedFundamentalsByInstrumentId(instrumentId, marketScope);
     }
-    return (this.marketDataService as any).storedFundamentalsByInstrumentId(instrumentId, marketScope);
+    if (!asOf || !response?.records) return response;
+    // Filter to fundamental periods ending on or before asOf (point-in-time: no future filings)
+    const asOfMs = asOf.getTime();
+    const filtered = response.records.filter((record: any) => {
+      const periodEndDate = record.periodEndDate ? new Date(record.periodEndDate) : null;
+      return periodEndDate !== null && Number.isFinite(periodEndDate.getTime()) && periodEndDate.getTime() <= asOfMs;
+    });
+    return { ...response, records: filtered };
   }
 
   private async persistSignalResult(result: SignalResultDto) {
@@ -1592,12 +1630,13 @@ export class SignalGenerationEngineService {
     return (positive + alpha * 0.5) / (total + alpha);
   }
 
-  private confidenceFor(prices: SignalPricePoint[], fundamental: any, signalCount: number): SignalConfidence {
-    // Check if the data is stale (more than 3 business days old)
+  private confidenceFor(prices: SignalPricePoint[], fundamental: any, signalCount: number, asOf?: Date): SignalConfidence {
+    // Check if the data is stale (more than 5 calendar days old relative to asOf or now)
     const latestDate = prices[0]?.date ? new Date(prices[0].date) : null;
-    const threeDaysAgo = new Date();
-    threeDaysAgo.setDate(threeDaysAgo.getDate() - 5); // 5 cal days for safety margin on weekends
-    const isStale = latestDate ? latestDate < threeDaysAgo : true;
+    const anchor = asOf ?? new Date();
+    const fiveDaysAgo = new Date(anchor);
+    fiveDaysAgo.setDate(fiveDaysAgo.getDate() - 5); // 5 cal days for safety margin on weekends
+    const isStale = latestDate ? latestDate < fiveDaysAgo : true;
 
     if (prices.length >= 200 && fundamental && signalCount >= 6 && !isStale) return 'HIGH';
     if (prices.length >= 50 && signalCount >= 3) return 'MEDIUM';

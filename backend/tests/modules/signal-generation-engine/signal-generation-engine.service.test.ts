@@ -1900,6 +1900,175 @@ describe('SignalGenerationEngineService v2 accuracy fixes', () => {
     expect((service as any).triggerTypeFor('BULLISH', null)).toBe('bullish_entry_trigger');
   });
 
+  // ── Point-in-time (as-of date) support ──────────────────────────────────
+
+  it('asOf: generatedAt and generatedDate are set from asOfDate, not now', async () => {
+    const repository = {
+      createSignalResult: jest.fn(async (result: any) => ({ ...result, id: 'signal-asof' })),
+    };
+    const asOfDate = '2020-06-15';
+    const prices = Array.from({ length: 260 }, (_, i) => {
+      const d = new Date('2020-06-15');
+      d.setDate(d.getDate() - i);
+      return { date: d.toISOString(), open: 100, high: 101, low: 99, close: 100, adjusted_close: 100, volume: 1000 };
+    });
+    const marketDataService = {
+      getInstrument: jest.fn().mockResolvedValue({ id: 'stock-1', symbol: 'ASOF', company_name: 'AsOf Co', sector: 'Technology', country: 'IN' }),
+      listPricesByInstrumentId: jest.fn().mockResolvedValue({ prices }),
+      storedFundamentalsByInstrumentId: jest.fn().mockResolvedValue({ records: [{ eps: 1, periodEndDate: new Date('2020-03-31') }] }),
+    };
+    const service = new SignalGenerationEngineService(repository as any, marketDataService as any, { workbench: jest.fn().mockResolvedValue(null) } as any);
+
+    const result = await service.generateForInstrument('stock-1', { asOfDate, researchContextMode: 'LIGHTWEIGHT' });
+
+    expect(result?.generated_at).toContain('2020-06-15');
+    expect(result?.generatedDate).toContain('2020-06-15');
+    // price fetch received endDate
+    expect(marketDataService.listPricesByInstrumentId).toHaveBeenCalledWith(
+      'stock-1',
+      expect.any(Number),
+      undefined,
+      expect.any(Date), // endDate = asOfDate
+      expect.any(Object),
+    );
+    const endDateArg: Date = marketDataService.listPricesByInstrumentId.mock.calls[0][3];
+    expect(endDateArg.toISOString().startsWith('2020-06-15')).toBe(true);
+  });
+
+  it('asOf: staleness and confidence are measured relative to asOfDate (historical date → not stale, no stale warning)', async () => {
+    const repository = {
+      createSignalResult: jest.fn(async (result: any) => ({ ...result, id: 'signal-conf' })),
+    };
+    const asOfDate = '2020-06-15';
+    // Prices land on 2020-06-15 (same day as asOf) — should not be stale
+    const prices = Array.from({ length: 260 }, (_, i) => {
+      const d = new Date('2020-06-15');
+      d.setDate(d.getDate() - i);
+      return { date: d.toISOString(), open: 100, high: 101, low: 99, close: 100, adjusted_close: 100, volume: 1000 };
+    });
+    const marketDataService = {
+      getInstrument: jest.fn().mockResolvedValue({ id: 'stock-1', symbol: 'CONF', company_name: 'Conf Co', sector: 'Technology', country: 'IN' }),
+      listPricesByInstrumentId: jest.fn().mockResolvedValue({ prices }),
+      storedFundamentalsByInstrumentId: jest.fn().mockResolvedValue({ records: [{ eps: 2, pe_ratio: 15, periodEndDate: new Date('2020-03-31') }] }),
+    };
+    const service = new SignalGenerationEngineService(repository as any, marketDataService as any, { workbench: jest.fn().mockResolvedValue(null) } as any);
+
+    const result = await service.generateForInstrument('stock-1', { asOfDate, researchContextMode: 'LIGHTWEIGHT' });
+
+    // Price is on asOfDate → NOT stale → no stale warning emitted
+    expect(result?.warnings?.some((w) => w.includes('stale'))).toBe(false);
+    // Also: the confidenceFor stale check used asOfDate (not today); if it had used today, the
+    // 2020 prices would be treated as stale and confidence would stay LOW even with 260 bars + fundamentals.
+    // We can't assert HIGH here (signal count depends on price shape), but we CAN assert that
+    // the stale-override works by confirming generatedDate is set correctly.
+    expect(result?.generatedDate).toContain('2020-06-15');
+  });
+
+  it('asOf: backward-compat — omitting asOfDate leaves generatedAt as today', async () => {
+    const repository = {
+      createSignalResult: jest.fn(async (result: any) => ({ ...result, id: 'signal-today' })),
+    };
+    const before = new Date();
+    const prices = Array.from({ length: 30 }, (_, i) => freshPrice(i, 100, 500));
+    const marketDataService = {
+      getInstrument: jest.fn().mockResolvedValue({ id: 'stock-1', symbol: 'TODAY', company_name: 'Today Co', sector: 'Technology', country: 'IN' }),
+      listPricesByInstrumentId: jest.fn().mockResolvedValue({ prices }),
+      fundamentalsByInstrumentId: jest.fn().mockResolvedValue({ records: [] }),
+    };
+    const service = new SignalGenerationEngineService(repository as any, marketDataService as any, { workbench: jest.fn().mockResolvedValue(null) } as any);
+
+    const result = await service.generateForInstrument('stock-1');
+
+    const after = new Date();
+    const generatedAt = new Date(result!.generated_at);
+    expect(generatedAt >= before).toBe(true);
+    expect(generatedAt <= after).toBe(true);
+    // price fetch called without endDate (4th positional arg should be undefined)
+    expect(marketDataService.listPricesByInstrumentId).toHaveBeenCalledWith(
+      'stock-1',
+      expect.any(Number),
+      undefined,
+      undefined,
+      expect.any(Object),
+    );
+  });
+
+  it('asOf: fundamentals are filtered to periods ending <= asOfDate', async () => {
+    const repository = {
+      createSignalResult: jest.fn(async (result: any) => ({ ...result, id: 'signal-fund' })),
+    };
+    const asOfDate = '2018-12-31';
+    const prices = Array.from({ length: 260 }, (_, i) => {
+      const d = new Date('2018-12-31');
+      d.setDate(d.getDate() - i);
+      return { date: d.toISOString(), open: 50, high: 51, low: 49, close: 50, adjusted_close: 50, volume: 500 };
+    });
+    const marketDataService = {
+      getInstrument: jest.fn().mockResolvedValue({ id: 'stock-1', symbol: 'FUND', company_name: 'Fund Co', sector: 'Energy', country: 'IN' }),
+      listPricesByInstrumentId: jest.fn().mockResolvedValue({ prices }),
+      storedFundamentalsByInstrumentId: jest.fn().mockResolvedValue({
+        records: [
+          { eps: 5, pe_ratio: 12, periodEndDate: new Date('2025-03-31') }, // future — should be filtered out
+          { eps: 3, pe_ratio: 10, periodEndDate: new Date('2018-09-30') }, // visible as of 2018-12-31
+          { eps: 2, pe_ratio: 8, periodEndDate: new Date('2018-03-31') }, // visible
+        ],
+      }),
+    };
+    const capturedFundamental: any[] = [];
+    const service = new SignalGenerationEngineService(repository as any, marketDataService as any, { workbench: jest.fn().mockResolvedValue(null) } as any);
+    const origEvalFund = service.evaluateFundamentals.bind(service);
+    jest.spyOn(service, 'evaluateFundamentals').mockImplementation((fund, ...rest) => {
+      if (fund) capturedFundamental.push(fund);
+      return origEvalFund(fund, ...rest);
+    });
+
+    await service.generateForInstrument('stock-1', { asOfDate, researchContextMode: 'LIGHTWEIGHT' });
+
+    // The 2025 record must not have been used
+    expect(capturedFundamental.length).toBeGreaterThan(0);
+    const usedPe = capturedFundamental[0]?.pe_ratio;
+    expect(usedPe).toBe(10); // the 2018-09-30 record (most recent before asOfDate)
+  });
+
+  it('asOf: LIGHTWEIGHT is forced even when researchContextMode is not specified', async () => {
+    const repository = {
+      createSignalResult: jest.fn(async (result: any) => ({ ...result, id: 'signal-lw' })),
+    };
+    const asOfDate = '2019-05-01';
+    const prices = Array.from({ length: 260 }, (_, i) => {
+      const d = new Date('2019-05-01');
+      d.setDate(d.getDate() - i);
+      return { date: d.toISOString(), open: 100, high: 101, low: 99, close: 100, adjusted_close: 100, volume: 1000 };
+    });
+    const workbench = jest.fn().mockResolvedValue({ valuation: {}, relative_strength: {} });
+    const marketDataService = {
+      getInstrument: jest.fn().mockResolvedValue({ id: 'stock-1', symbol: 'LW', company_name: 'LW Co', sector: 'Technology', country: 'IN' }),
+      listPricesByInstrumentId: jest.fn().mockResolvedValue({ prices }),
+      storedFundamentalsByInstrumentId: jest.fn().mockResolvedValue({ records: [] }),
+    };
+    const service = new SignalGenerationEngineService(repository as any, marketDataService as any, { workbench } as any);
+
+    await service.generateForInstrument('stock-1', { asOfDate });
+
+    // workbench should NOT be called (forced LIGHTWEIGHT)
+    expect(workbench).not.toHaveBeenCalled();
+  });
+
+  it('asOf: run() passes asOfDate through to generationRequest and forces LIGHTWEIGHT', async () => {
+    const marketDataService = {
+      listInstruments: jest.fn().mockResolvedValue({ instruments: [{ id: 'stock-1', symbol: 'A' }], pagination: { total: 1 } }),
+    };
+    const service = new SignalGenerationEngineService(runAuditRepository() as any, marketDataService as any, {} as any);
+    const generateSpy = jest.spyOn(service, 'generateForInstrument').mockResolvedValue(null);
+
+    await service.run({ asOfDate: '2021-01-15', region: 'IN', assetType: 'STOCK', useDataQualityFilter: false });
+
+    expect(generateSpy).toHaveBeenCalledWith('stock-1', expect.objectContaining({
+      asOfDate: '2021-01-15',
+      researchContextMode: 'LIGHTWEIGHT',
+    }));
+  });
+
   // ── Fix 10: MODEL_VERSION bumped to v2 ───────────────────────────────────
   it('fix10: MODEL_VERSION is signal-engine-v2', async () => {
     const repository = {

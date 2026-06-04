@@ -254,6 +254,12 @@ export interface SignalRunRequest {
   onlyStrategyEligible?: boolean;
   excludeNoiseFiltered?: boolean;
   force?: boolean;
+  /** Optional point-in-time date for historical signal generation.
+   *  When provided, price windows are sliced to <= asOfDate, staleness is measured
+   *  relative to asOfDate, fundamentals are filtered to periods ending <= asOfDate,
+   *  and generatedDate/generatedAt are set from asOfDate instead of now.
+   *  Omitting this field (or passing undefined) preserves today's behavior exactly. */
+  asOfDate?: string | Date;
 }
 
 export interface SignalQuery {

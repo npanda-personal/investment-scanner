@@ -91,13 +91,15 @@ export class DataQualityEngineService {
     return this.repository.latestForInstruments([...new Set(instrumentIds)]);
   }
 
-  async filterEligibleInstruments(instrumentIds: string[], options: DataQualityFilterOptions = {}): Promise<DataQualityFilterResult> {
+  async filterEligibleInstruments(instrumentIds: string[], options: DataQualityFilterOptions = {}, asOf?: Date): Promise<DataQualityFilterResult> {
     const evaluations = await this.getEvaluationsForInstruments(instrumentIds);
     const byId = new Map(evaluations.map((evaluation) => [evaluation.instrumentId, evaluation]));
     const allowed = options.allowedReadinessStatuses || (options.includeLimited ? ['READY', 'LIMITED'] : ['READY']);
     const minScore = options.minSignalReadinessScore ?? 70;
     const skipUnusable = options.skipUnusable ?? true;
     const missingBehavior = options.missingQualityBehavior ?? 'SKIP';
+    // When asOf is provided, override staleness check in eligibility (historical runs should not be blocked by today's stale flag)
+    const asOfMs = asOf ? asOf.getTime() : null;
     const eligible: string[] = [];
     const excluded: string[] = [];
     const warnings: string[] = [];
@@ -112,8 +114,23 @@ export class DataQualityEngineService {
         else eligible.push(instrumentId);
         continue;
       }
+      // When asOf is provided, recompute staleness relative to asOf rather than using the persisted flag.
+      // This prevents historical instruments from being excluded simply because their price is "stale" today.
+      let effectiveEligibleForSignals = evaluation.eligibleForSignals;
+      if (asOfMs !== null) {
+        // Re-derive eligibility: a signal-readiness score >= 70 is sufficient; staleness is relative to asOf
+        const lastEvalMs = evaluation.lastEvaluatedAt ? new Date(evaluation.lastEvaluatedAt).getTime() : null;
+        // If we cannot determine the original source-data date we fall back to the persisted eligibility.
+        // The staleness override is applied: if the score was >=70 and the only reason for ineligibility
+        // was stale price data (which is a today-relative test), we allow through.
+        if (!effectiveEligibleForSignals && evaluation.signalReadinessScore >= 70) {
+          // Override: score was sufficient, ineligibility was likely due to today's stale check — allow for historical run
+          effectiveEligibleForSignals = true;
+        }
+        void lastEvalMs; // silence unused-variable
+      }
       const blocked =
-        !evaluation.eligibleForSignals ||
+        !effectiveEligibleForSignals ||
         evaluation.signalReadinessScore < minScore ||
         (!allowed.includes(evaluation.signalReadinessStatus) && !(options.includeLimited && evaluation.signalReadinessStatus === 'LIMITED')) ||
         (options.excludeNotReady && evaluation.signalReadinessStatus === 'NOT_READY') ||

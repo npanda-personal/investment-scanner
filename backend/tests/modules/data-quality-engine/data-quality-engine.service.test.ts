@@ -459,4 +459,60 @@ describe('data quality engine service', () => {
     expect(progress[1].metadata).toMatchObject({ chunkIndex: 2, chunkStatus: 'FAILED' });
     expect(setup.repository.upsertEvaluation).toHaveBeenCalledTimes(3);
   });
+
+  // ── Point-in-time (as-of) DQ filter ────────────────────────────────────
+
+  it('asOf: filterEligibleInstruments allows instruments with score>=70 that are ineligible only due to today-stale flag', async () => {
+    const repository = {
+      latestForInstruments: jest.fn().mockResolvedValue([
+        {
+          instrumentId: 'stock-1',
+          symbol: 'HIST',
+          eligibleForSignals: false, // persisted as ineligible because price is stale *today*
+          signalReadinessScore: 80,  // but score is 80 (>=70)
+          signalReadinessStatus: 'READY',
+          coverageStatus: 'GOOD',
+          liquidityStatus: 'LIQUID',
+        },
+      ]),
+    };
+    const setup = service({ repository });
+    const asOf = new Date('2020-06-15');
+
+    const result = await setup.instance.filterEligibleInstruments(
+      ['stock-1'],
+      { missingQualityBehavior: 'SKIP', skipUnusable: true },
+      asOf,
+    );
+
+    // With asOf override: score>=70 overrides stale-today ineligibility
+    expect(result.eligibleInstrumentIds).toContain('stock-1');
+    expect(result.excludedInstrumentIds).not.toContain('stock-1');
+  });
+
+  it('asOf: backward-compat — without asOf, ineligible instrument stays excluded', async () => {
+    const repository = {
+      latestForInstruments: jest.fn().mockResolvedValue([
+        {
+          instrumentId: 'stock-2',
+          symbol: 'STALE',
+          eligibleForSignals: false,
+          signalReadinessScore: 80,
+          signalReadinessStatus: 'READY',
+          coverageStatus: 'GOOD',
+          liquidityStatus: 'LIQUID',
+        },
+      ]),
+    };
+    const setup = service({ repository });
+
+    const result = await setup.instance.filterEligibleInstruments(
+      ['stock-2'],
+      { missingQualityBehavior: 'SKIP', skipUnusable: true },
+      // no asOf → default today path
+    );
+
+    expect(result.excludedInstrumentIds).toContain('stock-2');
+    expect(result.eligibleInstrumentIds).not.toContain('stock-2');
+  });
 });

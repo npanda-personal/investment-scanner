@@ -787,6 +787,16 @@ type NseTradingHolidayCacheEntry = {
   sourceUrl: string;
 };
 
+/**
+ * Minimal port for invalidating persisted signal-quality outcomes when
+ * adjustedClose prices change. Implemented by SignalQualityLabRepository;
+ * declared structurally here to avoid importing that module (which depends on
+ * this one) and creating a circular dependency.
+ */
+export interface SignalOutcomeStalenessInvalidator {
+  markStaleByInstrumentIds(instrumentIds: string[]): Promise<number>;
+}
+
 export class MarketDataFoundationService {
   private static lastIngestionAt = 0;
   private static ingestionThrottleChain: Promise<void> = Promise.resolve();
@@ -812,8 +822,34 @@ export class MarketDataFoundationService {
     private readonly repository = new MarketDataFoundationRepository(),
     private readonly marketDataProvider: LegacyMarketDataProviderPort = disabledMarketDataProvider,
     private readonly angelOneMarketDataProvider: LegacyAngelProviderPort = disabledAngelProvider,
-    private readonly pipelineRecorder?: MarketDataPipelineRecorder
+    private readonly pipelineRecorder?: MarketDataPipelineRecorder,
+    // Optional hook used to invalidate persisted signal-quality outcomes when
+    // adjustedClose prices change. Defaults (lazily, in invalidateSignalOutcomes)
+    // to SignalQualityLabRepository — the repository file is imported directly to
+    // avoid a circular module dependency (signal-quality-lab depends on this module).
+    private signalOutcomeInvalidator?: SignalOutcomeStalenessInvalidator
   ) {}
+
+  /**
+   * Best-effort invalidation of persisted signal_outcomes for instruments whose
+   * adjustedClose prices just changed. Never throws — a stale-outcome failure
+   * must not fail a price recompute. Returns the number of rows invalidated.
+   */
+  private async invalidateSignalOutcomes(instrumentIds: string[]): Promise<number> {
+    const ids = [...new Set(instrumentIds.map((id) => String(id || '').trim()).filter(Boolean))];
+    if (ids.length === 0) return 0;
+    try {
+      if (!this.signalOutcomeInvalidator) {
+        // Lazy require avoids a static circular import at module load time.
+        const { SignalQualityLabRepository } = require('../signal-quality-lab/signal-quality-lab.repository');
+        this.signalOutcomeInvalidator = new SignalQualityLabRepository();
+      }
+      return await this.signalOutcomeInvalidator!.markStaleByInstrumentIds(ids);
+    } catch {
+      // best-effort; stale outcomes will be caught by the next maturity sweep / recalculate
+      return 0;
+    }
+  }
 
   list(options: PaginationOptions) {
     return this.repository.listStocks(options);
@@ -3778,7 +3814,8 @@ export class MarketDataFoundationService {
   async listRecentPriceWindowsByInstrumentIds(
     instrumentIds: string[],
     limit = 500,
-    _options: Pick<PaginationOptions, 'region' | 'assetType'> = {}
+    _options: Pick<PaginationOptions, 'region' | 'assetType'> = {},
+    endDate?: Date
   ) {
     const uniqueIds = [...new Set(instrumentIds.filter(Boolean))];
     if (uniqueIds.length === 0) return new Map<string, any[]>();
@@ -3790,17 +3827,20 @@ export class MarketDataFoundationService {
     if (stocks.length === 0) return new Map<string, any[]>();
 
     const safeLimit = Math.max(1, Math.min(Math.floor(Number(limit) || 500), 5000));
-    const cutoff = new Date();
+    const anchor = endDate ?? new Date();
+    const cutoff = new Date(anchor);
     cutoff.setDate(cutoff.getDate() - Math.max(365, safeLimit * 3));
     const instrumentIdBySymbol = new Map(stocks.map((stock) => [stock.symbol, stock.id]));
     const symbols = stocks.map((stock) => stock.symbol);
     const prices: any[] = [];
     for (let offset = 0; offset < symbols.length; offset += RECENT_PRICE_WINDOW_SYMBOL_CHUNK_SIZE) {
       const symbolChunk = symbols.slice(offset, offset + RECENT_PRICE_WINDOW_SYMBOL_CHUNK_SIZE);
+      const timestampFilter: Record<string, Date> = { gte: cutoff };
+      if (endDate) timestampFilter['lte'] = endDate;
       const chunkPrices = await this.repository.prisma.priceTick.findMany({
         where: {
           symbol: { in: symbolChunk },
-          timestamp: { gte: cutoff },
+          timestamp: timestampFilter,
         },
         orderBy: [{ symbol: 'asc' }, { timestamp: 'desc' }],
         select: {
@@ -3844,14 +3884,15 @@ export class MarketDataFoundationService {
     return byInstrumentId;
   }
 
-  async storedFundamentalsByInstrumentIds(instrumentIds: string[], _options: Pick<PaginationOptions, 'region' | 'assetType'> = {}) {
+  async storedFundamentalsByInstrumentIds(instrumentIds: string[], _options: Pick<PaginationOptions, 'region' | 'assetType'> = {}, asOf?: Date) {
     const uniqueIds = [...new Set(instrumentIds.filter(Boolean))];
     if (uniqueIds.length === 0) return new Map<string, any>();
     const stocks = await this.repository.prisma.stock.findMany({
       where: { id: { in: uniqueIds } },
     });
     const records = await this.repository.prisma.fundamental.findMany({
-      where: { stockId: { in: stocks.map((stock) => stock.id) } },
+      // asOf: point-in-time guard so a batch backfill never sees fundamentals filed after the as-of date.
+      where: { stockId: { in: stocks.map((stock) => stock.id) }, ...(asOf ? { periodEndDate: { lte: asOf } } : {}) },
       orderBy: [{ stockId: 'asc' }, { periodEndDate: 'desc' }],
     });
     const recordsByStockId = new Map<string, any[]>();
@@ -12664,6 +12705,13 @@ export class MarketDataFoundationService {
     // Write only changed values.
     const updates = adjustedBars.map((bar) => ({ date: bar.date, adjustedClose: bar.adjustedClose }));
     const updated = await this.repository.updateAdjustedCloses(symbol, updates);
+
+    // adjustedClose drives forwardReturnPercent/futurePrice in persisted
+    // signal_outcomes — invalidate them so the maturity sweep / next recalculate
+    // re-evaluates with fresh prices. Best-effort; only when prices changed.
+    if (updated > 0) {
+      await this.invalidateSignalOutcomes([instrumentId]);
+    }
 
     return { instrumentId, symbol, bars: adjustedBars.length, updated, warnings };
   }
