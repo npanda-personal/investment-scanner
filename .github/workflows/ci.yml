@@ -9,6 +9,22 @@ on:
 jobs:
   backend-build:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: timescale/timescaledb:latest-pg16
+        env:
+          POSTGRES_USER: scanner
+          POSTGRES_PASSWORD: scanner_password
+          POSTGRES_DB: investment_scanner
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U scanner -d investment_scanner"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://scanner:scanner_password@localhost:5432/investment_scanner?schema=public
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -24,13 +40,21 @@ jobs:
         working-directory: backend
         run: npm ci
 
+      - name: Generate Prisma client
+        working-directory: backend
+        run: npx prisma generate
+
+      - name: Apply database schema
+        working-directory: backend
+        run: npx prisma db push --skip-generate
+
       - name: Build backend
         working-directory: backend
         run: npm run build
 
-      - name: Run backend tests (if any)
+      - name: Run backend tests
         working-directory: backend
-        run: npm test -- --passWithNoTests
+        run: npm test
 
   frontend-build:
     runs-on: ubuntu-latest
@@ -73,6 +97,10 @@ jobs:
       - name: Install backend dependencies
         working-directory: backend
         run: npm ci
+
+      - name: Generate Prisma client
+        working-directory: backend
+        run: npx prisma generate
 
       - name: Run TypeScript type check (backend)
         working-directory: backend
