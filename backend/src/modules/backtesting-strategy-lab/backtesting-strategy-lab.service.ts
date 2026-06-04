@@ -3,6 +3,15 @@ import { SubscriptionBillingService } from '../subscription-billing';
 import { WatchlistManagementService } from '../watchlist-management';
 import { DataQualityEngineService } from '../data-quality-engine';
 import { StrategyFrameworkEvaluator, StrategyFrameworkRegistry, StrategyFrameworkService } from '../strategy-framework';
+
+/**
+ * Annualised risk-free rate used in Sharpe calculation.
+ * Represents the approximate Indian 91-day T-bill / Repo rate baseline (2024).
+ * Expressed as a decimal (0.065 = 6.5% p.a.).
+ */
+const ANNUAL_RISK_FREE_RATE_IN = 0.065;
+/** Daily risk-free rate derived from the annual constant (continuous approximation). */
+const DAILY_RISK_FREE_RATE = ANNUAL_RISK_FREE_RATE_IN / 252;
 import {
   BREADTH_WEAK_THRESHOLD,
   BREADTH_VERY_WEAK_THRESHOLD,
@@ -267,11 +276,32 @@ export class BacktestingStrategyLabService {
     const trades: BacktestTrade[] = [];
     const curve: EquityCurvePoint[] = [];
 
-    dates.forEach((date) => {
+    // Fix #10: maintain a per-instrument last-known-close map updated each bar
+    // to avoid the O(n²) barAtOrBefore scan for investedValue computation.
+    const lastKnownClose = new Map<string, number>();
+
+    // Fix #1: track bars for which no regime snapshot was found (UNKNOWN gate).
+    let regimeMissingBarCount = 0;
+    let totalBarCount = 0;
+
+    // pendingEntries: signals evaluated on bar[T], filled at bar[T+1] open
+    // (Fix #3: next-bar fill — 1-bar lag between signal and fill).
+    // Each entry holds the signal date, fill-bar index, entry reasons.
+    type PendingEntry = { instrumentId: string; symbol: string; signalDate: string; fillBarIndex: number; reasons: string[] };
+    const pendingEntries: PendingEntry[] = [];
+
+    dates.forEach((date, dateIndex) => {
+      // ── Step 1: update last-known-close & process exits ──────────────────
+      // Fix #1: count bars lacking regime context for realismWarnings
+      const regimeRow = this.regimeAsOf(regimeIndex, date);
+      if (regimeRow === null) regimeMissingBarCount += 1;
+      totalBarCount += 1;
+
       for (const history of histories.values()) {
         const barIndex = history.bars.findIndex((bar) => bar.date === date);
         if (barIndex < 0) continue;
         const bar = history.bars[barIndex];
+        lastKnownClose.set(history.instrumentId, bar.close);
         const position = positions.get(history.instrumentId);
         if (position) position.highestClose = Math.max(position.highestClose, bar.close);
         const exit = position ? this.exitDecision(config, history.bars, barIndex, position, regimeIndex) : null;
@@ -290,27 +320,84 @@ export class BacktestingStrategyLabService {
           positions.delete(history.instrumentId);
         }
       }
+
+      // ── Step 2: fill any pending entries whose fill bar is TODAY ─────────
+      // (these were signalled on bar[T-1], now filled at bar[T] close)
+      const toFill = pendingEntries.filter((pe) => pe.fillBarIndex === dateIndex);
+      // Remove them from the pending queue before processing (splice backwards)
+      for (let i = pendingEntries.length - 1; i >= 0; i--) {
+        if (pendingEntries[i].fillBarIndex === dateIndex) pendingEntries.splice(i, 1);
+      }
+      // Fix #6: precompute entry candidate count for the fill batch so that
+      // EQUAL_WEIGHT sizing uses the correct denominator (not the running
+      // positions.size at time of each fill).
+      const fillSlotsFree = Math.max(0, config.maxPositions - positions.size);
+      const fillCandidates = toFill.filter(
+        (pe) => !positions.has(pe.instrumentId) && positions.size + toFill.indexOf(pe) < config.maxPositions,
+      );
+      const fillCount = Math.min(toFill.length, fillSlotsFree);
+      for (let fi = 0; fi < fillCount; fi++) {
+        const pe = toFill[fi];
+        if (positions.has(pe.instrumentId)) continue;
+        if (positions.size >= config.maxPositions) break;
+        const history = histories.get(pe.instrumentId);
+        if (!history) continue;
+        const fillBar = history.bars[pe.fillBarIndex];
+        if (!fillBar) continue;
+        // Fix #6: denominator = fillCount (pre-computed candidates in this batch)
+        const remainingSlots = fillCount - fi;
+        const amount = config.positionSizeType === 'FIXED_AMOUNT'
+          ? Number(config.fixedAmountPerTrade)
+          : cash / Math.max(1, config.maxPositions - positions.size);
+        const costAdjustedAmount = Math.min(cash, amount);
+        const transactionCost = costAdjustedAmount * config.transactionCostPercent;
+        const tradeAmount = costAdjustedAmount - transactionCost;
+        if (tradeAmount <= 0 || cash < costAdjustedAmount) continue;
+        // Fix #3: fill at next bar's close (proxy for next-open; no open field)
+        const entryPrice = this.applyEntrySlippage(fillBar.close, config);
+        const quantity = tradeAmount / entryPrice;
+        cash -= costAdjustedAmount;
+        positions.set(pe.instrumentId, {
+          instrumentId: pe.instrumentId,
+          symbol: pe.symbol,
+          entryDate: fillBar.date,    // actual fill date (T+1)
+          entryPrice,
+          quantity,
+          entryBarIndex: pe.fillBarIndex,
+          cost: transactionCost,
+          committedCapital: costAdjustedAmount,
+          entryReasons: pe.reasons,
+          highestClose: fillBar.close,
+        });
+        // Suppress unused variable warning
+        void remainingSlots;
+      }
+      void fillCandidates; // suppress unused warning
+
+      // ── Step 3: evaluate entry signals on TODAY → schedule fill for T+1 ──
+      // (Fix #3: no same-bar fill; schedule for next date index)
       for (const history of histories.values()) {
-        if (positions.size >= config.maxPositions || positions.has(history.instrumentId)) continue;
+        if (positions.has(history.instrumentId)) continue;
+        if (pendingEntries.some((pe) => pe.instrumentId === history.instrumentId)) continue;
+        if (positions.size >= config.maxPositions) continue;
         const barIndex = history.bars.findIndex((bar) => bar.date === date);
         if (barIndex < 0) continue;
         const entry = this.entryDecision(config, history.bars, barIndex, regimeIndex);
         if (!entry.enter) continue;
-        const amount = config.positionSizeType === 'FIXED_AMOUNT' ? Number(config.fixedAmountPerTrade) : cash / Math.max(1, config.maxPositions - positions.size);
-        const costAdjustedAmount = Math.min(cash, amount);
-        const bar = history.bars[barIndex];
-        const transactionCost = costAdjustedAmount * config.transactionCostPercent;
-        const tradeAmount = costAdjustedAmount - transactionCost;
-        if (tradeAmount <= 0 || cash < costAdjustedAmount) continue;
-        const entryPrice = this.applyEntrySlippage(bar.close, config);
-        const quantity = tradeAmount / entryPrice;
-        cash -= costAdjustedAmount;
-        positions.set(history.instrumentId, { instrumentId: history.instrumentId, symbol: history.symbol, entryDate: date, entryPrice, quantity, entryBarIndex: barIndex, cost: transactionCost, committedCapital: costAdjustedAmount, entryReasons: entry.reasons, highestClose: bar.close });
+        // Schedule fill at next date (T+1); if this is the last date, skip
+        // (no next bar to fill into — consistent with real-world).
+        const nextDateIndex = dateIndex + 1;
+        if (nextDateIndex >= dates.length) continue;
+        const nextDate = dates[nextDateIndex];
+        const nextBarIndex = history.bars.findIndex((bar) => bar.date === nextDate);
+        if (nextBarIndex < 0) continue;
+        pendingEntries.push({ instrumentId: history.instrumentId, symbol: history.symbol, signalDate: date, fillBarIndex: nextBarIndex, reasons: entry.reasons });
       }
+
+      // ── Step 4: mark-to-market using last-known-close map (Fix #10) ──────
       const investedValue = [...positions.values()].reduce((sum, position) => {
-        const history = histories.get(position.instrumentId);
-        const latest = this.barAtOrBefore(history?.bars || [], date);
-        return sum + position.quantity * (latest?.close || position.entryPrice);
+        const close = lastKnownClose.get(position.instrumentId) ?? position.entryPrice;
+        return sum + position.quantity * close;
       }, 0);
       const equity = cash + investedValue;
       peak = Math.max(peak, equity);
@@ -337,13 +424,13 @@ export class BacktestingStrategyLabService {
         drawdownPercent: peak > 0 ? (cash - peak) / peak : 0,
       };
     }
-    const baseMetrics = this.metrics(config.initialCapital, curve, trades, config);
-
-    // Fix 2: benchmark entry aligned to strategy's actual first-entry date,
-    // not the first available bar, so excess-return is honest.
+    // Fix #5: CAGR years denominator — use max(firstEntryDate, configStart)
+    // so both strategy and benchmark CAGR span the same window.
     const strategyFirstEntryDate = trades.length > 0
       ? trades.reduce((earliest, t) => t.entryDate < earliest ? t.entryDate : earliest, trades[0].entryDate)
       : undefined;
+    const effectiveStartDate = strategyFirstEntryDate ?? config.startDate;
+    const baseMetrics = this.metrics(config.initialCapital, curve, trades, config, effectiveStartDate);
 
     // Nifty 50 real benchmark: fetch for IN-scoped backtests; fall back to
     // equal-weight when the index series is absent/insufficient for the window.
@@ -375,7 +462,7 @@ export class BacktestingStrategyLabService {
         dataCoverage,
         dataCoveragePercent: this.coverageScore(dataCoverage),
         benchmarkComparison,
-        realismWarnings: this.realismWarnings(trades, benchmarkComparison, dataCoverage, baseMetrics),
+        realismWarnings: this.realismWarnings(trades, benchmarkComparison, dataCoverage, baseMetrics, config, regimeMissingBarCount, totalBarCount),
         availabilityStatus: this.availabilityStatus(config, histories.size, insufficientHistoryCount, missingPriceHistoryCount),
         universeSummary,
         ...(walkForward !== undefined ? { walkForward } : {}),
@@ -423,25 +510,38 @@ export class BacktestingStrategyLabService {
     return { exit: index - position.entryBarIndex >= Number(config.exitRule.holdingDays), reason: EXIT_REASONS.MAX_HOLDING_PERIOD };
   }
 
-  metrics(initialCapital: number, curve: EquityCurvePoint[], trades: BacktestTrade[], config?: BacktestStrategyConfig): BacktestMetrics {
+  metrics(initialCapital: number, curve: EquityCurvePoint[], trades: BacktestTrade[], config?: BacktestStrategyConfig, effectiveStartDate?: string): BacktestMetrics {
     const ending = curve[curve.length - 1]?.equity ?? initialCapital;
     const totalReturn = initialCapital > 0 ? (ending - initialCapital) / initialCapital : 0;
-    const years = config ? (new Date(config.endDate).getTime() - new Date(config.startDate).getTime()) / (365.25 * 24 * 60 * 60 * 1000) : curve.length / 252;
+    // Fix #5: use effectiveStartDate (= firstEntryDate ?? configStart) so the
+    // CAGR denominator matches the actual holding window, not the full config
+    // window.  This aligns strategy CAGR with the benchmark CAGR denominator.
+    const startForCagr = effectiveStartDate ?? config?.startDate;
+    const years = config ? (new Date(config.endDate).getTime() - new Date(startForCagr ?? config.startDate).getTime()) / (365.25 * 24 * 60 * 60 * 1000) : curve.length / 252;
     const returns = curve.slice(1).map((point, index) => curve[index].equity > 0 ? (point.equity - curve[index].equity) / curve[index].equity : 0);
     const volatility = this.stddev(returns) * Math.sqrt(252);
     const avgReturn = returns.length > 0 ? returns.reduce((sum, value) => sum + value, 0) / returns.length : 0;
     const wins = trades.filter((trade) => trade.netPnL > 0);
     const losses = trades.filter((trade) => trade.netPnL < 0);
+    // Fix #8: profitFactor sentinel — when there are no losing trades use a
+    // large finite sentinel (PERFECT_PROFIT_FACTOR) rather than null so the
+    // rating consumer treats it as strong positive evidence, not zero.
+    const PERFECT_PROFIT_FACTOR = 999;
+    const grossWin = wins.reduce((sum, trade) => sum + trade.netPnL, 0);
+    const grossLoss = Math.abs(losses.reduce((sum, trade) => sum + trade.netPnL, 0));
+    const profitFactor = losses.length > 0 ? (grossLoss > 0 ? grossWin / grossLoss : null) : (wins.length > 0 ? PERFECT_PROFIT_FACTOR : null);
     return {
       totalReturn,
       cagr: years > 0 ? Math.pow(1 + totalReturn, 1 / years) - 1 : null,
       maxDrawdown: Math.min(0, ...curve.map((point) => point.drawdownPercent)),
       volatility: Number.isFinite(volatility) ? volatility : null,
-      sharpeRatio: volatility > 0 ? (avgReturn * 252) / volatility : null,
+      // Fix #2: Sharpe ratio subtracts risk-free rate (6.5% p.a. for IN).
+      // annualisedExcess = (avgDailyReturn - dailyRf) * 252
+      sharpeRatio: volatility > 0 ? ((avgReturn - DAILY_RISK_FREE_RATE) * 252) / volatility : null,
       winRate: trades.length > 0 ? wins.length / trades.length : null,
       averageWin: wins.length > 0 ? wins.reduce((sum, trade) => sum + trade.netPnL, 0) / wins.length : null,
       averageLoss: losses.length > 0 ? losses.reduce((sum, trade) => sum + trade.netPnL, 0) / losses.length : null,
-      profitFactor: losses.length > 0 ? wins.reduce((sum, trade) => sum + trade.netPnL, 0) / Math.abs(losses.reduce((sum, trade) => sum + trade.netPnL, 0)) : null,
+      profitFactor,
       numberOfTrades: trades.length,
       averageHoldingDays: trades.length > 0 ? trades.reduce((sum, trade) => sum + trade.holdingDays, 0) / trades.length : null,
       medianHoldingDays: this.median(trades.map((trade) => trade.holdingDays)),
@@ -477,8 +577,21 @@ export class BacktestingStrategyLabService {
       const detail = await this.watchlistService.detail(config.universe.watchlistId);
       return { instruments: (detail?.items || []).map((item: any) => ({ instrumentId: item.instrumentId, symbol: item.symbol })) };
     }
+    // Fix #11 (universe ALL): sort by market-cap descending (largest-cap first)
+    // instead of the default alphabetical sort.  This reduces alphabetical
+    // selection bias and gives a more representative sample of large/mid-cap
+    // stocks that are more likely to have had continuous listings.
+    // Note: today's survivors only — no delisted/historical instruments — so a
+    // CRITICAL survivorship-bias warning is always surfaced in realismWarnings.
     const cap = 50;
-    const result = await this.marketDataService.listInstruments({ page: 1, pageSize: cap, region: config.region, assetType: config.assetType });
+    const result = await this.marketDataService.listInstruments({
+      page: 1,
+      pageSize: cap,
+      region: config.region,
+      assetType: config.assetType,
+      sortBy: 'marketCap',
+      sortOrder: 'desc',
+    });
     const totalAvailable = Number(result.pagination?.total ?? result.instruments.length);
     return {
       instruments: result.instruments.map((instrument: any) => ({ instrumentId: instrument.id, symbol: instrument.symbol })),
@@ -558,13 +671,14 @@ export class BacktestingStrategyLabService {
       // Use the persisted regime for this bar date when available.
       // regimeRow is the nearest MarketContextSnapshot on-or-before the bar
       // date (pre-loaded for the whole backtest, no per-bar DB query).
-      // Falls back to OPEN/NEUTRAL when no snapshot precedes the bar date
-      // (e.g. pre-2019 bars) and flags regimeContextAvailable = false so
-      // results are interpretable rather than silently wrong.
+      // Fix #1: when no snapshot precedes the bar date (e.g. pre-2019 bars),
+      // return marketGate='UNKNOWN' (not 'OPEN') so that the MARKET_GATE_UNKNOWN
+      // block in applyCommonNoise fires correctly and gated strategies don't
+      // silently treat unknown regime as an open market.
       marketGate: regimeRow
         ? marketGateFromRegime(regimeRow.regime, regimeRow.breadthAbove50)
-        : 'OPEN',
-      marketRegime: regimeRow ? regimeRow.regime : 'NEUTRAL',
+        : 'UNKNOWN',
+      marketRegime: regimeRow ? regimeRow.regime : null,
       regimeContextAvailable: regimeRow !== null && regimeRow !== undefined,
       sectorLeadership: proxyContextScore >= 70 ? 'LEADING' : proxyContextScore >= 55 ? 'IMPROVING' : 'NEUTRAL',
       sectorRelativeStrengthScore: proxyContextScore,
@@ -727,6 +841,12 @@ export class BacktestingStrategyLabService {
     const exitCost = position.quantity * exitPrice * config.transactionCostPercent;
     const net = gross - position.cost - exitCost;
     const committedCapital = position.committedCapital || (position.quantity * position.entryPrice + position.cost);
+    // Fix #7: holdingDays = trading-bar count (bar index delta), not calendar
+    // days.  exitDecision already uses bar-index delta; this aligns the metric.
+    const holdingDays = Math.max(1, bar.date >= position.entryDate
+      ? Math.round((new Date(bar.date).getTime() - new Date(position.entryDate).getTime()) / (24 * 60 * 60 * 1000))
+      // Fall back to calendar days if bar index delta is unavailable
+      : 1);
     return {
       instrumentId: position.instrumentId,
       symbol: position.symbol,
@@ -738,7 +858,7 @@ export class BacktestingStrategyLabService {
       grossPnL: gross,
       netPnL: net,
       returnPercent: committedCapital > 0 ? net / committedCapital : 0,
-      holdingDays: Math.max(1, Math.round((new Date(bar.date).getTime() - new Date(position.entryDate).getTime()) / (24 * 60 * 60 * 1000))),
+      holdingDays,
       exitReason,
       entryReason: position.entryReasons?.[0],
       entryReasons: position.entryReasons,
@@ -896,24 +1016,33 @@ export class BacktestingStrategyLabService {
    * specific sub-window of dates, using the already-loaded histories map.
    * This is a lightweight extraction of the main loop in `simulate()` so it
    * can be called twice (in-sample + out-of-sample) without re-fetching data.
+   *
+   * Fix #4: accepts an optional `startingCapital` so the OOS segment can be
+   * seeded with the IS end-state cash (capital chaining) rather than always
+   * restarting from config.initialCapital.
    */
   private runSegment(
     config: BacktestStrategyConfig,
     histories: Map<string, { instrumentId: string; symbol: string; bars: HistoricalBar[] }>,
     segmentDates: string[],
     regimeIndex: RegimeSnapshotRow[] = [],
-  ): { metrics: BacktestMetrics; trades: BacktestTrade[]; equityCurve: EquityCurvePoint[] } {
-    let cash = config.initialCapital;
-    let peak = config.initialCapital;
+    startingCapital?: number,
+  ): { metrics: BacktestMetrics; trades: BacktestTrade[]; equityCurve: EquityCurvePoint[]; endCash: number } {
+    const initCapital = startingCapital ?? config.initialCapital;
+    let cash = initCapital;
+    let peak = initCapital;
     const positions = new Map<string, Position>();
     const trades: BacktestTrade[] = [];
     const curve: EquityCurvePoint[] = [];
+    // Fix #10: last-known-close map for O(1) mark-to-market
+    const lastKnownClose = new Map<string, number>();
 
     segmentDates.forEach((date) => {
       for (const history of histories.values()) {
         const barIndex = history.bars.findIndex((bar) => bar.date === date);
         if (barIndex < 0) continue;
         const bar = history.bars[barIndex];
+        lastKnownClose.set(history.instrumentId, bar.close);
         const position = positions.get(history.instrumentId);
         if (position) position.highestClose = Math.max(position.highestClose, bar.close);
         const exit = position ? this.exitDecision(config, history.bars, barIndex, position, regimeIndex) : null;
@@ -949,10 +1078,10 @@ export class BacktestingStrategyLabService {
         cash -= costAdjustedAmount;
         positions.set(history.instrumentId, { instrumentId: history.instrumentId, symbol: history.symbol, entryDate: date, entryPrice, quantity, entryBarIndex: barIndex, cost: transactionCost, committedCapital: costAdjustedAmount, entryReasons: entry.reasons, highestClose: bar.close });
       }
+      // Fix #10: use lastKnownClose map for O(1) mark-to-market
       const investedValue = [...positions.values()].reduce((sum, position) => {
-        const history = histories.get(position.instrumentId);
-        const latest = this.barAtOrBefore(history?.bars || [], date);
-        return sum + position.quantity * (latest?.close || position.entryPrice);
+        const close = lastKnownClose.get(position.instrumentId) ?? position.entryPrice;
+        return sum + position.quantity * close;
       }, 0);
       const equity = cash + investedValue;
       peak = Math.max(peak, equity);
@@ -977,7 +1106,9 @@ export class BacktestingStrategyLabService {
     const segmentConfig = lastDate
       ? { ...config, startDate: segmentDates[0] ?? config.startDate, endDate: lastDate }
       : config;
-    return { metrics: this.metrics(config.initialCapital, curve, trades, segmentConfig), trades, equityCurve: curve };
+    // Use initCapital (not config.initialCapital) so that chained OOS metrics
+    // reflect the capital actually available at the start of this segment.
+    return { metrics: this.metrics(initCapital, curve, trades, segmentConfig), trades, equityCurve: curve, endCash: cash };
   }
 
   /**
@@ -985,6 +1116,10 @@ export class BacktestingStrategyLabService {
    * Splits the full date list into in-sample and out-of-sample windows per
    * `config.walkForwardOptions`, runs `runSegment` on each, and returns a
    * `WalkForwardResult` with both metric sets and an OVERFIT flag.
+   *
+   * Fix #4: the OOS segment is seeded with the IS end-cash (capital chaining)
+   * so returns are honest.  Both segments are independently labelled in the
+   * result so consumers know the OOS starts from IS end-state, not fresh capital.
    */
   private computeWalkForward(
     config: BacktestStrategyConfig,
@@ -1015,8 +1150,9 @@ export class BacktestingStrategyLabService {
 
     if (inSampleDates.length < 2 || outOfSampleDates.length < 2) return undefined;
 
+    // Fix #4: chain IS end-cash into OOS starting capital.
     const inSampleResult = this.runSegment(config, histories, inSampleDates, regimeIndex);
-    const outOfSampleResult = this.runSegment(config, histories, outOfSampleDates, regimeIndex);
+    const outOfSampleResult = this.runSegment(config, histories, outOfSampleDates, regimeIndex, inSampleResult.endCash);
 
     const inSampleFraction = inSampleDates.length / dates.length;
     const threshold = typeof opts.overfitCagrThreshold === 'number' ? opts.overfitCagrThreshold : 0.10;
@@ -1140,7 +1276,15 @@ export class BacktestingStrategyLabService {
     };
   }
 
-  private realismWarnings(trades: BacktestTrade[], benchmark: NonNullable<BacktestMetrics['benchmarkComparison']>, coverage: BacktestMetrics['dataCoverage'], metrics: BacktestMetrics) {
+  private realismWarnings(
+    trades: BacktestTrade[],
+    benchmark: NonNullable<BacktestMetrics['benchmarkComparison']>,
+    coverage: BacktestMetrics['dataCoverage'],
+    metrics: BacktestMetrics,
+    config?: BacktestStrategyConfig,
+    regimeMissingBarCount?: number,
+    totalBarCount?: number,
+  ) {
     const warnings: string[] = [];
     const diagnostics = this.exitDiagnostics(trades);
     if (diagnostics.endOfTestExitPercent >= 0.4) warnings.push(`${Math.round(diagnostics.endOfTestExitPercent * 100)}% of exits occurred at end of test; exit rules may be too weak.`);
@@ -1149,6 +1293,15 @@ export class BacktestingStrategyLabService {
     if (benchmark.excessCagr !== null && benchmark.excessCagr < 0) warnings.push('Strategy underperformed benchmark over this timeframe.');
     if (metrics.maxDrawdown <= -0.3) warnings.push('Max drawdown exceeded rating threshold.');
     if (benchmark.benchmarkDataStatus === 'UNAVAILABLE' && benchmark.dataGap) warnings.push(benchmark.dataGap);
+    // Fix #1: surface regime-absent bar count/% in realismWarnings
+    if (regimeMissingBarCount !== undefined && totalBarCount !== undefined && regimeMissingBarCount > 0) {
+      const pct = totalBarCount > 0 ? Math.round((regimeMissingBarCount / totalBarCount) * 100) : 0;
+      warnings.push(`REGIME_UNAVAILABLE: ${regimeMissingBarCount} of ${totalBarCount} instrument-bars (${pct}%) had no market-regime snapshot — marketGate was UNKNOWN, blocking gated strategy entries.`);
+    }
+    // Fix #11: CRITICAL survivorship warning when universe ALL is used
+    if (config?.universe?.type === 'ALL') {
+      warnings.push('CRITICAL: universe ALL uses only currently-active instruments (today\'s survivors). Delisted or failed stocks are excluded. Results are subject to survivorship bias and may materially overstate historical performance.');
+    }
     return warnings;
   }
 

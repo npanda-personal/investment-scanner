@@ -265,7 +265,10 @@ describe('strategyContextFromBars: regime from persisted snapshot', () => {
     expect(ctx.regimeContextAvailable).toBe(true);
   });
 
-  it('falls back to OPEN/NEUTRAL + regimeContextAvailable=false when no prior snapshot', () => {
+  it('falls back to UNKNOWN/null + regimeContextAvailable=false when no prior snapshot', () => {
+    // Fix #1: when no regime snapshot exists for a bar date, marketGate MUST
+    // be 'UNKNOWN' (not 'OPEN') so that gated strategies are honestly blocked,
+    // not silently treated as if the market were open.
     const { service } = makeService([]);
     const svcAny = service as any;
 
@@ -295,8 +298,10 @@ describe('strategyContextFromBars: regime from persisted snapshot', () => {
     expect(regimeRow).toBeNull();
 
     const ctx = svcAny.strategyContextFromBars(bars, index, config, undefined, regimeRow);
-    expect(ctx.marketGate).toBe('OPEN');
-    expect(ctx.marketRegime).toBe('NEUTRAL');
+    // Fix #1: UNKNOWN (not OPEN) when no regime context
+    expect(ctx.marketGate).toBe('UNKNOWN');
+    // marketRegime is null (not 'NEUTRAL') when no snapshot
+    expect(ctx.marketRegime).toBeNull();
     expect(ctx.regimeContextAvailable).toBe(false);
   });
 

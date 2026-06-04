@@ -532,6 +532,96 @@ function inputRoots(input: string): string[] {
     .filter(Boolean);
 }
 
+// ---------------------------------------------------------------------------
+// Fix #8 — profitFactor sentinel: null (zero-loss) must award max points
+// ---------------------------------------------------------------------------
+
+describe('Fix #8 — profitFactor null (zero-loss) → rating awards full profit factor score', () => {
+  const baseInput = {
+    strategyCode: 'TREND_MOMENTUM',
+    strategyVersion: '1.0',
+    timeframe: '3Y' as const,
+    region: 'IN',
+    assetType: 'STOCK',
+    universeKey: 'ALL_ELIGIBLE',
+    startingCapital: 100_000,
+    endingCapital: 118_000,
+    totalReturn: 0.18,
+    cagr: 0.18,
+    maxDrawdown: -0.12,
+    volatility: 0.15,
+    sharpe: 1.2,
+    winRate: 0.62,
+    tradeCount: 35,
+    averageHoldingDays: 30,
+    exposurePercent: 0.6,
+    generatedAt: new Date().toISOString(),
+  };
+
+  it('rating score with profitFactor=null (zero losses) is >= score with profitFactor=2', () => {
+    const ratingWithNullPF = StrategyFrameworkEvaluator.rate({ ...baseInput, profitFactor: null });
+    const ratingWith2PF = StrategyFrameworkEvaluator.rate({ ...baseInput, profitFactor: 2 });
+    // null profitFactor (zero losses = perfect) must award >= the score for profitFactor=2
+    expect(ratingWithNullPF.ratingScore).toBeGreaterThanOrEqual(ratingWith2PF.ratingScore);
+  });
+
+  it('rating score with profitFactor=999 (sentinel) equals max profit factor contribution', () => {
+    const ratingWith999 = StrategyFrameworkEvaluator.rate({ ...baseInput, profitFactor: 999 });
+    const ratingWith2 = StrategyFrameworkEvaluator.rate({ ...baseInput, profitFactor: 2 });
+    // Sentinel 999 must produce >= score as profitFactor=2
+    expect(ratingWith999.ratingScore).toBeGreaterThanOrEqual(ratingWith2.ratingScore);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Fix #9 — getBacktestConfig accepts optional endDate param
+// ---------------------------------------------------------------------------
+
+describe('Fix #9 — getBacktestConfig uses supplied endDate, not wall-clock', () => {
+  it('endDate in returned config matches supplied endDate', () => {
+    const registry = new StrategyFrameworkRegistry();
+    const strategy = registry.get('TREND_MOMENTUM')!;
+    const evaluator = new StrategyFrameworkEvaluator(strategy);
+    const fixedEnd = '2024-06-15';
+    const config = evaluator.getBacktestConfig({
+      strategyCode: 'TREND_MOMENTUM',
+      timeframe: '3Y',
+      endDate: fixedEnd,
+    });
+    expect(config.endDate).toBe(fixedEnd);
+  });
+
+  it('startDate is exactly N years before the supplied endDate', () => {
+    const registry = new StrategyFrameworkRegistry();
+    const strategy = registry.get('TREND_MOMENTUM')!;
+    const evaluator = new StrategyFrameworkEvaluator(strategy);
+    const fixedEnd = '2024-06-15';
+    const config = evaluator.getBacktestConfig({
+      strategyCode: 'TREND_MOMENTUM',
+      timeframe: '3Y',
+      endDate: fixedEnd,
+    });
+    const expectedStart = new Date('2024-06-15');
+    expectedStart.setFullYear(expectedStart.getFullYear() - 3);
+    expect(config.startDate).toBe(expectedStart.toISOString().slice(0, 10));
+  });
+
+  it('endDate defaults to today when not supplied (wall-clock)', () => {
+    const registry = new StrategyFrameworkRegistry();
+    const strategy = registry.get('TREND_MOMENTUM')!;
+    const evaluator = new StrategyFrameworkEvaluator(strategy);
+    const before = new Date().toISOString().slice(0, 10);
+    const config = evaluator.getBacktestConfig({
+      strategyCode: 'TREND_MOMENTUM',
+      timeframe: '1Y',
+    });
+    const after = new Date().toISOString().slice(0, 10);
+    // endDate should be today (within the test execution window)
+    expect(config.endDate >= before).toBe(true);
+    expect(config.endDate <= after).toBe(true);
+  });
+});
+
 function inputSatisfied(input: string, declared: Set<string>) {
   if (declared.has(input)) return true;
   if (input === 'signal') return declared.has('rawSignal') || declared.has('calibratedSignal');

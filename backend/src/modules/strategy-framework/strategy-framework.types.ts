@@ -199,6 +199,12 @@ export interface RegisteredBacktestInput {
   takeProfitPercent?: number;
   positionSizeType?: 'EQUAL_WEIGHT' | 'FIXED_AMOUNT';
   fixedAmountPerTrade?: number;
+  /**
+   * Fix #9: optional explicit end date (YYYY-MM-DD).  When omitted, today's
+   * wall-clock date is used.  Providing this anchors historical re-evaluations
+   * so the rating is not affected by an ever-expanding future window.
+   */
+  endDate?: string;
 }
 
 export interface StrategyPerformanceSummaryDto {

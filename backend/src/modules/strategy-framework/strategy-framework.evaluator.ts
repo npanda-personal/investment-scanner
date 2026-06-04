@@ -82,7 +82,10 @@ export class StrategyFrameworkEvaluator implements StrategyEvaluator {
 
   getBacktestConfig(input: RegisteredBacktestInput): BacktestStrategyConfig {
     const years = YEARS_BY_TIMEFRAME[input.timeframe];
-    const end = new Date();
+    // Fix #9: use an optional explicit endDate so that saved/historical
+    // re-evaluations are rated against a stable window, not an ever-expanding
+    // wall-clock future.  Default remains today when not supplied.
+    const end = input.endDate ? new Date(input.endDate) : new Date();
     const start = new Date(end);
     start.setFullYear(start.getFullYear() - years);
     const entry = String(this.definition.parameters.backtestEntryRule || 'SIGNAL_DIRECTION_BULLISH');
@@ -133,7 +136,11 @@ export class StrategyFrameworkEvaluator implements StrategyEvaluator {
     score += clamp((0.35 + summary.maxDrawdown) * 80, 0, 20);
     score += clamp((summary.sharpe + 0.2) * 16, 0, 20);
     score += clamp((summary.winRate ?? 0) * 18, 0, 15);
-    score += clamp((summary.profitFactor ?? 0) * 5, 0, 10);
+    // Fix #8: profitFactor null on zero-loss is NOT a penalty — treat as the
+    // cap (10 pts) so perfect strategies are rewarded, not penalised.
+    // A profitFactor sentinel of 999 (from service) maps to well above 10 pts
+    // before clamp, so it naturally reaches the cap.
+    score += clamp((summary.profitFactor ?? 10 / 5) * 5, 0, 10);
     score += summary.tradeCount >= 30 ? 5 : 2;
     score += clamp(((summary as any).dataCoverageScore ?? 1) * 5, 0, 5);
     if (summary.maxDrawdown <= -0.35) {
