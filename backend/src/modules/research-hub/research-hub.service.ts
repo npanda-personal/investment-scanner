@@ -52,7 +52,23 @@ export class ResearchHubService {
           region,
           assetType,
         );
-        return { ...cached, whatChanged: freshWhatChanged };
+        // NR-41 stale-cache fix: recompute actionability on every read using the current
+        // aggregation logic so that blocking/non-blocking dimension changes (e.g. the
+        // "not yet measured" stub dimensions that were incorrectly set blocking:true in
+        // snapshots built before the fix) never permanently drag overallStatus to
+        // INSUFFICIENT_DATA.  All inputs come from the cached snapshot itself — no
+        // signals are regenerated — so this is still a persisted-read.
+        const calibrationHealth = await this.calibrationService.health().catch(() => null);
+        const freshActionability = this.buildActionability(
+          cached.marketReadiness,
+          cached.researchPriorities,
+          cached.strategyProofSummary,
+          cached.confirmationSummary,
+          cached.dataGaps,
+          cached.nextActions,
+          calibrationHealth,
+        );
+        return { ...cached, whatChanged: freshWhatChanged, actionability: freshActionability };
       }
       return this.emptyOverview(['Research overview snapshot is not ready yet. Run the backend pipeline to materialize this dashboard.']);
     }

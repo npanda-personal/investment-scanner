@@ -26,7 +26,7 @@ import {
 import { Link } from 'react-router-dom';
 import { useSmartMoneyIntelligence } from '../hooks';
 import type { SectorSmartMoneySummary, SectorSmartMoneyStatus, SmartMoneyRange, SmartMoneyStatus, SmartMoneyStockSummary } from '../types';
-import { DataTable, FilterBar, PageHeader, type DataTableColumn } from '@/shared/components';
+import { DataTable, FilterBar, PageHeader, StalenessBadge, type DataTableColumn } from '@/shared/components';
 import { humanizeCode } from '@/shared/format/enumLabels';
 
 const statusColor = (status: SmartMoneyStatus | string) => {
@@ -149,6 +149,17 @@ export default function SmartMoneyIntelligencePage() {
     },
   ];
 
+  // NR-56: derive the best available snapshot date for the staleness badge.
+  // Prefer dataThroughDate from the first top/distribution item (most specific),
+  // then fall back to the sectors list's latest updatedAt.
+  const snapshotAsOf =
+    top[0]?.dataThroughDate ||
+    top[0]?.snapshotDate ||
+    distribution[0]?.dataThroughDate ||
+    distribution[0]?.snapshotDate ||
+    sectors[0]?.updatedAt ||
+    null;
+
   if (loading && !top.length && !distribution.length) {
     return <Stack alignItems="center" sx={{ py: 8 }}><CircularProgress /></Stack>;
   }
@@ -158,6 +169,7 @@ export default function SmartMoneyIntelligencePage() {
       <PageHeader
         title="Smart Money Intelligence"
         subtitle="Price-volume accumulation, distribution warnings, and sector flow context."
+        badges={<StalenessBadge asOf={snapshotAsOf} label="Smart money" />}
         primaryAction={<Button variant="contained" onClick={handleRun} disabled={refreshingSnapshots}>{refreshingSnapshots ? 'Refreshing...' : 'Refresh Snapshots'}</Button>}
       />
 

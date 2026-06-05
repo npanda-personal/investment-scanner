@@ -47,6 +47,8 @@ export interface SmartMoneyStockSummary {
   signals: SmartMoneySignal[];
   insiderOwnership: InsiderOwnershipSummary;
   researchUrl: string;
+  snapshotDate?: string | null;
+  dataThroughDate?: string | null;
 }
 
 export interface SectorSmartMoneySummary {

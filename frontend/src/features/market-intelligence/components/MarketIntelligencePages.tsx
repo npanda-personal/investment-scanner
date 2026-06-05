@@ -340,7 +340,7 @@ function SnapshotPageShell({
       {!loading && !error && envelope && <SnapshotMetadata envelope={envelope} />}
       {showWarnings && (
         <Stack spacing={1} sx={{ mb: 2 }}>
-          {envelope?.warnings.map((warning) => <Alert key={warning} severity="warning">{warning}</Alert>)}
+          {envelope?.warnings.map((warning) => <Alert key={warning} severity="warning">{humanizeCode(warning)}</Alert>)}
         </Stack>
       )}
       {showUnavailable && (
@@ -741,6 +741,30 @@ function useSectorConstituents(sector: string | null, region: string, assetType:
 }
 
 /**
+ * NR-64: Sector score chip with subtle color encoding.
+ * Thresholds are tuned to the observed NSE sector score range (typically 0–100):
+ *   >= 60 → green (strong / above neutral)
+ *   40–59 → default / neutral
+ *   < 40  → red (weak / below neutral)
+ */
+function SectorScoreCell({ score }: { score: number | null }) {
+  if (score === null || score === undefined) {
+    return <Typography variant="body2" color="text.secondary">Unavailable</Typography>;
+  }
+  const color: 'success' | 'default' | 'error' =
+    score >= 60 ? 'success' : score < 40 ? 'error' : 'default';
+  return (
+    <Chip
+      label={new Intl.NumberFormat().format(score)}
+      color={color}
+      variant="outlined"
+      size="small"
+      sx={{ fontWeight: 600, minWidth: 44 }}
+    />
+  );
+}
+
+/**
  * Expandable sector row — clicking expands a constituents sub-table below.
  */
 function SectorRowWithDrillDown({
@@ -786,7 +810,7 @@ function SectorRowWithDrillDown({
           {indexLabel(row.sector)}
         </TableCell>
         <TableCell>{formatEnum(row.classification)}</TableCell>
-        <TableCell align="right">{formatOptional(row.sectorScore)}</TableCell>
+        <TableCell align="right"><SectorScoreCell score={row.sectorScore} /></TableCell>
         <TableCell align="right">{formatPercentPoints(row.return1W)}</TableCell>
         <TableCell align="right">{formatPercentPoints(row.return1M)}</TableCell>
         <TableCell align="right">{formatPercentPoints(row.return3M)}</TableCell>
@@ -920,7 +944,7 @@ function SectorIntelligencePanel({
         {loading && <LinearProgress />}
         {error && <Alert severity="error">{error}</Alert>}
         {envelope && <SnapshotMetadata envelope={envelope} compact />}
-        {!loading && !error && envelope?.warnings.map((warning) => <Alert key={warning} severity="warning">{warning}</Alert>)}
+        {!loading && !error && envelope?.warnings.map((warning) => <Alert key={warning} severity="warning">{humanizeCode(warning)}</Alert>)}
         {!loading && !error && rows.length === 0 && (
           <EmptyState title="No persisted sector rows for this scope/date." message={envelope?.message || 'No persisted Sector Intelligence rows are available for this scope.'} />
         )}

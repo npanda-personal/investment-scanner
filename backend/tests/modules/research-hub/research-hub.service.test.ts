@@ -4,6 +4,7 @@ import { StrategyDecisionEngineService } from '../../../src/modules/strategy-dec
 import { SmartMoneyIntelligenceService } from '../../../src/modules/smart-money-intelligence';
 import { MarketContextIntelligenceService } from '../../../src/modules/market-context-intelligence';
 import { StrategyFrameworkService } from '../../../src/modules/strategy-framework';
+import { SignalCalibrationEngineService } from '../../../src/modules/signal-calibration-engine';
 
 // Mock dependencies
 jest.mock('../../../src/modules/signal-generation-engine');
@@ -11,6 +12,20 @@ jest.mock('../../../src/modules/strategy-decision-engine');
 jest.mock('../../../src/modules/smart-money-intelligence');
 jest.mock('../../../src/modules/market-context-intelligence');
 jest.mock('../../../src/modules/strategy-framework');
+jest.mock('../../../src/modules/signal-calibration-engine');
+
+/** Stub calibration health response (0 calibrated signals = INSUFFICIENT_DATA, blocking). */
+const stubCalibrationHealth = {
+  status: 'ok' as const,
+  module: 'signal-calibration-engine' as const,
+  calibrationModelVersion: 'signal-calibration-v2',
+  calibratedSignals: 0,
+  latestGeneratedAt: null,
+  dataStatus: 'MISSING' as const,
+  gaps: ['No calibrated signal results persisted yet.'],
+  calibrationEvidence: {} as any,
+  calibrationReadiness: { status: 'UNAVAILABLE', confidenceTier: 'NONE', calibrationApplied: false, adjustmentCapApplied: 0, downstreamInfluence: 'NONE', authoritativeScore: 'RAW', reasons: [], blockers: [] } as any,
+};
 
 describe('ResearchHubService', () => {
   let service: ResearchHubService;
@@ -19,6 +34,7 @@ describe('ResearchHubService', () => {
   let signalService: jest.Mocked<SignalGenerationEngineService>;
   let smartMoneyService: jest.Mocked<SmartMoneyIntelligenceService>;
   let strategyFrameworkService: jest.Mocked<StrategyFrameworkService>;
+  let calibrationService: jest.Mocked<SignalCalibrationEngineService>;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -28,6 +44,8 @@ describe('ResearchHubService', () => {
     signalService = new SignalGenerationEngineService() as any;
     smartMoneyService = new SmartMoneyIntelligenceService() as any;
     strategyFrameworkService = new StrategyFrameworkService() as any;
+    calibrationService = new SignalCalibrationEngineService() as any;
+
     (signalService.funnelDiagnostics as jest.Mock).mockResolvedValue({
       total: 0,
       bullish: 0,
@@ -41,13 +59,16 @@ describe('ResearchHubService', () => {
       breadth: {},
       explanation: [],
     } as any);
+    // NR-41: mock calibration health to return 0 calibrated signals (INSUFFICIENT_DATA)
+    (calibrationService.health as jest.Mock).mockResolvedValue(stubCalibrationHealth);
 
     service = new ResearchHubService(
       strategyService,
       contextService,
       signalService,
       smartMoneyService,
-      strategyFrameworkService
+      strategyFrameworkService,
+      calibrationService
     );
   });
 
@@ -70,7 +91,11 @@ describe('ResearchHubService', () => {
       } as any;
       const db = {
         pipelineRun: {
-          findFirst: jest.fn().mockResolvedValue({ metadata: { version: 'research-overview-v1', overview: cachedOverview } }),
+          // First call: loadCachedOverview returns the snapshot
+          // Second call: loadPriorOverview (for NR-52 re-diff) returns null (no prior yet)
+          findFirst: jest.fn()
+            .mockResolvedValueOnce({ metadata: { version: 'research-overview-v1', overview: cachedOverview } })
+            .mockResolvedValueOnce(null),
         },
       };
       const cachedService = new ResearchHubService(
@@ -79,12 +104,17 @@ describe('ResearchHubService', () => {
         signalService,
         smartMoneyService,
         strategyFrameworkService,
+        calibrationService,
         db as any
       );
 
       const result = await cachedService.overview();
 
-      expect(result).toBe(cachedOverview);
+      // NR-52: result is now a spread of cachedOverview with a fresh whatChanged (re-diffed).
+      // We cannot use toBe() anymore since the object is rebuilt.
+      expect(result.generatedAt).toBe(cachedOverview.generatedAt);
+      expect(result.marketReadiness).toBe(cachedOverview.marketReadiness);
+      expect(result.researchPriorities).toBe(cachedOverview.researchPriorities);
       expect(db.pipelineRun.findFirst).toHaveBeenCalledWith(expect.objectContaining({
         where: expect.objectContaining({
           pipelineKey: 'research-hub-overview',
@@ -387,7 +417,7 @@ describe('ResearchHubService', () => {
         },
       };
 
-      const svc = new ResearchHubService(strategyService, contextService, signalService, smartMoneyService, strategyFrameworkService, db as any);
+      const svc = new ResearchHubService(strategyService, contextService, signalService, smartMoneyService, strategyFrameworkService, calibrationService, db as any);
       const result = await svc.overview({ live: true });
 
       expect(result.whatChanged.newTradeCandidates).toContain('RELIANCE');
@@ -417,7 +447,7 @@ describe('ResearchHubService', () => {
         },
       };
 
-      const svc = new ResearchHubService(strategyService, contextService, signalService, smartMoneyService, strategyFrameworkService, db as any);
+      const svc = new ResearchHubService(strategyService, contextService, signalService, smartMoneyService, strategyFrameworkService, calibrationService, db as any);
       const result = await svc.overview({ live: true });
 
       expect(result.whatChanged.downgradedCandidates).toContain('INFY');
@@ -444,7 +474,7 @@ describe('ResearchHubService', () => {
         },
       };
 
-      const svc = new ResearchHubService(strategyService, contextService, signalService, smartMoneyService, strategyFrameworkService, db as any);
+      const svc = new ResearchHubService(strategyService, contextService, signalService, smartMoneyService, strategyFrameworkService, calibrationService, db as any);
       const result = await svc.overview({ live: true });
 
       expect(result.whatChanged.marketGateChange).toEqual({ from: 'OPEN', to: 'CLOSED' });
@@ -467,7 +497,7 @@ describe('ResearchHubService', () => {
         },
       };
 
-      const svc = new ResearchHubService(strategyService, contextService, signalService, smartMoneyService, strategyFrameworkService, db as any);
+      const svc = new ResearchHubService(strategyService, contextService, signalService, smartMoneyService, strategyFrameworkService, calibrationService, db as any);
       const result = await svc.overview({ live: true });
 
       expect(result.whatChanged.newTradeCandidates).toHaveLength(0);
@@ -485,7 +515,7 @@ describe('ResearchHubService', () => {
           upsert: jest.fn().mockResolvedValue({}),
         },
       };
-      const svc = new ResearchHubService(strategyService, contextService, signalService, smartMoneyService, strategyFrameworkService, db as any);
+      const svc = new ResearchHubService(strategyService, contextService, signalService, smartMoneyService, strategyFrameworkService, calibrationService, db as any);
       const result = await svc.overview({ live: true });
       const json = JSON.stringify(result.whatChanged).toLowerCase();
       expect(json).not.toMatch(/\b(buy|sell|purchase|order)\b/);
