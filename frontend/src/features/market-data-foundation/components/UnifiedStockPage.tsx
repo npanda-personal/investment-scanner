@@ -215,7 +215,7 @@ function MarketContextRail() {
           )}
           {!loading && !snapshot && (
             <Alert severity="info">
-              Instrument Context backend not available yet. No fake rows are shown.
+              Instrument context not available yet.
             </Alert>
           )}
           <Chip
@@ -254,12 +254,8 @@ function MarketContextRail() {
       </Paper>
       <Paper variant="outlined" sx={{ p: 2 }}>
         <Stack spacing={1}>
-          <Typography variant="subtitle2" fontWeight={800}>
-            Backend dependency
-          </Typography>
           <Typography variant="body2" color="text.secondary">
-            The InstrumentContextSnapshot read API is missing. This rail does not infer
-            context from local page data.
+            Instrument context not available yet.
           </Typography>
         </Stack>
       </Paper>

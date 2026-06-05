@@ -230,7 +230,7 @@ const InstrumentDetailPage: React.FC = () => {
       <Paper sx={{ p: 2, mb: 3 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
           <Typography variant="h6">Historical Prices</Typography>
-          <Chip label={prices?.adjustment_strategy || 'Close shown as adjusted close for MVP'} size="small" variant="outlined" />
+          <Chip label="Prices shown are split/bonus-adjusted." size="small" variant="outlined" />
         </Box>
         {chartData.length > 0 ? (
           <Box sx={{ height: 320 }}>

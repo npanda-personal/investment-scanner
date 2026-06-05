@@ -11,6 +11,11 @@ import { BulkBlockDealsWidget } from './BulkBlockDealsWidget';
 const pct = (value: number | null) => value === null ? 'N/A' : `${(value * 100).toFixed(1)}%`;
 const colorFor = (value?: string) => value === 'RISK_ON' || value === 'LEADING' || value === 'SUPPORTIVE' ? 'success' : value === 'RISK_OFF' || value === 'LAGGING' || value === 'HEADWIND' ? 'error' : 'warning';
 
+// NR-71: backend explanation strings can contain raw long-decimal floats (e.g. 33.68406706005322).
+// Round any float with more than 1 decimal place to 1 d.p. so traders see clean numbers.
+const roundFloatsInText = (text: string): string =>
+  text.replace(/\b(\d+\.\d{2,})\b/g, (_, n) => parseFloat(n).toFixed(1));
+
 const Metric: React.FC<{ label: string; value: string }> = ({ label, value }) => (
   <Paper variant="outlined" sx={{ p: 1.5 }}>
     <Typography variant="caption" color="text.secondary">{label}</Typography>
@@ -111,7 +116,7 @@ export const MarketContextPage: React.FC = () => {
         <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={2}>
           <Box>
             <Typography variant="h6">Market Regime</Typography>
-            <Typography color="text.secondary">{summary.regime.explanation}</Typography>
+            <Typography color="text.secondary">{roundFloatsInText(summary.regime.explanation)}</Typography>
           </Box>
           <Stack alignItems={{ xs: 'flex-start', md: 'flex-end' }} spacing={1}>
             <Typography variant="h3">{summary.regime.score}</Typography>
@@ -184,7 +189,7 @@ export const MarketContextPage: React.FC = () => {
         <Paper sx={{ p: 2 }}>
           <Typography variant="h6" sx={{ mb: 2 }}>Macro Snapshot</Typography>
           <Chip color={colorFor(summary.macro.macroStatus)} label={summary.macro.macroStatus} sx={{ mb: 1 }} />
-          <Typography color="text.secondary">{summary.macro.explanation}</Typography>
+          <Typography color="text.secondary">{roundFloatsInText(summary.macro.explanation)}</Typography>
           <Typography variant="caption" color="text.secondary">{summary.macro.dataStatus}</Typography>
         </Paper>
 
@@ -198,7 +203,7 @@ export const MarketContextPage: React.FC = () => {
       <Paper sx={{ p: 2, mt: 3 }}>
         <Typography variant="h6" sx={{ mb: 1 }}>Key Takeaways</Typography>
         <Box component="ul" sx={{ pl: 2, my: 0 }}>
-          {summary.explanation.map((item) => <Typography component="li" key={item}>{item}</Typography>)}
+          {summary.explanation.map((item) => <Typography component="li" key={item}>{roundFloatsInText(item)}</Typography>)}
         </Box>
       </Paper>
     </Box>

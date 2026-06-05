@@ -289,8 +289,8 @@ function CoveragePanel({ run }: { run: TodayReviewRun }) {
             <Typography variant="caption">Blocked: {formatNumber(scanFunnel.blocked)}</Typography>
             <Typography variant="caption">Strategy outside trusted universe: {formatNumber(scanFunnel.outsideTrustedUniverse)}</Typography>
           </Stack>
-          {warnings.slice(0, 3).map((warning: string) => (
-            <Typography key={warning} variant="caption" color="text.secondary">{warning}</Typography>
+          {warnings.slice(0, 3).map((warning: string, warningIndex: number) => (
+            <Typography key={`warning-${warningIndex}-${warning}`} variant="caption" color="text.secondary">{warning}</Typography>
           ))}
         </Stack>
       </CardContent>
@@ -342,8 +342,8 @@ function ExclusionExplainabilityPanel({ run }: { run: TodayReviewRun }) {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {examples.map((example: any) => (
-                    <TableRow key={`${example.instrumentId}:${example.primaryReasonCode}`}>
+                  {examples.map((example: any, exampleIndex: number) => (
+                    <TableRow key={`${example.instrumentId}:${example.primaryReasonCode}:${exampleIndex}`}>
                       <TableCell>
                         <Typography fontWeight={700}>{example.symbol}</Typography>
                         <Typography variant="caption" color="text.secondary">{example.companyName || example.instrumentId}</Typography>
