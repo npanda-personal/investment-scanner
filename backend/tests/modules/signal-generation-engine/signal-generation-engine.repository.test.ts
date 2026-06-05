@@ -274,7 +274,7 @@ describe('SignalGenerationEngineRepository', () => {
     await repository.latestRunAudit({ region: 'IN', assetType: 'STOCK', modelVersion: 'signal-engine-v1' });
     expect(findFirst).toHaveBeenCalledWith(expect.objectContaining({
       where: { region: 'IN', assetType: 'STOCK', modelVersion: 'signal-engine-v1' },
-      orderBy: { startedAt: 'desc' },
+      orderBy: [{ sourceDataDate: { sort: 'desc', nulls: 'last' } }, { startedAt: 'desc' }],
     }));
   });
 

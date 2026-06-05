@@ -22,6 +22,47 @@ describe('MarketContextIntelligenceService', () => {
     expect(result.regime).toBe('RISK_ON');
   });
 
+  it('does NOT classify as RISK_ON when breadth is zero even with positive index trend (CB-42)', () => {
+    // CB-42: breadth gates 60% of score; zero breadth cannot reach RISK_ON.
+    // Prices: index 0 = 50 (latest/crashed), indices 1-259 = 200 (history high).
+    // SMA50  = (50 + 49*200)/50 = 197  -> 50 < 197 -> below SMA50
+    // SMA200 = (50 + 199*200)/200 = 199.25 -> 50 < 199.25 -> below SMA200
+    // 63-bar return = (50-200)/200 = -75% -> returnScore = max(0, 50-150) = 0
+    // nseiPrices = [] -> indexTrendScore = 50 (neutral, no data)
+    // leadershipScore ≈ 50 (sector RS)
+    // score = 0*0.35 + 0*0.25 + 50*0.25 + 0*0.10 + 50*0.05 = 12.5 + 2.5 = 15 -> RISK_OFF
+    const service = new MarketContextIntelligenceService({} as any, {} as any);
+    const weakBreadthPrices = Array.from({ length: 260 }, (_, i) => i === 0 ? 50 : 200);
+    const items = [
+      instrument({ symbol: 'X1', latest: 50, previous: 48, prices: weakBreadthPrices }),
+      instrument({ symbol: 'X2', latest: 50, previous: 48, prices: weakBreadthPrices }),
+    ];
+    const result = service.calculateRegime(items, []);
+
+    expect(result.regime).not.toBe('RISK_ON');
+    expect(result.score).toBeLessThan(65);
+  });
+
+  it('does NOT classify as RISK_ON in a narrow rally — few stocks rising but broad market below SMAs', () => {
+    // CB-42: strong individual-stock 63-bar return with zero breadth must stay below RISK_ON.
+    // latest=50 is well below SMA50 (avg of 50,200,200,...=197) and SMA200 (≈199).
+    // Even supplying a bullish ^NSEI (score=75), total score:
+    // 0*0.35 + 0*0.25 + 75*0.25 + 0*0.10 + 50*0.05 = 18.75 + 2.5 = 21.25 -> RISK_OFF
+    const service = new MarketContextIntelligenceService({} as any, {} as any);
+    const narrowRallyPrices = Array.from({ length: 260 }, (_, i) => i === 0 ? 50 : 200);
+    const items = [
+      instrument({ symbol: 'N1', latest: 50, previous: 48, prices: narrowRallyPrices }),
+      instrument({ symbol: 'N2', latest: 50, previous: 48, prices: narrowRallyPrices }),
+    ];
+    // nseiPrices: 63-bar return = +12.5% -> nseiScore = min(100, 50+25) = 75
+    const nseiPrices = Array.from({ length: 260 }, (_, i) => i === 0 ? 22500 : 20000);
+
+    const result = service.calculateRegime(items, nseiPrices);
+
+    expect(result.regime).not.toBe('RISK_ON');
+    expect(result.score).toBeLessThan(65);
+  });
+
   it('ranks sectors and classifies leadership', () => {
     const service = new MarketContextIntelligenceService({} as any, {} as any);
     const sectors = service.rankSectors([
@@ -51,7 +92,10 @@ describe('MarketContextIntelligenceService', () => {
       listPricesByInstrumentId: jest.fn().mockResolvedValue({ prices: instrument().prices.map((close: number) => ({ adjusted_close: close })) }),
     };
     const signalService = { topSignals: jest.fn().mockResolvedValue({ signals: [] }) };
-    const repository = { saveSnapshot: jest.fn().mockResolvedValue(undefined) };
+    const repository = {
+      saveSnapshot: jest.fn().mockResolvedValue(undefined),
+      loadIndexPrices: jest.fn().mockResolvedValue([]),
+    };
     const service = new MarketContextIntelligenceService(repository as any, marketDataService as any, signalService as any);
 
     await service.run('IN');
@@ -138,12 +182,17 @@ describe('MarketContextIntelligenceService', () => {
     const signalService = { topSignals: jest.fn().mockResolvedValue({ signals: [{ instrument_id: 'stock-1', direction: 'BULLISH', score: 80 }] }) };
     const repository = {
       saveSnapshot: jest.fn().mockResolvedValue(undefined),
+      loadIndexPrices: jest.fn().mockResolvedValue([]),
     };
     const service = new MarketContextIntelligenceService(repository as any, marketDataService as any, signalService as any);
 
     await service.run('IN');
 
-    expect(marketDataService.listInstruments).toHaveBeenCalledWith({ page: 1, pageSize: 500, region: 'IN' });
+    // CB-41: IN-region now uses liquid-universe filter (NSE mainboard CASH, sorted by marketCap desc)
+    expect(marketDataService.listInstruments).toHaveBeenCalledWith({
+      page: 1, pageSize: 500, region: 'IN',
+      exchange: 'NSE', instrumentSegment: 'CASH', sortBy: 'marketCap', sortOrder: 'desc',
+    });
     expect(signalService.topSignals).toHaveBeenCalledWith({ limit: 100, region: 'IN' });
     expect(repository.saveSnapshot).toHaveBeenCalledWith(expect.objectContaining({
       regime: expect.any(Object),
@@ -168,6 +217,7 @@ describe('MarketContextIntelligenceService', () => {
         .mockResolvedValueOnce(null)
         .mockResolvedValueOnce(summary),
       saveSnapshot: jest.fn().mockResolvedValue(undefined),
+      loadIndexPrices: jest.fn().mockResolvedValue([]),
     };
     const marketDataService = {
       listInstruments: jest.fn().mockResolvedValue({ instruments: [{ id: 'stock-1', symbol: 'AAA', sector: 'Technology', country: 'India' }] }),

@@ -22,6 +22,27 @@ import type {
 } from './market-context-intelligence.types';
 
 const SAMPLE_SIZE = 500;
+/**
+ * CB-41 fix: liquid-universe filter for IN-region breadth computation.
+ * No Nifty 500 constituent table exists in the DB; best available proxy is
+ * active NSE mainboard (instrumentSegment=CASH, exchange=NSE) stocks with a
+ * persisted marketCap, sorted desc by marketCap up to SAMPLE_SIZE (500).
+ * This excludes SME-segment names, ETFs, indices, and marketCap-null shells
+ * that contaminate an unfiltered page-1 list.
+ * Limitation: marketCap data lags by the last fundamentals backfill; ~302
+ * stocks have NULL marketCap and are excluded until backfill completes.
+ */
+const LIQUID_UNIVERSE_FILTERS = {
+  exchange: 'NSE',
+  instrumentSegment: 'CASH',
+  sortBy: 'marketCap' as const,
+  sortOrder: 'desc' as const,
+};
+/**
+ * NSE Nifty 50 broad-market index symbol present in price_ticks (source data
+ * through 2026-06-04). Used as the index-trend input for the regime score.
+ */
+const NSEI_SYMBOL = '^NSEI';
 const SECTOR_LOOKBACK_DAYS = {
   return1W: 7,
   return1M: 30,
@@ -46,13 +67,15 @@ export class MarketContextIntelligenceService {
    * When `asOf` is omitted the behaviour is identical to the previous `run()` method.
    */
   async runAsOf(region?: string, asOf?: Date): Promise<{ status: string }> {
-    const [items, signals] = await Promise.all([
+    const endDate = asOf ? this.startOfUtcDay(asOf) : undefined;
+    const [items, signals, nseiPrices] = await Promise.all([
       this.loadContextInstruments(region, asOf),
       this.loadSignalMap(region),
+      this.repository.loadIndexPrices(NSEI_SYMBOL, 270, endDate),
     ]);
     const enriched = items.map((item) => ({ ...item, ...signals.get(item.instrumentId) }));
 
-    const regime = this.calculateRegime(enriched);
+    const regime = this.calculateRegime(enriched, nseiPrices);
     const sectors = this.rankSectors(enriched);
     const breadth = this.calculateBreadth(enriched);
     const countries = this.rankCountries(enriched);
@@ -296,20 +319,60 @@ export class MarketContextIntelligenceService {
     };
   }
 
-  calculateRegime(items: ContextInstrument[]): MarketRegimeSummary {
+  /**
+   * Regime scoring weights (v2 — CB-42 fix):
+   *
+   *   % above SMA-50    35%  — primary breadth gate; narrow rallies stay NEUTRAL/RISK_OFF
+   *   % above SMA-200   25%  — structural breadth; confirms trend durability
+   *   ^NSEI index trend 25%  — objective single-index signal; null → 50 (no data, neutral)
+   *   broad mean return 10%  — corroborating evidence, demoted from 35%; null → 0 (conservative)
+   *   leadership score   5%  — sector rotation tie-breaker
+   *
+   * Key corrections vs v1:
+   * - Breadth gates 60% of the score: a narrow rally (weak breadth, few stocks up) cannot
+   *   alone push to RISK_ON regardless of how high the mean return of those few stocks is.
+   * - null broadReturn → 0 (not the old 50); absent mean-return evidence does not inflate
+   *   the score toward RISK_ON.
+   * - ^NSEI 63-bar trend added as a 25% objective gate using persisted index prices.
+   * - null nseiReturn → 50 (genuinely neutral; index data may not be available point-in-time).
+   *
+   * Worked example (false-RISK_ON case that is now fixed):
+   *   Scenario: 2-stock narrow rally, both stocks have strong +12% 63-bar return,
+   *   but broad market is below SMA50 and SMA200 (above50=0, above200=0), ^NSEI null.
+   *   Old score: 73×0.35 + 0×0.25 + 0×0.25 + 50×0.15 = 25.6 + 0 + 0 + 7.5 = 33 → RISK_OFF
+   *     (old formula actually was already risk_off here; the real failure was when null
+   *     return defaulted to 50 and inflated narrow-market signals to NEUTRAL/RISK_ON range)
+   *   Null-return bias (old): score = 50×0.35 + 40×0.25 + 20×0.25 + 50×0.15 = 40 → RISK_OFF boundary
+   *   New score for null-return + modest breadth: 0×0.10 term removed entirely; breadth
+   *   must carry the load.
+   */
+  calculateRegime(items: ContextInstrument[], nseiPrices: number[] = []): MarketRegimeSummary {
     const breadth = this.calculateBreadth(items);
     const sectorItems = this.rankSectors(items);
     const broadReturn = this.average(items.map((item) => this.returnAt(item.prices, 63)).filter(this.isNumber));
     const leadershipScore = sectorItems[0]?.relativeStrengthScore ?? 50;
     const above50 = breadth.percentAboveSma50 ?? 0;
     const above200 = breadth.percentAboveSma200 ?? 0;
-    const returnScore = broadReturn === null ? 50 : Math.max(0, Math.min(100, 50 + broadReturn * 200));
-    const score = Math.round(returnScore * 0.35 + above50 * 100 * 0.25 + above200 * 100 * 0.25 + leadershipScore * 0.15);
+
+    // null broadReturn → 0: no evidence of positive return should not push score up
+    const returnScore = broadReturn === null ? 0 : Math.max(0, Math.min(100, 50 + broadReturn * 200));
+
+    // ^NSEI 63-bar trend: null → 50 (neutral; index data may lag on weekends/point-in-time)
+    const nseiReturn = this.returnAt(nseiPrices, 63);
+    const indexTrendScore = nseiReturn === null ? 50 : Math.max(0, Math.min(100, 50 + nseiReturn * 200));
+
+    const score = Math.round(
+      above50 * 100 * 0.35 +
+      above200 * 100 * 0.25 +
+      indexTrendScore * 0.25 +
+      returnScore * 0.10 +
+      leadershipScore * 0.05,
+    );
     const regime = this.regimeFromScore(score);
     return {
       regime,
       score,
-      explanation: `${regime.replace('_', '-').toLowerCase()} because broad return is ${this.formatPercent(broadReturn)} and ${this.formatPercent(above50)} of sampled instruments are above SMA50.`,
+      explanation: `${regime.replace('_', '-').toLowerCase()} because ${this.formatPercent(above50)} of liquid-universe instruments are above SMA50, ${this.formatPercent(above200)} above SMA200, and the Nifty 50 index 63-bar trend score is ${indexTrendScore}.`,
       updatedAt: new Date().toISOString(),
       dataStatus: items.length > 0 ? 'PARTIAL' : 'MISSING',
     };
@@ -382,7 +445,14 @@ export class MarketContextIntelligenceService {
 
 
   private async loadContextInstruments(region?: string, asOf?: Date): Promise<ContextInstrument[]> {
-    const response = await this.marketDataService.listInstruments({ page: 1, pageSize: SAMPLE_SIZE, region });
+    // CB-41 fix: for IN-region, request liquid NSE mainboard universe sorted by marketCap desc.
+    // This approximates Nifty 500 constituents without an explicit constituent table in the DB.
+    // For other regions, fall back to unfiltered page-1 (existing behaviour).
+    const isIndianRegion = !region || region.trim().toUpperCase() === 'IN';
+    const universeOptions = isIndianRegion
+      ? { ...LIQUID_UNIVERSE_FILTERS, region }
+      : { region };
+    const response = await this.marketDataService.listInstruments({ page: 1, pageSize: SAMPLE_SIZE, ...universeOptions });
     const instruments = response.instruments || [];
     // When asOf is set, cap price history to that date so no future prices leak in.
     // listPricesByInstrumentId(id, limit, startDate?, endDate?) — pass asOf as endDate.

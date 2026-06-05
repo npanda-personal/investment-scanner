@@ -138,12 +138,29 @@ export const partitionHistoricalPrices = (
   return result;
 };
 
+// Spike rejection is DEFAULT ON at 50% to guard against bhavcopy decimal errors that
+// would otherwise poison adjustedClose recomputes for all prior bars.
+//
+// Corporate-action days (splits, bonuses) can produce raw moves well above 50% on the
+// unadjusted series, but those are handled by the corporate-actions back-adjustment
+// pipeline which adjusts prior bars rather than the raw price row itself. This guard
+// operates on the raw close-to-close ratio, so a legitimately recorded raw price that
+// exceeds the threshold is flagged/rejected here. The threshold is deliberately set at
+// 50% — well above NSE/BSE circuit limits (5/10/20%) — so normal trading-day moves
+// are never affected. Use MARKET_DATA_SPIKE_THRESHOLD (fractional, e.g. "1.0" = 100%)
+// to loosen or use MARKET_DATA_REJECT_PRICE_SPIKES=0 to disable entirely.
 const defaultSpikeRejectionThreshold = (): number => {
-  if (!/^(1|true|yes|on)$/i.test(String(process.env.MARKET_DATA_REJECT_PRICE_SPIKES || ''))) {
+  // Explicit opt-out: MARKET_DATA_REJECT_PRICE_SPIKES=0|false|no|off disables the guard.
+  if (/^(0|false|no|off)$/i.test(String(process.env.MARKET_DATA_REJECT_PRICE_SPIKES ?? ''))) {
     return 0;
   }
-  const parsed = Number(process.env.MARKET_DATA_SPIKE_THRESHOLD ?? '0.5');
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0.5;
+  // Allow the threshold to be overridden (tighter or looser) via env without disabling.
+  const envThreshold = process.env.MARKET_DATA_SPIKE_THRESHOLD;
+  if (envThreshold !== undefined) {
+    const parsed = Number(envThreshold);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 0.5;
+  }
+  return 0.5;
 };
 
 export const validateRequiredString = (value: unknown, fieldName: string): string | null => {

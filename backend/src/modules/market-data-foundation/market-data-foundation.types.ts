@@ -921,6 +921,17 @@ export interface TrustedReviewUniversePriceRow {
   close: number;
   adjustedClose: number | null;
   volume: number | null;
+  /** Adjustment factor = adjustedClose / close when close > 0, else 1.
+   *  Applied compute-on-read; no schema change required. */
+  adjustmentFactor: number;
+  /** Raw open * adjustmentFactor. Falls back to raw open when factor cannot be computed. */
+  adjustedOpen: number;
+  /** Raw high * adjustmentFactor. Falls back to raw high when factor cannot be computed. */
+  adjustedHigh: number;
+  /** Raw low * adjustmentFactor. Falls back to raw low when factor cannot be computed. */
+  adjustedLow: number;
+  /** Raw volume / adjustmentFactor. Falls back to raw volume when factor cannot be computed. */
+  adjustedVolume: number | null;
 }
 
 export interface TrustedReviewUniverseInstrument {

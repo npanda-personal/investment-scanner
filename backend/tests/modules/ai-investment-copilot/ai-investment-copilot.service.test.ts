@@ -408,6 +408,161 @@ describe('AiInvestmentCopilotService', () => {
     });
   });
 
+  // -----------------------------------------------------------------------
+  // CB-47: correctness / compliance regression tests
+  // -----------------------------------------------------------------------
+
+  describe('CB-47: riskFactors must not duplicate bearishFactors verbatim', () => {
+    it('riskFactors and bearishFactors are distinct (no item shared between both)', async () => {
+      const strategyDecisionService = {
+        latestForInstrument: jest.fn().mockResolvedValue({
+          decision: 'AVOID',
+          strategy: 'TREND_MOMENTUM',
+          decisionScore: 20,
+          confidence: 'LOW',
+          reasons: ['Price is below SMA50 support.'],
+          blockers: ['Market gate is CLOSED.'],
+        }),
+      };
+      const result = await createService({ strategyDecisionService }).stockSummary('stock-1');
+
+      const sharedItems = result.riskFactors.filter((r: string) =>
+        result.bearishFactors.includes(r)
+      );
+      expect(sharedItems).toHaveLength(0);
+    });
+
+    it('riskFactors are non-empty distinct items (bearish signal produces risk flag, not duplicate)', async () => {
+      const result = await createService({
+        signalService: {
+          latestForInstrument: jest.fn().mockResolvedValue({ score: 30, direction: 'BEARISH', confidence: 'MEDIUM' }),
+        },
+      }).stockSummary('stock-1');
+
+      // bearishFactors has the bearish signal entry
+      expect(result.bearishFactors.join(' ')).toContain('bearish');
+      // riskFactors must NOT reproduce that exact same string
+      const exact = result.bearishFactors.find((b: string) => b.toLowerCase().includes('bearish'));
+      if (exact) {
+        expect(result.riskFactors).not.toContain(exact);
+      }
+    });
+  });
+
+  describe('CB-47: safeLanguage — enter/exit verbs and pipelineExplanation sanitization', () => {
+    it('sanitizes "enter the trade" phrase in any text field', async () => {
+      const result = await createService({
+        marketContextService: {
+          summary: jest.fn().mockResolvedValue({
+            regime: { regime: 'RISK_ON', explanation: 'Conditions align; enter the trade at breakout.' },
+            topSectors: [],
+            weakSectors: [],
+            breadth: { percentAboveSma50: null, advanceDeclineRatio: null },
+            macro: { macroStatus: 'UNKNOWN', dataStatus: 'MISSING' },
+          }),
+        },
+      }).marketBrief();
+
+      const allText = JSON.stringify(result).toLowerCase();
+      expect(allText).not.toContain('enter the trade');
+    });
+
+    it('sanitizes "exit" action verb in pipelineExplanation reason strings', async () => {
+      const strategyDecisionService = {
+        latestForInstrument: jest.fn().mockResolvedValue({
+          decision: 'TRADE_CANDIDATE',
+          strategy: 'TREND_MOMENTUM',
+          decisionScore: 80,
+          confidence: 'HIGH',
+          reasons: ['You should exit your short and enter a long position here.'],
+          blockers: [],
+        }),
+      };
+      const result = await createService({ strategyDecisionService }).stockSummary('stock-1');
+
+      // pipelineExplanation.strategyDecision.reasons must be sanitized
+      const pe = (result as any).pipelineExplanation;
+      const reasonText = (pe?.strategyDecision?.reasons ?? []).join(' ').toLowerCase();
+      expect(reasonText).not.toMatch(/\benter a long\b/);
+    });
+  });
+
+  describe('CB-47: dataStatus — missing strategy/today-review must yield PARTIAL, not COMPLETE', () => {
+    it('yields PARTIAL when strategyDecision is absent (no strategy decision on record)', async () => {
+      // null disables lazy-require; strategyDecision will be null → dataGap added
+      const result = await createService({
+        strategyDecisionService: null,
+        todayReviewService: null,
+      }).stockSummary('stock-1');
+
+      expect(result.dataStatus).toBe('PARTIAL');
+      expect(result.dataGaps).toContain('No current strategy decision on record.');
+    });
+
+    it('yields PARTIAL when instrument is absent from today-review', async () => {
+      const todayReviewService = {
+        latest: jest.fn().mockResolvedValue({
+          candidates: [{ instrumentId: 'other', symbol: 'ZZZ', state: 'LONG_REVIEW', direction: 'LONG', grade: 'A', confidenceScore: 90, reasonSummary: '', watchReasons: [] }],
+        }),
+      };
+      const result = await createService({ todayReviewService }).stockSummary('stock-1');
+
+      expect(result.dataStatus).toBe('PARTIAL');
+      expect(result.dataGaps).toContain('Instrument is not in the latest today-review candidate set.');
+    });
+
+    it('yields COMPLETE only when all pipeline stages are present and no data gaps exist', async () => {
+      const strategyDecisionService = {
+        latestForInstrument: jest.fn().mockResolvedValue({
+          decision: 'TRADE_CANDIDATE',
+          strategy: 'TREND_MOMENTUM',
+          decisionScore: 82,
+          confidence: 'HIGH',
+          reasons: ['Price above SMA50.'],
+          blockers: [],
+        }),
+      };
+      const tradePlanService = {
+        latestForInstrument: jest.fn().mockResolvedValue({
+          planStatus: 'VALID',
+          riskGrade: 'LOW',
+          entryZone: { type: 'BREAKOUT', preferredEntryMin: 490, preferredEntryMax: 505 },
+          stopLoss: { price: 470, method: 'SMA50' },
+          target: { price: 540, method: 'REWARD_RISK_MULTIPLE' },
+          rewardRiskRatio: 2.0,
+          blockers: [],
+        }),
+      };
+      const todayReviewService = {
+        latest: jest.fn().mockResolvedValue({
+          candidates: [{ instrumentId: 'stock-1', symbol: 'AAA', state: 'LONG_REVIEW', direction: 'LONG', grade: 'A', confidenceScore: 88, reasonSummary: 'All green.', watchReasons: [] }],
+        }),
+      };
+      // Also need smartMoney with complete data and non-MISSING macro
+      const result = await createService({
+        strategyDecisionService,
+        tradePlanService,
+        todayReviewService,
+        smartMoneyService: {
+          stock: jest.fn().mockResolvedValue({ smartMoneyScore: 80, status: 'ACCUMULATION', dataStatus: 'COMPLETE', insiderOwnership: { ownershipDataStatus: 'AVAILABLE' } }),
+          sectors: jest.fn().mockResolvedValue([]),
+        },
+        marketContextService: {
+          summary: jest.fn().mockResolvedValue({
+            regime: { regime: 'RISK_ON', explanation: 'breadth positive.' },
+            topSectors: [],
+            weakSectors: [],
+            breadth: { percentAboveSma50: 0.7, advanceDeclineRatio: 0.5 },
+            macro: { macroStatus: 'STABLE', dataStatus: 'AVAILABLE' },
+          }),
+        },
+      }).stockSummary('stock-1');
+
+      expect(result.dataGaps).toHaveLength(0);
+      expect(result.dataStatus).toBe('COMPLETE');
+    });
+  });
+
   describe('COPILOT_USAGE_UNLIMITED env gate (BUG 4 regression)', () => {
     afterEach(() => {
       delete process.env.COPILOT_USAGE_UNLIMITED;

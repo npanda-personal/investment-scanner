@@ -1155,15 +1155,23 @@ export class MarketDataFoundationRepository {
       },
     });
 
-    return prices.map((price) => ({
-      ...price,
-      open: price.open.toString(),
-      high: price.high.toString(),
-      low: price.low.toString(),
-      close: price.close.toString(),
-      adjustedClose: price.adjustedClose?.toString() ?? null,
-      volume: price.volume !== null ? price.volume.toString() : null,
-    }));
+    return prices.map((price) => {
+      const factor = this.computeAdjustmentFactor(price.close, price.adjustedClose);
+      return {
+        ...price,
+        open: price.open.toString(),
+        high: price.high.toString(),
+        low: price.low.toString(),
+        close: price.close.toString(),
+        adjustedClose: price.adjustedClose?.toString() ?? null,
+        volume: price.volume !== null ? price.volume.toString() : null,
+        adjustmentFactor: factor,
+        adjustedOpen: Number((Number(price.open) * factor).toFixed(4)),
+        adjustedHigh: Number((Number(price.high) * factor).toFixed(4)),
+        adjustedLow: Number((Number(price.low) * factor).toFixed(4)),
+        adjustedVolume: price.volume !== null ? Number((Number(price.volume) / factor).toFixed(0)) : null,
+      };
+    });
   }
 
   async listForwardPriceWindowsByInstrumentIds(
@@ -1236,6 +1244,7 @@ export class MarketDataFoundationRepository {
     });
 
     if (latestTick) {
+      const factor = this.computeAdjustmentFactor(latestTick.close, latestTick.adjustedClose);
       return {
         ...latestTick,
         open: latestTick.open.toString(),
@@ -1244,6 +1253,11 @@ export class MarketDataFoundationRepository {
         close: latestTick.close.toString(),
         adjustedClose: latestTick.adjustedClose?.toString() ?? null,
         volume: latestTick.volume !== null ? latestTick.volume.toString() : null,
+        adjustmentFactor: factor,
+        adjustedOpen: Number((Number(latestTick.open) * factor).toFixed(4)),
+        adjustedHigh: Number((Number(latestTick.high) * factor).toFixed(4)),
+        adjustedLow: Number((Number(latestTick.low) * factor).toFixed(4)),
+        adjustedVolume: latestTick.volume !== null ? Number((Number(latestTick.volume) / factor).toFixed(0)) : null,
       };
     }
 
@@ -2104,15 +2118,27 @@ export class MarketDataFoundationRepository {
         return [symbol, rows] as const;
       }));
       for (const [symbol, rows] of chunkRows) {
-        rowsBySymbol.set(symbol, rows.reverse().map((row) => ({
-          date: row.timestamp.toISOString().slice(0, 10),
-          open: Number(row.open),
-          high: Number(row.high),
-          low: Number(row.low),
-          close: Number(row.close),
-          adjustedClose: row.adjustedClose === null || row.adjustedClose === undefined ? null : Number(row.adjustedClose),
-          volume: row.volume === null || row.volume === undefined ? null : Number(row.volume),
-        })));
+        rowsBySymbol.set(symbol, rows.reverse().map((row) => {
+          const factor = this.computeAdjustmentFactor(row.close, row.adjustedClose);
+          const rawOpen = Number(row.open);
+          const rawHigh = Number(row.high);
+          const rawLow = Number(row.low);
+          const rawVol = row.volume === null || row.volume === undefined ? null : Number(row.volume);
+          return {
+            date: row.timestamp.toISOString().slice(0, 10),
+            open: rawOpen,
+            high: rawHigh,
+            low: rawLow,
+            close: Number(row.close),
+            adjustedClose: row.adjustedClose === null || row.adjustedClose === undefined ? null : Number(row.adjustedClose),
+            volume: rawVol,
+            adjustmentFactor: factor,
+            adjustedOpen: Number((rawOpen * factor).toFixed(4)),
+            adjustedHigh: Number((rawHigh * factor).toFixed(4)),
+            adjustedLow: Number((rawLow * factor).toFixed(4)),
+            adjustedVolume: rawVol !== null ? Number((rawVol / factor).toFixed(0)) : null,
+          };
+        }));
       }
     }
     return rowsBySymbol;
@@ -2282,6 +2308,27 @@ export class MarketDataFoundationRepository {
       LEFT JOIN quality ON quality.symbol = input_symbols.symbol
       ORDER BY input_symbols.symbol ASC
     `);
+  }
+
+  /**
+   * Compute the per-row corporate-action adjustment factor for compute-on-read
+   * adjusted OHLCV.  Formula: factor = adjustedClose / close.
+   * - Returns 1 (no adjustment) when close == 0, either field is null/undefined,
+   *   or the resulting factor is not a finite positive number.
+   * - Volume is divided by the factor (splits increase share count; dividends
+   *   do not normally affect volume, but the same factor is applied consistently
+   *   so every field moves on the same scale).
+   */
+  private computeAdjustmentFactor(
+    close: { toNumber?(): number } | number | string | null | undefined,
+    adjustedClose: { toNumber?(): number } | number | string | null | undefined,
+  ): number {
+    if (close == null || adjustedClose == null) return 1;
+    const c = typeof (close as any).toNumber === 'function' ? (close as any).toNumber() : Number(close);
+    const ac = typeof (adjustedClose as any).toNumber === 'function' ? (adjustedClose as any).toNumber() : Number(adjustedClose);
+    if (!Number.isFinite(c) || c <= 0 || !Number.isFinite(ac) || ac <= 0) return 1;
+    const factor = ac / c;
+    return Number.isFinite(factor) && factor > 0 ? factor : 1;
   }
 
   private percent(value: number, denominator: number) {

@@ -123,8 +123,13 @@ describe('market data validation', () => {
     );
   });
 
-  it('keeps large price moves by default so corporate actions do not erase history', () => {
-    const result = partitionHistoricalPrices([
+  // Spike rejection is now DEFAULT ON at 50%. Raw bhavcopy rows with >50% day-over-day
+  // moves are rejected/flagged to prevent decimal-error ticks from poisoning the
+  // adjustedClose recompute. Corporate-action adjusted series are handled by the
+  // back-adjustment pipeline, not by raw price ingestion, so this guard does not apply
+  // to adjusted prices produced downstream.
+  it('rejects >50% raw moves by default (default spike guard ON) and passes with guard disabled', () => {
+    const rows = [
       {
         symbol: 'FCSSOFT.NS',
         date: new Date('2025-01-01'),
@@ -134,6 +139,7 @@ describe('market data validation', () => {
         close: 100,
       },
       {
+        // 120% move vs prior close — exceeds default 50% threshold
         symbol: 'FCSSOFT.NS',
         date: new Date('2025-01-02'),
         open: 210,
@@ -142,12 +148,62 @@ describe('market data validation', () => {
         close: 220,
       },
       {
+        // 78% drop vs last valid close (100) — also exceeds 50% threshold
         symbol: 'FCSSOFT.NS',
         date: new Date('2025-01-03'),
         open: 50,
         high: 55,
         low: 45,
         close: 48,
+      },
+    ];
+
+    // Default (no env): spike guard is ON at 50%; rows 2 and 3 are rejected/flagged.
+    const defaultResult = partitionHistoricalPrices(rows);
+    expect(defaultResult.valid).toHaveLength(1);
+    expect(defaultResult.valid[0].close).toBe(100);
+    expect(defaultResult.invalid).toHaveLength(2);
+    expect(defaultResult.invalid.flatMap((r) => r.errors)).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/abnormal price spike/),
+        expect.stringMatching(/abnormal price spike/),
+      ])
+    );
+
+    // Explicit threshold of 0 disables the guard — all rows pass.
+    const disabledResult = partitionHistoricalPrices(rows, 0);
+    expect(disabledResult.valid).toHaveLength(3);
+    expect(disabledResult.invalid).toHaveLength(0);
+  });
+
+  it('passes normal intra-day and moderate moves under the default 50% spike guard', () => {
+    // Normal moves well within NSE/BSE circuit limits pass without flagging.
+    const result = partitionHistoricalPrices([
+      {
+        symbol: 'RELIANCE.NS',
+        date: new Date('2025-01-01'),
+        open: 2900,
+        high: 2950,
+        low: 2880,
+        close: 2920,
+      },
+      {
+        // ~6.8% move — above a 5% circuit but well below 50%; must pass.
+        symbol: 'RELIANCE.NS',
+        date: new Date('2025-01-02'),
+        open: 3110,
+        high: 3130,
+        low: 3090,
+        close: 3120,
+      },
+      {
+        // 49% move — just under the 50% default threshold; must pass.
+        symbol: 'RELIANCE.NS',
+        date: new Date('2025-01-03'),
+        open: 4640,
+        high: 4660,
+        low: 4620,
+        close: 4648,
       },
     ]);
 

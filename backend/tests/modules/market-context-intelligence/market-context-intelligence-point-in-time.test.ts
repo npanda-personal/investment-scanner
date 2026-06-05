@@ -44,6 +44,7 @@ function makeRepository() {
       }),
       latestSnapshot: jest.fn().mockResolvedValue(null),
       latestPersistedSnapshot: jest.fn().mockResolvedValue(null),
+      loadIndexPrices: jest.fn().mockResolvedValue([]),
     },
     savedSnapshots,
   };

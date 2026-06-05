@@ -108,6 +108,9 @@ export class SignalQualityLabService {
 
     // Fallback: live computation path (used only when persisted repository
     // methods are unavailable — e.g. in legacy or minimal test contexts).
+    // Production repositories always have countMatureByHorizon so this path
+    // is unreachable in production; tryPersistedDashboard always returns
+    // a non-null result (including the pending state for matureCount=0).
     const analysisQuery = this.analysisQuery(query);
     const rawSignals = await this.signalService.signalHistory(analysisQuery);
     const signals = await this.applyDataQualityFilters(rawSignals, analysisQuery);
@@ -177,6 +180,9 @@ export class SignalQualityLabService {
 
     // Fallback: live computation path (used only when persisted repository
     // methods are unavailable — e.g. in legacy or minimal test contexts).
+    // Production repositories always have countMatureByHorizon so this path
+    // is unreachable in production; tryPersistedSummary always returns
+    // a non-null result (including the pending state for matureCount=0).
     const analysisQuery = this.analysisQuery(query);
     const rawSignals = await this.signalService.signalHistory(analysisQuery);
     const signals = await this.applyDataQualityFilters(rawSignals, analysisQuery);
@@ -1288,10 +1294,6 @@ export class SignalQualityLabService {
     return wins / outcomes.length;
   }
 
-  private averageHorizon(items: SignalOutcomeSet[], horizon: QualityHorizon): number | null {
-    return this.average(items.map((item) => item.outcomes.find((outcome) => outcome.horizon === horizon)?.forwardReturnPercent).filter((value): value is number => value !== null && value !== undefined));
-  }
-
   private maxDrawdown(window: PricePoint[]): number | null {
     if (window.length === 0) return null;
     let peak = window[0].adjustedClose;
@@ -1312,6 +1314,36 @@ export class SignalQualityLabService {
       const outcome = item.outcomes.find((entry) => entry.horizon === horizon);
       return Boolean(outcome?.available && outcome.forwardReturnPercent !== null);
     });
+  }
+
+  private async countDelta(query: QualityQuery, override: Partial<QualityQuery>): Promise<number> {
+    const withoutFilter = await this.signalService.signalHistoryCount({ ...query, ...override });
+    const withFilter = await this.signalService.signalHistoryCount(query);
+    return Math.max(0, withoutFilter - withFilter);
+  }
+
+  private recommendedAction(total: number, evaluated: number, insufficient: number, missing: number, dataQuality: DataQualityFilterSummary): string {
+    if (total === 0 && dataQuality.filterApplied && dataQuality.excludedByDataQuality > 0) return '0 signals remain after data-quality filters. Reset filters or use a less restrictive readiness filter.';
+    if (total === 0) return 'Run Signal Generation for the selected market scope, then return after price data exists.';
+    if (missing >= total) return 'Sync historical market data for these instruments before measuring outcomes.';
+    if (missing > 0 && insufficient > 0) return `Only ${evaluated} of ${total} signals are evaluated. Sync missing Market Data Foundation price history, then use a shorter horizon or wait for future trading rows.`;
+    if (missing > 0) return `Only ${evaluated} of ${total} signals are evaluated. Sync missing Market Data Foundation price history before relying on this sample.`;
+    if (insufficient > 0) return 'Try a shorter horizon such as 1D or 5D, sync latest market data, or wait until enough future trading days exist.';
+    if (evaluated > 0) return 'Review evaluated historical forward returns and keep market data current.';
+    return 'Check whether signal dates, filters, and market scope match available price history.';
+  }
+
+  private diagnosticWarnings(total: number, evaluated: number, insufficient: number, missing: number, dataQuality: DataQualityFilterSummary): string[] {
+    const warnings: string[] = [];
+    if (total > 0 && evaluated === 0) warnings.push('No evaluated outcomes are available for the selected horizon.');
+    if (insufficient > 0) warnings.push('Some signals do not yet have enough future trading rows for the selected horizon.');
+    if (missing > 0) warnings.push('Some signals have no available price history in Market Data Foundation.');
+    if (dataQuality.filterApplied && dataQuality.totalSignalsAfterFilter === 0) warnings.push('0 signals remain after data-quality filters.');
+    return warnings;
+  }
+
+  private averageHorizon(items: SignalOutcomeSet[], horizon: QualityHorizon): number | null {
+    return this.average(items.map((item) => item.outcomes.find((outcome) => outcome.horizon === horizon)?.forwardReturnPercent).filter((value): value is number => value !== null && value !== undefined));
   }
 
   private horizonAvailability(outcomes: SignalOutcomeSet[]): HorizonAvailabilitySummary {
@@ -1349,8 +1381,6 @@ export class SignalQualityLabService {
       .filter((item) => item.priceHistoryAvailable && !item.outcomes.find((outcome) => outcome.horizon === query.horizon)?.available)
       .map((item) => new Date(item.generatedAt).getTime())
       .filter(Number.isFinite);
-    // Fix 11: advance by trading days, not raw calendar milliseconds.
-    // A 5-trading-day horizon spans ~7 calendar days; 60 trading days ≈ 84 calendar days.
     const nextEvaluableDate = newestUnevaluated.length > 0
       ? this.addTradingDays(new Date(Math.min(...newestUnevaluated)), HORIZON_DAYS[query.horizon]).toISOString()
       : null;
@@ -1381,32 +1411,6 @@ export class SignalQualityLabService {
       recommendedAction: this.recommendedAction(filteredSignals.length, evaluatedSignals, insufficientFuturePriceCount, missingPriceHistoryCount, dataQualityFilterSummary),
       warnings,
     };
-  }
-
-  private async countDelta(query: QualityQuery, override: Partial<QualityQuery>): Promise<number> {
-    const withoutFilter = await this.signalService.signalHistoryCount({ ...query, ...override });
-    const withFilter = await this.signalService.signalHistoryCount(query);
-    return Math.max(0, withoutFilter - withFilter);
-  }
-
-  private recommendedAction(total: number, evaluated: number, insufficient: number, missing: number, dataQuality: DataQualityFilterSummary): string {
-    if (total === 0 && dataQuality.filterApplied && dataQuality.excludedByDataQuality > 0) return '0 signals remain after data-quality filters. Reset filters or use a less restrictive readiness filter.';
-    if (total === 0) return 'Run Signal Generation for the selected market scope, then return after price data exists.';
-    if (missing >= total) return 'Sync historical market data for these instruments before measuring outcomes.';
-    if (missing > 0 && insufficient > 0) return `Only ${evaluated} of ${total} signals are evaluated. Sync missing Market Data Foundation price history, then use a shorter horizon or wait for future trading rows.`;
-    if (missing > 0) return `Only ${evaluated} of ${total} signals are evaluated. Sync missing Market Data Foundation price history before relying on this sample.`;
-    if (insufficient > 0) return 'Try a shorter horizon such as 1D or 5D, sync latest market data, or wait until enough future trading days exist.';
-    if (evaluated > 0) return 'Review evaluated historical forward returns and keep market data current.';
-    return 'Check whether signal dates, filters, and market scope match available price history.';
-  }
-
-  private diagnosticWarnings(total: number, evaluated: number, insufficient: number, missing: number, dataQuality: DataQualityFilterSummary): string[] {
-    const warnings: string[] = [];
-    if (total > 0 && evaluated === 0) warnings.push('No evaluated outcomes are available for the selected horizon.');
-    if (insufficient > 0) warnings.push('Some signals do not yet have enough future trading rows for the selected horizon.');
-    if (missing > 0) warnings.push('Some signals have no available price history in Market Data Foundation.');
-    if (dataQuality.filterApplied && dataQuality.totalSignalsAfterFilter === 0) warnings.push('0 signals remain after data-quality filters.');
-    return warnings;
   }
 
   private evidenceUsability(total: number, evaluated: number, missing: number, insufficient: number, minSampleSize: number): EvidenceUsability {

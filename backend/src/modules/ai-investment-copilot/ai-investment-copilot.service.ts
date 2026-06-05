@@ -312,9 +312,13 @@ export class AiInvestmentCopilotService {
       bullishFactors: bullish,
       bearishFactors: bearish,
       riskFactors: [
-        ...bearish,
+        signal?.direction === 'BEARISH' ? `Signal direction is bearish (score ${signal.score}); review any existing position.` : null,
+        typeof performance.max_drawdown === 'number' && performance.max_drawdown < -0.2 ? `Historical drawdown is notable at ${this.percent(performance.max_drawdown)}; position sizing deserves caution.` : null,
+        ...strategyDecisionBearish.map((s) => `Risk flag: ${s}`),
         smartMoney?.dataStatus === 'PARTIAL' ? 'Smart money analysis is partial because ownership data is missing.' : null,
         tradePlan?.planStatus === 'BLOCKED' ? `Trade plan is BLOCKED: ${(tradePlan.blockers ?? [])[0] ?? 'see blockers.'}` : null,
+        !strategyDecision ? 'No strategy decision on record; pipeline-level assessment is incomplete.' : null,
+        !todayCandidate ? 'Instrument was not surfaced in today\'s review candidate set.' : null,
       ].filter(Boolean) as string[],
       dataGaps: gaps,
       suggestedNextReviews: [
@@ -325,7 +329,7 @@ export class AiInvestmentCopilotService {
         tradePlan && tradePlan.planStatus === 'VALID' ? 'Review the trade plan page for full entry/stop/target geometry.' : 'Run trade plan generation for this instrument.',
       ],
       sourceModules,
-      dataStatus: gaps.filter((g) => !g.startsWith('No current') && !g.startsWith('Instrument is not')).length > 0 ? 'PARTIAL' : 'COMPLETE',
+      dataStatus: gaps.length > 0 ? 'PARTIAL' : 'COMPLETE',
       pipelineExplanation,
     } as any);
   }
@@ -468,8 +472,25 @@ export class AiInvestmentCopilotService {
     });
   }
 
+  private sanitizePipelineExplanation(pe: any): any {
+    if (!pe) return pe;
+    const sanitizeStrings = (obj: any): any => {
+      if (typeof obj === 'string') return this.safeLanguage(obj);
+      if (Array.isArray(obj)) return obj.map(sanitizeStrings);
+      if (obj !== null && typeof obj === 'object') {
+        const out: Record<string, any> = {};
+        for (const key of Object.keys(obj)) {
+          out[key] = sanitizeStrings(obj[key]);
+        }
+        return out;
+      }
+      return obj;
+    };
+    return sanitizeStrings(pe);
+  }
+
   private response(input: Omit<CopilotSummaryResponse, 'generatedAt'>): CopilotSummaryResponse {
-    const cleaned: CopilotSummaryResponse = {
+    const base: CopilotSummaryResponse = {
       ...input,
       summary: this.safeLanguage(input.summary),
       keyTakeaways: input.keyTakeaways.map((item) => this.safeLanguage(item)).filter(Boolean),
@@ -479,7 +500,13 @@ export class AiInvestmentCopilotService {
       suggestedNextReviews: input.suggestedNextReviews.map((item) => this.safeLanguage(item)).filter(Boolean),
       generatedAt: new Date().toISOString(),
     };
-    return cleaned;
+    // pipelineExplanation is an extension field not in the base CopilotSummaryResponse type.
+    // Sanitize its string leaves when present, passing through via any-cast.
+    const inputAny = input as any;
+    if (inputAny.pipelineExplanation !== undefined) {
+      (base as any).pipelineExplanation = this.sanitizePipelineExplanation(inputAny.pipelineExplanation);
+    }
+    return base;
   }
 
   private async safe<T>(fn: () => Promise<T> | T): Promise<T | null> {
@@ -514,9 +541,27 @@ export class AiInvestmentCopilotService {
 
   private safeLanguage(value: string): string {
     return value
+      // Original narrow phrases
       .replace(/buy now/gi, 'review')
       .replace(/sell immediately/gi, 'review risk')
       .replace(/guaranteed/gi, 'not certain')
-      .replace(/will definitely/gi, 'may');
+      .replace(/will definitely/gi, 'may')
+      // Broader buy/sell variants
+      .replace(/\bbuy\b/gi, 'consider reviewing')
+      .replace(/\bsell\b/gi, 'consider reviewing for exit risk')
+      // Enter/exit trade action verbs → neutral research phrasing
+      .replace(/\benter the trade\b/gi, 'review the setup')
+      .replace(/\benter a trade\b/gi, 'review a setup')
+      .replace(/\benter this trade\b/gi, 'review this setup')
+      .replace(/\benter position\b/gi, 'review for a potential position')
+      .replace(/\benter at\b/gi, 'zone of interest at')
+      .replace(/\bexit the trade\b/gi, 'review for risk reduction')
+      .replace(/\bexit a trade\b/gi, 'review for risk reduction')
+      .replace(/\bexit this trade\b/gi, 'review this for risk reduction')
+      .replace(/\bexit position\b/gi, 'review position for risk reduction')
+      .replace(/\bexit at\b/gi, 'risk-reduction level at')
+      // Generic enter/exit as action verbs (not part of compound noun like "entry")
+      .replace(/\benter\b(?! zone| band| channel| level| point| range| area)/gi, 'review')
+      .replace(/\bexit\b(?! zone| band| channel| level| point| range| area| risk| candidate)/gi, 'review for exit risk');
   }
 }

@@ -32,6 +32,7 @@ import {
 } from 'recharts';
 import { fetchStockResearchWorkbench } from '../api/stockResearchWorkbenchService';
 import type { ResearchRange, ResearchWorkbenchResponse, SignalEvidenceSection } from '../types';
+import { inr, inrCompact, changeColor, stripSuffix } from '@/shared/format/money';
 import { SignalWidget } from '@/features/signal-generation-engine';
 import { StrategyDecisionWidget } from '@/features/strategy-decision-engine';
 import { AddToWatchlistDialog } from '@/features/watchlist-management';
@@ -113,16 +114,16 @@ const StockResearchWorkbenchPage: React.FC = () => {
           <Box>
             <Typography variant="h4">{overview.company_name}</Typography>
             <Typography color="text.secondary">
-              {overview.symbol} | {overview.exchange || 'UNKNOWN'} | {overview.country || 'N/A'} | {overview.currency}
+              {stripSuffix(overview.symbol)} | {overview.exchange || 'UNKNOWN'} | {overview.country || 'N/A'} | {overview.currency}
             </Typography>
             <Typography variant="body2" color="text.secondary">
               {overview.sector || 'N/A'} | {overview.industry || 'N/A'}
             </Typography>
           </Box>
           <Box sx={{ textAlign: { xs: 'left', md: 'right' } }}>
-            <Typography variant="h4">{formatNumber(overview.latest_price)}</Typography>
-            <Typography color={overview.daily_change_percent && overview.daily_change_percent >= 0 ? 'success.main' : 'error.main'}>
-              {formatNumber(overview.daily_change)} ({formatPercent(overview.daily_change_percent)})
+            <Typography variant="h4">{inr(overview.latest_price)}</Typography>
+            <Typography color={changeColor(overview.daily_change_percent)}>
+              {inr(overview.daily_change)} ({formatPercent(overview.daily_change_percent)})
             </Typography>
             <Typography variant="caption" color="text.secondary">
               {overview.source} | {formatDateTime(overview.last_updated_timestamp)}
@@ -161,7 +162,7 @@ const StockResearchWorkbenchPage: React.FC = () => {
         open={alertDialogOpen}
         onClose={() => setAlertDialogOpen(false)}
         defaults={{
-          name: `${String(overview.symbol)} price above ${formatNumber(overview.latest_price)}`,
+          name: `${stripSuffix(String(overview.symbol))} price above ${inr(overview.latest_price)}`,
           type: 'PRICE_ABOVE',
           scope: 'STOCK',
           instrumentId: String(overview.instrument_id),
@@ -231,13 +232,13 @@ const StockResearchWorkbenchPage: React.FC = () => {
         >
           {fundamentals ? (
             <MetricGrid items={{
-              Revenue: formatNumber(fundamentals.revenue),
-              EPS: formatNumber(fundamentals.eps),
-              'Net Income': formatNumber(fundamentals.net_income),
+              Revenue: inrCompact(fundamentals.revenue),
+              EPS: inr(fundamentals.eps),
+              'Net Income': inrCompact(fundamentals.net_income),
               'P/E': formatNumber(fundamentals.pe_ratio),
               'Dividend Yield': formatPercent(fundamentals.dividend_yield),
               Shares: formatNumber(fundamentals.shares_outstanding),
-              'Market Cap': formatNumber(fundamentals.market_cap),
+              'Market Cap': inrCompact(fundamentals.market_cap),
               Period: String(fundamentals.period_type || 'N/A'),
             }} />
           ) : <Typography color="text.secondary">No fundamentals available.</Typography>}
@@ -279,9 +280,9 @@ const StockResearchWorkbenchPage: React.FC = () => {
                 onClick={() => navigate(`/research/stocks/${String(peer.instrument_id)}`)}
                 sx={{ p: 1.5, cursor: 'pointer', '&:hover': { borderColor: 'primary.main', bgcolor: 'action.hover' } }}
               >
-                <Typography fontWeight={700}>{String(peer.symbol)} | {String(peer.company_name)}</Typography>
+                <Typography fontWeight={700}>{stripSuffix(String(peer.symbol))} | {String(peer.company_name)}</Typography>
                 <Typography variant="body2" color="text.secondary">{String(peer.exchange || 'UNKNOWN')}</Typography>
-                <Typography variant="body2">Price: {formatNumber(peer.latest_price)} | {range}: {formatPercent(peer.return_selected)}</Typography>
+                <Typography variant="body2">Price: {inr(peer.latest_price)} | {range}: {formatPercent(peer.return_selected)}</Typography>
                 <Typography variant="body2">P/E: {formatNumber(peer.pe_ratio)} | Yield: {formatPercent(peer.dividend_yield)}</Typography>
               </Paper>
             ))}
@@ -302,7 +303,7 @@ const StockResearchWorkbenchPage: React.FC = () => {
             {data.corporate_actions.map((action) => (
               <Paper key={`${action.action_type}-${action.effective_date}-${action.value}`} variant="outlined" sx={{ p: 1.5 }}>
                 <Typography fontWeight={700}>{String(action.action_type)} | {new Date(String(action.effective_date)).toLocaleDateString()}</Typography>
-                <Typography variant="body2">Amount: {formatNumber(action.amount)} | Ratio: {formatNumber(action.ratio)} | {String(action.currency || overview.currency)}</Typography>
+                <Typography variant="body2">Amount: {inr(action.amount)} | Ratio: {formatNumber(action.ratio)} | {String(action.currency || overview.currency)}</Typography>
                 <Typography variant="caption" color="text.secondary">{String(action.source)} | {String(action.data_status)}</Typography>
               </Paper>
             ))}

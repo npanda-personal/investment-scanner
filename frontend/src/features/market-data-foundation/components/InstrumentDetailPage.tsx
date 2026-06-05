@@ -37,6 +37,7 @@ import {
 } from '../api/marketDataFoundationService';
 import { PageHeader } from '@/shared/components';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
+import { inr, inrCompact, stripSuffix } from '@/shared/format/money';
 
 type ChipColor = 'default' | 'success' | 'warning' | 'error' | 'info';
 
@@ -147,7 +148,7 @@ const InstrumentDetailPage: React.FC = () => {
   return (
     <Box sx={{ p: 3, maxWidth: 1400, mx: 'auto' }}>
       <PageHeader
-        title={instrument.symbol}
+        title={stripSuffix(instrument.symbol)}
         subtitle={instrument.company_name}
         backTo="/instrument-workspace"
         backLabel="Instrument search"
@@ -166,8 +167,9 @@ const InstrumentDetailPage: React.FC = () => {
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(4, 1fr)' }, gap: 2, mb: 3 }}>
         <Paper sx={{ p: 2 }}>
           <Typography variant="overline" color="text.secondary">Latest Price</Typography>
-          <Typography variant="h5">{latest?.latest ? formatNumber(latest.latest.close) : 'N/A'}</Typography>
+          <Typography variant="h5">{latest?.latest ? inr(latest.latest.close) : 'N/A'}</Typography>
           <Typography variant="caption" color="text.secondary">{latest?.latest ? formatDate(latest.latest.date) : 'No price data'}</Typography>
+          <PriceRangeBand prices={prices?.prices ?? []} />
         </Paper>
         <Paper sx={{ p: 2 }}>
           <Typography variant="overline" color="text.secondary">Exchange</Typography>
@@ -225,11 +227,11 @@ const InstrumentDetailPage: React.FC = () => {
         {(prices?.prices || []).slice(0, 20).map((price) => (
           <TableRow key={price.date}>
             <TableCell>{formatDate(price.date)}</TableCell>
-            <TableCell align="right">{formatNumber(price.open)}</TableCell>
-            <TableCell align="right">{formatNumber(price.high)}</TableCell>
-            <TableCell align="right">{formatNumber(price.low)}</TableCell>
-            <TableCell align="right">{formatNumber(price.close)}</TableCell>
-            <TableCell align="right">{formatNumber(price.adjusted_close)}</TableCell>
+            <TableCell align="right">{inr(price.open)}</TableCell>
+            <TableCell align="right">{inr(price.high)}</TableCell>
+            <TableCell align="right">{inr(price.low)}</TableCell>
+            <TableCell align="right">{inr(price.close)}</TableCell>
+            <TableCell align="right">{inr(price.adjusted_close)}</TableCell>
             <TableCell align="right">{formatNumber(price.volume)}</TableCell>
             <TableCell>{price.source}</TableCell>
           </TableRow>
@@ -241,13 +243,13 @@ const InstrumentDetailPage: React.FC = () => {
           <TableRow key={`${record.period_type}-${record.period_end_date}`}>
             <TableCell>{record.period_type}</TableCell>
             <TableCell>{formatDate(record.period_end_date)}</TableCell>
-            <TableCell align="right">{formatNumber(record.revenue)}</TableCell>
-            <TableCell align="right">{formatNumber(record.eps)}</TableCell>
-            <TableCell align="right">{formatNumber(record.net_income)}</TableCell>
+            <TableCell align="right">{inrCompact(record.revenue)}</TableCell>
+            <TableCell align="right">{inr(record.eps)}</TableCell>
+            <TableCell align="right">{inrCompact(record.net_income)}</TableCell>
             <TableCell align="right">{formatNumber(record.pe_ratio)}</TableCell>
             <TableCell align="right">{formatNumber(record.dividend_yield)}</TableCell>
             <TableCell align="right">{formatNumber(record.shares_outstanding)}</TableCell>
-            <TableCell align="right">{formatNumber(record.market_cap)}</TableCell>
+            <TableCell align="right">{inrCompact(record.market_cap)}</TableCell>
             <TableCell>{record.currency || 'N/A'}</TableCell>
             <TableCell>{record.source}</TableCell>
             <TableCell>{record.data_status}</TableCell>
@@ -264,7 +266,7 @@ const InstrumentDetailPage: React.FC = () => {
             <TableCell>{action.payment_date ? formatDate(action.payment_date) : 'N/A'}</TableCell>
             <TableCell>{formatNumber(action.value)}</TableCell>
             <TableCell>{formatNumber(action.ratio)}</TableCell>
-            <TableCell>{formatNumber(action.amount)}</TableCell>
+            <TableCell>{inr(action.amount)}</TableCell>
             <TableCell>{action.currency || 'N/A'}</TableCell>
             <TableCell>{action.source}</TableCell>
             <TableCell>{action.data_status}</TableCell>
@@ -312,11 +314,11 @@ const TableSection: React.FC<{ title: string; children: React.ReactNode }> = ({ 
               {title === 'Price Table' && (
                 <>
                   <TableCell sx={{ width: 128 }}>Date</TableCell>
-                  <TableCell sx={{ width: 110 }} align="right">Open</TableCell>
-                  <TableCell sx={{ width: 110 }} align="right">High</TableCell>
-                  <TableCell sx={{ width: 110 }} align="right">Low</TableCell>
-                  <TableCell sx={{ width: 110 }} align="right">Close</TableCell>
-                  <TableCell sx={{ width: 140 }} align="right">Adjusted Close</TableCell>
+                  <TableCell sx={{ width: 110 }} align="right">Open (Rs.)</TableCell>
+                  <TableCell sx={{ width: 110 }} align="right">High (Rs.)</TableCell>
+                  <TableCell sx={{ width: 110 }} align="right">Low (Rs.)</TableCell>
+                  <TableCell sx={{ width: 110 }} align="right">Close (Rs.)</TableCell>
+                  <TableCell sx={{ width: 140 }} align="right">Adj. Close (Rs.)</TableCell>
                   <TableCell sx={{ width: 130 }} align="right">Volume</TableCell>
                   <TableCell sx={{ width: 162 }}>Source</TableCell>
                 </>
@@ -326,7 +328,7 @@ const TableSection: React.FC<{ title: string; children: React.ReactNode }> = ({ 
                   <TableCell sx={{ width: 110 }}>Period</TableCell>
                   <TableCell sx={{ width: 130 }}>Period End</TableCell>
                   <TableCell sx={{ width: 120 }} align="right">Revenue</TableCell>
-                  <TableCell sx={{ width: 90 }} align="right">EPS</TableCell>
+                  <TableCell sx={{ width: 90 }} align="right">EPS (Rs.)</TableCell>
                   <TableCell sx={{ width: 126 }} align="right">Net Income</TableCell>
                   <TableCell sx={{ width: 104 }} align="right">PE Ratio</TableCell>
                   <TableCell sx={{ width: 136 }} align="right">Dividend Yield</TableCell>
@@ -345,7 +347,7 @@ const TableSection: React.FC<{ title: string; children: React.ReactNode }> = ({ 
                   <TableCell sx={{ width: 130 }}>Payment Date</TableCell>
                   <TableCell sx={{ width: 110 }}>Value</TableCell>
                   <TableCell sx={{ width: 110 }}>Ratio</TableCell>
-                  <TableCell sx={{ width: 110 }}>Amount</TableCell>
+                  <TableCell sx={{ width: 110 }}>Amount (Rs.)</TableCell>
                   <TableCell sx={{ width: 96 }}>Currency</TableCell>
                   <TableCell sx={{ width: 156 }}>Source</TableCell>
                   <TableCell sx={{ width: 152 }}>Status</TableCell>
@@ -368,4 +370,20 @@ const TableSection: React.FC<{ title: string; children: React.ReactNode }> = ({ 
   );
 };
 
+/**
+ * Shows a derived high/low band from the loaded price array.
+ * A true 52-week field requires a dedicated backend API field (not yet present).
+ */
+const PriceRangeBand: React.FC<{ prices: { close: number }[] }> = ({ prices }) => {
+  if (prices.length === 0) return null;
+  const closes = prices.map((p) => p.close).filter(Number.isFinite);
+  if (closes.length === 0) return null;
+  const hi = Math.max(...closes);
+  const lo = Math.min(...closes);
+  return (
+    <Typography variant="caption" color="text.secondary" display="block">
+      ~{prices.length}D range: {inr(lo)} - {inr(hi)}
+    </Typography>
+  );
+};
 export default InstrumentDetailPage;

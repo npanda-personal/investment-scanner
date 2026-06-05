@@ -10,7 +10,32 @@ export class MarketContextIntelligenceController {
     private readonly capitalPostureService = new CapitalPostureService(),
   ) {}
 
-  summary = async (req: Request, res: Response) => this.respond(res, () => this.service.summary({ region: this.region(req) }));
+  summary = async (req: Request, res: Response) => {
+    // Persisted-read only: never generate or write on a GET.
+    // Repoints to the same persisted path used by persistedSummary so no
+    // live .run() / saveSnapshot() is triggered.
+    const region = this.region(req) || 'GLOBAL';
+    return this.respond(res, async () => {
+      const persisted = await this.service.latestPersistedSummary(region);
+      if (!persisted) {
+        return {
+          status: 'missing',
+          scope: { region },
+          summary: null,
+          asOf: null,
+          materialized: false,
+          message: 'Persisted market context is not available for this scope.',
+        };
+      }
+      return {
+        status: 'ready',
+        scope: { region },
+        summary: persisted,
+        asOf: persisted.updatedAt || persisted.regime?.updatedAt || null,
+        materialized: false,
+      };
+    });
+  };
 
   persistedSummary = async (req: Request, res: Response) => {
     const region = this.region(req) || 'GLOBAL';

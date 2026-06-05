@@ -53,8 +53,12 @@ export class SignalGenerationEngineController {
     if (validationError) return res.status(400).json({ error: validationError });
 
     try {
-      const result = await this.service.latestForInstrument(instrumentId);
-      if (!result) return res.status(404).json({ error: 'Instrument not found or signal unavailable' });
+      // Persisted-read only: never trigger live generation on a GET.
+      // latestPersistedForInstruments is a bulk reader that never calls run();
+      // returns [] when nothing is persisted yet — no fallback to .run().
+      const results = await this.service.latestPersistedForInstruments([instrumentId]);
+      const result = results[0] ?? null;
+      if (!result) return res.status(404).json({ error: 'No persisted signal found for this instrument. Run signal generation via POST /signals/run to populate.' });
       return res.json(result);
     } catch (error) {
       console.error('Signal instrument endpoint error:', error);

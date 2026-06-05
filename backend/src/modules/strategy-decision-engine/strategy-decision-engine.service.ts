@@ -41,6 +41,16 @@ const DEFAULT_EVALUATION_WORKER_CONCURRENCY = 5;
 const MAX_EVALUATION_WORKER_CONCURRENCY = 8;
 const REVIEW_STRATEGY_CATEGORIES = new Set(['ENTRY', 'EXIT']);
 
+/**
+ * CB-45: minimum framework score to retain TRADE_CANDIDATE in the SELECTIVE regime.
+ * Indian strategies typically score 70–80 under normal NSE conditions. A gate of 85
+ * blocked almost every candidate. 75 equals the framework's own minScore for top-tier
+ * long strategies — admits strong-but-not-perfect setups while remaining stricter than
+ * the OPEN gate (which admits anything ≥ minScore = 70).
+ */
+// eslint-disable-next-line @typescript-eslint/no-inferrable-types
+const SELECTIVE_MIN_SCORE: number = 75;
+
 type StrategyEvaluationBatchContext = {
   pricesByInstrumentId: Map<string, any[]>;
   calibrationByInstrumentId: Map<string, any>;
@@ -592,7 +602,7 @@ export class StrategyDecisionEngineService {
       mapped.action = 'AVOID_NEW_ENTRY';
     } else if (ctx.gate.marketGate === 'SELECTIVE' && result.strategyCode !== 'DEFENSIVE_EXIT') {
       warnings.push('Market is selective; only high-quality setups should be reviewed.');
-      if (mapped.decision === 'TRADE_CANDIDATE' && result.score < 85) {
+      if (mapped.decision === 'TRADE_CANDIDATE' && result.score < SELECTIVE_MIN_SCORE) {
         mapped.decision = 'WATCH';
         mapped.action = 'WAIT_FOR_CONFIRMATION';
       }

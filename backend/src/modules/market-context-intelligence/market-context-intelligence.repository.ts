@@ -477,6 +477,26 @@ export class MarketContextIntelligenceRepository {
     return end;
   }
 
+
+  /**
+   * CB-41/CB-42: Load closing prices for a named index symbol (e.g. ^NSEI), most-recent first.
+   * Used by the regime calculator to compute an index-trend term.
+   */
+  async loadIndexPrices(symbol: string, limit: number, endDate?: Date): Promise<number[]> {
+    const rows = await this.db.priceTick.findMany({
+      where: {
+        symbol,
+        ...(endDate ? { timestamp: { lte: endDate } } : {}),
+      },
+      orderBy: { timestamp: 'desc' },
+      take: limit,
+      select: { close: true },
+    });
+    return rows
+      .map((row: any) => Number(row.close))
+      .filter((v: number) => Number.isFinite(v) && v > 0);
+  }
+
   private weakSectorSlice(sectors: SectorRotationItem[]) {
     if (sectors.length <= 1) return [];
     return sectors.slice(-Math.min(5, sectors.length - 1)).reverse();

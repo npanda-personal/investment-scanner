@@ -111,6 +111,30 @@ const ResearchOverviewPage: React.FC = () => {
         primaryAction={<Button variant="outlined" onClick={reload} startIcon={<UpdateOutlined />}>Reload Snapshot</Button>}
       />
 
+      {data.generatedAt && (
+        <Box
+          sx={{
+            position: 'sticky',
+            top: 0,
+            zIndex: 10,
+            bgcolor: 'background.paper',
+            borderBottom: '1px solid',
+            borderColor: 'divider',
+            px: 3,
+            py: 0.75,
+            mb: 2,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1,
+          }}
+        >
+          <UpdateOutlined fontSize="small" color="action" />
+          <Typography variant="caption" color="text.secondary">
+            As of {new Date(data.generatedAt).toLocaleString()}
+          </Typography>
+        </Box>
+      )}
+
       <Grid container spacing={4}>
         <Grid item xs={12}>
           <ActionabilitySummary actionability={actionability} />

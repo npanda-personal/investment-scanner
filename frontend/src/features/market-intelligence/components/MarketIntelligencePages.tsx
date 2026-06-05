@@ -686,8 +686,11 @@ function TagList({ values, emptyLabel, tone = 'default' }: { values: string[]; e
   if (values.length === 0) return <Typography variant="body2" color="text.secondary">{emptyLabel}</Typography>;
   return (
     <Stack direction="row" gap={0.75} flexWrap="wrap" useFlexGap>
-      {values.map((value) => <HealthBadge key={value} label={value} />)}
-      {tone === 'warning' && null}
+      {values.map((value) => (
+        tone === 'warning'
+          ? <Chip key={value} label={value} color="warning" variant="outlined" size="small" />
+          : <HealthBadge key={value} label={value} />
+      ))}
     </Stack>
   );
 }

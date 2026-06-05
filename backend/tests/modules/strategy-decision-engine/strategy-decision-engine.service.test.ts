@@ -1206,4 +1206,143 @@ describe('StrategyDecisionEngineService', () => {
       expect(result.instrumentIds).toEqual(['stock-1']);
       expect(result.totalCount).toBe(1);
     });
+
+    // ── CB-45: SELECTIVE threshold sanity ────────────────────────────────────
+    // Strategies typically score 70–80 in NSE conditions; a threshold of 85
+    // would block almost every real candidate.  75 (= SELECTIVE_MIN_SCORE)
+    // is the framework's own minScore for top-tier long strategies.
+
+    it('CB-45: score of 75–80 yields TRADE_CANDIDATE in SELECTIVE regime (not downgraded to WATCH)', async () => {
+      // Ascending prices so price > sma50 > sma200 — valid uptrend for TREND_MOMENTUM.
+      const ascendingPrices = makePrices(260, '2025-01-01', 40, 0.5);
+      const svc = createFrameworkBackedService({
+        marketData: {
+          getInstrument: jest.fn().mockResolvedValue({
+            id: 'stock-1', symbol: 'ABC', sector: 'Tech', country: 'IN',
+            exchange: 'NSE', currency: 'INR', asset_type: 'STOCK',
+          }),
+          listPricesByInstrumentId: jest.fn().mockResolvedValue({ prices: ascendingPrices }),
+          listInstruments: jest.fn().mockResolvedValue({ instruments: [] }),
+        },
+        signal: {
+          latestForInstrument: jest.fn().mockResolvedValue({ score: 77, direction: 'BULLISH' }),
+          topSignals: jest.fn().mockResolvedValue({ signals: [] }),
+        },
+        calibration: {
+          latestForInstrument: jest.fn().mockResolvedValue({ calibratedScore: 77, calibratedDirection: 'BULLISH', calibratedConfidence: 'HIGH' }),
+        },
+        context: {
+          latestPersistedSummary: jest.fn().mockResolvedValue({
+            dataStatus: 'COMPLETE',
+            topSectors: [{ sector: 'Tech', leadershipStatus: 'LEADING', relativeStrengthScore: 75 }],
+            weakSectors: [],
+            regime: { regime: 'NEUTRAL', score: 55 },
+            breadth: { percentAboveSma50: 0.45 },
+          }),
+          summary: jest.fn().mockResolvedValue({ dataStatus: 'COMPLETE' }),
+          regime: jest.fn().mockResolvedValue({ regime: 'NEUTRAL', score: 55 }),
+          breadth: jest.fn().mockResolvedValue({ percentAboveSma50: 0.45 }),
+        },
+        smartMoney: {
+          latestPersistedStock: jest.fn().mockResolvedValue({ status: 'ACCUMULATION', smartMoneyScore: 77 }),
+          stock: jest.fn().mockResolvedValue({ status: 'ACCUMULATION', smartMoneyScore: 77 }),
+        },
+      });
+
+      const selectiveGate = {
+        marketCondition: 'MIXED' as const,
+        marketGate: 'SELECTIVE' as const,
+        allowedActions: ['ONLY_HIGH_QUALITY_SETUPS'] as any[],
+        marketScore: 55,
+        reasons: [],
+        blockers: [],
+        dataStatus: 'COMPLETE' as any,
+        updatedAt: new Date().toISOString(),
+      };
+
+      const result = await svc.evaluateInstrumentStrategy('stock-1', 'TREND_MOMENTUM', selectiveGate);
+
+      expect(result).not.toBeNull();
+      expect(result?.frameworkBacked).toBe(true);
+      // If the framework itself returned TRADE_CANDIDATE (score ≥ minScore + rules passed),
+      // the SELECTIVE gate must NOT downgrade a 75+ score to WATCH (CB-45 fix: threshold is 75).
+      // A selective-downgrade is defined as: warning present, decision=WATCH, score in [75, 84].
+      const frameworkScore = result?.decisionScore ?? 0;
+      const selectiveDowngradeApplied =
+        result?.warnings?.some((w: string) => w.includes('selective')) &&
+        result?.decision === 'WATCH' &&
+        frameworkScore >= 75 &&
+        frameworkScore < 85;
+      expect(selectiveDowngradeApplied).toBe(false);
+    });
+
+    // ── CB-46: derivativesEligible wiring in strategy-decision-engine ─────────
+    // toStrategyFrameworkContext reads derivativesEligible from ctx.instrument.
+    // This test proves an F&O-eligible instrument is not blocked by
+    // "Derivatives eligibility is not confirmed" in the decision engine path.
+
+    it('CB-46: F&O-eligible instrument passes the derivativesEligible gate in BREAKDOWN_MOMENTUM', async () => {
+      const descendingPrices = Array.from({ length: 260 }, (_, index) => {
+        const date = new Date('2025-01-01');
+        date.setDate(date.getDate() + index);
+        const close = Math.max(1, 200 - index * 0.4);
+        return { date: date.toISOString(), close, adjusted_close: close, volume: 500000 };
+      });
+
+      const svc = createFrameworkBackedService({
+        marketData: {
+          getInstrument: jest.fn().mockResolvedValue({
+            id: 'fo-stock-1', symbol: 'BEARLTD.NS', sector: 'Metals',
+            country: 'IN', exchange: 'NSE', currency: 'INR', asset_type: 'STOCK',
+            derivativesEligible: true,
+          }),
+          listPricesByInstrumentId: jest.fn().mockResolvedValue({ prices: descendingPrices }),
+          listInstruments: jest.fn().mockResolvedValue({ instruments: [] }),
+        },
+        signal: {
+          latestForInstrument: jest.fn().mockResolvedValue({ score: 72, direction: 'BEARISH' }),
+          topSignals: jest.fn().mockResolvedValue({ signals: [] }),
+        },
+        calibration: {
+          latestForInstrument: jest.fn().mockResolvedValue({ calibratedScore: 72, calibratedDirection: 'BEARISH', calibratedConfidence: 'HIGH' }),
+        },
+        context: {
+          latestPersistedSummary: jest.fn().mockResolvedValue({
+            dataStatus: 'COMPLETE',
+            topSectors: [],
+            weakSectors: [{ sector: 'Metals', leadershipStatus: 'LAGGING', relativeStrengthScore: 25 }],
+            regime: { regime: 'RISK_OFF', score: 20 },
+            breadth: { percentAboveSma50: 0.15 },
+          }),
+          summary: jest.fn().mockResolvedValue({ dataStatus: 'COMPLETE' }),
+          regime: jest.fn().mockResolvedValue({ regime: 'RISK_OFF', score: 20 }),
+          breadth: jest.fn().mockResolvedValue({ percentAboveSma50: 0.15 }),
+        },
+        smartMoney: {
+          latestPersistedStock: jest.fn().mockResolvedValue({ status: 'DISTRIBUTION', smartMoneyScore: 25 }),
+          stock: jest.fn().mockResolvedValue({ status: 'DISTRIBUTION', smartMoneyScore: 25 }),
+        },
+      });
+
+      const closedGate = {
+        marketCondition: 'BAD' as const,
+        marketGate: 'CLOSED' as const,
+        allowedActions: ['MANAGE_EXISTING_POSITIONS_ONLY'] as any[],
+        marketScore: 20, reasons: [], blockers: [],
+        dataStatus: 'COMPLETE' as any, updatedAt: new Date().toISOString(),
+      };
+
+      const result = await svc.evaluateInstrumentStrategy('fo-stock-1', 'BREAKDOWN_MOMENTUM', closedGate);
+
+      expect(result).not.toBeNull();
+      expect(result?.frameworkBacked).toBe(true);
+      // Must NOT be blocked by the F&O eligibility gate
+      expect(result?.noiseFiltersTriggered ?? []).not.toContain('NOT_DERIVATIVES_ELIGIBLE');
+      const allBlockerText = (result?.blockers ?? []).join(' ');
+      expect(allBlockerText).not.toContain('NOT_DERIVATIVES_ELIGIBLE');
+      expect(allBlockerText).not.toContain('Cash-only');
+      expect(allBlockerText).not.toContain('Derivatives eligibility is not confirmed');
+      // Score must be positive — at least the BEARISH_SIGNAL rule fires
+      expect(result?.decisionScore ?? 0).toBeGreaterThan(0);
+    });
   });

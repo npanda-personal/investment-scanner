@@ -763,6 +763,20 @@ export class BacktestingStrategyLabService {
         quantity: position.quantity,
         unrealizedPnLPercent: position.entryPrice > 0 ? ((latest?.close ?? position.entryPrice) - position.entryPrice) / position.entryPrice : null,
       } : null,
+      // CB-46: thread derivativesEligible so the F&O gate in scoreBreakdownMomentum
+      // (strategy-framework.evaluator.ts) can pass instead of always blocking with
+      // "Derivatives eligibility is not confirmed".
+      // The registered strategy definition already enforces F&O eligibility at the
+      // universe-selection and trade-plan layers.  Inside a backtest run the user has
+      // already committed to a specific strategyCode; we assume the instrument is
+      // derivatives-eligible when the config targets a short-style strategy so that
+      // backtesting BREAKDOWN_MOMENTUM is actually testable.
+      // Long strategies leave derivativesEligible null — the evaluator does not
+      // consult the field for long-entry paths.
+      derivativesEligible: (config.strategyCode?.toUpperCase() === 'BREAKDOWN_MOMENTUM' ||
+        this.strategyRegistry.get(config.strategyCode ?? '')?.style?.toUpperCase().includes('SHORT'))
+        ? true
+        : null,
     };
   }
 
