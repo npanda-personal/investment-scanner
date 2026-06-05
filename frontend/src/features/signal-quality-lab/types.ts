@@ -178,6 +178,7 @@ export interface ScorecardRow {
   winRate: number | null;
   winRateConfidence: WinRateConfidence | null;
   avgReturnPercent: number | null;
+  avgAlphaPercent?: number | null;
   medianReturnPercent: number | null;
   expectancy: number | null;
   profitFactor: number | null;
@@ -195,6 +196,7 @@ export interface ScorecardSummary {
   winRate: number | null;
   winRateConfidence: WinRateConfidence | null;
   avgReturnPercent: number | null;
+  avgAlphaPercent?: number | null;
   medianReturnPercent: number | null;
   expectancy: number | null;
   profitFactor: number | null;

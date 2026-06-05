@@ -523,14 +523,37 @@ function StockInterestTable({ rows }: { rows: StockInterestSnapshot[] }) {
   );
 }
 
+function ResultDateCell({ resultDate, resultDateLabel }: { resultDate: string | null; resultDateLabel?: 'Official' | 'Estimated' | null }) {
+  const dateText = formatDate(resultDate);
+  if (!resultDateLabel) {
+    return (
+      <Stack direction="row" spacing={0.5} alignItems="center">
+        <span>{dateText}</span>
+        <Chip label="date basis unknown" size="small" variant="outlined" sx={{ color: 'text.disabled', borderColor: 'divider', fontSize: '0.65rem' }} />
+      </Stack>
+    );
+  }
+  return (
+    <Stack direction="row" spacing={0.5} alignItems="center">
+      <span>{dateText}</span>
+      <Chip
+        label={resultDateLabel}
+        size="small"
+        variant="outlined"
+        color={resultDateLabel === 'Official' ? 'success' : 'warning'}
+      />
+    </Stack>
+  );
+}
+
 function EarningsTable({ rows }: { rows: EarningsIntelligenceSnapshot[] }) {
   return (
     <RankingTable
       rows={rows}
-      columns={['Symbol', 'Result Date', 'Date Source', 'Period End', 'Validated At', 'Days To Result', 'Revenue Growth', 'Profit Growth', 'EPS Growth', 'Margin Trend', 'Consistency', 'Acceleration', 'Freshness', 'Reasons', 'Risks', 'Warnings']}
+      columns={['Symbol', 'Result Date / Basis', 'Date Source', 'Period End', 'Validated At', 'Days To Result', 'Revenue Growth', 'Profit Growth', 'EPS Growth', 'Margin Trend', 'Consistency', 'Acceleration', 'Freshness', 'Reasons', 'Risks', 'Warnings']}
       renderRow={(row) => [
         row.symbol,
-        formatDate(row.resultDate),
+        <ResultDateCell key="result-date" resultDate={row.resultDate} resultDateLabel={row.resultDateLabel} />,
         formatEnum(row.resultDateSource),
         formatDate(row.periodEndDate),
         formatDate(row.validatedAt),

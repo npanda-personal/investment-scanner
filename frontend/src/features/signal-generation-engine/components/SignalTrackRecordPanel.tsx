@@ -131,6 +131,17 @@ const HorizonSummaryRow: React.FC<{ row: ScorecardSummary }> = ({ row }) => {
         <Typography variant="body2" color={changeColor(row.avgReturnPercent)}>{retPct(row.avgReturnPercent)}</Typography>
       </TableCell>
       <TableCell align="right">
+        {row.avgAlphaPercent === null || row.avgAlphaPercent === undefined ? (
+          <Tooltip title="Benchmark-relative not yet available" arrow>
+            <Typography variant="body2" color="text.disabled" sx={{ cursor: 'help' }}>—</Typography>
+          </Tooltip>
+        ) : (
+          <Typography variant="body2" color={changeColor(row.avgAlphaPercent)}>
+            {retPct(row.avgAlphaPercent)}
+          </Typography>
+        )}
+      </TableCell>
+      <TableCell align="right">
         <Typography variant="body2" color={changeColor(row.expectancy)}>{retPct(row.expectancy)}</Typography>
       </TableCell>
       <TableCell align="right">
@@ -168,6 +179,17 @@ const DirectionBreakdownRow: React.FC<{ row: ScorecardRow }> = ({ row }) => {
       </TableCell>
       <TableCell align="right">
         <Typography variant="caption" color={changeColor(row.avgReturnPercent)}>{retPct(row.avgReturnPercent)}</Typography>
+      </TableCell>
+      <TableCell align="right">
+        {row.avgAlphaPercent === null || row.avgAlphaPercent === undefined ? (
+          <Tooltip title="Benchmark-relative not yet available" arrow>
+            <Typography variant="caption" color="text.disabled" sx={{ cursor: 'help' }}>—</Typography>
+          </Tooltip>
+        ) : (
+          <Typography variant="caption" color={changeColor(row.avgAlphaPercent)}>
+            {retPct(row.avgAlphaPercent)}
+          </Typography>
+        )}
       </TableCell>
       <TableCell align="right">
         <Typography variant="caption" color={changeColor(row.expectancy)}>{retPct(row.expectancy)}</Typography>
@@ -286,6 +308,10 @@ export const SignalTrackRecordPanel: React.FC<SignalTrackRecordPanelProps> = ({ 
                 </Alert>
               )}
 
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                Alpha = signal return − same-horizon Nifty 50 return. Green = outperformed index; red = underperformed.
+              </Typography>
+
               <Table size="small" sx={{ mb: 1 }}>
                 <TableHead>
                   <TableRow>
@@ -303,6 +329,11 @@ export const SignalTrackRecordPanel: React.FC<SignalTrackRecordPanelProps> = ({ 
                     <TableCell align="right">
                       <Tooltip title="Average forward return % over the horizon window" arrow>
                         <span>Avg Return</span>
+                      </Tooltip>
+                    </TableCell>
+                    <TableCell align="right">
+                      <Tooltip title="Alpha vs Nifty 50: signal avg forward return minus Nifty 50 return over the same horizon. Green = signal beat the index; red = underperformed. '—' means benchmark data not yet available for this horizon." arrow>
+                        <span>Alpha vs Nifty</span>
                       </Tooltip>
                     </TableCell>
                     <TableCell align="right">
@@ -347,6 +378,11 @@ export const SignalTrackRecordPanel: React.FC<SignalTrackRecordPanelProps> = ({ 
                           <TableCell align="right"><Typography variant="caption">Samples</Typography></TableCell>
                           <TableCell align="right"><Typography variant="caption">Win Rate</Typography></TableCell>
                           <TableCell align="right"><Typography variant="caption">Avg Return</Typography></TableCell>
+                          <TableCell align="right">
+                            <Tooltip title="Alpha vs Nifty 50: signal return minus same-horizon Nifty 50 return" arrow>
+                              <Typography variant="caption" sx={{ cursor: 'help', borderBottom: '1px dotted', borderColor: 'text.disabled' }}>Alpha vs Nifty</Typography>
+                            </Tooltip>
+                          </TableCell>
                           <TableCell align="right"><Typography variant="caption">Expectancy</Typography></TableCell>
                           <TableCell align="right"><Typography variant="caption">Profit Factor</Typography></TableCell>
                           <TableCell />

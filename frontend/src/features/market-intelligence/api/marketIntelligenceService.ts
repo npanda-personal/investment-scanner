@@ -40,6 +40,7 @@ type BackendEarningsRow = Omit<EarningsIntelligenceSnapshot, 'marginTrend' | 're
   id?: string;
   marginTrend?: number | null;
   resultDateSource?: string | null;
+  resultDateLabel?: 'Official' | 'Estimated' | null;
   categories?: string[];
 };
 
@@ -270,6 +271,7 @@ export async function fetchEarningsIntelligenceSnapshot(scope: MarketScope): Pro
       dataThroughDate: row.dataThroughDate ?? body.dataThroughDate ?? null,
       generatedAt: row.generatedAt ?? body.generatedAt ?? null,
       resultDateSource: row.resultDateSource || 'UNKNOWN',
+      resultDateLabel: row.resultDateLabel ?? null,
       periodEndDate: row.periodEndDate ?? null,
       validatedAt: row.validatedAt ?? null,
       marginTrend: typeof row.marginTrend === 'number' ? row.marginTrend : null,
