@@ -20,6 +20,8 @@ describe('market context routes', () => {
       countries: jest.fn(),
       macro: jest.fn(),
       run: jest.fn(),
+      fiiDiiActivity: jest.fn(),
+      fiiDiiIngest: jest.fn(),
     } as any);
     const routes = router.stack.filter((layer: any) => layer.route).map((layer: any) => `${Object.keys(layer.route.methods)[0].toUpperCase()} ${layer.route.path}`);
 
@@ -37,6 +39,8 @@ describe('market context routes', () => {
       'GET /market-context/countries',
       'GET /market-context/macro',
       'POST /market-context/run',
+      'GET /market-context/fii-dii',
+      'POST /market-context/fii-dii/ingest',
     ]);
   });
 

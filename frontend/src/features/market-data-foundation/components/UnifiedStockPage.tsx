@@ -22,7 +22,7 @@ import StockResearchWorkbenchPage from '@/features/stock-research-workbench';
 import { PageHeader } from '@/shared/components';
 import { fetchInstrumentContextSnapshot } from '@/features/market-intelligence/api/marketIntelligenceService';
 import { useReadModelSnapshot } from '@/features/market-intelligence/hooks/useMarketIntelligenceSnapshot';
-import { fetchInstruments } from '@/features/market-data-foundation';
+import { fetchInstruments } from '../api/marketDataFoundationService';
 
 const tabs = [
   { value: 'overview', label: 'Overview' },

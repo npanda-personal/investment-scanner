@@ -52,3 +52,29 @@ export async function fetchCapitalPosture(params: { region?: string } = {}): Pro
   const response = await axios.get<CapitalPostureDto>(`${API_BASE}/capital-posture`, { params });
   return response.data;
 }
+
+// ---------------------------------------------------------------------------
+// CB-21: FII/DII Activity
+// ---------------------------------------------------------------------------
+
+export interface FiiDiiRow {
+  tradingDate: string;
+  category: 'FII' | 'DII';
+  buyValueCr: number;
+  sellValueCr: number;
+  netValueCr: number;
+}
+
+export interface FiiDiiActivityResponse {
+  status: 'ready' | 'missing' | 'error';
+  source: string;
+  asOf: string | null;
+  fetchedAt: string;
+  rows: FiiDiiRow[];
+  message?: string;
+}
+
+export async function fetchFiiDiiActivity(params: { days?: number } = {}): Promise<FiiDiiActivityResponse> {
+  const response = await axios.get<FiiDiiActivityResponse>(`${API_BASE}/fii-dii`, { params });
+  return response.data;
+}

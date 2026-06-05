@@ -18,6 +18,9 @@ export const createMarketContextIntelligenceRouter = (
   router.get('/market-context/countries', controller.countries);
   router.get('/market-context/macro', controller.macro);
   router.post('/market-context/run', controller.run);
+  // CB-21: FII/DII Activity
+  router.get('/market-context/fii-dii', controller.fiiDiiActivity);
+  router.post('/market-context/fii-dii/ingest', controller.fiiDiiIngest);
   return router;
 };
 

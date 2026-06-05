@@ -448,6 +448,8 @@ describe('market-context routes — capital-posture endpoint registered', () => 
       countries:           jest.fn(),
       macro:               jest.fn(),
       run:                 jest.fn(),
+      fiiDiiActivity:      jest.fn(),
+      fiiDiiIngest:        jest.fn(),
     } as any);
 
     const routes = router.stack

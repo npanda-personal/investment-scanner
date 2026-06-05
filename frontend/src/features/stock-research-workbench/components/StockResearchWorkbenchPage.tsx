@@ -332,6 +332,49 @@ const StockResearchWorkbenchPage: React.FC = () => {
       <Grid container spacing={3}>
         <Grid item xs={12} md={6}>
           <SignalWidget instrumentId={String(overview.instrument_id || '')} />
+          {/* NR-59: Surface calibrated score inline from workbench signalEvidence when present.
+              The /signals/:id endpoint returns a raw persisted DTO without calibration overlay,
+              so calibrationStatus is never 'CALIBRATED' there. The workbench already reads
+              calibration via a separate persisted-read; we surface it here as an honest
+              supplement — shown only when a calibration row actually exists. */}
+          {data.signalEvidence?.calibratedScore !== null && data.signalEvidence?.calibratedScore !== undefined && (
+            <Paper variant="outlined" sx={{ px: 2, py: 1, mb: 3, mt: -2, borderTop: 0, borderRadius: '0 0 4px 4px', bgcolor: 'action.hover' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+                  Calibrated score:
+                </Typography>
+                <Typography variant="body2" fontWeight={700} color="primary.main">
+                  {Number(data.signalEvidence.calibratedScore).toLocaleString(undefined, { maximumFractionDigits: 3 })}
+                </Typography>
+                {data.signalEvidence.calibratedDirection && (
+                  <Chip
+                    label={String(data.signalEvidence.calibratedDirection)}
+                    size="small"
+                    color={
+                      data.signalEvidence.calibratedDirection === 'BULLISH' ? 'success'
+                      : data.signalEvidence.calibratedDirection === 'BEARISH' ? 'error'
+                      : 'default'
+                    }
+                    variant="outlined"
+                    sx={{ height: 18, fontSize: 10 }}
+                  />
+                )}
+                <Tooltip title="Calibrated score from the latest persisted SignalCalibrationResult for this instrument. Sourced from historical signal outcomes — for research reference only." arrow>
+                  <Typography variant="caption" color="text.disabled" sx={{ cursor: 'help', ml: 'auto' }}>
+                    persisted calibration
+                  </Typography>
+                </Tooltip>
+              </Box>
+            </Paper>
+          )}
+          {/* Show explicit "calibration pending" only when calibratedScore is truly absent */}
+          {(data.signalEvidence?.calibratedScore === null || data.signalEvidence?.calibratedScore === undefined) && (
+            <Paper variant="outlined" sx={{ px: 2, py: 1, mb: 3, mt: -2, borderTop: 0, borderRadius: '0 0 4px 4px', bgcolor: 'action.hover' }}>
+              <Typography variant="caption" color="text.disabled">
+                Calibration pending — no calibration record yet for this instrument.
+              </Typography>
+            </Paper>
+          )}
         </Grid>
         <Grid item xs={12} md={6}>
           <StrategyDecisionWidget instrumentId={String(overview.instrument_id || '')} />
@@ -463,18 +506,27 @@ const StockResearchWorkbenchPage: React.FC = () => {
         </Section>
 
         <Section title="Relative Strength" status={String(data.relative_strength.data_status || 'MISSING')} source={data.trust.source} updatedAt={data.trust.last_updated_timestamp}>
-          <MetricGrid items={{
-            'Stock Return': formatPercent(data.relative_strength.stock_return),
-            ...(data.relative_strength.benchmark_symbol
-              ? {
-                  [`Benchmark (${String(data.relative_strength.benchmark_symbol)})`]: formatPercent(data.relative_strength.benchmark_return),
-                  'vs Benchmark': formatPercent(data.relative_strength.relative_to_benchmark),
-                }
-              : {}),
-            'Peer Avg Return': formatPercent(data.relative_strength.peer_average_return),
-            'Relative to Peers': formatPercent(data.relative_strength.relative_to_peer_average),
-            Basis: `${range} ${String(data.relative_strength.fallback_used || 'N/A')}`,
-          }} />
+          {/* NR-58: when stock_return is null it is always a data-gap edge case (selectedPrices < 2
+              for the chosen range). Show an honest explanation instead of a bare N/A grid. */}
+          {data.relative_strength.stock_return === null ? (
+            <Alert severity="warning" sx={{ mb: 1 }}>
+              Insufficient price history for the <strong>{range}</strong> range — this instrument has a data gap
+              covering the selected period. Try a shorter range or MAX to see available data.
+            </Alert>
+          ) : (
+            <MetricGrid items={{
+              'Stock Return': formatPercent(data.relative_strength.stock_return),
+              ...(data.relative_strength.benchmark_symbol
+                ? {
+                    [`Benchmark (${String(data.relative_strength.benchmark_symbol)})`]: formatPercent(data.relative_strength.benchmark_return),
+                    'vs Benchmark': formatPercent(data.relative_strength.relative_to_benchmark),
+                  }
+                : {}),
+              'Peer Avg Return': formatPercent(data.relative_strength.peer_average_return),
+              'Relative to Peers': formatPercent(data.relative_strength.relative_to_peer_average),
+              Basis: `${range} ${String(data.relative_strength.fallback_used || 'N/A')}`,
+            }} />
+          )}
         </Section>
       </Box>
 

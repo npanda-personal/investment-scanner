@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import { MarketContextIntelligenceService } from './market-context-intelligence.service';
 import { MarketPulseSnapshotService } from './market-pulse-snapshot.service';
 import { CapitalPostureService } from './capital-posture.service';
+import { ingestFiiDii, getLatestFiiDiiActivity } from './fii-dii.service';
 
 export class MarketContextIntelligenceController {
   constructor(
@@ -101,6 +102,20 @@ export class MarketContextIntelligenceController {
   };
 
   run = async (req: Request, res: Response) => this.respond(res, () => this.service.run(this.region(req)));
+
+  /**
+   * CB-21: FII/DII Activity
+   * GET  /market-context/fii-dii          — persisted-read (last N days)
+   * POST /market-context/fii-dii/ingest   — fetch from NSE + persist
+   */
+  fiiDiiActivity = async (req: Request, res: Response) => {
+    res.setHeader('Cache-Control', 'no-store');
+    const days = typeof req.query.days === 'string' ? Math.max(1, Math.min(30, Number(req.query.days) || 5)) : 5;
+    return this.respond(res, () => getLatestFiiDiiActivity(days));
+  };
+
+  fiiDiiIngest = async (_req: Request, res: Response) =>
+    this.respond(res, () => ingestFiiDii());
 
   regime = async (req: Request, res: Response) => this.respond(res, () => this.service.regime(this.region(req)));
   sectors = async (req: Request, res: Response) => this.respond(res, () => this.service.sectors(this.region(req)));

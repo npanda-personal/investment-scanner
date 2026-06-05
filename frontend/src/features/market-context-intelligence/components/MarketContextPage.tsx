@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { humanizeCode } from '@/shared/format/enumLabels';
 import { useMarketContext } from '../hooks';
 import type { CapBandBreadth } from '../types';
+import { FiiDiiActivityWidget } from './FiiDiiActivityWidget';
 
 const pct = (value: number | null) => value === null ? 'N/A' : `${(value * 100).toFixed(1)}%`;
 const colorFor = (value?: string) => value === 'RISK_ON' || value === 'LEADING' || value === 'SUPPORTIVE' ? 'success' : value === 'RISK_OFF' || value === 'LAGGING' || value === 'HEADWIND' ? 'error' : 'warning';
@@ -185,6 +186,9 @@ export const MarketContextPage: React.FC = () => {
           <Typography color="text.secondary">{summary.macro.explanation}</Typography>
           <Typography variant="caption" color="text.secondary">{summary.macro.dataStatus}</Typography>
         </Paper>
+
+        {/* CB-21: FII / DII Activity widget */}
+        <FiiDiiActivityWidget />
       </Box>
 
       <Paper sx={{ p: 2, mt: 3 }}>
