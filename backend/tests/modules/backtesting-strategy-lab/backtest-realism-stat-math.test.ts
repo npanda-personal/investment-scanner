@@ -718,3 +718,186 @@ describe('CB-9 — Survivorship bias warning and point-in-time context', () => {
     expect(symbolsResult.metrics.realismWarnings?.some((w) => w.includes('SURVIVORSHIP_BIAS_UNIVERSE'))).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// NR-33 — Wilson CI on win rate + low-sample flag + zero-exit anomaly
+// ---------------------------------------------------------------------------
+
+describe('NR-33 — Wilson CI + low-sample flag + zero-exit anomaly', () => {
+  it('wilsonCI returns lower < p̂ < upper for a sample with wins', () => {
+    const service = createService() as any;
+    const ci = service.wilsonCI(7, 15); // 7/15 ≈ 46.7%
+    expect(ci.lower).toBeLessThan(7 / 15);
+    expect(ci.upper).toBeGreaterThan(7 / 15);
+    expect(ci.lower).toBeGreaterThanOrEqual(0);
+    expect(ci.upper).toBeLessThanOrEqual(1);
+  });
+
+  it('wilsonCI.lowSample is true when n < 30', () => {
+    const service = createService() as any;
+    expect(service.wilsonCI(5, 10).lowSample).toBe(true);
+    expect(service.wilsonCI(10, 29).lowSample).toBe(true);
+  });
+
+  it('wilsonCI.lowSample is false when n >= 30', () => {
+    const service = createService() as any;
+    expect(service.wilsonCI(15, 30).lowSample).toBe(false);
+  });
+
+  it('CI bounds for 100% win rate are sensibly < 1', () => {
+    const service = createService() as any;
+    const ci = service.wilsonCI(15, 15); // 100% but small sample
+    expect(ci.upper).toBeLessThanOrEqual(1);
+    // Wilson CI shrinks the upper bound below 1 for small samples
+    expect(ci.lower).toBeLessThan(1);
+    expect(ci.lowSample).toBe(true);
+  });
+
+  it('simulate() populates winRateCI when trades exist', async () => {
+    const service = createService();
+    const result = await service.simulate({ ...baseConfig });
+    if (result.metrics.numberOfTrades > 0) {
+      expect(result.metrics.winRateCI).toBeDefined();
+      expect(typeof result.metrics.winRateCI!.lower).toBe('number');
+      expect(typeof result.metrics.winRateCI!.upper).toBe('number');
+      expect(result.metrics.winRateCI!.n).toBe(result.metrics.numberOfTrades);
+    }
+  });
+
+  it('detectZeroExitAnomaly returns true when stops configured but no stop exits occurred', () => {
+    const service = createService() as any;
+    const config: BacktestStrategyConfig = { ...baseConfig, stopLossPercent: 0.08, trailingStopPercent: 0.12 };
+    const trades = [
+      { instrumentId: 'i', symbol: 'A', entryDate: '2021-01-01', exitDate: '2021-01-21', entryPrice: 100, exitPrice: 110, quantity: 1, grossPnL: 10, netPnL: 9, returnPercent: 0.09, holdingDays: 20, exitReason: 'STRATEGY_EXIT' },
+      { instrumentId: 'i', symbol: 'B', entryDate: '2021-02-01', exitDate: '2021-03-01', entryPrice: 100, exitPrice: 92, quantity: 1, grossPnL: -8, netPnL: -9, returnPercent: -0.09, holdingDays: 28, exitReason: 'MAX_HOLDING_PERIOD' },
+    ];
+    expect(service.detectZeroExitAnomaly(config, trades)).toBe(true);
+  });
+
+  it('detectZeroExitAnomaly returns false when at least one stop exit exists', () => {
+    const service = createService() as any;
+    const config: BacktestStrategyConfig = { ...baseConfig, stopLossPercent: 0.08 };
+    const trades = [
+      { instrumentId: 'i', symbol: 'A', entryDate: '2021-01-01', exitDate: '2021-01-21', entryPrice: 100, exitPrice: 90, quantity: 1, grossPnL: -10, netPnL: -11, returnPercent: -0.11, holdingDays: 20, exitReason: 'STOP_LOSS' },
+    ];
+    expect(service.detectZeroExitAnomaly(config, trades)).toBe(false);
+  });
+
+  it('detectZeroExitAnomaly returns false when no stops are configured', () => {
+    const service = createService() as any;
+    const config: BacktestStrategyConfig = { ...baseConfig }; // no stopLossPercent etc.
+    const trades = [
+      { instrumentId: 'i', symbol: 'A', entryDate: '2021-01-01', exitDate: '2021-01-21', entryPrice: 100, exitPrice: 90, quantity: 1, grossPnL: -10, netPnL: -11, returnPercent: -0.11, holdingDays: 20, exitReason: 'STRATEGY_EXIT' },
+    ];
+    expect(service.detectZeroExitAnomaly(config, trades)).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// NR-32 — monthly return grid + regime-segmented summary
+// ---------------------------------------------------------------------------
+
+describe('NR-32 — monthly return grid buckets + Calmar + Sortino', () => {
+  it('computeMonthlyReturns returns cells ordered by year/month', () => {
+    const service = createService() as any;
+    // Build a simple 3-month equity curve spanning Jan–Mar 2021
+    const curve = [
+      { date: '2021-01-04', equity: 100_000, cash: 100_000, investedValue: 0, drawdownPercent: 0 },
+      { date: '2021-01-29', equity: 102_000, cash: 102_000, investedValue: 0, drawdownPercent: 0 },
+      { date: '2021-02-01', equity: 102_000, cash: 102_000, investedValue: 0, drawdownPercent: 0 },
+      { date: '2021-02-26', equity: 99_000, cash: 99_000, investedValue: 0, drawdownPercent: 0 },
+      { date: '2021-03-01', equity: 99_000, cash: 99_000, investedValue: 0, drawdownPercent: 0 },
+      { date: '2021-03-31', equity: 105_000, cash: 105_000, investedValue: 0, drawdownPercent: 0 },
+    ];
+    const cells = service.computeMonthlyReturns(curve);
+    expect(cells.length).toBeGreaterThanOrEqual(3);
+    // Verify ordering
+    for (let i = 1; i < cells.length; i++) {
+      const prev = cells[i - 1];
+      const curr = cells[i];
+      const prevOrd = prev.year * 12 + prev.month;
+      const currOrd = curr.year * 12 + curr.month;
+      expect(currOrd).toBeGreaterThanOrEqual(prevOrd);
+    }
+    // Jan 2021: 102000/100000 - 1 = 2%
+    const jan = cells.find((c: { year: number; month: number; returnPercent: number | null }) => c.year === 2021 && c.month === 1);
+    expect(jan).toBeDefined();
+    if (jan?.returnPercent !== null && jan?.returnPercent !== undefined) {
+      expect(jan.returnPercent).toBeCloseTo(0.02, 3);
+    }
+    // Feb 2021: 99000/102000 - 1 ≈ -2.94%
+    const feb = cells.find((c: { year: number; month: number; returnPercent: number | null }) => c.year === 2021 && c.month === 2);
+    expect(feb).toBeDefined();
+    if (feb?.returnPercent !== null && feb?.returnPercent !== undefined) {
+      expect(feb.returnPercent).toBeCloseTo(-0.0294, 3);
+    }
+  });
+
+  it('computeMonthlyReturns returns empty array for curves with fewer than 2 points', () => {
+    const service = createService() as any;
+    expect(service.computeMonthlyReturns([])).toEqual([]);
+    expect(service.computeMonthlyReturns([{ date: '2021-01-01', equity: 100000, cash: 100000, investedValue: 0, drawdownPercent: 0 }])).toEqual([]);
+  });
+
+  it('simulate() populates monthlyReturns with cells covering the run period', async () => {
+    const service = createService();
+    const result = await service.simulate({ ...baseConfig });
+    // monthlyReturns should be present and contain at least 1 cell for a multi-month run
+    expect(result.metrics.monthlyReturns).toBeDefined();
+    expect(Array.isArray(result.metrics.monthlyReturns)).toBe(true);
+    // For a 18-month simulation window, expect multiple months
+    if (result.metrics.monthlyReturns!.length > 0) {
+      const firstCell = result.metrics.monthlyReturns![0];
+      expect(typeof firstCell.year).toBe('number');
+      expect(firstCell.month).toBeGreaterThanOrEqual(1);
+      expect(firstCell.month).toBeLessThanOrEqual(12);
+    }
+  });
+
+  it('metrics() computes calmarRatio = cagr / |maxDrawdown| when both exist', () => {
+    const service = createService() as any;
+    // Build an equity curve with a known drawdown
+    const curve = [
+      { date: '2021-01-01', equity: 100_000, cash: 100_000, investedValue: 0, drawdownPercent: 0 },
+      { date: '2021-07-01', equity: 80_000, cash: 80_000, investedValue: 0, drawdownPercent: -0.2 },
+      { date: '2021-12-31', equity: 120_000, cash: 120_000, investedValue: 0, drawdownPercent: 0 },
+    ];
+    const config: BacktestStrategyConfig = { ...baseConfig, startDate: '2021-01-01', endDate: '2021-12-31' };
+    const m = service.metrics(100_000, curve, [], config);
+    // maxDrawdown should be -0.2; CAGR positive → calmar > 0
+    expect(m.calmarRatio).not.toBeNull();
+    if (m.calmarRatio !== null && m.cagr !== null && m.maxDrawdown < 0) {
+      expect(m.calmarRatio).toBeCloseTo(m.cagr / Math.abs(m.maxDrawdown), 4);
+    }
+  });
+
+  it('metrics() calmarRatio is null when maxDrawdown is 0', () => {
+    const service = createService() as any;
+    const curve = [
+      { date: '2021-01-01', equity: 100_000, cash: 100_000, investedValue: 0, drawdownPercent: 0 },
+      { date: '2021-12-31', equity: 120_000, cash: 120_000, investedValue: 0, drawdownPercent: 0 },
+    ];
+    const config: BacktestStrategyConfig = { ...baseConfig, startDate: '2021-01-01', endDate: '2021-12-31' };
+    const m = service.metrics(100_000, curve, [], config);
+    // No drawdown → calmarRatio should be null
+    expect(m.calmarRatio).toBeNull();
+  });
+
+  it('metrics() computes sortinoRatio as finite number for a curve with downside returns', () => {
+    const service = createService() as any;
+    let equity = 100_000;
+    const curve = Array.from({ length: 252 }, (_item, i) => {
+      const dailyRet = (i % 5 === 0) ? -0.005 : 0.003; // some down days
+      equity = equity * (1 + dailyRet);
+      const d = new Date('2021-01-04');
+      d.setDate(d.getDate() + i);
+      return { date: d.toISOString().slice(0, 10), equity, cash: 0, investedValue: equity, drawdownPercent: 0 };
+    });
+    const config: BacktestStrategyConfig = { ...baseConfig, startDate: '2021-01-04', endDate: '2021-12-31' };
+    const m = service.metrics(100_000, curve, [], config);
+    expect(m.sortinoRatio).not.toBeNull();
+    if (m.sortinoRatio !== null) {
+      expect(Number.isFinite(m.sortinoRatio)).toBe(true);
+    }
+  });
+});

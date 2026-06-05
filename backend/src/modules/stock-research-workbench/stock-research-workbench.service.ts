@@ -105,8 +105,15 @@ export class StockResearchWorkbenchService {
     const pricePoints = this.toPricePoints(prices?.prices || []);
     const selectedPrices = this.filterByRange(pricePoints, range);
     const latestFundamental = fundamentals?.records?.[0] || null;
+    const latestClose = latest?.latest?.close ?? pricePoints[0]?.adjusted_close ?? null;
+    const enrichedFundamentals = this.deriveFundamentals(
+      latestFundamental,
+      fundamentals?.records || [],
+      latestClose,
+      corporateActions?.actions || [],
+    );
     const peers = await this.peerComparison(instrument, instrumentId, range);
-    const valuation = this.valuationSnapshot(latestFundamental, peers, instrument.market_cap);
+    const valuation = this.valuationSnapshot(enrichedFundamentals, peers, instrument.market_cap);
     const performance = this.performanceMetrics(pricePoints, selectedPrices);
     // Fetch Nifty 50 for relative-strength; uses same time window as the selected range.
     const nifty50PricePoints = await this.fetchNifty50PricePoints(selectedPrices);
@@ -144,7 +151,7 @@ export class StockResearchWorkbenchService {
         data_status: prices?.data_status || 'MISSING',
       },
       performance,
-      fundamentals: latestFundamental,
+      fundamentals: enrichedFundamentals,
       valuation,
       peers,
       relative_strength: relativeStrength,
@@ -413,6 +420,104 @@ export class StockResearchWorkbenchService {
       fallback_used: useIndex ? 'nse_nifty_50' : 'peer_average',
       data_status: stockReturn !== null ? (useIndex ? 'COMPLETE' : 'PARTIAL') : 'MISSING',
     };
+  }
+
+  /**
+   * Augment a fundamentals record with derived metrics when persisted values are absent.
+   *
+   * Derived fields (only filled when persisted value is null):
+   *  - pe_ratio:        latestClose / TTM EPS  (sum of last 4 quarterly EPS, or latest annual EPS)
+   *  - market_cap:      shares_outstanding × latestClose
+   *  - dividend_yield:  TTM dividends per share / latestClose  (dividend CAs in the last 12 months)
+   *
+   * Each derived field is accompanied by `_<field>_derived: true` flag.
+   * Returns null when latestFundamental is null (nothing to augment).
+   * Never fabricates — sets derived value to null when inputs are missing.
+   */
+  deriveFundamentals(
+    latestFundamental: any,
+    allRecords: any[],
+    latestClose: number | null,
+    corporateActions: any[],
+  ): any {
+    if (!latestFundamental) return null;
+
+    const result = { ...latestFundamental };
+    const close = typeof latestClose === 'number' && Number.isFinite(latestClose) && latestClose > 0
+      ? latestClose
+      : null;
+
+    // ── Trailing PE ───────────────────────────────────────────────────────────
+    if (result.pe_ratio === null || result.pe_ratio === undefined) {
+      let ttmEps: number | null = null;
+      const quarterly = allRecords.filter(
+        (r: any) => (r.period_type ?? '').toUpperCase() === 'QUARTERLY' && typeof r.eps === 'number' && Number.isFinite(r.eps),
+      );
+      if (quarterly.length >= 4) {
+        // Sum last 4 quarterly EPS (already ordered newest-first)
+        ttmEps = quarterly.slice(0, 4).reduce((sum: number, r: any) => sum + (r.eps as number), 0);
+      } else if (
+        typeof latestFundamental.eps === 'number' &&
+        Number.isFinite(latestFundamental.eps) &&
+        (latestFundamental.period_type ?? '').toUpperCase() === 'ANNUAL'
+      ) {
+        ttmEps = latestFundamental.eps as number;
+      } else if (typeof latestFundamental.eps === 'number' && Number.isFinite(latestFundamental.eps)) {
+        // Single record with EPS but unknown periodType — use as best proxy
+        ttmEps = latestFundamental.eps as number;
+      }
+      if (close !== null && ttmEps !== null && ttmEps !== 0) {
+        result.pe_ratio = close / ttmEps;
+        result._pe_ratio_derived = true;
+      } else {
+        result._pe_ratio_derived = false;
+      }
+    } else {
+      result._pe_ratio_derived = false;
+    }
+
+    // ── Market Cap ───────────────────────────────────────────────────────────
+    if (result.market_cap === null || result.market_cap === undefined) {
+      const shares =
+        typeof latestFundamental.shares_outstanding === 'number' &&
+        Number.isFinite(latestFundamental.shares_outstanding) &&
+        latestFundamental.shares_outstanding > 0
+          ? (latestFundamental.shares_outstanding as number)
+          : null;
+      if (close !== null && shares !== null) {
+        result.market_cap = shares * close;
+        result._market_cap_derived = true;
+      } else {
+        result._market_cap_derived = false;
+      }
+    } else {
+      result._market_cap_derived = false;
+    }
+
+    // ── Dividend Yield ────────────────────────────────────────────────────────
+    if (result.dividend_yield === null || result.dividend_yield === undefined) {
+      const twelveMonthsAgo = new Date();
+      twelveMonthsAgo.setFullYear(twelveMonthsAgo.getFullYear() - 1);
+      const ttmDividends = (corporateActions as any[]).filter((action: any) => {
+        if ((action.action_type ?? '').toLowerCase() !== 'dividend') return false;
+        if (!action.effective_date) return false;
+        const d = new Date(action.effective_date);
+        return !Number.isNaN(d.getTime()) && d >= twelveMonthsAgo;
+      }).reduce((sum: number, action: any) => {
+        const amt = typeof action.amount === 'number' ? action.amount : Number(action.amount);
+        return sum + (Number.isFinite(amt) ? amt : 0);
+      }, 0);
+      if (close !== null && ttmDividends > 0) {
+        result.dividend_yield = ttmDividends / close;
+        result._dividend_yield_derived = true;
+      } else {
+        result._dividend_yield_derived = false;
+      }
+    } else {
+      result._dividend_yield_derived = false;
+    }
+
+    return result;
   }
 
   private toPricePoints(prices: any[]): ResearchPricePoint[] {

@@ -58,13 +58,45 @@ export interface BacktestStrategy {
   updatedAt: string;
 }
 
+/** NR-33: Wilson score 95% confidence interval on the win rate. */
+export interface WilsonCI {
+  lower: number;
+  upper: number;
+  n: number;
+  /** True when n < 30 (low-sample flag). */
+  lowSample: boolean;
+}
+
+/** NR-32: One cell in the monthly return grid. */
+export interface MonthlyReturnCell {
+  year: number;
+  /** 1-based month (1=Jan … 12=Dec). */
+  month: number;
+  returnPercent: number | null;
+}
+
+/** NR-32: Per-regime performance breakdown. */
+export interface RegimePerformanceRow {
+  regime: string;
+  cagr: number | null;
+  winRate: number | null;
+  numberOfTrades: number;
+  activeMonths: number;
+}
+
 export interface BacktestMetrics {
   totalReturn: number;
   cagr: number | null;
   maxDrawdown: number;
   volatility: number | null;
   sharpeRatio: number | null;
+  /** NR-32: Calmar ratio: CAGR / |maxDrawdown|. */
+  calmarRatio?: number | null;
+  /** NR-32: Sortino ratio (excess return / downside deviation). */
+  sortinoRatio?: number | null;
   winRate: number | null;
+  /** NR-33: Wilson 95% CI on win rate. Present whenever numberOfTrades > 0. */
+  winRateCI?: WilsonCI;
   averageWin: number | null;
   averageLoss: number | null;
   profitFactor: number | null;
@@ -96,6 +128,12 @@ export interface BacktestMetrics {
     benchmarkDataStatus: 'AVAILABLE' | 'FALLBACK_EQUAL_WEIGHT' | 'UNAVAILABLE';
     dataGap?: string;
   };
+  /** NR-32: Month-by-month return grid derived from the equity curve. */
+  monthlyReturns?: MonthlyReturnCell[];
+  /** NR-32: Per-regime breakdown (CAGR + win rate split by regime). */
+  regimePerformance?: RegimePerformanceRow[];
+  /** NR-33: True when stops were configured but generated zero stop exits. */
+  zeroExitAnomaly?: boolean;
   realismWarnings?: string[];
   dataQualityMetadata?: {
     universeBeforeDataQualityFilter: number;

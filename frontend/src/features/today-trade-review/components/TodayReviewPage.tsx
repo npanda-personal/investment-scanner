@@ -722,9 +722,16 @@ function CandidateTable({ candidates }: { candidates: TodayReviewCandidate[] }) 
     setActionMessage(`Exported ${sortedCandidates.length} Today Review rows as an Excel-compatible CSV.`);
   };
 
+  const missingTierCount = useMemo(() => candidates.filter(hasMissingTierContext).length, [candidates]);
+
   return (
     <Stack spacing={1.5}>
       {actionMessage && <Alert severity="success">{actionMessage}</Alert>}
+      {missingTierCount > 0 && (
+        <Alert severity="info">
+          Confidence scores are conservatively downgraded where DQ tier context is missing ({missingTierCount} of {candidates.length} candidates in this view). Scores shown as &ldquo;X (from Y)&rdquo; are display-only adjustments and do not affect ranking.
+        </Alert>
+      )}
       <Box
         sx={{
           display: 'grid',

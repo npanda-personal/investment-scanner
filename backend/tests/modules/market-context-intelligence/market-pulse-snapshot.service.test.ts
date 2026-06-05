@@ -164,4 +164,138 @@ describe('MarketPulseSnapshotService', () => {
     expect(first.region).toBe('IN');
     expect(first.assetType).toBe('STOCK');
   });
+
+  it('NR-22: extracts India VIX latest value + 5D range from index prices and classifies posture', () => {
+    const service = new MarketPulseSnapshotService({} as any);
+    const latestDate = new Date('2026-05-29T00:00:00.000Z');
+
+    const vixPrices: MarketPulsePricePoint[] = Array.from({ length: 7 }, (_u, i) => ({
+      symbol: 'NSE_INDEX_INDIA_VIX',
+      label: 'India VIX',
+      source: 'NSE_INDEX_EOD',
+      timestamp: new Date(latestDate.getTime() - i * 24 * 60 * 60 * 1000),
+      close: 14.5 - i * 0.3,
+      adjustedClose: 14.5 - i * 0.3,
+      volume: null,
+    }));
+
+    const data = baseData({ indexPrices: [...baseData().indexPrices, ...vixPrices] });
+    const snapshot = service.calculateSnapshot(data, { generatedAt });
+
+    expect(snapshot.vixSummaryJson.latest).toBeCloseTo(14.5);
+    expect(snapshot.vixSummaryJson.posture).toBe('CALM');
+    expect(snapshot.vixSummaryJson.asOf).toBe('2026-05-29');
+    expect(snapshot.vixSummaryJson.low5d).toBeLessThan(snapshot.vixSummaryJson.high5d!);
+  });
+
+  it('NR-22: caps market health label at FRAGILE when VIX > 22', () => {
+    const service = new MarketPulseSnapshotService({} as any);
+    const latestDate = new Date('2026-05-29T00:00:00.000Z');
+
+    // VIX at 25 (HIGH posture)
+    const highVixPrices: MarketPulsePricePoint[] = Array.from({ length: 5 }, (_u, i) => ({
+      symbol: 'NSE_INDEX_INDIA_VIX',
+      label: 'India VIX',
+      source: 'NSE_INDEX_EOD',
+      timestamp: new Date(latestDate.getTime() - i * 24 * 60 * 60 * 1000),
+      close: 25 - i * 0.2,
+      adjustedClose: 25 - i * 0.2,
+      volume: null,
+    }));
+
+    const data = baseData({ indexPrices: [...baseData().indexPrices, ...highVixPrices] });
+    const snapshot = service.calculateSnapshot(data, { generatedAt });
+
+    expect(snapshot.vixSummaryJson.posture).toBe('HIGH');
+    // Health label must be FRAGILE or lower — not HEALTHY or TRADABLE_BUT_SELECTIVE
+    expect(['FRAGILE', 'RISKY']).toContain(snapshot.marketHealthLabel);
+  });
+
+  it('NR-22: returns UNAVAILABLE VIX summary when no VIX price data is present', () => {
+    const service = new MarketPulseSnapshotService({} as any);
+    const snapshot = service.calculateSnapshot(baseData(), { generatedAt });
+
+    expect(snapshot.vixSummaryJson.posture).toBe('UNAVAILABLE');
+    expect(snapshot.vixSummaryJson.latest).toBeNull();
+  });
+
+  it('NR-23: counts advances and declines from latest stock prices and computes A/D ratio', () => {
+    const service = new MarketPulseSnapshotService({} as any);
+    const snapshot = service.calculateSnapshot(baseData(), { generatedAt });
+
+    // baseData has AAA (+trend), BBB (+trend), CCC (-trend)
+    expect(snapshot.advanceDeclineJson.advances).toBeGreaterThan(0);
+    expect(snapshot.advanceDeclineJson.declines).toBeGreaterThanOrEqual(0);
+    expect(snapshot.advanceDeclineJson.ratio).not.toBeNull();
+    expect(snapshot.advanceDeclineJson.asOf).not.toBeNull();
+  });
+
+  it('NR-23: returns zero advances/declines and null ratio when no stock prices are present', () => {
+    const service = new MarketPulseSnapshotService({} as any);
+    const snapshot = service.calculateSnapshot(baseData({ stockPrices: [] }), { generatedAt });
+
+    expect(snapshot.advanceDeclineJson.advances).toBe(0);
+    expect(snapshot.advanceDeclineJson.declines).toBe(0);
+    expect(snapshot.advanceDeclineJson.ratio).toBeNull();
+  });
+
+  it('NR-21: latestSnapshot loads up to 6 snapshots and derives health score history + prior score', async () => {
+    const makeRecord = (score: number, date: string) => ({
+      id: `id-${date}`,
+      snapshotDate: new Date(date),
+      dataThroughDate: new Date(date),
+      generatedAt: new Date(date),
+      region: 'IN',
+      assetType: 'STOCK',
+      timeframe: '1d',
+      status: 'FRESH',
+      marketHealthScore: score,
+      marketHealthLabel: 'HEALTHY',
+      indexTrendScore: 80,
+      sectorStrengthScore: 75,
+      breadthScore: 70,
+      deliveryParticipationScore: 65,
+      dataFreshnessScore: 100,
+      topIndicesJson: [],
+      strongSectorsJson: [],
+      weakSectorsJson: [],
+      breadthSummaryJson: {
+        status: 'READY',
+        percentAbove20Dma: 0.7, percentAbove50Dma: 0.6, percentAbove200Dma: 0.5,
+        percentPositive1M: 0.65, percentPositive3M: 0.6,
+        sampleCount: 100, sma20SampleCount: 100, sma50SampleCount: 100,
+        sma200SampleCount: 100, positive1MSampleCount: 100, positive3MSampleCount: 100,
+        summaryText: 'ok',
+      },
+      deliverySummaryJson: {
+        status: 'READY', sampleCount: 100, highDeliveryCount: 60,
+        highDeliveryPercent: 0.6, latestTradingDate: date, summaryText: 'ok',
+      },
+      candidateCount: 5,
+      warningsJson: [],
+      sourceSummaryJson: { status: 'FRESH', score: 100, latestCompletedTradingDate: date, dataThroughDate: date, segments: {} },
+      vixSummaryJson: { latest: 14.5, low5d: 13.2, high5d: 16.1, asOf: date, posture: 'CALM' as const },
+      advanceDeclineJson: { advances: 150, declines: 80, ratio: 1.88, asOf: date },
+      pipelineRunId: null,
+      createdAt: new Date(date),
+      updatedAt: new Date(date),
+    });
+
+    // Newest-first order (as repository returns)
+    const rows = [51, 43, 55, 60, 48].map((score, i) => makeRecord(score, `2026-05-${29 - i}T00:00:00.000Z`));
+
+    const repository = {
+      snapshotHistory: jest.fn().mockResolvedValue(rows),
+    };
+    const service = new MarketPulseSnapshotService(repository as any);
+
+    const envelope = await service.latestSnapshot({ region: 'IN', assetType: 'STOCK' });
+
+    expect(envelope.availability).toBe('READY');
+    expect(envelope.snapshot!.marketHealthScore).toBe(51); // newest score
+    expect(envelope.snapshot!.priorHealthScore).toBe(43); // second-newest
+    // History is oldest-first with >=2 entries
+    expect(envelope.snapshot!.healthScoreHistory.length).toBeGreaterThanOrEqual(2);
+    expect(envelope.snapshot!.healthScoreHistory[envelope.snapshot!.healthScoreHistory.length - 1]).toBe(51);
+  });
 });

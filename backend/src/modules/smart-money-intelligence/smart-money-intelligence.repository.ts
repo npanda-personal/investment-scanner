@@ -1,9 +1,26 @@
 import { PrismaClient } from '@prisma/client';
 import prisma from '../../db/prisma';
-import type { SmartMoneyEvidenceReasonCode, SmartMoneyListQuery, SmartMoneyRange, SmartMoneyStockSummary, SectorSmartMoneySummary } from './smart-money-intelligence.types';
+import type { SmartMoneyEvidenceReasonCode, SmartMoneyListQuery, SmartMoneyRange, SmartMoneyStockSummary, SectorSmartMoneySummary, SectorSmartMoneyStatus } from './smart-money-intelligence.types';
 import { resolveMarketRegionFilter } from '../../shared/utils/market-scope';
 
 export type SmartMoneySnapshotWriteAction = 'created' | 'updated' | 'unchanged';
+
+/**
+ * Classify an average sector smart-money score into a 5-band status.
+ * Bands are tuned to the observed NSE score spread (approx 41–59 as of 2026-06):
+ *   >= 62  → STRONG_ACCUMULATION
+ *   56–61  → ACCUMULATING
+ *   48–55  → NEUTRAL
+ *   38–47  → DISTRIBUTING
+ *   < 38   → STRONG_DISTRIBUTION
+ */
+function classifySectorScore(score: number): SectorSmartMoneyStatus {
+  if (score >= 62) return 'STRONG_ACCUMULATION';
+  if (score >= 56) return 'ACCUMULATING';
+  if (score >= 48) return 'NEUTRAL';
+  if (score >= 38) return 'DISTRIBUTING';
+  return 'STRONG_DISTRIBUTION';
+}
 
 export class SmartMoneyIntelligenceRepository {
   constructor(private readonly db: PrismaClient = prisma) {}
@@ -146,7 +163,7 @@ export class SmartMoneyIntelligenceRepository {
 
      return [...groups.entries()].map(([sector, items]) => {
        const average = Math.round(items.reduce((sum, item) => sum + item.smartMoneyScore, 0) / Math.max(1, items.length));
-       const sectorStatus: any = average >= 65 ? 'ACCUMULATING' : average <= 40 ? 'DISTRIBUTING' : 'NEUTRAL';
+       const sectorStatus: SectorSmartMoneyStatus = classifySectorScore(average);
        const dataStatus: any = items.some((item) => item.dataStatus === 'PARTIAL' || item.dataStatus === 'ERROR') ? 'PARTIAL' : 'COMPLETE';
        const updatedAt = items.map((item) => item.updatedAt).sort().at(-1) || new Date(0).toISOString();
        return {

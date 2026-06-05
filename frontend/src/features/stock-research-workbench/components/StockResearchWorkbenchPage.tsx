@@ -434,10 +434,10 @@ const StockResearchWorkbenchPage: React.FC = () => {
               Revenue: inrCompact(fundamentals.revenue),
               EPS: inr(fundamentals.eps),
               'Net Income': inrCompact(fundamentals.net_income),
-              'P/E': formatNumber(fundamentals.pe_ratio),
-              'Dividend Yield': formatPercent(fundamentals.dividend_yield),
+              'P/E': <DerivedValue value={formatNumber(fundamentals.pe_ratio)} derived={!!fundamentals._pe_ratio_derived} />,
+              'Dividend Yield': <DerivedValue value={formatPercent(fundamentals.dividend_yield)} derived={!!fundamentals._dividend_yield_derived} />,
               Shares: formatNumber(fundamentals.shares_outstanding),
-              'Market Cap': inrCompact(fundamentals.market_cap),
+              'Market Cap': <DerivedValue value={inrCompact(fundamentals.market_cap)} derived={!!fundamentals._market_cap_derived} />,
               Period: String(fundamentals.period_type || 'N/A'),
             }} />
           ) : <Typography color="text.secondary">No fundamentals available.</Typography>}
@@ -532,7 +532,7 @@ const Section: React.FC<{ title: string; status?: string; source?: string; updat
   </Paper>
 );
 
-const MetricGrid: React.FC<{ items: Record<string, string> }> = ({ items }) => (
+const MetricGrid: React.FC<{ items: Record<string, React.ReactNode> }> = ({ items }) => (
   <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(4, 1fr)' }, gap: 1.5 }}>
     {Object.entries(items).map(([label, value]) => (
       <Box key={label}>
@@ -542,6 +542,19 @@ const MetricGrid: React.FC<{ items: Record<string, string> }> = ({ items }) => (
     ))}
   </Box>
 );
+
+/** Wraps a formatted value with a small "derived" badge when the value was computed, not persisted. */
+const DerivedValue: React.FC<{ value: string; derived: boolean }> = ({ value, derived }) =>
+  derived ? (
+    <Tooltip title="Computed from available inputs — not a persisted XBRL value" arrow>
+      <Box component="span" sx={{ display: 'inline-flex', alignItems: 'baseline', gap: 0.4 }}>
+        {value}
+        <Typography component="span" variant="caption" sx={{ fontSize: '0.6rem', color: 'text.secondary', fontWeight: 400 }}>
+          derived
+        </Typography>
+      </Box>
+    </Tooltip>
+  ) : <>{value}</>;
 
 /**
  * Signal Evidence / Track Record section.

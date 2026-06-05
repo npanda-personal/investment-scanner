@@ -150,6 +150,62 @@ describe('SmartMoneyIntelligenceService', () => {
     expect(sectors[0].instrumentCount).toBe(2);
   });
 
+  describe('sector score classification bands', () => {
+    /**
+     * Verify the 5-band thresholds that prevent all sectors from collapsing to NEUTRAL:
+     *   >= 62  → STRONG_ACCUMULATION
+     *   56–61  → ACCUMULATING
+     *   48–55  → NEUTRAL
+     *   38–47  → DISTRIBUTING
+     *   < 38   → STRONG_DISTRIBUTION
+     */
+    const classifyViaAggregate = (score: number) => {
+      const service = new SmartMoneyIntelligenceService({} as any, {} as any);
+      // Craft two stocks that average to exactly `score`
+      const stockA = { ...service.calculateStockSummary(instrument, bars('accumulation')), smartMoneyScore: score, status: 'NEUTRAL' as const };
+      const stockB = { ...service.calculateStockSummary({ ...instrument, id: 'stock-2', symbol: 'BBB' }, bars('distribution')), smartMoneyScore: score, status: 'NEUTRAL' as const };
+      return service.aggregateSectors([stockA, stockB])[0].sectorStatus;
+    };
+
+    it('classifies score 63 as non-NEUTRAL (STRONG_ACCUMULATION per 5-band thresholds)', () => {
+      const result = classifyViaAggregate(63);
+      expect(result).toBe('STRONG_ACCUMULATION');
+      expect(result).not.toBe('NEUTRAL');
+    });
+
+    it('classifies score 40 as DISTRIBUTING (not NEUTRAL)', () => {
+      expect(classifyViaAggregate(40)).toBe('DISTRIBUTING');
+    });
+
+    it('classifies score 62 as STRONG_ACCUMULATION boundary', () => {
+      expect(classifyViaAggregate(62)).toBe('STRONG_ACCUMULATION');
+    });
+
+    it('classifies score 56 as ACCUMULATING lower boundary', () => {
+      expect(classifyViaAggregate(56)).toBe('ACCUMULATING');
+    });
+
+    it('classifies score 55 as NEUTRAL upper boundary', () => {
+      expect(classifyViaAggregate(55)).toBe('NEUTRAL');
+    });
+
+    it('classifies score 48 as NEUTRAL lower boundary', () => {
+      expect(classifyViaAggregate(48)).toBe('NEUTRAL');
+    });
+
+    it('classifies score 47 as DISTRIBUTING upper boundary', () => {
+      expect(classifyViaAggregate(47)).toBe('DISTRIBUTING');
+    });
+
+    it('classifies score 38 as DISTRIBUTING lower boundary', () => {
+      expect(classifyViaAggregate(38)).toBe('DISTRIBUTING');
+    });
+
+    it('classifies score 37 as STRONG_DISTRIBUTION', () => {
+      expect(classifyViaAggregate(37)).toBe('STRONG_DISTRIBUTION');
+    });
+  });
+
   it('returns top accumulation and distribution lists from mocked repository', async () => {
     const repository = {
       latestSnapshots: jest.fn(async (_query, isDistribution) => ({

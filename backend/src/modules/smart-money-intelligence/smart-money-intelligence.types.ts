@@ -3,7 +3,20 @@ export type SmartMoneyConfidence = 'LOW' | 'MEDIUM' | 'HIGH';
 export type SmartMoneyDataStatus = 'COMPLETE' | 'PARTIAL' | 'MISSING' | 'ERROR';
 export type SmartMoneyRange = '1M' | '3M' | '6M';
 export type SmartMoneySignalDirection = 'ACCUMULATION' | 'DISTRIBUTION' | 'NEUTRAL';
-export type SectorSmartMoneyStatus = 'ACCUMULATING' | 'NEUTRAL' | 'DISTRIBUTING';
+/**
+ * Sector-level Smart Money classification bands (tuned to observed NSE score spread 41–59):
+ *   STRONG_ACCUMULATION : averageSmartMoneyScore >= 62
+ *   ACCUMULATING        : averageSmartMoneyScore 56–61
+ *   NEUTRAL             : averageSmartMoneyScore 48–55
+ *   DISTRIBUTING        : averageSmartMoneyScore 38–47
+ *   STRONG_DISTRIBUTION : averageSmartMoneyScore < 38
+ */
+export type SectorSmartMoneyStatus =
+  | 'STRONG_ACCUMULATION'
+  | 'ACCUMULATING'
+  | 'NEUTRAL'
+  | 'DISTRIBUTING'
+  | 'STRONG_DISTRIBUTION';
 export type SmartMoneyEvidenceStatus = 'USABLE' | 'LIMITED' | 'UNAVAILABLE';
 export type SmartMoneyFreshnessStatus = 'CURRENT' | 'STALE' | 'UNKNOWN';
 export type SmartMoneyEvidenceSource = 'PERSISTED_SNAPSHOT' | 'ON_DEMAND_DERIVED';

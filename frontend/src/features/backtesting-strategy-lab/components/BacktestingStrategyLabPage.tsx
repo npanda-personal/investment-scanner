@@ -44,7 +44,7 @@ import {
   YAxis,
 } from 'recharts';
 import { useBacktestingStrategyLab } from '../hooks';
-import type { BacktestRun, BacktestStrategyConfig, EntryRuleType, ExitRuleType, PositionSizeType, UniverseType } from '../types';
+import type { BacktestRun, BacktestStrategyConfig, EntryRuleType, ExitRuleType, MonthlyReturnCell, PositionSizeType, UniverseType } from '../types';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
 import { fetchStrategies, type StrategyDefinition, type StrategyTimeframe } from '@/features/strategy-framework';
 
@@ -420,13 +420,32 @@ export default function BacktestingStrategyLabPage() {
                 {scopedRuns.slice(0, 8).map((run) => (
                   <Paper key={run.id} variant="outlined" sx={{ p: 1.25 }}>
                     <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" gap={1}>
-                      <Stack direction="row" spacing={1} alignItems="center">
-                        <Chip size="small" label={run.status} color={run.status === 'COMPLETED' ? 'success' : 'error'} />
-                        <Chip size="small" label={run.config.mode === 'REGISTERED_STRATEGY' || run.config.strategyCode ? 'Saved Registered Strategy Run' : 'Custom Rule Backtest'} />
-                        <Typography variant="body2">{new Date(run.startedAt).toLocaleString()}</Typography>
-                        <Typography variant="body2" color="text.secondary">{run.metrics?.calculationAudit?.aggregateStatus === 'LEGACY_INVALID' ? 'Legacy invalid' : fmtPercent(run.metrics?.totalReturn)}</Typography>
-                      </Stack>
-                      <Stack direction="row" spacing={0.5}>
+                      {/* NR-35: strategy name, universe, timeframe, key metrics */}
+                      <Box>
+                        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                          <Chip size="small" label={run.status} color={run.status === 'COMPLETED' ? 'success' : 'error'} />
+                          <Typography variant="body2" fontWeight={600}>
+                            {run.metrics?.frameworkStrategyName || run.config.strategyCode || (run.config.mode === 'REGISTERED_STRATEGY' ? 'Registered Strategy' : 'Custom Rule Backtest')}
+                          </Typography>
+                        </Stack>
+                        <Stack direction="row" spacing={1} sx={{ mt: 0.5 }} flexWrap="wrap">
+                          <Typography variant="caption" color="text.secondary">
+                            {new Date(run.startedAt).toLocaleString()}
+                          </Typography>
+                          {run.config.timeframe && <Typography variant="caption" color="text.secondary">· {run.config.timeframe}</Typography>}
+                          <Typography variant="caption" color="text.secondary">
+                            · Universe: {run.config.universe.type === 'SYMBOLS' && run.config.universe.symbols?.length ? run.config.universe.symbols.join(', ') : run.config.universe.type}
+                          </Typography>
+                        </Stack>
+                        {run.status === 'COMPLETED' && run.metrics && (
+                          <Stack direction="row" spacing={1} sx={{ mt: 0.5 }} flexWrap="wrap">
+                            <Typography variant="caption">CAGR: {run.metrics.calculationAudit?.aggregateStatus === 'LEGACY_INVALID' ? 'N/A' : fmtPercent(run.metrics.cagr)}</Typography>
+                            <Typography variant="caption">Win: {fmtPercent(run.metrics.winRate)}</Typography>
+                            <Typography variant="caption">Trades: {run.metrics.numberOfTrades}</Typography>
+                          </Stack>
+                        )}
+                      </Box>
+                      <Stack direction="row" spacing={0.5} alignItems="flex-start">
                         <Tooltip title="View Results" arrow>
                           <IconButton size="small" onClick={() => setSelectedRun(run)}>
                             <VisibilityOutlinedIcon fontSize="small" />
@@ -526,13 +545,41 @@ function ResultsPanel({ run, chartData }: { run: BacktestRun | null; chartData: 
         <Alert severity="info">Strategy rating and readiness only populate for Registered Strategy backtests. Custom Rule backtests use ad-hoc rules and do not produce a Framework rating.</Alert>
       )}
       {metrics?.calculationAudit?.warnings.length ? <Alert severity={aggregateInvalid ? 'error' : 'warning'}>{metrics.calculationAudit.warnings.join(' ')}</Alert> : null}
+
+      {/* NR-33: Low-sample CI warning banner + zero-exit anomaly */}
+      {metrics && (metrics.winRateCI?.lowSample || metrics.zeroExitAnomaly) && (
+        <Alert severity="warning">
+          {metrics.winRateCI?.lowSample && (
+            <Box>
+              Win rate based on {metrics.winRateCI.n} trade{metrics.winRateCI.n !== 1 ? 's' : ''} (95% CI {fmtPercent(metrics.winRateCI.lower)}–{fmtPercent(metrics.winRateCI.upper)}) — low sample
+            </Box>
+          )}
+          {metrics.zeroExitAnomaly && (
+            <Box sx={{ mt: metrics.winRateCI?.lowSample ? 0.5 : 0 }}>
+              Zero-exit anomaly: stop-loss / trailing-stop / take-profit were configured but generated no exits — all exits were strategy signal or max-holding-period
+            </Box>
+          )}
+        </Alert>
+      )}
+
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' }, gap: 1.5 }}>
         <MetricCard label="Ending Capital" value={aggregateInvalid ? 'Legacy invalid' : fmtMoney((run.config.initialCapital || 0) * (1 + (metrics?.totalReturn || 0)), run.config.region)} />
         <MetricCard label="Total Return" value={aggregateInvalid ? 'Legacy invalid' : fmtPercent(metrics?.totalReturn)} />
         <MetricCard label="CAGR" value={fmtPercent(metrics?.cagr)} />
         <MetricCard label="Max Drawdown" value={fmtPercent(metrics?.maxDrawdown)} />
         <MetricCard label="Sharpe" value={fmtNumber(metrics?.sharpeRatio)} />
-        <MetricCard label="Win Rate" value={fmtPercent(metrics?.winRate)} />
+        {/* NR-32: Sortino and Calmar ratios */}
+        <MetricCard label="Sortino" value={fmtNumber(metrics?.sortinoRatio)} />
+        <MetricCard label="Calmar" value={fmtNumber(metrics?.calmarRatio)} />
+        {/* NR-33: Win Rate with CI range when available */}
+        <MetricCard
+          label="Win Rate"
+          value={metrics?.winRate == null
+            ? 'N/A'
+            : metrics.winRateCI
+              ? `${fmtPercent(metrics.winRate)} (${fmtPercent(metrics.winRateCI.lower)}–${fmtPercent(metrics.winRateCI.upper)})`
+              : fmtPercent(metrics.winRate)}
+        />
         <MetricCard label="Trades" value={String(metrics?.numberOfTrades ?? 0)} />
         <MetricCard label="Profit Factor" value={fmtNumber(metrics?.profitFactor)} />
         <MetricCard label="Avg Hold" value={metrics?.averageHoldingDays ? `${metrics.averageHoldingDays.toFixed(0)} days` : 'N/A'} />
@@ -581,6 +628,43 @@ function ResultsPanel({ run, chartData }: { run: BacktestRun | null; chartData: 
           </ResponsiveContainer>
         </Box>
       </Paper>
+
+      {/* NR-32: Monthly return heatmap grid */}
+      {metrics?.monthlyReturns && metrics.monthlyReturns.length > 0 && (
+        <MonthlyReturnGrid monthlyReturns={metrics.monthlyReturns} region={run.config.region} />
+      )}
+
+      {/* NR-32: Regime-segmented performance table */}
+      {metrics?.regimePerformance && metrics.regimePerformance.length > 0 && (
+        <Paper sx={{ p: 2 }}>
+          <Typography variant="h6" sx={{ mb: 1 }}>Performance by Regime</Typography>
+          <Box sx={{ overflowX: 'auto' }}>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Regime</TableCell>
+                  <TableCell align="right">CAGR (approx)</TableCell>
+                  <TableCell align="right">Win Rate</TableCell>
+                  <TableCell align="right">Trades</TableCell>
+                  <TableCell align="right">Active Months</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {metrics.regimePerformance.map((row) => (
+                  <TableRow key={row.regime}>
+                    <TableCell>{row.regime}</TableCell>
+                    <TableCell align="right">{fmtPercent(row.cagr)}</TableCell>
+                    <TableCell align="right">{fmtPercent(row.winRate)}</TableCell>
+                    <TableCell align="right">{row.numberOfTrades}</TableCell>
+                    <TableCell align="right">{row.activeMonths}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Box>
+        </Paper>
+      )}
+
       {metrics?.dataQualityMetadata && (
         <Alert severity="info">
           Data quality filter universe: {metrics.dataQualityMetadata.universeAfterDataQualityFilter} / {metrics.dataQualityMetadata.universeBeforeDataQualityFilter} included;
@@ -670,6 +754,82 @@ function MetricCard({ label, value }: { label: string; value: string }) {
     <Paper sx={{ p: 2 }}>
       <Typography variant="body2" color="text.secondary">{label}</Typography>
       <Typography variant="h6" fontWeight={700}>{value}</Typography>
+    </Paper>
+  );
+}
+
+const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** NR-32: colored heatmap table of monthly returns (rows=years, cols=Jan–Dec). */
+function MonthlyReturnGrid({ monthlyReturns, region }: { monthlyReturns: MonthlyReturnCell[]; region?: string }) {
+  const years = [...new Set(monthlyReturns.map((c) => c.year))].sort((a, b) => a - b);
+  const lookup = new Map<string, number | null>();
+  for (const cell of monthlyReturns) {
+    lookup.set(`${cell.year}-${cell.month}`, cell.returnPercent);
+  }
+  const cellBg = (ret: number | null) => {
+    if (ret === null) return 'transparent';
+    if (ret >= 0.08) return '#1b5e20';
+    if (ret >= 0.04) return '#388e3c';
+    if (ret >= 0.01) return '#81c784';
+    if (ret >= -0.01) return 'transparent';
+    if (ret >= -0.04) return '#e57373';
+    if (ret >= -0.08) return '#e53935';
+    return '#b71c1c';
+  };
+  const cellFg = (ret: number | null) => {
+    if (ret === null) return undefined;
+    return Math.abs(ret) > 0.04 ? '#fff' : undefined;
+  };
+
+  return (
+    <Paper sx={{ p: 2 }}>
+      <Typography variant="h6" sx={{ mb: 1 }}>Monthly Returns</Typography>
+      <Box sx={{ overflowX: 'auto' }}>
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+              <TableCell sx={{ fontWeight: 700, minWidth: 52 }}>Year</TableCell>
+              {MONTH_LABELS.map((m) => (
+                <TableCell key={m} align="center" sx={{ fontWeight: 600, minWidth: 52 }}>{m}</TableCell>
+              ))}
+              <TableCell align="right" sx={{ fontWeight: 600, minWidth: 64 }}>Annual</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {years.map((year) => {
+              const monthVals = Array.from({ length: 12 }, (_, i) => lookup.get(`${year}-${i + 1}`) ?? null);
+              const validMonths = monthVals.filter((v): v is number => v !== null);
+              const annualReturn = validMonths.length > 0
+                ? validMonths.reduce((acc, r) => acc * (1 + r), 1) - 1
+                : null;
+              return (
+                <TableRow key={year}>
+                  <TableCell sx={{ fontWeight: 600 }}>{year}</TableCell>
+                  {monthVals.map((ret, mi) => (
+                    <TableCell
+                      key={mi}
+                      align="center"
+                      sx={{ bgcolor: cellBg(ret), color: cellFg(ret), fontSize: '0.72rem', p: 0.5 }}
+                    >
+                      {ret !== null ? `${(ret * 100).toFixed(1)}%` : '—'}
+                    </TableCell>
+                  ))}
+                  <TableCell
+                    align="right"
+                    sx={{ bgcolor: cellBg(annualReturn), color: cellFg(annualReturn), fontSize: '0.75rem', fontWeight: 600, p: 0.5 }}
+                  >
+                    {annualReturn !== null ? `${(annualReturn * 100).toFixed(1)}%` : '—'}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </Box>
+      <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+        Monthly returns are equity-curve based (daily-close simulation, {region || 'IN'}).
+      </Typography>
     </Paper>
   );
 }

@@ -17,6 +17,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
+import type { MarketPulseAdvanceDeclineSummary, MarketPulseVixSummary } from '../types';
 import { useState, type ReactNode } from 'react';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { InstrumentSearchSelect, PageHeader } from '@/shared/components';
@@ -456,12 +457,30 @@ function MarketPulseSnapshotView({
       <SectionHeader title="Market Health" subtitle="Displayed exactly as provided by the Market Pulse read model." />
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(4, 1fr)' }, gap: 2 }}>
         <ScoreCard label="Health Label" value={snapshot.marketHealthLabel} />
-        <ScoreCard label="Health Score" value={formatOptional(snapshot.marketHealthScore)} />
+        <ScoreCard
+          label="Health Score"
+          value={
+            <Stack spacing={0.5}>
+              <Typography variant="h6" fontWeight={800}>{formatOptional(snapshot.marketHealthScore)}</Typography>
+              {/* NR-21: health score trend + sparkline */}
+              <HealthScoreTrend
+                currentScore={snapshot.marketHealthScore ?? null}
+                priorScore={snapshot.priorHealthScore ?? null}
+                history={snapshot.healthScoreHistory}
+              />
+            </Stack>
+          }
+        />
         <ScoreCard label="Snapshot Status" value={formatEnum(snapshot.status)} />
         <ScoreCard label="Data Through" value={formatDate(snapshot.dataThroughDate)} />
         <ScoreCard label="Generated At" value={formatDateTime(snapshot.generatedAt)} />
         <ScoreCard label="Candidate Count" value={formatOptional(snapshot.candidateCount)} />
       </Box>
+      {/* NR-22 + NR-23: VIX and A/D headline row */}
+      <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
+        <VixWidget vix={snapshot.vixSummary} />
+        <AdvanceDeclineWidget ad={snapshot.advanceDecline} />
+      </Stack>
       <SectionPanel title="Top 5 Indices">
         {displayIndices.length === 0 ? <EmptyState title="No index rows in snapshot." /> : (
           <TableContainer>
@@ -505,6 +524,145 @@ function MarketPulseSnapshotView({
         </SectionPanel>
       )}
     </Stack>
+  );
+}
+
+/**
+ * NR-22: India VIX widget.
+ * Renders "India VIX: 16.5 | 5D 14.9–16.7" with a color cue.
+ * If VIX data is absent, renders "India VIX: —" honestly.
+ */
+function VixWidget({ vix }: { vix: MarketPulseVixSummary | null | undefined }) {
+  const unavailable = !vix || vix.posture === 'UNAVAILABLE' || vix.latest === null;
+
+  const postureColor = unavailable
+    ? 'default'
+    : vix!.posture === 'HIGH'
+      ? 'error'
+      : vix!.posture === 'ELEVATED'
+        ? 'warning'
+        : 'success';
+
+  const postureLabel = unavailable
+    ? ''
+    : vix!.posture === 'HIGH'
+      ? 'High fear — posture capped at Fragile'
+      : vix!.posture === 'ELEVATED'
+        ? 'Elevated volatility'
+        : 'Calm';
+
+  const vixText = unavailable
+    ? 'India VIX: —'
+    : `India VIX: ${vix!.latest!.toFixed(1)}`;
+
+  const rangeText = !unavailable && vix!.low5d !== null && vix!.high5d !== null
+    ? ` | 5D ${vix!.low5d.toFixed(1)}–${vix!.high5d.toFixed(1)}`
+    : '';
+
+  return (
+    <Tooltip title={unavailable ? 'India VIX data is not available in the persisted snapshot.' : `Posture: ${postureLabel}${vix?.asOf ? ` (as of ${vix.asOf})` : ''}`} arrow>
+      <Chip
+        label={`${vixText}${rangeText}`}
+        color={postureColor as 'default' | 'error' | 'warning' | 'success'}
+        variant="outlined"
+        size="small"
+      />
+    </Tooltip>
+  );
+}
+
+/**
+ * NR-23: Advance/Decline headline widget.
+ * Renders "Advances: X / Declines: Y (A/D: Z.ZZ)".
+ */
+function AdvanceDeclineWidget({ ad }: { ad: MarketPulseAdvanceDeclineSummary | null | undefined }) {
+  if (!ad || ad.asOf === null) {
+    return (
+      <Typography variant="body2" color="text.secondary">
+        Advances/Declines: —
+      </Typography>
+    );
+  }
+
+  const ratioText = ad.ratio !== null ? ` (A/D: ${ad.ratio.toFixed(2)})` : '';
+  const adColor = ad.ratio !== null ? (ad.ratio >= 1 ? 'success.main' : 'warning.main') : 'text.secondary';
+
+  return (
+    <Tooltip title={`Advance/Decline breadth from mainboard stock prices as of ${ad.asOf}`} arrow>
+      <Typography variant="body2" color={adColor} fontWeight={600}>
+        {`Advances: ${ad.advances.toLocaleString()} / Declines: ${ad.declines.toLocaleString()}${ratioText}`}
+      </Typography>
+    </Tooltip>
+  );
+}
+
+/**
+ * NR-21: Health score trend widget — shows delta from prior day and a 5-point sparkline.
+ * Renders "43 ↓ from 51 yesterday" and a tiny inline SVG line.
+ * Honest "no prior data" when <2 snapshots.
+ */
+function HealthScoreTrend({
+  currentScore,
+  priorScore,
+  history,
+}: {
+  currentScore: number | null;
+  priorScore: number | null;
+  history: number[] | null | undefined;
+}) {
+  if (currentScore === null) return null;
+
+  const hasPrior = priorScore !== null;
+  const delta = hasPrior ? currentScore - priorScore! : null;
+  const deltaLabel = delta === null
+    ? 'No prior data available'
+    : delta === 0
+      ? 'unchanged from yesterday'
+      : delta > 0
+        ? `↑ ${delta > 0 ? '+' : ''}${delta} from ${priorScore} yesterday`
+        : `↓ ${delta} from ${priorScore} yesterday`;
+  const deltaColor = delta === null ? 'text.secondary' : delta > 0 ? 'success.main' : delta < 0 ? 'error.main' : 'text.secondary';
+
+  const hasHistory = Array.isArray(history) && history.length >= 2;
+
+  return (
+    <Stack direction="row" spacing={1.5} alignItems="center">
+      <Typography variant="body2" color={deltaColor} fontWeight={600}>
+        {deltaLabel}
+      </Typography>
+      {hasHistory && <MiniSparkline values={history!} />}
+    </Stack>
+  );
+}
+
+/** Tiny inline SVG sparkline for health score history. */
+function MiniSparkline({ values }: { values: number[] }) {
+  const W = 72;
+  const H = 24;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  const pts = values.map((v, i) => {
+    const x = (i / (values.length - 1)) * W;
+    const y = H - ((v - min) / range) * H;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  });
+  return (
+    <Tooltip title={`5-day health scores: ${values.join(', ')}`} arrow>
+      <svg width={W} height={H} style={{ display: 'block', overflow: 'visible' }}>
+        <polyline
+          points={pts.join(' ')}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          style={{ opacity: 0.7 }}
+        />
+        {pts.map((pt, i) => {
+          const [x, y] = pt.split(',').map(Number);
+          return <circle key={i} cx={x} cy={y} r={2.5} fill="currentColor" style={{ opacity: 0.85 }} />;
+        })}
+      </svg>
+    </Tooltip>
   );
 }
 
@@ -736,10 +894,15 @@ function RankingTable<T>({ rows, columns, renderRow }: { rows: T[]; columns: str
 }
 
 function ScoreCard({ label, value }: { label: string; value: ReactNode }) {
+  // If value is a Stack/Box already (NR-21 health trend), render it directly;
+  // otherwise wrap in the standard h6 typography.
+  const isComposite = value !== null && typeof value === 'object';
   return (
     <Paper variant="outlined" sx={{ p: 2 }}>
       <Typography variant="caption" color="text.secondary">{label}</Typography>
-      <Typography variant="h6" fontWeight={800}>{value}</Typography>
+      {isComposite
+        ? value
+        : <Typography variant="h6" fontWeight={800}>{value}</Typography>}
     </Paper>
   );
 }

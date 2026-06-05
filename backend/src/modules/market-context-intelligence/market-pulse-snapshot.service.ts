@@ -1,6 +1,7 @@
 import { latestCompletedTradingDateForRegion } from '../market-data-foundation';
 import { MarketPulseSnapshotRepository } from './market-pulse-snapshot.repository';
 import type {
+  MarketPulseAdvanceDeclineSummary,
   MarketPulseBreadthSummary,
   MarketPulseCalculationData,
   MarketPulseCalculationOptions,
@@ -20,6 +21,7 @@ import type {
   MarketPulseSourceImport,
   MarketPulseSourceSummary,
   MarketPulseStockUniverseItem,
+  MarketPulseVixSummary,
 } from './market-pulse-snapshot.types';
 
 type FreshnessResult = {
@@ -40,6 +42,9 @@ type ComponentResult<T> = {
 const REQUIRED_SOURCE_SEGMENTS = ['CM', 'INDEX', 'SECTOR_INDEX'] as const;
 const ALL_SOURCE_SEGMENTS = ['CM', 'INDEX', 'SECTOR_INDEX', 'DELIVERY'] as const;
 const HIGH_DELIVERY_THRESHOLD = 50;
+const VIX_SYMBOL = 'NSE_INDEX_INDIA_VIX';
+/** VIX above this threshold caps market posture at NEUTRAL (FRAGILE label). */
+const VIX_HIGH_THRESHOLD = 22;
 
 export class MarketPulseSnapshotService {
   // Leveraged / inverse / factor / thematic index slices that should NOT appear in the
@@ -67,8 +72,9 @@ export class MarketPulseSnapshotService {
 
   async latestSnapshot(scope: MarketPulseScope): Promise<MarketPulseSnapshotEnvelope> {
     const normalized = this.normalizeScope(scope);
-    const row = await this.repository.latestSnapshot(normalized);
-    if (!row) {
+    // NR-21: Load up to 6 snapshots so we can compute prior-day delta and 5-point sparkline.
+    const rows = await this.repository.snapshotHistory({ ...normalized, limit: 6 });
+    if (rows.length === 0) {
       return {
         availability: 'EMPTY',
         scope: normalized,
@@ -78,12 +84,17 @@ export class MarketPulseSnapshotService {
       };
     }
 
+    const latest = rows[0];
+    // rows are newest-first; reverse to oldest-first for the sparkline history array.
+    const healthHistory = rows.map((r) => r.marketHealthScore).reverse();
+    const priorHealthScore = rows.length >= 2 ? rows[1].marketHealthScore : null;
+
     return {
       availability: 'READY',
       scope: normalized,
-      snapshot: this.toDto(row),
+      snapshot: this.toDto(latest, priorHealthScore, healthHistory),
       message: 'Persisted Market Pulse snapshot loaded.',
-      warnings: row.warningsJson,
+      warnings: latest.warningsJson,
     };
   }
 
@@ -93,7 +104,7 @@ export class MarketPulseSnapshotService {
     return {
       availability: snapshots.length > 0 ? 'READY' : 'EMPTY',
       scope: normalized,
-      snapshots: snapshots.map((snapshot) => this.toDto(snapshot)),
+      snapshots: snapshots.map((snapshot) => this.toDto(snapshot, null, [])),
       message: snapshots.length > 0 ? 'Persisted Market Pulse history loaded.' : 'No persisted Market Pulse history exists for this scope.',
       warnings: snapshots.length > 0 ? [] : ['Run MARKET_PULSE_REFRESH to create the first snapshot.'],
     };
@@ -121,6 +132,8 @@ export class MarketPulseSnapshotService {
     const breadth = this.calculateBreadth(data.stockUniverse, data.stockPrices);
     const delivery = this.calculateDelivery(data.deliverySnapshots);
     const candidateCount = this.calculateCandidateCount(data.stockUniverse, data.stockPrices, sectorStrength.rows || [], freshness.dataThroughDate);
+    const vixSummary = this.calculateVixSummary(data.indexPrices);
+    const advanceDecline = this.calculateAdvanceDecline(data.stockUniverse, data.stockPrices);
     const warnings = this.uniqueStrings([
       ...freshness.warnings,
       ...indexTrend.warnings,
@@ -138,6 +151,10 @@ export class MarketPulseSnapshotService {
       + freshness.score * 0.10
     );
 
+    // NR-22: VIX posture modifier — cap market label at FRAGILE when VIX > VIX_HIGH_THRESHOLD.
+    const baseLabel = this.downgradeLabelForFreshness(this.marketHealthLabelForScore(marketHealthScore), freshness.status);
+    const marketHealthLabel = this.applyVixPostureCap(baseLabel, vixSummary);
+
     return {
       snapshotDate,
       dataThroughDate: freshness.dataThroughDate || this.latestEvidenceDate(data) || snapshotDate,
@@ -147,7 +164,7 @@ export class MarketPulseSnapshotService {
       timeframe: normalized.timeframe,
       status,
       marketHealthScore,
-      marketHealthLabel: this.downgradeLabelForFreshness(this.marketHealthLabelForScore(marketHealthScore), freshness.status),
+      marketHealthLabel,
       indexTrendScore: Math.round(indexTrend.score),
       sectorStrengthScore: Math.round(sectorStrength.score),
       breadthScore: Math.round(breadth.score),
@@ -161,6 +178,8 @@ export class MarketPulseSnapshotService {
       candidateCount,
       warningsJson: warnings,
       sourceSummaryJson: freshness.sourceSummary,
+      vixSummaryJson: vixSummary,
+      advanceDeclineJson: advanceDecline,
       pipelineRunId: options.pipelineRunId ?? null,
     };
   }
@@ -271,8 +290,11 @@ export class MarketPulseSnapshotService {
     // Exclude leveraged/inverse/factor/ESG slices: they are not the headline market
     // overview a trader expects, and inverse indices move OPPOSITE the market — so
     // including them in the momentum average corrupts the health score.
-    const headlineRows = allRows.filter((row) => !MarketPulseSnapshotService.INDEX_NOISE.test(row.symbol));
-    const scoringRows = headlineRows.length >= 3 ? headlineRows : allRows;
+    // Also exclude the VIX — it is a volatility index, not a price trend index.
+    const headlineRows = allRows.filter(
+      (row) => !MarketPulseSnapshotService.INDEX_NOISE.test(row.symbol) && row.symbol !== VIX_SYMBOL,
+    );
+    const scoringRows = headlineRows.length >= 3 ? headlineRows : allRows.filter((row) => row.symbol !== VIX_SYMBOL);
 
     const priorityOf = (symbol: string) => {
       const idx = MarketPulseSnapshotService.INDEX_PRIORITY.indexOf(symbol);
@@ -430,6 +452,78 @@ export class MarketPulseSnapshotService {
     return count;
   }
 
+  /**
+   * NR-22: Extract India VIX from the index prices (source NSE_INDEX_EOD, symbol NSE_INDEX_INDIA_VIX).
+   * Computes latest value + 5-day high/low range.
+   */
+  private calculateVixSummary(indexPrices: MarketPulsePricePoint[]): MarketPulseVixSummary {
+    const series = indexPrices
+      .filter((p) => p.symbol === VIX_SYMBOL)
+      .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+
+    if (series.length === 0) {
+      return { latest: null, low5d: null, high5d: null, asOf: null, posture: 'UNAVAILABLE' };
+    }
+
+    const latest = series[0].close;
+    const window5d = series.slice(0, 5).map((p) => p.close);
+    const low5d = Math.min(...window5d);
+    const high5d = Math.max(...window5d);
+    const asOf = this.dateKey(series[0].timestamp);
+
+    let posture: MarketPulseVixSummary['posture'];
+    if (latest > VIX_HIGH_THRESHOLD) posture = 'HIGH';
+    else if (latest >= 15) posture = 'ELEVATED';
+    else posture = 'CALM';
+
+    return { latest, low5d, high5d, asOf, posture };
+  }
+
+  /**
+   * NR-22: Cap the market health label at FRAGILE when VIX > VIX_HIGH_THRESHOLD.
+   * Documented: when VIX > 22, the market posture is capped at NEUTRAL (FRAGILE label)
+   * regardless of the underlying score, because elevated fear invalidates HEALTHY/TRADABLE reads.
+   */
+  private applyVixPostureCap(label: MarketPulseHealthLabel, vix: MarketPulseVixSummary): MarketPulseHealthLabel {
+    if (vix.posture !== 'HIGH') return label;
+    if (label === 'HEALTHY' || label === 'TRADABLE_BUT_SELECTIVE') return 'FRAGILE';
+    return label;
+  }
+
+  /**
+   * NR-23: Compute advances/declines from latest stock prices.
+   * A stock "advances" if its latest close is higher than the prior close (1-day change > 0).
+   */
+  private calculateAdvanceDecline(
+    stockUniverse: MarketPulseStockUniverseItem[],
+    prices: MarketPulsePricePoint[],
+  ): MarketPulseAdvanceDeclineSummary {
+    const groups = this.groupPrices(prices);
+    const universeSymbols = new Set(stockUniverse.map((s) => s.symbol));
+    let advances = 0;
+    let declines = 0;
+    let latestDate: Date | null = null;
+
+    for (const [symbol, series] of groups.entries()) {
+      if (!universeSymbols.has(symbol)) continue;
+      if (series.length < 2) continue;
+      const today = series[0];
+      const yesterday = series[1];
+      if (!this.isNumber(today.close) || !this.isNumber(yesterday.close) || yesterday.close <= 0) continue;
+      if (!latestDate || today.timestamp > latestDate) latestDate = today.timestamp;
+      if (today.close > yesterday.close) advances += 1;
+      else if (today.close < yesterday.close) declines += 1;
+    }
+
+    const total = advances + declines;
+    return {
+      advances,
+      declines,
+      ratio: total > 0 ? Math.round((advances / Math.max(declines, 1)) * 100) / 100 : null,
+      asOf: latestDate ? this.dateKey(latestDate) : null,
+    };
+  }
+
   private snapshotStatus(hasAnyPriceEvidence: boolean, freshnessStatus: MarketPulseSnapshotStatus, warnings: string[]): MarketPulseSnapshotStatus {
     if (!hasAnyPriceEvidence) return 'FAILED';
     if (freshnessStatus === 'FAILED') return 'FAILED';
@@ -574,7 +668,7 @@ export class MarketPulseSnapshotService {
     };
   }
 
-  private toDto(row: MarketPulseSnapshotRecord): MarketPulseSnapshotDto {
+  private toDto(row: MarketPulseSnapshotRecord, priorHealthScore: number | null = null, healthScoreHistory: number[] = []): MarketPulseSnapshotDto {
     return {
       snapshotDate: this.dateKey(row.snapshotDate),
       dataThroughDate: this.dateKey(row.dataThroughDate),
@@ -595,6 +689,10 @@ export class MarketPulseSnapshotService {
       candidateCount: row.candidateCount,
       warnings: row.warningsJson,
       sourceSummary: row.sourceSummaryJson,
+      vixSummary: row.vixSummaryJson,
+      advanceDecline: row.advanceDeclineJson,
+      priorHealthScore,
+      healthScoreHistory: healthScoreHistory.length >= 2 ? healthScoreHistory : [],
       pipelineRunId: row.pipelineRunId,
     };
   }

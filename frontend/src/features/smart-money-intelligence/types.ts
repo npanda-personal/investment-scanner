@@ -2,7 +2,12 @@ export type SmartMoneyStatus = 'ACCUMULATION' | 'NEUTRAL' | 'DISTRIBUTION' | 'IN
 export type SmartMoneyConfidence = 'LOW' | 'MEDIUM' | 'HIGH';
 export type SmartMoneyDataStatus = 'COMPLETE' | 'PARTIAL' | 'MISSING' | 'ERROR';
 export type SmartMoneyRange = '1M' | '3M' | '6M';
-export type SectorSmartMoneyStatus = 'ACCUMULATING' | 'NEUTRAL' | 'DISTRIBUTING';
+export type SectorSmartMoneyStatus =
+  | 'STRONG_ACCUMULATION'
+  | 'ACCUMULATING'
+  | 'NEUTRAL'
+  | 'DISTRIBUTING'
+  | 'STRONG_DISTRIBUTION';
 
 export interface SmartMoneySignal {
   type: string;

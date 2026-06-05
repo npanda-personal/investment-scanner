@@ -876,6 +876,8 @@ model MarketPulseSnapshot {
   weakSectorsJson            Json     @default("[]")
   breadthSummaryJson         Json     @default("{}")
   deliverySummaryJson        Json     @default("{}")
+  vixSummaryJson             Json?
+  advanceDeclineJson         Json?
   candidateCount             Int      @default(0)
   warningsJson               Json     @default("[]")
   sourceSummaryJson          Json     @default("{}")

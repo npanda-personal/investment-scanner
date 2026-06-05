@@ -41,6 +41,21 @@ export interface MarketPulseIndexRow {
   freshness?: string | null;
 }
 
+export interface MarketPulseVixSummary {
+  latest: number | null;
+  low5d: number | null;
+  high5d: number | null;
+  asOf: string | null;
+  posture: 'CALM' | 'ELEVATED' | 'HIGH' | 'UNAVAILABLE';
+}
+
+export interface MarketPulseAdvanceDeclineSummary {
+  advances: number;
+  declines: number;
+  ratio: number | null;
+  asOf: string | null;
+}
+
 export interface MarketPulseSnapshot {
   snapshotDate: string;
   dataThroughDate: string;
@@ -60,6 +75,14 @@ export interface MarketPulseSnapshot {
     dataThroughDate?: string | null;
     latestCompletedTradingDate?: string | null;
   } | null;
+  /** NR-22: India VIX summary. */
+  vixSummary?: MarketPulseVixSummary | null;
+  /** NR-23: Advance/Decline headline counts. */
+  advanceDecline?: MarketPulseAdvanceDeclineSummary | null;
+  /** NR-21: Prior-day market health score. */
+  priorHealthScore?: number | null;
+  /** NR-21: Last 5 daily health scores oldest-first for sparkline. */
+  healthScoreHistory?: number[] | null;
 }
 
 export interface SectorIntelligenceSnapshot {

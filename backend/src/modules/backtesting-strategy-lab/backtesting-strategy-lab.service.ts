@@ -53,10 +53,13 @@ import type {
   CreateBacktestStrategyRequest,
   EquityCurvePoint,
   HistoricalBar,
+  MonthlyReturnCell,
+  RegimePerformanceRow,
   RunBacktestRequest,
   UpdateBacktestStrategyRequest,
   WalkForwardResult,
   WalkForwardSegmentResult,
+  WilsonCI,
 } from './backtesting-strategy-lab.types';
 import { validateConfig, validateStrategyInput } from './backtesting-strategy-lab.validation';
 
@@ -540,6 +543,14 @@ export class BacktestingStrategyLabService {
       ? this.computeWalkForward(config, histories, dates, regimeIndex)
       : undefined;
 
+    // NR-32: monthly return grid + regime-segmented breakdown.
+    const sampledCurve = this.sampleCurve(curve);
+    const monthlyReturns = this.computeMonthlyReturns(curve);
+    const regimePerformance = this.computeRegimePerformance(trades, curve, regimeIndex, config);
+
+    // NR-33: zero-exit anomaly flag.
+    const zeroExitAnomaly = this.detectZeroExitAnomaly(config, trades);
+
     return {
       metrics: {
         ...baseMetrics,
@@ -550,10 +561,13 @@ export class BacktestingStrategyLabService {
         realismWarnings: this.realismWarnings(trades, benchmarkComparison, dataCoverage, baseMetrics, config, regimeMissingBarCount, totalBarCount, warmUpBarCount, liquidityUnknownBarCount),
         availabilityStatus: this.availabilityStatus(config, histories.size, insufficientHistoryCount, missingPriceHistoryCount),
         universeSummary,
+        monthlyReturns,
+        ...(regimePerformance.length > 0 ? { regimePerformance } : {}),
+        zeroExitAnomaly,
         ...(walkForward !== undefined ? { walkForward } : {}),
       },
       trades,
-      equityCurve: this.sampleCurve(curve),
+      equityCurve: sampledCurve,
     };
   }
 
@@ -697,15 +711,33 @@ export class BacktestingStrategyLabService {
     const grossWin = wins.reduce((sum, trade) => sum + trade.netPnL, 0);
     const grossLoss = Math.abs(losses.reduce((sum, trade) => sum + trade.netPnL, 0));
     const profitFactor = losses.length > 0 ? (grossLoss > 0 ? grossWin / grossLoss : null) : (wins.length > 0 ? PERFECT_PROFIT_FACTOR : null);
+    const cagr = years > 0 ? Math.pow(1 + totalReturn, 1 / years) - 1 : null;
+    const maxDrawdown = Math.min(0, ...curve.map((point) => point.drawdownPercent));
+    const finiteVolatility = Number.isFinite(volatility) ? volatility : null;
+    // NR-32 — Sortino: downside deviation uses only returns below the daily risk-free rate
+    const downsideReturns = returns.filter((r) => r < DAILY_RISK_FREE_RATE);
+    const downsideDeviation = downsideReturns.length > 1
+      ? Math.sqrt(downsideReturns.reduce((sum, r) => sum + Math.pow(r - DAILY_RISK_FREE_RATE, 2), 0) / (downsideReturns.length - 1)) * Math.sqrt(252)
+      : null;
+    const sortinoRatio = downsideDeviation !== null && downsideDeviation > 0
+      ? ((avgReturn - DAILY_RISK_FREE_RATE) * 252) / downsideDeviation
+      : null;
+    // NR-32 — Calmar: CAGR / |maxDrawdown|
+    const calmarRatio = cagr !== null && maxDrawdown < 0 ? cagr / Math.abs(maxDrawdown) : null;
+    const winRate = trades.length > 0 ? wins.length / trades.length : null;
     return {
       totalReturn,
-      cagr: years > 0 ? Math.pow(1 + totalReturn, 1 / years) - 1 : null,
-      maxDrawdown: Math.min(0, ...curve.map((point) => point.drawdownPercent)),
-      volatility: Number.isFinite(volatility) ? volatility : null,
+      cagr,
+      maxDrawdown,
+      volatility: finiteVolatility,
       // Fix #2: Sharpe ratio subtracts risk-free rate (6.5% p.a. for IN).
       // annualisedExcess = (avgDailyReturn - dailyRf) * 252
       sharpeRatio: volatility > 0 ? ((avgReturn - DAILY_RISK_FREE_RATE) * 252) / volatility : null,
-      winRate: trades.length > 0 ? wins.length / trades.length : null,
+      calmarRatio: Number.isFinite(calmarRatio) ? calmarRatio : null,
+      sortinoRatio: Number.isFinite(sortinoRatio) ? sortinoRatio : null,
+      winRate,
+      // NR-33: Wilson 95% CI on win rate
+      winRateCI: trades.length > 0 ? this.wilsonCI(wins.length, trades.length) : undefined,
       averageWin: wins.length > 0 ? wins.reduce((sum, trade) => sum + trade.netPnL, 0) / wins.length : null,
       averageLoss: losses.length > 0 ? losses.reduce((sum, trade) => sum + trade.netPnL, 0) / losses.length : null,
       profitFactor,
@@ -717,6 +749,124 @@ export class BacktestingStrategyLabService {
       worstTrade: trades.length > 0 ? Math.min(...trades.map((trade) => trade.returnPercent)) : null,
       exitDiagnostics: this.exitDiagnostics(trades),
     };
+  }
+
+  /**
+   * NR-33: Wilson score 95% confidence interval on the win rate.
+   * Formula: (p̂ + z²/2n ± z√(p̂(1-p̂)/n + z²/4n²)) / (1 + z²/n)  where z = 1.96.
+   */
+  wilsonCI(wins: number, n: number): WilsonCI {
+    const z = 1.96;
+    const z2 = z * z;
+    const p = n > 0 ? wins / n : 0;
+    const center = (p + z2 / (2 * n)) / (1 + z2 / n);
+    const margin = (z / (1 + z2 / n)) * Math.sqrt(p * (1 - p) / n + z2 / (4 * n * n));
+    return {
+      lower: Math.max(0, center - margin),
+      upper: Math.min(1, center + margin),
+      n,
+      lowSample: n < 30,
+    };
+  }
+
+  /**
+   * NR-32: Compute a month-by-month return grid from the equity curve.
+   * For each calendar month with at least 2 equity-curve points, the return
+   * is (last equity / first equity) - 1.
+   */
+  private computeMonthlyReturns(curve: EquityCurvePoint[]): MonthlyReturnCell[] {
+    if (curve.length < 2) return [];
+    const byMonth = new Map<string, EquityCurvePoint[]>();
+    for (const point of curve) {
+      const key = point.date.slice(0, 7); // YYYY-MM
+      const bucket = byMonth.get(key) ?? [];
+      bucket.push(point);
+      byMonth.set(key, bucket);
+    }
+    const cells: MonthlyReturnCell[] = [];
+    for (const [key, points] of byMonth.entries()) {
+      const year = Number(key.slice(0, 4));
+      const month = Number(key.slice(5, 7));
+      if (points.length < 2) {
+        const prevKey = new Date(year, month - 2, 1).toISOString().slice(0, 7);
+        const prevPoints = byMonth.get(prevKey);
+        if (prevPoints && prevPoints.length > 0) {
+          const startEquity = prevPoints[prevPoints.length - 1].equity;
+          const endEquity = points[points.length - 1].equity;
+          cells.push({ year, month, returnPercent: startEquity > 0 ? (endEquity - startEquity) / startEquity : null });
+        } else {
+          cells.push({ year, month, returnPercent: null });
+        }
+      } else {
+        const startEquity = points[0].equity;
+        const endEquity = points[points.length - 1].equity;
+        cells.push({ year, month, returnPercent: startEquity > 0 ? (endEquity - startEquity) / startEquity : null });
+      }
+    }
+    cells.sort((a, b) => a.year !== b.year ? a.year - b.year : a.month - b.month);
+    return cells;
+  }
+
+  /**
+   * NR-32: Compute per-regime performance breakdown.
+   * Groups trades by the regime active at their entry date and computes
+   * win rate + approximate CAGR per regime.
+   */
+  private computeRegimePerformance(
+    trades: BacktestTrade[],
+    curve: EquityCurvePoint[],
+    regimeIndex: RegimeSnapshotRow[],
+    config: BacktestStrategyConfig,
+  ): RegimePerformanceRow[] {
+    if (regimeIndex.length === 0 || trades.length === 0) return [];
+    const regimeForDate = (date: string): string => {
+      const row = this.regimeAsOf(regimeIndex, date);
+      return row ? row.regime : 'UNKNOWN';
+    };
+    const tradesByRegime = new Map<string, BacktestTrade[]>();
+    for (const trade of trades) {
+      const regime = regimeForDate(trade.entryDate);
+      const bucket = tradesByRegime.get(regime) ?? [];
+      bucket.push(trade);
+      tradesByRegime.set(regime, bucket);
+    }
+    const curveDates = new Set(curve.map((pt) => pt.date.slice(0, 7)));
+    const regimeMonths = new Map<string, Set<string>>();
+    for (const ym of curveDates) {
+      const sampleDate = `${ym}-15`;
+      const row = this.regimeAsOf(regimeIndex, sampleDate);
+      const regime = row ? row.regime : 'UNKNOWN';
+      const bucket = regimeMonths.get(regime) ?? new Set<string>();
+      bucket.add(ym);
+      regimeMonths.set(regime, bucket);
+    }
+    const rows: RegimePerformanceRow[] = [];
+    for (const [regime, regimeTrades] of tradesByRegime.entries()) {
+      const wins = regimeTrades.filter((t) => t.netPnL > 0).length;
+      const winRate = regimeTrades.length > 0 ? wins / regimeTrades.length : null;
+      const activeMonths = regimeMonths.get(regime)?.size ?? 0;
+      const totalNetPnL = regimeTrades.reduce((sum, t) => sum + t.netPnL, 0);
+      const approxReturn = config.initialCapital > 0 ? totalNetPnL / config.initialCapital : 0;
+      const years = activeMonths / 12;
+      const cagr = years > 0 ? Math.pow(1 + approxReturn, 1 / years) - 1 : null;
+      rows.push({ regime, cagr: Number.isFinite(cagr) ? cagr : null, winRate, numberOfTrades: regimeTrades.length, activeMonths });
+    }
+    rows.sort((a, b) => b.numberOfTrades - a.numberOfTrades);
+    return rows;
+  }
+
+  /**
+   * NR-33: zero-exit anomaly — stop/trailing/TP were configured (non-zero) but
+   * all exits were strategy/SMA-cross or max-holding-period.
+   */
+  detectZeroExitAnomaly(config: BacktestStrategyConfig, trades: BacktestTrade[]): boolean {
+    const hasStopConfigured = (typeof config.stopLossPercent === 'number' && config.stopLossPercent > 0)
+      || (typeof config.trailingStopPercent === 'number' && config.trailingStopPercent > 0)
+      || (typeof config.takeProfitPercent === 'number' && config.takeProfitPercent > 0);
+    if (!hasStopConfigured || trades.length === 0) return false;
+    const diagnostics = this.exitDiagnostics(trades);
+    const stopExitTotal = diagnostics.stopLossExitCount + diagnostics.trailingStopExitCount + diagnostics.takeProfitExitCount;
+    return stopExitTotal === 0;
   }
 
   private async resolveUniverse(config: BacktestStrategyConfig): Promise<ResolvedUniverse> {

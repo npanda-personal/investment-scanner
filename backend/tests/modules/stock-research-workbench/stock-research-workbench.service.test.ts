@@ -83,6 +83,7 @@ describe('StockResearchWorkbenchService metrics', () => {
         data_status: 'COMPLETE',
       })),
       listPricesByInstrumentId: jest.fn(async (id: string) => id === 'main' ? mainPrices : peerPrices),
+      list: jest.fn(async () => ({ stocks: [{ id: 'peer', symbol: 'PEER', company_name: 'Peer Co', exchange: 'NASDAQ', sector: 'Technology', industry: 'Software', market_cap: 500, data_status: 'COMPLETE' }], pagination: { total: 1, page: 1, pageSize: 20 } })),
       fundamentalsByInstrumentId: jest.fn(async (id: string) => ({
         records: [{
           pe_ratio: id === 'main' ? 20 : 10,
@@ -191,6 +192,7 @@ const buildWorkbenchService = (overrides: {
       last_updated_timestamp: '2026-04-28T00:00:00.000Z', data_status: 'COMPLETE',
     }),
     listPricesByInstrumentId: jest.fn(async (id: string) => id === 'main' ? mainPrices : peerPrices),
+    list: jest.fn(async () => ({ stocks: [], pagination: { total: 0, page: 1, pageSize: 20 } })),
     fundamentalsByInstrumentId: jest.fn().mockResolvedValue({ records: [{ pe_ratio: 20, dividend_yield: 0.02, data_status: 'COMPLETE', source: 'database', last_updated_timestamp: '2026-04-28T00:00:00.000Z' }] }),
     corporateActionsByInstrumentId: jest.fn().mockResolvedValue({ actions: [] }),
     listInstruments: jest.fn().mockResolvedValue({
@@ -278,5 +280,85 @@ describe('StockResearchWorkbenchService – Nifty 50 relative-strength', () => {
     // peer_average_return should be present even when index is used
     expect('peer_average_return' in rs).toBe(true);
     expect('relative_to_peer_average' in rs).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// NR-31: deriveFundamentals — derived PE / market cap / dividend yield
+// ---------------------------------------------------------------------------
+
+describe('StockResearchWorkbenchService – deriveFundamentals', () => {
+  const svc = new StockResearchWorkbenchService({} as any);
+
+  it('returns null when latestFundamental is null', () => {
+    expect(svc.deriveFundamentals(null, [], 100, [])).toBeNull();
+  });
+
+  it('computes trailing PE = close / EPS when pe_ratio is absent (annual record)', () => {
+    const fund = { eps: 50, pe_ratio: null, market_cap: null, dividend_yield: null, shares_outstanding: null, period_type: 'ANNUAL' };
+    const result = svc.deriveFundamentals(fund, [fund], 2500, []);
+    expect(result.pe_ratio).toBeCloseTo(50, 4);   // 2500 / 50
+    expect(result._pe_ratio_derived).toBe(true);
+  });
+
+  it('computes trailing PE from 4 quarterly EPS when available', () => {
+    const q = (eps: number) => ({ eps, pe_ratio: null, market_cap: null, dividend_yield: null, shares_outstanding: null, period_type: 'QUARTERLY' });
+    const records = [q(10), q(12), q(8), q(10), q(5)]; // last 4 sum = 40
+    const result = svc.deriveFundamentals(records[0], records, 1000, []);
+    expect(result.pe_ratio).toBeCloseTo(25, 4);  // 1000 / 40
+    expect(result._pe_ratio_derived).toBe(true);
+  });
+
+  it('does not override persisted pe_ratio; _pe_ratio_derived = false', () => {
+    const fund = { eps: 50, pe_ratio: 20, market_cap: null, dividend_yield: null, shares_outstanding: null, period_type: 'ANNUAL' };
+    const result = svc.deriveFundamentals(fund, [fund], 2500, []);
+    expect(result.pe_ratio).toBe(20);
+    expect(result._pe_ratio_derived).toBe(false);
+  });
+
+  it('sets pe_ratio null (not derived) when EPS is missing', () => {
+    const fund = { eps: null, pe_ratio: null, market_cap: null, dividend_yield: null, shares_outstanding: null, period_type: 'ANNUAL' };
+    const result = svc.deriveFundamentals(fund, [fund], 2500, []);
+    expect(result.pe_ratio).toBeNull();
+    expect(result._pe_ratio_derived).toBe(false);
+  });
+
+  it('computes market_cap = shares × close when market_cap is absent', () => {
+    const fund = { eps: null, pe_ratio: null, market_cap: null, dividend_yield: null, shares_outstanding: 6_750_000_000, period_type: 'ANNUAL' };
+    const result = svc.deriveFundamentals(fund, [fund], 1400, []);
+    expect(result.market_cap).toBeCloseTo(6_750_000_000 * 1400, -3);
+    expect(result._market_cap_derived).toBe(true);
+  });
+
+  it('sets market_cap null (not derived) when shares_outstanding is missing', () => {
+    const fund = { eps: null, pe_ratio: null, market_cap: null, dividend_yield: null, shares_outstanding: null, period_type: 'ANNUAL' };
+    const result = svc.deriveFundamentals(fund, [fund], 1400, []);
+    expect(result.market_cap).toBeNull();
+    expect(result._market_cap_derived).toBe(false);
+  });
+
+  it('computes dividend_yield from TTM dividends in corporate actions', () => {
+    const now = new Date();
+    const sixMonthsAgo = new Date(now);
+    sixMonthsAgo.setMonth(now.getMonth() - 6);
+    const twoYearsAgo = new Date(now);
+    twoYearsAgo.setFullYear(now.getFullYear() - 2);
+
+    const actions = [
+      { action_type: 'dividend', effective_date: sixMonthsAgo.toISOString(), amount: 14 },
+      { action_type: 'dividend', effective_date: twoYearsAgo.toISOString(), amount: 10 }, // outside TTM
+      { action_type: 'bonus', effective_date: sixMonthsAgo.toISOString(), amount: 1 },    // not dividend
+    ];
+    const fund = { eps: null, pe_ratio: null, market_cap: null, dividend_yield: null, shares_outstanding: null, period_type: 'ANNUAL' };
+    const result = svc.deriveFundamentals(fund, [fund], 1400, actions);
+    expect(result.dividend_yield).toBeCloseTo(14 / 1400, 6);  // only recent dividend
+    expect(result._dividend_yield_derived).toBe(true);
+  });
+
+  it('sets dividend_yield null (not derived) when no TTM dividends', () => {
+    const fund = { eps: null, pe_ratio: null, market_cap: null, dividend_yield: null, shares_outstanding: null, period_type: 'ANNUAL' };
+    const result = svc.deriveFundamentals(fund, [fund], 1400, []);
+    expect(result.dividend_yield).toBeNull();
+    expect(result._dividend_yield_derived).toBe(false);
   });
 });

@@ -1,6 +1,7 @@
 import type { PrismaClient } from '@prisma/client';
 import prisma from '../../db/prisma';
 import type {
+  MarketPulseAdvanceDeclineSummary,
   MarketPulseCalculationData,
   MarketPulseDeliveryPoint,
   MarketPulsePricePoint,
@@ -10,7 +11,12 @@ import type {
   MarketPulseSnapshotRecord,
   MarketPulseSourceImport,
   MarketPulseStockUniverseItem,
+  MarketPulseVixSummary,
 } from './market-pulse-snapshot.types';
+
+// Used in toRecord default values below (TS needs the types for the cast).
+const UNAVAILABLE_VIX: MarketPulseVixSummary = { latest: null, low5d: null, high5d: null, asOf: null, posture: 'UNAVAILABLE' };
+const EMPTY_AD: MarketPulseAdvanceDeclineSummary = { advances: 0, declines: 0, ratio: null, asOf: null };
 
 const PRICE_LOOKBACK_DAYS = 420;
 const DELIVERY_LOOKBACK_DAYS = 90;
@@ -77,6 +83,8 @@ export class MarketPulseSnapshotRepository {
         candidateCount: data.candidateCount,
         warningsJson: data.warningsJson,
         sourceSummaryJson: data.sourceSummaryJson,
+        vixSummaryJson: data.vixSummaryJson,
+        advanceDeclineJson: data.advanceDeclineJson,
         pipelineRunId: data.pipelineRunId,
       },
     });
@@ -312,6 +320,8 @@ export class MarketPulseSnapshotRepository {
       candidateCount: input.candidateCount,
       warningsJson: input.warningsJson,
       sourceSummaryJson: input.sourceSummaryJson,
+      vixSummaryJson: input.vixSummaryJson,
+      advanceDeclineJson: input.advanceDeclineJson,
       pipelineRunId: input.pipelineRunId ?? null,
     };
   }
@@ -341,6 +351,8 @@ export class MarketPulseSnapshotRepository {
       candidateCount: Number(row.candidateCount || 0),
       warningsJson: Array.isArray(row.warningsJson) ? row.warningsJson.map(String) : [],
       sourceSummaryJson: row.sourceSummaryJson || {},
+      vixSummaryJson: row.vixSummaryJson || UNAVAILABLE_VIX,
+      advanceDeclineJson: row.advanceDeclineJson || EMPTY_AD,
       pipelineRunId: row.pipelineRunId ?? null,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,

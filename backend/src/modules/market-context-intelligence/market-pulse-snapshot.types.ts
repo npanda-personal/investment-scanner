@@ -109,6 +109,38 @@ export interface MarketPulseSourceSummary {
   }>;
 }
 
+/** NR-22: India VIX summary (latest + 5-day range + fear posture). */
+export interface MarketPulseVixSummary {
+  /** Latest VIX close value, null if data is absent. */
+  latest: number | null;
+  /** 5-day low of VIX close values. */
+  low5d: number | null;
+  /** 5-day high of VIX close values. */
+  high5d: number | null;
+  /** Date of the latest VIX reading (YYYY-MM-DD), null if absent. */
+  asOf: string | null;
+  /**
+   * Human posture modifier:
+   *   CALM      VIX < 15
+   *   ELEVATED  VIX 15–22
+   *   HIGH      VIX > 22  → caps market posture at FRAGILE
+   *   UNAVAILABLE  no VIX data
+   */
+  posture: 'CALM' | 'ELEVATED' | 'HIGH' | 'UNAVAILABLE';
+}
+
+/** NR-23: Advance/Decline breadth headline. */
+export interface MarketPulseAdvanceDeclineSummary {
+  /** Count of IN mainboard stocks with positive 1D adjusted-close change. */
+  advances: number;
+  /** Count of IN mainboard stocks with negative 1D adjusted-close change. */
+  declines: number;
+  /** Advance/Decline ratio = advances / max(declines, 1). */
+  ratio: number | null;
+  /** Date the A/D was computed from (YYYY-MM-DD). */
+  asOf: string | null;
+}
+
 export interface MarketPulseSnapshotInput {
   snapshotDate: Date;
   dataThroughDate: Date;
@@ -132,6 +164,10 @@ export interface MarketPulseSnapshotInput {
   candidateCount: number;
   warningsJson: string[];
   sourceSummaryJson: MarketPulseSourceSummary;
+  /** NR-22: India VIX latest + 5-day range. */
+  vixSummaryJson: MarketPulseVixSummary;
+  /** NR-23: Advance/Decline counts and ratio for IN mainboard. */
+  advanceDeclineJson: MarketPulseAdvanceDeclineSummary;
   pipelineRunId?: string | null;
 }
 
@@ -161,6 +197,14 @@ export interface MarketPulseSnapshotDto {
   candidateCount: number;
   warnings: string[];
   sourceSummary: MarketPulseSourceSummary;
+  /** NR-22: India VIX summary (latest + 5D range + posture). */
+  vixSummary: MarketPulseVixSummary;
+  /** NR-23: Advance/Decline headline counts. */
+  advanceDecline: MarketPulseAdvanceDeclineSummary;
+  /** NR-21: Prior-day market health score, null if no previous snapshot exists. */
+  priorHealthScore: number | null;
+  /** NR-21: Last 5 daily health scores (oldest first), for sparkline. Empty if <2 persisted snapshots. */
+  healthScoreHistory: number[];
   pipelineRunId?: string | null;
 }
 

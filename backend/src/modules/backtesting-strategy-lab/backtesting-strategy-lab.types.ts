@@ -69,6 +69,37 @@ export interface WalkForwardResult {
   cagrDegradation: number | null;
 }
 
+/**
+ * NR-33: Wilson score 95% confidence interval for a proportion.
+ * Lower and upper bounds are both in [0, 1].
+ */
+export interface WilsonCI {
+  lower: number;
+  upper: number;
+  n: number;
+  /** True when n < 30 (low-sample flag). */
+  lowSample: boolean;
+}
+
+/** NR-32: One cell in the monthly return grid: year + month (1-based) → return. */
+export interface MonthlyReturnCell {
+  year: number;
+  /** 1-based month (1=Jan … 12=Dec). */
+  month: number;
+  /** Monthly portfolio return, or null when no equity-curve data covers that month. */
+  returnPercent: number | null;
+}
+
+/** NR-32: Per-regime performance breakdown. */
+export interface RegimePerformanceRow {
+  regime: string;
+  cagr: number | null;
+  winRate: number | null;
+  numberOfTrades: number;
+  /** Number of distinct calendar months the strategy was active in this regime. */
+  activeMonths: number;
+}
+
 export interface StrategyRule<T extends string> {
   type: T;
   threshold?: number;
@@ -172,7 +203,13 @@ export interface BacktestMetrics {
   maxDrawdown: number;
   volatility: number | null;
   sharpeRatio: number | null;
+  /** NR-32: Calmar ratio: CAGR / |maxDrawdown|. Null when maxDrawdown is 0 or CAGR is null. */
+  calmarRatio: number | null;
+  /** NR-32: Sortino ratio (annualised excess return over risk-free rate / downside deviation). */
+  sortinoRatio: number | null;
   winRate: number | null;
+  /** NR-33: Wilson 95% CI on win rate. Present whenever numberOfTrades > 0. */
+  winRateCI?: WilsonCI;
   averageWin: number | null;
   averageLoss: number | null;
   profitFactor: number | null;
@@ -204,6 +241,22 @@ export interface BacktestMetrics {
     benchmarkDataStatus: 'AVAILABLE' | 'NSE_NIFTY_50' | 'FALLBACK_EQUAL_WEIGHT' | 'UNAVAILABLE';
     dataGap?: string;
   };
+  /**
+   * NR-32: Month-by-month return grid derived from the equity curve.
+   * Rows = distinct years, columns = Jan–Dec.  Present on every completed run.
+   */
+  monthlyReturns?: MonthlyReturnCell[];
+  /**
+   * NR-32: Per-regime breakdown: CAGR + win rate split by historical regime periods.
+   * Only present when regime snapshots were available during the backtest.
+   */
+  regimePerformance?: RegimePerformanceRow[];
+  /**
+   * NR-33: Zero-exit anomaly flag: stopLoss / trailingStop / takeProfit were configured
+   * (non-zero) but generated ZERO such exits — all exits were strategy/SMA-cross
+   * or max-holding-period.  Set to true when the anomaly is detected.
+   */
+  zeroExitAnomaly?: boolean;
   realismWarnings?: string[];
   dataQualityMetadata?: {
     universeBeforeDataQualityFilter: number;

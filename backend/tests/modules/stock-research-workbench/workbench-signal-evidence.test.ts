@@ -62,6 +62,7 @@ const buildMarketDataMock = () => ({
   fundamentalsByInstrumentId: jest.fn().mockResolvedValue({ records: [{ pe_ratio: 20, dividend_yield: 0.02 }] }),
   corporateActionsByInstrumentId: jest.fn().mockResolvedValue({ actions: [] }),
   listInstruments: jest.fn().mockResolvedValue({ instruments: [] }),
+  list: jest.fn().mockResolvedValue({ stocks: [], pagination: { total: 0, page: 1, pageSize: 20 } }),
 });
 
 // ---------------------------------------------------------------------------

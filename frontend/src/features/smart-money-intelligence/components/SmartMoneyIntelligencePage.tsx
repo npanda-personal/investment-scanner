@@ -19,20 +19,49 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
-import { 
-  SearchOutlined, 
-  LaunchOutlined 
+import {
+  SearchOutlined,
+  LaunchOutlined
 } from '@mui/icons-material';
 import { Link } from 'react-router-dom';
 import { useSmartMoneyIntelligence } from '../hooks';
-import type { SectorSmartMoneySummary, SmartMoneyRange, SmartMoneyStatus, SmartMoneyStockSummary } from '../types';
+import type { SectorSmartMoneySummary, SectorSmartMoneyStatus, SmartMoneyRange, SmartMoneyStatus, SmartMoneyStockSummary } from '../types';
 import { DataTable, FilterBar, PageHeader, type DataTableColumn } from '@/shared/components';
+import { humanizeCode } from '@/shared/format/enumLabels';
 
 const statusColor = (status: SmartMoneyStatus | string) => {
   if (status === 'ACCUMULATION' || status === 'ACCUMULATING') return 'success';
   if (status === 'DISTRIBUTION' || status === 'DISTRIBUTING') return 'error';
   if (status === 'INSUFFICIENT_DATA') return 'default';
   return 'warning';
+};
+
+/**
+ * Color encoding for the 5-band sector classification.
+ * Returns MUI sx color properties so we get a full green-to-red gradient
+ * rather than the 3-value success/warning/error MUI palette.
+ */
+const sectorStatusSx = (status: SectorSmartMoneyStatus | string): { bgcolor: string; color: string } => {
+  switch (status) {
+    case 'STRONG_ACCUMULATION': return { bgcolor: '#1b5e20', color: '#fff' };
+    case 'ACCUMULATING':        return { bgcolor: '#388e3c', color: '#fff' };
+    case 'NEUTRAL':             return { bgcolor: '#f9a825', color: '#fff' };
+    case 'DISTRIBUTING':        return { bgcolor: '#e64a19', color: '#fff' };
+    case 'STRONG_DISTRIBUTION': return { bgcolor: '#b71c1c', color: '#fff' };
+    default:                    return { bgcolor: '#757575', color: '#fff' };
+  }
+};
+
+/** Human-readable label for sector classification bands. */
+const sectorStatusLabel = (status: SectorSmartMoneyStatus | string): string => {
+  switch (status) {
+    case 'STRONG_ACCUMULATION': return 'Strong Accumulation';
+    case 'ACCUMULATING':        return 'Accumulation';
+    case 'NEUTRAL':             return 'Neutral';
+    case 'DISTRIBUTING':        return 'Distribution';
+    case 'STRONG_DISTRIBUTION': return 'Strong Distribution';
+    default:                    return humanizeCode(status);
+  }
 };
 
 const fmtPercent = (value: number | null | undefined) => value === null || value === undefined ? 'N/A' : `${(value * 100).toFixed(1)}%`;
@@ -137,10 +166,10 @@ export default function SmartMoneyIntelligencePage() {
       </Alert>
 
       <FilterBar onReset={() => { setSector(''); setRange('3M'); }}>
-        <TextField 
-          select 
-          label="Range" 
-          value={range} 
+        <TextField
+          select
+          label="Range"
+          value={range}
           onChange={(event) => setRange(event.target.value as SmartMoneyRange)}
           sx={{ minWidth: 120 }}
         >
@@ -148,10 +177,10 @@ export default function SmartMoneyIntelligencePage() {
           <MenuItem value="3M">3M</MenuItem>
           <MenuItem value="6M">6M</MenuItem>
         </TextField>
-        <TextField 
-          select 
-          label="Sector" 
-          value={sector} 
+        <TextField
+          select
+          label="Sector"
+          value={sector}
           onChange={(event) => setSector(event.target.value)}
           sx={{ minWidth: 180 }}
         >
@@ -262,7 +291,13 @@ function SectorView({ sectors }: { sectors: SectorSmartMoneySummary[] }) {
               {sectors.slice(0, 12).map((sector) => (
                 <TableRow key={sector.sector}>
                   <TableCell>{sector.sector}</TableCell>
-                  <TableCell><Chip size="small" label={sector.sectorStatus} color={statusColor(sector.sectorStatus)} /></TableCell>
+                  <TableCell>
+                    <Chip
+                      size="small"
+                      label={sectorStatusLabel(sector.sectorStatus)}
+                      sx={sectorStatusSx(sector.sectorStatus)}
+                    />
+                  </TableCell>
                   <TableCell align="right">{sector.averageSmartMoneyScore}</TableCell>
                   <TableCell align="right">{sector.accumulationCount}</TableCell>
                   <TableCell align="right">{sector.distributionCount}</TableCell>
@@ -322,12 +357,11 @@ function StockDetail({ stock, loading }: { stock: SmartMoneyStockSummary | null;
         </Stack>
       )}
       <Divider sx={{ my: 2 }} />
-      <Typography variant="subtitle2">Insider / Ownership</Typography>
-      <Typography variant="body2" color="text.secondary">{stock.insiderOwnership.explanation}</Typography>
-      <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
-        <Chip size="small" label={`Ownership: ${stock.insiderOwnership.ownershipDataStatus}`} variant="outlined" />
+      <Stack direction="row" justifyContent="space-between" alignItems="center">
+        <Typography variant="subtitle2">Insider / Ownership</Typography>
         <Button size="small" component={Link} to={stock.researchUrl}>Open Research</Button>
       </Stack>
+      <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>{stock.insiderOwnership.explanation}</Typography>
     </Paper>
   );
 }

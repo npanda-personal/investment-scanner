@@ -60,6 +60,8 @@ describe('MarketPulseSnapshotRepository', () => {
         dataThroughDate: '2026-05-29',
         segments: {},
       },
+      vixSummaryJson: { latest: 14.5, low5d: 13.2, high5d: 16.1, asOf: '2026-05-29', posture: 'CALM' },
+      advanceDeclineJson: { advances: 150, declines: 80, ratio: 1.88, asOf: '2026-05-29' },
       pipelineRunId: 'run-1',
     });
 
