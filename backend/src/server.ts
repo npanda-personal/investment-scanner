@@ -4,6 +4,7 @@ import { appConfig } from './config/env';
 import {
   startMarketDataStartupLoads,
 } from './modules/market-data-foundation/market-data-foundation.scheduler';
+import { startEodIngestScheduler } from './modules/market-context-intelligence/eod-ingest.scheduler';
 
 export const createHttpServer = (): http.Server => {
   const app = createApp();
@@ -18,6 +19,7 @@ export const startServer = (port = appConfig.port): http.Server => {
     startMarketDataStartupLoads().catch((error) => {
       console.error('[MarketDataStartup] failed to start market-data startup loads', error);
     });
+    startEodIngestScheduler();
   });
 
   return server;
