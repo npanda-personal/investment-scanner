@@ -3,13 +3,15 @@ import { MarketContextIntelligenceService } from '../market-context-intelligence
 import { SignalGenerationEngineService } from '../signal-generation-engine';
 import { SmartMoneyIntelligenceService } from '../smart-money-intelligence';
 import { StrategyFrameworkService } from '../strategy-framework';
+import { SignalCalibrationEngineService } from '../signal-calibration-engine';
 import prisma from '../../db/prisma';
 import type { StrategyDecisionDto, StrategyQuery } from '../strategy-decision-engine';
-import type { 
-  ResearchOverview, 
-  MarketReadiness, 
-  ResearchPriorities, 
-  ConfirmationSummary, 
+import type { CalibrationHealthResponse } from '../signal-calibration-engine';
+import type {
+  ResearchOverview,
+  MarketReadiness,
+  ResearchPriorities,
+  ConfirmationSummary,
   NextAction,
   ResearchWhatChanged,
   ResearchPriorityCandidate,
@@ -31,6 +33,7 @@ export class ResearchHubService {
     private readonly signalService = new SignalGenerationEngineService(),
     private readonly smartMoneyService = new SmartMoneyIntelligenceService(),
     private readonly strategyFrameworkService = new StrategyFrameworkService(),
+    private readonly calibrationService = new SignalCalibrationEngineService(),
     private readonly db = prisma
   ) {}
 
@@ -39,7 +42,18 @@ export class ResearchHubService {
     const assetType = query.assetType || 'STOCK';
     if (!query.live) {
       const cached = await this.loadCachedOverview(region, assetType);
-      if (cached) return cached;
+      if (cached) {
+        // NR-52: re-diff the two most recent persisted snapshots at read time so that
+        // whatChanged is never frozen from an old build.  The snapshot itself is still
+        // served from cache (persisted-read); only the diff is re-computed live.
+        const freshWhatChanged = await this.buildWhatChangedFromStoredSnapshots(
+          cached.researchPriorities,
+          cached.marketReadiness,
+          region,
+          assetType,
+        );
+        return { ...cached, whatChanged: freshWhatChanged };
+      }
       return this.emptyOverview(['Research overview snapshot is not ready yet. Run the backend pipeline to materialize this dashboard.']);
     }
     return this.buildOverview({ region, assetType });
@@ -170,7 +184,8 @@ export class ResearchHubService {
 
     // 5. Next Actions
     const nextActions: NextAction[] = this.generateNextActions(marketReadiness, priorities, dataGaps, strategyProofSummary);
-    const actionability = this.buildActionability(marketReadiness, priorities, strategyProofSummary, confirmationSummary, dataGaps, nextActions);
+    const calibrationHealth = await this.calibrationService.health().catch(() => null);
+    const actionability = this.buildActionability(marketReadiness, priorities, strategyProofSummary, confirmationSummary, dataGaps, nextActions, calibrationHealth);
 
     return {
       actionability,
@@ -308,49 +323,70 @@ export class ResearchHubService {
     assetType: string,
   ): Promise<ResearchWhatChanged> {
     const priorOverview = await this.loadPriorOverview(region, assetType);
+    return this.diffOverviews(currentPriorities, currentReadiness, priorOverview);
+  }
+
+  private candidateKey(c: ResearchPriorityCandidate): string {
+    return `${c.instrumentId || c.symbol}-${c.strategy}`;
+  }
+
+  /**
+   * NR-52: Build a fresh diff by loading the current + prior persisted snapshots from
+   * the database.  Used on the persisted-read (live=false) path so that whatChanged is
+   * never frozen from the time the snapshot was originally built.
+   *
+   * Priority order for the "prior" snapshot:
+   *   1. The dedicated prior-key slot (written by saveCachedOverview when ≥2 refreshes ran)
+   *   2. If no prior-key exists, we only have one snapshot — return the honest "no prior" message.
+   */
+  private async buildWhatChangedFromStoredSnapshots(
+    currentPriorities: ResearchPriorities,
+    currentReadiness: MarketReadiness,
+    region: string,
+    assetType: string,
+  ): Promise<ResearchWhatChanged> {
+    const priorOverview = await this.loadPriorOverview(region, assetType);
+    return this.diffOverviews(currentPriorities, currentReadiness, priorOverview);
+  }
+
+  /**
+   * Core diff logic, shared by both buildWhatChanged (build path) and
+   * buildWhatChangedFromStoredSnapshots (read path).
+   */
+  private diffOverviews(
+    currentPriorities: ResearchPriorities,
+    currentReadiness: MarketReadiness,
+    priorOverview: ResearchOverview | null,
+  ): ResearchWhatChanged {
     if (!priorOverview) {
       return {
         newTradeCandidates: [],
         downgradedCandidates: [],
         marketGateChange: null,
-        warnings: ['No prior snapshot to compare yet; run the pipeline again to see what changed.'],
+        warnings: ['No prior snapshot to compare yet; run the pipeline refresh a second time to see what changed.'],
       };
     }
 
     const priorTradeCandidates = priorOverview.researchPriorities?.tradeCandidates || [];
     const currentCandidates = currentPriorities.tradeCandidates;
 
-    // Keys: instrumentId-strategy (stable enough for diff; symbol alone could collide for multi-strategy)
-    const priorKeySet = new Set<string>(
-      priorTradeCandidates.map(c => this.candidateKey(c))
-    );
-    const currentKeySet = new Set<string>(
-      currentCandidates.map(c => this.candidateKey(c))
-    );
+    const priorKeySet = new Set<string>(priorTradeCandidates.map(c => this.candidateKey(c)));
+    const currentKeySet = new Set<string>(currentCandidates.map(c => this.candidateKey(c)));
 
-    // New: present in current but absent from prior
     const newTradeCandidates = currentCandidates
       .filter(c => !priorKeySet.has(this.candidateKey(c)))
       .map(c => c.symbol || '');
 
-    // Downgraded:
-    //   (a) Was a trade candidate before, is no longer in trade candidates now
-    //   (b) Was in trade candidates before, decisionScore / readinessLabel dropped
     const downgradedCandidates: string[] = [];
-
     for (const priorCand of priorTradeCandidates) {
       const key = this.candidateKey(priorCand);
       const currentCand = currentKeySet.has(key)
         ? currentCandidates.find(c => this.candidateKey(c) === key)
         : undefined;
-
       if (!currentCand) {
-        // Fell out of the actionable set entirely
         downgradedCandidates.push(priorCand.symbol || '');
         continue;
       }
-
-      // Score dropped meaningfully (>= 10 points) or readiness declined
       const scoreDrop = (priorCand.decisionScore ?? 0) - (currentCand.decisionScore ?? 0);
       const readinessDropped =
         this.readinessRank(priorCand.readinessLabel) > this.readinessRank(currentCand.readinessLabel);
@@ -359,7 +395,6 @@ export class ResearchHubService {
       }
     }
 
-    // Market gate change
     const priorGate = priorOverview.marketReadiness?.marketGate;
     const currentGate = currentReadiness.marketGate;
     const marketGateChange: ResearchWhatChanged['marketGateChange'] =
@@ -373,10 +408,6 @@ export class ResearchHubService {
     }
 
     return { newTradeCandidates, downgradedCandidates, marketGateChange, warnings };
-  }
-
-  private candidateKey(c: ResearchPriorityCandidate): string {
-    return `${c.instrumentId || c.symbol}-${c.strategy}`;
   }
 
   private async loadPriorOverview(region: string, assetType: string): Promise<ResearchOverview | null> {
@@ -433,7 +464,7 @@ export class ResearchHubService {
       targetRoute: '/pipeline-ops',
     }];
     return {
-      actionability: this.buildActionability(marketReadiness, priorities, this.buildStrategyProofSummary([], marketReadiness), confirmationSummary, dataGaps, nextActions),
+      actionability: this.buildActionability(marketReadiness, priorities, this.buildStrategyProofSummary([], marketReadiness), confirmationSummary, dataGaps, nextActions, null),
       marketReadiness,
       researchPriorities: priorities,
       strategyProofSummary: this.buildStrategyProofSummary([], marketReadiness),
@@ -456,44 +487,55 @@ export class ResearchHubService {
     proof: StrategyProofSummary,
     confirmation: ConfirmationSummary,
     dataGaps: string[],
-    nextActions: NextAction[]
+    nextActions: NextAction[],
+    calibrationHealth: CalibrationHealthResponse | null
   ): ResearchActionability {
     const reviewCandidateCount = priorities.tradeCandidates.length;
     const signalCount = confirmation.signalSummary.topBullishCount + confirmation.signalSummary.topBearishCount;
+
+    // NR-41: signalEvidence — computed from real funnelDiagnostics signal counts (bullish + bearish).
+    // Status is LIMITED (not READY) because raw counts do not prove signal quality maturity.
+    const signalEvidenceDimension: ActionabilityDimension = {
+      status: signalCount > 0 ? 'LIMITED' : 'INSUFFICIENT_DATA',
+      label: 'Signal Evidence',
+      sourceModule: 'signal-quality-lab',
+      blocking: signalCount === 0,
+      count: signalCount,
+      message: signalCount > 0
+        ? `${signalCount} raw signals available (${confirmation.signalSummary.topBullishCount} bullish / ${confirmation.signalSummary.topBearishCount} bearish). Signal quality maturity evidence is not yet wired into Research Hub actionability.`
+        : 'No raw signals are available for this scope.',
+    };
+
+    // NR-41: calibrationReadiness — computed from SignalCalibrationEngineService.health().
+    // Uses real calibrated signal count and readiness status from the service.
+    const calibrationReadinessDimension: ActionabilityDimension = this.calibrationReadinessDimension(calibrationHealth);
+
+    // NR-41: todayReviewReadiness and tradePlanReadiness have no measurable data source yet.
+    // They are labelled explicitly and excluded from the aggregate (blocking: false so
+    // reduceActionability ignores them as non-blocking INSUFFICIENT_DATA).
+    const todayReviewReadinessDimension: ActionabilityDimension = {
+      status: 'INSUFFICIENT_DATA',
+      label: 'Today Review Readiness',
+      sourceModule: 'today-trade-review',
+      blocking: false,
+      message: 'Not yet measured — Today Review readiness has no stable data source wired into Research Hub.',
+    };
+    const tradePlanReadinessDimension: ActionabilityDimension = {
+      status: 'INSUFFICIENT_DATA',
+      label: 'Trade Plan Readiness',
+      sourceModule: 'trade-plan-risk-engine',
+      blocking: false,
+      message: 'Not yet measured — Trade Plan paper-readiness has no stable data source wired into Research Hub.',
+    };
+
     const dimensions = {
       marketEnvironment: this.marketEnvironmentDimension(readiness),
       dataReadiness: this.dataReadinessDimension(readiness, dataGaps),
-      signalEvidence: this.unstableDimension(
-        signalCount > 0 ? 'LIMITED' : 'INSUFFICIENT_DATA',
-        'Signal Evidence',
-        'signal-quality-lab',
-        signalCount,
-        signalCount > 0
-          ? 'Raw signal counts are available, but Signal Quality evidence maturity is not yet wired into Research Hub actionability.'
-          : 'Signal Quality evidence maturity is not yet available for this overview.'
-      ),
-      calibrationReadiness: this.unstableDimension(
-        'INSUFFICIENT_DATA',
-        'Calibration Readiness',
-        'signal-calibration-engine',
-        undefined,
-        'Calibration readiness is not yet wired into Research Hub actionability.'
-      ),
+      signalEvidence: signalEvidenceDimension,
+      calibrationReadiness: calibrationReadinessDimension,
       strategyProof: this.strategyProofDimension(proof, reviewCandidateCount),
-      todayReviewReadiness: this.unstableDimension(
-        'INSUFFICIENT_DATA',
-        'Today Review Readiness',
-        'today-trade-review',
-        undefined,
-        'Today Review readiness is not yet a stable Research Hub input.'
-      ),
-      tradePlanReadiness: this.unstableDimension(
-        'INSUFFICIENT_DATA',
-        'Trade Plan Readiness',
-        'trade-plan-risk-engine',
-        undefined,
-        'Trade Plan paper-readiness is not yet a stable Research Hub input.'
-      ),
+      todayReviewReadiness: todayReviewReadinessDimension,
+      tradePlanReadiness: tradePlanReadinessDimension,
     };
     const allDimensions = Object.values(dimensions);
     const blockers = allDimensions
@@ -504,6 +546,8 @@ export class ResearchHubService {
         count: dimension.count,
         message: dimension.message,
       }));
+    // NR-41: reduceActionability only counts INSUFFICIENT_DATA dimensions that are blocking=true,
+    // so the two "not yet measured" dimensions (blocking: false) are excluded from the aggregate.
     const overallStatus = this.reduceActionability(allDimensions);
     const nextBestAction = nextActions[0]
       ? { ...nextActions[0], sourceModule: nextActions[0].targetRoute.includes('data-quality') ? 'data-quality-engine' : 'strategy-decision-engine' }
@@ -517,6 +561,52 @@ export class ResearchHubService {
       dimensions,
       nextBestAction,
       blockers,
+    };
+  }
+
+  private calibrationReadinessDimension(health: CalibrationHealthResponse | null): ActionabilityDimension {
+    if (!health) {
+      return {
+        status: 'INSUFFICIENT_DATA',
+        label: 'Calibration Readiness',
+        sourceModule: 'signal-calibration-engine',
+        blocking: true,
+        message: 'Calibration service is unavailable.',
+      };
+    }
+    const count = health.calibratedSignals;
+    const readiness = health.calibrationReadiness;
+    const readinessStatus = readiness?.status;
+    if (count === 0 || health.dataStatus === 'MISSING') {
+      return {
+        status: 'INSUFFICIENT_DATA',
+        label: 'Calibration Readiness',
+        sourceModule: 'signal-calibration-engine',
+        blocking: true,
+        count,
+        message: 'No calibrated signals are persisted yet. Run the calibration engine to generate readiness evidence.',
+      };
+    }
+    if (readinessStatus === 'USABLE') {
+      return {
+        status: 'LIMITED',
+        label: 'Calibration Readiness',
+        sourceModule: 'signal-calibration-engine',
+        blocking: false,
+        count,
+        message: `${count} calibrated signals persisted. Evidence is usable but downstream influence is not yet wired into Research Hub actionability.`,
+        evidenceDate: health.latestGeneratedAt ?? undefined,
+      };
+    }
+    // LIMITED readiness from calibration engine
+    return {
+      status: 'LIMITED',
+      label: 'Calibration Readiness',
+      sourceModule: 'signal-calibration-engine',
+      blocking: false,
+      count,
+      message: `${count} calibrated signals persisted (readiness: ${readinessStatus ?? 'unknown'}). Evidence needs refresh before downstream influence can be confirmed.`,
+      evidenceDate: health.latestGeneratedAt ?? undefined,
     };
   }
 
@@ -619,26 +709,12 @@ export class ResearchHubService {
     };
   }
 
-  private unstableDimension(
-    status: Exclude<ActionabilityStatus, 'READY'>,
-    label: string,
-    sourceModule: string,
-    count: number | undefined,
-    message: string
-  ): ActionabilityDimension {
-    return {
-      status,
-      label,
-      sourceModule,
-      blocking: status === 'BLOCKED' || status === 'UNPROVEN' || status === 'INSUFFICIENT_DATA',
-      count,
-      message,
-    };
-  }
-
   private reduceActionability(dimensions: ActionabilityDimension[]): ActionabilityStatus {
     if (dimensions.some((dimension) => dimension.status === 'BLOCKED')) return 'BLOCKED';
-    if (dimensions.some((dimension) => dimension.status === 'INSUFFICIENT_DATA')) return 'INSUFFICIENT_DATA';
+    // NR-41: Only count INSUFFICIENT_DATA as blocking if the dimension itself is blocking=true.
+    // Dimensions explicitly labelled "Not yet measured" have blocking=false and are excluded
+    // from the aggregate so they cannot drag the overall status to INSUFFICIENT_DATA.
+    if (dimensions.some((dimension) => dimension.status === 'INSUFFICIENT_DATA' && dimension.blocking)) return 'INSUFFICIENT_DATA';
     if (dimensions.some((dimension) => dimension.status === 'UNPROVEN')) return 'UNPROVEN';
     if (dimensions.some((dimension) => dimension.status === 'LIMITED')) return 'LIMITED';
     return 'READY';

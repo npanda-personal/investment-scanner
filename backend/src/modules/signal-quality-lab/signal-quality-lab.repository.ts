@@ -716,6 +716,118 @@ export class SignalQualityLabRepository {
   }
 
   // ---------------------------------------------------------------------------
+  // By-regime aggregation (persisted path)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Aggregate persisted signal_outcomes by the market regime that was in effect
+   * on the signal's generated date, joining to market_context_snapshots.
+   *
+   * For each outcome row, the nearest snapshot on or before signalGeneratedDate
+   * (within 7 calendar days) is looked up via a LATERAL subquery.  This matches
+   * the on-demand regimeForDate() logic in HistoricalContextSnapshotsService.
+   *
+   * Win-rate semantics (matches scorecard):
+   *   - denominator = BULLISH + BEARISH rows only (NEUTRAL excluded)
+   *   - win = BULLISH row with forwardReturnPercent > 0 OR BEARISH row < 0
+   *
+   * Only dataComplete = true rows are included.
+   *
+   * Returns one row per (horizon, regime) combination that has at least one
+   * dataComplete row.  Regimes with zero samples are not returned from SQL —
+   * the service layer fills in the known regime buckets with zeroes.
+   */
+  async byRegimeFromPersistedOutcomes(query: {
+    horizon?: QualityHorizon;
+    modelVersion?: string;
+    region?: string;
+  }): Promise<Array<{
+    horizon: QualityHorizon;
+    regime: string;
+    sampleSize: number;
+    directionalSampleSize: number;
+    winRate: number | null;
+    avgReturnPercent: number | null;
+  }>> {
+    const whereParts: string[] = [`so."dataComplete" = true`];
+    if (query.horizon) {
+      whereParts.push(`so.horizon = '${this.escapeString(query.horizon)}'`);
+    }
+    if (query.modelVersion) {
+      whereParts.push(`so."modelVersion" = '${this.escapeString(query.modelVersion)}'`);
+    }
+    const region = query.region ? this.escapeString(query.region.toUpperCase()) : 'IN';
+    const whereClause = whereParts.join(' AND ');
+
+    const sql = `
+      WITH resolved AS (
+        SELECT
+          so.horizon,
+          so.direction,
+          so."forwardReturnPercent",
+          COALESCE(
+            (
+              SELECT mcs.regime
+              FROM market_context_snapshots mcs
+              WHERE mcs.region = '${region}'
+                AND mcs."snapshotDate" <= so."signalGeneratedDate"
+                AND mcs."snapshotDate" >= so."signalGeneratedDate" - INTERVAL '7 days'
+              ORDER BY mcs."snapshotDate" DESC
+              LIMIT 1
+            ),
+            'UNKNOWN'
+          ) AS regime
+        FROM signal_outcomes so
+        WHERE ${whereClause}
+      ),
+      directional AS (
+        SELECT
+          horizon,
+          regime,
+          COUNT(*) FILTER (WHERE direction IN ('BULLISH','BEARISH')) AS directional_sample,
+          COUNT(*) FILTER (
+            WHERE (direction = 'BULLISH' AND "forwardReturnPercent" > 0)
+               OR (direction = 'BEARISH' AND "forwardReturnPercent" < 0)
+          ) AS wins
+        FROM resolved
+        GROUP BY horizon, regime
+      ),
+      aggregated AS (
+        SELECT
+          horizon,
+          regime,
+          COUNT(*) AS sample_size,
+          AVG("forwardReturnPercent") AS avg_return
+        FROM resolved
+        GROUP BY horizon, regime
+      )
+      SELECT
+        a.horizon,
+        a.regime,
+        a.sample_size::int AS sample_size,
+        COALESCE(d.directional_sample, 0)::int AS directional_sample_size,
+        CASE WHEN COALESCE(d.directional_sample, 0) = 0 THEN NULL
+             ELSE ROUND((d.wins::numeric / d.directional_sample::numeric), 6)
+        END AS win_rate,
+        ROUND(a.avg_return::numeric, 6) AS avg_return_percent
+      FROM aggregated a
+      LEFT JOIN directional d ON a.horizon = d.horizon AND a.regime = d.regime
+      ORDER BY a.horizon, a.regime
+    `;
+
+    const rows = await this.db.$queryRawUnsafe<any[]>(sql);
+
+    return rows.map((row) => ({
+      horizon: row.horizon as QualityHorizon,
+      regime: String(row.regime ?? 'UNKNOWN'),
+      sampleSize: Number(row.sample_size),
+      directionalSampleSize: Number(row.directional_sample_size),
+      winRate: row.win_rate !== null && row.win_rate !== undefined ? Number(row.win_rate) : null,
+      avgReturnPercent: row.avg_return_percent !== null && row.avg_return_percent !== undefined ? Number(row.avg_return_percent) : null,
+    }));
+  }
+
+  // ---------------------------------------------------------------------------
   // Legacy stub (kept for backward compat)
   // ---------------------------------------------------------------------------
 

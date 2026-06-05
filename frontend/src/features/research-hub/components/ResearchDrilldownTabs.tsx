@@ -359,20 +359,68 @@ const BreadthTabPanel: React.FC<{ scope: MarketScope }> = ({ scope }) => {
         )}
       </Box>
 
-      {(breadth.officialAdvanceCount !== null ||
-        breadth.officialDeclineCount !== null) && (
+      {/* NR-42: computed A/D from our breadth universe (always shown when breadth data is available) */}
+      {(breadth.instrumentCount > 0 || breadth.bullishSignalCount > 0 || breadth.advanceDeclineRatio !== null) && (
         <Box>
           <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
-            Official NSE Advances / Declines
+            Computed Advance / Decline
             <Typography
               component="span"
               variant="caption"
               color="text.secondary"
               sx={{ ml: 1 }}
             >
-              ({data?.sourceLabels?.officialAdvancesDeclines ?? 'NSE official'})
+              (derived from our price universe — not official NSE data)
             </Typography>
           </Typography>
+          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+            {breadth.advanceDeclineRatio !== null && (
+              <Chip
+                label={`A/D Ratio: ${breadth.advanceDeclineRatio.toFixed(2)}`}
+                size="small"
+                color={breadth.advanceDeclineRatio >= 1 ? 'success' : 'warning'}
+                variant="outlined"
+              />
+            )}
+            {breadth.newHigh52WeekCount > 0 && (
+              <Chip
+                label={`52W Highs: ${num(breadth.newHigh52WeekCount)}`}
+                size="small"
+                color="success"
+                variant="outlined"
+              />
+            )}
+            {breadth.newLow52WeekCount > 0 && (
+              <Chip
+                label={`52W Lows: ${num(breadth.newLow52WeekCount)}`}
+                size="small"
+                color="error"
+                variant="outlined"
+              />
+            )}
+            <Chip
+              label={`Universe: ${num(breadth.instrumentCount)} instruments`}
+              size="small"
+              variant="outlined"
+            />
+          </Stack>
+        </Box>
+      )}
+
+      {/* NR-42: official NSE A/D — show row with honest "not ingested" label instead of hiding it */}
+      <Box>
+        <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
+          Official NSE Advances / Declines
+          <Typography
+            component="span"
+            variant="caption"
+            color="text.secondary"
+            sx={{ ml: 1 }}
+          >
+            ({data?.sourceLabels?.officialAdvancesDeclines ?? 'NSE official'})
+          </Typography>
+        </Typography>
+        {(breadth.officialAdvanceCount !== null || breadth.officialDeclineCount !== null) ? (
           <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
             <Chip
               label={`Advances: ${num(breadth.officialAdvanceCount)}`}
@@ -394,8 +442,12 @@ const BreadthTabPanel: React.FC<{ scope: MarketScope }> = ({ scope }) => {
               />
             )}
           </Stack>
-        </Box>
-      )}
+        ) : (
+          <Typography variant="caption" color="text.secondary">
+            Official NSE A/D not ingested — official advance/decline counts from NSE are not yet part of the data pipeline.
+          </Typography>
+        )}
+      </Box>
 
       {data?.gaps && data.gaps.length > 0 && (
         <Alert severity="warning" sx={{ mt: 1 }}>

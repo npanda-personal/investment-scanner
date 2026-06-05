@@ -706,6 +706,80 @@ export class SignalQualityLabService {
     }
   }
 
+  /**
+   * Build the by-regime QualityMetricGroup array from the persisted path.
+   *
+   * Calls the repository SQL (signal_outcomes LATERAL JOIN market_context_snapshots)
+   * to resolve the market regime in effect at each signal's generated date, then:
+   *   - Maps DB rows to QualityMetricGroup shape
+   *   - Injects all known regime buckets (RISK_ON / NEUTRAL / RISK_OFF / UNKNOWN)
+   *     with sampleSize=0 / winRate=null / averageForwardReturn=null so the FE can
+   *     always render a complete table instead of a hidden/empty section
+   *   - Marks groups with directionalSampleSize < MIN_GROUP_SAMPLES_THRESHOLD as
+   *     SMALL_SAMPLE (honest low-sample flag)
+   */
+  private async byRegimeFromPersistedOutcomes(query: QualityQuery): Promise<QualityMetricGroup[]> {
+    const rows = await this.repository.byRegimeFromPersistedOutcomes({
+      horizon: query.horizon,
+      modelVersion: query.modelVersion,
+      region: query.region,
+    }).catch(() => [] as Awaited<ReturnType<typeof this.repository.byRegimeFromPersistedOutcomes>>);
+
+    const KNOWN_REGIMES = ['RISK_ON', 'NEUTRAL', 'RISK_OFF', 'UNKNOWN'] as const;
+    const horizon = query.horizon;
+
+    const byRegimeKey = new Map(rows.filter((r) => r.horizon === horizon).map((r) => [r.regime, r]));
+
+    return KNOWN_REGIMES.map((regime) => {
+      const row = byRegimeKey.get(regime);
+      if (!row) {
+        return {
+          group: regime,
+          name: regime,
+          horizon,
+          rawSignalCount: 0,
+          sampleSize: 0,
+          samples: 0,
+          unevaluatedCount: 0,
+          winRate: null,
+          averageForwardReturn: null,
+          averageReturn: null,
+          medianForwardReturn: null,
+          medianReturn: null,
+          averageMaxDrawdown: null,
+          bestReturn: null,
+          worstReturn: null,
+          positiveCount: 0,
+          negativeCount: 0,
+          status: 'SMALL_SAMPLE' as const,
+          reason: 'No evaluated outcomes in this regime bucket.',
+        };
+      }
+      const isSmall = row.directionalSampleSize < MIN_GROUP_SAMPLES_THRESHOLD;
+      return {
+        group: regime,
+        name: regime,
+        horizon,
+        rawSignalCount: row.sampleSize,
+        sampleSize: row.directionalSampleSize,
+        samples: row.directionalSampleSize,
+        unevaluatedCount: 0,
+        winRate: row.winRate,
+        averageForwardReturn: row.avgReturnPercent,
+        averageReturn: row.avgReturnPercent,
+        medianForwardReturn: null,
+        medianReturn: null,
+        averageMaxDrawdown: null,
+        bestReturn: null,
+        worstReturn: null,
+        positiveCount: 0,
+        negativeCount: 0,
+        status: (isSmall ? 'SMALL_SAMPLE' : 'EVALUATED') as QualityMetricGroup['status'],
+        reason: isSmall ? `Only ${row.directionalSampleSize} directional outcome(s); interpret as indicative only.` : null,
+      };
+    });
+  }
+
   private async tryPersistedDashboard(query: QualityQuery): Promise<{
     summary: QualitySummary;
     byType: SignalTypePerformance[];
@@ -736,15 +810,18 @@ export class SignalQualityLabService {
       const byType = persistedMetrics.byType.filter((item) => item.sampleSize >= minSample);
       const bySector = persistedMetrics.bySector.filter((item) => item.sampleSize >= minSample);
       const noisy = persistedMetrics.noisy;
-      // byRegime and byDataQuality require a join between signal_outcomes and
-      // external context (historical-regime snapshots / DQ evaluations) that is
-      // not yet materialised in the persisted path.  Return empty arrays with a
-      // discoverable warning rather than triggering live recomputation.
+      // byRegime: SQL join signal_outcomes → market_context_snapshots (LATERAL subquery).
+      // Resolves the market regime in effect at each signal's generated date.
+      // All 4 known regime buckets are returned — zero-sample ones with sampleSize=0 / winRate=null.
+      const byRegime = await this.byRegimeFromPersistedOutcomes(query);
+
+      // byDataQuality requires a join to DQ evaluations — not yet materialised
+      // in the persisted path; return empty with a warning.
       const warnings = [
         ...summary.warnings,
-        'by-regime and by-data-quality groupings are not available in the persisted read path; run recalculate to refresh.',
+        'by-data-quality grouping is not available in the persisted read path; run recalculate to refresh.',
       ];
-      return { summary: { ...summary, warnings }, byType, bySector, byRegime: [], byDataQuality: [], noisy };
+      return { summary: { ...summary, warnings }, byType, bySector, byRegime, byDataQuality: [], noisy };
     } catch {
       return null;
     }

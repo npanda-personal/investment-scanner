@@ -76,6 +76,99 @@ const MetricCard: React.FC<{ label: string; value: string; tone?: 'success' | 'w
 
 const NULL_COL_TOOLTIP = 'not computed in persisted path';
 
+const REGIME_ORDER = ['RISK_ON', 'NEUTRAL', 'RISK_OFF', 'UNKNOWN'] as const;
+type KnownRegime = typeof REGIME_ORDER[number];
+
+const regimeLabel: Record<KnownRegime, string> = {
+  RISK_ON: 'Risk-On',
+  NEUTRAL: 'Neutral',
+  RISK_OFF: 'Risk-Off',
+  UNKNOWN: 'Unknown',
+};
+
+const RegimeTable: React.FC<{ rows: QualityMetricGroup[] }> = ({ rows }) => {
+  const byRegime = new Map(rows.map((r) => [r.group as KnownRegime, r]));
+  return (
+    <Paper sx={{ p: 2, overflowX: 'auto' }}>
+      <Typography variant="h6" sx={{ mb: 1 }}>Performance by Regime</Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+        Win rate and avg forward return grouped by market regime at signal date. Research-support only; not a prediction.
+      </Typography>
+      <Table size="small">
+        <TableHead>
+          <TableRow>
+            <TableCell>Regime</TableCell>
+            <TableCell>N (directional)</TableCell>
+            <TableCell>Win Rate</TableCell>
+            <TableCell>Avg Fwd Return</TableCell>
+            <TableCell>Confidence</TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {REGIME_ORDER.map((regime) => {
+            const row = byRegime.get(regime);
+            const n = row?.sampleSize ?? 0;
+            const isLowSample = n > 0 && n < 30;
+            const isNoSample = n === 0;
+            return (
+              <TableRow key={regime}>
+                <TableCell>
+                  <Typography variant="body2" fontWeight={700}>{regimeLabel[regime]}</Typography>
+                </TableCell>
+                <TableCell>
+                  {isNoSample ? (
+                    <Typography component="span" variant="body2" color="text.disabled">—</Typography>
+                  ) : (
+                    <>{n.toLocaleString()}</>
+                  )}
+                </TableCell>
+                <TableCell>
+                  {isNoSample ? (
+                    <Tooltip title="No evaluated outcomes in this regime bucket" arrow>
+                      <Typography component="span" variant="body2" color="text.disabled" sx={{ cursor: 'help', borderBottom: '1px dotted', borderColor: 'text.disabled' }}>—</Typography>
+                    </Tooltip>
+                  ) : (
+                    <>
+                      {percent(row?.winRate)}
+                      {isLowSample && (
+                        <Tooltip title={`n=${n} — low sample; interpret with caution`} arrow>
+                          <Chip size="small" label="low n" color="warning" variant="outlined" sx={{ ml: 0.5, cursor: 'help' }} />
+                        </Tooltip>
+                      )}
+                    </>
+                  )}
+                </TableCell>
+                <TableCell>
+                  {isNoSample ? (
+                    <Typography component="span" variant="body2" color="text.disabled">—</Typography>
+                  ) : (
+                    percent(row?.averageForwardReturn)
+                  )}
+                </TableCell>
+                <TableCell>
+                  {isNoSample ? (
+                    <Typography component="span" variant="body2" color="text.disabled">no samples</Typography>
+                  ) : isLowSample ? (
+                    <Chip size="small" label="LOW" color="warning" variant="outlined" />
+                  ) : n < 100 ? (
+                    <Chip size="small" label="MEDIUM" color="info" variant="outlined" />
+                  ) : (
+                    <Chip size="small" label="HIGH" color="success" variant="outlined" />
+                  )}
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+      <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+        Confidence: HIGH ≥ 100 samples, MEDIUM ≥ 30, LOW &lt; 30. Regimes with no samples show "—".
+        Historical measurement only; not prediction or trading advice.
+      </Typography>
+    </Paper>
+  );
+};
+
 const MetricTable: React.FC<{ title: string; rows: (QualityMetricGroup | SignalTypePerformance)[]; nameKey?: 'group' | 'signalType'; emptyReason?: string }> = ({ title, rows, nameKey = 'group', emptyReason }) => (
   <Paper sx={{ p: 2, overflowX: 'auto' }}>
     <Typography variant="h6" sx={{ mb: 2 }}>{title}</Typography>
@@ -382,11 +475,7 @@ const SignalQualityLabPage: React.FC = () => {
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', xl: '1fr 1fr' }, gap: 3, mb: 3 }}>
           <MetricTable title="Performance by Signal Type" rows={byType} nameKey="signalType" />
           <MetricTable title="Performance by Sector" rows={bySector} />
-          <MetricTable
-            title="Performance by Regime"
-            rows={byRegime}
-            emptyReason={summary?.warnings?.find((w) => /regime/i.test(w)) || (byRegime.length === 0 ? 'By-regime breakdown is not available in the persisted path.' : undefined)}
-          />
+          <RegimeTable rows={byRegime} />
           <MetricTable
             title="Performance by Data Quality"
             rows={byDataQuality}

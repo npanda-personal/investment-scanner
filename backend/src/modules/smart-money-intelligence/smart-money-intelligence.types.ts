@@ -4,12 +4,22 @@ export type SmartMoneyDataStatus = 'COMPLETE' | 'PARTIAL' | 'MISSING' | 'ERROR';
 export type SmartMoneyRange = '1M' | '3M' | '6M';
 export type SmartMoneySignalDirection = 'ACCUMULATION' | 'DISTRIBUTION' | 'NEUTRAL';
 /**
- * Sector-level Smart Money classification bands (tuned to observed NSE score spread 41–59):
- *   STRONG_ACCUMULATION : averageSmartMoneyScore >= 62
- *   ACCUMULATING        : averageSmartMoneyScore 56–61
- *   NEUTRAL             : averageSmartMoneyScore 48–55
- *   DISTRIBUTING        : averageSmartMoneyScore 38–47
- *   STRONG_DISTRIBUTION : averageSmartMoneyScore < 38
+ * Sector-level Smart Money classification status.
+ *
+ * Primary rule — count-based (used when classified stocks >= 3):
+ *   netAccShare = accumulationCount / (accumulationCount + distributionCount)
+ *   netAccShare >= 0.65 → STRONG_ACCUMULATION
+ *   netAccShare >= 0.55 → ACCUMULATING
+ *   netAccShare >= 0.45 → NEUTRAL
+ *   netAccShare >= 0.35 → DISTRIBUTING
+ *                else   → STRONG_DISTRIBUTION
+ *
+ * Score-based fallback (when classified < 3):
+ *   averageSmartMoneyScore >= 62 → STRONG_ACCUMULATION
+ *   averageSmartMoneyScore >= 56 → ACCUMULATING
+ *   averageSmartMoneyScore >= 48 → NEUTRAL
+ *   averageSmartMoneyScore >= 38 → DISTRIBUTING
+ *                             else → STRONG_DISTRIBUTION
  */
 export type SectorSmartMoneyStatus =
   | 'STRONG_ACCUMULATION'
