@@ -1,14 +1,11 @@
-import { PrismaClient } from '@prisma/client';
 import type { StockSyncTask, WorkerResult } from './market-data-foundation.types';
 
 export class StockSyncWorker {
   private workerId: number;
-  private prisma: PrismaClient;
   private concurrency: number;
 
   constructor(workerId: number, concurrency: number = 3) {
     this.workerId = workerId;
-    this.prisma = new PrismaClient();
     this.concurrency = concurrency;
   }
 
@@ -56,6 +53,10 @@ export class StockSyncWorker {
   }
 
   async disconnect(): Promise<void> {
-    await this.prisma.$disconnect();
+    // No-op: this legacy worker no longer owns a PrismaClient. It used to open its
+    // own connection pool per instance, which multiplied against Postgres
+    // max_connections (=20 in dev) and caused connection exhaustion (P2037) when
+    // several workers were spawned. All DB access now goes through the shared
+    // singleton (src/db/prisma.ts). Kept for caller compatibility.
   }
 }
