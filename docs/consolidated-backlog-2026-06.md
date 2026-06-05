@@ -17,6 +17,46 @@ Source tags: **[ARCH] [UX] [PO] [DOM]**. Status: 🆕 open · 🟡 partial (some
 
 ---
 
+## ★ RE-PRIORITIZATION — market-first lens (owner directive 2026-06-05)
+
+> Owner directive: **"market insights are top priority; portfolio / watchlist / alerts etc. are low. I only care about all screens showing market and stock related info."**
+> So the ranking axis is no longer pure correctness-severity — it's **"does this make the market/stock-information screens more accurate, richer, or better?"** Personal-tracking surfaces (portfolio, watchlist, alerts, journal, notifications, billing, account) drop to LOW even when their underlying bug is a P0-correctness defect, because the owner does not prioritize those screens.
+> Market/stock screens in scope: Market Pulse (home), Daily Review / today-review, Research Hub, Stock Research Workbench, Instrument Workspace, Stock Interest Radar, Earnings Intelligence, Smart Money, Signals/Quality/Calibration, Market Context/regime/breadth, Backtesting, Strategy Decision/Framework — **and the data foundation that feeds all of them.**
+
+### TIER 1 — Market/Stock data TRUTH (do first; GIGO on the screens you care about)
+- **CB-1** adjusted OHLCV (raw H/L/V corrupt ATR/ADX/OBV/stops on every split/bonus stock) — **#1.**
+- **CB-7** spike rejection ON (one bad tick poisons stock price history).
+- **CB-5** persisted-read GET leaks on the **signal** + **market-context** endpoints (these are market/stock-info reads; one even writes).
+- **CB-4** apply calibration + fix direction mislabel (the trust score shown on every stock/signal) — ⚠️ owner ruling first.
+- **CB-15 / CB-16 / CB-17 / CB-19** corporate-action & universe-hygiene truth for stock prices (rights/TERP, mergers/demergers, T2T-SME mixing, ISIN continuity).
+- **CB-32** pipeline date-skew + dead MARKET_PULSE/BACKTEST_PROOF stages (stale = wrong on market screens).
+
+### TIER 2 — Market/Stock intelligence DEPTH & HONESTY (the actual edge)
+- **Free NSE/BSE market data (highest market-insight value): CB-20** delivery% · **CB-21** FII/DII flows · **CB-22** bulk/block deals · **CB-23** India VIX · **CB-24** F&O ban/ASM-GSM/lot-sizes · **CB-25** retire the smart-money stub onto real bulk-deal data.
+- **Alpha-vs-beta honesty on signal/backtest surfaces: CB-8** benchmark-relative · **CB-9** survivorship · **CB-10** next-bar fill · **CB-11** ADX warm-up · **CB-12** India transaction costs · **CB-13** intrabar/gap stops · **CB-14** Wilder RSI.
+- **Market intelligence correctness: CB-41** breadth universe (Nifty 500) · **CB-42** regime score over-weight/no-index-trend · **CB-43** earnings blackout into today-review · **CB-44** honest/official earnings dates · **CB-45** SELECTIVE>85 gate · **CB-46** short backtestability · **CB-47** copilot defects (dup risk factors, safe-language, false COMPLETE).
+- **CB-30** surface track-record to the trader (trust on stock signals) · **CB-18** holiday calendar → staleness · **CB-28** reliable scheduler (fresh market data for the open) · **CB-27** cross-signal conflict detection (today-review LONG vs strategy EXIT for the same stock).
+- **CB-29** consolidated market "Morning Briefing" home · **CB-31** Copilot in nav (the only market/stock synthesis view).
+
+### TIER 3 — Market/Stock SCREEN UX & polish
+- **CB-48** decision-first hierarchy (Market Pulse / Daily Review / Research Hub) · **CB-49** purge dev/architecture copy from stock screens · **CB-50** ₹/Cr formatting + 52-week range + delivery%/VWAP on price surfaces · **CB-51** enum remainder + warning-tone bug on stock tables · **CB-53** stub surfaces (Context Rail, radars) · **CB-55** standard RankingTable (sort/sticky/column-visibility/confidence-filter) · **charting component** (volume-aligned, MA, 52W, corp-action markers — credibility cornerstone of the Workbench) · **CB-52** per-row "open workspace" action (the ★watchlist/🔔alert parts are LOW).
+- **Screen IA: CB-66** cut the 3 stub radars from nav · **CB-67** promote-or-delete the orphan dashboard · **CB-68** collapse Daily-Review-Shortlist vs Today-Review.
+- **Perf that keeps stock screens fast/stable: CB-57** N+1 (backtest/signal) · **CB-58** per-endpoint concurrency bound · **CB-59** Redis read-model cache · **CB-60** Timescale aggregates · plus tech-debt CB-61/62/63/64.
+
+### TIER 4 — LOW (personal-tracking surfaces — deprioritized per directive, even where P0-correctness)
+- Portfolio: **CB-2** realized P&L · **CB-3** CA-adjust holdings · **CB-33** missing-price phantom loss · **CB-36** XIRR/benchmark · **CB-37** STCG/LTCG · **CB-38** health-weight · **CB-39** sector exposure · **CB-40** posture dead-zone.
+- Alerts: **CB-34** userId batch bug · **CB-35** dedupe flood · **CB-65** quiet-hours · **CB-71** missing alert types.
+- **CB-26** Trade Journal UI · **CB-69** billing · Watchlist row-detail · Notifications/Account (UX-audit §2 subset).
+- *(These keep their P0/P1 correctness tags in the tables below — they're real bugs — but sit here because the owner does not prioritize these screens this phase.)*
+
+### TIER 5 — Defer (P3): commercial-phase infra (job queue, observability, read replicas), net-new personal screens, advanced backtest stats.
+
+### Standing item (not a screen, not deprioritizable): **CB-6** — rotate the live broker creds / TOTP seed + purge the env block. **Owner action** (I will not touch `.env`).
+
+**Net effect of the re-tier:** the portfolio correctness items I had at P0 (CB-2/CB-3) move to LOW; the free-NSE-data + alpha-vs-beta + regime/breadth items rise to the top working set; CB-1 stays #1 because it's the GIGO root for *every* stock indicator on *every* market screen.
+
+---
+
 ## 0. Already shipped this session (so they're not re-counted as open)
 NULLS-LAST backtest universe; TEST_-fixture data guarded out of reads (RELIANCE ₹193→₹1420); signals 7→1021;
 Market-Pulse headline-index curation + inverse-index excluded from health score; enum humanization on Market Pulse + today-review;
