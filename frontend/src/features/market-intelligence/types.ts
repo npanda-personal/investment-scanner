@@ -185,6 +185,31 @@ export interface InstrumentContextSnapshot {
   freshness: FreshnessSnapshot;
 }
 
+export interface SectorConstituentRow {
+  instrumentId: string;
+  symbol: string;
+  companyName: string | null;
+  marketCap: number | null;
+  latestPrice: number | null;
+  latestPriceTimestamp: string | null;
+  return1W: number | null;
+  return1M: number | null;
+  signalDirection: string | null;
+  signalScore: number | null;
+  relativeStrength: number | null;
+}
+
+export interface SectorConstituentsEnvelope {
+  availability: 'READY' | 'EMPTY' | 'INVALID_PARAMS' | 'ERROR';
+  sector: string;
+  region: string;
+  assetType: string;
+  constituents: SectorConstituentRow[];
+  count: number;
+  message: string;
+  warnings: string[];
+}
+
 export type MarketReadModelKey =
   | 'marketPulse'
   | 'sectorIntelligence'

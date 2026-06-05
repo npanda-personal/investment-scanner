@@ -96,6 +96,7 @@ describe('MarketContextIntelligenceService', () => {
     const repository = {
       saveSnapshot: jest.fn().mockResolvedValue(undefined),
       loadIndexPrices: jest.fn().mockResolvedValue([]),
+      loadCapBandUniverse: jest.fn().mockResolvedValue([]),
     };
     const service = new MarketContextIntelligenceService(repository as any, marketDataService as any, signalService as any);
 
@@ -107,18 +108,20 @@ describe('MarketContextIntelligenceService', () => {
   });
 
   it('stratifies breadth by cap band and counts large-cap stocks correctly (NR-5)', () => {
+    // marketCap is stored in absolute rupees in the DB; 1 Crore = 1e7 rupees.
+    const CR = 1e7; // 1 Crore in rupees (DB unit)
     const prices = Array.from({ length: 260 }, (_, i) => 200 - i * 0.2);
-    // Large-cap: marketCap > 20,000 Cr
+    // Large-cap: marketCap > 20,000 Cr  → > 2e11 rupees
     const largeItems = Array.from({ length: 8 }, (_, i) =>
-      instrument({ symbol: `L${i}`, marketCap: 25_000 + i * 1_000, prices }),
+      instrument({ symbol: `L${i}`, marketCap: (25_000 + i * 1_000) * CR, prices }),
     );
-    // Mid-cap: 5,000–20,000 Cr
+    // Mid-cap: 5,000–20,000 Cr  → 5e10 – 2e11 rupees
     const midItems = Array.from({ length: 6 }, (_, i) =>
-      instrument({ symbol: `M${i}`, marketCap: 8_000 + i * 1_000, prices }),
+      instrument({ symbol: `M${i}`, marketCap: (8_000 + i * 1_000) * CR, prices }),
     );
-    // Small-cap: < 5,000 Cr
+    // Small-cap: < 5,000 Cr  → < 5e10 rupees
     const smallItems = Array.from({ length: 5 }, (_, i) =>
-      instrument({ symbol: `S${i}`, marketCap: 1_000 + i * 500, prices }),
+      instrument({ symbol: `S${i}`, marketCap: (1_000 + i * 500) * CR, prices }),
     );
     // null marketCap: must not inflate any named band
     const nullCapItems = Array.from({ length: 3 }, (_, i) =>
@@ -147,12 +150,13 @@ describe('MarketContextIntelligenceService', () => {
   });
 
   it('returns null metrics for bands with fewer than 5 instruments (NR-5)', () => {
+    const CR = 1e7; // 1 Crore in rupees (DB unit)
     const prices = Array.from({ length: 260 }, (_, i) => 200 - i * 0.2);
     const fewLarge = Array.from({ length: 3 }, (_, i) =>
-      instrument({ symbol: `FL${i}`, marketCap: 30_000, prices }),
+      instrument({ symbol: `FL${i}`, marketCap: 30_000 * CR, prices }),
     );
     const enoughMid = Array.from({ length: 10 }, (_, i) =>
-      instrument({ symbol: `EM${i}`, marketCap: 10_000, prices }),
+      instrument({ symbol: `EM${i}`, marketCap: 10_000 * CR, prices }),
     );
 
     const service = new MarketContextIntelligenceService({} as any, {} as any);
@@ -244,6 +248,7 @@ describe('MarketContextIntelligenceService', () => {
     const repository = {
       saveSnapshot: jest.fn().mockResolvedValue(undefined),
       loadIndexPrices: jest.fn().mockResolvedValue([]),
+      loadCapBandUniverse: jest.fn().mockResolvedValue([]),
     };
     const service = new MarketContextIntelligenceService(repository as any, marketDataService as any, signalService as any);
 
@@ -279,6 +284,7 @@ describe('MarketContextIntelligenceService', () => {
         .mockResolvedValueOnce(summary),
       saveSnapshot: jest.fn().mockResolvedValue(undefined),
       loadIndexPrices: jest.fn().mockResolvedValue([]),
+      loadCapBandUniverse: jest.fn().mockResolvedValue([]),
     };
     const marketDataService = {
       listInstruments: jest.fn().mockResolvedValue({ instruments: [{ id: 'stock-1', symbol: 'AAA', sector: 'Technology', country: 'India' }] }),

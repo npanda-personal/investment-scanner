@@ -33,6 +33,15 @@ const SAMPLE_SIZE = 500;
  * that contaminate an unfiltered page-1 list.
  * Limitation: marketCap data lags by the last fundamentals backfill; ~302
  * stocks have NULL marketCap and are excluded until backfill completes.
+ *
+ * NR-5 cap-band universe:
+ * For calculateBreadthByCapBand we load a WIDER universe (up to 1500 stocks)
+ * so that MID (₹5,000–20,000 Cr) and SMALL (< ₹5,000 Cr) bands have enough
+ * instruments to compute non-null metrics.  The top-500 universe used for
+ * headline breadth / regime is predominantly LARGE-cap, leaving MID/SMALL
+ * empty.  The wider load uses a repository method that issues only 2 DB
+ * round-trips regardless of universe size (window-function batch query),
+ * so it is connection-pool-safe.
  */
 const LIQUID_UNIVERSE_FILTERS = {
   exchange: 'NSE',
@@ -70,17 +79,41 @@ export class MarketContextIntelligenceService {
    */
   async runAsOf(region?: string, asOf?: Date): Promise<{ status: string }> {
     const endDate = asOf ? this.startOfUtcDay(asOf) : undefined;
-    const [items, signals, nseiPrices] = await Promise.all([
+    const isIndianRegion = !region || region.trim().toUpperCase() === 'IN';
+
+    const [items, signals, nseiPrices, capBandItems] = await Promise.all([
       this.loadContextInstruments(region, asOf),
       this.loadSignalMap(region),
       this.repository.loadIndexPrices(NSEI_SYMBOL, 270, endDate),
+      // NR-5: load wider universe for cap-band breadth (IN-region only; 2 DB round-trips).
+      // Non-IN regions fall back to the headline universe — cap-band divergence is
+      // only meaningful for NSE/BSE where LARGE/MID/SMALL bands are well-defined.
+      isIndianRegion
+        ? this.repository.loadCapBandUniverse(endDate)
+        : Promise.resolve(null),
     ]);
     const enriched = items.map((item) => ({ ...item, ...signals.get(item.instrumentId) }));
 
     const regime = this.calculateRegime(enriched, nseiPrices);
     const sectors = this.rankSectors(enriched);
     const breadth = this.calculateBreadth(enriched);
-    const breadthByCapBand = this.calculateBreadthByCapBand(enriched);
+
+    // NR-5: use the wider cap-band universe for band stratification when available;
+    // fall back to the headline universe so the field is never null.
+    const capBandUniverse: ContextInstrument[] = capBandItems
+      ? capBandItems.map((item) => ({
+          ...item,
+          sector: null,
+          country: null,
+          signalDirection: undefined,
+          signalScore: undefined,
+        }))
+      : enriched;
+    console.log(
+      `[market-context] cap-band universe: ${capBandUniverse.length} instruments ` +
+      `(headline universe: ${enriched.length}; limit: ${MarketContextIntelligenceRepository.CAP_BAND_UNIVERSE_LIMIT})`
+    );
+    const breadthByCapBand = this.calculateBreadthByCapBand(capBandUniverse);
     const countries = this.rankCountries(enriched);
     const macro = this.macro();
 
@@ -440,16 +473,21 @@ export class MarketContextIntelligenceService {
   }
 
   /**
-   * Thresholds (₹ Crore):
-   *   Large-cap : marketCap > 20,000 Cr
-   *   Mid-cap   : 5,000 – 20,000 Cr
-   *   Small-cap : < 5,000 Cr (positive cap known)
+   * Thresholds (₹ — absolute rupees, as stored in the DB):
+   *   1 Crore = 1e7 rupees.
+   *   Large-cap : marketCap > 20,000 Cr  → > 2e11 rupees
+   *   Mid-cap   : 5,000 – 20,000 Cr     → 5e10 – 2e11 rupees
+   *   Small-cap : < 5,000 Cr            → < 5e10 rupees (positive cap known)
    *   UNKNOWN   : marketCap null / 0 — excluded from named-band stats; bands with < 5
    *               valid instruments surface null metrics ("—" in UI).
+   *
+   * DB unit note: the `marketCap` column stores absolute rupees (e.g. RELIANCE ≈ 1.95e13).
+   * Thresholds are therefore expressed in rupees, not crores.
    */
   calculateBreadthByCapBand(items: ContextInstrument[]): CapBandBreadth[] {
-    const LARGE_THRESHOLD = 20_000; // Cr
-    const MID_THRESHOLD   =  5_000; // Cr
+    const CRORE = 10_000_000; // 1 Cr = 1e7 rupees (DB unit)
+    const LARGE_THRESHOLD = 20_000 * CRORE; // 20,000 Cr in rupees
+    const MID_THRESHOLD   =  5_000 * CRORE; //  5,000 Cr in rupees
 
     const bandOf = (cap: number | null): CapBand => {
       if (cap === null || cap <= 0) return 'UNKNOWN';

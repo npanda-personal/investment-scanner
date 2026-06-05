@@ -45,6 +45,8 @@ function makeRepository() {
       latestSnapshot: jest.fn().mockResolvedValue(null),
       latestPersistedSnapshot: jest.fn().mockResolvedValue(null),
       loadIndexPrices: jest.fn().mockResolvedValue([]),
+      // NR-5: wider cap-band universe loader (returns empty array in unit tests)
+      loadCapBandUniverse: jest.fn().mockResolvedValue([]),
     },
     savedSnapshots,
   };

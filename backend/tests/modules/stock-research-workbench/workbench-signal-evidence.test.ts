@@ -151,7 +151,7 @@ describe('signalEvidenceFor — NO_TRACK_RECORD', () => {
     expect(result.calibratedDirection).toBeNull();
     expect(result.outcomeDepth).toBeNull();
     expect(result.trackRecordHorizon).toBeNull();
-    expect(result.note).toContain('No track record yet');
+    expect(result.note).toContain('track record');
     // reliabilityTier should still come from the signal row
     expect(result.reliabilityTier).toBe('PARTIAL');
   });

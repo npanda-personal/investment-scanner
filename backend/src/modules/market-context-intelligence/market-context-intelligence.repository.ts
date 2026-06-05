@@ -482,6 +482,108 @@ export class MarketContextIntelligenceRepository {
 
 
   /**
+   * NR-5 cap-band breadth fix: load a wider universe (up to CAP_BAND_UNIVERSE_LIMIT stocks)
+   * so MID and SMALL bands are populated.
+   *
+   * Design (pool-safe, 2 DB round-trips):
+   *   1. SELECT top-N NSE CASH stocks by marketCap (marketCap NOT NULL, > 0)
+   *   2. Single bulk SELECT from price_ticks WHERE symbol IN (...) AND rank <= 260
+   *      (using a window function so we never ship more than 260 rows per symbol).
+   *
+   * The result includes only stocks that have at least 2 price rows in the DB
+   * (the MIN_SAMPLE=5 guard in calculateBreadthByCapBand handles low-count bands).
+   *
+   * Cap: CAP_BAND_UNIVERSE_LIMIT = 1500.  If loading feels too heavy in production
+   * the cap can be lowered here; ~1000 is enough to reach mid-cap territory given
+   * NSE's current ~2,300 mainboard listings where ~200-250 are large-cap.
+   */
+  static readonly CAP_BAND_UNIVERSE_LIMIT = 1500;
+
+  async loadCapBandUniverse(endDate?: Date): Promise<Array<{
+    instrumentId: string;
+    symbol: string;
+    marketCap: number | null;
+    latest: number | null;
+    previous: number | null;
+    prices: number[];
+  }>> {
+    // Step 1: fetch top-N instruments with a known positive marketCap.
+    // Sorted desc by marketCap so LARGE stocks come first; the tail reaches into
+    // mid/small territory once LARGE is exhausted (~200-250 names on NSE).
+    const stocks = await this.db.stock.findMany({
+      where: {
+        exchange: 'NSE',
+        instrumentSegment: 'CASH',
+        isActive: true,
+        isDelisted: false,
+        marketCap: { not: null, gt: 0 },
+      },
+      orderBy: { marketCap: 'desc' },
+      take: MarketContextIntelligenceRepository.CAP_BAND_UNIVERSE_LIMIT,
+      select: { id: true, symbol: true, marketCap: true },
+    });
+
+    if (stocks.length === 0) return [];
+
+    const symbols = stocks.map((s: any) => s.symbol);
+
+    // Step 2: batch-load the 260 most-recent closes per symbol in a single query.
+    // We use a raw SQL window function (ROW_NUMBER OVER PARTITION BY symbol ORDER BY
+    // timestamp DESC) so we only return the freshest 260 rows per symbol and never
+    // pull unbounded data.  The endDate filter keeps this look-ahead-safe when the
+    // service is called with a historical asOf date.
+    const endFilter = endDate
+      ? Prisma.sql`AND pt.timestamp <= ${endDate}`
+      : Prisma.sql``;
+
+    const rows = await this.db.$queryRaw<Array<{
+      symbol: string;
+      close: string;
+      adjusted_close: string | null;
+      rn: string;
+    }>>(Prisma.sql`
+      SELECT symbol, close::text, "adjustedClose"::text AS adjusted_close, rn
+      FROM (
+        SELECT
+          symbol,
+          close,
+          "adjustedClose",
+          ROW_NUMBER() OVER (PARTITION BY symbol ORDER BY timestamp DESC) AS rn
+        FROM price_ticks pt
+        WHERE symbol = ANY(${symbols}::text[])
+          AND source NOT LIKE 'TEST_%'
+          ${endFilter}
+      ) ranked
+      WHERE rn <= 260
+      ORDER BY symbol ASC, rn ASC
+    `);
+
+    // Group price rows by symbol (rn=1 is latest, rn=2 is previous, etc.)
+    const pricesBySymbol = new Map<string, number[]>();
+    for (const row of rows) {
+      const price = Number(row.adjusted_close ?? row.close);
+      if (!Number.isFinite(price) || price <= 0) continue;
+      const arr = pricesBySymbol.get(row.symbol) ?? [];
+      arr.push(price);
+      pricesBySymbol.set(row.symbol, arr);
+    }
+
+    return stocks
+      .map((stock: any) => {
+        const prices = pricesBySymbol.get(stock.symbol) ?? [];
+        return {
+          instrumentId: stock.id,
+          symbol: stock.symbol,
+          marketCap: stock.marketCap !== null ? Number(stock.marketCap) : null,
+          latest:   prices[0] ?? null,
+          previous: prices[1] ?? null,
+          prices,
+        };
+      })
+      .filter((item) => item.prices.length >= 2); // need at least latest + previous
+  }
+
+  /**
    * CB-41/CB-42: Load closing prices for a named index symbol (e.g. ^NSEI), most-recent first.
    * Used by the regime calculator to compute an index-trend term.
    */

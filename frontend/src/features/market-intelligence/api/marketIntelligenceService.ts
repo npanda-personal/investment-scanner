@@ -6,6 +6,8 @@ import type {
   InstrumentContextSnapshot,
   MarketPulseSnapshot,
   RiskRadarSnapshot,
+  SectorConstituentRow,
+  SectorConstituentsEnvelope,
   SectorIntelligenceSnapshot,
   SnapshotAvailability,
   SnapshotEnvelope,
@@ -312,4 +314,51 @@ export async function fetchRiskRadarSnapshot(scope: MarketScope): Promise<Snapsh
 
 export async function fetchInstrumentContextSnapshot(scope: MarketScope): Promise<SnapshotEnvelope<InstrumentContextSnapshot>> {
   return unavailable(scope, 'Instrument Context backend not available yet.');
+}
+
+export async function fetchSectorConstituents(
+  sector: string,
+  scope: Pick<MarketScope, 'region' | 'assetType'>,
+): Promise<SectorConstituentsEnvelope> {
+  try {
+    const response = await axios.get<SectorConstituentsEnvelope>(
+      `${API_BASE}/sector-constituents`,
+      { params: { sector, region: scope.region, assetType: scope.assetType } },
+    );
+    const body = response.data;
+    return {
+      availability: body.availability ?? 'ERROR',
+      sector: body.sector ?? sector,
+      region: body.region ?? scope.region,
+      assetType: body.assetType ?? scope.assetType,
+      constituents: (body.constituents ?? []).map((row: SectorConstituentRow) => ({
+        instrumentId: row.instrumentId,
+        symbol: row.symbol,
+        companyName: row.companyName ?? null,
+        marketCap: row.marketCap ?? null,
+        latestPrice: row.latestPrice ?? null,
+        latestPriceTimestamp: row.latestPriceTimestamp ?? null,
+        return1W: typeof row.return1W === 'number' ? row.return1W : null,
+        return1M: typeof row.return1M === 'number' ? row.return1M : null,
+        signalDirection: row.signalDirection ?? null,
+        signalScore: typeof row.signalScore === 'number' ? row.signalScore : null,
+        relativeStrength: typeof row.relativeStrength === 'number' ? row.relativeStrength : null,
+      })),
+      count: body.count ?? 0,
+      message: body.message ?? '',
+      warnings: body.warnings ?? [],
+    };
+  } catch (caught) {
+    const msg = errorMessage(caught, `Failed to load constituents for sector "${sector}".`);
+    return {
+      availability: 'ERROR',
+      sector,
+      region: scope.region,
+      assetType: scope.assetType,
+      constituents: [],
+      count: 0,
+      message: msg,
+      warnings: [msg],
+    };
+  }
 }

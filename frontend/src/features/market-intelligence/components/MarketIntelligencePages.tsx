@@ -3,6 +3,8 @@ import {
   Box,
   Button,
   Chip,
+  Collapse,
+  IconButton,
   LinearProgress,
   Paper,
   Stack,
@@ -17,29 +19,36 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import type { MarketPulseAdvanceDeclineSummary, MarketPulseVixSummary } from '../types';
-import { useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { InstrumentSearchSelect, PageHeader } from '@/shared/components';
 import type { V1Instrument } from '@/features/market-data-foundation';
 import { humanizeCode, indexLabel, isHeadlineIndex } from '@/shared/format/enumLabels';
+import { inr, changeColor } from '@/shared/format/money';
 import {
   fetchCompounderRadarSnapshot,
   fetchEarningsIntelligenceSnapshot,
   fetchInstrumentContextSnapshot,
   fetchMarketPulseSnapshot,
   fetchRiskRadarSnapshot,
+  fetchSectorConstituents,
   fetchSectorIntelligenceSnapshot,
   fetchStockInterestRadarSnapshot,
   fetchTraderSetupRadarSnapshot,
 } from '../api/marketIntelligenceService';
 import { useReadModelSnapshot } from '../hooks/useMarketIntelligenceSnapshot';
+import { useMarketScope } from '@/contexts/MarketScopeContext';
 import type {
   CompounderSnapshot,
   EarningsIntelligenceSnapshot,
   InstrumentContextSnapshot,
   MarketPulseSnapshot,
   RiskRadarSnapshot,
+  SectorConstituentRow,
+  SectorConstituentsEnvelope,
   SectorIntelligenceSnapshot,
   SnapshotEnvelope,
   StockInterestSnapshot,
@@ -666,6 +675,196 @@ function MiniSparkline({ values }: { values: number[] }) {
   );
 }
 
+/**
+ * Hook: lazily load sector constituents the first time a sector row is expanded.
+ * Fetches from the persisted-read endpoint; never generates on GET.
+ */
+function useSectorConstituents(sector: string | null, region: string, assetType: string) {
+  const [data, setData] = useState<SectorConstituentsEnvelope | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(() => {
+    if (!sector || data || loading) return;
+    setLoading(true);
+    setError(null);
+    fetchSectorConstituents(sector, { region: region as any, assetType: assetType as any })
+      .then((result) => { setData(result); setLoading(false); })
+      .catch((err: unknown) => {
+        setError(err instanceof Error ? err.message : 'Failed to load sector constituents.');
+        setLoading(false);
+      });
+  }, [sector, data, loading, region, assetType]);
+
+  useEffect(() => {
+    if (sector) load();
+  }, [sector, load]);
+
+  return { data, loading, error };
+}
+
+/**
+ * Expandable sector row — clicking expands a constituents sub-table below.
+ */
+function SectorRowWithDrillDown({
+  row,
+  region,
+  assetType,
+}: {
+  row: SectorIntelligenceSnapshot;
+  region: string;
+  assetType: string;
+}) {
+  const navigate = useNavigate();
+  const [expanded, setExpanded] = useState(false);
+  const { data, loading, error } = useSectorConstituents(expanded ? row.sector : null, region, assetType);
+
+  const handleExpandClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setExpanded((prev) => !prev);
+  };
+
+  const colSpan = 9; // matches number of header cells
+
+  return (
+    <>
+      <TableRow
+        hover
+        sx={{ cursor: 'pointer' }}
+        title={`Click expand to see constituent stocks, or use the signal link to filter signals`}
+      >
+        <TableCell padding="checkbox">
+          <Tooltip title={expanded ? 'Hide constituents' : 'Show constituent stocks'} arrow>
+            <IconButton size="small" onClick={handleExpandClick} aria-label={expanded ? 'collapse' : 'expand'}>
+              {expanded ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
+            </IconButton>
+          </Tooltip>
+        </TableCell>
+        {/* Sector name — click opens signal screener */}
+        <TableCell
+          onClick={() => navigate(`/signals?sector=${encodeURIComponent(row.sector)}`)}
+          sx={{ cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
+          title={`View signals for ${indexLabel(row.sector)}`}
+        >
+          {indexLabel(row.sector)}
+        </TableCell>
+        <TableCell>{formatEnum(row.classification)}</TableCell>
+        <TableCell align="right">{formatOptional(row.sectorScore)}</TableCell>
+        <TableCell align="right">{formatPercentPoints(row.return1W)}</TableCell>
+        <TableCell align="right">{formatPercentPoints(row.return1M)}</TableCell>
+        <TableCell align="right">{formatPercentPoints(row.return3M)}</TableCell>
+        <TableCell><ReasonTags tags={row.reasonTags.map(humanizeCode)} /></TableCell>
+        <TableCell><RiskTags tags={row.warnings.map(humanizeCode)} /></TableCell>
+      </TableRow>
+      {expanded && (
+        <TableRow>
+          <TableCell colSpan={colSpan} sx={{ p: 0, borderBottom: 'none' }}>
+            <Collapse in={expanded} timeout="auto" unmountOnExit>
+              <Box sx={{ p: 1.5, bgcolor: 'action.hover' }}>
+                <SectorConstituentsTable
+                  sector={row.sector}
+                  data={data}
+                  loading={loading}
+                  error={error}
+                />
+              </Box>
+            </Collapse>
+          </TableCell>
+        </TableRow>
+      )}
+    </>
+  );
+}
+
+/** Constituents sub-table shown inside expanded sector row. */
+function SectorConstituentsTable({
+  sector,
+  data,
+  loading,
+  error,
+}: {
+  sector: string;
+  data: SectorConstituentsEnvelope | null;
+  loading: boolean;
+  error: string | null;
+}) {
+  if (loading) return <Stack spacing={1}><LinearProgress sx={{ mx: 1 }} /><Typography variant="caption" color="text.secondary" sx={{ px: 1 }}>Loading constituents for {indexLabel(sector)}…</Typography></Stack>;
+  if (error) return <Alert severity="error" sx={{ mx: 0 }}>{error}</Alert>;
+  if (!data) return null;
+  if (data.availability !== 'READY' || data.constituents.length === 0) {
+    return <Alert severity="info" sx={{ mx: 0 }}>{data.message || `No constituent stocks found for ${indexLabel(sector)}.`}</Alert>;
+  }
+
+  return (
+    <Stack spacing={0.75}>
+      <Typography variant="caption" color="text.secondary">
+        {data.count} constituent stock{data.count !== 1 ? 's' : ''} — top by market cap, persisted-read only
+      </Typography>
+      {data.warnings.map((w) => <Alert key={w} severity="warning" sx={{ py: 0 }}><Typography variant="caption">{w}</Typography></Alert>)}
+      <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 340, overflowY: 'auto' }}>
+        <Table size="small" stickyHeader>
+          <TableHead>
+            <TableRow>
+              <TableCell>Symbol</TableCell>
+              <TableCell>Company</TableCell>
+              <TableCell align="right">Price</TableCell>
+              <TableCell align="right">1W %</TableCell>
+              <TableCell align="right">1M %</TableCell>
+              <TableCell>Signal</TableCell>
+              <TableCell align="right">Score</TableCell>
+              <TableCell>Workspace</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {data.constituents.map((row: SectorConstituentRow) => (
+              <TableRow key={row.instrumentId} hover>
+                <TableCell>
+                  <Typography variant="body2" fontWeight={600}>{row.symbol}</Typography>
+                </TableCell>
+                <TableCell>
+                  <Typography variant="body2" noWrap sx={{ maxWidth: 180 }}>{row.companyName ?? '—'}</Typography>
+                </TableCell>
+                <TableCell align="right">
+                  <Typography variant="body2">{row.latestPrice !== null ? inr(row.latestPrice, { fractionDigits: 2 }) : '—'}</Typography>
+                </TableCell>
+                <TableCell align="right">
+                  <Typography variant="body2" color={row.return1W !== null ? changeColor(row.return1W) : 'text.secondary'}>
+                    {row.return1W !== null ? formatPercentPoints(row.return1W) : '—'}
+                  </Typography>
+                </TableCell>
+                <TableCell align="right">
+                  <Typography variant="body2" color={row.return1M !== null ? changeColor(row.return1M) : 'text.secondary'}>
+                    {row.return1M !== null ? formatPercentPoints(row.return1M) : '—'}
+                  </Typography>
+                </TableCell>
+                <TableCell>
+                  {row.signalDirection
+                    ? <Chip label={humanizeCode(row.signalDirection)} size="small" color={row.signalDirection === 'BULLISH' ? 'success' : row.signalDirection === 'BEARISH' ? 'error' : 'default'} variant="outlined" />
+                    : <Typography variant="body2" color="text.secondary">—</Typography>}
+                </TableCell>
+                <TableCell align="right">
+                  <Typography variant="body2">{row.signalScore !== null ? row.signalScore.toFixed(1) : '—'}</Typography>
+                </TableCell>
+                <TableCell>
+                  <Button
+                    size="small"
+                    component={RouterLink}
+                    to={`/stocks/${encodeURIComponent(row.instrumentId)}`}
+                    variant="text"
+                    sx={{ minWidth: 0, px: 0.75 }}
+                  >
+                    Open
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
+    </Stack>
+  );
+}
+
 function SectorIntelligencePanel({
   envelope,
   loading,
@@ -675,7 +874,7 @@ function SectorIntelligencePanel({
   loading: boolean;
   error: string | null;
 }) {
-  const navigate = useNavigate();
+  const { scope } = useMarketScope();
   const rows = envelope?.snapshot ?? [];
 
   return (
@@ -693,6 +892,8 @@ function SectorIntelligencePanel({
             <Table size="small">
               <TableHead>
                 <TableRow>
+                  {/* expand toggle column */}
+                  <TableCell padding="checkbox" />
                   <TableCell>Sector</TableCell>
                   <TableCell>Classification</TableCell>
                   <TableCell align="right">Sector Score</TableCell>
@@ -705,24 +906,12 @@ function SectorIntelligencePanel({
               </TableHead>
               <TableBody>
                 {rows.map((row) => (
-                  <TableRow
+                  <SectorRowWithDrillDown
                     key={row.sector}
-                    hover
-                    onClick={() => navigate(`/signals?sector=${encodeURIComponent(row.sector)}`)}
-                    sx={{ cursor: 'pointer' }}
-                    title={`View signals for ${indexLabel(row.sector)}`}
-                  >
-                    {/* Fix 2: render sector code as friendly name */}
-                    <TableCell>{indexLabel(row.sector)}</TableCell>
-                    <TableCell>{formatEnum(row.classification)}</TableCell>
-                    <TableCell align="right">{formatOptional(row.sectorScore)}</TableCell>
-                    <TableCell align="right">{formatPercentPoints(row.return1W)}</TableCell>
-                    <TableCell align="right">{formatPercentPoints(row.return1M)}</TableCell>
-                    <TableCell align="right">{formatPercentPoints(row.return3M)}</TableCell>
-                    {/* Fix 2: humanize reason / warning codes (STRONG, TOP_RELATIVE_RANK …) */}
-                    <TableCell><ReasonTags tags={row.reasonTags.map(humanizeCode)} /></TableCell>
-                    <TableCell><RiskTags tags={row.warnings.map(humanizeCode)} /></TableCell>
-                  </TableRow>
+                    row={row}
+                    region={scope.region}
+                    assetType={scope.assetType}
+                  />
                 ))}
               </TableBody>
             </Table>

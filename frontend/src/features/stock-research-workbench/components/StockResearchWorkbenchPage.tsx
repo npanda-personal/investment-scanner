@@ -346,6 +346,11 @@ const StockResearchWorkbenchPage: React.FC = () => {
             {data.chart.adjusted_close_fallback && (
               <Typography variant="caption" color="text.secondary">Adjusted close unavailable for some rows; close is used as fallback.</Typography>
             )}
+            {data.chart.insufficient_range_bars && (
+              <Typography variant="caption" color="warning.main" sx={{ display: 'block' }}>
+                Insufficient price bars for the selected range — this instrument has a data gap in this period. Try a shorter range or MAX.
+              </Typography>
+            )}
             <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
               SMA-50 and SMA-200 overlays shown when series length exceeds the window. For research reference only.
             </Typography>
@@ -460,6 +465,12 @@ const StockResearchWorkbenchPage: React.FC = () => {
         <Section title="Relative Strength" status={String(data.relative_strength.data_status || 'MISSING')} source={data.trust.source} updatedAt={data.trust.last_updated_timestamp}>
           <MetricGrid items={{
             'Stock Return': formatPercent(data.relative_strength.stock_return),
+            ...(data.relative_strength.benchmark_symbol
+              ? {
+                  [`Benchmark (${String(data.relative_strength.benchmark_symbol)})`]: formatPercent(data.relative_strength.benchmark_return),
+                  'vs Benchmark': formatPercent(data.relative_strength.relative_to_benchmark),
+                }
+              : {}),
             'Peer Avg Return': formatPercent(data.relative_strength.peer_average_return),
             'Relative to Peers': formatPercent(data.relative_strength.relative_to_peer_average),
             Basis: `${range} ${String(data.relative_strength.fallback_used || 'N/A')}`,
@@ -602,21 +613,22 @@ const SignalEvidencePanel: React.FC<{ evidence?: SignalEvidenceSection }> = ({ e
         </Stack>
       </Box>
 
-      {evidence.status === 'NO_TRACK_RECORD' ? (
-        <Alert severity="info" sx={{ mb: 1 }}>
-          No track record yet — outcome data will populate as signals mature over time. This is expected for recently listed stocks or instruments with no recent signals.
+      {evidence.status === 'NO_TRACK_RECORD' && (
+        <Alert severity="info" sx={{ mb: 1.5 }}>
+          No outcome track record yet — outcome data will populate as signals mature over time. This is expected for recently listed stocks or instruments with no recent signals.
         </Alert>
-      ) : (
-        <MetricGrid items={{
-          'Sample Size': evidence.outcomeDepth !== null ? String(evidence.outcomeDepth) : 'N/A',
-          'Horizon': evidence.trackRecordHorizon ?? 'N/A',
-          'Win Rate': evidence.winRate !== null ? formatPercent(evidence.winRate) : 'N/A',
-          'Avg Forward Return': evidence.avgForwardReturn !== null ? formatPercent(evidence.avgForwardReturn) : 'N/A',
-          'Calibrated Score': evidence.calibratedScore !== null ? formatNumber(evidence.calibratedScore) : 'N/A',
-          'Calibrated Direction': evidence.calibratedDirection ?? 'N/A',
-          'Reliability Tier': evidence.reliabilityTier ?? 'N/A',
-        }} />
       )}
+
+      {/* Always render calibration data when present, regardless of track-record status */}
+      <MetricGrid items={{
+        'Sample Size': evidence.outcomeDepth !== null ? String(evidence.outcomeDepth) : 'N/A',
+        'Horizon': evidence.trackRecordHorizon ?? 'N/A',
+        'Win Rate': evidence.winRate !== null ? formatPercent(evidence.winRate) : 'N/A',
+        'Avg Forward Return': evidence.avgForwardReturn !== null ? formatPercent(evidence.avgForwardReturn) : 'N/A',
+        'Calibrated Score': evidence.calibratedScore !== null ? formatNumber(evidence.calibratedScore) : 'N/A',
+        'Calibrated Direction': evidence.calibratedDirection ?? 'N/A',
+        'Reliability Tier': evidence.reliabilityTier ?? 'N/A',
+      }} />
 
       {evidence.note && (
         <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1.5 }}>

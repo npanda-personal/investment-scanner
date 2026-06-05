@@ -78,6 +78,8 @@ export interface ResearchWorkbenchResponse {
     range: ResearchRange;
     prices: ResearchPricePoint[];
     adjusted_close_fallback: boolean;
+    /** True when fewer than 2 bars exist in the selected range (e.g. price-history gap). */
+    insufficient_range_bars: boolean;
     source: string;
     last_updated_timestamp: string | null;
     data_status: MarketDataStatus;

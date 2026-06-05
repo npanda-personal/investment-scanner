@@ -1,4 +1,8 @@
 export { MarketIntelligenceController } from './market-intelligence.controller';
+export { SectorConstituentsRepository } from './sector-constituents.repository';
+export { SectorConstituentsService } from './sector-constituents.service';
+export type { SectorConstituentRow } from './sector-constituents.repository';
+export type { SectorConstituentsEnvelope } from './sector-constituents.service';
 export { marketIntelligenceModule } from './market-intelligence.module';
 export {
   createMarketIntelligenceRouter,

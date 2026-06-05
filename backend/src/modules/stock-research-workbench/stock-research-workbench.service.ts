@@ -149,6 +149,9 @@ export class StockResearchWorkbenchService {
         source: prices?.source || 'database',
         last_updated_timestamp: prices?.last_updated_timestamp ?? null,
         data_status: prices?.data_status || 'MISSING',
+        // Warn when the selected range yields insufficient bars for meaningful metrics.
+        // Typically caused by a price-history gap spanning the requested period.
+        insufficient_range_bars: selectedPrices.length < 2,
       },
       performance,
       fundamentals: enrichedFundamentals,
@@ -209,7 +212,10 @@ export class StockResearchWorkbenchService {
 
     if (!hasOutcomes) {
       status = 'NO_TRACK_RECORD';
-      note = 'No track record yet — outcomes will populate as signals mature over time.';
+      const calibNote = calibratedScore !== null
+        ? ` Calibrated score: ${calibratedScore} (${calibratedDirection ?? 'unknown direction'}).`
+        : '';
+      note = `No outcome track record yet — outcomes will populate as signals mature over time.${calibNote}`;
     } else if (!hasCalibration) {
       status = 'CALIBRATION_PENDING';
       note = `Track record available (${outcomeDepth} mature outcomes at ${horizon}) — calibration pending for this instrument.`;
