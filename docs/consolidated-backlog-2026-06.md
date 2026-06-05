@@ -252,3 +252,33 @@ the UX audit deferred to P3 — incrementally, on the existing Recharts chart, w
 
 **Recurring PO cadence (working-agreement #6):** re-run this PO pass at the start of each wave and as the
 backlog drains, so the queue never runs dry.
+
+---
+
+## NR-19..35 — Browser-grounded PO pass (2026-06-05, drove the running app)
+
+The PO drove the live app (per upgraded working-agreement #6) and catalogued ACTUAL rendered data
+points per screen. Concrete, screen-grounded — found runtime issues a code read missed. Triage:
+
+| ID | Screen | Title | Tier | Effort |
+|----|--------|-------|------|--------|
+| NR-19 | market-context, signals | **Blank-screen crash** — duplicate route registration (routes.tsx ~100-101) | **P0** | S |
+| NR-20 | Workbench | `TEST_CONNECTED_CHAIN` source label leaks on RELIANCE (metadata provider field) | **P0** | S |
+| NR-27 | Daily Review | RELIANCE stop ₹179.87 (pre-bonus unadjusted) shown with no warning; add >40%-gap guard | **P0** | S |
+| NR-25 | Daily Review | Regime + Sector + DQ columns always "—" (display-wiring gap; data exists) | P1 | S |
+| NR-22 | Market Pulse | India VIX widget (ingest from index bhavcopy; cap posture >22) — UI half of CB-23 | P1 | S |
+| NR-23 | Market Pulse, Daily Overview | A/D ratio as a headline number (basic daily count; simpler than CB-72 line) | P1 | S |
+| NR-21 | Market Pulse | Health score prior-day delta + 5-day sparkline (read persisted snapshots) | P1 | S |
+| NR-31 | Workbench | Derived PE / Market Cap / Dividend Yield (computable from close+EPS+divs) | P1 | S |
+| NR-29 | Daily Overview | Entire screen empty — wire movers/regime/candidates from persisted data | P1 | M |
+| NR-28 | Research Hub | Drilldown tabs render chrome with no content behind them | P1 | M |
+| NR-33 | Backtesting | Low-sample CI warning (<30 trades) + zero-exit anomaly flag | P1 | S |
+| NR-34 | AI Copilot | Market Brief never loads — auto-load + stale fallback + spinner | P1 | S |
+| NR-32 | Backtesting | Monthly-return grid + regime-segmented summary | P1 | M |
+| NR-26 | Daily Review | Confidence note repeated 20× — hoist to table header | P2 | S |
+| NR-24 | Market Pulse | Sector warning enums unhumanized (LATEST_PRICE_STALE_…) — CB-51 remainder | P2 | S |
+| NR-30 | Smart Money | Sector classification always NEUTRAL — band too wide | P2 | S |
+| NR-35 | Backtesting | Saved Runs list opaque — show strategy/universe/metrics | P2 | S |
+
+Note: NR-19/20/27 are P0 (visible trust breakage on market screens). NR-22/23 are the UI halves of
+CB-23/CB-72. Several deepen CB-1/CB-48/CB-50/CB-51 with concrete observed instances.
