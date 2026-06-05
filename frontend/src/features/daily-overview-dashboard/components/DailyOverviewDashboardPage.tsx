@@ -122,11 +122,7 @@ export function DailyOverviewDashboardPage() {
           </Stack>
         </Paper>
 
-        {(dashboard.critical.todayReview.error || dashboard.critical.marketMovers.error) && (
-          <Alert severity="warning">
-            {dashboard.critical.todayReview.error || dashboard.critical.marketMovers.error}
-          </Alert>
-        )}
+        {/* Per-section errors are rendered inline; no combined top-level error needed */}
 
         <Grid container spacing={2}>
           <Grid item xs={12} lg={8}>
@@ -157,15 +153,32 @@ export function DailyOverviewDashboardPage() {
                   </ToggleButtonGroup>
                 </Stack>
                 {dashboard.critical.marketMovers.loading && <LinearProgress />}
-                {!dashboard.critical.marketMovers.loading && moverSummary?.warnings?.[0] && (
+                {dashboard.critical.marketMovers.error && !dashboard.critical.marketMovers.loading && (
+                  <SectionError message={dashboard.critical.marketMovers.error} onRetry={() => void dashboard.refresh()} />
+                )}
+                {!dashboard.critical.marketMovers.loading && !dashboard.critical.marketMovers.error && moverSummary?.warnings?.[0] && (
                   <Alert severity="info">{moverSummary.warnings[0]}</Alert>
                 )}
                 <Grid container spacing={2}>
                   <Grid item xs={12} md={6}>
-                    <MoverList title={`Top ${moverRange} Price Gainers`} icon={<TrendingUpIcon color="success" />} rows={moverSummary?.gainers ?? []} tone="success.main" />
+                    <MoverList
+                      title={`Top ${moverRange} Price Gainers`}
+                      icon={<TrendingUpIcon color="success" />}
+                      rows={moverSummary?.gainers ?? []}
+                      tone="success.main"
+                      loading={dashboard.critical.marketMovers.loading}
+                      hasError={Boolean(dashboard.critical.marketMovers.error)}
+                    />
                   </Grid>
                   <Grid item xs={12} md={6}>
-                    <MoverList title={`Top ${moverRange} Price Losers`} icon={<TrendingDownIcon color="error" />} rows={moverSummary?.losers ?? []} tone="error.main" />
+                    <MoverList
+                      title={`Top ${moverRange} Price Losers`}
+                      icon={<TrendingDownIcon color="error" />}
+                      rows={moverSummary?.losers ?? []}
+                      tone="error.main"
+                      loading={dashboard.critical.marketMovers.loading}
+                      hasError={Boolean(dashboard.critical.marketMovers.error)}
+                    />
                   </Grid>
                 </Grid>
               </Stack>
@@ -176,12 +189,14 @@ export function DailyOverviewDashboardPage() {
             <Paper variant="outlined" sx={{ p: 2, height: '100%' }}>
               <Stack spacing={1.5}>
                 <Typography variant="h6">Today At A Glance</Typography>
-                {dashboard.criticalLoading ? (
+                {dashboard.critical.todayReview.loading ? (
                   <Stack spacing={1}>
                     <Skeleton variant="rounded" height={34} />
                     <Skeleton variant="rounded" height={34} />
                     <Skeleton variant="rounded" height={34} />
                   </Stack>
+                ) : dashboard.critical.todayReview.error ? (
+                  <SectionError message={dashboard.critical.todayReview.error} onRetry={() => void dashboard.refresh()} />
                 ) : (
                   <Stack direction="row" gap={1} flexWrap="wrap" useFlexGap>
                     <Chip label={`Bullish ${formatNumber(todayReviewGroups.bullishReview.length)}`} color="success" variant="outlined" />
@@ -192,14 +207,27 @@ export function DailyOverviewDashboardPage() {
                   </Stack>
                 )}
                 <Divider />
-                <Tooltip title="Advance/decline ratio: number of advancing stocks divided by declining stocks. Values above 1.0 indicate more advancers than decliners." arrow>
+                {dashboard.deferred.marketContext.loading ? (
+                  <Stack spacing={0.75}>
+                    <Skeleton variant="text" width="60%" />
+                    <Skeleton variant="text" width="50%" />
+                  </Stack>
+                ) : dashboard.deferred.marketContext.error ? (
                   <Typography variant="body2" color="text.secondary">
-                    A/D ratio: {formatRatio(marketContext?.breadth?.advanceDeclineRatio)}
+                    Market context unavailable — see Sector Strength below.
                   </Typography>
-                </Tooltip>
-                <Typography variant="body2" color="text.secondary">
-                  Regime: {formatStatus(marketContext?.regime?.regime)}
-                </Typography>
+                ) : (
+                  <>
+                    <Tooltip title="Advance/decline ratio: number of advancing stocks divided by declining stocks. Values above 1.0 indicate more advancers than decliners." arrow>
+                      <Typography variant="body2" color="text.secondary">
+                        A/D ratio: {formatRatio(marketContext?.breadth?.advanceDeclineRatio)}
+                      </Typography>
+                    </Tooltip>
+                    <Typography variant="body2" color="text.secondary">
+                      Regime: {formatStatus(marketContext?.regime?.regime)}
+                    </Typography>
+                  </>
+                )}
               </Stack>
             </Paper>
           </Grid>
@@ -214,10 +242,13 @@ export function DailyOverviewDashboardPage() {
                   <Typography variant="body2" color="text.secondary">Top 10 by Today Review rank</Typography>
                 </Stack>
                 {dashboard.critical.todayReview.loading && <LinearProgress />}
-                {!dashboard.critical.todayReview.loading && topSignalCandidates.length === 0 && (
+                {dashboard.critical.todayReview.error && !dashboard.critical.todayReview.loading && (
+                  <SectionError message={dashboard.critical.todayReview.error} onRetry={() => void dashboard.refresh()} />
+                )}
+                {!dashboard.critical.todayReview.loading && !dashboard.critical.todayReview.error && topSignalCandidates.length === 0 && (
                   <Alert severity="info">No ranked signal candidates are currently published for this scope.</Alert>
                 )}
-                {!dashboard.critical.todayReview.loading && topSignalCandidates.length > 0 && (
+                {!dashboard.critical.todayReview.loading && !dashboard.critical.todayReview.error && topSignalCandidates.length > 0 && (
                   <TableContainer sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, maxHeight: 430 }}>
                     <Table stickyHeader size="small" sx={{
                       minWidth: 820,
@@ -283,7 +314,10 @@ export function DailyOverviewDashboardPage() {
                   Stocks where market movement overlaps with a current signal candidate.
                 </Typography>
                 {dashboard.critical.todayReview.loading && <LinearProgress />}
-                {!dashboard.critical.todayReview.loading && hotStocks.length === 0 && (
+                {dashboard.critical.todayReview.error && !dashboard.critical.todayReview.loading && (
+                  <SectionError message={dashboard.critical.todayReview.error} onRetry={() => void dashboard.refresh()} />
+                )}
+                {!dashboard.critical.todayReview.loading && !dashboard.critical.todayReview.error && hotStocks.length === 0 && (
                   <Alert severity="info">No mover and signal-candidate overlap is available for {moverRange}.</Alert>
                 )}
                 <Grid container spacing={1}>
@@ -310,14 +344,23 @@ export function DailyOverviewDashboardPage() {
         <Paper variant="outlined" sx={{ p: 2 }}>
           <Stack spacing={1.5}>
             <Typography variant="h6">Sector Strength</Typography>
-            {dashboard.deferred.marketContext.loading && <LinearProgress />}
-            {dashboard.deferred.marketContext.error && <Alert severity="warning">{dashboard.deferred.marketContext.error}</Alert>}
+            {dashboard.deferred.marketContext.error && !dashboard.deferred.marketContext.loading && (
+              <SectionError message={dashboard.deferred.marketContext.error} onRetry={() => void dashboard.refresh()} />
+            )}
             <Grid container spacing={2}>
               <Grid item xs={12} md={6}>
-                <SectorList title="Leading Sectors" rows={marketContext?.topSectors ?? []} />
+                <SectorList
+                  title="Leading Sectors"
+                  rows={marketContext?.topSectors ?? []}
+                  loading={dashboard.deferred.marketContext.loading}
+                />
               </Grid>
               <Grid item xs={12} md={6}>
-                <SectorList title="Weak Sectors" rows={marketContext?.weakSectors ?? []} />
+                <SectorList
+                  title="Weak Sectors"
+                  rows={marketContext?.weakSectors ?? []}
+                  loading={dashboard.deferred.marketContext.loading}
+                />
               </Grid>
             </Grid>
           </Stack>
@@ -378,15 +421,34 @@ function CandidateDetailDialog({ candidate, onClose }: { candidate: CandidateGro
   );
 }
 
-function MoverList({ title, icon, rows, tone }: { title: string; icon: ReactNode; rows: MarketMoverRow[]; tone: string }) {
+function SectionError({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <Alert
+      severity="error"
+      action={
+        <Button color="inherit" size="small" startIcon={<RefreshIcon />} onClick={onRetry}>
+          Retry
+        </Button>
+      }
+    >
+      Couldn&apos;t reach the server — {message}
+    </Alert>
+  );
+}
+
+function MoverList({ title, icon, rows, tone, loading, hasError }: { title: string; icon: ReactNode; rows: MarketMoverRow[]; tone: string; loading: boolean; hasError: boolean }) {
   return (
     <Stack spacing={1}>
       <Stack direction="row" alignItems="center" gap={1}>
         {icon}
         <Typography variant="subtitle1" fontWeight={800}>{title}</Typography>
       </Stack>
-      {rows.length === 0 ? (
-        <Alert severity="info">No rows available.</Alert>
+      {loading ? (
+        <Stack spacing={0.75}>
+          {[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} variant="rounded" height={38} />)}
+        </Stack>
+      ) : hasError ? null : rows.length === 0 ? (
+        <Alert severity="info">No data for today.</Alert>
       ) : (
         <List dense disablePadding sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
           {rows.map((row, index) => (
@@ -413,12 +475,16 @@ function MoverList({ title, icon, rows, tone }: { title: string; icon: ReactNode
   );
 }
 
-function SectorList({ title, rows }: { title: string; rows: Array<{ sector: string; return1M: number | null; return3M: number | null; return6M: number | null; relativeStrengthScore: number }> }) {
+function SectorList({ title, rows, loading }: { title: string; rows: Array<{ sector: string; return1M: number | null; return3M: number | null; return6M: number | null; relativeStrengthScore: number }>; loading: boolean }) {
   return (
     <Stack spacing={1}>
       <Typography variant="subtitle1" fontWeight={800}>{title}</Typography>
-      {rows.length === 0 ? (
-        <Alert severity="info">No sector rows available.</Alert>
+      {loading ? (
+        <Stack spacing={0.75}>
+          {[1, 2, 3, 4, 5, 6].map((i) => <Skeleton key={i} variant="rounded" height={38} />)}
+        </Stack>
+      ) : rows.length === 0 ? (
+        <Alert severity="info">No data for today.</Alert>
       ) : (
         <List dense disablePadding sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
           {rows.slice(0, 6).map((row, index) => (

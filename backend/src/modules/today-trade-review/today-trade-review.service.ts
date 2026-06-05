@@ -1,6 +1,7 @@
 import { DataQualityEngineService } from '../data-quality-engine';
 import { EarningsIntelligenceService } from '../earnings-intelligence';
 import { MarketContextIntelligenceService } from '../market-context-intelligence';
+import type { MarketContextSummary } from '../market-context-intelligence';
 import { MarketDataFoundationService } from '../market-data-foundation';
 import type { TrustedReviewUniverseHealth, TrustedReviewUniverseInstrument } from '../market-data-foundation';
 import { SignalCalibrationEngineService } from '../signal-calibration-engine';
@@ -145,7 +146,7 @@ export class TodayTradeReviewService {
       sourceSnapshot.marketContext = sources.marketContext;
       sourceSnapshot.rawSignalUniverse = sources.rawSignalUniverse;
 
-      const liteResult = this.buildLiteCandidates(sources.trustedInstruments, sources.reviewUniverse, sources.scanEvidence, sources.strategyFunnel, sources.earningsProximity);
+      const liteResult = this.buildLiteCandidates(sources.trustedInstruments, sources.reviewUniverse, sources.scanEvidence, sources.strategyFunnel, sources.earningsProximity, sources.marketContext);
       sourceSnapshot.scanFunnel = liteResult.scanFunnel;
       const candidateSources = sources.reviewUniverse?.mode === 'NO_REVIEW'
         ? []
@@ -642,7 +643,8 @@ export class TodayTradeReviewService {
       membershipLoadFailureReason: string | null;
     },
     strategyFunnel: StrategyFunnelStats,
-    earningsProximity: Map<string, TodayReviewEarningsProximity> = new Map()
+    earningsProximity: Map<string, TodayReviewEarningsProximity> = new Map(),
+    marketContext?: MarketContextSummary | null
   ): { candidates: TodayReviewCandidateDto[]; scanFunnel: TodayReviewScanFunnel } {
     const scanFunnel: TodayReviewScanFunnel = {
       trustedUniverseCount: scanEvidence.trustedUniverseCount,
@@ -723,6 +725,14 @@ export class TodayTradeReviewService {
         ...(earningsCaveat ? [earningsCaveat] : []),
         ...instrument.warnings.slice(0, 2),
       ];
+      // Resolve sector leadership from the run's persisted market context (if available).
+      const instrumentSector = instrument.sector ?? null;
+      let sectorLeadershipStatus: string | null = null;
+      if (instrumentSector && marketContext) {
+        const top = marketContext.topSectors.find((item) => item.sector === instrumentSector);
+        const weak = marketContext.weakSectors.find((item) => item.sector === instrumentSector);
+        sectorLeadershipStatus = top?.leadershipStatus ?? weak?.leadershipStatus ?? null;
+      }
       candidates.push({
         instrumentId: instrument.id,
         symbol: instrument.symbol,
@@ -746,6 +756,8 @@ export class TodayTradeReviewService {
           hasRecentVolume: instrument.hasRecentVolume,
           contextGaps: instrument.contextGaps,
           dataStatus: 'PRICE_ACTION_READY',
+          /** sector: from instrument catalog metadata; null when absent (appears in contextGaps). */
+          sector: instrumentSector,
         },
         marketContextSnapshot: {
           reviewUniverseMode: reviewUniverse.mode,
@@ -755,6 +767,10 @@ export class TodayTradeReviewService {
           requiredDataThroughDate: reviewUniverse.requiredDataThroughDate,
           storedDataThroughDate: reviewUniverse.storedDataThroughDate,
           contextGapCounts: reviewUniverse.contextGapCounts,
+          /** regime: from the run's persisted market context; null when market context was unavailable. */
+          regime: marketContext?.regime ?? null,
+          /** sectorLeadershipStatus: resolved from market context topSectors/weakSectors for this candidate's sector. */
+          sectorLeadershipStatus,
         },
         strategyProofSnapshot: {
           proofType: 'OHLCV_LITE_HISTORICAL_EVIDENCE',
@@ -776,7 +792,7 @@ export class TodayTradeReviewService {
             signalStrength: setup.signalStrength,
             reason: setup.reason,
           },
-          priceBehaviour: this.litePriceBehaviourSnapshot(instrument.priceHistory),
+          priceBehaviour: this.litePriceBehaviourSnapshot(instrument.priceHistory, instrumentSector),
         },
       });
     }
@@ -1825,17 +1841,17 @@ export class TodayTradeReviewService {
    * Stored as `sourceSignalSnapshot.priceBehaviour` so the FE detail page can
    * compose a deterministic "Price behaviour" paragraph without a live compute.
    */
-  private litePriceBehaviourSnapshot(history: TrustedReviewUniverseInstrument['priceHistory']): {
+  private litePriceBehaviourSnapshot(history: TrustedReviewUniverseInstrument['priceHistory'], sector: string | null = null): {
     recentReturn3D: number | null;
     volumeVsAvg20D: number | null;
     deliveryPercent: null;
     deliveryEvidence: null;
-    sector: null;
+    sector: string | null;
     dailyChangePercent: number | null;
   } {
     const n = history.length;
     if (n < 2) {
-      return { recentReturn3D: null, volumeVsAvg20D: null, deliveryPercent: null, deliveryEvidence: null, sector: null, dailyChangePercent: null };
+      return { recentReturn3D: null, volumeVsAvg20D: null, deliveryPercent: null, deliveryEvidence: null, sector, dailyChangePercent: null };
     }
     const latest = history[n - 1];
     const prev = history[n - 2];
@@ -1862,7 +1878,7 @@ export class TodayTradeReviewService {
       volumeVsAvg20D,
       deliveryPercent: null,   // not available on lite path (no rawSignal)
       deliveryEvidence: null,
-      sector: null,
+      sector,   // from instrument catalog metadata; null when absent
       dailyChangePercent,
     };
   }

@@ -164,7 +164,7 @@ export function TodayReviewPage() {
                   {emptySectionExplanation(tab, run)}
                 </Typography>
               ) : (
-                <CandidateTable candidates={activeCandidates} />
+                <CandidateTable candidates={activeCandidates} run={run} />
               )}
             </CardContent>
           </Card>
@@ -187,6 +187,9 @@ function RunStatusPanel({ run, marketPosture }: { run: TodayReviewRun | null; ma
   const postureBandText = marketPosture?.suggestedExposureBand
     ? ` (${marketPosture.suggestedExposureBand.minPct}–${marketPosture.suggestedExposureBand.maxPct}%)`
     : '';
+  // Run-level market regime from persisted market context snapshot.
+  const runRegime: string | null = (sourceSnapshot as any).marketContext?.regime?.regime ?? null;
+  const regimeColor = runRegime === 'RISK_ON' ? 'success' : runRegime === 'RISK_OFF' ? 'error' : runRegime ? 'warning' : 'default';
   return (
     <Card variant="outlined">
       <CardContent>
@@ -194,6 +197,16 @@ function RunStatusPanel({ run, marketPosture }: { run: TodayReviewRun | null; ma
           <Chip label={`Run status: ${run.status}`} color={run.status === 'COMPLETED' ? 'success' : run.status === 'PARTIAL' ? 'warning' : 'error'} />
           <Chip label={`Trust: ${run.trustStatus}`} color={run.trustStatus === 'OK' ? 'success' : run.trustStatus === 'FAILED' ? 'error' : 'warning'} variant="outlined" />
           <Chip label={`Market Data trust: ${reviewReadiness.trustStatus || 'UNKNOWN'}`} variant="outlined" />
+          {runRegime ? (
+            <Tooltip title={`Market regime from persisted context snapshot: ${humanizeCode(runRegime)}. Applies to all candidates in this run.`} arrow>
+              <Chip
+                label={`Regime: ${humanizeCode(runRegime)}`}
+                color={regimeColor as any}
+                variant="filled"
+                size="small"
+              />
+            </Tooltip>
+          ) : null}
           {marketPosture ? (
             <Tooltip title={marketPosture.availability !== 'READY' ? 'Capital posture data is unavailable for this run.' : `Suggested exposure band${postureBandText}`} arrow>
               <Chip
@@ -494,8 +507,10 @@ function downloadTodayReviewCsv(rows: TodayReviewCandidate[], tabLabel: string) 
   URL.revokeObjectURL(url);
 }
 
-function CandidateTable({ candidates }: { candidates: TodayReviewCandidate[] }) {
+function CandidateTable({ candidates, run }: { candidates: TodayReviewCandidate[]; run: TodayReviewRun | null }) {
   const navigate = useNavigate();
+  // Run-level regime from persisted market context — used as per-row fallback when per-candidate snapshot lacks it.
+  const runRegime: string | null = run ? ((sourceSnapshotForRun(run) as any).marketContext?.regime?.regime ?? null) : null;
   const [query, setQuery] = useState('');
   const [gradeFilter, setGradeFilter] = useState('ALL');
   const [readinessFilter, setReadinessFilter] = useState('ALL');
@@ -658,15 +673,15 @@ function CandidateTable({ candidates }: { candidates: TodayReviewCandidate[] }) 
       id: 'market',
       label: 'Regime',
       width: 140,
-      value: marketLabel,
-      render: (candidate) => <EllipsisCell fullText={marketLabel(candidate)} />,
+      value: (candidate) => marketLabel(candidate, runRegime),
+      render: (candidate) => <EllipsisCell fullText={marketLabel(candidate, runRegime)} />,
     },
     {
       id: 'sector',
       label: 'Sector',
-      width: 180,
+      width: 200,
       value: sectorAlignment,
-      render: (candidate) => <EllipsisCell fullText={sectorAlignment(candidate)} />,
+      render: (candidate) => <SectorCell candidate={candidate} />,
     },
     {
       id: 'reason',
@@ -1040,6 +1055,46 @@ function EarningsProximityChip({ earningsProximity }: { earningsProximity?: Toda
   );
 }
 
+type SectorLeadershipStatus = 'LEADING' | 'IMPROVING' | 'NEUTRAL' | 'WEAKENING' | 'LAGGING';
+
+function sectorLeadershipColor(status: SectorLeadershipStatus | null): 'success' | 'warning' | 'error' | 'default' {
+  if (status === 'LEADING' || status === 'IMPROVING') return 'success';
+  if (status === 'WEAKENING' || status === 'LAGGING') return 'error';
+  return 'default';
+}
+
+function SectorCell({ candidate }: { candidate: TodayReviewCandidate }) {
+  const sector = sectorAlignment(candidate);
+  const market = candidate.marketContextSnapshot as any;
+  const leadership: SectorLeadershipStatus | null = market?.sectorLeadershipStatus ?? null;
+  if (sector === '—') {
+    return <EllipsisCell fullText="—" />;
+  }
+  return (
+    <Stack direction="row" spacing={0.5} alignItems="center" sx={{ flexWrap: 'nowrap', overflow: 'hidden' }}>
+      <Tooltip title={sector} arrow enterDelay={350}>
+        <Typography
+          component="span"
+          sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 'inherit', flexShrink: 1 }}
+        >
+          {sector}
+        </Typography>
+      </Tooltip>
+      {leadership ? (
+        <Tooltip title={`Sector leadership: ${humanizeCode(leadership)}`} arrow enterDelay={200}>
+          <Chip
+            label={humanizeCode(leadership)}
+            size="small"
+            color={sectorLeadershipColor(leadership)}
+            variant="outlined"
+            sx={{ ...chipNoWrapSx, flexShrink: 0, fontSize: 10, height: 18, '& .MuiChip-label': { px: 0.5 } }}
+          />
+        </Tooltip>
+      ) : null}
+    </Stack>
+  );
+}
+
 function searchableCandidateText(candidate: TodayReviewCandidate) {
   const context = tierContextForCandidate(candidate);
   const plan = candidate.tradePlanSnapshot as any;
@@ -1100,9 +1155,11 @@ function proofLabel(candidate: TodayReviewCandidate) {
   return proof?.strategyRating?.ratingGrade || plan?.strategyRating || '—';
 }
 
-function marketLabel(candidate: TodayReviewCandidate) {
+function marketLabel(candidate: TodayReviewCandidate, runRegime?: string | null) {
   const market = candidate.marketContextSnapshot as any;
-  return market?.regime?.regime || '—';
+  // Per-candidate snapshot (strategy path). Falls back to run-level regime (lite path + legacy runs).
+  const regime = market?.regime?.regime || runRegime || null;
+  return regime ? humanizeCode(regime) : '—';
 }
 
 function blockerLabel(candidate: TodayReviewCandidate) {
@@ -1274,8 +1331,15 @@ function gradeColor(grade: string) {
 }
 
 function sectorAlignment(candidate: TodayReviewCandidate) {
-  const sector = (candidate.dataQualitySnapshot as TodayReviewCandidateDataQualitySnapshot | null)?.sector || (candidate.sourceSignalSnapshot as any)?.rawSignal?.sector;
-  return sector || '—';
+  const dq = candidate.dataQualitySnapshot as TodayReviewCandidateDataQualitySnapshot | null;
+  const signal = candidate.sourceSignalSnapshot as any;
+  // Strategy path: dataQualitySnapshot.sector or sourceSignalSnapshot.rawSignal.sector
+  // Lite path: dataQualitySnapshot.sector (populated from instrument catalog) or priceBehaviour.sector
+  const sector = dq?.sector
+    || signal?.rawSignal?.sector
+    || signal?.priceBehaviour?.sector
+    || null;
+  return sector ? humanizeCode(sector) : '—';
 }
 
 function hasMissingTierContext(candidate: TodayReviewCandidate) {
