@@ -143,6 +143,11 @@ Done & committed (newest first):
 - ✅ **dailyPnLPercent denominator + null guards** (#113) — prior-day value of the measurable subset; null on zero basis. `d1c44c3`.
 - ✅ **Stale-price-age priceDate** (#114) — `priceDate` now on HoldingValuationDto (intelligence red-flag wiring still a follow-up). `d1c44c3`.
 - ✅ **Rate-limit /auth/login + /auth/signup** (#131) — zero-dep per-IP limiter, NODE_ENV=test bypass. `d1c44c3`.
+- ✅ **Batch previous-close lookup** (#124) — enrichSignals now one bulk query instead of N per-signal. `09049f3`.
+- ✅ **EARNINGS_INTELLIGENCE_REFRESH scheduled-chain ordering** (#122) — was at the tail (after today-review consumed stale earnings); moved to stageOrder 5 (post-calibration, pre-consumers). `09049f3`.
+- ✅ **Fundamentals coverage depth tiers** (#115) — NONE/SHALLOW/ADEQUATE/DEEP + period count on DQ DTO; a single manual row no longer reads as full coverage. `09049f3`.
+- ✅ **EXIT_TRIGGERED → CLOSED resolver** (#125) — next-bar close-evidence resolver in the POST-refresh path; closed-history can now populate honestly. `ac58058`.
+- ✅ **Copilot wiring** (#126) — already delivered as task #40 (deterministic explainer over strategy-decision/trade-plan/today-review).
 - ✅ **De-duplicate marketGate vs Capital Posture** (#119) — already single-sourced via capital-posture.types thresholds. `dc134b1`/`1d8bab7`.
 - ✅ **DEFENSIVE_EXIT real portfolio risk** (#120) — phantom constant 5 replaced with derived P&L/exposure score or honest-zero + dataGap. `dc134b1`.
 - ✅ **stock-research-workbench signal-evidence section** (#127) — shipped in FE audit. `b1d7519`.
@@ -151,7 +156,11 @@ Done & committed (newest first):
 
 Related infra/perf fixed same window: backtest NULLS-LAST universe ranking + today-review pool/scan bounding (#51/#52, `62b3cc6`); dead worker PrismaClient removed (`5b9fd02`).
 
-Still open in P2: reframe 25% signal-quality health weight (#111); fundamentals coverage tiers (#115); peer-relative batch signals (#116); smart-money bulk/block deals (#117, needs NSE source); macro proxy RBI/FII-DII (#118, needs source); regime-score weight validation (#121); EARNINGS_INTELLIGENCE_REFRESH in scheduled chain (#122); scheduled NSE-XBRL fundamentals refresh (#123); batch previous-close lookup (#124); EXIT_TRIGGERED→CLOSED resolver (#125); copilot wiring (#126 — largely done in #40); refresh-token flow (#130); symbol+exchange uniqueness (#132, L/migration); durable BSE historical source (#133); DataQualitySnapshot scope fields (#134); watchlist idea-stage/priority (#129 remainder).
+Still open in P2 (each needs a product decision, an external NSE/RBI data source, or a DB migration — deferred for owner input rather than forced unsupervised):
+- **Product judgment:** reframe 25% signal-quality health weight (#111 — how much should edge-less signals drive AT_RISK?); regime-score weight validation + SAMPLE_SIZE (#121).
+- **Needs external NSE/RBI source (integration + live verification):** smart-money bulk/block deals (#117); macro proxy RBI rate calendar / FII-DII flows (#118); durable BSE historical candle source (#133).
+- **DB migration (riskier unsupervised):** symbol+exchange uniqueness (#132, L); DataQualitySnapshot scope fields (#134); persist fundamentals tier columns (#115 follow-up).
+- **Medium feature:** peer-relative batch signals + weekly peer cache (#116); scheduled incremental NSE-XBRL fundamentals refresh (#123); refresh-token flow (#130); watchlist idea-stage/priority (#129 remainder).
 
 ---
 
