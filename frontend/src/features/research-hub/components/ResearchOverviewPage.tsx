@@ -35,6 +35,7 @@ import {
   TimelineOutlined,
 } from '@mui/icons-material';
 import { Link } from 'react-router-dom';
+import { humanizeCode } from '@/shared/format/enumLabels';
 import { useResearchOverview } from '../hooks/useResearchOverview';
 import { PageHeader } from '@/shared/components';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
@@ -125,7 +126,7 @@ const ResearchOverviewPage: React.FC = () => {
           <Typography variant="h6" sx={{ mb: 2, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
             <LocalFireDepartmentOutlined color="primary" /> Research Priority Board
           </Typography>
-          <ResearchPriorityBoard priorities={researchPriorities} />
+          <ResearchPriorityBoard priorities={researchPriorities} generatedAt={data.generatedAt} />
         </Grid>
 
         {/* 3. Confirmation & What Changed Panel */}
@@ -161,7 +162,7 @@ const ResearchOverviewPage: React.FC = () => {
           </Stack>
         </Grid>
       </Grid>
-      
+
       {dataGaps.length > 0 && (
         <Box sx={{ mt: 4 }}>
           <Alert severity="warning">
@@ -250,12 +251,12 @@ const MarketReadinessHero: React.FC<{
     : marketEnvironmentMessage || 'Market environment is one input; setup readiness is not confirmed.';
 
   return (
-    <Paper 
-      elevation={0} 
-      sx={{ 
-        p: 4, 
+    <Paper
+      elevation={0}
+      sx={{
+        p: 4,
         borderRadius: 2,
-        borderLeft: '8px solid', 
+        borderLeft: '8px solid',
         borderColor: `${gateColor}.main`,
         backgroundColor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.03)' : 'rgba(0, 0, 0, 0.01)'
       }}
@@ -284,7 +285,7 @@ const MarketReadinessHero: React.FC<{
               </>
             )}
           </Stack>
-          
+
           {(readiness?.blockers?.length ?? 0) > 0 && (
             <Box sx={{ mt: 2, p: 2, bgcolor: 'error.main', color: 'error.contrastText', borderRadius: 1 }}>
               <Typography variant="subtitle2" fontWeight={700} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -294,18 +295,18 @@ const MarketReadinessHero: React.FC<{
             </Box>
           )}
         </Grid>
-        
+
         <Grid item xs={12} md={4}>
           <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: 700, color: 'text.secondary' }}>
             Recommended Next Actions
           </Typography>
           <Stack spacing={1}>
             {nextActions.map((action, idx) => (
-              <Button 
-                key={idx} 
-                component={Link} 
-                to={action.targetRoute} 
-                variant={action.priority === 'HIGH' ? 'contained' : 'outlined'} 
+              <Button
+                key={idx}
+                component={Link}
+                to={action.targetRoute}
+                variant={action.priority === 'HIGH' ? 'contained' : 'outlined'}
                 color={action.priority === 'HIGH' ? 'primary' : 'inherit'}
                 size="small"
                 fullWidth
@@ -322,11 +323,17 @@ const MarketReadinessHero: React.FC<{
   );
 };
 
-const ResearchPriorityBoard: React.FC<{ priorities: ResearchOverview['researchPriorities'] }> = ({ priorities }) => {
+const ResearchPriorityBoard: React.FC<{ priorities: ResearchOverview['researchPriorities']; generatedAt?: string }> = ({ priorities, generatedAt }) => {
   return (
     <Grid container spacing={3}>
       <Grid item xs={12} sm={6}>
-        <PriorityCard title="Review Candidates" items={priorities?.tradeCandidates || []} type="candidate" emptyMsg="No framework-backed review candidates with enough proof." />
+        <PriorityCard
+          title="Review Candidates"
+          items={priorities?.tradeCandidates || []}
+          type="candidate"
+          emptyMsg="No framework-backed candidates meet the proof threshold yet."
+          snapshotDate={generatedAt}
+        />
       </Grid>
       <Grid item xs={12} sm={6}>
         <PriorityCard title="Exit / Reduce Risk" items={priorities?.exitCandidates || []} type="exit" emptyMsg="No active exit candidates found." />
@@ -341,13 +348,17 @@ const ResearchPriorityBoard: React.FC<{ priorities: ResearchOverview['researchPr
   );
 };
 
-const PriorityCard: React.FC<{ title: string; items: ResearchPriorityCandidate[]; type: 'candidate' | 'exit' | 'watch' | 'avoid', emptyMsg: string }> = ({ title, items = [], type, emptyMsg }) => {
+const PriorityCard: React.FC<{ title: string; items: ResearchPriorityCandidate[]; type: 'candidate' | 'exit' | 'watch' | 'avoid'; emptyMsg: string; snapshotDate?: string }> = ({ title, items = [], type, emptyMsg, snapshotDate }) => {
   const getHeaderColor = () => {
     if (type === 'candidate') return 'primary.main';
     if (type === 'exit') return 'error.main';
     if (type === 'watch') return 'info.main';
     return 'warning.main';
   };
+
+  const snapshotTs = snapshotDate ? new Date(snapshotDate) : null;
+  const ageMs = snapshotTs ? Date.now() - snapshotTs.getTime() : null;
+  const isStale = ageMs !== null && ageMs > 24 * 60 * 60 * 1000;
 
   return (
     <Paper variant="outlined" sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -359,14 +370,30 @@ const PriorityCard: React.FC<{ title: string; items: ResearchPriorityCandidate[]
       </Box>
       <CardContent sx={{ p: 0, flexGrow: 1 }}>
         {items.length === 0 ? (
-          <Box sx={{ p: 4, textAlign: 'center' }}>
+          <Box sx={{ p: 3, textAlign: 'center' }}>
             <Typography variant="body2" color="text.secondary">{emptyMsg}</Typography>
+            {snapshotTs && (
+              <Box sx={{ mt: 1.5 }}>
+                <Typography variant="caption" color="text.secondary" display="block">
+                  Evaluation snapshot: {snapshotTs.toLocaleString()}
+                </Typography>
+                {isStale && (
+                  <Chip
+                    label="Stale — over 1 day old"
+                    size="small"
+                    color="warning"
+                    variant="filled"
+                    sx={{ mt: 0.75, fontWeight: 700, fontSize: '0.65rem' }}
+                  />
+                )}
+              </Box>
+            )}
           </Box>
         ) : (
           <List disablePadding>
             {items.map((item, idx) => (
               <React.Fragment key={item.id || idx}>
-                <ListItem 
+                <ListItem
                   disablePadding
                   sx={{ '&:hover': { bgcolor: 'action.hover' } }}
                   secondaryAction={
@@ -384,13 +411,13 @@ const PriorityCard: React.FC<{ title: string; items: ResearchPriorityCandidate[]
                     <ListItemIcon sx={{ minWidth: 40 }}>
                       {type === 'candidate' ? <FlashOnOutlined color="primary" /> : type === 'exit' ? <ShieldOutlined color="error" /> : <SearchOutlined />}
                     </ListItemIcon>
-                    <ListItemText 
+                    <ListItemText
                       primary={
                         <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
                           <Typography variant="body1" fontWeight={700}>{item.symbol}</Typography>
                           <Typography variant="caption" sx={{ px: 0.5, borderRadius: 0.5, bgcolor: 'action.selected' }}>{item.decisionScore}</Typography>
-                          <Chip size="small" label={item.backtestSummary?.ratingGrade || item.strategyRating?.ratingGrade || 'UNPROVEN'} />
-                          <Chip size="small" label={safeReadiness(item.readinessLabel)} />
+                          <Chip size="small" label={humanizeCode(item.backtestSummary?.ratingGrade || item.strategyRating?.ratingGrade || 'UNPROVEN')} />
+                          <Chip size="small" label={humanizeCode(safeReadiness(item.readinessLabel))} />
                         </Stack>
                       }
                       secondary={
@@ -431,7 +458,7 @@ const ConfirmationPanel: React.FC<{ summary: ResearchOverview['confirmationSumma
           {/* Signal Confirmation */}
           <ListItem sx={{ py: 2, px: 2 }}>
             <ListItemIcon sx={{ minWidth: 40 }}><FlashOnOutlined /></ListItemIcon>
-            <ListItemText 
+            <ListItemText
               primary="Signal Pulse"
               secondary={
                 <Box sx={{ mt: 0.5 }}>
@@ -446,11 +473,11 @@ const ConfirmationPanel: React.FC<{ summary: ResearchOverview['confirmationSumma
             />
           </ListItem>
           <Divider />
-          
+
           {/* Smart Money Confirmation */}
           <ListItem sx={{ py: 2, px: 2 }}>
             <ListItemIcon sx={{ minWidth: 40 }}><GppGoodOutlined /></ListItemIcon>
-            <ListItemText 
+            <ListItemText
               primary="Smart Money Alignment"
               secondary={
                 <Box sx={{ mt: 0.5 }}>
@@ -472,11 +499,11 @@ const ConfirmationPanel: React.FC<{ summary: ResearchOverview['confirmationSumma
             />
           </ListItem>
           <Divider />
-          
+
           {/* Market Context */}
           <ListItem sx={{ py: 2, px: 2 }}>
             <ListItemIcon sx={{ minWidth: 40 }}><TrendingUpOutlined /></ListItemIcon>
-            <ListItemText 
+            <ListItemText
               primary="Sector Tailwinds"
               secondary={
                 <Box sx={{ mt: 0.5 }}>
@@ -516,8 +543,8 @@ const StrategyProofPanel: React.FC<{ summary: ResearchOverview['strategyProofSum
                     <Typography variant="caption" color="text.secondary">{item.candidateCount} review candidate(s){item.topCandidateSymbol ? ` - top ${item.topCandidateSymbol}` : ''}</Typography>
                   </Box>
                   <Stack direction="row" spacing={0.5}>
-                    <Chip size="small" label={item.bestRating} />
-                    <Chip size="small" label={safeReadiness(item.readinessLabel)} />
+                    <Chip size="small" label={humanizeCode(item.bestRating)} />
+                    <Chip size="small" label={humanizeCode(safeReadiness(item.readinessLabel))} />
                   </Stack>
                 </Stack>
               </Paper>
@@ -633,10 +660,10 @@ const ResearchModuleDrilldowns: React.FC = () => {
             to={m.route}
             variant="outlined"
             fullWidth
-            sx={{ 
-              flexDirection: 'column', 
-              py: 2, 
-              height: '100%', 
+            sx={{
+              flexDirection: 'column',
+              py: 2,
+              height: '100%',
               borderColor: 'divider',
               color: 'text.primary',
               '&:hover': { bgcolor: 'action.hover' }

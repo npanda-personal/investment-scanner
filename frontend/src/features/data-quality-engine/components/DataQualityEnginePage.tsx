@@ -36,6 +36,7 @@ import type {
 import { useMarketScope } from '@/contexts/MarketScopeContext';
 import { DataTable, FilterBar, PageHeader, StatusBadge, type DataTableColumn, type SortDirection } from '@/shared/components';
 import { DataQualityPipelineStatusStrip } from './DataQualityPipelineStatusStrip';
+import { humanizeCode } from '@/shared/format/enumLabels';
 
 type QualityView = 'all' | 'ready' | 'blocked' | 'coverage' | 'liquidity' | 'backtest';
 type QualityTierKey = 'dailyReview' | 'signal' | 'backtest' | 'calibration' | 'automation';
@@ -137,7 +138,7 @@ const ScoreStatus: React.FC<{ score: number; status: string }> = ({ score, statu
     <Stack spacing={0.5} sx={{ minWidth: 110 }}>
       <Stack direction="row" justifyContent="space-between" spacing={1}>
         <Typography variant="body2" fontWeight={700}>{Math.round(score)}</Typography>
-        <Chip size="small" label={status} color={color} variant="outlined" />
+        <Chip size="small" label={humanizeCode(status)} color={color} variant="outlined" />
       </Stack>
       <LinearProgress
         variant="determinate"
@@ -149,7 +150,7 @@ const ScoreStatus: React.FC<{ score: number; status: string }> = ({ score, statu
 };
 
 const TierStatusChip: React.FC<{ status: DataQualityUseCaseTierStatus }> = ({ status }) => (
-  <Chip size="small" label={status} color={statusColor(status)} variant="outlined" sx={{ minWidth: 86 }} />
+  <Chip size="small" label={humanizeCode(status)} color={statusColor(status)} variant="outlined" sx={{ minWidth: 86 }} />
 );
 
 const DataQualityEnginePage: React.FC = () => {
@@ -451,9 +452,9 @@ const DataQualityEnginePage: React.FC = () => {
             </Box>
             <Divider />
             <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-              <StatusBadge label={selected.coverageStatus} />
-              <StatusBadge label={selected.signalReadinessStatus} />
-              <StatusBadge label={selected.liquidityStatus} />
+              <Chip size="small" variant="outlined" label={humanizeCode(selected.coverageStatus)} color={statusColor(selected.coverageStatus)} />
+              <Chip size="small" variant="outlined" label={humanizeCode(selected.signalReadinessStatus)} color={statusColor(selected.signalReadinessStatus)} />
+              <Chip size="small" variant="outlined" label={humanizeCode(selected.liquidityStatus)} color={statusColor(selected.liquidityStatus)} />
               <StatusBadge label={selected.eligibleForSignals ? 'SIGNALS YES' : 'SIGNALS NO'} />
             </Stack>
             {selectedTiers?.automation.status === 'BLOCKED' && (

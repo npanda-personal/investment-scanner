@@ -5,7 +5,7 @@ import HomePage from './HomePage';
 import AdminHomePage from './AdminHomePage';
 import { marketIntelligenceRoutes } from '@/features/market-intelligence';
 import { marketDataFoundationRoutes } from '@/features/market-data-foundation';
-import UnifiedStockPage from '@/features/market-data-foundation/components/UnifiedStockPage';
+import UnifiedStockPage, { InstrumentWorkspaceSymbolRedirect } from '@/features/market-data-foundation/components/UnifiedStockPage';
 import { stockResearchWorkbenchRoutes } from '@/features/stock-research-workbench';
 import { signalGenerationEngineRoutes } from '@/features/signal-generation-engine';
 import { portfolioManagementRoutes } from '@/features/portfolio-management';
@@ -33,6 +33,10 @@ import { signalPositionLedgerRoutes } from '@/features/signal-position-ledger';
 const userInstrumentRoutes: RouteObject[] = [
   { path: 'stocks', element: <Navigate to="/instrument-workspace" replace /> },
   { path: 'stocks/:id', element: <UnifiedStockPage /> },
+  // Deep-link support: /instrument-workspace/:symbol resolves the symbol to a
+  // catalog instrument and redirects to /stocks/:id. This makes URLs like
+  // /instrument-workspace/RELIANCE shareable and bookmarkable.
+  { path: 'instrument-workspace/:symbol', element: <InstrumentWorkspaceSymbolRedirect /> },
 ];
 
 const marketDataOperatorRoutes = marketDataFoundationRoutes.filter((route) => !String(route.path).startsWith('stocks'));

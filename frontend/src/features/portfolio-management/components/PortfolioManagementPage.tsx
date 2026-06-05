@@ -68,7 +68,7 @@ const resolveSymbol = (instrumentId: string | null, holdingsMap: Map<string, str
   return holdingsMap.get(instrumentId) || instrumentId.slice(0, 12) + (instrumentId.length > 12 ? '…' : '');
 };
 
-const money = (value: number | null | undefined, currency = 'USD') =>
+const money = (value: number | null | undefined, currency = 'INR') =>
   value === null || value === undefined
     ? 'N/A'
     : new Intl.NumberFormat(undefined, { style: 'currency', currency, maximumFractionDigits: 2 }).format(value);
@@ -82,7 +82,7 @@ const defaultHoldingForm = {
   instrumentId: '',
   quantity: '',
   averageCost: '',
-  currency: 'USD',
+  currency: 'INR',
   notes: '',
 };
 
@@ -92,7 +92,7 @@ const defaultTransactionForm = {
   quantity: '',
   price: '',
   amount: '',
-  currency: 'USD',
+  currency: 'INR',
   transactionDate: new Date().toISOString().slice(0, 10),
   notes: '',
 };
@@ -140,7 +140,7 @@ const PortfolioManagementPage: React.FC = () => {
   const selectedPortfolio = summary?.portfolio || detail?.portfolio || portfolios.find((portfolio) => portfolio.id === selectedId) || portfolios[0];
   const [formError, setFormError] = useState<string | null>(null);
   const [portfolioName, setPortfolioName] = useState('');
-  const [portfolioCurrency, setPortfolioCurrency] = useState('USD');
+  const [portfolioCurrency, setPortfolioCurrency] = useState('INR');
   const [portfolioDescription, setPortfolioDescription] = useState('');
   const [holdingForm, setHoldingForm] = useState(defaultHoldingForm);
   const [editingHolding, setEditingHolding] = useState<PortfolioHolding | null>(null);
@@ -152,7 +152,7 @@ const PortfolioManagementPage: React.FC = () => {
   const [capitalPosture, setCapitalPosture] = useState<CapitalPostureData | null>(null);
   const [postureLoading, setPostureLoading] = useState(false);
   const [postureError, setPostureError] = useState<string | null>(null);
-  const baseCurrency = selectedPortfolio?.baseCurrency || 'USD';
+  const baseCurrency = selectedPortfolio?.baseCurrency || 'INR';
 
   // Build a map from instrumentId -> symbol from holdings data for transaction display
   const holdingsSymbolMap = useMemo<Map<string, string>>(() => {
@@ -199,7 +199,7 @@ const PortfolioManagementPage: React.FC = () => {
         description: portfolioDescription || null,
       });
       setPortfolioName('');
-      setPortfolioCurrency('USD');
+      setPortfolioCurrency('INR');
       setPortfolioDescription('');
       await reloadOrSelect(portfolio.id);
     } catch (err: any) {

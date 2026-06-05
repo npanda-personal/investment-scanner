@@ -123,6 +123,26 @@ function displayEnum(value: string | null | undefined): string {
     .join(' ');
 }
 
+/**
+ * Derive a freshness label from actual dates rather than trusting the backend's
+ * cached status string.  Compares dataThroughDate against the expected latest
+ * trading date (latestCompletedTradingDate from sourceSummary, if present).
+ * If >1 calendar day behind the expected latest, the snapshot is Stale.
+ * Returns null when there is insufficient information to decide.
+ */
+function deriveFreshness(
+  dataThroughDate: string | null | undefined,
+  latestCompletedTradingDate: string | null | undefined,
+): string | null {
+  if (!dataThroughDate || !latestCompletedTradingDate) return null;
+  const dtMs = new Date(dataThroughDate).getTime();
+  const latestMs = new Date(latestCompletedTradingDate).getTime();
+  if (!Number.isFinite(dtMs) || !Number.isFinite(latestMs)) return null;
+  const diffDays = Math.round((latestMs - dtMs) / 86_400_000);
+  if (diffDays > 1) return `Stale (${diffDays}d behind)`;
+  return 'Fresh';
+}
+
 function arrayOfStrings(value: unknown): string[] {
   return Array.isArray(value) ? value.map(String) : [];
 }
@@ -175,7 +195,13 @@ export async function fetchMarketPulseSnapshot(scope: MarketScope): Promise<Snap
       message: body.message || (snapshot ? 'Persisted Market Pulse snapshot loaded.' : 'Market Pulse snapshot is not available for this scope.'),
       warnings: body.warnings || snapshot?.warnings || [],
       status: snapshot?.status || null,
-      freshness: snapshot?.sourceSummary?.status || snapshot?.status || null,
+      // Fix 3: derive freshness from actual dates so a stale snapshot cannot
+      // self-report as "Fresh" if the backend's cached status field is wrong.
+      freshness:
+        deriveFreshness(snapshot?.dataThroughDate, snapshot?.sourceSummary?.latestCompletedTradingDate)
+        ?? snapshot?.sourceSummary?.status
+        ?? snapshot?.status
+        ?? null,
       snapshotDate: snapshot?.snapshotDate || null,
       dataThroughDate: snapshot?.dataThroughDate || null,
       generatedAt: snapshot?.generatedAt || null,

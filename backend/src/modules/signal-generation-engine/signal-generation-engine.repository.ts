@@ -147,7 +147,10 @@ export class SignalGenerationEngineRepository {
         assetType: query.assetType,
         modelVersion: query.modelVersion,
       },
-      orderBy: { startedAt: 'desc' },
+      // Order by the market-data date the run covered (NULLS LAST), then recency.
+      // Prevents a tiny manual/test run (null or stale sourceDataDate) from masking
+      // the real daily run as the "latest run" in the admin audit.
+      orderBy: [{ sourceDataDate: { sort: 'desc', nulls: 'last' } }, { startedAt: 'desc' }],
     });
     return record ? this.runToDto(record) : null;
   }

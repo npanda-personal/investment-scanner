@@ -222,7 +222,10 @@ export class MarketDataFoundationRepository {
     sortBy?: 'importedAt' | 'tradingDate';
     sortDirection?: 'asc' | 'desc';
   } = {}) {
-    const where: any = {};
+    const where: any = {
+      // Exclude TEST_% fixture rows from the admin list by default
+      source: { not: { startsWith: 'TEST_' } },
+    };
     if (input.source) where.source = input.source.trim().toUpperCase();
     if (input.segment) where.segment = input.segment.trim().toUpperCase();
     if (input.status) where.status = input.status.trim().toUpperCase();
@@ -905,6 +908,7 @@ export class MarketDataFoundationRepository {
           MAX(price_ticks.timestamp) AS "latestStoredTimestamp"
         FROM stocks
         LEFT JOIN price_ticks ON price_ticks.symbol = stocks.symbol
+          AND UPPER(COALESCE(price_ticks.source, '')) NOT LIKE 'TEST\\_%'
         WHERE ${this.activeStockSyncTaskSqlWhere(options)}
         ${excludeFilter}
         GROUP BY stocks.id, stocks.symbol, stocks.exchange, stocks."providerSymbol", stocks."sourceSymbol", stocks."displaySymbol", stocks."lastSuccessfulDataLoadTimestamp"
@@ -951,6 +955,7 @@ export class MarketDataFoundationRepository {
           MAX(price_ticks.timestamp) AS "latestStoredTimestamp"
         FROM stocks
         LEFT JOIN price_ticks ON price_ticks.symbol = stocks.symbol
+          AND UPPER(COALESCE(price_ticks.source, '')) NOT LIKE 'TEST\\_%'
         WHERE ${this.activeStockSyncTaskSqlWhere(options)}
         GROUP BY stocks.id
       )
@@ -1129,6 +1134,7 @@ export class MarketDataFoundationRepository {
           gte: startDate,
           lte: endDate,
         },
+        source: { not: { startsWith: 'TEST_' } },
       },
       orderBy: { timestamp: 'desc' },
       take: limit,
@@ -1180,6 +1186,7 @@ export class MarketDataFoundationRepository {
       where: {
         symbol: { in: stocks.map((stock) => stock.symbol) },
         timestamp: { gte: startDate },
+        source: { not: { startsWith: 'TEST_' } },
       },
       orderBy: [{ symbol: 'asc' }, { timestamp: 'asc' }],
       select: {
@@ -1209,7 +1216,7 @@ export class MarketDataFoundationRepository {
 
   async latestPrice(symbol: string) {
     const latestTick = await this.prisma.priceTick.findFirst({
-      where: { symbol },
+      where: { symbol, source: { not: { startsWith: 'TEST_' } } },
       orderBy: { timestamp: 'desc' },
       select: {
         timestamp: true,
@@ -1274,6 +1281,7 @@ export class MarketDataFoundationRepository {
       FROM price_ticks
       INNER JOIN stocks ON stocks.symbol = price_ticks.symbol
       WHERE ${this.scopedStockSqlWhere(options)}
+        AND UPPER(COALESCE(price_ticks.source, '')) NOT LIKE 'TEST\\_%'
     `);
 
     return rows[0]?.timestamp ?? null;
@@ -1357,6 +1365,7 @@ export class MarketDataFoundationRepository {
           FROM price_ticks
           WHERE price_ticks.symbol = price_identity.price_symbol
             AND UPPER(COALESCE(price_ticks."dataStatus", 'COMPLETE')) = 'COMPLETE'
+            AND UPPER(COALESCE(price_ticks.source, '')) NOT LIKE 'TEST\\_%'
             AND COALESCE(price_ticks."adjustedClose", price_ticks.close) >= ${MARKET_MOVER_MIN_PRICE}
           ORDER BY price_ticks.timestamp DESC
           LIMIT 1
@@ -1379,6 +1388,7 @@ export class MarketDataFoundationRepository {
             AND price_ticks.timestamp <= latest_prices.timestamp - (${lookbackDays}::int * INTERVAL '1 day')
             AND price_ticks.timestamp >= latest_prices.timestamp - ((${lookbackDays}::int + ${MARKET_MOVER_BASE_WINDOW_DAYS}::int) * INTERVAL '1 day')
             AND UPPER(COALESCE(price_ticks."dataStatus", 'COMPLETE')) = 'COMPLETE'
+            AND UPPER(COALESCE(price_ticks.source, '')) NOT LIKE 'TEST\\_%'
             AND COALESCE(price_ticks."adjustedClose", price_ticks.close) >= ${MARKET_MOVER_MIN_PRICE}
           ORDER BY price_ticks.timestamp DESC
           LIMIT 1
@@ -1396,6 +1406,7 @@ export class MarketDataFoundationRepository {
             WHERE price_ticks.symbol = price_identity.price_symbol
               AND price_ticks.timestamp <= latest_prices.timestamp
               AND UPPER(COALESCE(price_ticks."dataStatus", 'COMPLETE')) = 'COMPLETE'
+              AND UPPER(COALESCE(price_ticks.source, '')) NOT LIKE 'TEST\\_%'
               AND COALESCE(price_ticks."adjustedClose", price_ticks.close) >= ${MARKET_MOVER_MIN_PRICE}
             ORDER BY price_ticks.timestamp DESC
             LIMIT ${recentBars}
@@ -2077,7 +2088,7 @@ export class MarketDataFoundationRepository {
       const chunk = uniqueSymbols.slice(index, index + chunkSize);
       const chunkRows = await Promise.all(chunk.map(async (symbol) => {
         const rows = await this.prisma.priceTick.findMany({
-          where: { symbol },
+          where: { symbol, source: { not: { startsWith: 'TEST_' } } },
           orderBy: { timestamp: 'desc' },
           take: perSymbolLimit,
           select: {
@@ -2152,6 +2163,7 @@ export class MarketDataFoundationRepository {
             SUM(CASE WHEN price_ticks."sourceFileImportId" IS NOT NULL THEN 1 ELSE 0 END)::int AS "sourceFileImportPriceRows"
           FROM price_ticks
           WHERE price_ticks.symbol = input_symbols.symbol
+            AND UPPER(COALESCE(price_ticks.source, '')) NOT LIKE 'TEST\\_%'
         ) history_stats ON TRUE
       ),
       recent_ranked AS (
@@ -2182,6 +2194,7 @@ export class MarketDataFoundationRepository {
               price_ticks."sourceFileImportId"
             FROM price_ticks
             WHERE price_ticks.symbol = input_symbols.symbol
+              AND UPPER(COALESCE(price_ticks.source, '')) NOT LIKE 'TEST\\_%'
             ORDER BY price_ticks.timestamp DESC
             LIMIT ${STANDARD_REVIEW_MIN_BARS}
           ) sampled
@@ -2938,7 +2951,7 @@ export class MarketDataFoundationRepository {
 
   async listFundamentals(stockId: string) {
     return (this.prisma as any).fundamental.findMany({
-      where: { stockId },
+      where: { stockId, source: { not: { startsWith: 'TEST_' } } },
       orderBy: { periodEndDate: 'desc' },
     });
   }

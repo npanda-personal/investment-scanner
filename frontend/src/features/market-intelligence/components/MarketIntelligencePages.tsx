@@ -20,6 +20,7 @@ import { useState, type ReactNode } from 'react';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { InstrumentSearchSelect, PageHeader } from '@/shared/components';
 import type { V1Instrument } from '@/features/market-data-foundation';
+import { humanizeCode, indexLabel, isHeadlineIndex } from '@/shared/format/enumLabels';
 import {
   fetchCompounderRadarSnapshot,
   fetchEarningsIntelligenceSnapshot,
@@ -105,7 +106,7 @@ export function MarketPulsePage() {
       envelope={view.data}
       missingTitle="Market Pulse backend not available yet."
     >
-      {snapshot && <MarketPulseSnapshotView snapshot={snapshot} />}
+      {snapshot && <MarketPulseSnapshotView snapshot={snapshot} shownWarnings={view.data?.warnings ?? []} />}
       <SectorIntelligencePanel envelope={sectorView.data} loading={sectorView.loading} error={sectorView.error} />
     </SnapshotPageShell>
   );
@@ -352,7 +353,46 @@ function RadarPage<T>({
   );
 }
 
-function MarketPulseSnapshotView({ snapshot }: { snapshot: MarketPulseSnapshot }) {
+/**
+ * Derive a human freshness label for a single index row.
+ * Compares the snapshot's dataThroughDate against the expected latest trading date
+ * (sourced from sourceSummary.latestCompletedTradingDate).  If the snapshot is
+ * more than 1 calendar day behind the expected date it is considered Stale.
+ */
+function computeIndexFreshness(
+  snapshotDataThroughDate: string,
+  latestCompletedTradingDate: string | null | undefined,
+): string {
+  if (!latestCompletedTradingDate) return 'Unavailable';
+  const snapshotMs = new Date(snapshotDataThroughDate).getTime();
+  const latestMs = new Date(latestCompletedTradingDate).getTime();
+  if (!Number.isFinite(snapshotMs) || !Number.isFinite(latestMs)) return 'Unavailable';
+  const diffDays = Math.round((latestMs - snapshotMs) / 86_400_000);
+  if (diffDays > 1) return `Stale (${diffDays}d behind)`;
+  return 'Fresh';
+}
+
+function MarketPulseSnapshotView({
+  snapshot,
+  shownWarnings,
+}: {
+  snapshot: MarketPulseSnapshot;
+  /** Warnings already displayed at the envelope level — excluded here to avoid duplicates. */
+  shownWarnings: string[];
+}) {
+  // Fix 1: Curate indices — prefer headline (Nifty 50, Bank Nifty, Sensex …) over
+  // obscure inverse/midsmall niche indices.  Fall back to whatever exists if fewer
+  // than 5 headline rows, but always prefer headline rows when available.
+  const headlineIndices = snapshot.topIndices.filter((row) => isHeadlineIndex(row.symbol));
+  const displayIndices = (headlineIndices.length > 0 ? headlineIndices : snapshot.topIndices).slice(0, 5);
+
+  const latestCompletedTradingDate = snapshot.sourceSummary?.latestCompletedTradingDate;
+
+  // Fix 4: De-duplicate snapshot.warnings against warnings already shown at the
+  // envelope/shell level so the same message does not appear twice.
+  const shownSet = new Set(shownWarnings);
+  const uniqSnapshotWarnings = snapshot.warnings.filter((w) => !shownSet.has(w));
+
   return (
     <Stack spacing={2}>
       <SectionHeader title="Market Health" subtitle="Displayed exactly as provided by the Market Pulse read model." />
@@ -365,17 +405,19 @@ function MarketPulseSnapshotView({ snapshot }: { snapshot: MarketPulseSnapshot }
         <ScoreCard label="Candidate Count" value={formatOptional(snapshot.candidateCount)} />
       </Box>
       <SectionPanel title="Top 5 Indices">
-        {snapshot.topIndices.length === 0 ? <EmptyState title="No index rows in snapshot." /> : (
+        {displayIndices.length === 0 ? <EmptyState title="No index rows in snapshot." /> : (
           <TableContainer>
             <Table size="small">
               <TableHead><TableRow><TableCell>Index</TableCell><TableCell align="right">Value</TableCell><TableCell align="right">Move</TableCell><TableCell>Freshness</TableCell></TableRow></TableHead>
               <TableBody>
-                {snapshot.topIndices.slice(0, 5).map((row) => (
+                {displayIndices.map((row) => (
                   <TableRow key={row.symbol}>
-                    <TableCell>{row.label || row.symbol}</TableCell>
+                    {/* Fix 1: display friendly name via indexLabel instead of raw code */}
+                    <TableCell>{indexLabel(row.symbol)}</TableCell>
                     <TableCell align="right">{formatOptional(row.value)}</TableCell>
                     <TableCell align="right">{formatRatioPercent(row.changePercent)}</TableCell>
-                    <TableCell>{row.freshness || 'Unavailable'}</TableCell>
+                    {/* Fix 3: derive freshness from dates, not from the backend's cached status string */}
+                    <TableCell>{computeIndexFreshness(snapshot.dataThroughDate, latestCompletedTradingDate)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -384,14 +426,16 @@ function MarketPulseSnapshotView({ snapshot }: { snapshot: MarketPulseSnapshot }
         )}
       </SectionPanel>
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: 'repeat(2, 1fr)' }, gap: 2 }}>
-        <SectionPanel title="Strong Sectors"><TagList values={snapshot.strongSectors} emptyLabel="No strong sectors in snapshot." /></SectionPanel>
-        <SectionPanel title="Weak Sectors"><TagList values={snapshot.weakSectors} emptyLabel="No weak sectors in snapshot." tone="warning" /></SectionPanel>
+        {/* Fix 2: render sector names via indexLabel (handles ^CNXMETAL etc.) */}
+        <SectionPanel title="Strong Sectors"><TagList values={snapshot.strongSectors.map(indexLabel)} emptyLabel="No strong sectors in snapshot." /></SectionPanel>
+        <SectionPanel title="Weak Sectors"><TagList values={snapshot.weakSectors.map(indexLabel)} emptyLabel="No weak sectors in snapshot." tone="warning" /></SectionPanel>
         <SectionPanel title="Breadth Summary"><Typography>{snapshot.breadthSummary || 'Unavailable'}</Typography></SectionPanel>
         <SectionPanel title="Delivery Participation Summary"><Typography>{snapshot.deliverySummary || 'Unavailable'}</Typography></SectionPanel>
       </Box>
-      {snapshot.warnings.length > 0 && (
+      {/* Fix 4: only show warnings not already displayed at the top (envelope) level */}
+      {uniqSnapshotWarnings.length > 0 && (
         <SectionPanel title="Missing Data Warnings">
-          <Stack spacing={1}>{snapshot.warnings.map((warning) => <Alert key={warning} severity="warning">{warning}</Alert>)}</Stack>
+          <Stack spacing={1}>{uniqSnapshotWarnings.map((warning) => <Alert key={warning} severity="warning">{warning}</Alert>)}</Stack>
         </SectionPanel>
       )}
     </Stack>
@@ -437,14 +481,16 @@ function SectorIntelligencePanel({
               <TableBody>
                 {rows.map((row) => (
                   <TableRow key={row.sector}>
-                    <TableCell>{row.sector}</TableCell>
+                    {/* Fix 2: render sector code as friendly name */}
+                    <TableCell>{indexLabel(row.sector)}</TableCell>
                     <TableCell>{formatEnum(row.classification)}</TableCell>
                     <TableCell align="right">{formatOptional(row.sectorScore)}</TableCell>
                     <TableCell align="right">{formatPercentPoints(row.return1W)}</TableCell>
                     <TableCell align="right">{formatPercentPoints(row.return1M)}</TableCell>
                     <TableCell align="right">{formatPercentPoints(row.return3M)}</TableCell>
-                    <TableCell><ReasonTags tags={row.reasonTags} /></TableCell>
-                    <TableCell><RiskTags tags={row.warnings} /></TableCell>
+                    {/* Fix 2: humanize reason / warning codes (STRONG, TOP_RELATIVE_RANK …) */}
+                    <TableCell><ReasonTags tags={row.reasonTags.map(humanizeCode)} /></TableCell>
+                    <TableCell><RiskTags tags={row.warnings.map(humanizeCode)} /></TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -616,7 +662,9 @@ function SnapshotMetadata({ envelope, compact = false }: { envelope: SnapshotEnv
   return (
     <Stack direction="row" gap={1} flexWrap="wrap" useFlexGap sx={{ mb: compact ? 0 : 2 }}>
       {items.map(([label, value]) => (
-        <Chip key={label} size="small" variant="outlined" label={`${label}: ${label === 'Status' || label === 'Freshness' ? formatEnum(String(value)) : value}`} />
+        // Fix 3: Freshness is already a derived human string ("Fresh" / "Stale (Nd behind)") —
+        // do not pass it through formatEnum which would corrupt "Stale (2d behind)" etc.
+        <Chip key={label} size="small" variant="outlined" label={`${label}: ${label === 'Status' ? formatEnum(String(value)) : value}`} />
       ))}
     </Stack>
   );

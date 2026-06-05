@@ -642,7 +642,7 @@ describe('MarketDataFoundationRepository', () => {
     expect(prisma.stock.findMany).toHaveBeenCalledWith(expect.objectContaining({
       skip: 25,
       take: 25,
-      orderBy: { marketCap: 'desc' },
+      orderBy: { marketCap: { sort: 'desc', nulls: 'last' } },
       where: expect.objectContaining({
         AND: expect.arrayContaining([
           expect.objectContaining({
@@ -913,7 +913,7 @@ describe('MarketDataFoundationRepository', () => {
     });
 
     expect(prisma.stock.findMany).toHaveBeenCalledWith(expect.objectContaining({
-      orderBy: { symbol: 'desc' },
+      orderBy: { symbol: { sort: 'desc', nulls: 'last' } },
     }));
   });
 

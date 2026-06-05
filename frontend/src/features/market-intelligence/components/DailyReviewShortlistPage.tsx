@@ -10,6 +10,7 @@ import {
   Chip,
   LinearProgress,
   Paper,
+  Skeleton,
   Stack,
   Table,
   TableBody,
@@ -20,6 +21,7 @@ import {
   Typography,
 } from '@mui/material';
 import { Link as RouterLink } from 'react-router-dom';
+import { humanizeCode } from '@/shared/format/enumLabels';
 import { PageHeader } from '@/shared/components';
 import { useDailyReviewShortlist } from '../hooks/useDailyReviewShortlist';
 import type {
@@ -45,7 +47,49 @@ export function DailyReviewShortlistPage() {
         )}
       />
 
-      {loading && <LinearProgress sx={{ mb: 2 }} />}
+      {loading && (
+        <Stack spacing={2}>
+          <LinearProgress />
+          <Typography variant="body2" color="text.secondary">
+            Loading shortlist — collecting persisted sources (Today Review, Active Ledger, Stock Interest, Data Quality, Market Pulse)…
+          </Typography>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(4, 1fr)' }, gap: 2 }}>
+            {[0, 1, 2, 3].map((i) => (
+              <Paper key={i} variant="outlined" sx={{ p: 2 }}>
+                <Skeleton variant="text" width="60%" />
+                <Skeleton variant="text" width="40%" height={32} />
+                <Skeleton variant="text" width="80%" />
+              </Paper>
+            ))}
+          </Box>
+          <Paper variant="outlined" sx={{ p: 2 }}>
+            <Skeleton variant="text" width="30%" sx={{ mb: 1 }} />
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(5, 1fr)' }, gap: 1 }}>
+              {[0, 1, 2, 3, 4].map((i) => (
+                <Paper key={i} variant="outlined" sx={{ p: 1.25 }}>
+                  <Skeleton variant="text" width="70%" />
+                  <Skeleton variant="text" width="50%" />
+                </Paper>
+              ))}
+            </Box>
+          </Paper>
+          <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
+            <Box sx={{ p: 2 }}>
+              <Skeleton variant="text" width="25%" />
+            </Box>
+            {[0, 1, 2, 3].map((i) => (
+              <Box key={i} sx={{ px: 2, py: 1, borderTop: '1px solid', borderColor: 'divider' }}>
+                <Stack direction="row" spacing={2} alignItems="center">
+                  <Skeleton variant="text" width={24} />
+                  <Skeleton variant="text" width={80} />
+                  <Skeleton variant="text" width={120} />
+                  <Skeleton variant="text" width={160} sx={{ flexGrow: 1 }} />
+                </Stack>
+              </Box>
+            ))}
+          </Paper>
+        </Stack>
+      )}
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
       {!loading && !error && data && <DailyReviewShortlistContent data={data} />}
     </Box>
@@ -92,7 +136,7 @@ function SourceContributionPanel({ data }: { data: DailyReviewShortlistResult })
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(5, 1fr)' }, gap: 1 }}>
           {data.sourceContributions.map((source) => (
             <Paper key={source.source} variant="outlined" sx={{ p: 1.25 }}>
-              <Typography variant="caption" color="text.secondary">{source.source}</Typography>
+              <Typography variant="caption" color="text.secondary">{humanizeCode(source.source)}</Typography>
               <Typography fontWeight={800}>{source.selectedCount} selected</Typography>
               <Typography variant="body2" color="text.secondary">{source.availableCount} available</Typography>
             </Paper>
@@ -332,7 +376,7 @@ function ChipList({ values, size = 'medium' }: { values: string[]; size?: 'small
   if (values.length === 0) return <Typography variant="body2" color="text.secondary">Unavailable</Typography>;
   return (
     <Stack direction="row" gap={0.75} flexWrap="wrap" useFlexGap>
-      {values.map((value) => <Chip key={value} label={value} size={size} variant="outlined" />)}
+      {values.map((value) => <Chip key={value} label={humanizeCode(value)} size={size} variant="outlined" />)}
     </Stack>
   );
 }

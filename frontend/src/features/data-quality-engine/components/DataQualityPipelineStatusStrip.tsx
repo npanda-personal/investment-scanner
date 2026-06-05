@@ -1,6 +1,7 @@
 import { Box, Chip, CircularProgress, LinearProgress, Stack, Typography } from '@mui/material';
 import { Link as RouterLink } from 'react-router-dom';
 import { usePipelineStatus, type PipelineStatusStage, type PipelineStatusValue } from '@/features/pipeline-ops';
+import { humanizeCode } from '@/shared/format/enumLabels';
 
 type DataQualityPipelineStatusStripProps = {
   region: string;
@@ -90,7 +91,7 @@ export function DataQualityPipelineStatusStrip({ region, assetType }: DataQualit
             <Typography variant="caption" color="text.secondary">Pipeline stage</Typography>
             <Typography variant="body2" fontWeight={700}>{STAGE_LABEL}</Typography>
             <Chip size="small" label={`${region} / ${assetType}`} />
-            {status && <Chip size="small" variant="outlined" label={status} />}
+            {status && <Chip size="small" variant="outlined" label={humanizeCode(status)} />}
             {loading && <CircularProgress size={14} />}
             {refreshing && !loading && <Typography variant="caption" color="text.secondary">Refreshing...</Typography>}
           </Stack>

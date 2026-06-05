@@ -58,9 +58,10 @@ import {
 } from '../api/marketDataFoundationService';
 import MarketDataStatusPanel from './MarketDataStatusPanel';
 import { HistoricalBackfillRunEvidence, SourceFileImportEvidence } from './MarketDataOpsEvidence';
-import { DataTable, FilterBar, PageHeader, StatusBadge, type DataTableColumn, type SortDirection } from '@/shared/components';
+import { DataTable, FilterBar, PageHeader, StatusBadge, statusColor, type DataTableColumn, type SortDirection } from '@/shared/components';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
 import { normalizeAssetTypeForMarketDataApi, normalizeMarketForApi } from '../api/marketScopeApi';
+import { humanizeCode } from '@/shared/format/enumLabels';
 
 const formatTimestamp = (timestamp: string) => new Date(timestamp).toLocaleString();
 const formatDateOnly = (date?: string | null) => date ? new Date(`${date.slice(0, 10)}T00:00:00`).toLocaleDateString() : 'No candle';
@@ -990,10 +991,10 @@ const MarketDataFoundationPage: React.FC = () => {
             </Tooltip>
             {instrument.universe_state && (
               <Tooltip title={instrument.readiness_blockers?.length ? instrument.readiness_blockers.join(', ') : 'Strict universe state'} arrow>
-                <Chip size="small" label={instrument.universe_state} color={instrument.universe_state === 'REVIEW_READY' ? 'success' : instrument.universe_state === 'CATALOG_ONLY' || instrument.universe_state === 'STALE_OR_INCOMPLETE' ? 'warning' : 'default'} variant="outlined" />
+                <Chip size="small" label={humanizeCode(instrument.universe_state)} color={instrument.universe_state === 'REVIEW_READY' ? 'success' : instrument.universe_state === 'CATALOG_ONLY' || instrument.universe_state === 'STALE_OR_INCOMPLETE' ? 'warning' : 'default'} variant="outlined" />
               </Tooltip>
             )}
-            <StatusBadge label={instrument.data_status} />
+            <Chip size="small" label={humanizeCode(instrument.data_status)} color={statusColor(instrument.data_status)} variant="outlined" />
           </Stack>
         );
       },

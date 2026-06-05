@@ -10,12 +10,15 @@ import {
   Typography,
 } from '@mui/material';
 import { useSubscriptionBilling } from '../hooks';
+import { useAuthIdentity } from '@/features/auth-identity';
+import { humanizeCode } from '@/shared/format/enumLabels';
 import type { FeatureLimit, SubscriptionPlan } from '../types';
 
 const planColor = (code: string) => code === 'ADMIN' ? 'secondary' : code === 'PRO' ? 'primary' : 'default';
 
 export default function SubscriptionBillingPage() {
   const { me, plans, loading, saving, error, setError, changePlan } = useSubscriptionBilling();
+  const { user } = useAuthIdentity();
 
   if (loading) {
     return <Stack alignItems="center" sx={{ py: 8 }}><CircularProgress /></Stack>;
@@ -28,7 +31,7 @@ export default function SubscriptionBillingPage() {
           <Typography variant="h4" fontWeight={700}>Subscription & Billing</Typography>
           <Typography color="text.secondary">MVP plan readiness, feature limits, and usage metering. Billing provider is manual/disabled by default.</Typography>
         </Box>
-        <Chip label={me?.subscription.planCode || 'FREE'} color={planColor(me?.subscription.planCode || 'FREE')} />
+        <Chip label={me?.plan.name || humanizeCode(me?.subscription.planCode || 'FREE')} color={planColor(me?.subscription.planCode || 'FREE')} />
       </Stack>
 
       {error && <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 2 }}>{error}</Alert>}
@@ -39,7 +42,9 @@ export default function SubscriptionBillingPage() {
             <Typography variant="h6">My Plan</Typography>
             <Typography variant="h4" fontWeight={700}>{me?.plan.name || 'Free'}</Typography>
             <Typography color="text.secondary">Status: {me?.subscription.status || 'ACTIVE'}</Typography>
-            <Typography variant="body2" color="text.secondary">User: {me?.userId}</Typography>
+            <Typography variant="body2" color="text.secondary">
+              Account: {user?.email || user?.name || me?.userId || '—'}
+            </Typography>
           </Paper>
           <Paper sx={{ p: 2 }}>
             <Typography variant="h6" sx={{ mb: 1 }}>Available Plans</Typography>
@@ -78,10 +83,7 @@ function PlanCard({ plan, current, saving, onSelect }: { plan: SubscriptionPlan;
     <Paper variant="outlined" sx={{ p: 1.5 }}>
       <Stack direction="row" justifyContent="space-between" alignItems="center" gap={1}>
         <Box>
-          <Stack direction="row" spacing={1} alignItems="center">
-            <Typography fontWeight={700}>{plan.name}</Typography>
-            <Chip size="small" label={plan.code} color={planColor(plan.code)} />
-          </Stack>
+          <Typography fontWeight={700}>{plan.name || humanizeCode(plan.code)}</Typography>
           <Typography variant="body2" color="text.secondary">{plan.active ? 'Active plan option' : 'Inactive'}</Typography>
         </Box>
         <Button size="small" variant={current ? 'outlined' : 'contained'} disabled={saving || current || !plan.active} onClick={onSelect}>

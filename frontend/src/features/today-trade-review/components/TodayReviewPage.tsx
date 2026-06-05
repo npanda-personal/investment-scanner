@@ -36,6 +36,7 @@ import type { ReactNode } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { PageHeader } from '@/shared/components/PageHeader';
+import { humanizeCode } from '@/shared/format/enumLabels';
 import { useTodayReview } from '../hooks/useTodayReview';
 import type {
   TodayReviewCandidate,
@@ -236,7 +237,7 @@ function CoveragePanel({ run }: { run: TodayReviewRun }) {
             <Chip label={`Review session: ${reviewUniverse.targetTradingDate || 'Unavailable'}`} variant="outlined" />
             <Chip label={`Required data-through: ${reviewUniverse.requiredDataThroughDate || 'Unavailable'}`} variant="outlined" />
             <Chip label={`Stored data-through: ${reviewUniverse.storedDataThroughDate || reviewUniverse.dataThroughDate || formatDate(run.dataThroughDate)}`} variant="outlined" />
-            <Chip label={`Readiness decision: ${reviewReadiness.userDecision || 'WAIT'}`} variant="outlined" />
+            <Chip label={`Readiness decision: ${humanizeCode(reviewReadiness.userDecision || 'WAIT')}`} variant="outlined" />
           </Stack>
           {missingReadiness && (
             <Alert severity="warning">
@@ -321,7 +322,7 @@ function ExclusionExplainabilityPanel({ run }: { run: TodayReviewRun }) {
               {summaries.slice(0, 8).map((summary: any) => (
                 <Chip
                   key={`${summary.category}:${summary.code}`}
-                  label={`${summary.category}: ${summary.count} - ${summary.label}`}
+                  label={`${humanizeCode(summary.category)}: ${summary.count} - ${humanizeCode(summary.label)}`}
                   color={summary.blocking ? 'warning' : 'default'}
                   variant={summary.blocking ? 'filled' : 'outlined'}
                 />
@@ -346,8 +347,8 @@ function ExclusionExplainabilityPanel({ run }: { run: TodayReviewRun }) {
                         <Typography fontWeight={700}>{example.symbol}</Typography>
                         <Typography variant="caption" color="text.secondary">{example.companyName || example.instrumentId}</Typography>
                       </TableCell>
-                      <TableCell>{example.primaryReasonLabel}</TableCell>
-                      <TableCell>{(example.reasonCategories || []).join(', ')}</TableCell>
+                      <TableCell>{humanizeCode(example.primaryReasonLabel)}</TableCell>
+                      <TableCell>{(example.reasonCategories || []).map((c: string) => humanizeCode(c)).join(', ')}</TableCell>
                       <TableCell>{example.promoted ? 'Promoted' : 'Not promoted'}</TableCell>
                     </TableRow>
                   ))}
@@ -547,7 +548,6 @@ function CandidateTable({ candidates }: { candidates: TodayReviewCandidate[] }) 
             component={RouterLink}
             to={`/today-review/candidates/${candidate.id}`}
             fontWeight={700}
-            title={`${candidate.symbol} - ${candidate.companyName || 'Company unavailable'}`}
             onClick={(event) => event.stopPropagation()}
             sx={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
           >
@@ -567,15 +567,15 @@ function CandidateTable({ candidates }: { candidates: TodayReviewCandidate[] }) 
       id: 'setup',
       label: 'Setup',
       width: 170,
-      value: (candidate) => candidate.setupType || candidate.strategyCode,
-      render: (candidate) => <EllipsisCell fullText={candidate.setupType || candidate.strategyCode} />,
+      value: (candidate) => humanizeCode(candidate.setupType || candidate.strategyCode),
+      render: (candidate) => <EllipsisCell fullText={humanizeCode(candidate.setupType || candidate.strategyCode)} />,
     },
     {
       id: 'board',
       label: 'Board',
       width: 230,
-      value: (candidate) => `${boardSectionLabel(candidate)} ${boardSourceLabel(candidate)} ${candidate.boardReason || ''}`,
-      render: (candidate) => <EllipsisCell fullText={`${boardSectionLabel(candidate)} / ${boardSourceLabel(candidate)} - ${candidate.boardReason || 'Standard board selection.'}`} />,
+      value: (candidate) => `${boardSectionLabel(candidate)} ${boardSourceLabel(candidate)} ${humanizeCode(candidate.boardReason) || ''}`,
+      render: (candidate) => <EllipsisCell fullText={`${boardSectionLabel(candidate)} / ${boardSourceLabel(candidate)} - ${humanizeCode(candidate.boardReason) || 'Standard board selection.'}`} />,
     },
     {
       id: 'entry',
@@ -953,11 +953,13 @@ function EllipsisCell({
   strong?: boolean;
 }) {
   const text = fullText || '-';
+  const isAbsent = text === '—';
+  const tooltipTitle = isAbsent ? 'not available' : text !== '-' ? text : '';
   return (
-    <Tooltip title={text !== '-' ? text : ''} arrow enterDelay={350}>
+    <Tooltip title={tooltipTitle} arrow enterDelay={350}>
       <Typography
-        title={text}
         component="span"
+        color={isAbsent ? 'text.disabled' : 'inherit'}
         sx={{
           display: 'block',
           maxWidth: '100%',
@@ -975,17 +977,23 @@ function EllipsisCell({
 }
 
 function TierChip({ tier }: { tier: TierCellContext }) {
-  const title = tier.reason ? `${tier.label} - ${tier.reason}` : tier.label;
+  const isAbsent = tier.label === '—';
+  const title = isAbsent
+    ? 'not available'
+    : tier.reason
+      ? `${tier.label} - ${tier.reason}`
+      : tier.label;
   return (
     <Tooltip title={title} arrow enterDelay={350}>
-      <Chip
-        title={title}
-        size="small"
-        label={tier.label}
-        color={tierColor(tier.status)}
-        variant={tier.status === 'READY' ? 'outlined' : 'filled'}
-        sx={chipNoWrapSx}
-      />
+      <span>
+        <Chip
+          size="small"
+          label={tier.label}
+          color={isAbsent ? 'default' : tierColor(tier.status)}
+          variant={tier.status === 'READY' ? 'outlined' : 'filled'}
+          sx={chipNoWrapSx}
+        />
+      </span>
     </Tooltip>
   );
 }
@@ -1039,18 +1047,18 @@ function latestDataDate(candidate: TodayReviewCandidate) {
 
 function dataQualityLabel(candidate: TodayReviewCandidate) {
   const dq = candidate.dataQualitySnapshot as TodayReviewCandidateDataQualitySnapshot | null;
-  return dq?.coverageStatus || dq?.signalReadinessStatus || 'Missing';
+  return dq?.coverageStatus || dq?.signalReadinessStatus || '—';
 }
 
 function proofLabel(candidate: TodayReviewCandidate) {
   const plan = candidate.tradePlanSnapshot as any;
   const proof = candidate.strategyProofSnapshot as any;
-  return proof?.strategyRating?.ratingGrade || plan?.strategyRating || 'Unproven';
+  return proof?.strategyRating?.ratingGrade || plan?.strategyRating || '—';
 }
 
 function marketLabel(candidate: TodayReviewCandidate) {
   const market = candidate.marketContextSnapshot as any;
-  return market?.regime?.regime || 'Unknown';
+  return market?.regime?.regime || '—';
 }
 
 function blockerLabel(candidate: TodayReviewCandidate) {
@@ -1089,14 +1097,14 @@ function tierContextForCandidate(candidate: TodayReviewCandidate): CandidateTier
   return {
     dailyReview: {
       status: dailyReviewStatus,
-      label: dailyReview ? `Daily: ${dailyReview.status}` : 'Daily: Missing',
-      reason: dailyReview?.reasons?.[0] || (dailyReview ? null : 'No dailyReview tier payload was stored in this run snapshot.'),
+      label: dailyReview ? `Daily: ${dailyReview.status}` : '—',
+      reason: dailyReview?.reasons?.[0] || (dailyReview ? null : 'Daily review tier not available in this run snapshot.'),
     },
     automation: {
       status: automationStatus,
-      label: automation ? 'Automation: BLOCKED' : 'Automation: Missing',
+      label: automation ? 'Automation: BLOCKED' : '—',
       reason: !automation
-        ? 'Automation tier payload missing; execution remains policy-blocked.'
+        ? 'Automation tier not available; execution remains policy-blocked.'
         : upstreamAutomationStatus !== 'BLOCKED'
           ? `Upstream tier reported ${upstreamAutomationStatus}; Today Review keeps automation policy-blocked (PHASE0_AUTOMATION_NOT_AUTHORIZED).`
           : automation.reasons?.[0] || 'PHASE0_AUTOMATION_NOT_AUTHORIZED',
@@ -1213,7 +1221,7 @@ function gradeColor(grade: string) {
 
 function sectorAlignment(candidate: TodayReviewCandidate) {
   const sector = (candidate.dataQualitySnapshot as TodayReviewCandidateDataQualitySnapshot | null)?.sector || (candidate.sourceSignalSnapshot as any)?.rawSignal?.sector;
-  return sector || 'Unknown';
+  return sector || '—';
 }
 
 function hasMissingTierContext(candidate: TodayReviewCandidate) {

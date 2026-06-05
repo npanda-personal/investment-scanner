@@ -56,6 +56,10 @@ export function InstrumentSearchSelect({ label = 'Stock / instrument', value, on
       onChange={(_event, nextValue) => onChange(nextValue)}
       options={options}
       loading={loading}
+      // Options are already filtered server-side by the search query; disable
+      // MUI's default client-side re-filter which would otherwise hide results
+      // when the typed query does not match option labels character-for-character.
+      filterOptions={(x) => x}
       getOptionLabel={(option) => `${option.symbol} - ${option.company_name || 'Unknown company'}`}
       isOptionEqualToValue={(option, selected) => option.id === selected.id}
       renderInput={(params) => (
