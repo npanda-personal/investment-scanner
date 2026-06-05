@@ -446,12 +446,24 @@ export class SignalGenerationEngineRepository {
       } as SignalQuery & SignalFunnelDiagnosticsQuery),
       generatedDate: { not: null },
     };
-    const latest = await this.db.signalResult.findFirst({
+    // Group the most recent generated dates by count, then pick the latest date whose
+    // signal count is SUBSTANTIAL. This prevents a tiny partial/test run (e.g. a
+    // connected-chain seed of ~20 rows generated "today") from shadowing the real
+    // full-universe run from the prior date in the served reads.
+    const grouped = await this.db.signalResult.groupBy({
+      by: ['generatedDate'],
       where,
-      orderBy: [{ generatedDate: 'desc' }, { generatedAt: 'desc' }],
-      select: { generatedDate: true },
+      _count: { _all: true },
+      orderBy: { generatedDate: 'desc' },
+      take: 10,
     });
-    return latest?.generatedDate ?? null;
+    if (grouped.length === 0) return null;
+    const maxCount = Math.max(...grouped.map((g) => g._count._all));
+    // Floor: at least 40% of the largest recent run (and ≥ 20 rows). The date holding
+    // maxCount always clears this, so a substantial date is always found.
+    const floor = Math.max(20, Math.floor(maxCount * 0.4));
+    const substantial = grouped.find((g) => g._count._all >= floor && g.generatedDate != null);
+    return substantial?.generatedDate ?? grouped[0].generatedDate ?? null;
   }
 
   private canUseLatestGeneratedDateFastPath(query: SignalQuery): boolean {
