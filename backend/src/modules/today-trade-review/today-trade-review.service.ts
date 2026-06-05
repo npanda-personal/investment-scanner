@@ -774,6 +774,7 @@ export class TodayTradeReviewService {
             signalStrength: setup.signalStrength,
             reason: setup.reason,
           },
+          priceBehaviour: this.litePriceBehaviourSnapshot(instrument.priceHistory),
         },
       });
     }
@@ -1270,11 +1271,21 @@ export class TodayTradeReviewService {
 
   private marketContextSnapshotFor(source: TodayReviewCandidateSource) {
     if (!source.marketContext) return null;
+    // Resolve sector leadership for the candidate's sector so the FE price-behaviour card can reference it.
+    const sector = source.rawSignal?.sector ?? source.dataQuality?.sector ?? null;
+    let sectorLeadershipStatus: string | null = null;
+    if (sector) {
+      const top = source.marketContext.topSectors.find((item) => item.sector === sector);
+      const weak = source.marketContext.weakSectors.find((item) => item.sector === sector);
+      sectorLeadershipStatus = top?.leadershipStatus ?? weak?.leadershipStatus ?? null;
+    }
     return {
       regime: source.marketContext.regime,
       breadth: source.marketContext.breadth,
       dataStatus: source.marketContext.dataStatus,
       updatedAt: source.marketContext.updatedAt,
+      /** Sector leadership status for this candidate's sector, derived at run time. Null when sector is unavailable. */
+      sectorLeadershipStatus,
     };
   }
 
@@ -1319,6 +1330,13 @@ export class TodayTradeReviewService {
         confidence: source.smartMoney.confidence,
         supportOnly: true,
       } : null,
+      /** Price-behaviour inputs assembled at run time from the raw signal; read-only. */
+      priceBehaviour: {
+        deliveryPercent: source.rawSignal?.deliveryPercent ?? null,
+        deliveryEvidence: source.rawSignal?.deliveryEvidence ?? null,
+        sector: source.rawSignal?.sector ?? source.dataQuality?.sector ?? null,
+        dailyChangePercent: source.rawSignal?.dailyChangePercent ?? null,
+      },
     };
   }
 
@@ -1780,6 +1798,56 @@ export class TodayTradeReviewService {
         note: 'Capital Posture regime is unavailable — posture service could not be reached.',
       };
     }
+  }
+
+  /**
+   * Assembles price-behaviour inputs from the trusted-universe priceHistory at
+   * run time (lite path).  All values are derived from persisted OHLCV rows;
+   * never fabricated.  Returns null fields when data is insufficient.
+   *
+   * Stored as `sourceSignalSnapshot.priceBehaviour` so the FE detail page can
+   * compose a deterministic "Price behaviour" paragraph without a live compute.
+   */
+  private litePriceBehaviourSnapshot(history: TrustedReviewUniverseInstrument['priceHistory']): {
+    recentReturn3D: number | null;
+    volumeVsAvg20D: number | null;
+    deliveryPercent: null;
+    deliveryEvidence: null;
+    sector: null;
+    dailyChangePercent: number | null;
+  } {
+    const n = history.length;
+    if (n < 2) {
+      return { recentReturn3D: null, volumeVsAvg20D: null, deliveryPercent: null, deliveryEvidence: null, sector: null, dailyChangePercent: null };
+    }
+    const latest = history[n - 1];
+    const prev = history[n - 2];
+    const dailyChangePercent = prev.close > 0
+      ? Number((((latest.close - prev.close) / prev.close) * 100).toFixed(2))
+      : null;
+
+    // 3-day return: latest close vs close 3 bars ago (index n-4)
+    const bar3DaysAgo = n >= 4 ? history[n - 4] : null;
+    const recentReturn3D = bar3DaysAgo && bar3DaysAgo.close > 0
+      ? Number((((latest.close - bar3DaysAgo.close) / bar3DaysAgo.close) * 100).toFixed(2))
+      : null;
+
+    // Volume vs 20-day average (prior 20 bars before latest)
+    const prior20 = history.slice(Math.max(0, n - 21), n - 1);
+    const avgVol20 = prior20.length >= 5 ? this.average(prior20.map((row) => row.volume || 0)) : 0;
+    const latestVol = latest.volume ?? 0;
+    const volumeVsAvg20D = avgVol20 > 0
+      ? Number((latestVol / avgVol20).toFixed(2))
+      : null;
+
+    return {
+      recentReturn3D,
+      volumeVsAvg20D,
+      deliveryPercent: null,   // not available on lite path (no rawSignal)
+      deliveryEvidence: null,
+      sector: null,
+      dailyChangePercent,
+    };
   }
 
   private dedupeDecisions(items: Array<{ decision: StrategyDecisionDto; sourceKind: 'ENTRY' | 'EXIT' }>) {

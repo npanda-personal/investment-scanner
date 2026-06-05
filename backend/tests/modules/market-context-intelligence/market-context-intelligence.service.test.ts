@@ -9,6 +9,7 @@ const instrument = (overrides: any = {}) => ({
   latest: overrides.latest ?? 120,
   previous: overrides.previous ?? 118,
   prices: overrides.prices || Array.from({ length: 260 }, (_, index) => 120 - index * 0.2),
+  marketCap: overrides.marketCap !== undefined ? overrides.marketCap : null,
   signalDirection: overrides.signalDirection || 'BULLISH',
   signalScore: overrides.signalScore ?? 80,
 });
@@ -103,6 +104,66 @@ describe('MarketContextIntelligenceService', () => {
     const savedSummary = repository.saveSnapshot.mock.calls[0][0];
     expect(savedSummary.topSectors.map((sector: any) => sector.sector)).toEqual(['Financial Services']);
     expect(savedSummary.weakSectors).toEqual([]);
+  });
+
+  it('stratifies breadth by cap band and counts large-cap stocks correctly (NR-5)', () => {
+    const prices = Array.from({ length: 260 }, (_, i) => 200 - i * 0.2);
+    // Large-cap: marketCap > 20,000 Cr
+    const largeItems = Array.from({ length: 8 }, (_, i) =>
+      instrument({ symbol: `L${i}`, marketCap: 25_000 + i * 1_000, prices }),
+    );
+    // Mid-cap: 5,000–20,000 Cr
+    const midItems = Array.from({ length: 6 }, (_, i) =>
+      instrument({ symbol: `M${i}`, marketCap: 8_000 + i * 1_000, prices }),
+    );
+    // Small-cap: < 5,000 Cr
+    const smallItems = Array.from({ length: 5 }, (_, i) =>
+      instrument({ symbol: `S${i}`, marketCap: 1_000 + i * 500, prices }),
+    );
+    // null marketCap: must not inflate any named band
+    const nullCapItems = Array.from({ length: 3 }, (_, i) =>
+      instrument({ symbol: `N${i}`, marketCap: null, prices }),
+    );
+
+    const service = new MarketContextIntelligenceService({} as any, {} as any);
+    const bands = service.calculateBreadthByCapBand([...largeItems, ...midItems, ...smallItems, ...nullCapItems]);
+
+    const large = bands.find((b) => b.band === 'LARGE')!;
+    const mid   = bands.find((b) => b.band === 'MID')!;
+    const small = bands.find((b) => b.band === 'SMALL')!;
+
+    expect(large.instrumentCount).toBe(8);
+    expect(large.percentAboveSma50).not.toBeNull();
+    expect(large.percentAboveSma200).not.toBeNull();
+
+    expect(mid.instrumentCount).toBe(6);
+    expect(mid.percentAboveSma50).not.toBeNull();
+
+    expect(small.instrumentCount).toBe(5);
+    expect(small.percentAboveSma50).not.toBeNull();
+
+    // null-cap must not inflate any band
+    expect(large.instrumentCount + mid.instrumentCount + small.instrumentCount).toBe(19);
+  });
+
+  it('returns null metrics for bands with fewer than 5 instruments (NR-5)', () => {
+    const prices = Array.from({ length: 260 }, (_, i) => 200 - i * 0.2);
+    const fewLarge = Array.from({ length: 3 }, (_, i) =>
+      instrument({ symbol: `FL${i}`, marketCap: 30_000, prices }),
+    );
+    const enoughMid = Array.from({ length: 10 }, (_, i) =>
+      instrument({ symbol: `EM${i}`, marketCap: 10_000, prices }),
+    );
+
+    const service = new MarketContextIntelligenceService({} as any, {} as any);
+    const bands = service.calculateBreadthByCapBand([...fewLarge, ...enoughMid]);
+
+    const large = bands.find((b) => b.band === 'LARGE')!;
+    const mid   = bands.find((b) => b.band === 'MID')!;
+
+    expect(large.percentAboveSma50).toBeNull();
+    expect(large.percentAboveSma200).toBeNull();
+    expect(mid.percentAboveSma50).not.toBeNull();
   });
 
   it('calculates breadth', () => {

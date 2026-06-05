@@ -1608,3 +1608,138 @@ describe('TodayTradeReviewService', () => {
     }
   });
 });
+
+describe('priceBehaviour snapshot assembly (NR-11)', () => {
+  it('lite candidate sourceSignalSnapshot includes priceBehaviour with recentReturn3D and volumeVsAvg20D computed from priceHistory', async () => {
+    // Build a price history with a known pattern: 160 bars, volume 1000 per bar, last close 114.0
+    const history = Array.from({ length: 160 }, (_, index) => {
+      const close = 50 + index * 0.4;
+      return {
+        date: new Date(Date.UTC(2026, 0, index + 1)).toISOString().slice(0, 10),
+        open: close - 0.15,
+        high: close + 0.2,
+        low: close - 0.5,
+        close,
+        adjustedClose: close,
+        adjustmentFactor: 1,
+        adjustedOpen: close - 0.15,
+        adjustedHigh: close + 0.2,
+        adjustedLow: close - 0.5,
+        adjustedVolume: 1000,
+        volume: 1000,
+      };
+    });
+    // last close = 50 + 159*0.4 = 113.6; bar at index 156 = 50 + 156*0.4 = 112.4
+    // recentReturn3D = (113.6 - 112.4) / 112.4 * 100 = 1.07%
+
+    const instrument = trustedInstrument({
+      id: 'lite-pb-test',
+      symbol: 'PBTEST.NS',
+      priceHistory: history,
+      priceHistoryBars: 160,
+      latestClose: 113.6,
+      latestVolume: 1200,
+      hasRecentVolume: true,
+      contextGaps: [],
+      warnings: [],
+      derivativesEligible: false,
+    });
+
+    const repository = new MemoryTodayReviewRepository();
+    const svcOverrides = services({
+      marketDataService: {
+        latestStoredCandleInfo: jest.fn().mockResolvedValue({ latestTradingDate: '2026-05-10' }),
+        trustedReviewUniverseHealth: jest.fn().mockResolvedValue(trustedHealth({
+          trustedCount: 1,
+          status: 'READY',
+          mode: 'FULL_REVIEW',
+          warnings: [],
+          contextGapCounts: { missingSector: 0, missingIndustry: 0, missingMarketCap: 0, missingIsin: 0, missingListingDate: 0 },
+          scanPolicy: { scanLimit: 1, scanComplete: true, scanOrdering: 'recentVolumeDesc_priceHistoryCompleteness_latestFreshness_symbol' },
+        })),
+        listTrustedReviewUniverseInstruments: jest.fn().mockResolvedValue([instrument]),
+      },
+      strategyDecisionService: {
+        marketGate: jest.fn().mockResolvedValue({ marketGate: 'OPEN', marketCondition: 'HEALTHY' }),
+        candidates: jest.fn().mockResolvedValue({ results: [], total: 0 }),
+        exits: jest.fn().mockResolvedValue([]),
+      },
+    });
+    const service = new TodayTradeReviewService(repository, svcOverrides, () => fixedNow);
+
+    const result = await service.run();
+
+    const candidate = result.run?.candidates.find((c) => c.symbol === 'PBTEST.NS');
+    expect(candidate).toBeDefined();
+    const pb = (candidate?.sourceSignalSnapshot as any)?.priceBehaviour;
+    expect(pb).toBeDefined();
+    expect(typeof pb.dailyChangePercent).toBe('number');
+    expect(typeof pb.recentReturn3D).toBe('number');
+    expect(typeof pb.volumeVsAvg20D).toBe('number');
+    // deliveryPercent is null on lite path (no rawSignal)
+    expect(pb.deliveryPercent).toBeNull();
+    // Verify the 3-day return is approximately correct: ~1.07%
+    expect(pb.recentReturn3D).toBeCloseTo(1.07, 1);
+    // Volume ratio: latest 1000 / avg20 1000 = 1.0
+    expect(pb.volumeVsAvg20D).toBeCloseTo(1.0, 1);
+  });
+
+  it('strategy-backed candidate sourceSignalSnapshot priceBehaviour includes deliveryPercent from rawSignal', async () => {
+    const signalWithDelivery = {
+      instrument_id: 'stock-1',
+      symbol: 'ALPHA.NS',
+      company_name: 'Alpha Ltd',
+      sector: 'Financial Services',
+      country: 'India',
+      currentPrice: 100,
+      previousClose: 98,
+      dailyChange: 2,
+      dailyChangePercent: 2.04,
+      currency: 'INR',
+      priceTimestamp: fixedNow.toISOString(),
+      score: 77,
+      direction: 'BULLISH',
+      confidence: 'HIGH',
+      triggered_signals: [],
+      negative_signals: [],
+      explanation: 'Supportive.',
+      generated_at: fixedNow.toISOString(),
+      source: 'test',
+      data_status: 'COMPLETE',
+      deliveryPercent: 62.5,
+      deliveryEvidence: 'Delivery 62.5% (above average)',
+    };
+
+    const repository = new MemoryTodayReviewRepository();
+    const svcOverrides = services({
+      signalService: {
+        latestForInstrument: jest.fn().mockResolvedValue(signalWithDelivery),
+        latestSignalUniverse: jest.fn().mockResolvedValue([]),
+      },
+    });
+    const service = new TodayTradeReviewService(repository, svcOverrides, () => fixedNow);
+
+    const result = await service.run();
+
+    const candidate = result.run?.candidates.find((c) => c.symbol === 'ALPHA.NS');
+    expect(candidate).toBeDefined();
+    const pb = (candidate?.sourceSignalSnapshot as any)?.priceBehaviour;
+    expect(pb).toBeDefined();
+    expect(pb.deliveryPercent).toBe(62.5);
+    expect(pb.deliveryEvidence).toBe('Delivery 62.5% (above average)');
+    expect(pb.dailyChangePercent).toBe(2.04);
+  });
+
+  it('strategy-backed candidate marketContextSnapshot includes sectorLeadershipStatus when sector is in topSectors', async () => {
+    const repository = new MemoryTodayReviewRepository();
+    const service = new TodayTradeReviewService(repository, services(), () => fixedNow);
+
+    const result = await service.run();
+
+    const candidate = result.run?.candidates.find((c) => c.symbol === 'ALPHA.NS');
+    expect(candidate).toBeDefined();
+    const market = candidate?.marketContextSnapshot as any;
+    // 'Financial Services' sector is in topSectors as 'LEADING' in the test fixture
+    expect(market?.sectorLeadershipStatus).toBe('LEADING');
+  });
+});

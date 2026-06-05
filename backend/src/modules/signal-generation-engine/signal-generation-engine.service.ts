@@ -904,18 +904,51 @@ export class SignalGenerationEngineService {
         result = await this.attachStrategyMatches(result, prices, instrument, options, ratingCache);
         return this.withTriggerContract(result, instrument);
       }));
-      return enriched.filter((signal) => this.signalPassesStrategyFilters(signal, options));
+      return this.withRsPercentiles(enriched.filter((signal) => this.signalPassesStrategyFilters(signal, options)));
     } catch (error) {
       console.error('Signal enrichment failed:', error);
-      return signals.map(signal => ({
+      return this.withRsPercentiles(signals.map(signal => ({
         ...signal,
         currentPrice: null,
         previousClose: null,
         dailyChange: null,
         dailyChangePercent: null,
         priceTimestamp: null,
-      })).map((signal) => this.withTriggerContract(signal)).filter((signal) => this.signalPassesStrategyFilters(signal, options));
+      })).map((signal) => this.withTriggerContract(signal)).filter((signal) => this.signalPassesStrategyFilters(signal, options)));
     }
+  }
+
+  /**
+   * NR-6: assign each signal a relative-strength percentile (0–100) by ranking its
+   * composite `score` ascending within the SERVED set (weakest→0, strongest→100).
+   * Ties take the lower-bound rank. A served set of < 2 leaves rsPercentile/relativeReturn
+   * null (no meaningful ranking). Pure in-memory over the already-served signals — no
+   * extra DB or price reads, so it adds no look-ahead or pool pressure.
+   */
+  private withRsPercentiles(signals: SignalResultDto[]): SignalResultDto[] {
+    const n = signals.length;
+    if (n < 2) {
+      return signals.map((s) => ({ ...s, rsPercentile: null, relativeReturn: null }));
+    }
+    const scoreOf = (s: SignalResultDto): number => (typeof s.score === 'number' ? s.score : 0);
+    const sortedScores = signals.map(scoreOf).sort((a, b) => a - b);
+    // lower-bound rank: first index where sortedScores[i] >= score (ties share lowest rank)
+    const lowerBoundRank = (score: number): number => {
+      let lo = 0;
+      let hi = sortedScores.length;
+      while (lo < hi) {
+        const mid = (lo + hi) >> 1;
+        if (sortedScores[mid] < score) lo = mid + 1;
+        else hi = mid;
+      }
+      return lo;
+    };
+    return signals.map((s) => {
+      const score = scoreOf(s);
+      const rsPercentile = Math.round((lowerBoundRank(score) / (n - 1)) * 100);
+      const relativeReturn = (score - 50) / 50;
+      return { ...s, rsPercentile, relativeReturn };
+    });
   }
 
   async enrichSignal(signal: SignalResultDto): Promise<SignalResultDto> {

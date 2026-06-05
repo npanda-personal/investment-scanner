@@ -67,6 +67,7 @@ export function TodayReviewCandidateDetailPage() {
   const explainability = candidate.explainability;
   const dqTierContext = detailTierContext(dataQuality);
   const confidence = detailConfidenceDisplay(candidate.confidenceScore, dqTierContext.missingTierContext);
+  const priceBehaviourText = buildPriceBehaviourText(candidate);
 
   return (
     <Stack spacing={3}>
@@ -117,6 +118,18 @@ export function TodayReviewCandidateDetailPage() {
           </Stack>
         </CardContent>
       </Card>
+
+      {priceBehaviourText && (
+        <Card variant="outlined">
+          <CardContent>
+            <Typography variant="h6" gutterBottom>Price behaviour</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic', mb: 1 }}>
+              Deterministic summary assembled from persisted snapshot data. Descriptive context only — not investment advice.
+            </Typography>
+            <Typography>{priceBehaviourText}</Typography>
+          </CardContent>
+        </Card>
+      )}
 
       {(candidate.blockers.length > 0 || candidate.watchReasons.length > 0) && (
         <Alert severity={candidate.blockers.length > 0 ? 'error' : 'warning'}>
@@ -428,6 +441,97 @@ function reasonCategoryLabel(category: string) {
 function reasonSourceLabel(sourceModule: string) {
   if (/trade plan/i.test(sourceModule)) return 'Today Review evidence';
   return sourceModule;
+}
+
+/**
+ * Assembles a deterministic "Price behaviour" sentence from fields already
+ * present in the candidate snapshot.  Returns null when no useful data is
+ * available (so the card is omitted rather than rendered empty).
+ *
+ * Clause order:
+ *   1. Recent return (3-day or daily change)
+ *   2. Volume context
+ *   3. Delivery context (strategy-backed path only)
+ *   4. Earnings proximity (from watchReasons caveat string)
+ *   5. Sector context
+ *
+ * Never fabricates — each clause is omitted when its source field is null.
+ */
+function buildPriceBehaviourText(candidate: TodayReviewCandidate): string | null {
+  const signals = candidate.sourceSignalSnapshot as any;
+  const pb = signals?.priceBehaviour as {
+    recentReturn3D?: number | null;
+    dailyChangePercent?: number | null;
+    volumeVsAvg20D?: number | null;
+    deliveryPercent?: number | null;
+    deliveryEvidence?: string | null;
+    sector?: string | null;
+  } | null | undefined;
+
+  const market = candidate.marketContextSnapshot as any;
+  const dataQuality = candidate.dataQualitySnapshot as any;
+
+  const clauses: string[] = [];
+
+  // 1. Recent return
+  const ret3D = typeof pb?.recentReturn3D === 'number' && Number.isFinite(pb.recentReturn3D) ? pb.recentReturn3D : null;
+  const dailyPct = typeof pb?.dailyChangePercent === 'number' && Number.isFinite(pb.dailyChangePercent) ? pb.dailyChangePercent : null;
+  if (ret3D !== null) {
+    const sign = ret3D >= 0 ? '+' : '';
+    clauses.push(`Price moved ${sign}${ret3D.toFixed(1)}% over the last 3 trading days`);
+  } else if (dailyPct !== null) {
+    const sign = dailyPct >= 0 ? '+' : '';
+    clauses.push(`Price moved ${sign}${dailyPct.toFixed(1)}% in the latest session`);
+  }
+
+  // 2. Volume context
+  const volRatio = typeof pb?.volumeVsAvg20D === 'number' && pb.volumeVsAvg20D > 0 ? pb.volumeVsAvg20D : null;
+  const hasRecentVolume = dataQuality?.hasRecentVolume;
+  if (volRatio !== null) {
+    if (volRatio >= 1.5) {
+      clauses.push(`on above-average volume (${volRatio.toFixed(1)}x 20-day average)`);
+    } else if (volRatio >= 0.8) {
+      clauses.push(`on near-average volume (${volRatio.toFixed(1)}x 20-day average)`);
+    } else {
+      clauses.push(`on below-average volume (${volRatio.toFixed(1)}x 20-day average)`);
+    }
+  } else if (typeof hasRecentVolume === 'boolean') {
+    clauses.push(hasRecentVolume ? 'with recent volume activity confirmed' : 'with no recent volume activity noted');
+  }
+
+  // 3. Delivery context (strategy-backed path — available when rawSignal is present)
+  const deliveryPct = typeof pb?.deliveryPercent === 'number' && Number.isFinite(pb.deliveryPercent) ? pb.deliveryPercent : null;
+  if (deliveryPct !== null) {
+    clauses.push(`delivery ${deliveryPct.toFixed(0)}%`);
+  }
+
+  // 4. Earnings proximity — parse from watchReasons
+  const earningsWatchReason = candidate.watchReasons.find((reason) =>
+    reason.toLowerCase().includes('earnings result') || reason.toLowerCase().includes('earnings in')
+  );
+  if (earningsWatchReason) {
+    // Extract the lead clause up to the em-dash for brevity
+    const brief = earningsWatchReason.split(' — ')[0] ?? earningsWatchReason;
+    clauses.push(brief);
+  }
+
+  // 5. Sector context
+  const sector = pb?.sector ?? dataQuality?.sector ?? null;
+  const sectorLeadership: string | null = market?.sectorLeadershipStatus ?? null;
+  if (sector) {
+    if (sectorLeadership) {
+      clauses.push(`sector ${sector} is ${sectorLeadership.toUpperCase()}`);
+    } else {
+      clauses.push(`sector ${sector}`);
+    }
+  }
+
+  if (clauses.length === 0) return null;
+
+  // Compose: first clause starts the sentence; subsequent clauses are appended
+  const [first, ...rest] = clauses;
+  if (rest.length === 0) return `${first}.`;
+  return `${first}, ${rest.join('; ')}.`;
 }
 
 function safeReviewText(value: string) {

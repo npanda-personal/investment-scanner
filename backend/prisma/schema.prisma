@@ -845,6 +845,7 @@ model MarketContextSnapshot {
   newLowCount               Int?
   macroStatus               String?
   explanation               String?
+  breadthByCapBand          Json?
   source                    String
   dataStatus                String
   createdAt                 DateTime @default(now())

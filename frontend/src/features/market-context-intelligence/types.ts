@@ -1,3 +1,15 @@
+export type CapBand = 'LARGE' | 'MID' | 'SMALL' | 'UNKNOWN';
+
+export interface CapBandBreadth {
+  band: CapBand;
+  label: string;
+  percentAboveSma50: number | null;
+  percentAboveSma200: number | null;
+  advancers: number;
+  decliners: number;
+  instrumentCount: number;
+}
+
 export type MarketRegime = 'RISK_ON' | 'NEUTRAL' | 'RISK_OFF';
 export type LeadershipStatus = 'LEADING' | 'IMPROVING' | 'WEAKENING' | 'LAGGING';
 export type MacroStatus = 'SUPPORTIVE' | 'MIXED' | 'HEADWIND' | 'UNKNOWN';
@@ -74,6 +86,7 @@ export interface MarketContextSummary {
   topSectors: SectorRotationItem[];
   weakSectors: SectorRotationItem[];
   breadth: MarketBreadth;
+  breadthByCapBand: CapBandBreadth[];
   countryStrength: CountryStrengthItem[];
   macro: MacroSnapshot;
   explanation: string[];

@@ -94,6 +94,14 @@ export interface SignalResultDto {
    */
   calibratedScore?: number | null;
   /**
+   * NR-6: relative-strength percentile (0–100) — rank of this signal's composite
+   * `score` within the served universe, ascending (weakest→0, strongest→100). Ties
+   * share the lower-bound rank. null when the served universe has < 2 signals.
+   */
+  rsPercentile?: number | null;
+  /** NR-6: normalized relative-return proxy = (score-50)/50, range [-1,+1]. */
+  relativeReturn?: number | null;
+  /**
    * The evaluation horizon used by the calibration model (e.g. '20D').
    * Sourced from calibrationEvidence.horizon on the persisted row.
    * null when calibration is absent.

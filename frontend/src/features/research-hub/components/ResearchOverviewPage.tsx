@@ -40,6 +40,7 @@ import { useResearchOverview } from '../hooks/useResearchOverview';
 import { PageHeader } from '@/shared/components';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
 import type { ActionabilityDimension, ActionabilityStatus, ResearchOverview, NextAction, ResearchPriorityCandidate } from '../api/researchHubApi';
+import { ResearchDrilldownTabs } from './ResearchDrilldownTabs';
 
 const ResearchOverviewPage: React.FC = () => {
   const { scope } = useMarketScope();
@@ -177,13 +178,15 @@ const ResearchOverviewPage: React.FC = () => {
               <WhatChangedPanel whatChanged={whatChanged} generatedAt={data.generatedAt} />
             </Box>
 
-            <Box>
-              <Typography variant="h6" sx={{ mb: 2, fontWeight: 700 }}>
-                Drilldown Analysis
-              </Typography>
-              <ResearchModuleDrilldowns />
-            </Box>
           </Stack>
+        </Grid>
+
+        {/* 4. Drilldown Tabs — full width */}
+        <Grid item xs={12}>
+          <Typography variant="h6" sx={{ mb: 2, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
+            <TimelineOutlined color="info" /> Drilldown Analysis
+          </Typography>
+          <ResearchDrilldownTabs />
         </Grid>
       </Grid>
 
@@ -664,42 +667,6 @@ const WhatChangedPanel: React.FC<{
         )}
       </CardContent>
     </Card>
-  );
-};
-
-const ResearchModuleDrilldowns: React.FC = () => {
-  const modules = [
-    { label: 'Market Pulse', icon: <TrendingUpOutlined />, route: '/market-pulse', desc: 'Daily context' },
-    { label: 'Market Map', icon: <TimelineOutlined />, route: '/market-map', desc: 'Stock map' },
-    { label: 'Breadth', icon: <GppGoodOutlined />, route: '/breadth', desc: 'Participation' },
-    { label: 'Flow', icon: <FlashOnOutlined />, route: '/institutional-flow', desc: 'Institutional context' },
-  ];
-
-  return (
-    <Grid container spacing={1}>
-      {modules.map((m) => (
-        <Grid item xs={6} key={m.label}>
-          <Button
-            component={Link}
-            to={m.route}
-            variant="outlined"
-            fullWidth
-            sx={{
-              flexDirection: 'column',
-              py: 2,
-              height: '100%',
-              borderColor: 'divider',
-              color: 'text.primary',
-              '&:hover': { bgcolor: 'action.hover' }
-            }}
-          >
-            {m.icon}
-            <Typography variant="caption" fontWeight={700} sx={{ mt: 1 }}>{m.label}</Typography>
-            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>{m.desc}</Typography>
-          </Button>
-        </Grid>
-      ))}
-    </Grid>
   );
 };
 

@@ -1,9 +1,10 @@
 import React from 'react';
 import RefreshIcon from '@mui/icons-material/Refresh';
-import { Alert, Box, Button, Chip, CircularProgress, LinearProgress, Paper, Stack, Tooltip, Typography } from '@mui/material';
+import { Alert, Box, Button, Chip, CircularProgress, LinearProgress, Paper, Stack, Table, TableBody, TableCell, TableHead, TableRow, Tooltip, Typography } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { humanizeCode } from '@/shared/format/enumLabels';
 import { useMarketContext } from '../hooks';
+import type { CapBandBreadth } from '../types';
 
 const pct = (value: number | null) => value === null ? 'N/A' : `${(value * 100).toFixed(1)}%`;
 const colorFor = (value?: string) => value === 'RISK_ON' || value === 'LEADING' || value === 'SUPPORTIVE' ? 'success' : value === 'RISK_OFF' || value === 'LAGGING' || value === 'HEADWIND' ? 'error' : 'warning';
@@ -25,6 +26,55 @@ function formatDateTime(value?: string | null) {
   if (!value) return 'Unavailable';
   return new Date(value).toLocaleString();
 }
+
+const dash = (value: number | null, fmt: (v: number) => string = (v) => String(v)) =>
+  value === null ? '—' : fmt(value);
+
+const CapBandBreadthTable: React.FC<{ bands: CapBandBreadth[] }> = ({ bands }) => {
+  if (!bands || bands.length === 0) {
+    return (
+      <Typography variant="body2" color="text.secondary">
+        Cap-band breadth not yet computed. Run market-context refresh to generate.
+      </Typography>
+    );
+  }
+  return (
+    <Table size="small">
+      <TableHead>
+        <TableRow>
+          <TableCell><Typography variant="caption" fontWeight={700}>Band</Typography></TableCell>
+          <TableCell align="right"><Typography variant="caption" fontWeight={700}>{'> SMA50'}</Typography></TableCell>
+          <TableCell align="right"><Typography variant="caption" fontWeight={700}>{'> SMA200'}</Typography></TableCell>
+          <TableCell align="right"><Typography variant="caption" fontWeight={700}>A / D</Typography></TableCell>
+          <TableCell align="right"><Typography variant="caption" fontWeight={700}>N</Typography></TableCell>
+        </TableRow>
+      </TableHead>
+      <TableBody>
+        {bands.map((row) => (
+          <TableRow key={row.band}>
+            <TableCell>
+              <Tooltip title={row.label} arrow>
+                <Typography variant="body2" fontWeight={600}>{humanizeCode(row.band + '_CAP')}</Typography>
+              </Tooltip>
+            </TableCell>
+            <TableCell align="right">
+              <Typography variant="body2">{dash(row.percentAboveSma50, (v) => `${(v * 100).toFixed(1)}%`)}</Typography>
+            </TableCell>
+            <TableCell align="right">
+              <Typography variant="body2">{dash(row.percentAboveSma200, (v) => `${(v * 100).toFixed(1)}%`)}</Typography>
+            </TableCell>
+            <TableCell align="right">
+              <Typography variant="body2">{row.instrumentCount < 5 ? '—' : `${row.advancers} / ${row.decliners}`}</Typography>
+            </TableCell>
+            <TableCell align="right">
+              <Typography variant="body2" color="text.secondary">{row.instrumentCount}</Typography>
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  );
+};
 
 export const MarketContextPage: React.FC = () => {
   const { summary, loading, error, reload } = useMarketContext();
@@ -107,6 +157,14 @@ export const MarketContextPage: React.FC = () => {
             <Metric label="Price Sample" value={String(summary.breadth.instrumentCount)} />
             <Metric label="SMA Samples" value={breadthSmaSamples(summary)} />
           </Box>
+        </Paper>
+
+        <Paper sx={{ p: 2 }}>
+          <Typography variant="h6" sx={{ mb: 1 }}>Breadth by Cap Band</Typography>
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
+            Large &gt; &#8377;20,000 Cr &nbsp;|&nbsp; Mid &#8377;5,000&#8211;20,000 Cr &nbsp;|&nbsp; Small &lt; &#8377;5,000 Cr. &#8220;&#8212;&#8221; = insufficient data.
+          </Typography>
+          <CapBandBreadthTable bands={summary.breadthByCapBand ?? []} />
         </Paper>
 
         <Paper sx={{ p: 2 }}>

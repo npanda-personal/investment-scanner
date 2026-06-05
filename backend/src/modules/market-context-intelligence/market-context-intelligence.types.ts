@@ -5,6 +5,17 @@ export type LeadershipStatus = 'LEADING' | 'IMPROVING' | 'WEAKENING' | 'LAGGING'
 export type MacroStatus = 'SUPPORTIVE' | 'MIXED' | 'HEADWIND' | 'UNKNOWN';
 export type MarketContextRange = '1M' | '3M' | '6M';
 export type SectorIntelligenceClassification = 'STRONG' | 'IMPROVING' | 'NEUTRAL' | 'WEAK';
+export type CapBand = 'LARGE' | 'MID' | 'SMALL' | 'UNKNOWN';
+
+export interface CapBandBreadth {
+  band: CapBand;
+  label: string;
+  percentAboveSma50: number | null;
+  percentAboveSma200: number | null;
+  advancers: number;
+  decliners: number;
+  instrumentCount: number;
+}
 
 export interface ContextInstrument {
   instrumentId: string;
@@ -14,6 +25,7 @@ export interface ContextInstrument {
   latest: number | null;
   previous: number | null;
   prices: number[];
+  marketCap: number | null;
   signalDirection?: string | null;
   signalScore?: number | null;
 }
@@ -167,6 +179,7 @@ export interface MarketContextSummary {
   topSectors: SectorRotationItem[];
   weakSectors: SectorRotationItem[];
   breadth: MarketBreadth;
+  breadthByCapBand: CapBandBreadth[];
   countryStrength: CountryStrengthItem[];
   macro: MacroSnapshot;
   explanation: string[];

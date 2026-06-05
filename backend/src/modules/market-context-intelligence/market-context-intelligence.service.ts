@@ -3,6 +3,8 @@ import { SignalGenerationEngineService } from '../signal-generation-engine';
 import { isKnownSector } from '../../shared/utils/sector-metadata';
 import { MarketContextIntelligenceRepository } from './market-context-intelligence.repository';
 import type {
+  CapBand,
+  CapBandBreadth,
   ContextInstrument,
   CountryStrengthItem,
   LeadershipStatus,
@@ -78,6 +80,7 @@ export class MarketContextIntelligenceService {
     const regime = this.calculateRegime(enriched, nseiPrices);
     const sectors = this.rankSectors(enriched);
     const breadth = this.calculateBreadth(enriched);
+    const breadthByCapBand = this.calculateBreadthByCapBand(enriched);
     const countries = this.rankCountries(enriched);
     const macro = this.macro();
 
@@ -86,6 +89,7 @@ export class MarketContextIntelligenceService {
       topSectors: sectors.slice(0, 5),
       weakSectors: this.weakSectorSlice(sectors),
       breadth,
+      breadthByCapBand,
       countryStrength: countries.slice(0, 8),
       macro,
       explanation: this.takeaways(regime, sectors, breadth, macro),
@@ -435,6 +439,61 @@ export class MarketContextIntelligenceService {
     };
   }
 
+  /**
+   * Thresholds (₹ Crore):
+   *   Large-cap : marketCap > 20,000 Cr
+   *   Mid-cap   : 5,000 – 20,000 Cr
+   *   Small-cap : < 5,000 Cr (positive cap known)
+   *   UNKNOWN   : marketCap null / 0 — excluded from named-band stats; bands with < 5
+   *               valid instruments surface null metrics ("—" in UI).
+   */
+  calculateBreadthByCapBand(items: ContextInstrument[]): CapBandBreadth[] {
+    const LARGE_THRESHOLD = 20_000; // Cr
+    const MID_THRESHOLD   =  5_000; // Cr
+
+    const bandOf = (cap: number | null): CapBand => {
+      if (cap === null || cap <= 0) return 'UNKNOWN';
+      if (cap > LARGE_THRESHOLD) return 'LARGE';
+      if (cap >= MID_THRESHOLD)  return 'MID';
+      return 'SMALL';
+    };
+
+    const META: { band: CapBand; label: string }[] = [
+      { band: 'LARGE', label: 'Large-cap (> ₹20,000 Cr)' },
+      { band: 'MID',   label: 'Mid-cap (₹5,000–20,000 Cr)' },
+      { band: 'SMALL', label: 'Small-cap (< ₹5,000 Cr)' },
+    ];
+
+    const MIN_SAMPLE = 5;
+
+    return META.map(({ band, label }) => {
+      const group = items.filter(
+        (item) => item.latest !== null && item.prices.length > 1 && bandOf(item.marketCap) === band,
+      );
+
+      if (group.length < MIN_SAMPLE) {
+        return { band, label, percentAboveSma50: null, percentAboveSma200: null, advancers: 0, decliners: 0, instrumentCount: group.length };
+      }
+
+      const sma50Sample  = group.filter((item) => this.sma(item.prices, 50)  !== null);
+      const sma200Sample = group.filter((item) => this.sma(item.prices, 200) !== null);
+      const above50  = sma50Sample.filter((item)  => item.latest! > this.sma(item.prices, 50)!).length;
+      const above200 = sma200Sample.filter((item) => item.latest! > this.sma(item.prices, 200)!).length;
+      const advancers = group.filter((item) => item.previous !== null && item.latest! > item.previous!).length;
+      const decliners = group.filter((item) => item.previous !== null && item.latest! < item.previous!).length;
+
+      return {
+        band,
+        label,
+        percentAboveSma50:  sma50Sample.length  >= MIN_SAMPLE ? above50  / sma50Sample.length  : null,
+        percentAboveSma200: sma200Sample.length >= MIN_SAMPLE ? above200 / sma200Sample.length : null,
+        advancers,
+        decliners,
+        instrumentCount: group.length,
+      };
+    });
+  }
+
   classifyLeadership(return1M: number | null, return3M: number | null, score: number): LeadershipStatus {
     if (score >= 70 && (return3M ?? 0) >= 0) return 'LEADING';
     if ((return1M ?? 0) > 0 && (return3M ?? 0) <= 0.03) return 'IMPROVING';
@@ -472,6 +531,7 @@ export class MarketContextIntelligenceService {
         latest: prices[0] ?? null,
         previous: prices[1] ?? null,
         prices,
+        marketCap: instrument.market_cap ?? null,
       };
     }));
     return rows;

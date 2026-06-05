@@ -54,6 +54,9 @@ export interface SignalResult {
   calibrationHorizon?: string | null;
   calibrationSampleSize?: number | null;
   lifecycleState?: LifecycleState | null;
+  // Relative-strength universe percentile (NR-6)
+  rsPercentile?: number | null;
+  relativeReturn?: number | null;
 }
 
 export interface SignalScoringInputSummary {

@@ -143,6 +143,30 @@ export function SignalTable({ signals, totalCount, loading, page, pageSize, sort
         );
       },
     },
+    {
+      id: 'rsPercentile',
+      label: 'RS',
+      sortable: true,
+      align: 'right' as const,
+      render: (signal: SignalResult) => {
+        const pct = signal.rsPercentile;
+        if (pct == null) {
+          return (
+            <Tooltip title="Relative-strength percentile unavailable" arrow>
+              <Typography variant="body2" color="text.disabled" sx={{ cursor: 'help' }}>—</Typography>
+            </Tooltip>
+          );
+        }
+        const color = pct >= 70 ? 'success.main' : pct >= 40 ? 'text.primary' : 'error.main';
+        return (
+          <Tooltip title={`RS percentile ${pct} — stronger than ${pct}% of signals in this universe`} arrow>
+            <Typography variant="body2" sx={{ color, fontWeight: pct >= 70 ? 600 : 400 }}>
+              {pct}
+            </Typography>
+          </Tooltip>
+        );
+      },
+    },
     { id: 'direction', label: 'Raw Direction', sortable: true, render: (signal) => <StatusBadge label={signal.direction} /> },
     { id: 'confidence', label: 'Confidence', sortable: true, render: (signal) => <StatusBadge label={signal.confidence} /> },
     {
