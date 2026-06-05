@@ -42,6 +42,27 @@ const ALL_SOURCE_SEGMENTS = ['CM', 'INDEX', 'SECTOR_INDEX', 'DELIVERY'] as const
 const HIGH_DELIVERY_THRESHOLD = 50;
 
 export class MarketPulseSnapshotService {
+  // Leveraged / inverse / factor / thematic index slices that should NOT appear in the
+  // headline market overview (and must be excluded from the momentum/health average —
+  // an inverse index moves opposite the market).
+  private static readonly INDEX_NOISE = /(_PR_|_TR_|INVERSE|_1X_|_2X_|_3X_|MIDSMALL|MICROCAP|HIGH_BETA|LOW_VOLATILITY|LOW_VOL|EQUAL_WEIGHT|ALPHA|MOMENTUM|QUALITY|VALUE|ESG|MULTICAP|MULTIFACTOR|ENHANCED|LIQUID|FLEXICAP|DIVIDEND|SECTOR_LEADERS|MANUFACTURING|INFRASTRUCTURE_50|NIFTY[0-9]{2,3}_|TOTAL_MARKET|LARGEMIDCAP|LARGEMIDSMALL)/i;
+
+  // Display order for the headline indices a trader expects first.
+  private static readonly INDEX_PRIORITY = [
+    '^NSEI', 'NSE_INDEX_NIFTY_50',
+    '^NSEBANK', 'NSE_INDEX_NIFTY_BANK',
+    '^BSESN', 'NSE_INDEX_SENSEX',
+    'NSE_INDEX_NIFTY_NEXT_50',
+    'NSE_INDEX_NIFTY_MIDCAP_100',
+    'NSE_INDEX_NIFTY_FINANCIAL_SERVICES',
+    'NSE_INDEX_NIFTY_IT',
+    'NSE_INDEX_NIFTY_AUTO',
+    'NSE_INDEX_NIFTY_PHARMA',
+    'NSE_INDEX_NIFTY_FMCG',
+    'NSE_INDEX_NIFTY_METAL',
+    'NSE_INDEX_NIFTY_ENERGY',
+  ];
+
   constructor(private readonly repository = new MarketPulseSnapshotRepository()) {}
 
   async latestSnapshot(scope: MarketPulseScope): Promise<MarketPulseSnapshotEnvelope> {
@@ -231,7 +252,7 @@ export class MarketPulseSnapshotService {
       return { score: 0, rows: [], warnings: ['Index trend score unavailable because persisted index price rows are missing.'] };
     }
 
-    const rows = [...groups.entries()].map(([symbol, series]) => {
+    const allRows = [...groups.entries()].map(([symbol, series]) => {
       const returns = this.seriesReturns(series);
       const score = this.seriesScore(series, returns);
       return {
@@ -245,15 +266,29 @@ export class MarketPulseSnapshotService {
         score,
         freshness: this.dateKey(series[0].timestamp),
       };
-    }).sort((left, right) => right.score - left.score);
+    });
 
-    if (rows.some((row) => row.return3M === null)) {
+    // Exclude leveraged/inverse/factor/ESG slices: they are not the headline market
+    // overview a trader expects, and inverse indices move OPPOSITE the market — so
+    // including them in the momentum average corrupts the health score.
+    const headlineRows = allRows.filter((row) => !MarketPulseSnapshotService.INDEX_NOISE.test(row.symbol));
+    const scoringRows = headlineRows.length >= 3 ? headlineRows : allRows;
+
+    const priorityOf = (symbol: string) => {
+      const idx = MarketPulseSnapshotService.INDEX_PRIORITY.indexOf(symbol);
+      return idx === -1 ? Number.MAX_SAFE_INTEGER : idx;
+    };
+    const displayRows = [...scoringRows]
+      .sort((left, right) => (priorityOf(left.symbol) - priorityOf(right.symbol)) || (right.score - left.score))
+      .slice(0, 5);
+
+    if (scoringRows.some((row) => row.return3M === null)) {
       warnings.push('Some index rows have insufficient persisted history for 3M trend scoring.');
     }
 
     return {
-      score: this.average(rows.map((row) => row.score)) ?? 0,
-      rows: rows.slice(0, 5),
+      score: this.average(scoringRows.map((row) => row.score)) ?? 0,
+      rows: displayRows,
       warnings,
     };
   }
