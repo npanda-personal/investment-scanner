@@ -5,6 +5,7 @@ export function createMarketIntelligenceRouter(controller = new MarketIntelligen
   const router = Router();
   router.get('/market-intelligence/stock-interest', controller.stockInterest);
   router.get('/market-intelligence/sector-constituents', controller.sectorConstituents);
+  router.get('/market-intelligence/instrument-context/:instrumentId', controller.instrumentContext);
   return router;
 }
 

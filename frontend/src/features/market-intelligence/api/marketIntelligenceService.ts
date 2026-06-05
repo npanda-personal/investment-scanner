@@ -312,8 +312,39 @@ export async function fetchRiskRadarSnapshot(scope: MarketScope): Promise<Snapsh
   return unavailable(scope, 'Risk Radar backend not available yet.');
 }
 
-export async function fetchInstrumentContextSnapshot(scope: MarketScope): Promise<SnapshotEnvelope<InstrumentContextSnapshot>> {
-  return unavailable(scope, 'Instrument Context backend not available yet.');
+export async function fetchInstrumentContextSnapshot(
+  scope: MarketScope,
+  instrumentId?: string,
+): Promise<SnapshotEnvelope<InstrumentContextSnapshot>> {
+  if (!instrumentId) {
+    return unavailable(scope, 'No instrument selected.');
+  }
+  try {
+    const response = await axios.get<{ status: string; context: InstrumentContextSnapshot; message?: string }>(
+      `${API_BASE}/instrument-context/${encodeURIComponent(instrumentId)}`,
+    );
+    const body = response.data;
+    if (body.status === 'not_found' || !body.context) {
+      return {
+        availability: 'EMPTY',
+        scope,
+        snapshot: null,
+        message: body.message || 'Instrument not found.',
+        warnings: [],
+      };
+    }
+    return {
+      availability: 'READY',
+      scope,
+      snapshot: body.context,
+      message: 'Instrument context assembled from persisted read models.',
+      warnings: [],
+      snapshotDate: body.context.assembledAt?.slice(0, 10) ?? null,
+      generatedAt: body.context.assembledAt ?? null,
+    };
+  } catch (caught) {
+    return errorEnvelope(scope, 'Failed to load instrument context snapshot.', caught);
+  }
 }
 
 export async function fetchSectorConstituents(

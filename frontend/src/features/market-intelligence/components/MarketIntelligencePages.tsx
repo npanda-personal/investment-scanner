@@ -1108,17 +1108,48 @@ function RiskTable({ rows }: { rows: RiskRadarSnapshot[] }) {
 }
 
 function InstrumentContextRail({ snapshot }: { snapshot: InstrumentContextSnapshot }) {
+  const regimeLabel = snapshot.marketRegime.absent
+    ? '—'
+    : `${snapshot.marketRegime.value?.regime ?? '—'} (${snapshot.marketRegime.value?.score ?? '—'})`;
+  const sectorLabel = snapshot.sectorStrength.absent
+    ? '—'
+    : `${snapshot.sectorStrength.value?.sector ?? '—'}: ${snapshot.sectorStrength.value?.classification ?? '—'}`;
+  const rsLabel = snapshot.relativeStrength.absent
+    ? '—'
+    : (() => {
+        const rs = snapshot.relativeStrength.value;
+        if (!rs) return '—';
+        if (rs.relativeReturn63d !== null && rs.relativeReturn63d !== undefined) {
+          const sign = rs.relativeReturn63d >= 0 ? '+' : '';
+          return `vs Nifty ${sign}${(rs.relativeReturn63d * 100).toFixed(1)}%`;
+        }
+        if (rs.stockReturn63d !== null && rs.stockReturn63d !== undefined) {
+          const sign = rs.stockReturn63d >= 0 ? '+' : '';
+          return `63d: ${sign}${(rs.stockReturn63d * 100).toFixed(1)}%`;
+        }
+        return '—';
+      })();
+  const smLabel = snapshot.smartMoney.absent
+    ? '—'
+    : `${snapshot.smartMoney.value?.status ?? '—'} (${snapshot.smartMoney.value?.score ?? '—'})`;
+  const fnoLabel = snapshot.fnoBan.absent
+    ? '—'
+    : snapshot.fnoBan.value?.banned
+      ? `Banned (${snapshot.fnoBan.value?.banDate ?? ''})`
+      : 'Not banned';
+  const signalLabel = snapshot.latestSignal.absent
+    ? '—'
+    : `${snapshot.latestSignal.value?.direction ?? '—'} (${snapshot.latestSignal.value?.score !== undefined ? Math.round(snapshot.latestSignal.value.score) : '—'})`;
+
   return (
     <SectionPanel title="Instrument Context Snapshot">
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(4, 1fr)' }, gap: 1.5 }}>
-        <ScoreCard label="Market Pulse State" value={snapshot.marketState} />
-        <ScoreCard label="Sector State" value={snapshot.sectorState} />
-        <ScoreCard label="Relative Strength" value={snapshot.relativeStrength} />
-        <ScoreCard label="Earnings Status" value={snapshot.earningsStatus} />
-        <ScoreCard label="Compounder Status" value={snapshot.compounderStatus} />
-        <ScoreCard label="Setup Status" value={snapshot.setupStatus} />
-        <ScoreCard label="Risk Status" value={snapshot.riskStatus} />
-        <ScoreCard label="Freshness" value={snapshot.freshness.label} />
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' }, gap: 1.5 }}>
+        <ScoreCard label="Market Regime" value={regimeLabel} />
+        <ScoreCard label="Sector Strength" value={sectorLabel} />
+        <ScoreCard label="Relative Strength (63d)" value={rsLabel} />
+        <ScoreCard label="Smart Money" value={smLabel} />
+        <ScoreCard label="F&O Ban" value={fnoLabel} />
+        <ScoreCard label="Latest Signal" value={signalLabel} />
       </Box>
     </SectionPanel>
   );

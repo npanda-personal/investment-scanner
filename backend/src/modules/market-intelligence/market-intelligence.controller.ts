@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import { StockInterestSnapshotService } from './stock-interest-snapshot.service';
 import { SectorConstituentsService } from './sector-constituents.service';
 import { parseStockInterestScope } from './stock-interest-snapshot.validation';
+import { assembleInstrumentContext } from './instrument-context.service';
 
 export class MarketIntelligenceController {
   constructor(
@@ -46,6 +47,24 @@ export class MarketIntelligenceController {
         message,
         warnings: [message],
       });
+    }
+  };
+
+  instrumentContext = async (req: Request, res: Response) => {
+    try {
+      res.setHeader('Cache-Control', 'no-store');
+      const instrumentId = typeof req.params.instrumentId === 'string' ? req.params.instrumentId.trim() : '';
+      if (!instrumentId) {
+        return res.status(400).json({ status: 'error', message: 'instrumentId is required', context: null });
+      }
+      const context = await assembleInstrumentContext(instrumentId);
+      if (!context) {
+        return res.status(404).json({ status: 'not_found', message: `Instrument ${instrumentId} not found`, context: null });
+      }
+      return res.json({ status: 'ready', context });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to assemble instrument context';
+      return res.status(500).json({ status: 'error', message, context: null });
     }
   };
 }

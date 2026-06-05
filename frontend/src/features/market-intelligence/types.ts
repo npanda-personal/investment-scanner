@@ -172,17 +172,58 @@ export interface RiskRadarSnapshot {
   freshness?: string | null;
 }
 
+export interface InstrumentContextField<T = string | null> {
+  value: T;
+  source: string;
+  asOf: string | null;
+  absent: boolean;
+}
+
 export interface InstrumentContextSnapshot {
-  snapshotDate: string;
+  instrumentId: string;
   symbol: string;
-  marketState: string;
-  sectorState: string;
-  relativeStrength: string;
-  earningsStatus: string;
-  compounderStatus: string;
-  setupStatus: string;
-  riskStatus: string;
-  freshness: FreshnessSnapshot;
+  sector: string | null;
+  assembledAt: string;
+
+  marketRegime: InstrumentContextField<{
+    regime: string;
+    score: number;
+    explanation: string;
+  } | null>;
+
+  sectorStrength: InstrumentContextField<{
+    sector: string;
+    classification: string;
+    sectorScore: number | null;
+    return1W: number | null;
+    return1M: number | null;
+    return3M: number | null;
+  } | null>;
+
+  relativeStrength: InstrumentContextField<{
+    stockReturn63d: number | null;
+    benchmarkReturn63d: number | null;
+    relativeReturn63d: number | null;
+    rsPercentile: number | null;
+  } | null>;
+
+  smartMoney: InstrumentContextField<{
+    status: string;
+    score: number;
+    confidence: string;
+  } | null>;
+
+  fnoBan: InstrumentContextField<{
+    banned: boolean;
+    banDate: string | null;
+  } | null>;
+
+  latestSignal: InstrumentContextField<{
+    direction: string;
+    score: number;
+    confidence: string;
+    generatedDate: string | null;
+  } | null>;
 }
 
 export interface SectorConstituentRow {

@@ -1,10 +1,28 @@
 /**
  * EOD Ingest Scheduler
  *
- * Runs three NSE free-data ingests once per day after market close:
+ * Runs data ingests and intelligence snapshot regenerations once per day
+ * after market close, in staggered order so each job runs on the freshest
+ * persisted data:
+ *
+ *   DATA INGESTS (raw NSE free-data):
  *   1. FII/DII activity         — 18:30 IST (13:00 UTC)
  *   2. Bulk & Block Deals       — 18:35 IST (13:05 UTC)
  *   3. F&O Securities Ban List  — 18:40 IST (13:10 UTC)
+ *
+ *   INTELLIGENCE SNAPSHOT REGENERATIONS (recompute over persisted data):
+ *   4. Market Pulse snapshot    — 19:00 IST (13:30 UTC)
+ *      Calls MarketPulseSnapshotService.refreshSnapshot — persists a new
+ *      dated snapshot so prior-day diff and sparkline can be computed.
+ *      NOTE: The Market Context regime snapshot (MarketContextSnapshot /
+ *      HistoricalContextSnapshots) is already scheduled via the
+ *      pipeline-orchestration chain (runScheduledMarketContextSnapshotStage
+ *      fires as a downstream of the market-data pipeline). It is NOT added
+ *      here to avoid duplication.
+ *   5. Research Hub snapshot    — 19:10 IST (13:40 UTC)
+ *      Calls ResearchHubService.refreshOverview — persists a new overview
+ *      snapshot so whatChanged can diff the current day against the prior
+ *      one (fixes the permanent "No prior snapshot to compare yet" message).
  *
  * Design:
  * - Uses the same setInterval pattern as MarketDataFoundationScheduler.
@@ -13,12 +31,16 @@
  * - Never runs at startup — dev-server restarts must NOT hammer NSE.
  * - Every job is wrapped in try/catch so a network failure only logs a warning
  *   and never crashes the scheduler or the process.
+ * - Snapshot regen jobs are pool-aware: they run sequentially (staggered
+ *   10-minute gaps) and never concurrently with each other.
  * - The ingest functions already enforce their own 7–8 s timeouts internally.
  */
 
 import { ingestFiiDii } from './fii-dii.service';
 import { ingestBulkBlockDeals } from './bulk-block-deals.service';
 import { ingestFnoBanList } from '../../modules/smart-money-intelligence/fno-ban.service';
+import { MarketPulseSnapshotService } from './market-pulse-snapshot.service';
+import { ResearchHubService } from '../research-hub/research-hub.service';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -47,6 +69,9 @@ export class EodIngestScheduler {
   private readonly tickIntervalMs: number;
 
   private readonly jobs: JobSpec[] = [
+    // -----------------------------------------------------------------------
+    // DATA INGESTS — raw NSE free-data feeds
+    // -----------------------------------------------------------------------
     {
       name: 'FII/DII Activity',
       utcHour: 13,
@@ -66,6 +91,33 @@ export class EodIngestScheduler {
       utcHour: 13,
       utcMinute: 10,  // 18:40 IST = 13:10 UTC
       run: ingestFnoBanList,
+      lastFiredDate: null,
+    },
+    // -----------------------------------------------------------------------
+    // INTELLIGENCE SNAPSHOT REGENERATIONS — recompute over persisted data.
+    // Staggered 10-minute gaps keep pool usage sequential, not concurrent.
+    // The Market Context regime snapshot is intentionally NOT listed here:
+    // it is already fired by pipeline-orchestration's
+    // runScheduledMarketContextSnapshotStage (downstream of market-data sync).
+    // -----------------------------------------------------------------------
+    {
+      name: 'Market Pulse Snapshot',
+      utcHour: 13,
+      utcMinute: 30,  // 19:00 IST = 13:30 UTC
+      run: async () => {
+        const svc = new MarketPulseSnapshotService();
+        return svc.refreshSnapshot({ region: 'IN', assetType: 'STOCK' });
+      },
+      lastFiredDate: null,
+    },
+    {
+      name: 'Research Hub Snapshot',
+      utcHour: 13,
+      utcMinute: 40,  // 19:10 IST = 13:40 UTC
+      run: async () => {
+        const svc = new ResearchHubService();
+        return svc.refreshOverview({ region: 'IN', assetType: 'STOCK' });
+      },
       lastFiredDate: null,
     },
   ];
