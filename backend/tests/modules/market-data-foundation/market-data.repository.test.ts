@@ -2312,4 +2312,89 @@ describe('MarketDataFoundationRepository', () => {
     expect(queryText).toContain('latest_prices.timestamp >=');
     expect(queryText).toContain('latest_prices.timestamp <');
   });
+
+  // ── CB-20: delivery% repository read (NR-1) ────────────────────────────────
+
+  it('getRecentDeliveryBySymbol returns delivery rows ordered by date desc', async () => {
+    const findMany = jest.fn().mockResolvedValue([
+      {
+        tradingDate: new Date('2026-06-01T00:00:00.000Z'),
+        tradedQuantity: BigInt(500000),
+        deliverableQuantity: BigInt(310000),
+        deliveryPercent: '62.000000000000000000000000000000',
+        source: 'NSE_DELIVERY',
+      },
+      {
+        tradingDate: new Date('2026-05-31T00:00:00.000Z'),
+        tradedQuantity: BigInt(400000),
+        deliverableQuantity: BigInt(60000),
+        deliveryPercent: '15.000000000000000000000000000000',
+        source: 'NSE_DELIVERY',
+      },
+    ]);
+    const prisma = {
+      marketDeliverySnapshot: { findMany },
+    };
+    const repository = new MarketDataFoundationRepository(prisma as any);
+
+    const rows = await repository.getRecentDeliveryBySymbol('RELIANCE', 5);
+
+    expect(findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { symbol: 'RELIANCE' },
+      orderBy: { tradingDate: 'desc' },
+      take: 5,
+    }));
+    expect(rows).toHaveLength(2);
+    expect(rows[0].deliveryPercent).toBeCloseTo(62);
+    expect(rows[1].deliveryPercent).toBeCloseTo(15);
+    expect(rows[0].tradingDate).toEqual(new Date('2026-06-01T00:00:00.000Z'));
+  });
+
+  it('getRecentDeliveryBySymbol applies endDate filter for as-of reads', async () => {
+    const findMany = jest.fn().mockResolvedValue([]);
+    const prisma = {
+      marketDeliverySnapshot: { findMany },
+    };
+    const repository = new MarketDataFoundationRepository(prisma as any);
+
+    await repository.getRecentDeliveryBySymbol('TCS', 3, new Date('2026-05-01T00:00:00.000Z'));
+
+    expect(findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: {
+        symbol: 'TCS',
+        tradingDate: { lte: new Date('2026-05-01T00:00:00.000Z') },
+      },
+    }));
+  });
+
+  it('getRecentDeliveryBySymbol clamps take to max 20', async () => {
+    const findMany = jest.fn().mockResolvedValue([]);
+    const prisma = {
+      marketDeliverySnapshot: { findMany },
+    };
+    const repository = new MarketDataFoundationRepository(prisma as any);
+
+    await repository.getRecentDeliveryBySymbol('INFY', 999);
+
+    expect(findMany).toHaveBeenCalledWith(expect.objectContaining({ take: 20 }));
+  });
+
+  it('getRecentDeliveryBySymbol returns null deliveryPercent when source row has null', async () => {
+    const findMany = jest.fn().mockResolvedValue([
+      {
+        tradingDate: new Date('2026-06-01T00:00:00.000Z'),
+        tradedQuantity: null,
+        deliverableQuantity: null,
+        deliveryPercent: null,
+        source: 'NSE_DELIVERY',
+      },
+    ]);
+    const prisma = {
+      marketDeliverySnapshot: { findMany },
+    };
+    const repository = new MarketDataFoundationRepository(prisma as any);
+
+    const rows = await repository.getRecentDeliveryBySymbol('HDFCBANK', 1);
+    expect(rows[0].deliveryPercent).toBeNull();
+  });
 });

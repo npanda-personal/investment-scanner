@@ -17,14 +17,16 @@ import {
   Typography,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import { 
-  PlaylistAddOutlined, 
-  NotificationsNoneOutlined 
+import {
+  PlaylistAddOutlined,
+  NotificationsNoneOutlined
 } from '@mui/icons-material';
 import {
   Bar,
   ComposedChart,
+  Legend,
   Line,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip as ChartTooltip,
   XAxis,
@@ -33,6 +35,7 @@ import {
 import { fetchStockResearchWorkbench } from '../api/stockResearchWorkbenchService';
 import type { ResearchRange, ResearchWorkbenchResponse, SignalEvidenceSection } from '../types';
 import { inr, inrCompact, changeColor, stripSuffix } from '@/shared/format/money';
+import { humanizeCode } from '@/shared/format/enumLabels';
 import { SignalWidget } from '@/features/signal-generation-engine';
 import { StrategyDecisionWidget } from '@/features/strategy-decision-engine';
 import { AddToWatchlistDialog } from '@/features/watchlist-management';
@@ -62,6 +65,88 @@ const StatusChip: React.FC<{ status?: string }> = ({ status }) => (
   />
 );
 
+// ── NR-18: Cap-tier derivation ────────────────────────────────────────────────
+// Thresholds in rupees: Large ≥ ₹20,000 Cr (2e11), Mid ₹5,000–20,000 Cr (5e10–2e11), Small < ₹5,000 Cr (5e10)
+// Circuit limits are approximate; disclosed as indicative only.
+interface CapTier {
+  label: string;
+  circuit: string;
+  color: 'default' | 'primary' | 'secondary' | 'error' | 'info' | 'success' | 'warning';
+}
+
+function deriveCapTier(marketCap: number | null | undefined): CapTier | null {
+  if (marketCap === null || marketCap === undefined || !Number.isFinite(Number(marketCap))) {
+    return null;
+  }
+  const cap = Number(marketCap);
+  if (cap >= 2e11) {
+    return { label: 'Large Cap', circuit: '~5%', color: 'success' };
+  }
+  if (cap >= 5e10) {
+    return { label: 'Mid Cap', circuit: '~10%', color: 'primary' };
+  }
+  return { label: 'Small Cap', circuit: '~20%', color: 'warning' };
+}
+
+// ── NR-2: SMA computation ─────────────────────────────────────────────────────
+// Returns an array of the same length as `prices`. Values before the window is
+// full are null so partial MAs are never drawn.
+function computeSma(prices: number[], window: number): (number | null)[] {
+  if (prices.length < window) {
+    // Guard: series shorter than the window — return all nulls
+    return prices.map(() => null);
+  }
+  return prices.map((_, i) => {
+    if (i < window - 1) return null;
+    const slice = prices.slice(i - window + 1, i + 1);
+    const sum = slice.reduce((acc, v) => acc + v, 0);
+    return sum / window;
+  });
+}
+
+// ── NR-4: Corporate action label ─────────────────────────────────────────────
+// Map action_type codes to brief chart labels via humanizeCode.
+function corpActionLabel(action: Record<string, unknown>): string {
+  const raw = String(action.action_type ?? '');
+  // Shorten common types to keep the chart tidy
+  const shortened: Record<string, string> = {
+    BONUS: 'Bonus',
+    SPLIT: 'Split',
+    DIVIDEND: 'Div',
+    RIGHTS: 'Rights',
+  };
+  const upper = raw.toUpperCase().replace(/^(BONUS|SPLIT|DIVIDEND|RIGHTS).*/, '$1');
+  return shortened[upper] ?? humanizeCode(raw).split(' ').slice(0, 2).join(' ');
+}
+
+// ── NR-9: 52-week range computation ──────────────────────────────────────────
+interface RangeInfo {
+  high: number;
+  low: number;
+  positionPct: number; // 0–100, % above the low
+  windowWeeks: number; // actual weeks in the loaded series
+  isFullYear: boolean;
+}
+
+function compute52wRange(prices: { date: string; adjusted_close: number }[]): RangeInfo | null {
+  if (prices.length < 2) return null;
+  const closes = prices.map((p) => p.adjusted_close).filter(Number.isFinite);
+  if (closes.length < 2) return null;
+
+  const high = Math.max(...closes);
+  const low = Math.min(...closes);
+  const current = closes[closes.length - 1];
+  const positionPct = high === low ? 100 : ((current - low) / (high - low)) * 100;
+
+  // How many weeks does the loaded series span?
+  const dates = prices.map((p) => new Date(p.date).getTime()).filter((t) => !isNaN(t));
+  const spanDays = dates.length >= 2 ? (Math.max(...dates) - Math.min(...dates)) / 86_400_000 : 0;
+  const windowWeeks = Math.round(spanDays / 7);
+  const isFullYear = windowWeeks >= 52;
+
+  return { high, low, positionPct, windowWeeks, isFullYear };
+}
+
 const StockResearchWorkbenchPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -79,17 +164,54 @@ const StockResearchWorkbenchPage: React.FC = () => {
     setError(null);
     fetchStockResearchWorkbench(id, range)
       .then(setData)
-      .catch((err: any) => setError(err.response?.data?.error || err.message || 'Failed to load research workbench'))
+      .catch((err: unknown) => {
+        const anyErr = err as { response?: { data?: { error?: string } }; message?: string };
+        setError(anyErr.response?.data?.error || anyErr.message || 'Failed to load research workbench');
+      })
       .finally(() => setLoading(false));
   }, [id, range]);
 
+  // ── Chart data with SMA overlays (NR-2) ──────────────────────────────────
   const chartData = useMemo(() => {
-    return [...(data?.chart.prices || [])].reverse().map((point) => ({
+    const prices = [...(data?.chart.prices || [])].reverse();
+    const closes = prices.map((p) => p.adjusted_close);
+    const sma50 = computeSma(closes, 50);
+    const sma200 = computeSma(closes, 200);
+
+    return prices.map((point, i) => ({
       date: new Date(point.date).toLocaleDateString(),
       adjusted_close: point.adjusted_close,
       volume: point.volume || 0,
+      sma50: sma50[i],
+      sma200: sma200[i],
     }));
   }, [data]);
+
+  // ── Corporate action ex-date markers (NR-4) ──────────────────────────────
+  // Build a set of local date strings matching the chart x-axis keys
+  const corpActionDates = useMemo(() => {
+    if (!data?.corporate_actions?.length) return new Map<string, string>();
+    const map = new Map<string, string>();
+    for (const action of data.corporate_actions) {
+      const rawDate = action.ex_date ?? action.effective_date;
+      if (!rawDate) continue;
+      const localDate = new Date(String(rawDate)).toLocaleDateString();
+      const label = corpActionLabel(action);
+      // If multiple actions on same date, join them
+      map.set(localDate, map.has(localDate) ? `${map.get(localDate)}, ${label}` : label);
+    }
+    return map;
+  }, [data]);
+
+  // ── 52-week range (NR-9) ──────────────────────────────────────────────────
+  const rangeInfo = useMemo(() => {
+    if (!data?.chart.prices?.length) return null;
+    const prices = [...data.chart.prices].reverse();
+    return compute52wRange(prices);
+  }, [data]);
+
+  // ── Cap tier (NR-18) ──────────────────────────────────────────────────────
+  const capTier = useMemo(() => deriveCapTier(data?.overview.market_cap), [data]);
 
   if (loading) {
     return <Box sx={{ p: 3, display: 'flex', justifyContent: 'center' }}><CircularProgress /></Box>;
@@ -109,6 +231,7 @@ const StockResearchWorkbenchPage: React.FC = () => {
         Back to Research Command Center
       </Button>
 
+      {/* ── Overview header ── */}
       <Paper sx={{ p: 3, mb: 3 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, flexDirection: { xs: 'column', md: 'row' } }}>
           <Box>
@@ -119,7 +242,43 @@ const StockResearchWorkbenchPage: React.FC = () => {
             <Typography variant="body2" color="text.secondary">
               {overview.sector || 'N/A'} | {overview.industry || 'N/A'}
             </Typography>
+
+            {/* NR-18: Cap-tier + circuit badge */}
+            <Stack direction="row" spacing={1} sx={{ mt: 1 }} alignItems="center">
+              {capTier ? (
+                <Tooltip
+                  title={`Indicative circuit limit: ${capTier.circuit}. For research reference only — not investment advice.`}
+                  arrow
+                >
+                  <Chip
+                    label={`${capTier.label} · circuit ${capTier.circuit}`}
+                    size="small"
+                    color={capTier.color}
+                    variant="outlined"
+                  />
+                </Tooltip>
+              ) : (
+                <Chip label="Cap tier: —" size="small" variant="outlined" color="default" />
+              )}
+              <Typography variant="caption" color="text.secondary">
+                {inrCompact(overview.market_cap)} mkt cap
+              </Typography>
+            </Stack>
+
+            {/* NR-9: 52-week range */}
+            {rangeInfo && (
+              <Box sx={{ mt: 1 }}>
+                <Typography variant="caption" color="text.secondary">
+                  {rangeInfo.isFullYear ? '52w' : `~${rangeInfo.windowWeeks}w`} range:{' '}
+                  <strong>{inr(rangeInfo.low)}</strong> – <strong>{inr(rangeInfo.high)}</strong>
+                  {' · '}
+                  <strong>{rangeInfo.positionPct.toFixed(1)}%</strong> above{' '}
+                  {rangeInfo.isFullYear ? '52w' : `${rangeInfo.windowWeeks}w`} low
+                </Typography>
+              </Box>
+            )}
           </Box>
+
           <Box sx={{ textAlign: { xs: 'left', md: 'right' } }}>
             <Typography variant="h4">{inr(overview.latest_price)}</Typography>
             <Typography color={changeColor(overview.daily_change_percent)}>
@@ -179,6 +338,7 @@ const StockResearchWorkbenchPage: React.FC = () => {
         </Grid>
       </Grid>
 
+      {/* ── Price chart with SMA overlays (NR-2) + CA markers (NR-4) ── */}
       <Paper sx={{ p: 2, mb: 3 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, mb: 2, flexDirection: { xs: 'column', md: 'row' } }}>
           <Box>
@@ -186,6 +346,9 @@ const StockResearchWorkbenchPage: React.FC = () => {
             {data.chart.adjusted_close_fallback && (
               <Typography variant="caption" color="text.secondary">Adjusted close unavailable for some rows; close is used as fallback.</Typography>
             )}
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+              SMA-50 and SMA-200 overlays shown when series length exceeds the window. For research reference only.
+            </Typography>
           </Box>
           <ToggleButtonGroup size="small" value={range} exclusive onChange={(_event, value) => value && setRange(value)}>
             {ranges.map((item) => <ToggleButton key={item} value={item}>{item}</ToggleButton>)}
@@ -194,15 +357,51 @@ const StockResearchWorkbenchPage: React.FC = () => {
         {chartData.length === 0 ? (
           <Typography color="text.secondary">No price history available.</Typography>
         ) : (
-          <Box sx={{ height: 360 }}>
+          <Box sx={{ height: 380 }}>
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={chartData}>
                 <XAxis dataKey="date" minTickGap={28} />
                 <YAxis yAxisId="price" domain={['auto', 'auto']} />
                 <YAxis yAxisId="volume" orientation="right" hide />
                 <ChartTooltip />
-                <Bar yAxisId="volume" dataKey="volume" fill="#cfd8dc" />
-                <Line yAxisId="price" type="monotone" dataKey="adjusted_close" stroke="#1976d2" strokeWidth={2} dot={false} />
+                <Legend verticalAlign="top" />
+
+                {/* NR-4: Corporate action reference lines */}
+                {Array.from(corpActionDates.entries()).map(([dateStr, label]) => (
+                  <ReferenceLine
+                    key={dateStr}
+                    yAxisId="price"
+                    x={dateStr}
+                    stroke="#f57c00"
+                    strokeDasharray="4 3"
+                    label={{ value: label, position: 'insideTopRight', fontSize: 10, fill: '#f57c00' }}
+                  />
+                ))}
+
+                <Bar yAxisId="volume" dataKey="volume" fill="#cfd8dc" name="Volume" />
+                <Line yAxisId="price" type="monotone" dataKey="adjusted_close" stroke="#1976d2" strokeWidth={2} dot={false} name="Price" />
+                {/* NR-2: SMA-50 overlay — only renders where non-null */}
+                <Line
+                  yAxisId="price"
+                  type="monotone"
+                  dataKey="sma50"
+                  stroke="#e65100"
+                  strokeWidth={1.5}
+                  dot={false}
+                  connectNulls={false}
+                  name="SMA 50"
+                />
+                {/* NR-2: SMA-200 overlay — only renders where non-null */}
+                <Line
+                  yAxisId="price"
+                  type="monotone"
+                  dataKey="sma200"
+                  stroke="#2e7d32"
+                  strokeWidth={1.5}
+                  dot={false}
+                  connectNulls={false}
+                  name="SMA 200"
+                />
               </ComposedChart>
             </ResponsiveContainer>
           </Box>

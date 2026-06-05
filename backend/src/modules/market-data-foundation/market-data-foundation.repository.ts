@@ -437,6 +437,53 @@ export class MarketDataFoundationRepository {
     return { insertedOrUpdated };
   }
 
+  /**
+   * Returns the latest delivery% snapshot for a given symbol, plus the prior N-1 rows.
+   * Persisted-read only — never triggers any computation.
+   * Returns null rows when delivery data is absent (source only covers NSE stocks; BSE/others will be null).
+   *
+   * @param symbol  Canonical stock symbol (no .NS/.BO suffix)
+   * @param limit   How many recent trading-day rows to return (default 5, max 20)
+   * @param endDate When provided, only rows with tradingDate <= endDate are returned (as-of support)
+   */
+  async getRecentDeliveryBySymbol(
+    symbol: string,
+    limit = 5,
+    endDate?: Date,
+  ): Promise<Array<{
+    tradingDate: Date;
+    tradedQuantity: bigint | null;
+    deliverableQuantity: bigint | null;
+    deliveryPercent: number | null;
+    source: string;
+  }>> {
+    const take = Math.max(1, Math.min(limit, 20));
+    const rows = await (this.prisma as any).marketDeliverySnapshot.findMany({
+      where: {
+        symbol,
+        ...(endDate ? { tradingDate: { lte: endDate } } : {}),
+      },
+      orderBy: { tradingDate: 'desc' },
+      take,
+      select: {
+        tradingDate: true,
+        tradedQuantity: true,
+        deliverableQuantity: true,
+        deliveryPercent: true,
+        source: true,
+      },
+    });
+    return rows.map((row: any) => ({
+      tradingDate: row.tradingDate as Date,
+      tradedQuantity: row.tradedQuantity as bigint | null,
+      deliverableQuantity: row.deliverableQuantity as bigint | null,
+      deliveryPercent: row.deliveryPercent !== null && row.deliveryPercent !== undefined
+        ? Number(row.deliveryPercent)
+        : null,
+      source: row.source as string,
+    }));
+  }
+
   async providerDataCleanupReport() {
     const providerSource = this.providerSourceWhere();
     const [

@@ -1,6 +1,8 @@
 import React from 'react';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { Alert, Box, Button, Chip, CircularProgress, LinearProgress, Paper, Stack, Tooltip, Typography } from '@mui/material';
+import { useNavigate } from 'react-router-dom';
+import { humanizeCode } from '@/shared/format/enumLabels';
 import { useMarketContext } from '../hooks';
 
 const pct = (value: number | null) => value === null ? 'N/A' : `${(value * 100).toFixed(1)}%`;
@@ -26,6 +28,7 @@ function formatDateTime(value?: string | null) {
 
 export const MarketContextPage: React.FC = () => {
   const { summary, loading, error, reload } = useMarketContext();
+  const navigate = useNavigate();
   if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress /></Box>;
   if (error || !summary) return <Alert severity="error">{error || 'Market context unavailable'}</Alert>;
 
@@ -74,10 +77,16 @@ export const MarketContextPage: React.FC = () => {
           ) : (
           <Stack spacing={1.5}>
             {summary.topSectors.map((sector) => (
-              <Box key={sector.sector}>
+              <Box
+                key={sector.sector}
+                onClick={() => navigate(`/signals?sector=${encodeURIComponent(sector.sector)}`)}
+                sx={{ cursor: 'pointer', borderRadius: 1, p: 0.75, mx: -0.75, '&:hover': { bgcolor: 'action.hover' } }}
+                role="button"
+                aria-label={`View ${humanizeCode(sector.sector)} signals`}
+              >
                 <Stack direction="row" justifyContent="space-between">
-                  <Typography fontWeight={700}>{sector.sector}</Typography>
-                  <Chip size="small" color={colorFor(sector.leadershipStatus)} label={sector.leadershipStatus} />
+                  <Typography fontWeight={700}>{humanizeCode(sector.sector)}</Typography>
+                  <Chip size="small" color={colorFor(sector.leadershipStatus)} label={humanizeCode(sector.leadershipStatus)} />
                 </Stack>
                 <Typography variant="body2" color="text.secondary">1M {pct(sector.return1M)} · 3M {pct(sector.return3M)} · 6M {pct(sector.return6M)} · Signals {sector.bullishSignalCount}/{sector.bearishSignalCount}</Typography>
                 <LinearProgress variant="determinate" value={sector.relativeStrengthScore} sx={{ mt: 0.75, height: 7, borderRadius: 1 }} />

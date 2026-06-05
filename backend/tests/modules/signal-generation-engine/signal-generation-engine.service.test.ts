@@ -158,6 +158,72 @@ describe('SignalGenerationEngineService', () => {
       .toContain('Bullish because price is above SMA50');
   });
 
+  // ── CB-20 / NR-1: delivery% evidence ──────────────────────────────────────
+
+  describe('buildDeliveryEvidence', () => {
+    it('returns high-conviction phrase for delivery >= 60%', () => {
+      const service = new SignalGenerationEngineService({} as any, {} as any, {} as any);
+      expect(service.buildDeliveryEvidence(62)).toBe('Delivery 62% (high conviction).');
+      expect(service.buildDeliveryEvidence(100)).toBe('Delivery 100% (high conviction).');
+      expect(service.buildDeliveryEvidence(60)).toBe('Delivery 60% (high conviction).');
+    });
+
+    it('returns above-average phrase for delivery 40–59%', () => {
+      const service = new SignalGenerationEngineService({} as any, {} as any, {} as any);
+      expect(service.buildDeliveryEvidence(45)).toBe('Delivery 45% (above-average delivery).');
+      expect(service.buildDeliveryEvidence(40)).toBe('Delivery 40% (above-average delivery).');
+      expect(service.buildDeliveryEvidence(59)).toBe('Delivery 59% (above-average delivery).');
+    });
+
+    it('returns intraday-churn phrase for delivery < 20%', () => {
+      const service = new SignalGenerationEngineService({} as any, {} as any, {} as any);
+      expect(service.buildDeliveryEvidence(15)).toBe('Delivery 15% (intraday churn, lower conviction).');
+      expect(service.buildDeliveryEvidence(0)).toBe('Delivery 0% (intraday churn, lower conviction).');
+      expect(service.buildDeliveryEvidence(19)).toBe('Delivery 19% (intraday churn, lower conviction).');
+    });
+
+    it('returns null for moderate delivery (20–39%) — no noise annotation', () => {
+      const service = new SignalGenerationEngineService({} as any, {} as any, {} as any);
+      expect(service.buildDeliveryEvidence(20)).toBeNull();
+      expect(service.buildDeliveryEvidence(35)).toBeNull();
+      expect(service.buildDeliveryEvidence(39)).toBeNull();
+    });
+
+    it('returns null when delivery data is absent', () => {
+      const service = new SignalGenerationEngineService({} as any, {} as any, {} as any);
+      expect(service.buildDeliveryEvidence(null)).toBeNull();
+    });
+  });
+
+  it('explain appends delivery evidence when provided', () => {
+    const service = new SignalGenerationEngineService({} as any, {} as any, {} as any);
+    const result = service.explain(
+      'BULLISH',
+      [{ code: 'A', label: 'price is above SMA50', category: 'TECHNICAL' }],
+      [],
+      'Delivery 62% (high conviction).',
+    );
+    expect(result).toContain('Bullish because price is above SMA50');
+    expect(result).toContain('Delivery 62% (high conviction).');
+  });
+
+  it('explain without delivery evidence is unchanged from prior behavior', () => {
+    const service = new SignalGenerationEngineService({} as any, {} as any, {} as any);
+    const withNull = service.explain(
+      'BULLISH',
+      [{ code: 'A', label: 'price is above SMA50', category: 'TECHNICAL' }],
+      [],
+      null,
+    );
+    const withoutArg = service.explain(
+      'BULLISH',
+      [{ code: 'A', label: 'price is above SMA50', category: 'TECHNICAL' }],
+      [],
+    );
+    expect(withNull).toBe(withoutArg);
+    expect(withNull).not.toContain('Delivery');
+  });
+
   it('generates and persists an instrument signal', async () => {
     const saved: any[] = [];
     const repository = {
@@ -198,6 +264,105 @@ describe('SignalGenerationEngineService', () => {
     });
     expect(saved[0].triggered_signals.length).toBeGreaterThan(0);
     expect(saved[0].explanation).toContain('Bullish because');
+  });
+
+  // ── CB-20 / NR-1: delivery% propagates through signal generation ──────────
+
+  it('attaches deliveryPercent and high-conviction evidence when delivery_percent >= 60 in price response', async () => {
+    const saved: any[] = [];
+    const repository = {
+      createSignalResult: jest.fn(async (result) => {
+        saved.push(result);
+        return { ...result, id: 'signal-del-1' };
+      }),
+    };
+    const prices = Array.from({ length: 260 }, (_, index) => price(index, 200 - index * 0.2, index === 0 ? 1000 : 100));
+    const marketDataService = {
+      getInstrument: jest.fn().mockResolvedValue({
+        id: 'stock-del',
+        symbol: 'RELIANCE',
+        company_name: 'Reliance Industries',
+        sector: 'Energy',
+        country: 'IN',
+        currency: 'INR',
+      }),
+      // delivery_percent is returned by listPricesByInstrumentId (CB-20 update)
+      listPricesByInstrumentId: jest.fn().mockResolvedValue({ prices, delivery_percent: 62 }),
+      storedFundamentalsByInstrumentId: jest.fn().mockResolvedValue({ records: [] }),
+    };
+    const researchService = {
+      workbench: jest.fn().mockResolvedValue(null),
+    };
+    const service = new SignalGenerationEngineService(repository as any, marketDataService as any, researchService as any);
+
+    const result = await service.generateForInstrument('stock-del', { researchContextMode: 'LIGHTWEIGHT' });
+
+    expect(result?.deliveryPercent).toBe(62);
+    expect(result?.deliveryEvidence).toBe('Delivery 62% (high conviction).');
+    expect(result?.explanation).toContain('Delivery 62% (high conviction).');
+    expect(saved[0].deliveryPercent).toBe(62);
+  });
+
+  it('attaches intraday-churn evidence when delivery_percent < 20', async () => {
+    const saved: any[] = [];
+    const repository = {
+      createSignalResult: jest.fn(async (result) => {
+        saved.push(result);
+        return { ...result, id: 'signal-del-2' };
+      }),
+    };
+    const prices = Array.from({ length: 260 }, (_, index) => price(index, 200 - index * 0.2, index === 0 ? 1000 : 100));
+    const marketDataService = {
+      getInstrument: jest.fn().mockResolvedValue({
+        id: 'stock-del2',
+        symbol: 'SMSTOCK',
+        company_name: 'Small Co',
+        sector: 'Retail',
+        country: 'IN',
+        currency: 'INR',
+      }),
+      listPricesByInstrumentId: jest.fn().mockResolvedValue({ prices, delivery_percent: 14 }),
+      storedFundamentalsByInstrumentId: jest.fn().mockResolvedValue({ records: [] }),
+    };
+    const researchService = { workbench: jest.fn().mockResolvedValue(null) };
+    const service = new SignalGenerationEngineService(repository as any, marketDataService as any, researchService as any);
+
+    const result = await service.generateForInstrument('stock-del2', { researchContextMode: 'LIGHTWEIGHT' });
+
+    expect(result?.deliveryPercent).toBe(14);
+    expect(result?.deliveryEvidence).toBe('Delivery 14% (intraday churn, lower conviction).');
+  });
+
+  it('leaves deliveryPercent undefined and explanation unmodified when delivery data is absent', async () => {
+    const saved: any[] = [];
+    const repository = {
+      createSignalResult: jest.fn(async (result) => {
+        saved.push(result);
+        return { ...result, id: 'signal-del-3' };
+      }),
+    };
+    const prices = Array.from({ length: 260 }, (_, index) => price(index, 200 - index * 0.2, index === 0 ? 1000 : 100));
+    const marketDataService = {
+      getInstrument: jest.fn().mockResolvedValue({
+        id: 'stock-del3',
+        symbol: 'BSEONLY',
+        company_name: 'BSE Only Co',
+        sector: 'Finance',
+        country: 'IN',
+        currency: 'INR',
+      }),
+      // No delivery_percent field — simulates BSE-only or absent data
+      listPricesByInstrumentId: jest.fn().mockResolvedValue({ prices }),
+      storedFundamentalsByInstrumentId: jest.fn().mockResolvedValue({ records: [] }),
+    };
+    const researchService = { workbench: jest.fn().mockResolvedValue(null) };
+    const service = new SignalGenerationEngineService(repository as any, marketDataService as any, researchService as any);
+
+    const result = await service.generateForInstrument('stock-del3', { researchContextMode: 'LIGHTWEIGHT' });
+
+    expect(result?.deliveryPercent).toBeUndefined();
+    expect(result?.deliveryEvidence).toBeUndefined();
+    expect(result?.explanation).not.toContain('Delivery');
   });
 
   it('skips heavyweight research workbench calls for lightweight batch context', async () => {

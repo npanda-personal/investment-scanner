@@ -289,9 +289,19 @@ export class AiInvestmentCopilotService {
     if (tradePlan) sourceModules.push('trade-plan-risk-engine');
     if (todayCandidate) sourceModules.push('today-trade-review');
 
+    // -- Cross-module conflict detection --
+    const conflicts = this.detectConflicts({
+      symbol: overview.symbol || instrumentId,
+      signalDirection: signal?.direction ?? null,
+      todayCandidateState: todayCandidate?.state ?? null,
+      strategyDecisionAction: strategyDecision?.decision ?? null,
+      marketRegime: marketContext?.regime?.regime ?? null,
+    });
+
     return this.response({
       title: `${overview.symbol || 'Stock'} Copilot Summary`,
       summary: `${DISCLAIMER} ${overview.company_name || overview.symbol || 'This stock'} has ${signal ? `a ${signal.direction.toLowerCase()} signal` : 'no current signal'} and ${smartMoney ? `a smart money status of ${smartMoney.status.toLowerCase()}` : 'limited smart money context'}${strategyDecision ? `, with a persisted strategy decision of ${strategyDecision.decision}` : ''}.`,
+      conflicts: conflicts.length > 0 ? conflicts : undefined,
       keyTakeaways: [
         `Latest price context: ${overview.latest_price ?? 'not available'}.`,
         signal ? `Signal score is ${signal.score} with ${signal.confidence?.toLowerCase?.() || 'unknown'} confidence.` : 'Signal context is missing.',
@@ -487,6 +497,42 @@ export class AiInvestmentCopilotService {
       return obj;
     };
     return sanitizeStrings(pe);
+  }
+
+  /**
+   * CB-27: deterministic cross-module conflict detection. Flags genuine directional
+   * contradictions among the signal, today-review state, strategy decision, and market
+   * regime for the same instrument. Research-support only — surfaces contradictions to
+   * reconcile, never an instruction.
+   */
+  private detectConflicts(input: {
+    symbol: string;
+    signalDirection: string | null;
+    todayCandidateState: string | null;
+    strategyDecisionAction: string | null;
+    marketRegime: string | null;
+  }): string[] {
+    const conflicts: string[] = [];
+    const sym = input.symbol || 'This stock';
+    const dir = (input.signalDirection || '').toUpperCase();
+    const state = (input.todayCandidateState || '').toUpperCase();
+    const action = (input.strategyDecisionAction || '').toUpperCase();
+    const regime = (input.marketRegime || '').toUpperCase();
+    const readable = (code: string | null) => (code || '').replace(/_/g, ' ').toLowerCase().trim();
+
+    const longLean = dir === 'BULLISH' || state.includes('LONG');
+    const exitDecision = action.includes('EXIT') || action === 'AVOID' || action === 'DEFENSIVE_EXIT';
+
+    if (longLean && exitDecision) {
+      conflicts.push(`${sym}: a long/bullish read (${readable(input.signalDirection) || readable(input.todayCandidateState) || 'signal'}) contradicts the strategy decision "${readable(input.strategyDecisionAction)}" — reconcile before acting.`);
+    }
+    if (dir === 'BEARISH' && state.includes('LONG')) {
+      conflicts.push(`${sym}: the signal is bearish but it appears as a long review candidate — directional contradiction.`);
+    }
+    if (longLean && regime === 'RISK_OFF') {
+      conflicts.push(`${sym}: a long/bullish read sits against a RISK_OFF market regime — exposure caution warranted.`);
+    }
+    return conflicts;
   }
 
   private response(input: Omit<CopilotSummaryResponse, 'generatedAt'>): CopilotSummaryResponse {

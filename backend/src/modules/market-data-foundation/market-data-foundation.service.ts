@@ -4042,7 +4042,24 @@ export class MarketDataFoundationService {
       return null;
     }
 
-    const prices = await this.repository.listPrices(stock.symbol, limit, startDate, endDate);
+    // Fetch prices and recent delivery% concurrently (persisted-read, null-safe)
+    const [prices, recentDelivery] = await Promise.all([
+      this.repository.listPrices(stock.symbol, limit, startDate, endDate),
+      this.repository.getRecentDeliveryBySymbol(stock.symbol, 5, endDate).catch(() => []),
+    ]);
+
+    // Build a date-keyed lookup so each price row can carry its delivery%
+    const deliveryByDate = new Map<string, number | null>();
+    for (const row of recentDelivery) {
+      const key = row.tradingDate instanceof Date
+        ? row.tradingDate.toISOString().split('T')[0]
+        : String(row.tradingDate).split('T')[0];
+      if (!deliveryByDate.has(key)) deliveryByDate.set(key, row.deliveryPercent);
+    }
+
+    // Latest delivery% for the top-level summary field (most recent trading day)
+    const latestDeliveryPercent = recentDelivery[0]?.deliveryPercent ?? null;
+
     return {
       instrument_id: stock.id,
       symbol: stock.symbol,
@@ -4051,20 +4068,43 @@ export class MarketDataFoundationService {
       ingestion_timestamp: prices[0]?.ingestionTimestamp instanceof Date ? prices[0].ingestionTimestamp.toISOString() : null,
       last_updated_timestamp: prices[0]?.lastUpdatedTimestamp instanceof Date ? prices[0].lastUpdatedTimestamp.toISOString() : null,
       data_status: prices.length > 0 ? 'COMPLETE' : 'MISSING',
-      prices: prices.map((price) => ({
-        date: price.timestamp,
-        open: Number(price.open),
-        high: Number(price.high),
-        low: Number(price.low),
-        close: Number(price.close),
-        adjusted_close: price.adjustedClose !== null ? Number(price.adjustedClose) : Number(price.close),
-        volume: price.volume !== null ? Number(price.volume) : null,
-        source: 'source' in price && price.source ? price.source : 'database',
-        ingestion_timestamp: price.ingestionTimestamp instanceof Date ? price.ingestionTimestamp.toISOString() : new Date().toISOString(),
-        last_updated_timestamp: price.lastUpdatedTimestamp instanceof Date ? price.lastUpdatedTimestamp.toISOString() : new Date().toISOString(),
-        data_status: price.dataStatus || 'COMPLETE',
-      })),
+      /** Latest NSE delivery% (deliverable qty / traded qty × 100) for this stock.
+       *  null when delivery data is absent (e.g. BSE-only stocks, or data not yet ingested). */
+      delivery_percent: latestDeliveryPercent,
+      prices: prices.map((price) => {
+        const dateKey = price.timestamp instanceof Date
+          ? price.timestamp.toISOString().split('T')[0]
+          : String(price.timestamp).split('T')[0];
+        return {
+          date: price.timestamp,
+          open: Number(price.open),
+          high: Number(price.high),
+          low: Number(price.low),
+          close: Number(price.close),
+          adjusted_close: price.adjustedClose !== null ? Number(price.adjustedClose) : Number(price.close),
+          volume: price.volume !== null ? Number(price.volume) : null,
+          /** Delivery% for this specific trading day (null when absent). */
+          delivery_percent: deliveryByDate.has(dateKey) ? deliveryByDate.get(dateKey) ?? null : null,
+          source: 'source' in price && price.source ? price.source : 'database',
+          ingestion_timestamp: price.ingestionTimestamp instanceof Date ? price.ingestionTimestamp.toISOString() : new Date().toISOString(),
+          last_updated_timestamp: price.lastUpdatedTimestamp instanceof Date ? price.lastUpdatedTimestamp.toISOString() : new Date().toISOString(),
+          data_status: price.dataStatus || 'COMPLETE',
+        };
+      }),
     };
+  }
+
+  /**
+   * Returns the latest delivery% snapshot for a stock identified by its internal symbol.
+   * Passes through directly to the repository (persisted-read, null-safe).
+   * Signal generation and other consumers use this for evidence annotation.
+   */
+  getRecentDeliveryBySymbol(
+    symbol: string,
+    limit = 5,
+    endDate?: Date,
+  ) {
+    return this.repository.getRecentDeliveryBySymbol(symbol, limit, endDate);
   }
 
   async latestPriceByInstrumentId(instrumentId: string, options: Pick<PaginationOptions, 'region' | 'assetType'> = {}) {

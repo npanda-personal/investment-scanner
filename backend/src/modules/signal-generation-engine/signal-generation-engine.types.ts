@@ -75,6 +75,17 @@ export interface SignalResultDto {
   writeStatus?: SignalWriteStatus;
   triggerContract?: SignalTriggerContractDto;
 
+  // ── Delivery% evidence (NSE-sourced, persisted-read, null when absent) ──────
+  /**
+   * Latest NSE delivery% (deliverable qty / traded qty × 100) for this stock.
+   * null when delivery data is absent (BSE-only or data not yet ingested).
+   * High delivery (>= 40%) indicates institutional/positional interest.
+   * Low delivery (< 20%) indicates intraday churn with limited real conviction.
+   */
+  deliveryPercent?: number | null;
+  /** Human-readable delivery% evidence phrase appended to explanation/evidence. */
+  deliveryEvidence?: string | null;
+
   // ── Calibration overlay (additive, persisted-read only) ────────────────────
   /**
    * Calibration-adjusted score from the latest persisted SignalCalibrationResult

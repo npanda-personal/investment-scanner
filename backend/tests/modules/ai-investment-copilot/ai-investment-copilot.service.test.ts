@@ -598,3 +598,24 @@ describe('AiInvestmentCopilotService', () => {
     });
   });
 });
+
+describe('AiInvestmentCopilotService.detectConflicts (CB-27 cross-module conflict)', () => {
+  const svc = createService() as any;
+  it('flags a long/bullish read that contradicts an EXIT strategy decision', () => {
+    const c = svc.detectConflicts({ symbol: 'RELIANCE', signalDirection: 'BULLISH', todayCandidateState: 'LONG_REVIEW', strategyDecisionAction: 'EXIT_CANDIDATE', marketRegime: 'NEUTRAL' });
+    expect(c.length).toBeGreaterThan(0);
+    expect(c[0]).toMatch(/RELIANCE/);
+  });
+  it('flags a long/bullish read against a RISK_OFF regime', () => {
+    const c = svc.detectConflicts({ symbol: 'TCS', signalDirection: 'BULLISH', todayCandidateState: null, strategyDecisionAction: null, marketRegime: 'RISK_OFF' });
+    expect(c.some((x: string) => /RISK_OFF/.test(x))).toBe(true);
+  });
+  it('flags a bearish signal listed as a long review candidate', () => {
+    const c = svc.detectConflicts({ symbol: 'INFY', signalDirection: 'BEARISH', todayCandidateState: 'LONG_REVIEW', strategyDecisionAction: null, marketRegime: 'NEUTRAL' });
+    expect(c.length).toBeGreaterThan(0);
+  });
+  it('returns no conflicts when aligned', () => {
+    const c = svc.detectConflicts({ symbol: 'HDFCBANK', signalDirection: 'BULLISH', todayCandidateState: 'LONG_REVIEW', strategyDecisionAction: 'ENTRY_CANDIDATE', marketRegime: 'RISK_ON' });
+    expect(c).toEqual([]);
+  });
+});

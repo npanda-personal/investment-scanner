@@ -649,6 +649,20 @@ export class SignalGenerationEngineService {
       ? research.relative_strength.relative_to_peer_average
       : null;
 
+    // ── Delivery% evidence (NR-1) ─────────────────────────────────────────────
+    // listPricesByInstrumentId now returns delivery_percent (latest NSE delivery snapshot).
+    // We attach it as evidence/conviction context; it does NOT alter the composite score —
+    // conviction text is additive and honest (no overfitting).
+    // High delivery (>= 40%): positional / institutional interest → adds conviction note.
+    // Low delivery (< 20%): intraday churn → adds caution note.
+    // 20-40%: moderate, no annotation (avoid noise).
+    // absent (null): no annotation (BSE-only or data gap — never fabricate).
+    const deliveryPercent: number | null =
+      typeof (pricesResponse as any)?.delivery_percent === 'number'
+        ? (pricesResponse as any).delivery_percent
+        : null;
+    const deliveryEvidence = this.buildDeliveryEvidence(deliveryPercent);
+
     const technical = this.evaluateTechnical(prices);
     const momentum = this.evaluateMomentum(prices, relativeToPeers);
     const fundamentals = this.evaluateFundamentals(latestFundamental, peerAveragePe, peerAverageYield);
@@ -727,7 +741,7 @@ export class SignalGenerationEngineService {
       confidence,
       triggered_signals: triggeredSignals,
       negative_signals: negativeSignals,
-      explanation: this.explain(direction, triggeredSignals, negativeSignals),
+      explanation: this.explain(direction, triggeredSignals, negativeSignals, deliveryEvidence),
       generated_at: generatedAt,
       modelVersion: options.modelVersion || MODEL_VERSION,
       rulesetVersion: options.rulesetVersion || options.modelVersion || MODEL_VERSION,
@@ -744,6 +758,8 @@ export class SignalGenerationEngineService {
       reliabilityTier,
       isSme,
       warnings,
+      deliveryPercent: deliveryPercent ?? undefined,
+      deliveryEvidence: deliveryEvidence ?? undefined,
     };
 
     if (options.includeStrategyMatches || options.strategyCode || options.onlyStrategyEligible || options.excludeNoiseFiltered) {
@@ -2073,12 +2089,36 @@ export class SignalGenerationEngineService {
     return 'NEUTRAL';
   }
 
-  explain(direction: SignalDirection, triggeredSignals: SignalItem[], negativeSignals: SignalItem[]): string {
+  explain(direction: SignalDirection, triggeredSignals: SignalItem[], negativeSignals: SignalItem[], deliveryEvidence?: string | null): string {
     const primary = direction === 'BEARISH' ? negativeSignals : triggeredSignals;
     const fallback = direction === 'BEARISH' ? triggeredSignals : negativeSignals;
     const reasons = (primary.length > 0 ? primary : fallback).slice(0, 4).map((signal) => signal.label);
-    if (reasons.length === 0) return `${direction} because there is not enough market data for a strong signal.`;
-    return `${direction.charAt(0)}${direction.slice(1).toLowerCase()} because ${this.joinReasons(reasons)}.`;
+    const base = reasons.length === 0
+      ? `${direction} because there is not enough market data for a strong signal.`
+      : `${direction.charAt(0)}${direction.slice(1).toLowerCase()} because ${this.joinReasons(reasons)}.`;
+    // Append delivery evidence phrase when present (e.g. "Delivery 62% (high conviction).")
+    if (deliveryEvidence) return `${base} ${deliveryEvidence}`;
+    return base;
+  }
+
+  /**
+   * Build a short delivery% evidence phrase for the signal explanation.
+   * Returns null when delivery data is absent (never fabricate).
+   *
+   * Thresholds are intentionally coarse / conservative:
+   *   >= 60%  → "high conviction" (strong positional/institutional demand)
+   *   >= 40%  → "above-average delivery" (meaningful real interest)
+   *   < 20%   → "intraday churn" (volume dominated by day traders, weaker signal)
+   *   20–39%  → no annotation (moderate; avoid noise)
+   *   null    → no annotation (data absent)
+   */
+  buildDeliveryEvidence(deliveryPercent: number | null): string | null {
+    if (deliveryPercent === null || deliveryPercent === undefined) return null;
+    const pct = Math.round(deliveryPercent);
+    if (pct >= 60) return `Delivery ${pct}% (high conviction).`;
+    if (pct >= 40) return `Delivery ${pct}% (above-average delivery).`;
+    if (pct < 20) return `Delivery ${pct}% (intraday churn, lower conviction).`;
+    return null; // 20–39%: moderate, skip annotation
   }
 
   private async resolveRunUniverse(request: SignalRunRequest, batchSize: number, offset: number): Promise<{ instrumentIds: string[]; totalCount: number }> {

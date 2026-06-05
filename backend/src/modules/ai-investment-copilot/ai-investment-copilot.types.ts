@@ -8,6 +8,14 @@ export interface CopilotSummaryResponse {
   bearishFactors: string[];
   riskFactors: string[];
   dataGaps: string[];
+  /**
+   * Cross-module direction conflicts detected for this instrument.
+   * Present and non-empty only when genuine contradictions exist among
+   * signal direction, today-review state, strategy decision, and
+   * market/portfolio posture. Omitted (or empty) when signals are aligned.
+   * For research support only — reconcile before acting.
+   */
+  conflicts?: string[];
   suggestedNextReviews: string[];
   sourceModules: string[];
   generatedAt: string;

@@ -1,10 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Alert, Box, Button, Checkbox, Chip, CircularProgress, FormControlLabel, MenuItem, Paper, Stack, Tab, Tabs, TextField, Typography } from '@mui/material';
 import { fetchLatestSignalRun, fetchSignalScreener, fetchTopSignals, runSignals } from '../api/signalGenerationEngineService';
 import type { ReliabilityTier, SignalConfidence, SignalDirection, SignalGenerationRunAudit, SignalResult, SignalRunResponse } from '../types';
 import { MarketRegimeWidget } from '@/features/market-context-intelligence';
 import { SignalTrackRecordPanel } from './SignalTrackRecordPanel';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { SignalTable } from './SignalTable';
 import { BatchProgressBar, FilterBar, PageHeader, type SortDirection } from '@/shared/components';
 import { useBatchRunner } from '@/shared/hooks';
@@ -29,19 +29,24 @@ const tabs: Array<{ value: SignalTab; label: string }> = [
 
 const SignalsDashboardPage: React.FC = () => {
   const { scope } = useMarketScope();
+  const [searchParams] = useSearchParams();
   const batchRunner = useBatchRunner<SignalRunResponse>();
   const [signals, setSignals] = useState<SignalResult[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [directionCounts, setDirectionCounts] = useState<Record<SignalDirection, number>>({ BULLISH: 0, NEUTRAL: 0, BEARISH: 0 });
-  const [activeTab, setActiveTab] = useState<SignalTab>('bullish');
+  // Pre-seed screener tab if a ?sector= query param is present (e.g. from sector drill-down)
+  const initialSector = searchParams.get('sector') ?? '';
+  const [activeTab, setActiveTab] = useState<SignalTab>(initialSector ? 'screener' : 'bullish');
   const [pageByTab, setPageByTab] = useState<Record<SignalTab, number>>({ bullish: 0, bearish: 0, neutral: 0, momentum: 0, recent: 0, screener: 0 });
   const [pageSizeByTab, setPageSizeByTab] = useState<Record<SignalTab, number>>({ bullish: 25, bearish: 25, neutral: 25, momentum: 25, recent: 25, screener: 25 });
   const [sortBy, setSortBy] = useState('score');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [direction, setDirection] = useState<SignalDirection | ''>('');
   const [minScore, setMinScore] = useState('60');
-  const [sector, setSector] = useState('');
+  const [sector, setSector] = useState(initialSector);
   const [country, setCountry] = useState('');
+  // Track the sector param so we can update the filter if the user navigates to a different sector
+  const prevSectorParam = useRef(initialSector);
   const [confidence, setConfidence] = useState<SignalConfidence | ''>('');
   const [signalType, setSignalType] = useState('');
   const [search, setSearch] = useState('');
@@ -112,6 +117,19 @@ const SignalsDashboardPage: React.FC = () => {
     // Reset pages when scope changes
     resetPages();
   }, [scope.region, scope.assetType]);
+
+  // Sync screener filter when the ?sector= query param changes (e.g. clicking a second sector link)
+  useEffect(() => {
+    const paramSector = searchParams.get('sector') ?? '';
+    if (paramSector !== prevSectorParam.current) {
+      prevSectorParam.current = paramSector;
+      if (paramSector) {
+        setSector(paramSector);
+        setActiveTab('screener');
+        resetPages();
+      }
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     fetchLatestSignalRun({ region: scope.region, assetType: scope.assetType })

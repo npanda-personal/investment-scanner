@@ -14,6 +14,7 @@ import {
   TableHead,
   TableRow,
   Tabs,
+  Tooltip,
   Typography,
 } from '@mui/material';
 import { useState, type ReactNode } from 'react';
@@ -92,10 +93,21 @@ const riskTabs = [
   { label: 'Portfolio Risk', value: 'PORTFOLIO_RISK' },
 ];
 
+/** Count earnings rows with an upcoming result within 0–14 calendar days. */
+function countUpcomingEarnings(rows: EarningsIntelligenceSnapshot[]): number {
+  return rows.filter((row) => {
+    const d = row.daysToResult;
+    return typeof d === 'number' && d >= 0 && d <= 14;
+  }).length;
+}
+
 export function MarketPulsePage() {
   const view = useReadModelSnapshot(fetchMarketPulseSnapshot);
   const sectorView = useReadModelSnapshot(fetchSectorIntelligenceSnapshot);
+  const earningsView = useReadModelSnapshot(fetchEarningsIntelligenceSnapshot);
   const snapshot = view.data?.snapshot ?? null;
+  const earningsRows = earningsView.data?.snapshot ?? null;
+  const upcomingEarningsCount = earningsRows !== null ? countUpcomingEarnings(earningsRows) : null;
 
   return (
     <SnapshotPageShell
@@ -106,6 +118,7 @@ export function MarketPulsePage() {
       envelope={view.data}
       missingTitle="Market Pulse backend not available yet."
     >
+      <EarningsSeasonBadge loading={earningsView.loading} upcomingCount={upcomingEarningsCount} />
       {snapshot && <MarketPulseSnapshotView snapshot={snapshot} shownWarnings={view.data?.warnings ?? []} />}
       <SectorIntelligencePanel envelope={sectorView.data} loading={sectorView.loading} error={sectorView.error} />
     </SnapshotPageShell>
@@ -354,6 +367,34 @@ function RadarPage<T>({
 }
 
 /**
+ * Earnings-season heat badge: shows count of stocks with a result due in the
+ * next 0–14 calendar days, derived from the persisted Earnings Intelligence
+ * snapshot already fetched for this page (no extra API call).
+ *
+ * If the earnings backend is unavailable the component renders a neutral chip
+ * so the layout stays consistent — no fabricated numbers.
+ */
+function EarningsSeasonBadge({ loading, upcomingCount }: { loading: boolean; upcomingCount: number | null }) {
+  if (loading) return null;
+  const label = upcomingCount === null
+    ? 'Earnings season: —'
+    : upcomingCount === 0
+      ? 'No results due in next 2 weeks'
+      : `Earnings season: ${upcomingCount} result${upcomingCount !== 1 ? 's' : ''} in next 2 weeks`;
+  const color = upcomingCount !== null && upcomingCount > 0 ? 'warning' : 'default';
+  const tooltipText = upcomingCount === null
+    ? 'Earnings Intelligence snapshot unavailable — result count cannot be derived.'
+    : `${upcomingCount} stock${upcomingCount !== 1 ? 's' : ''} from the Earnings Intelligence snapshot have a result date within 0–14 calendar days.`;
+  return (
+    <Stack direction="row" sx={{ mb: 2 }}>
+      <Tooltip title={tooltipText} arrow>
+        <Chip label={label} color={color} variant={upcomingCount !== null && upcomingCount > 0 ? 'filled' : 'outlined'} />
+      </Tooltip>
+    </Stack>
+  );
+}
+
+/**
  * Derive a human freshness label for a single index row.
  * Compares the snapshot's dataThroughDate against the expected latest trading date
  * (sourced from sourceSummary.latestCompletedTradingDate).  If the snapshot is
@@ -370,6 +411,23 @@ function computeIndexFreshness(
   const diffDays = Math.round((latestMs - snapshotMs) / 86_400_000);
   if (diffDays > 1) return `Stale (${diffDays}d behind)`;
   return 'Fresh';
+}
+
+function SectorDrillChip({ rawSector, tone = 'default' }: { rawSector: string; tone?: 'default' | 'warning' }) {
+  const navigate = useNavigate();
+  const label = indexLabel(rawSector);
+  return (
+    <Chip
+      key={rawSector}
+      label={label}
+      color={tone === 'warning' ? 'warning' : 'default'}
+      variant="outlined"
+      size="small"
+      onClick={() => navigate(`/signals?sector=${encodeURIComponent(rawSector)}`)}
+      sx={{ cursor: 'pointer' }}
+      title={`View signals filtered by sector: ${label}`}
+    />
+  );
 }
 
 function MarketPulseSnapshotView({
@@ -426,9 +484,17 @@ function MarketPulseSnapshotView({
         )}
       </SectionPanel>
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: 'repeat(2, 1fr)' }, gap: 2 }}>
-        {/* Fix 2: render sector names via indexLabel (handles ^CNXMETAL etc.) */}
-        <SectionPanel title="Strong Sectors"><TagList values={snapshot.strongSectors.map(indexLabel)} emptyLabel="No strong sectors in snapshot." /></SectionPanel>
-        <SectionPanel title="Weak Sectors"><TagList values={snapshot.weakSectors.map(indexLabel)} emptyLabel="No weak sectors in snapshot." tone="warning" /></SectionPanel>
+        {/* Fix 2: render sector names via indexLabel (handles ^CNXMETAL etc.) — chips are drill-down links to the Signals screener */}
+        <SectionPanel title="Strong Sectors">
+          {snapshot.strongSectors.length === 0
+            ? <Typography variant="body2" color="text.secondary">No strong sectors in snapshot.</Typography>
+            : <Stack direction="row" gap={0.75} flexWrap="wrap" useFlexGap>{snapshot.strongSectors.map((s) => <SectorDrillChip key={s} rawSector={s} />)}</Stack>}
+        </SectionPanel>
+        <SectionPanel title="Weak Sectors">
+          {snapshot.weakSectors.length === 0
+            ? <Typography variant="body2" color="text.secondary">No weak sectors in snapshot.</Typography>
+            : <Stack direction="row" gap={0.75} flexWrap="wrap" useFlexGap>{snapshot.weakSectors.map((s) => <SectorDrillChip key={s} rawSector={s} tone="warning" />)}</Stack>}
+        </SectionPanel>
         <SectionPanel title="Breadth Summary"><Typography>{snapshot.breadthSummary || 'Unavailable'}</Typography></SectionPanel>
         <SectionPanel title="Delivery Participation Summary"><Typography>{snapshot.deliverySummary || 'Unavailable'}</Typography></SectionPanel>
       </Box>
@@ -451,6 +517,7 @@ function SectorIntelligencePanel({
   loading: boolean;
   error: string | null;
 }) {
+  const navigate = useNavigate();
   const rows = envelope?.snapshot ?? [];
 
   return (
@@ -480,7 +547,13 @@ function SectorIntelligencePanel({
               </TableHead>
               <TableBody>
                 {rows.map((row) => (
-                  <TableRow key={row.sector}>
+                  <TableRow
+                    key={row.sector}
+                    hover
+                    onClick={() => navigate(`/signals?sector=${encodeURIComponent(row.sector)}`)}
+                    sx={{ cursor: 'pointer' }}
+                    title={`View signals for ${indexLabel(row.sector)}`}
+                  >
                     {/* Fix 2: render sector code as friendly name */}
                     <TableCell>{indexLabel(row.sector)}</TableCell>
                     <TableCell>{formatEnum(row.classification)}</TableCell>
