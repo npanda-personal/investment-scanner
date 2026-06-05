@@ -556,6 +556,7 @@ export class SignalPositionLedgerService {
         if (page.items.length === 0) break;
       }
       await this.refreshUntouchedActiveRows(state, query, touchedInstruments);
+      await this.resolveExitTriggeredRows(state, query);
       if (state.totalCount < state.processedCount) state.totalCount = state.processedCount;
       state.status = 'COMPLETED';
       state.completedAt = new Date().toISOString();
@@ -879,6 +880,81 @@ export class SignalPositionLedgerService {
         await this.persistActiveRow(refreshed);
         state.rows.set(refreshed.ledgerKey, refreshed);
       }
+    }
+  }
+
+  /**
+   * Close-price evidence resolver — runs ONLY inside runIncrementalRefresh
+   * (the POST refresh / scheduled stage path).  Never called from GET endpoints.
+   *
+   * For each EXIT_TRIGGERED row still in state.rows, fetches the FIRST price
+   * tick on or after the exit trigger date (next-bar fill semantics, matching
+   * the backtest convention).  If a source-proven tick exists, advances the row
+   * to CLOSED with realizedReturn.  If no tick exists yet, leaves it
+   * EXIT_TRIGGERED — honest pending, no fabricated close price.
+   *
+   * Batches the price lookup (one repository call for all EXIT_TRIGGERED rows)
+   * to avoid per-row round-trips and stay within Prisma pool=10 / Postgres
+   * max_connections=20.
+   */
+  private async resolveExitTriggeredRows(
+    state: LedgerRefreshState,
+    query: Pick<SignalPositionLedgerActiveQuery, 'region' | 'assetType'>,
+  ): Promise<void> {
+    const exitTriggeredRows = [...state.rows.values()].filter((row) => row.status === 'EXIT_TRIGGERED');
+    if (exitTriggeredRows.length === 0) return;
+
+    // Build the batch input: one entry per EXIT_TRIGGERED row.
+    const batchEntries = exitTriggeredRows.flatMap((row) => {
+      const ts = row.exitTriggerTimestamp;
+      if (!ts) return [];
+      const exitDate = new Date(ts);
+      if (!Number.isFinite(exitDate.getTime())) return [];
+      return [{ instrumentId: row.instrumentId, exitDate }];
+    });
+
+    if (batchEntries.length === 0) return;
+
+    const repositoryWithBatch = this.repository as SignalPositionLedgerRepository & {
+      firstPriceAtOrAfterBatch?: (
+        entries: Array<{ instrumentId: string; exitDate: Date }>,
+        scope: Pick<SignalPositionLedgerActiveQuery, 'region' | 'assetType'>,
+      ) => Promise<Map<string, SignalPositionLatestPriceSnapshot>>;
+    };
+    if (typeof repositoryWithBatch.firstPriceAtOrAfterBatch !== 'function') return;
+
+    const priceMap = await repositoryWithBatch.firstPriceAtOrAfterBatch(batchEntries, query);
+
+    for (const row of exitTriggeredRows) {
+      const closePriceSnapshot = priceMap.get(row.instrumentId) ?? null;
+      const closePrice = this.sourceProvenClosePrice(closePriceSnapshot);
+
+      if (closePrice === null) {
+        // No source-proven post-exit tick yet — leave as EXIT_TRIGGERED (honest pending).
+        continue;
+      }
+
+      const realizedReturnPercent = row.entryTriggerPrice > 0
+        ? Number((((closePrice - row.entryTriggerPrice) / row.entryTriggerPrice) * 100).toFixed(4))
+        : null;
+
+      const closedRow: SignalPositionLedgerActiveRow = {
+        ...row,
+        status: 'CLOSED',
+        lifecycleEvidenceStatus: 'CLOSED',
+        exitTriggerPrice: closePrice,
+        closePriceStatus: 'SOURCE_PROVEN',
+        latestTrustedPriceDate: closePriceSnapshot!.date,
+        latestTrustedPrice: closePrice,
+        currentReturnPercent: realizedReturnPercent,
+        currentReturnStatus: realizedReturnPercent !== null ? 'CURRENT' : row.currentReturnStatus,
+        closedAt: new Date().toISOString(),
+      };
+
+      await this.persistTerminalRow(closedRow);
+      state.rows.delete(closedRow.ledgerKey);
+      state.closedRows.set(closedRow.ledgerKey, closedRow);
+      state.succeededCount += 1;
     }
   }
 

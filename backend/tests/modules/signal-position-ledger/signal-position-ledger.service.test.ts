@@ -1291,6 +1291,217 @@ describe('SignalPositionLedgerService', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Close-price evidence resolver: resolveExitTriggeredRows
+// Runs ONLY inside the POST refresh path (runIncrementalRefresh).
+// ---------------------------------------------------------------------------
+
+describe('SignalPositionLedgerService — close-price evidence resolver (EXIT_TRIGGERED → CLOSED)', () => {
+  const exitTriggeredRow = (overrides: Partial<any> = {}) => ({
+    ...activeLedgerRow({ instrumentId: overrides.instrumentId || 'stock-et', symbol: overrides.symbol || 'ETX', ...overrides }),
+    status: 'EXIT_TRIGGERED' as const,
+    healthState: 'EXIT_TRIGGERED' as const,
+    lifecycleEvidenceStatus: 'EXIT_TRIGGERED' as const,
+    exitTriggerTimestamp: overrides.exitTriggerTimestamp || '2026-05-27T00:00:00.000Z',
+    exitTriggerPrice: null,
+    closePriceStatus: 'UNAVAILABLE' as const,
+    exitSourceDecisionId: overrides.exitSourceDecisionId || 'decision-et-1',
+    exitStrategyId: overrides.exitStrategyId || 'DEFENSIVE_EXIT',
+    exitStrategyVersion: overrides.exitStrategyVersion || '1.2.0',
+    exitRuleIds: overrides.exitRuleIds || ['PRICE_BELOW_SMA50'],
+    exitRuleId: overrides.exitRuleId || 'PRICE_BELOW_SMA50',
+    exitDecision: overrides.exitDecision || 'EXIT_CANDIDATE',
+    exitReasonSummary: overrides.exitReasonSummary || 'Price closed below SMA50.',
+    closedAt: null,
+  });
+
+  it('advances EXIT_TRIGGERED → CLOSED when a source-proven post-exit tick exists (next-bar fill)', async () => {
+    const existing = exitTriggeredRow({ instrumentId: 'stock-et', symbol: 'ETX', entryTriggerPrice: 100 });
+    const repository = {
+      listAllLedgerRows: jest.fn()
+        .mockResolvedValueOnce([existing])     // ACTIVE (includes EXIT_TRIGGERED)
+        .mockResolvedValueOnce([]),            // CLOSED
+      listLatestSignals: jest.fn().mockResolvedValue({
+        items: [], totalCount: 0, limit: 100, offset: 0, nextOffset: null, hasMore: false,
+      }),
+      latestSnapshotsByInstrumentIds: jest.fn().mockResolvedValue(new Map()),
+      firstPriceAtOrAfterBatch: jest.fn().mockResolvedValue(
+        new Map([['stock-et', {
+          date: '2026-05-28T00:00:00.000Z',
+          close: 115,
+          adjustedClose: 115,
+          dataStatus: 'COMPLETE',
+          source: 'database',
+        }]]),
+      ),
+      upsertActiveLedgerRow: jest.fn(),
+      closeLedgerRow: jest.fn(),
+    };
+    const signalService = { enrichSignals: jest.fn() };
+    const service = new SignalPositionLedgerService(repository as any, signalService as any);
+    const query = { region: 'IN', assetType: 'STOCK', limit: 25, offset: 0 };
+
+    await service.refreshActiveRows(query, { force: true, wait: true });
+    const active = await service.listActiveRows(query);
+    const closed = await service.listClosedRows(query);
+
+    expect(active.totalCount).toBe(0);
+    expect(closed.totalCount).toBe(1);
+    expect(closed.items[0]).toMatchObject({
+      status: 'CLOSED',
+      lifecycleEvidenceStatus: 'CLOSED',
+      symbol: 'ETX',
+      exitTriggerPrice: 115,
+      closePriceStatus: 'SOURCE_PROVEN',
+      latestTrustedPrice: 115,
+      latestTrustedPriceDate: '2026-05-28T00:00:00.000Z',
+      currentReturnStatus: 'CURRENT',
+    });
+    // Realized return: (115 - 100) / 100 * 100 = 15.0
+    expect(closed.items[0].currentReturnPercent).toBeCloseTo(15.0, 4);
+    expect(repository.closeLedgerRow).toHaveBeenCalledWith(expect.objectContaining({
+      status: 'CLOSED',
+      lifecycleEvidenceStatus: 'CLOSED',
+      exitTriggerPrice: 115,
+      closePriceStatus: 'SOURCE_PROVEN',
+    }));
+    // Verify the resolver was batched (single call, not per-row)
+    expect(repository.firstPriceAtOrAfterBatch).toHaveBeenCalledTimes(1);
+    expect(repository.firstPriceAtOrAfterBatch).toHaveBeenCalledWith(
+      expect.arrayContaining([expect.objectContaining({ instrumentId: 'stock-et' })]),
+      expect.objectContaining({ region: 'IN', assetType: 'STOCK' }),
+    );
+  });
+
+  it('leaves EXIT_TRIGGERED unchanged when no post-exit price tick exists yet (honest pending)', async () => {
+    const existing = exitTriggeredRow({ instrumentId: 'stock-et2', symbol: 'ETY', entryTriggerPrice: 100 });
+    const repository = {
+      listAllLedgerRows: jest.fn()
+        .mockResolvedValueOnce([existing])
+        .mockResolvedValueOnce([]),
+      listLatestSignals: jest.fn().mockResolvedValue({
+        items: [], totalCount: 0, limit: 100, offset: 0, nextOffset: null, hasMore: false,
+      }),
+      latestSnapshotsByInstrumentIds: jest.fn().mockResolvedValue(new Map()),
+      // No tick found: empty map
+      firstPriceAtOrAfterBatch: jest.fn().mockResolvedValue(new Map()),
+      upsertActiveLedgerRow: jest.fn(),
+      closeLedgerRow: jest.fn(),
+    };
+    const signalService = { enrichSignals: jest.fn() };
+    const service = new SignalPositionLedgerService(repository as any, signalService as any);
+    const query = { region: 'IN', assetType: 'STOCK', limit: 25, offset: 0 };
+
+    await service.refreshActiveRows(query, { force: true, wait: true });
+    const active = await service.listActiveRows(query);
+    const closed = await service.listClosedRows(query);
+
+    // Should remain EXIT_TRIGGERED, not fabricate a close price
+    expect(active.totalCount).toBe(1);
+    expect(closed.totalCount).toBe(0);
+    expect(active.items[0]).toMatchObject({
+      status: 'EXIT_TRIGGERED',
+      lifecycleEvidenceStatus: 'EXIT_TRIGGERED',
+      exitTriggerPrice: null,
+      closePriceStatus: 'UNAVAILABLE',
+      closedAt: null,
+    });
+    expect(repository.closeLedgerRow).not.toHaveBeenCalled();
+  });
+
+  it('computes realized return correctly from entry price to post-exit close price', async () => {
+    // entryTriggerPrice = 200, close = 240 → return = (240-200)/200*100 = 20.0
+    const existing = exitTriggeredRow({ instrumentId: 'stock-ret', symbol: 'RETX', entryTriggerPrice: 200 });
+    const repository = {
+      listAllLedgerRows: jest.fn()
+        .mockResolvedValueOnce([existing])
+        .mockResolvedValueOnce([]),
+      listLatestSignals: jest.fn().mockResolvedValue({
+        items: [], totalCount: 0, limit: 100, offset: 0, nextOffset: null, hasMore: false,
+      }),
+      latestSnapshotsByInstrumentIds: jest.fn().mockResolvedValue(new Map()),
+      firstPriceAtOrAfterBatch: jest.fn().mockResolvedValue(
+        new Map([['stock-ret', {
+          date: '2026-05-29T00:00:00.000Z',
+          close: 240,
+          adjustedClose: 240,
+          dataStatus: 'COMPLETE',
+          source: 'database',
+        }]]),
+      ),
+      upsertActiveLedgerRow: jest.fn(),
+      closeLedgerRow: jest.fn(),
+    };
+    const signalService = { enrichSignals: jest.fn() };
+    const service = new SignalPositionLedgerService(repository as any, signalService as any);
+    const query = { region: 'IN', assetType: 'STOCK', limit: 25, offset: 0 };
+
+    await service.refreshActiveRows(query, { force: true, wait: true });
+    const closed = await service.listClosedRows(query);
+
+    expect(closed.totalCount).toBe(1);
+    expect(closed.items[0].currentReturnPercent).toBeCloseTo(20.0, 4);
+    expect(closed.items[0].currentReturnStatus).toBe('CURRENT');
+    expect(closed.items[0].exitTriggerPrice).toBe(240);
+  });
+
+  it('does not call firstPriceAtOrAfterBatch on GET endpoints (persisted-read constraint)', async () => {
+    const closedRow = exitTriggeredRow({ instrumentId: 'stock-get', symbol: 'GETX' });
+    const firstPriceAtOrAfterBatch = jest.fn();
+    const repository = {
+      listLedgerRows: jest.fn().mockResolvedValue({
+        items: [closedRow], totalCount: 1, hasMore: false, nextOffset: null,
+      }),
+      firstPriceAtOrAfterBatch,
+      loadLatestMaterializedSnapshot: jest.fn(),
+      listLatestSignals: jest.fn(),
+      listAllLedgerRows: jest.fn(),
+      saveMaterializedSnapshot: jest.fn(),
+      upsertActiveLedgerRow: jest.fn(),
+      closeLedgerRow: jest.fn(),
+    };
+    const service = new SignalPositionLedgerService(repository as any, { enrichSignals: jest.fn() } as any);
+    const query = { region: 'IN', assetType: 'STOCK', limit: 25, offset: 0 };
+
+    await service.listPersistedActiveRows(query);
+    await service.listPersistedClosedRows(query);
+
+    expect(firstPriceAtOrAfterBatch).not.toHaveBeenCalled();
+  });
+
+  it('skips EXIT_TRIGGERED rows with no exitTriggerTimestamp without fabricating a close price', async () => {
+    const noTimestampRow = {
+      ...exitTriggeredRow({ instrumentId: 'stock-nt', symbol: 'NTX', entryTriggerPrice: 100 }),
+      exitTriggerTimestamp: null,
+    };
+    const firstPriceAtOrAfterBatch = jest.fn().mockResolvedValue(new Map());
+    const repository = {
+      listAllLedgerRows: jest.fn()
+        .mockResolvedValueOnce([noTimestampRow])
+        .mockResolvedValueOnce([]),
+      listLatestSignals: jest.fn().mockResolvedValue({
+        items: [], totalCount: 0, limit: 100, offset: 0, nextOffset: null, hasMore: false,
+      }),
+      latestSnapshotsByInstrumentIds: jest.fn().mockResolvedValue(new Map()),
+      firstPriceAtOrAfterBatch,
+      upsertActiveLedgerRow: jest.fn(),
+      closeLedgerRow: jest.fn(),
+    };
+    const signalService = { enrichSignals: jest.fn() };
+    const service = new SignalPositionLedgerService(repository as any, signalService as any);
+    const query = { region: 'IN', assetType: 'STOCK', limit: 25, offset: 0 };
+
+    await service.refreshActiveRows(query, { force: true, wait: true });
+    const active = await service.listActiveRows(query);
+
+    // Row stays EXIT_TRIGGERED; firstPriceAtOrAfterBatch not called (no valid exit dates)
+    expect(active.totalCount).toBe(1);
+    expect(active.items[0]).toMatchObject({ status: 'EXIT_TRIGGERED', closedAt: null });
+    // firstPriceAtOrAfterBatch may be called with empty batch but should never advance the row
+    expect(repository.closeLedgerRow).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Persisted-read constraint: trader GET path (listPersistedActiveRows)
 // must NEVER call ensureRefreshStarted or enrichSignals — even when the
 // persisted store is empty.

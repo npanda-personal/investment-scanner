@@ -534,6 +534,91 @@ export class SignalPositionLedgerRepository {
     };
   }
 
+  /**
+   * Batch next-bar fill: for each (instrumentId → exitDate) pair, fetch the
+   * FIRST price tick with timestamp >= exitDate (strictly after-or-equal, next-bar
+   * semantics).  Returns a Map keyed by instrumentId.  Instruments with no
+   * post-exit tick are absent from the result — callers must treat missing keys
+   * as "no evidence yet" and leave the row EXIT_TRIGGERED.
+   *
+   * The lookup is batched (one symbol IN-query + one priceTick IN-query) so
+   * many EXIT_TRIGGERED rows do not fan out into per-row round-trips.
+   */
+  async firstPriceAtOrAfterBatch(
+    entries: Array<{ instrumentId: string; exitDate: Date }>,
+    scope: Pick<SignalPositionLedgerActiveQuery, 'region' | 'assetType'>,
+  ): Promise<Map<string, SignalPositionLatestPriceSnapshot>> {
+    const result = new Map<string, SignalPositionLatestPriceSnapshot>();
+    if (entries.length === 0) return result;
+
+    const uniqueInstrumentIds = Array.from(new Set(entries.map((e) => e.instrumentId)));
+
+    const stocks = await this.db.stock.findMany({
+      where: {
+        id: { in: uniqueInstrumentIds },
+        ...this.stockScopeWhere(scope.region, scope.assetType),
+      },
+      select: { id: true, symbol: true },
+    });
+
+    if (stocks.length === 0) return result;
+
+    const instrumentIdToSymbol = new Map(stocks.map((s: { id: string; symbol: string }) => [s.id, s.symbol]));
+    const symbolToInstrumentId = new Map(stocks.map((s: { id: string; symbol: string }) => [s.symbol, s.id]));
+    const symbols = Array.from(symbolToInstrumentId.keys());
+
+    // Per-instrument minimum exit date — find earliest exit date across all entries
+    // so the single priceTick query covers all of them.
+    const minExitDate = entries.reduce<Date | null>((min, e) => {
+      if (!Number.isFinite(e.exitDate.getTime())) return min;
+      return min === null || e.exitDate < min ? e.exitDate : min;
+    }, null);
+
+    if (!minExitDate) return result;
+
+    // Fetch all ticks for the symbols on/after the earliest exit date.
+    // Order asc so the FIRST row per symbol is the next-bar fill candidate.
+    const ticks = await this.db.priceTick.findMany({
+      where: {
+        symbol: { in: symbols },
+        timestamp: { gte: minExitDate },
+      },
+      orderBy: [{ symbol: 'asc' }, { timestamp: 'asc' }],
+      select: {
+        symbol: true,
+        timestamp: true,
+        close: true,
+        adjustedClose: true,
+        dataStatus: true,
+        source: true,
+      },
+    });
+
+    // For each tick, keep the first (earliest) one per symbol that is >= the
+    // per-instrument exit date.
+    const seenSymbols = new Set<string>();
+    for (const tick of ticks) {
+      if (seenSymbols.has(tick.symbol)) continue;
+      const instrumentId = symbolToInstrumentId.get(tick.symbol);
+      if (!instrumentId) continue;
+      const entry = entries.find((e) => e.instrumentId === instrumentId);
+      if (!entry) continue;
+      if (!Number.isFinite(entry.exitDate.getTime())) continue;
+      if (tick.timestamp < entry.exitDate) continue;
+      seenSymbols.add(tick.symbol);
+      result.set(instrumentId, {
+        date: tick.timestamp.toISOString(),
+        close: Number(tick.close),
+        adjustedClose: tick.adjustedClose !== null ? Number(tick.adjustedClose) : Number(tick.close),
+        dataStatus: tick.dataStatus || 'MISSING',
+        source: tick.source || null,
+      });
+    }
+
+    void instrumentIdToSymbol; // referenced above via find — suppress unused warning
+    return result;
+  }
+
   private signalScopeWhere(region: string, assetType: string) {
     const stockFilters: Record<string, unknown>[] = [];
     const regionFilter = resolveMarketRegionFilter(region);
