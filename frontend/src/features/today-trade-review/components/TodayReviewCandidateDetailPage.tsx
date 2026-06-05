@@ -109,7 +109,7 @@ export function TodayReviewCandidateDetailPage() {
               <Fact label="Confidence score (conservative view)" value={confidence} />
               <Fact label="Entry trigger context" value={formatEntryTrigger(candidate, plan)} />
               <Fact label="Exit condition" value={formatExitCondition(plan)} />
-              <Fact label="Invalidation condition" value={formatInvalidationCondition(plan)} />
+              <Fact label="Invalidation condition" value={formatInvalidationCondition(plan, candidate)} />
               <Fact label="Data quality status" value={dataQualityStatus(dataQuality)} />
               <Fact label="Failure condition" value={safeReviewText(candidate.blockers[0] || plan?.invalidationRules?.[0] || 'Evidence weakens or invalidation is reached.')} />
               <Fact label="Do nothing unless" value={safeReviewText(plan?.doNothingUnless || (candidate.state === 'LONG_REVIEW' ? 'The entry trigger, invalidation condition, proof, and data quality remain valid.' : 'Blockers or data gaps are resolved in a later review.'))} />
@@ -206,7 +206,7 @@ export function TodayReviewCandidateDetailPage() {
             ['Risk warning', plan?.riskGrade || 'Unavailable'],
             ['Entry trigger context', formatEntryTrigger(candidate, plan)],
             ['Exit condition', formatExitCondition(plan)],
-            ['Invalidation condition', formatInvalidationCondition(plan)],
+            ['Invalidation condition', formatInvalidationCondition(plan, candidate)],
           ]} />
         </Panel>
       </Grid>
@@ -375,9 +375,19 @@ function formatExitCondition(plan: any) {
   return exitRule ? safeReviewText(exitRule) : 'Exit condition unavailable in this snapshot.';
 }
 
-function formatInvalidationCondition(plan: any) {
+function formatInvalidationCondition(plan: any, candidate?: TodayReviewCandidate) {
   if (!plan?.stopLoss) return 'Unavailable';
-  return `${formatCurrency(Number(plan.stopLoss.price))}; ${safeReviewText(plan.invalidationRules?.[0] || 'Invalidation unavailable')}`;
+  const stopPrice = Number(plan.stopLoss.price);
+  const entryRef = Number(plan.entryZone?.preferredEntryMin || plan.entryZone?.preferredEntryMax || 0);
+  const stopText = formatCurrency(stopPrice);
+  const ruleText = safeReviewText(plan.invalidationRules?.[0] || 'Invalidation unavailable');
+  const isLong = !candidate?.direction || candidate.direction === 'LONG' || String(candidate?.state).includes('LONG');
+  const isShort = candidate?.direction === 'SHORT' || String(candidate?.state).includes('SHORT');
+  const suspectStop =
+    (isLong && entryRef > 0 && stopPrice > 0 && stopPrice < entryRef * 0.6) ||
+    (isShort && entryRef > 0 && stopPrice > 0 && stopPrice > entryRef * 1.4);
+  const warning = suspectStop ? ' ⚠ Possible unadjusted stop — verify' : '';
+  return `${stopText}; ${ruleText}${warning}`;
 }
 
 function dataQualityStatus(dataQuality: TodayReviewCandidateDataQualitySnapshot | null) {

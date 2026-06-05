@@ -15,9 +15,10 @@ export interface PersistedMarketContextSummaryResponse {
   message?: string;
 }
 
-export async function fetchMarketContextSummary(params: { region?: string } = {}): Promise<MarketContextSummary> {
-  const response = await axios.get<MarketContextSummary>(`${API_BASE}/summary`, { params });
-  return response.data;
+export async function fetchMarketContextSummary(params: { region?: string } = {}): Promise<MarketContextSummary | null> {
+  // The /summary endpoint wraps the payload: { status, summary: MarketContextSummary|null, ... }
+  const response = await axios.get<PersistedMarketContextSummaryResponse>(`${API_BASE}/summary`, { params });
+  return response.data.summary ?? null;
 }
 export async function fetchPersistedMarketContextSummary(params: { region?: string } = {}): Promise<PersistedMarketContextSummaryResponse> {
   const response = await axios.get<PersistedMarketContextSummaryResponse>(`${API_BASE}/persisted-summary`, { params });

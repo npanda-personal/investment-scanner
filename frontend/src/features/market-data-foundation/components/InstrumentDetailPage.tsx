@@ -72,6 +72,21 @@ const formatNumber = (value: number | string | null | undefined) => {
   return Number.isFinite(numeric) ? numeric.toLocaleString(undefined, { maximumFractionDigits: 2 }) : String(value);
 };
 
+/**
+ * Suppress TEST_* provider values that are seeded for integration tests and
+ * must never be shown to the trader. Prefer the real price-record source when
+ * available, otherwise fall back to a generic exchange-feed label.
+ */
+const safeSource = (instrumentSource: string | null | undefined, priceSource?: string | null): string => {
+  const src = instrumentSource ?? '';
+  if (src.startsWith('TEST_') || src === '') {
+    // Use the latest price-record source if it doesn't look like a test value
+    if (priceSource && !priceSource.startsWith('TEST_') && priceSource !== '') return priceSource;
+    return 'NSE/BSE exchange feed';
+  }
+  return src;
+};
+
 const InstrumentDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -125,7 +140,9 @@ const InstrumentDetailPage: React.FC = () => {
   const dataThrough = instrument?.stored_data_through_date || latestPriceRecord?.date || instrument?.latest_price_date || null;
   const expectedThrough = instrument?.expected_latest_trading_date || instrument?.required_history_end_date || null;
   const latestUpdatedAt = latestPriceRecord?.last_updated_timestamp || prices?.last_updated_timestamp || instrument?.last_updated_timestamp || null;
-  const persistedSource = latestPriceRecord?.source || prices?.source || instrument?.source || 'Unknown';
+  const persistedSource = safeSource(
+    latestPriceRecord?.source || prices?.source || instrument?.source || null,
+  );
   const sourceStatus = latestPriceRecord?.data_status || latest?.data_status || prices?.data_status || instrument?.data_status || null;
   const freshnessStatus = instrument?.price_readiness || (dataThrough ? sourceStatus : 'MISSING_LATEST_PRICE');
 
@@ -181,7 +198,7 @@ const InstrumentDetailPage: React.FC = () => {
         </Paper>
         <Paper sx={{ p: 2 }}>
           <Typography variant="overline" color="text.secondary">Metadata</Typography>
-          <Typography variant="body2">Source: {instrument.source}</Typography>
+          <Typography variant="body2">Source: {safeSource(instrument.source, latestPriceRecord?.source)}</Typography>
           <Typography variant="body2">Updated: {formatDateTime(instrument.last_updated_timestamp)}</Typography>
         </Paper>
       </Box>

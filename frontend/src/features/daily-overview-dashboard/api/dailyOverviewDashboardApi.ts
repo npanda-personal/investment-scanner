@@ -14,7 +14,7 @@ export async function fetchDailyOverviewTodayReview(params: DailyOverviewScopePa
   return response.data;
 }
 
-export async function fetchDailyOverviewMarketContext(params: DailyOverviewScopeParams): Promise<MarketContextSummary> {
+export async function fetchDailyOverviewMarketContext(params: DailyOverviewScopeParams): Promise<MarketContextSummary | null> {
   return fetchMarketContextSummary({ region: params.region });
 }
 

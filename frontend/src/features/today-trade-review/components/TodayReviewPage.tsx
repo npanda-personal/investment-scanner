@@ -1209,7 +1209,17 @@ function formatEntry(plan: any) {
 function formatStop(plan: any, candidate?: TodayReviewCandidate) {
   if (candidate?.blockers?.[0]) return safeReviewText(candidate.blockers[0]);
   if (!plan?.stopLoss) return 'Unavailable';
-  return `${formatCurrency(Number(plan.stopLoss.price))}; ${safeReviewText(plan.invalidationRules?.[0] || 'Invalidation unavailable')}`;
+  const stopPrice = Number(plan.stopLoss.price);
+  const entryRef = Number(plan.entryZone?.preferredEntryMin || plan.entryZone?.preferredEntryMax || 0);
+  const stopText = formatCurrency(stopPrice);
+  const ruleText = safeReviewText(plan.invalidationRules?.[0] || 'Invalidation unavailable');
+  const isLong = !candidate?.direction || candidate.direction === 'LONG' || String(candidate?.state ?? '').includes('LONG');
+  const isShort = candidate?.direction === 'SHORT' || String(candidate?.state ?? '').includes('SHORT');
+  const suspectStop =
+    (isLong && entryRef > 0 && stopPrice > 0 && stopPrice < entryRef * 0.6) ||
+    (isShort && entryRef > 0 && stopPrice > 0 && stopPrice > entryRef * 1.4);
+  const warning = suspectStop ? ' ⚠ Possible unadjusted stop — verify' : '';
+  return `${stopText}; ${ruleText}${warning}`;
 }
 
 function gradeColor(grade: string) {

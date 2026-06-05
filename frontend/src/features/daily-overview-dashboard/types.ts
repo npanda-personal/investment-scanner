@@ -15,7 +15,7 @@ export interface DailyOverviewCriticalSections {
 }
 
 export interface DailyOverviewDeferredSections {
-  marketContext: DashboardSectionState<MarketContextSummary>;
+  marketContext: DashboardSectionState<MarketContextSummary | null>;
 }
 
 export type CalibrationEvidenceSummaryDisplayState = 'USABLE' | 'LIMITED' | 'UNAVAILABLE' | 'WAITING';
