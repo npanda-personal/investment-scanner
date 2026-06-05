@@ -67,6 +67,19 @@ export interface EarningsSnapshotDto {
   dataThroughDate: string | null;
   symbol: string;
   resultDate: string | null;
+  /**
+   * Human-readable label that indicates whether the result date is authoritative
+   * (from the official NSE board-meeting calendar) or an estimate derived from
+   * period-end cadence.  Consumers should display this label next to the date so
+   * the trader immediately knows the reliability level without decoding the enum.
+   *
+   * Values:
+   *   "Official"   — resultDateSource === 'OFFICIAL_CALENDAR'
+   *   "Estimated"  — resultDateSource === 'ESTIMATED_FROM_PERIOD_CADENCE'
+   *   (absent/null for fallback/unknown sources where a date is not meaningful
+   *   as a forward-looking result window)
+   */
+  resultDateLabel: 'Official' | 'Estimated' | null;
   resultDateSource: EarningsResultDateSource | string;
   periodEndDate: string | null;
   validatedAt: string | null;

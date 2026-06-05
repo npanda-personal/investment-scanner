@@ -7,7 +7,12 @@ export type {
   QualityHorizon,
   QualityMetricGroup,
   QualitySummary,
+  ScorecardGroupBy,
+  ScorecardResponse,
+  ScorecardRow,
+  ScorecardSummary,
   SignalHistoryItem,
   SignalOutcomeSet,
   SignalTypePerformance,
+  WinRateConfidence,
 } from './types';

@@ -21,13 +21,47 @@
  *                     STRICTLY BEFORE exDate.
  *                     If no prior bar, C_prev ≤ 0, or D ≥ C_prev → skip +
  *                     record a warning.
+ *   rights (CB-15)  – TERP-based adjustment.
+ *                     TERP = (C_prev + issuePrice × rightsRatio) / (1 + rightsRatio)
+ *                     factor = TERP / C_prev
+ *                     where C_prev is the close of the last trading bar
+ *                     STRICTLY BEFORE exDate (same lookup as dividend).
+ *                     rightsRatio = rightsShares / existingShares (e.g. 2:5 → 0.4).
+ *                     issuePrice  = subscription price per rights share (Rs).
+ *                     If no prior bar, C_prev ≤ 0, or issuePrice > C_prev → skip
+ *                     + record a warning.
+ *
+ * Structural-break events (CB-16) — NO numeric factor is computed for these types;
+ * they are recognised and stored as DISCONTINUITY_FLAG warnings so that downstream
+ * consumers know the price series has a structural break at that ex-date:
+ *   merger          – absorbing company typically has a gap/halt.
+ *   demerger        – parent company price series breaks (value transferred out).
+ *   spinoff         – spin-off sub-form of demerger.
+ *   rights_unparseable – rights issue whose ratio/price could not be extracted.
  *
  * Multiple actions on the same exDate have their factors multiplied together.
  * Bars on or after the latest exDate have factor 1 (adjustedClose === close).
  * adjustedClose values are rounded to 6 decimal places.
  */
 
-export type AdjustmentActionType = 'split' | 'bonus' | 'reverse_split' | 'dividend';
+export type AdjustmentActionType =
+  | 'split'
+  | 'bonus'
+  | 'reverse_split'
+  | 'dividend'
+  | 'rights'
+  | 'rights_unparseable'
+  | 'merger'
+  | 'demerger'
+  | 'spinoff';
+
+/** Action types that produce a price discontinuity but no computable factor. */
+export const DISCONTINUITY_TYPES: ReadonlySet<AdjustmentActionType> = new Set([
+  'merger',
+  'demerger',
+  'spinoff',
+  'rights_unparseable',
+]);
 
 export interface AdjustmentAction {
   /** The action type. */
@@ -42,14 +76,23 @@ export interface AdjustmentAction {
    *   • 1:1 bonus      → ratio = 2  (each holder gets 1 extra share per share)
    *   • 5:1 split       → ratio = 5
    *   • 10:1 rev split  → ratio = 0.1
-   * For dividend: not used (use `amount` instead).
+   * For dividend and rights: not used (use `amount` / `rightsRatio` + `issuePrice`).
    */
   ratio?: number;
   /**
-   * For dividend: cash amount per share.
-   * For split/bonus/reverse_split: not used.
+   * For dividend: cash amount per share (Rs).
+   * For split/bonus/reverse_split/rights: not used.
    */
   amount?: number;
+  /**
+   * For rights (CB-15): rightsShares / existingShares.
+   * e.g. "2:5 rights" → rightsRatio = 0.4.
+   */
+  rightsRatio?: number;
+  /**
+   * For rights (CB-15): subscription price per rights share (Rs).
+   */
+  issuePrice?: number;
 }
 
 export interface RawBar {
@@ -63,9 +106,25 @@ export interface AdjustedBar {
   adjustedClose: number;
 }
 
+export interface DiscontinuityFlag {
+  /** The ex-date of the structural-break event. */
+  exDate: Date;
+  /** Action type that caused the discontinuity. */
+  actionType: AdjustmentActionType;
+  /** Human-readable description. */
+  message: string;
+}
+
 export interface ComputeAdjustedClosesResult {
   bars: AdjustedBar[];
   warnings: string[];
+  /**
+   * CB-16: Structural-break events (merger / demerger / spinoff /
+   * rights_unparseable) that occurred within the bar range.
+   * No factor is applied for these events; the bars array is unchanged.
+   * Downstream consumers should surface these flags to users.
+   */
+  discontinuityFlags: DiscontinuityFlag[];
 }
 
 // ---------------------------------------------------------------------------
@@ -111,10 +170,11 @@ export function computeAdjustedCloses(
   actions: AdjustmentAction[],
 ): ComputeAdjustedClosesResult {
   const warnings: string[] = [];
+  const discontinuityFlags: DiscontinuityFlag[] = [];
 
   // ── 0. Handle empty input ──────────────────────────────────────────────────
   if (bars.length === 0) {
-    return { bars: [], warnings };
+    return { bars: [], warnings, discontinuityFlags };
   }
 
   // ── 1. Sort bars chronologically ──────────────────────────────────────────
@@ -124,13 +184,25 @@ export function computeAdjustedCloses(
   const sortedActions = [...actions].sort((a, b) => dayMs(a.exDate) - dayMs(b.exDate));
 
   // ── 3. Build a map: exDateMs → cumulative price factor for that ex-date ───
-  //      We process dividends first because they need C_prev (last bar before
-  //      exDate).  We then merge split/bonus/reverse_split factors in.
+  //      We process dividends and rights first because they need C_prev (last
+  //      bar before exDate).  We then merge split/bonus/reverse_split factors in.
   const factorByExDate = new Map<number, number>();
 
   for (const action of sortedActions) {
     const exMs = dayMs(action.exDate);
+    const exDateStr = action.exDate.toISOString().slice(0, 10);
     let factor: number;
+
+    // ── CB-16: Structural-break events — flag, do not factor ─────────────────
+    if (DISCONTINUITY_TYPES.has(action.type)) {
+      const message =
+        `DISCONTINUITY_FLAG: ${action.type} on ${exDateStr} — ` +
+        `price series has a structural break at this date. ` +
+        `No adjustment factor applied. Manual review recommended.`;
+      warnings.push(message);
+      discontinuityFlags.push({ exDate: action.exDate, actionType: action.type, message });
+      continue;
+    }
 
     if (
       action.type === 'split' ||
@@ -140,7 +212,7 @@ export function computeAdjustedCloses(
       const R = action.ratio;
       if (R === undefined || R === null || R <= 0) {
         warnings.push(
-          `Action ${action.type} on ${action.exDate.toISOString().slice(0, 10)} has invalid or missing ratio (${R}); skipped.`,
+          `Action ${action.type} on ${exDateStr} has invalid or missing ratio (${R}); skipped.`,
         );
         continue;
       }
@@ -149,7 +221,7 @@ export function computeAdjustedCloses(
       const D = action.amount;
       if (D === undefined || D === null || D <= 0) {
         warnings.push(
-          `Dividend on ${action.exDate.toISOString().slice(0, 10)} has invalid or missing amount (${D}); skipped.`,
+          `Dividend on ${exDateStr} has invalid or missing amount (${D}); skipped.`,
         );
         continue;
       }
@@ -165,28 +237,92 @@ export function computeAdjustedCloses(
 
       if (cPrev === null) {
         warnings.push(
-          `Dividend on ${action.exDate.toISOString().slice(0, 10)} (amount=${D}): no prior bar found; factor skipped.`,
+          `Dividend on ${exDateStr} (amount=${D}): no prior bar found; factor skipped.`,
         );
         continue;
       }
       if (cPrev <= 0) {
         warnings.push(
-          `Dividend on ${action.exDate.toISOString().slice(0, 10)} (amount=${D}): prior bar close=${cPrev} is ≤0; factor skipped.`,
+          `Dividend on ${exDateStr} (amount=${D}): prior bar close=${cPrev} is ≤0; factor skipped.`,
         );
         continue;
       }
       if (D >= cPrev) {
         warnings.push(
-          `Dividend on ${action.exDate.toISOString().slice(0, 10)} (amount=${D}): dividend ≥ prior close (${cPrev}); factor skipped.`,
+          `Dividend on ${exDateStr} (amount=${D}): dividend ≥ prior close (${cPrev}); factor skipped.`,
         );
         continue;
       }
 
       factor = (cPrev - D) / cPrev;
+    } else if (action.type === 'rights') {
+      // ── CB-15: TERP-based rights adjustment ─────────────────────────────────
+      // TERP = (C_prev + issuePrice × rightsRatio) / (1 + rightsRatio)
+      // factor = TERP / C_prev
+      //
+      // Derivation:
+      //   A holder of 1 share has: 1 existing share worth C_prev
+      //                          + rightsRatio new shares at issuePrice each.
+      //   Combined value = C_prev + issuePrice × rightsRatio
+      //   Total shares    = 1 + rightsRatio
+      //   TERP = (C_prev + issuePrice × rightsRatio) / (1 + rightsRatio)
+      //   factor = TERP / C_prev  (always ≤ 1 when issuePrice < C_prev)
+      const rr = action.rightsRatio;
+      const ip = action.issuePrice;
+      if (rr === undefined || rr === null || rr <= 0) {
+        warnings.push(
+          `Rights on ${exDateStr}: invalid or missing rightsRatio (${rr}); factor skipped.`,
+        );
+        continue;
+      }
+      if (ip === undefined || ip === null || ip < 0) {
+        warnings.push(
+          `Rights on ${exDateStr}: invalid or missing issuePrice (${ip}); factor skipped.`,
+        );
+        continue;
+      }
+
+      // Find C_prev (last bar strictly before exDate) — same as dividend lookup.
+      let cPrev: number | null = null;
+      for (let i = sortedBars.length - 1; i >= 0; i--) {
+        if (dayMs(sortedBars[i].date) < exMs) {
+          cPrev = sortedBars[i].close;
+          break;
+        }
+      }
+
+      if (cPrev === null) {
+        warnings.push(
+          `Rights on ${exDateStr} (rightsRatio=${rr}, issuePrice=${ip}): no prior bar found; factor skipped.`,
+        );
+        continue;
+      }
+      if (cPrev <= 0) {
+        warnings.push(
+          `Rights on ${exDateStr} (rightsRatio=${rr}, issuePrice=${ip}): prior bar close=${cPrev} is ≤0; factor skipped.`,
+        );
+        continue;
+      }
+      if (ip > cPrev) {
+        warnings.push(
+          `Rights on ${exDateStr} (rightsRatio=${rr}, issuePrice=${ip}): issuePrice > prior close (${cPrev}); factor skipped (would inflate price).`,
+        );
+        continue;
+      }
+
+      const terp = (cPrev + ip * rr) / (1 + rr);
+      factor = terp / cPrev;
+
+      if (factor <= 0 || factor > 1) {
+        warnings.push(
+          `Rights on ${exDateStr}: computed TERP factor=${factor.toFixed(8)} is out of (0,1]; factor skipped.`,
+        );
+        continue;
+      }
     } else {
-      // Unknown action type — skip silently (or warn if you prefer).
+      // Unknown action type — warn and skip.
       warnings.push(
-        `Unknown action type "${(action as AdjustmentAction).type}" on ${action.exDate.toISOString().slice(0, 10)}; skipped.`,
+        `Unknown action type "${(action as AdjustmentAction).type}" on ${exDateStr}; skipped.`,
       );
       continue;
     }
@@ -246,5 +382,5 @@ export function computeAdjustedCloses(
     return { date: bar.date, close: bar.close, adjustedClose };
   });
 
-  return { bars: adjustedBars, warnings };
+  return { bars: adjustedBars, warnings, discontinuityFlags };
 }

@@ -7,6 +7,8 @@ import FactCheckIcon from '@mui/icons-material/FactCheck';
 import NotificationsNoneIcon from '@mui/icons-material/NotificationsNone';
 import SavedSearchIcon from '@mui/icons-material/SavedSearch';
 import ShowChartIcon from '@mui/icons-material/ShowChart';
+import SmartToyIcon from '@mui/icons-material/SmartToy';
+import SpaceDashboardIcon from '@mui/icons-material/SpaceDashboard';
 import StarBorderIcon from '@mui/icons-material/StarBorder';
 import TodayIcon from '@mui/icons-material/Today';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
@@ -33,6 +35,7 @@ export const navGroups: NavGroup[] = [
     items: [
       { path: '/', label: 'Market Pulse', icon: <DashboardIcon />, aliases: ['/market-pulse'] },
       { path: '/today-review', label: 'Daily Review', icon: <TodayIcon />, matchPrefixes: ['/today-review/'] },
+      { path: '/daily-overview', label: 'Daily Overview', icon: <SpaceDashboardIcon /> },
       { path: '/research', label: 'Research Hub', icon: <WorkspacesIcon /> },
       { path: '/daily-review-shortlist', label: 'Review Shortlist', icon: <FactCheckIcon /> },
       { path: '/stock-interest-radar', label: 'Stock Interest Radar', icon: <SavedSearchIcon /> },
@@ -40,6 +43,8 @@ export const navGroups: NavGroup[] = [
       { path: '/watchlists', label: 'Watchlists', icon: <StarBorderIcon />, matchPrefixes: ['/watchlists/'] },
       { path: '/portfolios', label: 'Portfolios', icon: <AccountBalanceWalletIcon />, matchPrefixes: ['/portfolios/'] },
       { path: '/alerts', label: 'Alerts', icon: <NotificationsNoneIcon /> },
+      { path: '/notifications', label: 'Notifications', icon: <NotificationsNoneIcon /> },
+      { path: '/copilot', label: 'AI Copilot', icon: <SmartToyIcon /> },
       { path: '/instrument-workspace', label: 'Instrument Workspace', icon: <AssessmentIcon />, matchPrefixes: ['/stocks/', '/research/stocks/'] },
     ],
   },

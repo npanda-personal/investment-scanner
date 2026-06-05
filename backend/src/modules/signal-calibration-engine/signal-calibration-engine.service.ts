@@ -1,5 +1,10 @@
 import { HistoricalContextSnapshotsService } from '../historical-context-snapshots';
-import { SignalGenerationEngineService, type SignalResultDto } from '../signal-generation-engine';
+import {
+  SignalGenerationEngineService,
+  DIRECTION_BULLISH_THRESHOLD,
+  DIRECTION_BEARISH_THRESHOLD,
+  type SignalResultDto,
+} from '../signal-generation-engine';
 import { SignalQualityLabService, SCORE_BUCKETS, type NoisySignalItem, type QualityHorizon, type QualityMetricGroup, type SignalTypePerformance } from '../signal-quality-lab';
 import type { PersistedQualityMetrics } from '../signal-quality-lab';
 import { DataQualityEngineService, type DataQualityEvaluationDto } from '../data-quality-engine';
@@ -1321,8 +1326,11 @@ export class SignalCalibrationEngineService {
   }
 
   private directionForScore(score: number): SignalCalibrationResultDto['calibratedDirection'] {
-    if (score >= 70) return 'BULLISH';
-    if (score >= 40) return 'NEUTRAL';
+    // CB-4: unified with signal-generation-engine constants (BULLISH>=60 / BEARISH<=40).
+    // Previous hard-coded 70/40 mislabelled scores in [60-69] as NEUTRAL when the
+    // engine treats them as BULLISH — now both modules share the same cut-points.
+    if (score >= DIRECTION_BULLISH_THRESHOLD) return 'BULLISH';
+    if (score > DIRECTION_BEARISH_THRESHOLD) return 'NEUTRAL';
     return 'BEARISH';
   }
 

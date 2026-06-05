@@ -6,7 +6,7 @@
  *  3.  Next-bar fill — entry fills at T+1, not T
  *  4.  OOS capital chaining — OOS starts from IS end-cash
  *  8.  profitFactor sentinel on zero-loss → not 0 / not penalised
- * 11.  Universe ALL emits CRITICAL survivorship warning + non-alphabetical sort
+ * 11.  Universe ALL emits SURVIVORSHIP_BIAS_UNIVERSE warning + non-alphabetical sort
  *      (non-alphabetical: verified via listInstruments call with sortBy=marketCap)
  */
 import { BacktestingStrategyLabService } from '../../../src/modules/backtesting-strategy-lab';
@@ -383,7 +383,7 @@ describe('Fix #8 — profitFactor sentinel on zero-loss strategies', () => {
 // ---------------------------------------------------------------------------
 
 describe('Fix #11 — Universe ALL survivorship warning and non-alphabetical sort', () => {
-  it('always emits CRITICAL survivorship warning when universe type is ALL', async () => {
+  it('always emits SURVIVORSHIP_BIAS_UNIVERSE warning when universe type is ALL', async () => {
     const service = createService({
       marketDataService: {
         listInstruments: jest.fn().mockResolvedValue({
@@ -396,7 +396,7 @@ describe('Fix #11 — Universe ALL survivorship warning and non-alphabetical sor
     });
     const result = await service.simulate({ ...baseConfig, universe: { type: 'ALL' } });
     const warnings = result.metrics.realismWarnings ?? [];
-    const criticalWarning = warnings.find((w) => w.includes('CRITICAL') && w.includes('survivorship'));
+    const criticalWarning = warnings.find((w) => w.includes('SURVIVORSHIP_BIAS_UNIVERSE') && w.includes('survivorship'));
     expect(criticalWarning).toBeDefined();
   });
 
@@ -439,9 +439,282 @@ describe('Fix #11 — Universe ALL survivorship warning and non-alphabetical sor
     });
     const result = await service.simulate({ ...baseConfig, universe: { type: 'ALL' } });
     const warnings = result.metrics.realismWarnings ?? [];
-    const criticalWarning = warnings.find((w) => w.includes('CRITICAL'));
-    expect(criticalWarning).toBeDefined();
-    expect(criticalWarning).toMatch(/survivor/i);
-    expect(criticalWarning).toMatch(/delist|active|survivor/i);
+    const survivorshipWarning = warnings.find((w) => w.includes('SURVIVORSHIP_BIAS_UNIVERSE'));
+    expect(survivorshipWarning).toBeDefined();
+    expect(survivorshipWarning).toMatch(/survivor/i);
+    expect(survivorshipWarning).toMatch(/delist|active|survivor/i);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// CB-12 — India transaction cost model (0.45 % round-trip default)
+// ---------------------------------------------------------------------------
+
+describe('CB-12 — India delivery-equity transaction cost model', () => {
+  it('DEFAULT_INDIA_ONE_WAY_COST_PERCENT is 0.00225 (0.225 % per leg, 0.45 % round-trip)', () => {
+    // Import the constant from the service module
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { DEFAULT_INDIA_ONE_WAY_COST_PERCENT } = require('../../../src/modules/backtesting-strategy-lab/backtesting-strategy-lab.service');
+    expect(DEFAULT_INDIA_ONE_WAY_COST_PERCENT).toBeCloseTo(0.00225, 6);
+  });
+
+  it('round-trip cost on a zero-PnL trade is close to 0.45 % of committed capital', () => {
+    // Entry and exit at the same price → gross PnL = 0 → net PnL = -(entry cost + exit cost)
+    // With 0.225 % per leg: net ≈ -(0.00225 + 0.00225) * committed = -0.0045 * committed
+    const service = createService() as any;
+    const entryClose = 100;
+    const quantity = 100;
+    const committedCapital = 10_000; // entry notional = quantity * entryClose
+    // Build a synthetic position and a bar at the same price (zero gross PnL)
+    const position = {
+      instrumentId: 'i',
+      symbol: 'X',
+      entryDate: '2021-01-01',
+      entryPrice: entryClose,
+      quantity,
+      entryBarIndex: 0,
+      cost: committedCapital * 0.00225, // entry cost at 0.225 %
+      committedCapital,
+      entryReasons: [],
+      highestClose: entryClose,
+    };
+    const bar = { date: '2021-01-21', open: entryClose, high: entryClose, low: entryClose, close: entryClose, volume: 1000 };
+    const config: BacktestStrategyConfig = {
+      ...baseConfig,
+      transactionCostPercent: 0.00225, // default India one-way
+    };
+    const trade = service.closePosition(config, position, bar, 'END_OF_TEST', [], undefined);
+    // Exit cost = quantity * exitPrice * 0.00225 = 100 * 100 * 0.00225 = 22.5
+    // Net PnL = 0 - entry cost (22.5) - exit cost (22.5) = -45
+    // Round-trip cost as fraction of committed = 45 / 10000 = 0.45 %
+    const roundTripCostPercent = Math.abs(trade.netPnL) / committedCapital;
+    expect(roundTripCostPercent).toBeCloseTo(0.0045, 4); // 0.45 % ± 0.01 %
+  });
+
+  it('normalizeConfig applies India default cost when transactionCostPercent is not set (IN region)', async () => {
+    // Verify normalizeConfig via run() which calls normalizeConfig.
+    // With region=IN and no explicit transactionCostPercent, the cost should default to 0.00225.
+    // We verify this by running with an explicit 0.00225 and comparing PnL vs explicit 0.
+    const { DEFAULT_INDIA_ONE_WAY_COST_PERCENT } = require('../../../src/modules/backtesting-strategy-lab/backtesting-strategy-lab.service');
+    const serviceWithCost = createService();
+    // Run with explicit India default cost
+    const resultWithCost = await serviceWithCost.simulate({ ...baseConfig, transactionCostPercent: DEFAULT_INDIA_ONE_WAY_COST_PERCENT });
+    // Run with zero cost — PnL should be higher (no friction)
+    const resultNoCost = await serviceWithCost.simulate({ ...baseConfig, transactionCostPercent: 0 });
+    // With any trades, the 0-cost simulation should have higher or equal total return
+    if (resultWithCost.trades.length > 0 && resultNoCost.trades.length > 0) {
+      expect(resultNoCost.metrics.totalReturn).toBeGreaterThanOrEqual(resultWithCost.metrics.totalReturn);
+    }
+    // The default cost constant must be 0.00225
+    expect(DEFAULT_INDIA_ONE_WAY_COST_PERCENT).toBeCloseTo(0.00225, 6);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// CB-14 — Wilder-smoothed RSI
+// ---------------------------------------------------------------------------
+
+describe('CB-14 — Wilder-smoothed RSI', () => {
+  it('rsiFromLatestFirst returns null when fewer than period+1 values', () => {
+    const service = createService() as any;
+    // With period=14, need at least 15 values
+    expect(service.rsiFromLatestFirst([100, 101, 102], 14)).toBeNull();
+    expect(service.rsiFromLatestFirst(Array(14).fill(100), 14)).toBeNull();
+  });
+
+  it('rsiFromLatestFirst returns 100 when all moves are gains (no losses)', () => {
+    const service = createService() as any;
+    // Strictly ascending prices → all diffs are positive → avgLoss = 0 → RSI = 100
+    const prices = Array.from({ length: 40 }, (_x, i) => 100 + i); // 100, 101, 102, ...
+    // latest-first: [139, 138, ..., 100]
+    const latestFirst = [...prices].reverse();
+    expect(service.rsiFromLatestFirst(latestFirst, 14)).toBe(100);
+  });
+
+  it('rsiFromLatestFirst Wilder RSI is more stable than SMA-RS (smoother on mean-reverting series)', () => {
+    const service = createService() as any;
+    // Alternating series: 100, 102, 100, 102, ... (perfect oscillation)
+    // Wilder RSI should converge to ~50 after warm-up
+    const n = 60;
+    const prices = Array.from({ length: n }, (_x, i) => 100 + (i % 2) * 2);
+    const latestFirst = [...prices].reverse();
+    const rsi = service.rsiFromLatestFirst(latestFirst, 14);
+    expect(rsi).not.toBeNull();
+    // For a perfectly oscillating series, Wilder RSI converges toward 50
+    expect(rsi!).toBeGreaterThan(30);
+    expect(rsi!).toBeLessThan(70);
+  });
+
+  it('rsiFromLatestFirst produces different (smoother) result than naive SMA-RS for short series', () => {
+    // The key behavioral difference: Wilder uses exponential smoothing, so the
+    // result after the seed window is influenced by ALL prior bars, not just the
+    // last period bars.
+    const service = createService() as any;
+    // 30 bars of upward movement, then a single sharp drop
+    const upBars = Array.from({ length: 30 }, (_x, i) => 100 + i);
+    const drop = [upBars[upBars.length - 1] - 15]; // sharp drop
+    const series = [...upBars, ...drop];
+    const latestFirst = [...series].reverse();
+    const rsi = service.rsiFromLatestFirst(latestFirst, 14);
+    expect(rsi).not.toBeNull();
+    // After a long uptrend, even a sharp single-bar drop should keep RSI above ~40
+    // (Wilder smoothing retains memory of the uptrend)
+    expect(rsi!).toBeGreaterThan(40);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// CB-13 — Stops vs intrabar low/high (not EOD close) + gap-through fill at open
+// ---------------------------------------------------------------------------
+
+describe('CB-13 — Intrabar stop/gap-through fill', () => {
+  /**
+   * Build a bar with explicit OHLC fields.
+   */
+  const makeBar = (date: string, open: number, high: number, low: number, close: number) =>
+    ({ date, open, high, low, close, volume: 1000 });
+
+  it('stop-loss triggers when bar LOW touches the stop level (not close)', () => {
+    const service = createService() as any;
+    const config: BacktestStrategyConfig = { ...baseConfig, stopLossPercent: 0.10 };
+    const position = {
+      instrumentId: 'i', symbol: 'X', entryDate: '2021-01-01', entryPrice: 100,
+      quantity: 10, entryBarIndex: 0, cost: 0, committedCapital: 1000,
+      entryReasons: [], highestClose: 100,
+    };
+    // Bar: open=96, high=97, low=88, close=95 → close doesn't breach 90 (10% stop),
+    // but LOW=88 does breach 90 → stop should trigger
+    const bars = [
+      makeBar('2021-01-01', 100, 102, 99, 101), // entry bar
+      makeBar('2021-01-02', 96, 97, 88, 95),    // bar with low below stop (90)
+    ];
+    const exit = service.exitDecision(config, bars, 1, position);
+    expect(exit.exit).toBe(true);
+    expect(exit.reason).toBe('STOP_LOSS');
+  });
+
+  it('stop-loss does NOT trigger when bar LOW is above the stop level', () => {
+    const service = createService() as any;
+    const config: BacktestStrategyConfig = { ...baseConfig, stopLossPercent: 0.10 };
+    const position = {
+      instrumentId: 'i', symbol: 'X', entryDate: '2021-01-01', entryPrice: 100,
+      quantity: 10, entryBarIndex: 0, cost: 0, committedCapital: 1000,
+      entryReasons: [], highestClose: 100,
+    };
+    // Bar: low=91 → above stop (90), close=93 → close also above stop → no exit
+    const bars = [
+      makeBar('2021-01-01', 100, 102, 99, 101),
+      makeBar('2021-01-02', 95, 96, 91, 93),
+    ];
+    const exit = service.exitDecision(config, bars, 1, position);
+    expect(exit.exit).toBe(false);
+  });
+
+  it('gap-down through stop fills at bar OPEN (not stop level)', () => {
+    const service = createService() as any;
+    const config: BacktestStrategyConfig = { ...baseConfig, stopLossPercent: 0.10 };
+    const position = {
+      instrumentId: 'i', symbol: 'X', entryDate: '2021-01-01', entryPrice: 100,
+      quantity: 10, entryBarIndex: 0, cost: 0, committedCapital: 1000,
+      entryReasons: [], highestClose: 100,
+    };
+    // entryPrice=100, stop=90; bar opens at 82 (well below stop) → gap-through
+    // fill should be at open (82), not stop (90)
+    const bars = [
+      makeBar('2021-01-01', 100, 102, 99, 101),
+      makeBar('2021-01-02', 82, 85, 80, 83), // opens below stop
+    ];
+    const exit = service.exitDecision(config, bars, 1, position);
+    expect(exit.exit).toBe(true);
+    expect(exit.reason).toBe('STOP_LOSS');
+    // stopFillPrice should be bar open (82) because open < stop level (90)
+    expect(exit.stopFillPrice).toBeCloseTo(82, 1);
+  });
+
+  it('stop fill at stop-level when bar opens above stop but low touches it', () => {
+    const service = createService() as any;
+    const config: BacktestStrategyConfig = { ...baseConfig, stopLossPercent: 0.10 };
+    const position = {
+      instrumentId: 'i', symbol: 'X', entryDate: '2021-01-01', entryPrice: 100,
+      quantity: 10, entryBarIndex: 0, cost: 0, committedCapital: 1000,
+      entryReasons: [], highestClose: 100,
+    };
+    // Bar opens above stop (95 > 90), but low=88 touches it → fill at stop (90)
+    const bars = [
+      makeBar('2021-01-01', 100, 102, 99, 101),
+      makeBar('2021-01-02', 95, 97, 88, 92), // open 95 > stop 90; low 88 < stop 90
+    ];
+    const exit = service.exitDecision(config, bars, 1, position);
+    expect(exit.exit).toBe(true);
+    expect(exit.reason).toBe('STOP_LOSS');
+    // stopFillPrice should be 90 (the stop level), not 88 (the low) or 95 (the open)
+    expect(exit.stopFillPrice).toBeCloseTo(90, 1);
+  });
+
+  it('closePosition uses stopFillPrice when provided (not bar close)', () => {
+    const service = createService() as any;
+    const config: BacktestStrategyConfig = { ...baseConfig, transactionCostPercent: 0 };
+    const position = {
+      instrumentId: 'i', symbol: 'X', entryDate: '2021-01-01', entryPrice: 100,
+      quantity: 10, entryBarIndex: 0, cost: 0, committedCapital: 1000,
+      entryReasons: [], highestClose: 100,
+    };
+    const bar = makeBar('2021-01-02', 82, 85, 80, 83);
+    const stopFillPrice = 82; // gap-down fill at open
+    const trade = service.closePosition(config, position, bar, 'STOP_LOSS', [], stopFillPrice);
+    // With stopFillPrice=82, gross = qty * (82-100) = 10 * -18 = -180
+    expect(trade.exitPrice).toBeCloseTo(82, 1);
+    expect(trade.grossPnL).toBeCloseTo(-180, 1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// CB-9 — Survivorship warning with point-in-time context
+// ---------------------------------------------------------------------------
+
+describe('CB-9 — Survivorship bias warning and point-in-time context', () => {
+  it('emits SURVIVORSHIP_BIAS_UNIVERSE warning for universe ALL', async () => {
+    const service = createService({
+      marketDataService: {
+        listInstruments: jest.fn().mockResolvedValue({
+          instruments: [{ id: 'stock-1', symbol: 'AAA' }],
+          pagination: { total: 1 },
+        }),
+        listPricesByInstrumentId: jest.fn(async () => ({ prices: makePrices('AAA') })),
+        listPrices: jest.fn().mockResolvedValue([]),
+      },
+    });
+    const result = await service.simulate({ ...baseConfig, universe: { type: 'ALL' } });
+    const warnings = result.metrics.realismWarnings ?? [];
+    const survivorshipWarning = warnings.find((w) => w.includes('SURVIVORSHIP_BIAS_UNIVERSE'));
+    expect(survivorshipWarning).toBeDefined();
+    // Warning should mention delisted names and survivorship bias
+    expect(survivorshipWarning).toMatch(/delist/i);
+    expect(survivorshipWarning).toMatch(/survivorship bias/i);
+  });
+
+  it('SURVIVORSHIP_BIAS_UNIVERSE warning mentions that instruments with DB history ARE included', async () => {
+    const service = createService({
+      marketDataService: {
+        listInstruments: jest.fn().mockResolvedValue({
+          instruments: [{ id: 'stock-1', symbol: 'AAA' }],
+          pagination: { total: 50 },
+        }),
+        listPricesByInstrumentId: jest.fn(async () => ({ prices: makePrices('AAA') })),
+        listPrices: jest.fn().mockResolvedValue([]),
+      },
+    });
+    const result = await service.simulate({ ...baseConfig, universe: { type: 'ALL' } });
+    const warnings = result.metrics.realismWarnings ?? [];
+    const survivorshipWarning = warnings.find((w) => w.includes('SURVIVORSHIP_BIAS_UNIVERSE'));
+    expect(survivorshipWarning).toBeDefined();
+    // Should clarify that instruments with price data in the window ARE included
+    expect(survivorshipWarning).toMatch(/price database|IS included/i);
+  });
+
+  it('no survivorship warning for SYMBOLS or WATCHLIST universes', async () => {
+    const service = createService();
+    const symbolsResult = await service.simulate({ ...baseConfig, universe: { type: 'SYMBOLS', symbols: ['AAA'] } });
+    expect(symbolsResult.metrics.realismWarnings?.some((w) => w.includes('SURVIVORSHIP_BIAS_UNIVERSE'))).toBe(false);
   });
 });

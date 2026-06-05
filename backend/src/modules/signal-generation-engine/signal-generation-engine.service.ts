@@ -126,8 +126,10 @@ const OUTPERFORMING_PEERS_MIN_RELATIVE = 0.02;
 //   - Genuinely bearish (2+ categories aligned bearish): 5-40
 //   Deadband of [41-59] keeps "NEUTRAL" from disappearing; 60/40 cuts are chosen
 //   so a single-category lean that doesn't cross to ~60 stays NEUTRAL.
-const DIRECTION_BULLISH_THRESHOLD = 60;
-const DIRECTION_BEARISH_THRESHOLD = 40;
+// CB-4: exported so signal-calibration-engine can import and reuse these values
+// rather than re-encoding its own cut-points (which caused a 60/70 mismatch).
+export const DIRECTION_BULLISH_THRESHOLD = 60;
+export const DIRECTION_BEARISH_THRESHOLD = 40;
 
 // ── v3 Overextension / Mean-Reversion Guards ─────────────────────────────────
 //
@@ -1817,9 +1819,14 @@ export class SignalGenerationEngineService {
   }
 
   adx(prices: SignalPricePoint[], period: number): number | null {
+    // CB-11: Wilder ADX needs ~3×period bars to converge (mirrors the RSI fix at ~140 bars).
+    // Previous cap of period*2+1 (=29 for period=14) was too short for stable DX smoothing.
+    // Use min(prices.length, period*3) so we consume all available history up to the
+    // 3× warm-up target; the null-guard below ensures we still bail on thin history.
+    const warmupSize = Math.min(prices.length, period * 3);
     if (prices.length <= period * 2) return null;
-    const chronological = [...prices].slice(0, period * 2 + 1).reverse();
-    
+    const chronological = [...prices].slice(0, warmupSize).reverse();
+
     let trueRanges: number[] = [];
     let plusDM: number[] = [];
     let minusDM: number[] = [];
@@ -1827,8 +1834,15 @@ export class SignalGenerationEngineService {
     for (let i = 1; i < chronological.length; i++) {
       const current = chronological[i];
       const previous = chronological[i - 1];
-      
-      if (current.high === null || current.low === null || previous.high === null || previous.low === null) {
+
+      // CB-1: use adjusted high/low (with safe fallback to raw) so TR/DM are on the
+      // same price scale as adjusted_close after a split or bonus issue.
+      const curHigh  = current.adjusted_high  ?? current.high;
+      const curLow   = current.adjusted_low   ?? current.low;
+      const prevHigh = previous.adjusted_high ?? previous.high;
+      const prevLow  = previous.adjusted_low  ?? previous.low;
+
+      if (curHigh === null || curLow === null || prevHigh === null || prevLow === null) {
         trueRanges.push(0);
         plusDM.push(0);
         minusDM.push(0);
@@ -1836,14 +1850,14 @@ export class SignalGenerationEngineService {
       }
 
       const tr = Math.max(
-        current.high - current.low,
-        Math.abs(current.high - previous.adjusted_close),
-        Math.abs(current.low - previous.adjusted_close)
+        curHigh - curLow,
+        Math.abs(curHigh - previous.adjusted_close),
+        Math.abs(curLow - previous.adjusted_close)
       );
       trueRanges.push(tr);
 
-      const upMove = current.high - previous.high;
-      const downMove = previous.low - current.low;
+      const upMove = curHigh - prevHigh;
+      const downMove = prevLow - curLow;
 
       if (upMove > downMove && upMove > 0) {
         plusDM.push(upMove);
@@ -1908,14 +1922,19 @@ export class SignalGenerationEngineService {
     for (let i = 1; i < chronological.length; i++) {
       const current = chronological[i];
       const previous = chronological[i - 1];
-      if (current.high === null || current.low === null) {
+      // CB-1: use adjusted high/low (safe fallback to raw) so ATR stays on the same
+      // price scale as adjusted_close after a corporate action (split / bonus).
+      // Mixing raw high/low with adjusted_close overstates TR on the ex-date bar.
+      const curHigh = current.adjusted_high  ?? current.high;
+      const curLow  = current.adjusted_low   ?? current.low;
+      if (curHigh === null || curLow === null) {
         trueRanges.push(0);
         continue;
       }
       const tr = Math.max(
-        current.high - current.low,
-        Math.abs(current.high - previous.adjusted_close),
-        Math.abs(current.low - previous.adjusted_close)
+        curHigh - curLow,
+        Math.abs(curHigh - previous.adjusted_close),
+        Math.abs(curLow  - previous.adjusted_close)
       );
       trueRanges.push(tr);
     }
@@ -2505,6 +2524,14 @@ export class SignalGenerationEngineService {
         close: Number(price.close),
         adjusted_close: Number(price.adjusted_close),
         volume: price.volume !== null && price.volume !== undefined ? Number(price.volume) : null,
+        // CB-1: pass through adjusted OHLCV from the price read layer when present.
+        // Indicators use `adjusted_high ?? high`, `adjusted_low ?? low`, `adjusted_volume ?? volume`
+        // so existing callers (no adjusted_h/l/v) degrade gracefully to raw values.
+        adjusted_high: this.optionalNumber(price.adjusted_high),
+        adjusted_low: this.optionalNumber(price.adjusted_low),
+        adjusted_volume: price.adjusted_volume !== null && price.adjusted_volume !== undefined
+          ? this.optionalNumber(price.adjusted_volume)
+          : null,
       }))
       .filter((price) => Number.isFinite(price.adjusted_close))
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -2544,15 +2571,19 @@ export class SignalGenerationEngineService {
     for (let i = 1; i < chronological.length; i++) {
       const current = chronological[i];
       const previous = chronological[i - 1];
-      if (current.volume === null) {
+      // CB-1: use adjusted_volume (split-factor applied) with safe fallback to raw volume.
+      // After a split the raw volume reflects the post-split share count on old bars, so
+      // adjusted_volume normalises the series to a comparable unit across all bars.
+      const vol = current.adjusted_volume ?? current.volume;
+      if (vol === null) {
         obvArray.push(currentOBV);
         continue;
       }
-      
+
       if (current.adjusted_close > previous.adjusted_close) {
-        currentOBV += current.volume;
+        currentOBV += vol;
       } else if (current.adjusted_close < previous.adjusted_close) {
-        currentOBV -= current.volume;
+        currentOBV -= vol;
       }
       obvArray.push(currentOBV);
     }

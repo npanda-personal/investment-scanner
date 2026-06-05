@@ -51,11 +51,18 @@ function serviceWithSignals(signals: SignalResultDto[]) {
 
 describe('signal quality lab service', () => {
   it('calculates forward returns and max favorable/adverse moves', () => {
+    // CB-10: entry is at T+1 (bar after signal day).
+    // prices[0] = 2026-01-02, adjustedClose=100 (signal day, T+0)
+    // prices[1] = 2026-01-03, adjustedClose=101 (entry bar, T+1)
+    // 1D: (prices[2] - prices[1]) / prices[1] = (102 - 101) / 101 ≈ 0.0099
+    // 60D: prices[61].adjustedClose=161, return = (161-101)/101 ≈ 0.594
+    // maxFavorable = max path return = (161-101)/101 ≈ 0.594 (all prices rise monotonically)
+    // maxAdverse = min path return = 0 (window[0]=entry itself)
     const service = serviceWithSignals([]);
     const outcome = service.calculateOutcome(baseSignal(), prices);
-    expect(outcome.outcomes.find((item) => item.horizon === '1D')).toMatchObject({ available: true, forwardReturnPercent: 0.01 });
+    expect(outcome.outcomes.find((item) => item.horizon === '1D')).toMatchObject({ available: true, forwardReturnPercent: expect.closeTo(0.0099, 3) });
     expect(outcome.outcomes.find((item) => item.horizon === '60D')?.available).toBe(true);
-    expect(outcome.maxFavorableMovePercent).toBeCloseTo(0.6);
+    expect(outcome.maxFavorableMovePercent).toBeCloseTo(0.594, 2);
     expect(outcome.maxAdverseMovePercent).toBe(0);
     expect(outcome.maxDrawdownPercent).toBe(0);
   });
@@ -339,6 +346,11 @@ describe('signal quality lab service', () => {
   });
 
   it('keeps selected long-horizon evidence unavailable when only shorter horizons are mature', async () => {
+    // CB-10: entry is at T+1, so horizon availability shifts by one bar.
+    // With 7 rows: prices[0]=signal day, prices[1]=T+1 entry, prices[2]=1D, ..., prices[6]=5D.
+    // 1D available (window[1]=prices[2] ✓), 5D available (window[5]=prices[6] ✓),
+    // 20D NOT available (window[20]=prices[21] is missing).
+    // Old fixture used 6 rows (only enough for 1D under T+0); 7 rows are needed for 5D under T+1.
     const service = new SignalQualityLabService(
       {} as any,
       {
@@ -347,7 +359,7 @@ describe('signal quality lab service', () => {
       } as any,
       {
         listPricesByInstrumentId: jest.fn().mockResolvedValue({
-          prices: prices.slice(0, 6).map((price) => ({ date: price.date, adjusted_close: price.adjustedClose })),
+          prices: prices.slice(0, 7).map((price) => ({ date: price.date, adjusted_close: price.adjustedClose })),
         }),
       } as any,
       { regimeForDate: jest.fn().mockResolvedValue(null) } as any
@@ -554,6 +566,16 @@ describe('signal quality lab service', () => {
   });
 
   it('detects failed bullish, failed bearish, low confidence, stale, and flip noise', () => {
+    // CB-10: entry is at T+1 (bar after signal day).
+    // For FAILED_HIGH_SCORE_BULLISH/FAILED_BEARISH to fire, the 10D outcome must be
+    // available, which requires window[10] to exist. Under T+1 the window starts at
+    // prices[1] (T+1 entry), so window[10] = prices[11] — 12 rows total are needed.
+    //
+    // failedBullish fixture: prices[0]=signal day (100), prices[1]=T+1 entry (100),
+    //   prices[2..11]=95 (loss). entry=100, 10D=(95-100)/100=-0.05 < -0.03 → fires.
+    // failedBearish fixture: prices[0]=signal day (100), prices[1]=T+1 entry (100),
+    //   prices[2..11]=105 (gain). entry=100, 10D=(105-100)/100=0.05 > 0.03 → fires.
+    // LOW_CONFIDENCE_SIGNAL fires once 10D is available on the failedBullish outcome.
     const service = serviceWithSignals([]);
     const signals = [
       baseSignal({ id: 's1', direction: 'BULLISH', generated_at: new Date().toISOString(), confidence: 'LOW', score: 90 }),
@@ -563,12 +585,16 @@ describe('signal quality lab service', () => {
       baseSignal({ id: 's5', direction: 'BEARISH', generated_at: new Date(Date.now() - 10 * 86400000).toISOString() }),
     ];
     const failedBullish = service.calculateOutcome(signals[0], [
+      // prices[0] = T+0 signal day; prices[1] = T+1 entry (same price); prices[2..11] = loss
       { date: signals[0].generated_at, adjustedClose: 100 },
-      ...Array.from({ length: 10 }).map((_, i) => ({ date: new Date(Date.now() + (i + 1) * 86400000).toISOString(), adjustedClose: 95 })),
+      { date: new Date(Date.now() + 1 * 86400000).toISOString(), adjustedClose: 100 },
+      ...Array.from({ length: 10 }).map((_, i) => ({ date: new Date(Date.now() + (i + 2) * 86400000).toISOString(), adjustedClose: 95 })),
     ]);
     const failedBearish = service.calculateOutcome(signals[1], [
+      // prices[0] = T+0 signal day; prices[1] = T+1 entry (same price); prices[2..11] = gain
       { date: signals[1].generated_at, adjustedClose: 100 },
-      ...Array.from({ length: 10 }).map((_, i) => ({ date: new Date(Date.now() + (i + 1) * 86400000).toISOString(), adjustedClose: 105 })),
+      { date: new Date(Date.now() + 1 * 86400000).toISOString(), adjustedClose: 100 },
+      ...Array.from({ length: 10 }).map((_, i) => ({ date: new Date(Date.now() + (i + 2) * 86400000).toISOString(), adjustedClose: 105 })),
     ]);
     const noisy = service.detectNoisySignals(signals, [failedBullish, failedBearish]);
     expect(noisy.map((item) => item.issueType)).toEqual(expect.arrayContaining(['DIRECTION_FLIPS', 'FAILED_HIGH_SCORE_BULLISH', 'FAILED_BEARISH', 'LOW_CONFIDENCE_SIGNAL']));

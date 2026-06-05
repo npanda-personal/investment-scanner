@@ -386,6 +386,11 @@ model SignalOutcome {
   maxAdverseExcursion   Float?
   maxDrawdownPercent    Float?
 
+  /// CB-8: same-horizon Nifty 50 (^NSEI) return for the entry window (null when ^NSEI data unavailable)
+  benchmarkReturnPercent Float?
+  /// CB-8: signal return minus benchmark return (alpha); null when benchmarkReturnPercent is null
+  alphaPercent           Float?
+
   evaluatedAt DateTime @default(now())
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

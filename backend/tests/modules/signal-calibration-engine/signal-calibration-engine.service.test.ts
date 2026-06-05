@@ -871,3 +871,62 @@ describe('signal calibration engine service', () => {
     expect(setup.repository.create).not.toHaveBeenCalled();
   });
 });
+
+// ── CB-4: calibration direction label cut-points match engine thresholds ──────
+
+describe('CB-4 calibration direction cut-points unified with engine (BULLISH>=60 / BEARISH<=40)', () => {
+  // calibratedDirection is derived from calibratedScore (after boosts/penalties).
+  // We use INSUFFICIENT_SAMPLE context (0 evaluated samples) so calibrationApplied=false
+  // and calibratedScore == rawScore, giving us a clean 1:1 mapping to test the cut-points.
+  const noCalibrationContext = (): CalibrationContext => context({
+    horizonAvailability: {
+      '1D': { eligible: 0, evaluated: 0, insufficientFuturePrice: 0 },
+      '5D': { eligible: 0, evaluated: 0, insufficientFuturePrice: 0 },
+      '10D': { eligible: 0, evaluated: 0, insufficientFuturePrice: 0 },
+      '20D': { eligible: 0, evaluated: 0, insufficientFuturePrice: 0 },
+      '60D': { eligible: 0, evaluated: 0, insufficientFuturePrice: 0 },
+    },
+    evaluationDiagnostics: { evaluatedSignals: 0 },
+    signalTypeMetrics: new Map(),
+    scoreBucketMetric: null,
+    sectorMetric: null,
+  });
+
+  it('calibratedScore == rawScore when calibration is not applied (passthrough)', () => {
+    const svc = service().instance;
+    const result = svc.calibrate(rawSignal({ score: 65 }), noCalibrationContext());
+    // With INSUFFICIENT_SAMPLE evidence, calibration is not applied → calibratedScore = rawScore
+    expect(result.calibrationApplied).toBe(false);
+    expect(result.calibratedScore).toBe(result.rawScore);
+  });
+
+  it('calibratedDirection matches calibratedScore using BULLISH>=60 cut-point', () => {
+    const svc = service().instance;
+    // Use a score well above the old 70-threshold but in the 60-69 zone
+    // With no calibration applied, calibratedScore == rawScore → direction test is clean
+    const result65 = svc.calibrate(rawSignal({ score: 65 }), noCalibrationContext());
+    expect(result65.calibratedScore).toBe(65);
+    expect(result65.calibratedDirection).toBe('BULLISH'); // old code would give NEUTRAL (cut was 70)
+  });
+
+  it('calibratedDirection is NEUTRAL for calibratedScore in 41-59 band', () => {
+    const svc = service().instance;
+    const result50 = svc.calibrate(rawSignal({ score: 50 }), noCalibrationContext());
+    expect(result50.calibratedScore).toBe(50);
+    expect(result50.calibratedDirection).toBe('NEUTRAL');
+  });
+
+  it('calibratedDirection is BEARISH for calibratedScore at 40', () => {
+    const svc = service().instance;
+    const result40 = svc.calibrate(rawSignal({ score: 40 }), noCalibrationContext());
+    expect(result40.calibratedScore).toBe(40);
+    expect(result40.calibratedDirection).toBe('BEARISH');
+  });
+
+  it('calibratedDirection is BULLISH for calibratedScore at 60', () => {
+    const svc = service().instance;
+    const result60 = svc.calibrate(rawSignal({ score: 60 }), noCalibrationContext());
+    expect(result60.calibratedScore).toBe(60);
+    expect(result60.calibratedDirection).toBe('BULLISH');
+  });
+});

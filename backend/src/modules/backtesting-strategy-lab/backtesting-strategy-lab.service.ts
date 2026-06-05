@@ -12,6 +12,30 @@ import { StrategyFrameworkEvaluator, StrategyFrameworkRegistry, StrategyFramewor
 const ANNUAL_RISK_FREE_RATE_IN = 0.065;
 /** Daily risk-free rate derived from the annual constant (continuous approximation). */
 const DAILY_RISK_FREE_RATE = ANNUAL_RISK_FREE_RATE_IN / 252;
+
+/**
+ * CB-12 — India delivery-equity transaction cost model.
+ *
+ * Realistic one-way components (NSE/BSE delivery trade, FY-2024 rates):
+ *   STT (sell-side only)               0.1000 %
+ *   Exchange transaction charge (NSE)  0.0035 %
+ *   SEBI turnover fee                  0.0001 %
+ *   Stamp duty (buy-side only)         0.0150 %
+ *   GST on brokerage+exchange charges  0.0007 % (approx)
+ *   Brokerage (discount broker, cap)   0.0300 % (typical per leg)
+ *   DP (demat) charge per sell trade   ~₹15–20 flat → ~0.0050 % on ₹30 000 avg
+ *   ─────────────────────────────────────────────────────────────
+ *   Approximate one-way               ~0.15–0.22 %
+ *   Round-trip (entry + exit)          0.30–0.44 %  → default 0.225 % per leg
+ *
+ * DEFAULT_INDIA_ONE_WAY_COST_PERCENT = 0.00225 (0.225 % per leg)
+ * Round-trip total ≈ 0.45 % — consistent with CB-12 requirement (0.35–0.55 %).
+ *
+ * This constant is used as the default `transactionCostPercent` when the
+ * caller does not specify a cost and the region is 'IN'.  Callers may override
+ * it by setting `config.transactionCostPercent` explicitly.
+ */
+export const DEFAULT_INDIA_ONE_WAY_COST_PERCENT = 0.00225; // 0.225 % per leg → 0.45 % round-trip
 import {
   BREADTH_WEAK_THRESHOLD,
   BREADTH_VERY_WEAK_THRESHOLD,
@@ -257,8 +281,24 @@ export class BacktestingStrategyLabService {
     const minBars = this.isRegisteredConfig(config) ? this.minimumBarsForTimeframe(config.timeframe) : 21;
     for (const instrument of instruments) {
       const response = await this.marketDataService.listPricesByInstrumentId(instrument.instrumentId, 5000, new Date(config.startDate), new Date(config.endDate)).catch(() => null);
+      // CB-13: include OHLC fields so stop checks can use bar low/high for intrabar gaps.
+      // Prefer adjusted fields (adjusted_open, adjusted_high, adjusted_low, adjusted_close)
+      // where available; fall back to raw OHLC; use close as fallback for open/high/low.
       const bars = (response?.prices || [])
-        .map((price: any) => ({ date: new Date(price.date).toISOString().slice(0, 10), close: Number(price.adjusted_close ?? price.close), volume: price.volume !== null && price.volume !== undefined ? Number(price.volume) : null }))
+        .map((price: any) => {
+          const close = Number(price.adjusted_close ?? price.close);
+          const open = price.adjusted_open ?? price.open ?? close;
+          const high = price.adjusted_high ?? price.high ?? close;
+          const low = price.adjusted_low ?? price.low ?? close;
+          return {
+            date: new Date(price.date).toISOString().slice(0, 10),
+            open: Number.isFinite(Number(open)) ? Number(open) : close,
+            high: Number.isFinite(Number(high)) ? Number(high) : close,
+            low: Number.isFinite(Number(low)) ? Number(low) : close,
+            close,
+            volume: price.volume !== null && price.volume !== undefined ? Number(price.volume) : null,
+          };
+        })
         .filter((bar: HistoricalBar) => Number.isFinite(bar.close))
         .sort((a: HistoricalBar, b: HistoricalBar) => a.date.localeCompare(b.date));
       if (bars.length === 0) missingPriceHistoryCount += 1;
@@ -344,7 +384,8 @@ export class BacktestingStrategyLabService {
             ...registeredExit.invalidationRulesTriggered,
             ...registeredExit.reasons,
           ]) : [];
-          const trade = this.closePosition(config, position, bar, exit.reason, exitReasons);
+          // CB-13: pass stopFillPrice so intrabar stop/TP uses the correct fill price
+          const trade = this.closePosition(config, position, bar, exit.reason, exitReasons, exit.stopFillPrice);
           cash += this.exitCash(config, position.quantity, trade.exitPrice);
           trades.push(trade);
           positions.delete(history.instrumentId);
@@ -565,11 +606,65 @@ export class BacktestingStrategyLabService {
     return this.exitDecision(config, bars, index, position).exit;
   }
 
-  private exitDecision(config: BacktestStrategyConfig, bars: HistoricalBar[], index: number, position: Position, regimeIndex?: RegimeSnapshotRow[]): { exit: boolean; reason: string } {
-    const close = bars[index].close;
-    if (typeof config.stopLossPercent === 'number' && close <= position.entryPrice * (1 - config.stopLossPercent)) return { exit: true, reason: EXIT_REASONS.STOP_LOSS };
-    if (typeof config.trailingStopPercent === 'number' && close <= position.highestClose * (1 - config.trailingStopPercent)) return { exit: true, reason: EXIT_REASONS.TRAILING_STOP };
-    if (typeof config.takeProfitPercent === 'number' && close >= position.entryPrice * (1 + config.takeProfitPercent)) return { exit: true, reason: EXIT_REASONS.TAKE_PROFIT };
+  /**
+   * CB-13 — Intrabar stop/profit detection.
+   *
+   * Previously all stop checks used bar EOD close, meaning a stop triggered
+   * only when the *closing* price crossed the level.  Intraday gaps and
+   * whipsaws were never captured.
+   *
+   * Now:
+   *   - Stop-loss (long): triggered if bar LOW <= stopLevel.
+   *     If bar OPEN already <= stopLevel (gap-down through), fill at OPEN
+   *     (realistic — market opened below the stop, best fill is the open).
+   *     Otherwise fill at stopLevel.
+   *   - Trailing stop (long): same logic using bar LOW vs trailingLevel.
+   *   - Take-profit (long): triggered if bar HIGH >= takeProfitLevel;
+   *     if OPEN already >= takeProfitLevel, fill at OPEN; else at the level.
+   *
+   * The fill price override is returned in `stopFillPrice` and used by
+   * `closePosition` to override the default close-based slippage fill.
+   * When `stopFillPrice` is undefined, behaviour is unchanged (use close).
+   */
+  private exitDecision(
+    config: BacktestStrategyConfig,
+    bars: HistoricalBar[],
+    index: number,
+    position: Position,
+    regimeIndex?: RegimeSnapshotRow[],
+  ): { exit: boolean; reason: string; stopFillPrice?: number } {
+    const bar = bars[index];
+    const close = bar.close;
+    // CB-13: use bar low/high for intrabar stop detection.
+    // Fall back to close when low/high are absent (e.g. tests with close-only bars).
+    const barLow  = (typeof bar.low  === 'number' && Number.isFinite(bar.low)  && bar.low  > 0) ? bar.low  : close;
+    const barHigh = (typeof bar.high === 'number' && Number.isFinite(bar.high) && bar.high > 0) ? bar.high : close;
+    const barOpen = (typeof bar.open === 'number' && Number.isFinite(bar.open) && bar.open > 0) ? bar.open : close;
+
+    if (typeof config.stopLossPercent === 'number') {
+      const stopLevel = position.entryPrice * (1 - config.stopLossPercent);
+      if (barLow <= stopLevel) {
+        // Gap-down through stop: fill at open (worse than stop level).
+        const fillPrice = barOpen <= stopLevel ? barOpen : stopLevel;
+        return { exit: true, reason: EXIT_REASONS.STOP_LOSS, stopFillPrice: fillPrice };
+      }
+    }
+    if (typeof config.trailingStopPercent === 'number') {
+      const trailingLevel = position.highestClose * (1 - config.trailingStopPercent);
+      if (barLow <= trailingLevel) {
+        const fillPrice = barOpen <= trailingLevel ? barOpen : trailingLevel;
+        return { exit: true, reason: EXIT_REASONS.TRAILING_STOP, stopFillPrice: fillPrice };
+      }
+    }
+    if (typeof config.takeProfitPercent === 'number') {
+      const tpLevel = position.entryPrice * (1 + config.takeProfitPercent);
+      if (barHigh >= tpLevel) {
+        // Gap-up through take-profit: fill at open (better than TP level for buyer,
+        // but use open as the realistic fill when gap-through occurs).
+        const fillPrice = barOpen >= tpLevel ? barOpen : tpLevel;
+        return { exit: true, reason: EXIT_REASONS.TAKE_PROFIT, stopFillPrice: fillPrice };
+      }
+    }
     if (typeof config.maxHoldingDays === 'number' && index - position.entryBarIndex >= config.maxHoldingDays) return { exit: true, reason: EXIT_REASONS.MAX_HOLDING_PERIOD };
     if (config.strategyCode) {
       const registered = this.evaluateRegisteredStrategy(config, bars, index, true, position, regimeIndex);
@@ -649,12 +744,27 @@ export class BacktestingStrategyLabService {
       const detail = await this.watchlistService.detail(config.universe.watchlistId);
       return { instruments: (detail?.items || []).map((item: any) => ({ instrumentId: item.instrumentId, symbol: item.symbol })) };
     }
-    // Fix #11 (universe ALL): sort by market-cap descending (largest-cap first)
-    // instead of the default alphabetical sort.  This reduces alphabetical
-    // selection bias and gives a more representative sample of large/mid-cap
-    // stocks that are more likely to have had continuous listings.
-    // Note: today's survivors only — no delisted/historical instruments — so a
-    // CRITICAL survivorship-bias warning is always surfaced in realismWarnings.
+    // CB-9 / Fix #11 (universe ALL): sort by market-cap descending (largest-cap first)
+    // to reduce alphabetical selection bias.
+    //
+    // Point-in-time membership limitation (CB-9):
+    //   The catalog only contains currently-active instruments.  Stocks that were
+    //   in the top-50 during the backtest window but have since been delisted
+    //   (mergers, failures, suspensions) are absent from this query — they are NOT
+    //   hard-excluded by any code here, but they simply do not appear in the DB.
+    //   As a result: universe ALL implicitly excludes failed stocks that would have
+    //   dragged returns, overstating historical performance (survivorship bias).
+    //
+    //   Full point-in-time membership is not available without a dedicated
+    //   historical-constituents table.  Minimum viable fix (CB-9):
+    //     (a) surface a granular SURVIVORSHIP_BIAS_UNIVERSE warning with impact context;
+    //     (b) do NOT actively filter out any instrument based on listing status —
+    //         any instrument in the DB that has price history in the window is included.
+    //
+    //   Instruments with price history in the window are already included regardless
+    //   of current listing status because the price-history fetch (listPricesByInstrumentId)
+    //   is keyed on instrumentId, not current listing state.  The only gap is stocks
+    //   that are BOTH delisted AND absent from the current instrument catalog.
     const cap = 50;
     const result = await this.marketDataService.listInstruments({
       page: 1,
@@ -802,11 +912,19 @@ export class BacktestingStrategyLabService {
         fixedAmountPerTrade: config.fixedAmountPerTrade,
       });
     }
+    const effectiveRegion = config.region || config.universe.region || 'IN';
+    // CB-12: apply India delivery-equity cost default (0.225 % per leg = 0.45 % round-trip)
+    // when the caller has not set transactionCostPercent explicitly.
+    // The original flat 0.1 % (0.001) understated STT + exchange + SEBI + stamp + GST + DP.
+    const effectiveCostPercent = (config.transactionCostPercent !== undefined && config.transactionCostPercent !== null)
+      ? config.transactionCostPercent
+      : (effectiveRegion.toUpperCase() === 'IN' ? DEFAULT_INDIA_ONE_WAY_COST_PERCENT : 0.001);
     const normalized = {
       ...config,
       mode: config.strategyCode ? 'REGISTERED_STRATEGY' : config.mode || 'CUSTOM_RULES',
-      region: config.region || config.universe.region || 'IN',
+      region: effectiveRegion,
       assetType: config.assetType || config.universe.assetType || 'STOCK',
+      transactionCostPercent: effectiveCostPercent,
     };
     if (this.isRegisteredConfig(normalized)) {
       const strategy = this.strategyRegistry.get(normalized.strategyCode!);
@@ -871,17 +989,56 @@ export class BacktestingStrategyLabService {
     return 'RESEARCH_ONLY';
   }
 
+  /**
+   * CB-14 — Wilder-smoothed RSI (replaces simple-average RS).
+   *
+   * The original implementation computed RS as simple average of gains/losses
+   * over the seed window only — this matches a naive SMA-RS and produces a
+   * different (faster-reacting) RSI than the standard Wilder (EMA-like)
+   * formulation used everywhere else in the signal engine.
+   *
+   * Wilder RSI algorithm:
+   *   1. Seed: use a simple average of the first `period` up/down moves.
+   *   2. Smooth: for each subsequent bar apply Wilder's EMA:
+   *      avgGain = (prevAvgGain * (period-1) + currentGain) / period
+   *      avgLoss = (prevAvgLoss * (period-1) + currentLoss) / period
+   *   3. RSI = 100 - 100 / (1 + avgGain / avgLoss)
+   *
+   * `values` is ordered latest-first (index 0 = most recent close).
+   * We need at least `period * 2 + 1` values to produce a smoothed result.
+   */
   private rsiFromLatestFirst(values: number[], period: number): number | null {
-    if (values.length <= period) return null;
-    let gains = 0;
-    let losses = 0;
-    for (let i = 0; i < period; i++) {
-      const diff = values[i] - values[i + 1];
-      if (diff >= 0) gains += diff;
-      else losses += Math.abs(diff);
+    // Need at least period+1 price points to get period deltas for seed,
+    // plus an additional period bars for the Wilder smoothing pass.
+    // Minimum required: 2 * period + 1 values (oldest first after reversal).
+    if (values.length < period + 1) return null;
+
+    // Reverse to chronological order (oldest first) for the calculation.
+    const chronological = [...values].reverse();
+    const n = chronological.length;
+
+    // Compute all up/down moves.
+    const changes = chronological.slice(1).map((v, i) => v - chronological[i]);
+
+    // Seed: simple average of first `period` moves.
+    const seedChanges = changes.slice(0, period);
+    let avgGain = seedChanges.reduce((s, d) => s + Math.max(0, d), 0) / period;
+    let avgLoss = seedChanges.reduce((s, d) => s + Math.max(0, -d), 0) / period;
+
+    // Wilder smoothing: apply EMA over the remaining moves.
+    const smoothed = changes.slice(period);
+    for (const delta of smoothed) {
+      const gain = Math.max(0, delta);
+      const loss = Math.max(0, -delta);
+      avgGain = (avgGain * (period - 1) + gain) / period;
+      avgLoss = (avgLoss * (period - 1) + loss) / period;
     }
-    if (losses === 0) return 100;
-    const rs = (gains / period) / (losses / period);
+
+    // Edge: fewer than the full seed bars available (shouldn't happen given
+    // the length guard above, but guard anyway).
+    if (n <= period) return null;
+    if (avgLoss === 0) return 100;
+    const rs = avgGain / avgLoss;
     return 100 - (100 / (1 + rs));
   }
 
@@ -921,8 +1078,16 @@ export class BacktestingStrategyLabService {
     };
   }
 
-  private closePosition(config: BacktestStrategyConfig, position: Position, bar: HistoricalBar, exitReason: string, exitReasons: string[] = []): BacktestTrade {
-    const exitPrice = this.applyExitSlippage(bar.close, config);
+  /**
+   * CB-13: `stopFillPrice` overrides the default bar-close slippage fill.
+   * Used when a stop or take-profit fires intrabar (bar low/high triggered),
+   * so the exit fills at the stop level (or open, if gap-through).
+   */
+  private closePosition(config: BacktestStrategyConfig, position: Position, bar: HistoricalBar, exitReason: string, exitReasons: string[] = [], stopFillPrice?: number): BacktestTrade {
+    // CB-13: when a stop/TP intrabar fill price is known, use it directly
+    // (no additional slippage — the price already reflects the realistic fill).
+    // For EOD close exits, apply the usual slippage.
+    const exitPrice = stopFillPrice !== undefined ? stopFillPrice : this.applyExitSlippage(bar.close, config);
     const gross = position.quantity * (exitPrice - position.entryPrice);
     const exitCost = position.quantity * exitPrice * config.transactionCostPercent;
     const net = gross - position.cost - exitCost;
@@ -1141,7 +1306,8 @@ export class BacktestingStrategyLabService {
             ...registeredExit.invalidationRulesTriggered,
             ...registeredExit.reasons,
           ]) : [];
-          const trade = this.closePosition(config, position, bar, exit.reason, exitReasons);
+          // CB-13: pass stopFillPrice for intrabar stop fills
+          const trade = this.closePosition(config, position, bar, exit.reason, exitReasons, exit.stopFillPrice);
           cash += this.exitCash(config, position.quantity, trade.exitPrice);
           trades.push(trade);
           positions.delete(history.instrumentId);
@@ -1386,9 +1552,27 @@ export class BacktestingStrategyLabService {
       const pct = totalBarCount > 0 ? Math.round((regimeMissingBarCount / totalBarCount) * 100) : 0;
       warnings.push(`REGIME_UNAVAILABLE: ${regimeMissingBarCount} of ${totalBarCount} instrument-bars (${pct}%) had no market-regime snapshot — marketGate was UNKNOWN, blocking gated strategy entries.`);
     }
-    // Fix #11: CRITICAL survivorship warning when universe ALL is used
+    // CB-9 / Fix #11: CRITICAL survivorship warning when universe ALL is used.
+    // The catalog contains only currently-active instruments, so stocks that
+    // were in the index during the backtest window but have since been delisted
+    // (merger targets, insolvencies, suspensions) are absent from the universe.
+    // These excluded names would typically have dragged returns — their absence
+    // causes the backtest to overstate historical performance.
+    // Minimum viable fix applied: no instruments are ACTIVELY hard-excluded by
+    // listing status; any stock present in the DB with price history in the window
+    // is included.  The remaining gap (stocks delisted AND missing from the catalog)
+    // cannot be filled without a historical-constituents table.
     if (config?.universe?.type === 'ALL') {
-      warnings.push('CRITICAL: universe ALL uses only currently-active instruments (today\'s survivors). Delisted or failed stocks are excluded. Results are subject to survivorship bias and may materially overstate historical performance.');
+      warnings.push(
+        'SURVIVORSHIP_BIAS_UNIVERSE: universe ALL is constructed from today\'s active instruments only. ' +
+        'Stocks that were active during the backtest window but have since been delisted, suspended, or ' +
+        'acquired are absent from the catalog and cannot be included. ' +
+        'This survivorship bias likely overstates historical returns — delisted names disproportionately ' +
+        'include failed stocks with negative returns. ' +
+        'Any instrument present in the price database with history in the window IS included regardless ' +
+        'of current listing status; the gap is stocks absent from the instrument catalog entirely. ' +
+        'For point-in-time accuracy a historical-constituents table is required (not yet available).'
+      );
     }
     // Honest-labeling #48(1): PRICE_PROXY_CONTEXT warning for strategies that depend
     // on sectorLeadership / smartMoneyStatus — both are approximated from price proxies

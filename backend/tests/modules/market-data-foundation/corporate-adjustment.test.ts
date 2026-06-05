@@ -3,6 +3,7 @@ import {
   computeAdjustedCloses,
   AdjustmentAction,
   RawBar,
+  DISCONTINUITY_TYPES,
 } from '../../../src/modules/market-data-foundation/market-data-foundation.corporate-adjustment';
 
 // ---------------------------------------------------------------------------
@@ -667,5 +668,237 @@ describe('computeAdjustedCloses – numeric precision with many chained actions'
 
     expect(byDate['2014-12-31'].adjustedClose).toBeCloseTo(1, 5);
     expect(byDate['2025-01-01'].adjustedClose).toBe(1); // reference unchanged
+  });
+});
+
+// ---------------------------------------------------------------------------
+// CB-15: Rights issue — TERP adjustment
+// ---------------------------------------------------------------------------
+
+describe('computeAdjustedCloses – CB-15 rights TERP adjustment', () => {
+  /**
+   * Setup:
+   *   rights exDate: 2024-06-01
+   *   rightsRatio   = 2/5 = 0.4   (2 rights shares per 5 existing)
+   *   issuePrice    = 50           (subscription price per share)
+   *   C_prev        = 200          (close of 2024-05-31, last bar before exDate)
+   *
+   * TERP = (200 + 50 × 0.4) / (1 + 0.4)
+   *      = (200 + 20) / 1.4
+   *      = 220 / 1.4
+   *      ≈ 157.142857
+   *
+   * factor = 157.142857 / 200 ≈ 0.785714
+   *
+   * Bars BEFORE 2024-06-01 → × factor ≈ 0.7857
+   * Bars ON/AFTER 2024-06-01 → × 1 (unchanged)
+   */
+
+  const rightsRatio = 2 / 5;
+  const issuePrice = 50;
+  const cPrev = 200;
+  const terp = (cPrev + issuePrice * rightsRatio) / (1 + rightsRatio);
+  const expectedFactor = terp / cPrev; // 220/280 ≈ 0.785714
+
+  const actions: AdjustmentAction[] = [
+    { type: 'rights', exDate: d('2024-06-01'), rightsRatio, issuePrice },
+  ];
+
+  const bars: RawBar[] = [
+    bar('2024-05-29', 198),
+    bar('2024-05-30', 199),
+    bar('2024-05-31', cPrev), // C_prev
+    bar('2024-06-01', 158),   // ex-rights bar (reference)
+    bar('2024-06-02', 160),
+  ];
+
+  it('applies TERP factor to bars strictly before ex-date', () => {
+    const { bars: result, warnings } = computeAdjustedCloses(bars, actions);
+    expect(warnings).toHaveLength(0);
+
+    const byDate = Object.fromEntries(result.map((b) => [b.date.toISOString().slice(0, 10), b]));
+
+    expect(byDate['2024-05-29'].adjustedClose).toBeCloseTo(r6(198 * expectedFactor), 5);
+    expect(byDate['2024-05-30'].adjustedClose).toBeCloseTo(r6(199 * expectedFactor), 5);
+    expect(byDate['2024-05-31'].adjustedClose).toBeCloseTo(r6(cPrev * expectedFactor), 5);
+  });
+
+  it('leaves the ex-date bar and later bars unchanged', () => {
+    const { bars: result } = computeAdjustedCloses(bars, actions);
+    const byDate = Object.fromEntries(result.map((b) => [b.date.toISOString().slice(0, 10), b]));
+
+    expect(byDate['2024-06-01'].adjustedClose).toBe(158);
+    expect(byDate['2024-06-02'].adjustedClose).toBe(160);
+  });
+
+  it('TERP factor is ≤1 when issuePrice < C_prev (rights always dilute)', () => {
+    expect(expectedFactor).toBeGreaterThan(0);
+    expect(expectedFactor).toBeLessThanOrEqual(1);
+  });
+
+  it('shows no artificial adjusted-close gap across the ex-date (TERP continuity)', () => {
+    // adj(2024-05-31) = 200 × factor ≈ TERP = 157.14
+    // adj(2024-06-01) = 158 (ex-rights, close approximately at TERP)
+    // In a perfect market: adj(May-31) ≈ adj(Jun-01), proving the factor was correct.
+    const { bars: result } = computeAdjustedCloses(bars, actions);
+    const byDate = Object.fromEntries(result.map((b) => [b.date.toISOString().slice(0, 10), b]));
+
+    const adjPrev = byDate['2024-05-31'].adjustedClose;
+    // adj(May-31) should equal TERP (up to rounding)
+    expect(adjPrev).toBeCloseTo(terp, 3);
+  });
+
+  it('skips factor and warns when no prior bar exists', () => {
+    const noPriorActions: AdjustmentAction[] = [
+      { type: 'rights', exDate: d('2024-06-01'), rightsRatio, issuePrice },
+    ];
+    // All bars are on or after exDate
+    const noPriorBars: RawBar[] = [bar('2024-06-01', 158), bar('2024-06-02', 160)];
+
+    const { bars: result, warnings } = computeAdjustedCloses(noPriorBars, noPriorActions);
+    expect(warnings.length).toBeGreaterThanOrEqual(1);
+    expect(warnings[0]).toMatch(/no prior bar/i);
+    result.forEach((b) => expect(b.adjustedClose).toBe(b.close));
+  });
+
+  it('skips factor and warns when issuePrice > C_prev (invalid input)', () => {
+    const badActions: AdjustmentAction[] = [
+      { type: 'rights', exDate: d('2024-06-01'), rightsRatio, issuePrice: 300 }, // 300 > 200
+    ];
+    const { bars: result, warnings } = computeAdjustedCloses(bars, badActions);
+    expect(warnings.length).toBeGreaterThanOrEqual(1);
+    expect(warnings[0]).toMatch(/issuePrice.*prior close|prior close/i);
+    result.forEach((b) => expect(b.adjustedClose).toBe(b.close));
+  });
+
+  it('idempotency: running the same rights action twice produces the same output', () => {
+    // Passing the same action twice would double-apply the factor IF NOT idempotent.
+    // Our implementation accumulates by exDate, so two actions on the same date
+    // multiply the factors — this is consistent with split+dividend same-date behavior.
+    // The test confirms bars are stable when the function is called twice on the SAME input.
+    const { bars: r1 } = computeAdjustedCloses(bars, actions);
+    const { bars: r2 } = computeAdjustedCloses(bars, actions);
+    r1.forEach((b, i) => {
+      expect(b.adjustedClose).toBeCloseTo(r2[i].adjustedClose, 6);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// CB-16: Merger / demerger / spinoff / rights_unparseable — discontinuity flags
+// ---------------------------------------------------------------------------
+
+describe('computeAdjustedCloses – CB-16 structural-break events produce discontinuityFlags', () => {
+  const barsArr: RawBar[] = [
+    bar('2023-07-05', 1000),
+    bar('2023-07-06', 980),
+    bar('2023-07-10', 500), // post-demerger (structural break)
+    bar('2023-07-11', 510),
+  ];
+
+  it('demerger: emits discontinuityFlag, no factor applied, bars unchanged', () => {
+    const actions: AdjustmentAction[] = [
+      { type: 'demerger', exDate: d('2023-07-10') },
+    ];
+
+    const { bars: result, warnings, discontinuityFlags } = computeAdjustedCloses(barsArr, actions);
+
+    // No numeric adjustment applied
+    result.forEach((b) => expect(b.adjustedClose).toBe(b.close));
+
+    // Warning emitted
+    expect(warnings.length).toBeGreaterThanOrEqual(1);
+    expect(warnings[0]).toMatch(/DISCONTINUITY_FLAG/);
+
+    // Structured flag populated
+    expect(discontinuityFlags).toHaveLength(1);
+    expect(discontinuityFlags[0].actionType).toBe('demerger');
+    expect(discontinuityFlags[0].exDate).toEqual(d('2023-07-10'));
+    expect(discontinuityFlags[0].message).toMatch(/demerger/i);
+  });
+
+  it('merger: emits discontinuityFlag, bars unchanged', () => {
+    const actions: AdjustmentAction[] = [
+      { type: 'merger', exDate: d('2023-07-10') },
+    ];
+
+    const { bars: result, discontinuityFlags } = computeAdjustedCloses(barsArr, actions);
+    result.forEach((b) => expect(b.adjustedClose).toBe(b.close));
+    expect(discontinuityFlags).toHaveLength(1);
+    expect(discontinuityFlags[0].actionType).toBe('merger');
+  });
+
+  it('spinoff: emits discontinuityFlag, bars unchanged', () => {
+    const actions: AdjustmentAction[] = [
+      { type: 'spinoff', exDate: d('2023-07-10') },
+    ];
+
+    const { bars: result, discontinuityFlags } = computeAdjustedCloses(barsArr, actions);
+    result.forEach((b) => expect(b.adjustedClose).toBe(b.close));
+    expect(discontinuityFlags).toHaveLength(1);
+    expect(discontinuityFlags[0].actionType).toBe('spinoff');
+  });
+
+  it('rights_unparseable: emits discontinuityFlag, bars unchanged', () => {
+    const actions: AdjustmentAction[] = [
+      { type: 'rights_unparseable', exDate: d('2023-07-10') },
+    ];
+
+    const { bars: result, discontinuityFlags } = computeAdjustedCloses(barsArr, actions);
+    result.forEach((b) => expect(b.adjustedClose).toBe(b.close));
+    expect(discontinuityFlags).toHaveLength(1);
+    expect(discontinuityFlags[0].actionType).toBe('rights_unparseable');
+  });
+
+  it('multiple discontinuity events accumulate as separate flags', () => {
+    const actions: AdjustmentAction[] = [
+      { type: 'demerger', exDate: d('2023-07-06') },
+      { type: 'merger',   exDate: d('2023-07-10') },
+    ];
+
+    const { discontinuityFlags } = computeAdjustedCloses(barsArr, actions);
+    expect(discontinuityFlags).toHaveLength(2);
+  });
+
+  it('mix of valid action + discontinuity: split factor applied; demerger flagged only', () => {
+    // Split on 2023-07-06 (ratio=2 → factor=0.5)
+    // Demerger on 2023-07-10 (no factor)
+    const actions: AdjustmentAction[] = [
+      { type: 'split',   exDate: d('2023-07-06'), ratio: 2 },
+      { type: 'demerger', exDate: d('2023-07-10') },
+    ];
+
+    const { bars: result, discontinuityFlags, warnings } = computeAdjustedCloses(barsArr, actions);
+
+    // Discontinuity emitted for demerger
+    expect(discontinuityFlags).toHaveLength(1);
+    expect(discontinuityFlags[0].actionType).toBe('demerger');
+
+    // Split factor applied to 2023-07-05 (strictly before 2023-07-06)
+    const byDate = Object.fromEntries(result.map((b) => [b.date.toISOString().slice(0, 10), b]));
+    expect(byDate['2023-07-05'].adjustedClose).toBeCloseTo(500, 5); // 1000 × 0.5
+    // 2023-07-06 is ON split exDate → NOT affected by split; demerger has no factor
+    expect(byDate['2023-07-06'].adjustedClose).toBe(980);
+    // No split warning (only demerger discontinuity)
+    const nonDiscontinuityWarnings = warnings.filter((w) => !w.includes('DISCONTINUITY_FLAG'));
+    expect(nonDiscontinuityWarnings).toHaveLength(0);
+  });
+
+  it('empty-bars input returns empty discontinuityFlags', () => {
+    const actions: AdjustmentAction[] = [
+      { type: 'demerger', exDate: d('2023-07-10') },
+    ];
+    const { discontinuityFlags } = computeAdjustedCloses([], actions);
+    expect(discontinuityFlags).toHaveLength(0);
+  });
+
+  it('DISCONTINUITY_TYPES set contains merger, demerger, spinoff, rights_unparseable', () => {
+    expect(DISCONTINUITY_TYPES.has('merger')).toBe(true);
+    expect(DISCONTINUITY_TYPES.has('demerger')).toBe(true);
+    expect(DISCONTINUITY_TYPES.has('spinoff')).toBe(true);
+    expect(DISCONTINUITY_TYPES.has('rights_unparseable')).toBe(true);
+    expect(DISCONTINUITY_TYPES.has('split')).toBe(false);
+    expect(DISCONTINUITY_TYPES.has('bonus')).toBe(false);
+    expect(DISCONTINUITY_TYPES.has('dividend')).toBe(false);
   });
 });

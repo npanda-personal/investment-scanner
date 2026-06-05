@@ -409,4 +409,13 @@ export interface SignalPricePoint {
   close: number;
   adjusted_close: number;
   volume: number | null;
+  /** Corporate-action-adjusted high — present when the price read layer supplies it.
+   *  Falls back to raw `high` in indicators when absent (safe fallback). */
+  adjusted_high?: number | null;
+  /** Corporate-action-adjusted low — present when the price read layer supplies it.
+   *  Falls back to raw `low` in indicators when absent (safe fallback). */
+  adjusted_low?: number | null;
+  /** Corporate-action-adjusted volume (split-factor applied) — present when the
+   *  price read layer supplies it.  Falls back to raw `volume` in indicators. */
+  adjusted_volume?: number | null;
 }

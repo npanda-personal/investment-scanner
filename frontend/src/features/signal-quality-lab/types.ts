@@ -158,6 +158,59 @@ export interface QualityRecalculateRequest {
   to?: string;
 }
 
+// ---------------------------------------------------------------------------
+// Scorecard types (task #12 — Signal Track-Record Scorecard read API)
+// ---------------------------------------------------------------------------
+
+export type WinRateConfidence = 'HIGH' | 'MEDIUM' | 'LOW';
+export type ScorecardGroupBy = 'direction' | 'sector' | 'scoreBucket';
+
+/**
+ * One row in the scorecard — one (horizon x groupKey) combination.
+ * winRateConfidence must be shown alongside winRate; a 60% rate from 22 samples
+ * (LOW) must not be treated the same as one from 500 (HIGH).
+ */
+export interface ScorecardRow {
+  horizon: QualityHorizon;
+  groupKey: string;
+  sampleSize: number;
+  directionalSampleSize: number;
+  winRate: number | null;
+  winRateConfidence: WinRateConfidence | null;
+  avgReturnPercent: number | null;
+  medianReturnPercent: number | null;
+  expectancy: number | null;
+  profitFactor: number | null;
+  avgMaxAdverseExcursion: number | null;
+  avgMaxFavorableExcursion: number | null;
+  bestReturnPercent: number | null;
+  worstReturnPercent: number | null;
+}
+
+/** Per-horizon rollup (all groupBy dimensions collapsed). */
+export interface ScorecardSummary {
+  horizon: QualityHorizon;
+  sampleSize: number;
+  directionalSampleSize: number;
+  winRate: number | null;
+  winRateConfidence: WinRateConfidence | null;
+  avgReturnPercent: number | null;
+  medianReturnPercent: number | null;
+  expectancy: number | null;
+  profitFactor: number | null;
+  avgMaxAdverseExcursion: number | null;
+  avgMaxFavorableExcursion: number | null;
+  bestReturnPercent: number | null;
+  worstReturnPercent: number | null;
+}
+
+export interface ScorecardResponse {
+  groupBy: ScorecardGroupBy;
+  horizon: QualityHorizon | null;
+  rows: ScorecardRow[];
+  summary: ScorecardSummary[];
+}
+
 export interface QualityRecalculateResponse {
   processedCount: number;
   totalCount: number;

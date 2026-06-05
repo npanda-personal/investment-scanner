@@ -3,6 +3,7 @@ import { Alert, Box, Button, Checkbox, Chip, CircularProgress, FormControlLabel,
 import { fetchLatestSignalRun, fetchSignalScreener, fetchTopSignals, runSignals } from '../api/signalGenerationEngineService';
 import type { ReliabilityTier, SignalConfidence, SignalDirection, SignalGenerationRunAudit, SignalResult, SignalRunResponse } from '../types';
 import { MarketRegimeWidget } from '@/features/market-context-intelligence';
+import { SignalTrackRecordPanel } from './SignalTrackRecordPanel';
 import { Link } from 'react-router-dom';
 import { SignalTable } from './SignalTable';
 import { BatchProgressBar, FilterBar, PageHeader, type SortDirection } from '@/shared/components';
@@ -273,6 +274,8 @@ const SignalsDashboardPage: React.FC = () => {
       </Alert>
 
       <MarketRegimeWidget />
+
+      <SignalTrackRecordPanel modelVersion={latestRun?.modelVersion} />
 
       {activeTab === 'screener' && (
         <Box sx={{ mb: 3 }}>

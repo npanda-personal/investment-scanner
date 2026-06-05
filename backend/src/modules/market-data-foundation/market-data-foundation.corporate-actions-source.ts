@@ -19,11 +19,24 @@
  *   - Reverse split: ratio < 1      (e.g. 10:1 reverse → 0.1)
  *   - Dividend: amount = cash Rs per share
  *
- * Rights handling:
- *   Rights issues do NOT have a simple newShares/oldShares ratio — they depend
- *   on take-up rate, premium, etc.  This parser recognises "Rights" subjects,
- *   records a WARNING, and SKIPS the row (does not produce a ParsedCorporateAction
- *   for it).  Callers can inspect the `warnings` array for downstream handling.
+ * Rights handling (CB-15):
+ *   Rights issues use TERP (Theoretical Ex-Rights Price) adjustment.
+ *   TERP = (cum_price + issue_price × rights_ratio) / (1 + rights_ratio)
+ *   where rights_ratio = rightsShares / existingShares (e.g. "2:5 rights" → 2/5).
+ *   factor = TERP / cum_price
+ *   The parser extracts rightsRatio + issuePrice from the NSE subject string.
+ *   The adjustment engine applies TERP using the last bar before the ex-date as
+ *   cum_price (same pattern as dividend C_prev lookup).
+ *   If the ratio or price cannot be parsed, the row is stored as actionType
+ *   'rights_unparseable' so callers can flag/warn rather than silently drop.
+ *
+ * Merger/Demerger/Spin-off handling (CB-16):
+ *   These actions produce a price-series discontinuity that cannot be reliably
+ *   derived from the NSE subject string alone.  The parser recognises them and
+ *   stores them with actionType 'merger', 'demerger', or 'spinoff'.
+ *   The adjustment engine does NOT apply a numeric factor for these types; it
+ *   instead records a DISCONTINUITY_FLAG warning so downstream consumers know
+ *   the series has a structural break at that date.
  */
 
 // ---------------------------------------------------------------------------
@@ -32,10 +45,18 @@
 
 export interface ParsedCorporateAction {
   symbol: string;
-  actionType: 'split' | 'bonus' | 'reverse_split' | 'dividend';
+  actionType: 'split' | 'bonus' | 'reverse_split' | 'dividend' | 'rights' | 'rights_unparseable' | 'merger' | 'demerger' | 'spinoff';
   effectiveDate: Date; // EX-date normalised to UTC midnight
   amount?: number; // cash dividend per share (Rs)
   splitRatio?: number; // newShares / oldShares (same convention as adjustment engine)
+  /**
+   * Rights-specific fields (CB-15).
+   * rightsRatio = rightsShares / existingShares (e.g. 2:5 → 0.4)
+   * issuePrice  = subscription price per rights share (Rs)
+   * Both are present only when actionType === 'rights'.
+   */
+  rightsRatio?: number;
+  issuePrice?: number;
   source: string; // 'NSE_CORPORATE_ACTIONS'
   rawPurpose: string; // original subject string, preserved for audit
 }
@@ -66,11 +87,15 @@ export interface CorporateActionsUpsertFn {
 
 export interface CorporateActionDbInput {
   symbol: string;
-  type: string; // 'split' | 'bonus' | 'reverse_split' | 'dividend'
+  type: string; // 'split' | 'bonus' | 'reverse_split' | 'dividend' | 'rights' | 'rights_unparseable' | 'merger' | 'demerger' | 'spinoff'
   date: string; // ISO date string 'YYYY-MM-DD'
   value: number | string;
   amount?: number | null;
   splitRatio?: number | null;
+  /** Rights-specific (CB-15): rightsShares/existingShares ratio */
+  rightsRatio?: number | null;
+  /** Rights-specific (CB-15): subscription price per rights share (Rs) */
+  issuePrice?: number | null;
   currency?: string | null;
   source: string;
 }
@@ -199,7 +224,25 @@ export type SubjectParseResult =
   | { actionType: 'split'; splitRatio: number }
   | { actionType: 'reverse_split'; splitRatio: number }
   | { actionType: 'dividend'; amount: number }
-  | { actionType: 'rights' }
+  /**
+   * Rights with parseable ratio + issue price (CB-15).
+   * rightsRatio = rightsShares / existingShares (e.g. 2:5 → 0.4).
+   * issuePrice = subscription price per rights share (Rs).
+   * TERP = (cum_price + issuePrice * rightsRatio) / (1 + rightsRatio).
+   * factor = TERP / cum_price  (applied to bars BEFORE exDate by the adjustment engine).
+   */
+  | { actionType: 'rights'; rightsRatio: number; issuePrice: number }
+  /**
+   * Rights recognised but ratio/price could not be extracted.
+   * Stored for audit; adjustment engine emits DISCONTINUITY_FLAG warning.
+   */
+  | { actionType: 'rights_unparseable' }
+  /** Merger — price-series discontinuity; adjustment engine flags, does not factor. */
+  | { actionType: 'merger' }
+  /** Demerger / spin-off — price-series discontinuity; flags, does not factor. */
+  | { actionType: 'demerger' }
+  /** Spin-off — price-series discontinuity; flags, does not factor. */
+  | { actionType: 'spinoff' }
   | null;
 
 export const parseNseSubject = (subject: string): SubjectParseResult => {
@@ -267,11 +310,49 @@ export const parseNseSubject = (subject: string): SubjectParseResult => {
     return null;
   }
 
-  // ── RIGHTS ───────────────────────────────────────────────────────────────
-  // Pattern: "Rights 8:13 @ Premium Rs 4/-"
-  // Rights are not simple splits — return 'rights' sentinel so caller can warn+skip.
+  // ── RIGHTS (CB-15) ───────────────────────────────────────────────────────
+  // NSE patterns:
+  //   "Rights 2:5 @ Premium Rs 150/-"
+  //   "Rights Issue 8:13 @ Rs 4/-"
+  //   "Rights  1:3  @  Premium  Rs  10 per share"
+  //   "Rights Issue"  (no ratio — falls back to unparseable)
+  //
+  // Extraction: ratio A:B (rightsRatio = A/B) and price P.
+  // TERP = (cum_price + P × (A/B)) / (1 + A/B) — applied by adjustment engine.
   if (/\brights?\b/i.test(subject)) {
-    return { actionType: 'rights' };
+    const ratioMatch = subject.match(/(\d+)\s*:\s*(\d+)/);
+    const priceMatch = subject.match(/(?:rs?\.?|re\.?)\s*([\d]+(?:\.\d+)?)/i);
+    if (ratioMatch && priceMatch) {
+      const a = Number(ratioMatch[1]);
+      const b = Number(ratioMatch[2]);
+      const price = Number(priceMatch[1]);
+      if (a > 0 && b > 0 && price >= 0) {
+        return { actionType: 'rights', rightsRatio: a / b, issuePrice: price };
+      }
+    }
+    // Ratio or price not parseable — still store, but mark as unparseable.
+    return { actionType: 'rights_unparseable' };
+  }
+
+  // ── MERGER (CB-16) ───────────────────────────────────────────────────────
+  // NSE patterns: "Merger", "Amalgamation", "Merger/Amalgamation",
+  //               "Scheme of Amalgamation", "Arrangement/Amalgamation"
+  if (/\bmerger\b|\bamalgamation\b|\barrangement\b/i.test(subject)) {
+    // Guard: don't classify demerger/spinoff subjects as merger.
+    if (!/\bdemerger\b|\bspin[\s-]?off\b|\bseparation\b/i.test(subject)) {
+      return { actionType: 'merger' };
+    }
+  }
+
+  // ── DEMERGER / SPIN-OFF (CB-16) ──────────────────────────────────────────
+  // NSE patterns: "Demerger", "Scheme of Demerger", "Spin Off",
+  //               "Demerger/Listing", "Spinoff"
+  if (/\bdemerger\b|\bspin[\s-]?off\b|\bspinoff\b/i.test(subject)) {
+    // Spin-off is a sub-form of demerger; distinguish for clearer flagging.
+    if (/\bspin[\s-]?off\b|\bspinoff\b/i.test(subject)) {
+      return { actionType: 'spinoff' };
+    }
+    return { actionType: 'demerger' };
   }
 
   return null;
@@ -314,14 +395,6 @@ export const parseNseCorporateActionRow = (
       return null;
     }
 
-    if (parsed.actionType === 'rights') {
-      warnings.push(
-        `Row ${rowLabel}: rights issue — ratio is ambiguous (depends on take-up rate & premium); skipped. ` +
-        `Manual review required. Raw subject: "${rawPurpose}".`
-      );
-      return null;
-    }
-
     const action: ParsedCorporateAction = {
       symbol,
       actionType: parsed.actionType,
@@ -332,8 +405,29 @@ export const parseNseCorporateActionRow = (
 
     if (parsed.actionType === 'dividend') {
       action.amount = parsed.amount;
+    } else if (parsed.actionType === 'rights') {
+      // CB-15: store TERP inputs; adjustment engine computes TERP factor using cum_price.
+      action.rightsRatio = parsed.rightsRatio;
+      action.issuePrice = parsed.issuePrice;
+    } else if (parsed.actionType === 'rights_unparseable') {
+      // CB-15 fallback: ratio/price not extractable — store for audit; no factor applied.
+      warnings.push(
+        `Row ${rowLabel}: rights issue — ratio/price not parseable from subject; stored as rights_unparseable. ` +
+        `Manual review required. Raw subject: "${rawPurpose}".`
+      );
+    } else if (
+      parsed.actionType === 'merger' ||
+      parsed.actionType === 'demerger' ||
+      parsed.actionType === 'spinoff'
+    ) {
+      // CB-16: store structural-break event; adjustment engine will flag discontinuity.
+      warnings.push(
+        `Row ${rowLabel}: ${parsed.actionType} recognised — stored as price-series discontinuity marker. ` +
+        `No adjustment factor derived. Raw subject: "${rawPurpose}".`
+      );
     } else {
-      action.splitRatio = parsed.splitRatio;
+      // split / bonus / reverse_split
+      action.splitRatio = (parsed as { actionType: string; splitRatio: number }).splitRatio;
     }
 
     return action;
@@ -384,14 +478,20 @@ export const parseNseCorporateActions = (
  *
  * Key format (matches repository):
  *   stockId | actionType | YYYY-MM-DD | source | amountKey | splitRatioKey
+ *
+ * For rights actions (CB-15): splitRatioKey carries rightsRatio (the primary
+ * numeric discriminator) so upserts correctly deduplicate re-runs.
+ * For merger/demerger/spinoff (CB-16): both numeric segments are 'null' —
+ * uniqueness comes from stockId + actionType + date.
  */
 export const buildCorporateActionNaturalKey = (
   stockId: string,
-  action: Pick<ParsedCorporateAction, 'actionType' | 'effectiveDate' | 'source' | 'amount' | 'splitRatio'>
+  action: Pick<ParsedCorporateAction, 'actionType' | 'effectiveDate' | 'source' | 'amount' | 'splitRatio' | 'rightsRatio'>
 ): string => {
   const dateStr = action.effectiveDate.toISOString().slice(0, 10);
   const amountKey = decimalKey(action.amount);
-  const splitRatioKey = decimalKey(action.splitRatio);
+  // For rights: use rightsRatio as the key's numeric discriminator.
+  const splitRatioKey = decimalKey(action.splitRatio ?? action.rightsRatio);
   return [
     stockId,
     action.actionType.toLowerCase(),
@@ -461,9 +561,14 @@ export const importNseCorporateActions = async (
       symbol: action.symbol,
       type: action.actionType,
       date: action.effectiveDate.toISOString().slice(0, 10),
-      value: action.amount ?? action.splitRatio ?? 0,
+      // value: primary numeric identifier for the action type.
+      // For rights: store rightsRatio so downstream queries can read it without
+      // needing the extended fields (same slot pattern as splitRatio for splits).
+      value: action.amount ?? action.rightsRatio ?? action.splitRatio ?? 0,
       amount: action.amount ?? null,
       splitRatio: action.splitRatio ?? null,
+      rightsRatio: action.rightsRatio ?? null,
+      issuePrice: action.issuePrice ?? null,
       currency: action.actionType === 'dividend' ? 'INR' : null,
       source,
     };

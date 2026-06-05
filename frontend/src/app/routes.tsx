@@ -29,6 +29,7 @@ import { tradePlanRiskEngineRoutes } from '@/features/trade-plan-risk-engine';
 import { todayTradeReviewRoutes } from '@/features/today-trade-review';
 import { pipelineOpsRoutes } from '@/features/pipeline-ops';
 import { signalPositionLedgerRoutes } from '@/features/signal-position-ledger';
+import { DailyOverviewDashboardPage } from '@/features/daily-overview-dashboard';
 
 const userInstrumentRoutes: RouteObject[] = [
   { path: 'stocks', element: <Navigate to="/instrument-workspace" replace /> },
@@ -93,6 +94,7 @@ export const appRoutes: RouteObject[] = [
           ...alertsMonitoringRoutes,
           ...aiInvestmentCopilotRoutes,
           ...notificationsDeliveryRoutes,
+          { path: 'daily-overview', element: <DailyOverviewDashboardPage /> },
           ...protectedAuthIdentityRoutes,
           { path: 'admin', element: <AdminHomePage /> },
           ...prefixedAdminRoutes(operatorRoutes),

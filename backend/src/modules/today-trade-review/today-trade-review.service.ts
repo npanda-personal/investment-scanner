@@ -1,4 +1,5 @@
 import { DataQualityEngineService } from '../data-quality-engine';
+import { EarningsIntelligenceService } from '../earnings-intelligence';
 import { MarketContextIntelligenceService } from '../market-context-intelligence';
 import { MarketDataFoundationService } from '../market-data-foundation';
 import type { TrustedReviewUniverseHealth, TrustedReviewUniverseInstrument } from '../market-data-foundation';
@@ -17,6 +18,7 @@ import type {
   TodayReviewCandidateSource,
   TodayReviewCandidateState,
   TodayReviewDirection,
+  TodayReviewEarningsProximity,
   TodayReviewExcludedExample,
   TodayReviewExplainability,
   TodayReviewGrade,
@@ -39,6 +41,13 @@ import type {
 const DEFAULT_REGION = 'IN';
 const DEFAULT_ASSET_TYPE = 'STOCK';
 const ENTRY_LIMIT = 30;
+/**
+ * Number of trading days to the next result within which today-review attaches
+ * an earnings-blackout caveat to long-entry candidates.
+ * 3 trading days = roughly Mon-Wed for a Thursday result; keeps the trader alert
+ * without being too noisy for distant upcoming results.
+ */
+const EARNINGS_BLACKOUT_TRADING_DAYS = 3;
 const EXIT_LIMIT = 20;
 const TRUSTED_REVIEW_PAGE_SIZE = 250;
 const TRUSTED_REVIEW_SCAN_ORDERING = 'recentVolumeDesc_priceHistoryCompleteness_latestFreshness_symbol';
@@ -96,6 +105,7 @@ export class TodayTradeReviewService {
       signalService: new SignalGenerationEngineService(),
       calibrationService: new SignalCalibrationEngineService(),
       smartMoneyService: new SmartMoneyIntelligenceService(),
+      earningsService: new EarningsIntelligenceService(),
     },
     private readonly clock: () => Date = () => new Date(),
     /**
@@ -135,12 +145,12 @@ export class TodayTradeReviewService {
       sourceSnapshot.marketContext = sources.marketContext;
       sourceSnapshot.rawSignalUniverse = sources.rawSignalUniverse;
 
-      const liteResult = this.buildLiteCandidates(sources.trustedInstruments, sources.reviewUniverse, sources.scanEvidence, sources.strategyFunnel);
+      const liteResult = this.buildLiteCandidates(sources.trustedInstruments, sources.reviewUniverse, sources.scanEvidence, sources.strategyFunnel, sources.earningsProximity);
       sourceSnapshot.scanFunnel = liteResult.scanFunnel;
       const candidateSources = sources.reviewUniverse?.mode === 'NO_REVIEW'
         ? []
         : await this.buildCandidateSources(sources.entryDecisions, sources.exitDecisions, sources, scope, warnings, Boolean(request.skipTradePlanGeneration), sources.trustedInstruments);
-      const strategyCandidates = candidateSources.map((candidateSource) => this.mapCandidate(candidateSource));
+      const strategyCandidates = candidateSources.map((candidateSource) => this.mapCandidate(candidateSource, sources.earningsProximity));
       const board = this.assembleBoardCandidates(this.mergeCandidates([...liteResult.candidates, ...strategyCandidates]));
       sourceSnapshot.boardSelection = board.boardSelection;
       const candidates = board.candidates;
@@ -225,7 +235,7 @@ export class TodayTradeReviewService {
   }
 
   private async loadRunSources(scope: { region: string; assetType: string }, warnings: string[]) {
-    const [marketData, reviewReadiness, reviewUniverseResult, marketContext, marketGate, rawSignalUniverse, entryCandidates, exitCandidates] = await Promise.all([
+    const [marketData, reviewReadiness, reviewUniverseResult, marketContext, marketGate, rawSignalUniverse, entryCandidates, exitCandidates, earningsProximity] = await Promise.all([
       this.safe(() => this.services.marketDataService.latestStoredCandleInfo(scope.region, scope.assetType, this.clock()), 'Market data freshness is unavailable.', warnings),
       this.services.marketDataService.reviewReadinessSummary
         ? this.safe(() => this.services.marketDataService.reviewReadinessSummary!({ region: scope.region, assetType: scope.assetType }), TRUSTED_REVIEW_UNAVAILABLE_WARNING, warnings)
@@ -246,6 +256,9 @@ export class TodayTradeReviewService {
         sortDirection: 'desc',
       }), 'Strategy entry candidates are unavailable.', warnings),
       this.safe(() => this.services.strategyDecisionService.exits(undefined, scope.region, scope.assetType), 'Strategy exit-risk candidates are unavailable.', warnings),
+      this.services.earningsService
+        ? this.safe(() => this.services.earningsService!.latestProximityBySymbol(scope.region, scope.assetType), 'Earnings proximity data is unavailable.', warnings)
+        : Promise.resolve(null),
     ]);
     const reviewUniverseUnavailable = !reviewUniverseResult;
     let reviewUniverse = reviewUniverseResult || this.noReviewUniverse(scope, TRUSTED_REVIEW_UNAVAILABLE_WARNING);
@@ -327,6 +340,7 @@ export class TodayTradeReviewService {
       } : null,
       entryDecisions: strategyFilter.entryDecisions,
       exitDecisions: strategyFilter.exitDecisions,
+      earningsProximity: earningsProximity ?? new Map<string, TodayReviewEarningsProximity>(),
     };
   }
 
@@ -627,7 +641,8 @@ export class TodayTradeReviewService {
       trustedLoadStatus: TodayReviewTrustedLoadStatus;
       membershipLoadFailureReason: string | null;
     },
-    strategyFunnel: StrategyFunnelStats
+    strategyFunnel: StrategyFunnelStats,
+    earningsProximity: Map<string, TodayReviewEarningsProximity> = new Map()
   ): { candidates: TodayReviewCandidateDto[]; scanFunnel: TodayReviewScanFunnel } {
     const scanFunnel: TodayReviewScanFunnel = {
       trustedUniverseCount: scanEvidence.trustedUniverseCount,
@@ -696,11 +711,15 @@ export class TodayTradeReviewService {
         state = 'LONG_REVIEW';
         scanFunnel.promotedCandidates += 1;
       }
-      const score = state === 'BLOCKED' || state === 'AVOID' ? 0 : this.liteScore(setup, evidence, tradePlan.rewardRiskRatio, instrument, contextGapPenalty);
+      const earningsCaveat = this.earningsCaveat(instrument.symbol, earningsProximity);
+      const rawScore = state === 'BLOCKED' || state === 'AVOID' ? 0 : this.liteScore(setup, evidence, tradePlan.rewardRiskRatio, instrument, contextGapPenalty);
+      // Down-rank long entries by 10 points when results are imminent; short/blocked paths unaffected.
+      const score = (earningsCaveat && state === 'LONG_REVIEW') ? Math.max(0, rawScore - 10) : rawScore;
       const watchReasons = [
         ...(state === 'WATCH_ONLY' && evidence.label === 'UNPROVEN' ? ['Historical evidence is UNPROVEN; keep as watch only until more occurrences are available.'] : []),
         ...(tradePlan.rewardRiskRatio < 1.2 ? ['Exit/invalidation evidence is incomplete for research review.'] : []),
         ...(instrument.contextGaps.length > 0 ? [`Context gaps: ${instrument.contextGaps.join(', ')}.`] : []),
+        ...(earningsCaveat ? [earningsCaveat] : []),
         ...instrument.warnings.slice(0, 2),
       ];
       candidates.push({
@@ -964,6 +983,25 @@ export class TodayTradeReviewService {
     return gaps.reduce((total, gap) => total + (gap === 'marketCap' ? 3 : gap === 'sector' || gap === 'industry' ? 2 : 0), 0);
   }
 
+  /**
+   * Returns a human-readable earnings-proximity caveat string when persisted
+   * earnings data shows results are within EARNINGS_BLACKOUT_TRADING_DAYS.
+   * Returns null when no proximity data exists for the symbol or daysToResult
+   * is outside the window.  Never generates data — reads persisted only.
+   */
+  private earningsCaveat(symbol: string, earningsProximity: Map<string, TodayReviewEarningsProximity>): string | null {
+    const key = symbol.toUpperCase();
+    const proximity = earningsProximity.get(key);
+    if (!proximity || proximity.daysToResult === null) return null;
+    if (proximity.daysToResult > EARNINGS_BLACKOUT_TRADING_DAYS) return null;
+    const days = proximity.daysToResult;
+    const label = proximity.resultDateLabel ?? (proximity.resultDateSource === 'OFFICIAL_CALENDAR' ? 'Official' : 'Estimated');
+    const dateStr = proximity.resultDate ? ` (${proximity.resultDate.slice(0, 10)})` : '';
+    if (days === 0) return `Earnings result today${dateStr} [${label}] — long entry is high risk; consider waiting for post-result price discovery.`;
+    if (days === 1) return `Earnings result in 1 trading day${dateStr} [${label}] — long entry caution: results are imminent.`;
+    return `Earnings result in ${days} trading days${dateStr} [${label}] — long entry caution: consider waiting until after results.`;
+  }
+
   private liteReasonSummary(state: TodayReviewCandidateState, evidence: { label: string; sampleSize: number }, blockers: string[], watchReasons: string[]) {
     if (state === 'BLOCKED') return `Blocked: ${blockers[0] || 'hard blocker exists.'}`;
     if (state === 'WATCH_ONLY') return `Watch only: ${watchReasons[0] || 'lite evidence is not strong enough for research review.'}`;
@@ -1024,15 +1062,19 @@ export class TodayTradeReviewService {
     return usable.length % 2 ? usable[mid] : (usable[mid - 1] + usable[mid]) / 2;
   }
 
-  private mapCandidate(source: TodayReviewCandidateSource): TodayReviewCandidateDto {
+  private mapCandidate(source: TodayReviewCandidateSource, earningsProximity: Map<string, TodayReviewEarningsProximity> = new Map()): TodayReviewCandidateDto {
     const blockers = this.blockersFor(source);
-    const watchReasons = this.watchReasonsFor(source);
+    const earningsCaveat = this.earningsCaveat(source.decision.symbol || '', earningsProximity);
+    const baseWatchReasons = this.watchReasonsFor(source);
+    const watchReasons = earningsCaveat ? [earningsCaveat, ...baseWatchReasons] : baseWatchReasons;
     const hardBlocked = blockers.length > 0;
     const hasProof = this.hasUsableProof(source);
     const dataQualityMissing = !source.dataQuality;
     const tradePlan = source.tradePlan;
-    const score = hardBlocked ? 0 : this.scoreCandidate(source);
+    const rawScore = hardBlocked ? 0 : this.scoreCandidate(source);
     const state = this.stateFor(source, hardBlocked, hasProof, dataQualityMissing);
+    // Down-rank long entries by 10 points when results are imminent; exits/blocks unaffected.
+    const score = (earningsCaveat && state === 'LONG_REVIEW') ? Math.max(0, rawScore - 10) : rawScore;
     const grade = this.gradeFor(state, score);
     const confidenceScore = state === 'BLOCKED' || state === 'AVOID' ? 0 : score;
     const direction = this.directionFor(state, source);
@@ -1051,7 +1093,7 @@ export class TodayTradeReviewService {
       confidenceScore,
       reasonSummary: this.reasonSummaryFor(state, blockers, watchReasons),
       blockers,
-      watchReasons: state === 'LONG_REVIEW' || state === 'EXIT_RISK_REVIEW' ? watchReasons.slice(0, 2) : watchReasons,
+      watchReasons: state === 'LONG_REVIEW' || state === 'EXIT_RISK_REVIEW' ? watchReasons.slice(0, 3) : watchReasons,
       dataQualitySnapshot: source.dataQuality,
       marketContextSnapshot: this.marketContextSnapshotFor(source),
       strategyProofSnapshot: this.strategyProofSnapshotFor(source),

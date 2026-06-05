@@ -7,6 +7,8 @@ import type {
   QualityRecalculateRequest,
   QualityRecalculateResponse,
   QualitySummary,
+  ScorecardGroupBy,
+  ScorecardResponse,
   SignalHistoryItem,
   SignalOutcomeSet,
   SignalTypePerformance,
@@ -80,6 +82,29 @@ export async function fetchSignalOutcomes(
 ): Promise<SignalOutcomeSet[]> {
   const response = await axios.get<{ items: SignalOutcomeSet[] }>(`${API_BASE}/${instrumentId}/outcomes`, { params: { ...params(horizon, filters, scope), limit: 100 } });
   return response.data.items;
+}
+
+export interface ScorecardQueryParams {
+  horizon?: QualityHorizon;
+  groupBy?: ScorecardGroupBy;
+  direction?: 'BULLISH' | 'BEARISH' | 'NEUTRAL';
+  sector?: string;
+  modelVersion?: string;
+  from?: string;
+  to?: string;
+  minSampleSize?: number;
+}
+
+/**
+ * Fetch the Signal Track-Record Scorecard (task #12 read API).
+ * Returns per-horizon win-rates, sample sizes, expectancy, and profit factor.
+ * Persisted-read only — no live recompute.
+ */
+export async function fetchSignalScorecard(
+  query: ScorecardQueryParams = {}
+): Promise<ScorecardResponse> {
+  const response = await axios.get<ScorecardResponse>(`${API_BASE}/quality/scorecard`, { params: query });
+  return response.data;
 }
 
 export async function recalculateSignalQuality(input: QualityRecalculateRequest = {}): Promise<QualityRecalculateResponse> {

@@ -537,16 +537,47 @@ export class SignalQualityLabService {
       const horizons = Object.keys({ '1D': 1, '5D': 5, '10D': 10, '20D': 20, '60D': 60 }) as QualityHorizon[];
       const rows: SignalOutcomeUpsert[] = [];
 
+      // CB-8: fetch ^NSEI prices once for the batch (covering the full date range).
+      // Used to compute same-horizon benchmark return and alpha alongside signal return.
+      const benchmarkPrices = await this.fetchBenchmarkPrices(outcomes).catch(() => [] as PricePoint[]);
+
       for (const outcomeSet of outcomes) {
         if (!outcomeSet.signalResultId) continue;
 
         const signalGeneratedDate = new Date(outcomeSet.generatedAt);
         signalGeneratedDate.setUTCHours(0, 0, 0, 0);
 
+        // CB-8: find the T+1 entry index in the benchmark price series
+        // (same entry logic as calculateOutcome: the bar after signal day).
+        const benchmarkSignalDayIdx = benchmarkPrices.findIndex(
+          (p) => this.utcTradingDay(new Date(p.date)).getTime() >= signalGeneratedDate.getTime()
+        );
+        const benchmarkEntryIdx = benchmarkSignalDayIdx >= 0 ? benchmarkSignalDayIdx + 1 : -1;
+        const benchmarkEntry = benchmarkEntryIdx >= 0 && benchmarkEntryIdx < benchmarkPrices.length
+          ? benchmarkPrices[benchmarkEntryIdx]
+          : null;
+
         for (const horizon of horizons) {
           const fo = outcomeSet.outcomes.find((o) => o.horizon === horizon);
           const dataComplete = Boolean(fo?.available && fo.forwardReturnPercent !== null);
           const windowEndDate = fo?.futureDate ? new Date(fo.futureDate) : null;
+
+          // CB-8: compute same-horizon benchmark return and alpha when possible.
+          let benchmarkReturnPercent: number | null = null;
+          let alphaPercent: number | null = null;
+          if (benchmarkEntry && benchmarkEntry.adjustedClose > 0) {
+            const horizonRows = HORIZON_DAYS[horizon];
+            const benchmarkFutureIdx = benchmarkEntryIdx + horizonRows;
+            const benchmarkFuture = benchmarkFutureIdx < benchmarkPrices.length
+              ? benchmarkPrices[benchmarkFutureIdx]
+              : null;
+            if (benchmarkFuture) {
+              benchmarkReturnPercent = (benchmarkFuture.adjustedClose - benchmarkEntry.adjustedClose) / benchmarkEntry.adjustedClose;
+              if (fo?.forwardReturnPercent !== null && fo?.forwardReturnPercent !== undefined) {
+                alphaPercent = fo.forwardReturnPercent - benchmarkReturnPercent;
+              }
+            }
+          }
 
           rows.push({
             signalResultId: outcomeSet.signalResultId,
@@ -569,6 +600,9 @@ export class SignalQualityLabService {
             maxFavorableExcursion: fo?.maxFavorableExcursion ?? null,
             maxAdverseExcursion: fo?.maxAdverseExcursion ?? null,
             maxDrawdownPercent: fo?.maxDrawdown ?? null,
+            // CB-8: benchmark return and alpha (absolute numbers preserved separately)
+            benchmarkReturnPercent,
+            alphaPercent,
             evaluatedAt: now,
           });
 
@@ -1028,16 +1062,20 @@ export class SignalQualityLabService {
 
   calculateOutcome(signal: SignalResultDto, prices: PricePoint[]): SignalOutcomeSet {
     const generatedAt = this.utcTradingDay(new Date(signal.generated_at));
-    const startIndex = prices.findIndex((price) => this.utcTradingDay(new Date(price.date)).getTime() >= generatedAt.getTime());
-    const start = startIndex >= 0 ? prices[startIndex] : null;
-    // window contains rows [signalDay, signalDay+60] — up to 61 rows.
-    // INVARIANT: prices must come from normalizePrices() so window[N] = N trading days forward.
-    const window = startIndex >= 0 ? prices.slice(startIndex, startIndex + 61) : [];
+    // CB-10: find the signal-day bar (T+0), then enter at the NEXT bar (T+1).
+    // This avoids capturing overnight gap between signal generation and open,
+    // which inflated short-horizon (1D/5D) returns in earlier versions.
+    const signalDayIndex = prices.findIndex((price) => this.utcTradingDay(new Date(price.date)).getTime() >= generatedAt.getTime());
+    const entryIndex = signalDayIndex >= 0 ? signalDayIndex + 1 : -1;
+    const entry = entryIndex >= 0 && entryIndex < prices.length ? prices[entryIndex] : null;
+    // window starts at the entry bar (T+1) and covers up to 61 bars forward (T+1 through T+61).
+    // INVARIANT: prices must come from normalizePrices() so window[N] = N trading days from entry.
+    const window = entryIndex >= 0 ? prices.slice(entryIndex, entryIndex + 61) : [];
     const outcomes = (Object.keys(HORIZON_DAYS) as QualityHorizon[]).map((horizon) =>
-      this.forwardOutcome(horizon, start, window)
+      this.forwardOutcome(horizon, entry, window)
     );
     // Full-window (60D) excursion fields kept on the outer set for backward-compat.
-    const pathReturns = start && start.adjustedClose > 0 ? window.map((price) => (price.adjustedClose - start.adjustedClose) / start.adjustedClose) : [];
+    const pathReturns = entry && entry.adjustedClose > 0 ? window.map((price) => (price.adjustedClose - entry.adjustedClose) / entry.adjustedClose) : [];
     return {
       signalResultId: signal.id || '',
       instrumentId: signal.instrument_id,
@@ -1050,9 +1088,9 @@ export class SignalQualityLabService {
       generatedAt: signal.generated_at,
       outcomes,
       priceHistoryAvailable: prices.length > 0,
-      startPriceDate: start?.date ?? null,
+      startPriceDate: entry?.date ?? null,
       latestAvailablePriceDate: prices.length > 0 ? prices[prices.length - 1].date : null,
-      futureRowsAvailable: startIndex >= 0 ? Math.max(0, window.length - 1) : 0,
+      futureRowsAvailable: entryIndex >= 0 ? Math.max(0, window.length - 1) : 0,
       maxFavorableMovePercent: pathReturns.length > 0 ? Math.max(...pathReturns) : null,
       maxAdverseMovePercent: pathReturns.length > 0 ? Math.min(...pathReturns) : null,
       maxDrawdownPercent: this.maxDrawdown(window),
@@ -1133,6 +1171,40 @@ export class SignalQualityLabService {
       }
     }
     return items;
+  }
+
+  /**
+   * CB-8: Fetch and normalize the Nifty 50 (^NSEI) price series for a batch of outcomes.
+   *
+   * Fetches a window wide enough to cover the earliest signal date through the
+   * latest horizon end (60 trading days ≈ 90 calendar days after the latest signal).
+   * Returns a normalized (deduplicated, ascending) PricePoint array identical to
+   * the per-instrument series, so benchmark[N] = N trading days from entry.
+   *
+   * Returns an empty array if ^NSEI data is unavailable — callers treat null benchmark
+   * as "data unavailable" and leave benchmarkReturnPercent/alphaPercent as null.
+   */
+  private async fetchBenchmarkPrices(outcomes: SignalOutcomeSet[]): Promise<PricePoint[]> {
+    if (outcomes.length === 0) return [];
+    const signalDates = outcomes
+      .map((o) => this.utcTradingDay(new Date(o.generatedAt)).getTime())
+      .filter(Number.isFinite);
+    if (signalDates.length === 0) return [];
+    const earliest = new Date(Math.min(...signalDates));
+    // Extend end by 90 calendar days to cover the 60D horizon
+    const latest = new Date(Math.max(...signalDates) + 90 * 24 * 60 * 60 * 1000);
+    try {
+      const raw = await (this.marketDataService as any).listPrices('^NSEI', 5000, earliest, latest);
+      if (!raw || !Array.isArray(raw)) return [];
+      return this.normalizePrices(
+        raw.map((p: any) => ({
+          date: new Date(p.timestamp ?? p.date).toISOString(),
+          adjusted_close: Number(p.adjustedClose ?? p.adjusted_close ?? p.close),
+        }))
+      );
+    } catch {
+      return [];
+    }
   }
 
   private async prices(instrumentId: string, query?: Partial<QualityQuery>): Promise<PricePoint[]> {
@@ -1231,6 +1303,9 @@ export class SignalQualityLabService {
         maxFavorableExcursion: null,
         maxAdverseExcursion: null,
         maxDrawdown: null,
+        // CB-8: benchmark and alpha populated later in the persist path
+        benchmarkReturnPercent: null,
+        alphaPercent: null,
       };
     }
     // Horizon-scoped sub-window: rows [0, horizonRows] inclusive
@@ -1246,6 +1321,9 @@ export class SignalQualityLabService {
       maxFavorableExcursion: subReturns.length > 0 ? Math.max(...subReturns) : null,
       maxAdverseExcursion: subReturns.length > 0 ? Math.min(...subReturns) : null,
       maxDrawdown: this.maxDrawdown(subWindow),
+      // CB-8: benchmark and alpha populated later in the persist path
+      benchmarkReturnPercent: null,
+      alphaPercent: null,
     };
   }
 

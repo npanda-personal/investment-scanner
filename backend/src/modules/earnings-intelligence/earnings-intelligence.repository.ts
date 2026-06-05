@@ -269,13 +269,19 @@ export class EarningsIntelligenceRepository {
   }
 
   private toDto(record: any): EarningsSnapshotDto {
+    const resultDateSource: string = record.resultDateSource || 'UNKNOWN';
+    const resultDateLabel: EarningsSnapshotDto['resultDateLabel'] =
+      resultDateSource === 'OFFICIAL_CALENDAR' ? 'Official'
+      : resultDateSource === 'ESTIMATED_FROM_PERIOD_CADENCE' ? 'Estimated'
+      : null;
     return {
       id: record.id,
       snapshotDate: this.iso(record.snapshotDate) ?? '',
       dataThroughDate: this.iso(record.dataThroughDate),
       symbol: record.symbol,
       resultDate: this.iso(record.resultDate),
-      resultDateSource: record.resultDateSource || 'UNKNOWN',
+      resultDateLabel,
+      resultDateSource,
       periodEndDate: this.iso(record.periodEndDate),
       validatedAt: this.iso(record.validatedAt),
       daysToResult: record.daysToResult ?? null,

@@ -33,6 +33,7 @@ function persistedRow(categories: EarningsSnapshotDto['categories']): EarningsSn
     dataThroughDate: '2026-05-31T00:00:00.000Z',
     symbol: 'AAA',
     resultDate: '2026-05-10T00:00:00.000Z',
+    resultDateLabel: 'Official',
     resultDateSource: 'OFFICIAL_CALENDAR',
     periodEndDate: '2026-03-31T00:00:00.000Z',
     validatedAt: '2026-05-11T00:00:00.000Z',
@@ -394,5 +395,115 @@ describe('EarningsIntelligenceService', () => {
     });
     expect(response.categories.RESULT_WINNERS).toHaveLength(1);
     expect(response.items[0].symbol).toBe('AAA');
+  });
+
+  // ── CB-44: official date preferred; estimated clearly labeled ────────────────
+
+  it('CB-44: official result date produces resultDateLabel="Official" and no estimation warnings', () => {
+    const service = new EarningsIntelligenceService({} as any);
+    const snapshot = service.calculateSnapshot({
+      stockId: 'stock-1',
+      symbol: 'AAA',
+      region: 'IN',
+      assetType: 'STOCK',
+      snapshotDate: new Date('2026-06-01T00:00:00.000Z'),
+      dataThroughDate: null,
+      fundamentals: [
+        fundamental('2026-03-31', 130, 18, 1.8, {
+          officialResultDate: new Date('2026-05-10T00:00:00.000Z'),
+          validatedAt: new Date('2026-05-11T00:00:00.000Z'),
+        }),
+        fundamental('2025-03-31', 100, 10, 1),
+      ],
+      prices: [],
+      deliverySnapshots: [],
+    });
+
+    expect(snapshot.resultDateSource).toBe('OFFICIAL_CALENDAR');
+    expect(snapshot.resultDateLabel).toBe('Official');
+    expect(snapshot.warnings).not.toContain('OFFICIAL_CALENDAR_NOT_AVAILABLE');
+    expect(snapshot.warnings).not.toContain('RESULT_DATE_ESTIMATED_FROM_PERIOD_CADENCE');
+    expect(snapshot.riskTags).not.toContain('ESTIMATED_RESULT_DATE');
+  });
+
+  it('CB-44: estimated result date produces resultDateLabel="Estimated" with estimation warning', () => {
+    const service = new EarningsIntelligenceService({} as any);
+    // snapshotDate must be close enough to the estimated result date (within 45 days)
+    const snapshot = service.calculateSnapshot({
+      stockId: 'stock-1',
+      symbol: 'AAA',
+      region: 'IN',
+      assetType: 'STOCK',
+      snapshotDate: new Date('2026-07-15T00:00:00.000Z'),
+      dataThroughDate: null,
+      fundamentals: [
+        fundamental('2026-03-31', 130, 18, 1.8, {
+          validatedAt: new Date('2026-05-10T00:00:00.000Z'),
+        }),
+        fundamental('2025-03-31', 100, 10, 1),
+      ],
+      prices: [],
+      deliverySnapshots: [],
+    });
+
+    expect(snapshot.resultDateSource).toBe('ESTIMATED_FROM_PERIOD_CADENCE');
+    expect(snapshot.resultDateLabel).toBe('Estimated');
+    expect(snapshot.warnings).toContain('OFFICIAL_CALENDAR_NOT_AVAILABLE');
+    expect(snapshot.warnings).toContain('RESULT_DATE_ESTIMATED_FROM_PERIOD_CADENCE');
+    expect(snapshot.riskTags).toContain('ESTIMATED_RESULT_DATE');
+  });
+
+  it('CB-44: fallback (period-end) result date produces resultDateLabel=null', () => {
+    const service = new EarningsIntelligenceService({} as any);
+    const snapshot = service.calculateSnapshot({
+      stockId: 'stock-1',
+      symbol: 'AAA',
+      region: 'IN',
+      assetType: 'STOCK',
+      snapshotDate: new Date('2026-06-01T00:00:00.000Z'),
+      dataThroughDate: null,
+      fundamentals: [
+        fundamental('2026-03-31', 130, 18, 1.8, { validatedAt: new Date('2026-05-10T00:00:00.000Z') }),
+        fundamental('2025-03-31', 100, 10, 1),
+      ],
+      prices: [],
+      deliverySnapshots: [],
+    });
+
+    expect(snapshot.resultDateSource).toBe('PERIOD_END_DATE_FALLBACK');
+    expect(snapshot.resultDateLabel).toBeNull();
+  });
+
+  it('CB-44: latestProximityBySymbol returns only rows with daysToResult populated', async () => {
+    const rowWithDays: EarningsSnapshotDto = {
+      ...persistedRow(['UPCOMING_RESULTS']),
+      symbol: 'UPCO',
+      daysToResult: 2,
+      resultDateSource: 'ESTIMATED_FROM_PERIOD_CADENCE',
+      resultDateLabel: 'Estimated',
+    };
+    const rowNoDays: EarningsSnapshotDto = {
+      ...persistedRow(['EARNINGS_WATCHLIST']),
+      symbol: 'NOUP',
+      daysToResult: null,
+      resultDateLabel: 'Official',
+    };
+    const repository = {
+      latestSnapshot: jest.fn().mockResolvedValue({
+        rows: [rowWithDays, rowNoDays],
+        truncated: false,
+        snapshotDate: '2026-06-01',
+        dataThroughDate: '2026-05-31',
+      }),
+    };
+    const service = new EarningsIntelligenceService(repository as any);
+
+    const map = await service.latestProximityBySymbol('IN', 'STOCK');
+
+    expect(map.has('UPCO')).toBe(true);
+    expect(map.has('NOUP')).toBe(false);
+    const entry = map.get('UPCO')!;
+    expect(entry.daysToResult).toBe(2);
+    expect(entry.resultDateLabel).toBe('Estimated');
   });
 });

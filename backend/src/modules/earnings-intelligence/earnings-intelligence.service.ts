@@ -38,6 +38,38 @@ const PRICE_REACTION_TRADING_SESSIONS = 5;
 export class EarningsIntelligenceService {
   constructor(private readonly repository = new EarningsIntelligenceRepository()) {}
 
+  /**
+   * Returns a Map<symbol, proximity> from the latest persisted earnings snapshot.
+   * Only includes rows that have a `daysToResult` value (i.e., UPCOMING_RESULTS
+   * or ESTIMATED_FROM_PERIOD_CADENCE with a forward window).
+   *
+   * Used by today-trade-review to attach earnings-proximity caveats to candidates
+   * without triggering any live computation.  Safe to call on every GET.
+   */
+  async latestProximityBySymbol(region: string, assetType: string): Promise<Map<string, {
+    symbol: string;
+    daysToResult: number | null;
+    resultDateSource: string;
+    resultDateLabel: string | null;
+    resultDate: string | null;
+  }>> {
+    const normalized = this.normalizeScope({ region, assetType, limit: 5000 });
+    const latest = await this.repository.latestSnapshot({ ...normalized, limit: 5000 });
+    const result = new Map<string, { symbol: string; daysToResult: number | null; resultDateSource: string; resultDateLabel: string | null; resultDate: string | null }>();
+    for (const row of latest.rows) {
+      if (row.daysToResult !== null) {
+        result.set(row.symbol.toUpperCase(), {
+          symbol: row.symbol,
+          daysToResult: row.daysToResult,
+          resultDateSource: row.resultDateSource,
+          resultDateLabel: row.resultDateLabel ?? null,
+          resultDate: row.resultDate,
+        });
+      }
+    }
+    return result;
+  }
+
   async latest(query: EarningsIntelligenceQuery, now = new Date()): Promise<EarningsIntelligenceResponse> {
     const normalized = this.normalizeScope(query);
     const latest = await this.repository.latestSnapshot({ ...normalized, category: query.category, limit: query.limit });
@@ -250,6 +282,11 @@ export class EarningsIntelligenceService {
       input.deliverySnapshots[0]?.tradingDate ?? null,
     ]);
 
+    const resultDateLabel: EarningsSnapshotUpsertInput['resultDateLabel'] =
+      resultDateSource === 'OFFICIAL_CALENDAR' ? 'Official'
+      : resultDateSource === 'ESTIMATED_FROM_PERIOD_CADENCE' ? 'Estimated'
+      : null;
+
     return {
       snapshotDate: input.snapshotDate,
       dataThroughDate,
@@ -258,6 +295,7 @@ export class EarningsIntelligenceService {
       scopeRegion: input.region,
       scopeAssetType: input.assetType,
       resultDate,
+      resultDateLabel,
       resultDateSource,
       periodEndDate,
       validatedAt,

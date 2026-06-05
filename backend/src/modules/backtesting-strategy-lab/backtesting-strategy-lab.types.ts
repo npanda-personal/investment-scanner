@@ -284,6 +284,9 @@ export interface RunBacktestRequest {
 
 export interface HistoricalBar {
   date: string;
+  open?: number | null;
+  high?: number | null;
+  low?: number | null;
   close: number;
   volume?: number | null;
 }

@@ -418,3 +418,143 @@ describe('#7 DQ asOf no-snapshot falls back to INCLUDE', () => {
     expect(result.warnings.some(w => w.includes('trusted signal generation failed closed'))).toBe(true);
   });
 });
+
+// ── CB-1: adjusted OHLCV in ATR / ADX / OBV ─────────────────────────────────
+
+describe('CB-1 adjusted OHLCV in ATR / ADX / OBV', () => {
+  const service = new SignalGenerationEngineService({} as any, {} as any, {} as any);
+
+  /** Helper: create a price bar that carries adjusted_high / adjusted_low / adjusted_volume.
+   *  close is raw (double the adjusted to simulate a 2:1 split). */
+  const adjBar = (
+    index: number,
+    adj_close: number,
+    options: { vol?: number; adjHighOffset?: number; adjLowOffset?: number } = {},
+  ) => {
+    const { vol = 1000, adjHighOffset = 1, adjLowOffset = -1 } = options;
+    // Raw values are 2× adjusted (simulating a 2:1 split price scale on old bars)
+    const rawFactor = 2;
+    return {
+      date: new Date(Date.UTC(2024, 0, 1 + index)).toISOString(),
+      open: adj_close * rawFactor,
+      high: (adj_close + adjHighOffset) * rawFactor,   // raw high
+      low: (adj_close + adjLowOffset) * rawFactor,     // raw low
+      close: adj_close * rawFactor,
+      adjusted_close: adj_close,
+      volume: vol * rawFactor,                          // raw volume
+      adjusted_high: adj_close + adjHighOffset,         // adjusted high
+      adjusted_low: adj_close + adjLowOffset,           // adjusted low
+      adjusted_volume: vol,                             // adjusted volume
+    };
+  };
+
+  /** Same bar but WITHOUT adjusted_high/low/volume fields (pre-CB-1 legacy shape). */
+  const rawBar = (
+    index: number,
+    adj_close: number,
+    options: { vol?: number } = {},
+  ) => {
+    const { vol = 1000 } = options;
+    const rawFactor = 2;
+    return {
+      date: new Date(Date.UTC(2024, 0, 1 + index)).toISOString(),
+      open: adj_close * rawFactor,
+      high: (adj_close + 1) * rawFactor,
+      low: (adj_close - 1) * rawFactor,
+      close: adj_close * rawFactor,
+      adjusted_close: adj_close,
+      volume: vol,
+    };
+  };
+
+  it('ATR: uses adjusted_high/low when available — result differs from mixing raw h/l with adj_close', () => {
+    // On a split bar, raw high is 2× the adjusted scale.
+    // ATR with adjusted_high/low should be ~2 (the ±1 band in adjusted terms).
+    // ATR mixing raw high/low with adjusted_close would produce ~(raw_high - adj_close) ≈ large number.
+    const bars = Array.from({ length: 40 }, (_, i) => adjBar(i, 100 + i * 0.1));
+    const atrAdj = service.atr(bars, 14);
+    expect(atrAdj).not.toBeNull();
+    // In adjusted terms the range is ~2 (±1 around adj_close=100).
+    // In raw terms the range would be ~4 (±2 around raw_close=200).
+    expect(atrAdj!).toBeLessThan(5); // must be adjusted-scale (~2), not raw-scale (~4+)
+  });
+
+  it('ATR: falls back to raw high/low when adjusted_high/low are absent', () => {
+    const bars = Array.from({ length: 40 }, (_, i) => rawBar(i, 100 + i * 0.1));
+    const atrRaw = service.atr(bars, 14);
+    expect(atrRaw).not.toBeNull();
+    // Raw high = adj_close*2 + 2, raw low = adj_close*2 - 2, range ≈ 4
+    expect(atrRaw!).toBeGreaterThan(2);
+  });
+
+  it('ADX: uses adjusted_high/low when available — result is a finite non-null value', () => {
+    const bars = Array.from({ length: 50 }, (_, i) => adjBar(i, 100 + i));
+    const adxResult = service.adx(bars, 14);
+    expect(adxResult).not.toBeNull();
+    expect(Number.isFinite(adxResult!)).toBe(true);
+    expect(adxResult!).toBeGreaterThanOrEqual(0);
+    expect(adxResult!).toBeLessThanOrEqual(100);
+  });
+
+  it('OBV: uses adjusted_volume when available — OBV value equals sum of adjusted_volume, not raw', () => {
+    // Two bars: both up. adjusted_volume = 1000. raw volume = 2000.
+    const bars = [
+      { date: '2024-01-03', open: 200, high: 202, low: 198, close: 200, adjusted_close: 102, volume: 2000, adjusted_high: 101, adjusted_low: 99, adjusted_volume: 1000 },
+      { date: '2024-01-02', open: 200, high: 202, low: 198, close: 200, adjusted_close: 101, volume: 2000, adjusted_high: 101, adjusted_low: 99, adjusted_volume: 1000 },
+      { date: '2024-01-01', open: 200, high: 202, low: 198, close: 200, adjusted_close: 100, volume: 2000, adjusted_high: 101, adjusted_low: 99, adjusted_volume: 1000 },
+    ];
+    const obvArr = service.obv(bars);
+    // bars are newest-first (index 0 = most recent).
+    // OBV computed chronologically: bar[2] (oldest, 100) → bar[1] (101>100 → +1000) → bar[0] (102>101 → +1000)
+    // So OBV newest = +2000 (adjusted units), not +4000 (raw units)
+    expect(obvArr[0]).toBe(2000);
+  });
+
+  it('OBV: falls back to raw volume when adjusted_volume is absent', () => {
+    const bars = [
+      { date: '2024-01-03', open: 200, high: 202, low: 198, close: 200, adjusted_close: 102, volume: 2000 },
+      { date: '2024-01-02', open: 200, high: 202, low: 198, close: 200, adjusted_close: 101, volume: 2000 },
+      { date: '2024-01-01', open: 200, high: 202, low: 198, close: 200, adjusted_close: 100, volume: 2000 },
+    ];
+    const obvArr = service.obv(bars);
+    expect(obvArr[0]).toBe(4000); // raw volume fallback → 2×2000 = 4000
+  });
+});
+
+// ── CB-11: ADX warm-up increased to period×3 ─────────────────────────────────
+
+describe('CB-11 ADX warm-up period×3', () => {
+  const service = new SignalGenerationEngineService({} as any, {} as any, {} as any);
+
+  it('returns null when prices.length <= period*2 (old guard still applies)', () => {
+    // 28 bars for period=14 → prices.length (28) <= period*2 (28) → null
+    const bars = risingPrices(28, 1, 100);
+    expect(service.adx(bars, 14)).toBeNull();
+  });
+
+  it('returns non-null for 29 bars (just above the period*2 guard)', () => {
+    const bars = risingPrices(29, 1, 100);
+    const result = service.adx(bars, 14);
+    // 29 > 28 → should compute (may differ from 42-bar version due to shorter warm-up)
+    expect(result).not.toBeNull();
+  });
+
+  it('produces a stable ADX with 42+ bars (3× period) vs 29 bars — values differ due to warm-up', () => {
+    // With a mixed (non-monotone) trend, DX values computed over 29 bars vs 42 bars should differ
+    // because the 42-bar warm-up converges the Wilder smoothing further.
+    const longBars = Array.from({ length: 60 }, (_, i) => {
+      const ac = 100 + i + Math.sin(i * 0.7) * 5;
+      return price(60 - i, ac, 1000, ac + 2, ac - 2);
+    });
+    const shortSlice = longBars.slice(0, 29); // 29 most-recent bars
+    const adxLong  = service.adx(longBars, 14);
+    const adxShort = service.adx(shortSlice, 14);
+    expect(adxLong).not.toBeNull();
+    expect(adxShort).not.toBeNull();
+    // With enough variation in the series, Wilder smoothing over 42 vs 29 bars produces different values
+    expect(adxLong).not.toBe(adxShort);
+    expect(Number.isFinite(adxLong!)).toBe(true);
+    expect(adxLong!).toBeGreaterThanOrEqual(0);
+    expect(adxLong!).toBeLessThanOrEqual(100);
+  });
+});

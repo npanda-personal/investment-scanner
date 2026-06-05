@@ -6,7 +6,11 @@ export {
 } from './signal-generation-engine.router';
 export { SignalGenerationEngineController } from './signal-generation-engine.controller';
 export { SignalGenerationEngineRepository } from './signal-generation-engine.repository';
-export { SignalGenerationEngineService } from './signal-generation-engine.service';
+export {
+  SignalGenerationEngineService,
+  DIRECTION_BULLISH_THRESHOLD,
+  DIRECTION_BEARISH_THRESHOLD,
+} from './signal-generation-engine.service';
 export {
   normalizeDirection,
   normalizeSignalSortBy,

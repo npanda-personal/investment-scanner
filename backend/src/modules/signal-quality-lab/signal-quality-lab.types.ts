@@ -131,6 +131,18 @@ export interface ForwardOutcome {
    * (Fix 6: scoped to this horizon's row count, not the full 61-row window.)
    */
   maxDrawdown: number | null;
+  /**
+   * CB-8: Same-horizon Nifty 50 (^NSEI) return starting from the same T+1 entry date.
+   * Only populated in the persisted-outcome (recompute) path.
+   * Null when ^NSEI data is unavailable for the horizon window.
+   */
+  benchmarkReturnPercent: number | null;
+  /**
+   * CB-8: Signal forward return minus benchmark return (alpha).
+   * forwardReturnPercent − benchmarkReturnPercent.
+   * Null when benchmarkReturnPercent is null.
+   */
+  alphaPercent: number | null;
 }
 
 export interface SignalOutcomeSet {
@@ -283,6 +295,10 @@ export interface SignalOutcomeUpsert {
   maxFavorableExcursion: number | null;
   maxAdverseExcursion: number | null;
   maxDrawdownPercent: number | null;
+  /** CB-8: same-horizon ^NSEI return from T+1 entry. Null when unavailable. */
+  benchmarkReturnPercent: number | null;
+  /** CB-8: forwardReturnPercent − benchmarkReturnPercent. Null when benchmark unavailable. */
+  alphaPercent: number | null;
   evaluatedAt: Date;
 }
 
@@ -371,6 +387,11 @@ export interface ScorecardRow {
   avgMaxFavorableExcursion: number | null;
   bestReturnPercent: number | null;
   worstReturnPercent: number | null;
+  /**
+   * CB-8: Average alpha (signal return − benchmark return) for this group/horizon.
+   * Null when no rows have benchmarkReturnPercent populated.
+   */
+  avgAlphaPercent?: number | null;
 }
 
 /**
@@ -392,6 +413,11 @@ export interface ScorecardSummary {
   avgMaxFavorableExcursion: number | null;
   bestReturnPercent: number | null;
   worstReturnPercent: number | null;
+  /**
+   * CB-8: Average alpha (signal return − benchmark return) for this horizon.
+   * Null when no rows have benchmarkReturnPercent populated.
+   */
+  avgAlphaPercent?: number | null;
 }
 
 export interface ScorecardResponse {

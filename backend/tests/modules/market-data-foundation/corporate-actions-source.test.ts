@@ -215,15 +215,38 @@ describe('parseNseSubject — dividend', () => {
   });
 });
 
-describe('parseNseSubject — rights', () => {
-  it('recognises "Rights 8:13 @ Premium Rs 4/-" as rights type', () => {
+describe('parseNseSubject — rights (CB-15)', () => {
+  it('parses "Rights 8:13 @ Premium Rs 4/-" → rights with TERP inputs', () => {
     const r = parseNseSubject('Rights 8:13 @ Premium Rs 4/-');
-    expect(r).toEqual({ actionType: 'rights' });
+    expect(r).not.toBeNull();
+    expect(r!.actionType).toBe('rights');
+    if (r!.actionType === 'rights') {
+      // rightsRatio = 8/13 ≈ 0.6154
+      expect(r!.rightsRatio).toBeCloseTo(8 / 13, 10);
+      expect(r!.issuePrice).toBe(4);
+    }
   });
 
-  it('recognises "Rights Issue" as rights', () => {
+  it('parses "Rights 2:5 @ Rs 150" → correct ratio and price', () => {
+    const r = parseNseSubject('Rights 2:5 @ Rs 150');
+    expect(r).not.toBeNull();
+    expect(r!.actionType).toBe('rights');
+    if (r!.actionType === 'rights') {
+      expect(r!.rightsRatio).toBeCloseTo(2 / 5, 10);
+      expect(r!.issuePrice).toBe(150);
+    }
+  });
+
+  it('recognises "Rights Issue" (no ratio/price) as rights_unparseable', () => {
     const r = parseNseSubject('Rights Issue');
-    expect(r).toEqual({ actionType: 'rights' });
+    expect(r).not.toBeNull();
+    expect(r!.actionType).toBe('rights_unparseable');
+  });
+
+  it('recognises bare "Rights" with no ratio as rights_unparseable', () => {
+    const r = parseNseSubject('Rights');
+    expect(r).not.toBeNull();
+    expect(r!.actionType).toBe('rights_unparseable');
   });
 });
 
@@ -236,10 +259,6 @@ describe('parseNseSubject — unknown/garbled', () => {
     expect(parseNseSubject('Some Garbled Action XYZ Unknown')).toBeNull();
   });
 
-  it('returns null for "Demerger"', () => {
-    expect(parseNseSubject('Demerger')).toBeNull();
-  });
-
   it('returns null for "Buy Back"', () => {
     expect(parseNseSubject('Buy Back')).toBeNull();
   });
@@ -247,6 +266,49 @@ describe('parseNseSubject — unknown/garbled', () => {
   it('does not throw for any arbitrary garbage', () => {
     expect(() => parseNseSubject('!!! @@@ ### 123')).not.toThrow();
     expect(parseNseSubject('!!! @@@ ### 123')).toBeNull();
+  });
+});
+
+describe('parseNseSubject — merger/demerger/spinoff (CB-16)', () => {
+  it('recognises "Demerger" → demerger', () => {
+    const r = parseNseSubject('Demerger');
+    expect(r).not.toBeNull();
+    expect(r!.actionType).toBe('demerger');
+  });
+
+  it('recognises "Scheme of Demerger" → demerger', () => {
+    const r = parseNseSubject('Scheme of Demerger');
+    expect(r!.actionType).toBe('demerger');
+  });
+
+  it('recognises "Merger" → merger', () => {
+    const r = parseNseSubject('Merger');
+    expect(r!.actionType).toBe('merger');
+  });
+
+  it('recognises "Amalgamation" → merger', () => {
+    const r = parseNseSubject('Amalgamation');
+    expect(r!.actionType).toBe('merger');
+  });
+
+  it('recognises "Scheme of Amalgamation" → merger', () => {
+    const r = parseNseSubject('Scheme of Amalgamation');
+    expect(r!.actionType).toBe('merger');
+  });
+
+  it('recognises "Spin Off" → spinoff', () => {
+    const r = parseNseSubject('Spin Off');
+    expect(r!.actionType).toBe('spinoff');
+  });
+
+  it('recognises "Spinoff" → spinoff', () => {
+    const r = parseNseSubject('Spinoff');
+    expect(r!.actionType).toBe('spinoff');
+  });
+
+  it('does not misclassify "Demerger" as merger', () => {
+    const r = parseNseSubject('Demerger');
+    expect(r!.actionType).not.toBe('merger');
   });
 });
 
@@ -306,16 +368,33 @@ describe('parseNseCorporateActionRow — per-row error isolation', () => {
     expect(warnings[0]).toMatch(/unrecognised subject/i);
   });
 
-  it('returns null and warns for rights — records rights-specific message', () => {
+  it('returns a rights action with TERP inputs for parseable rights row (CB-15)', () => {
     const warnings: string[] = [];
     const result = parseNseCorporateActionRow(
       row('CO', 'Rights 8:13 @ Premium Rs 4/-', '15-May-2023'),
       NSE_CORPORATE_ACTIONS_SOURCE,
       warnings
     );
-    expect(result).toBeNull();
+    // Parseable rights are now stored (not skipped) for TERP adjustment.
+    expect(result).not.toBeNull();
+    expect(result!.actionType).toBe('rights');
+    expect(result!.rightsRatio).toBeCloseTo(8 / 13, 10);
+    expect(result!.issuePrice).toBe(4);
+    expect(warnings).toHaveLength(0); // no warning for parseable rights
+  });
+
+  it('returns rights_unparseable action and warns when ratio/price missing', () => {
+    const warnings: string[] = [];
+    const result = parseNseCorporateActionRow(
+      row('CO', 'Rights Issue', '15-May-2023'),
+      NSE_CORPORATE_ACTIONS_SOURCE,
+      warnings
+    );
+    expect(result).not.toBeNull();
+    expect(result!.actionType).toBe('rights_unparseable');
+    expect(warnings.length).toBeGreaterThan(0);
     expect(warnings[0]).toMatch(/rights/i);
-    expect(warnings[0]).toMatch(/ambiguous/i);
+    expect(warnings[0]).toMatch(/unparseable/i);
   });
 
   it('sets currency INR on dividend actions', () => {
@@ -365,14 +444,16 @@ describe('parseNseCorporateActions — batch parsing', () => {
   it('isolates bad rows — valid rows still parsed', () => {
     const mixed: NseCorporateActionRow[] = [
       ...goodRows,
-      row('BADCO', 'Garbled XYZ', '01-Jan-2024'),      // unrecognised
-      row('',      'Bonus 1:1',   '01-Jan-2024'),       // missing symbol
-      row('CO3',   'Bonus 1:1',   'invalid-date'),      // bad date
-      row('CO4',   'Rights Issue', '01-Jan-2024'),      // rights → skipped
+      row('BADCO', 'Garbled XYZ', '01-Jan-2024'),      // unrecognised → skipped
+      row('',      'Bonus 1:1',   '01-Jan-2024'),       // missing symbol → skipped
+      row('CO3',   'Bonus 1:1',   'invalid-date'),      // bad date → skipped
+      row('CO4',   'Rights Issue', '01-Jan-2024'),      // CB-15: rights_unparseable → STORED (not skipped); warning emitted
     ];
     const { parsed, skipped, warnings } = parseNseCorporateActions(mixed);
-    expect(parsed).toHaveLength(5);
-    expect(skipped).toBe(4);
+    // 5 good + 1 rights_unparseable (now stored) = 6 parsed; 3 hard-skipped
+    expect(parsed).toHaveLength(6);
+    expect(skipped).toBe(3);
+    // warnings: 3 skip-warnings + 1 rights_unparseable advisory = 4
     expect(warnings).toHaveLength(4);
   });
 
@@ -730,18 +811,20 @@ describe('fixture-based integration — NSE corporate actions CSV', () => {
     expect(fixtureRows.length).toBeGreaterThan(0);
   });
 
-  it('parses all valid fixture rows (skips rights, bad date, unknown, equal-FV split, empty symbol)', () => {
+  it('parses all valid fixture rows including CB-15 rights and CB-16 demerger', () => {
     const { parsed, skipped, warnings } = parseNseCorporateActions(fixtureRows);
 
     // Fixture has: 2 bonus (GENSOL,SHILPAMED) + bonus WIPRO + bonus PAGEIND
     //              + 2 splits (RELIANCE, SUMEETINDS) + TATAPOWER sub-div + INFY split
     //              + 3 dividends (FCL, HDFCBANK, TCS) + NESTLEIND
-    //              = 12 valid rows
-    // Skipped: UTKARSHBNK (rights), UNKNOWN_CO (garbled), BADDATE (bad date),
-    //          ZEROFV (equal face value), NOSYMBOL (empty symbol) = 5 skipped
-    expect(parsed).toHaveLength(12);
-    expect(skipped).toBe(5);
-    expect(warnings).toHaveLength(5);
+    //              + UTKARSHBNK rights (CB-15: parseable → stored)
+    //              = 13 valid rows
+    // Skipped: UNKNOWN_CO (garbled), BADDATE (bad date),
+    //          ZEROFV (equal face value), NOSYMBOL (empty symbol) = 4 skipped
+    expect(parsed).toHaveLength(13);
+    expect(skipped).toBe(4);
+    // 4 skip-warnings (garbled, bad date, equal FV, no symbol); no rights warning for parseable rights
+    expect(warnings).toHaveLength(4);
   });
 
   it('correctly identifies GENSOL as bonus with splitRatio 3', () => {
@@ -769,12 +852,21 @@ describe('fixture-based integration — NSE corporate actions CSV', () => {
     expect(fcl!.amount).toBeCloseTo(0.8);
   });
 
-  it('fixture warnings mention rights and unrecognised subjects', () => {
+  it('fixture warnings mention unrecognised subjects (no rights warning for parseable rights)', () => {
     const { warnings } = parseNseCorporateActions(fixtureRows);
-    const hasRightsWarning = warnings.some((w) => w.toLowerCase().includes('rights'));
+    // UTKARSHBNK has parseable rights — no warning emitted for it.
     const hasUnrecognisedWarning = warnings.some((w) => w.toLowerCase().includes('unrecognised'));
-    expect(hasRightsWarning).toBe(true);
     expect(hasUnrecognisedWarning).toBe(true);
+  });
+
+  it('UTKARSHBNK rights row is stored with correct TERP inputs (CB-15)', () => {
+    const { parsed } = parseNseCorporateActions(fixtureRows);
+    const utkarsh = parsed.find((p) => p.symbol === 'UTKARSHBNK');
+    expect(utkarsh).toBeDefined();
+    expect(utkarsh!.actionType).toBe('rights');
+    // rightsRatio = 8/13; issuePrice = 4
+    expect(utkarsh!.rightsRatio).toBeCloseTo(8 / 13, 10);
+    expect(utkarsh!.issuePrice).toBe(4);
   });
 });
 

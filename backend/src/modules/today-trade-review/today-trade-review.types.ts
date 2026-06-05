@@ -293,6 +293,19 @@ export interface TodayReviewRepository {
   getCandidate(id: string): Promise<TodayReviewCandidateDto | null>;
 }
 
+/**
+ * Minimal earnings-proximity snapshot used by today-review.
+ * Only the fields needed for the earnings-blackout caveat are required.
+ */
+export interface TodayReviewEarningsProximity {
+  symbol: string;
+  daysToResult: number | null;
+  resultDateSource: string;
+  /** Human-readable date label — 'Official' | 'Estimated' | null */
+  resultDateLabel: string | null;
+  resultDate: string | null;
+}
+
 export interface TodayReviewUpstreamServices {
   strategyDecisionService: {
     marketGate(region?: string): Promise<any>;
@@ -329,6 +342,15 @@ export interface TodayReviewUpstreamServices {
     latestPersistedStock(instrumentId: string, range?: '1M' | '3M' | '6M'): Promise<SmartMoneyStockSummary | null>;
     latestPersistedStocks?(instrumentIds: string[], range?: '1M' | '3M' | '6M'): Promise<SmartMoneyStockSummary[]>;
   };
+  /**
+   * Optional earnings intelligence service for earnings-proximity caveats.
+   * When present, today-review will load persisted earnings snapshots and attach
+   * an "earnings in N days" warning to candidates whose result is ≤3 trading days away.
+   * Uses persisted data only — never triggers a live computation on a GET.
+   */
+  earningsService?: {
+    latestProximityBySymbol(region: string, assetType: string): Promise<Map<string, TodayReviewEarningsProximity>>;
+  } | null;
 }
 
 export interface TodayReviewCandidateSource {

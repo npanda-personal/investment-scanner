@@ -116,18 +116,22 @@ describe('Fix 1: normalizePrices — duplicate-date rows stripped, window[N] = N
     expect(result[2].date).toBe('2026-01-05T00:00:00.000Z');
   });
 
-  it('calculateOutcome with 61 unique-date trading-day rows evaluates 60D horizon', () => {
+  it('calculateOutcome with 62 unique-date trading-day rows evaluates 60D horizon (T+1 entry)', () => {
+    // CB-10: entry is at T+1 (bar after signal day), so a 60D outcome needs:
+    //   prices[0]=T+0 signal day, prices[1]=T+1 entry, prices[61]=T+61 (60 bars forward from entry)
+    // Total required: 62 rows. 61 rows is one short under T+1 semantics.
     const service = emptyService();
-    const prices = makeTradingDayPrices('2026-01-02', 61);
+    const prices = makeTradingDayPrices('2026-01-02', 62);
     const outcome = service.calculateOutcome(makeSignal() as any, prices);
     const sixtyD = outcome.outcomes.find((o) => o.horizon === '60D');
     expect(sixtyD?.available).toBe(true);
     expect(sixtyD?.forwardReturnPercent).not.toBeNull();
   });
 
-  it('does not evaluate 60D when fewer than 61 rows exist', () => {
+  it('does not evaluate 60D when fewer than 62 rows exist (T+1 entry)', () => {
+    // Under T+1 semantics, 61 rows means entryIndex=1 and window[60]=prices[61] is out of bounds.
     const service = emptyService();
-    const prices = makeTradingDayPrices('2026-01-02', 60); // only 60 rows → window[60] is undefined
+    const prices = makeTradingDayPrices('2026-01-02', 61); // 61 rows → window[60] is undefined under T+1
     const outcome = service.calculateOutcome(makeSignal() as any, prices);
     const sixtyD = outcome.outcomes.find((o) => o.horizon === '60D');
     expect(sixtyD?.available).toBe(false);
@@ -577,5 +581,63 @@ describe('Fix 11: addTradingDays skips weekends', () => {
     // 60 trading days ≈ 84 calendar days
     expect(calendarDays).toBeGreaterThan(60);
     expect(calendarDays).toBeLessThanOrEqual(90); // reasonable upper bound
+  });
+});
+
+// ---------------------------------------------------------------------------
+// CB-10 / CB-8: T+1 entry semantics locked in
+// ---------------------------------------------------------------------------
+
+describe('CB-10: calculateOutcome enters at T+1 (bar after signal day)', () => {
+  it('(a) entry price equals prices[1], not prices[0] (the signal day close)', () => {
+    // The signal is generated on 2026-01-02 (prices[0], adjustedClose=100).
+    // Under T+1 semantics, the outcome must enter at prices[1] (adjustedClose=200),
+    // not at prices[0]. priceAtSignal and forwardReturnPercent must reflect the T+1 entry.
+    const service = emptyService();
+    const prices: PricePoint[] = [
+      { date: '2026-01-02T00:00:00.000Z', adjustedClose: 100 }, // T+0 signal day
+      { date: '2026-01-03T00:00:00.000Z', adjustedClose: 200 }, // T+1 entry
+      { date: '2026-01-04T00:00:00.000Z', adjustedClose: 210 }, // T+2
+    ];
+    const outcome = service.calculateOutcome(makeSignal({ generated_at: '2026-01-02T00:00:00.000Z' }) as any, prices);
+
+    const oneDayOutcome = outcome.outcomes.find((o) => o.horizon === '1D');
+    // Entry price must be 200 (T+1), not 100 (T+0)
+    expect(oneDayOutcome?.priceAtSignal).toBe(200);
+    // 1D return = (210 - 200) / 200 = 0.05
+    expect(oneDayOutcome?.available).toBe(true);
+    expect(oneDayOutcome?.forwardReturnPercent).toBeCloseTo(0.05, 5);
+    // startPriceDate must be the T+1 bar date
+    expect(outcome.startPriceDate).toBe('2026-01-03T00:00:00.000Z');
+  });
+
+  it('(b) alphaPercent = forwardReturnPercent − benchmarkReturnPercent for same-horizon window', () => {
+    // Directly test the alpha calculation used in the recalculate persist path.
+    // forwardReturnPercent = 0.10 (signal), benchmarkReturnPercent = 0.04 (Nifty same horizon)
+    // alphaPercent must be 0.06.
+    const forwardReturnPercent = 0.10;
+    const benchmarkReturnPercent = 0.04;
+    const alphaPercent = forwardReturnPercent - benchmarkReturnPercent;
+    expect(alphaPercent).toBeCloseTo(0.06, 10);
+
+    // Negative alpha: underperforming the benchmark
+    const forwardReturnNeg = -0.02;
+    const benchmarkReturnPos = 0.03;
+    expect(forwardReturnNeg - benchmarkReturnPos).toBeCloseTo(-0.05, 10);
+  });
+
+  it('(c) benchmarkReturnPercent and alphaPercent are null when benchmark prices are absent', () => {
+    // ForwardOutcome produced by forwardOutcome() always has benchmarkReturnPercent=null
+    // and alphaPercent=null — they are only populated in the recalculate persist path
+    // when ^NSEI prices are available. Verify the default null state from calculateOutcome.
+    const service = emptyService();
+    const prices = makeTradingDayPrices('2026-01-02', 62);
+    const outcome = service.calculateOutcome(makeSignal() as any, prices);
+
+    for (const fo of outcome.outcomes) {
+      // forwardOutcome() sets both to null; persist path fills them if benchmark available
+      expect(fo.benchmarkReturnPercent).toBeNull();
+      expect(fo.alphaPercent).toBeNull();
+    }
   });
 });

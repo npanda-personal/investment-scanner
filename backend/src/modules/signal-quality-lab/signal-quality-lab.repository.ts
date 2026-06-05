@@ -57,6 +57,8 @@ export class SignalQualityLabRepository {
               maxFavorableExcursion: row.maxFavorableExcursion ?? null,
               maxAdverseExcursion: row.maxAdverseExcursion ?? null,
               maxDrawdownPercent: row.maxDrawdownPercent ?? null,
+              // CB-8: benchmark return and alpha — written via raw SQL after batch to avoid
+              // Prisma client type mismatch (client was generated before schema migration).
               evaluatedAt: row.evaluatedAt,
             },
             update: {
@@ -82,6 +84,28 @@ export class SignalQualityLabRepository {
       );
 
       upserted += chunk.length;
+
+      // CB-8: write benchmarkReturnPercent and alphaPercent via raw SQL.
+      // These columns were added after the Prisma client was last generated,
+      // so they are not in the typed schema — raw UPDATE is the safe path.
+      const benchmarkRows = chunk.filter(
+        (r) => r.benchmarkReturnPercent !== null || r.alphaPercent !== null
+      );
+      if (benchmarkRows.length > 0) {
+        for (const r of benchmarkRows) {
+          await this.db.$executeRawUnsafe(
+            `UPDATE signal_outcomes
+             SET "benchmarkReturnPercent" = $1,
+                 "alphaPercent"           = $2
+             WHERE "signalResultId" = $3
+               AND horizon = $4`,
+            r.benchmarkReturnPercent ?? null,
+            r.alphaPercent ?? null,
+            r.signalResultId,
+            r.horizon,
+          );
+        }
+      }
     }
 
     return { upserted };
@@ -262,6 +286,7 @@ export class SignalQualityLabRepository {
           "forwardReturnPercent",
           "maxAdverseExcursion",
           "maxFavorableExcursion",
+          "alphaPercent",
           ${groupExpr} AS group_key
         FROM signal_outcomes
         WHERE "dataComplete" = true
@@ -295,7 +320,9 @@ export class SignalQualityLabRepository {
           AVG(b."maxAdverseExcursion") AS avg_mae,
           AVG(b."maxFavorableExcursion") AS avg_mfe,
           MAX(b."forwardReturnPercent") AS best_return,
-          MIN(b."forwardReturnPercent") AS worst_return
+          MIN(b."forwardReturnPercent") AS worst_return,
+          -- CB-8: avg alpha over rows where alphaPercent is populated
+          AVG(b."alphaPercent") AS avg_alpha
         FROM base b
         GROUP BY b.horizon, b.group_key
       )
@@ -325,7 +352,9 @@ export class SignalQualityLabRepository {
         ROUND(a.avg_mae::numeric, 6) AS avg_max_adverse_excursion,
         ROUND(a.avg_mfe::numeric, 6) AS avg_max_favorable_excursion,
         ROUND(a.best_return::numeric, 6) AS best_return_percent,
-        ROUND(a.worst_return::numeric, 6) AS worst_return_percent
+        ROUND(a.worst_return::numeric, 6) AS worst_return_percent,
+        -- CB-8: avg alpha (null when no rows have benchmark data yet)
+        ROUND(a.avg_alpha::numeric, 6) AS avg_alpha_percent
       FROM aggregated a
       LEFT JOIN directional d ON a.horizon = d.horizon AND a.group_key = d.group_key
       ${havingClause}
@@ -351,6 +380,7 @@ export class SignalQualityLabRepository {
       avgMaxFavorableExcursion: row.avg_max_favorable_excursion !== null && row.avg_max_favorable_excursion !== undefined ? Number(row.avg_max_favorable_excursion) : null,
       bestReturnPercent: row.best_return_percent !== null && row.best_return_percent !== undefined ? Number(row.best_return_percent) : null,
       worstReturnPercent: row.worst_return_percent !== null && row.worst_return_percent !== undefined ? Number(row.worst_return_percent) : null,
+      avgAlphaPercent: row.avg_alpha_percent !== null && row.avg_alpha_percent !== undefined ? Number(row.avg_alpha_percent) : null,
     }));
   }
 
@@ -447,6 +477,7 @@ export class SignalQualityLabRepository {
       avgMaxFavorableExcursion: row.avg_max_favorable_excursion !== null && row.avg_max_favorable_excursion !== undefined ? Number(row.avg_max_favorable_excursion) : null,
       bestReturnPercent: row.best_return_percent !== null && row.best_return_percent !== undefined ? Number(row.best_return_percent) : null,
       worstReturnPercent: row.worst_return_percent !== null && row.worst_return_percent !== undefined ? Number(row.worst_return_percent) : null,
+      avgAlphaPercent: null, // scorecardSummary SQL does not SELECT avg_alpha — populated null here; service layer may enrich if needed
     }));
   }
 
