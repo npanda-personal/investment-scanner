@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import { SmartMoneyIntelligenceService } from './smart-money-intelligence.service';
 import { getParam, parseLimit, parseOffset, parseOptionalText, parseRange } from './smart-money-intelligence.validation';
+import { getLatestFnoBanList, ingestFnoBanList } from './fno-ban.service';
 
 export class SmartMoneyIntelligenceController {
   constructor(private readonly service = new SmartMoneyIntelligenceService()) {}
@@ -47,6 +48,10 @@ export class SmartMoneyIntelligenceController {
   );
 
   health = async (_req: Request, res: Response) => this.respond(res, () => this.service.health());
+
+  fnoBanList = async (_req: Request, res: Response) => this.respond(res, () => getLatestFnoBanList());
+
+  fnoBanIngest = async (_req: Request, res: Response) => this.respond(res, () => ingestFnoBanList());
 
   private async respond(res: Response, fn: () => Promise<unknown> | unknown) {
     try {

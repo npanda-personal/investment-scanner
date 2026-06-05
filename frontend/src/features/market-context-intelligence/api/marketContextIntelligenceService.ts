@@ -78,3 +78,36 @@ export async function fetchFiiDiiActivity(params: { days?: number } = {}): Promi
   const response = await axios.get<FiiDiiActivityResponse>(`${API_BASE}/fii-dii`, { params });
   return response.data;
 }
+
+// ---------------------------------------------------------------------------
+// CB-22: Bulk & Block Deals
+// ---------------------------------------------------------------------------
+
+export type DealType = 'BULK' | 'BLOCK';
+export type DealSide = 'BUY' | 'SELL';
+
+export interface BulkBlockDealRow {
+  tradeDate: string;
+  dealType: DealType;
+  symbol: string;
+  name: string;
+  clientName: string;
+  buySell: DealSide;
+  qty: number;
+  avgPrice: number;
+  remarks: string | null;
+}
+
+export interface BulkBlockDealsResponse {
+  status: 'ready' | 'missing' | 'error';
+  source: string;
+  asOf: string | null;
+  fetchedAt: string;
+  rows: BulkBlockDealRow[];
+  message?: string;
+}
+
+export async function fetchBulkBlockDeals(params: { days?: number } = {}): Promise<BulkBlockDealsResponse> {
+  const response = await axios.get<BulkBlockDealsResponse>(`${API_BASE}/bulk-block-deals`, { params });
+  return response.data;
+}

@@ -21,6 +21,9 @@ export const createMarketContextIntelligenceRouter = (
   // CB-21: FII/DII Activity
   router.get('/market-context/fii-dii', controller.fiiDiiActivity);
   router.post('/market-context/fii-dii/ingest', controller.fiiDiiIngest);
+  // CB-22: Bulk & Block Deals
+  router.get('/market-context/bulk-block-deals', controller.bulkBlockDeals);
+  router.post('/market-context/bulk-block-deals/ingest', controller.bulkBlockDealsIngest);
   return router;
 };
 

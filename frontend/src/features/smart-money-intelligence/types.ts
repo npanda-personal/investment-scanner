@@ -77,6 +77,16 @@ export interface SmartMoneyHealth {
   notes: string[];
 }
 
+export interface FnoBanListResponse {
+  status: 'ready' | 'missing' | 'error';
+  source: string;
+  banDate: string | null;
+  fetchedAt: string;
+  symbols: string[];
+  count: number;
+  message?: string;
+}
+
 export interface SmartMoneyRunResponse {
   generated: number;
   skipped: number;

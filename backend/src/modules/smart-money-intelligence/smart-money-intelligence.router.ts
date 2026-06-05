@@ -12,6 +12,8 @@ export const createSmartMoneyIntelligenceRouter = (
   router.get('/smart-money/top', controller.top);
   router.get('/smart-money/distribution', controller.distribution);
   router.get('/smart-money/stocks/:instrumentId', controller.stock);
+  router.get('/smart-money/fno-ban', controller.fnoBanList);
+  router.post('/smart-money/fno-ban/ingest', controller.fnoBanIngest);
 
   return router;
 };

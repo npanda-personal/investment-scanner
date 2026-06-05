@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { PaginatedSmartMoneyListResponse, SectorSmartMoneySummary, SmartMoneyHealth, SmartMoneyRange, SmartMoneyRunResponse, SmartMoneyStockSummary } from '../types';
+import type { FnoBanListResponse, PaginatedSmartMoneyListResponse, SectorSmartMoneySummary, SmartMoneyHealth, SmartMoneyRange, SmartMoneyRunResponse, SmartMoneyStockSummary } from '../types';
 
 const API_BASE = '/api/v1/smart-money';
 
@@ -30,5 +30,15 @@ export async function runSmartMoneySnapshots(params: { batchSize?: number; offse
 
 export async function fetchSmartMoneyStock(instrumentId: string, range: SmartMoneyRange = '3M'): Promise<SmartMoneyStockSummary> {
   const response = await axios.get<SmartMoneyStockSummary>(`${API_BASE}/stocks/${instrumentId}`, { params: { range } });
+  return response.data;
+}
+
+export async function fetchFnoBanList(): Promise<FnoBanListResponse> {
+  const response = await axios.get<FnoBanListResponse>(`${API_BASE}/fno-ban`);
+  return response.data;
+}
+
+export async function ingestFnoBanList(): Promise<{ status: string; banDate: string | null; symbolsUpserted: number; message?: string }> {
+  const response = await axios.post(`${API_BASE}/fno-ban/ingest`);
   return response.data;
 }

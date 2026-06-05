@@ -10,6 +10,8 @@ describe('smart money intelligence routes', () => {
       top: jest.fn(),
       distribution: jest.fn(),
       stock: jest.fn(),
+      fnoBanList: jest.fn(),
+      fnoBanIngest: jest.fn(),
     } as any);
     const routes = router.stack.filter((layer: any) => layer.route).map((layer: any) => `${Object.keys(layer.route.methods)[0].toUpperCase()} ${layer.route.path}`);
 
@@ -20,6 +22,8 @@ describe('smart money intelligence routes', () => {
       'GET /smart-money/top',
       'GET /smart-money/distribution',
       'GET /smart-money/stocks/:instrumentId',
+      'GET /smart-money/fno-ban',
+      'POST /smart-money/fno-ban/ingest',
     ]);
   });
 });

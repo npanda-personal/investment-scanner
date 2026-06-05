@@ -24,8 +24,10 @@ import {
   LaunchOutlined
 } from '@mui/icons-material';
 import { Link } from 'react-router-dom';
+import { useCallback, useEffect, useState } from 'react';
 import { useSmartMoneyIntelligence } from '../hooks';
-import type { SectorSmartMoneySummary, SectorSmartMoneyStatus, SmartMoneyRange, SmartMoneyStatus, SmartMoneyStockSummary } from '../types';
+import type { FnoBanListResponse, SectorSmartMoneySummary, SectorSmartMoneyStatus, SmartMoneyRange, SmartMoneyStatus, SmartMoneyStockSummary } from '../types';
+import { fetchFnoBanList, ingestFnoBanList } from '../api/smartMoneyIntelligenceService';
 import { DataTable, FilterBar, PageHeader, StalenessBadge, type DataTableColumn } from '@/shared/components';
 import { humanizeCode } from '@/shared/format/enumLabels';
 
@@ -264,6 +266,7 @@ export default function SmartMoneyIntelligencePage() {
         </Stack>
         <Stack spacing={3}>
           <StockDetail stock={selectedStock} loading={detailLoading} />
+          <FnoBanWidget />
           <Paper sx={{ p: 2 }}>
             <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
               <Typography variant="h6">Data Coverage</Typography>
@@ -383,6 +386,100 @@ function Metric({ label, value }: { label: string; value: string }) {
     <Paper variant="outlined" sx={{ p: 1 }}>
       <Typography variant="body2" color="text.secondary">{label}</Typography>
       <Typography fontWeight={700}>{value}</Typography>
+    </Paper>
+  );
+}
+
+function FnoBanWidget() {
+  const [data, setData] = useState<FnoBanListResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [ingesting, setIngesting] = useState(false);
+  const [ingestMsg, setIngestMsg] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      setData(await fetchFnoBanList());
+    } catch {
+      setData(null);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const handleIngest = async () => {
+    setIngesting(true);
+    setIngestMsg(null);
+    try {
+      const result = await ingestFnoBanList();
+      setIngestMsg(
+        result.status === 'success'
+          ? `Ingested ${result.symbolsUpserted} symbol(s) for ${result.banDate ?? 'unknown date'}.`
+          : result.message ?? 'Ingest completed.'
+      );
+      await load();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Ingest failed';
+      setIngestMsg(msg);
+    } finally {
+      setIngesting(false);
+    }
+  };
+
+  return (
+    <Paper sx={{ p: 2 }}>
+      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+        <Box>
+          <Typography variant="h6">F&amp;O Ban List</Typography>
+          <Typography variant="body2" color="text.secondary">
+            Securities in F&amp;O ban period — derivatives trading restricted; elevated risk
+          </Typography>
+        </Box>
+        <Button size="small" variant="outlined" onClick={() => void handleIngest()} disabled={ingesting || loading}>
+          {ingesting ? 'Ingesting...' : 'Refresh'}
+        </Button>
+      </Stack>
+
+      {ingestMsg && (
+        <Alert severity="info" sx={{ mb: 1 }} onClose={() => setIngestMsg(null)}>
+          {ingestMsg}
+        </Alert>
+      )}
+
+      {loading ? (
+        <LinearProgress />
+      ) : !data || data.status === 'error' ? (
+        <Typography color="text.secondary" variant="body2">
+          {data?.message ?? 'List unavailable. Use Refresh to fetch from NSE.'}
+        </Typography>
+      ) : data.status === 'missing' ? (
+        <Typography color="text.secondary" variant="body2">
+          {data.message ?? 'No F&O ban data persisted yet. Use Refresh to ingest from NSE.'}
+        </Typography>
+      ) : data.symbols.length === 0 ? (
+        <Typography color="text.secondary" variant="body2">
+          No securities in ban period for {data.banDate ?? 'latest date'}.
+        </Typography>
+      ) : (
+        <>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+            As of {data.banDate} — {data.count} securit{data.count === 1 ? 'y' : 'ies'} in ban period
+          </Typography>
+          <Stack direction="row" flexWrap="wrap" gap={0.75}>
+            {data.symbols.map((symbol) => (
+              <Chip
+                key={symbol}
+                label={symbol}
+                size="small"
+                color="error"
+                variant="outlined"
+              />
+            ))}
+          </Stack>
+        </>
+      )}
     </Paper>
   );
 }

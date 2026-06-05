@@ -22,6 +22,8 @@ describe('market context routes', () => {
       run: jest.fn(),
       fiiDiiActivity: jest.fn(),
       fiiDiiIngest: jest.fn(),
+      bulkBlockDeals: jest.fn(),
+      bulkBlockDealsIngest: jest.fn(),
     } as any);
     const routes = router.stack.filter((layer: any) => layer.route).map((layer: any) => `${Object.keys(layer.route.methods)[0].toUpperCase()} ${layer.route.path}`);
 
@@ -41,6 +43,8 @@ describe('market context routes', () => {
       'POST /market-context/run',
       'GET /market-context/fii-dii',
       'POST /market-context/fii-dii/ingest',
+      'GET /market-context/bulk-block-deals',
+      'POST /market-context/bulk-block-deals/ingest',
     ]);
   });
 

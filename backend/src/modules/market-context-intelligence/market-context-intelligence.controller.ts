@@ -3,6 +3,7 @@ import { MarketContextIntelligenceService } from './market-context-intelligence.
 import { MarketPulseSnapshotService } from './market-pulse-snapshot.service';
 import { CapitalPostureService } from './capital-posture.service';
 import { ingestFiiDii, getLatestFiiDiiActivity } from './fii-dii.service';
+import { ingestBulkBlockDeals, getLatestBulkBlockDeals } from './bulk-block-deals.service';
 
 export class MarketContextIntelligenceController {
   constructor(
@@ -116,6 +117,20 @@ export class MarketContextIntelligenceController {
 
   fiiDiiIngest = async (_req: Request, res: Response) =>
     this.respond(res, () => ingestFiiDii());
+
+  /**
+   * CB-22: Bulk & Block Deals
+   * GET  /market-context/bulk-block-deals           — persisted-read (last N days)
+   * POST /market-context/bulk-block-deals/ingest    — fetch from NSE + persist
+   */
+  bulkBlockDeals = async (req: Request, res: Response) => {
+    res.setHeader('Cache-Control', 'no-store');
+    const days = typeof req.query.days === 'string' ? Math.max(1, Math.min(30, Number(req.query.days) || 1)) : 1;
+    return this.respond(res, () => getLatestBulkBlockDeals(days));
+  };
+
+  bulkBlockDealsIngest = async (_req: Request, res: Response) =>
+    this.respond(res, () => ingestBulkBlockDeals());
 
   regime = async (req: Request, res: Response) => this.respond(res, () => this.service.regime(this.region(req)));
   sectors = async (req: Request, res: Response) => this.respond(res, () => this.service.sectors(this.region(req)));
