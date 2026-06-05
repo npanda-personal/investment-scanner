@@ -214,3 +214,41 @@ stratification; auth rate-limit; EXIT_TRIGGERED→CLOSED resolver; pool-exhausti
 - **One genuine disagreement with the audits:** the UX audit's charting component is listed as net-new (P3-ish), but for the Research Workbench specifically it's a credibility cornerstone — I'd pull *that one* up to P1 when the workbench gets attention.
 
 **Suggested execution order:** CB-1 → CB-7 → CB-5 → (owner ruling) CB-4 → CB-2/CB-3 → CB-26 → CB-20/CB-21 → CB-8/CB-9/CB-10 → CB-32/CB-28 → then the P2 UX/perf sweeps.
+
+---
+
+## NR — Always-on PO proposals (2026-06-05, domain-expert pass)
+
+Net-new requirements from the standing PO agent (Indian-market domain expert), de-duped vs CB-1..72,
+ranked under the market-first lens. My triage tier in [brackets]. These feed the backlog as it drains
+(working-agreement #6). Full rationale per item is in the PO pass; condensed here:
+
+| ID | Title | Surface | Tier | Effort |
+|----|-------|---------|------|--------|
+| NR-2 | SMA-50/200 overlays on workbench chart | Stock/workbench | **[P1]** | S |
+| NR-3 | Nifty-50 benchmark overlay (rebased 100) on workbench chart | Stock/workbench | **[P1]** | S |
+| NR-4 | Corporate-action ex-date markers on workbench chart | Stock/workbench | **[P1]** | S |
+| NR-1 | Per-stock delivery% as a signal input + workbench display (consume CB-20 data) | Stock | **[P1]** | S |
+| NR-9 | 52-week range position (high/low/%-from-low) on workbench + today-review col | Stock | **[P1]** | S |
+| NR-7 | Sector drill-down → constituent signals (click sector → filtered screener) | Market→stock | **[P1]** | S |
+| NR-10 | Earnings-season "heat" badge on Market Pulse / today-review header | Market | **[P1]** | S |
+| NR-6 | RS rank / universe percentile on each signal + today-review | Stock | **[P1]** | M |
+| NR-15 | Cumulative A/D line (persist daily net + chart) | Market/context | **[P1]** | M |
+| NR-5 | Nifty Midcap/Smallcap cap-band breadth stratification | Market/context | **[P1]** | M |
+| NR-12 | FII/DII flows as regime input + Market Pulse widget (specific wiring of CB-21) | Market | **[P1]** | M |
+| NR-8 | NSE PCR / F&O OI ingest → regime sentiment input | Market | **[P1]** | M |
+| NR-11 | "Why did this move?" deterministic explainer on today-review candidate detail | Stock | **[P1]** | M |
+| NR-14 | Signal concentration-risk warning (sector clustering) on today-review | Market view | **[P2]** | S |
+| NR-13 | Sector signal-count trend (rolling 5D sparkline) on Market Context | Market | **[P2]** | M |
+| NR-18 | Liquidity / circuit-limit (cap-tier) badge on workbench header | Stock | **[P2]** | S |
+| NR-16 | Multi-timeframe confluence (weekly trend) in signal evidence | Stock | **[P2]** | M-L |
+| NR-17 | Results-season impact table (post-result reaction + QoQ momentum) | Stock/market | **[P2]** | L |
+
+**My triage notes:** NR-2/3/4 (chart overlays) + NR-1/NR-9 (delivery%, 52W) + NR-7/NR-10 are the
+highest effort-to-value wins — all S-effort, pure market/stock-screen improvements, mostly no new data.
+NR-8/NR-12 need new free NSE ingests (overlap CB-21/CB-24 source files — sequence them together).
+NR-16/NR-17 are L → defer. The chart overlays (NR-2/3/4) collectively realize the "charting component"
+the UX audit deferred to P3 — incrementally, on the existing Recharts chart, without a library swap.
+
+**Recurring PO cadence (working-agreement #6):** re-run this PO pass at the start of each wave and as the
+backlog drains, so the queue never runs dry.
