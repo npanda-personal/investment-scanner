@@ -1669,7 +1669,10 @@ export class MarketDataFoundationService {
   ): Promise<TrustedReviewUniverseInstrument[]> {
     const limit = Math.max(1, Math.min(Number(options.limit) || 100, 500));
     const offset = Math.max(Number(options.offset) || 0, 0);
-    const evaluation = await this.trustedReviewUniverseEvaluation(options);
+    // Use the snapshot cache so repeated paginated calls (one per 250-instrument page during
+    // today-review universe scan) do not re-run the full 2900+ stock evaluation each time.
+    const snapshot = await this.tryUniverseComputationSnapshot({ region: options.region?.trim().toUpperCase() || 'IN', assetType: options.assetType?.trim().toUpperCase() || 'STOCK' }, options.now instanceof Date ? options.now : undefined);
+    const evaluation = await this.trustedReviewUniverseEvaluation(options, snapshot ?? undefined);
     const selected = evaluation.trustedStocks.slice(offset, offset + limit);
     const selectedReadinessBySymbol = new Map(selected.map((item) => [item.stock.symbol, item.readiness]));
     const selectedStatsBySymbol = new Map(selected.map((item) => [item.stock.symbol, item.stats]));

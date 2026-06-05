@@ -682,10 +682,18 @@ export class MarketDataFoundationRepository {
       ];
     }
 
+    const resolvedSortBy = this.safeStockSortBy(sortBy);
+    // Nullable numeric columns (marketCap) default to NULLS FIRST in Postgres for
+    // DESC sorts, which causes stocks added without a marketCap value to dominate
+    // the first page and displace real large-caps in the backtest ALL universe.
+    // Use Prisma's { sort, nulls } object form to force NULLS LAST on any DESC sort.
+    const orderByValue: any = sortOrder === 'desc'
+      ? { sort: 'desc', nulls: 'last' }
+      : sortOrder;
     const [stocks, total] = await Promise.all([
       this.prisma.stock.findMany({
         where,
-        orderBy: { [this.safeStockSortBy(sortBy)]: sortOrder },
+        orderBy: { [resolvedSortBy]: orderByValue },
         skip,
         take: pageSize,
       }),
@@ -2062,7 +2070,9 @@ export class MarketDataFoundationRepository {
     const rowsBySymbol = new Map<string, TrustedReviewUniversePriceRow[]>(
       uniqueSymbols.map((symbol) => [symbol, []])
     );
-    const chunkSize = 25;
+    // Bounded to 5 concurrent queries per chunk so we stay well under the Prisma pool limit
+    // (connection_limit=10) even when paginating over the full trusted universe.
+    const chunkSize = 5;
     for (let index = 0; index < uniqueSymbols.length; index += chunkSize) {
       const chunk = uniqueSymbols.slice(index, index + chunkSize);
       const chunkRows = await Promise.all(chunk.map(async (symbol) => {
