@@ -30,6 +30,16 @@ export function humanizeCode(code: unknown): string {
       (m: string) => m.toUpperCase());
 }
 
+/**
+ * Humanize SCREAMING_SNAKE_CASE tokens embedded inside a longer sentence/string.
+ * (humanizeCode leaves multi-word human text untouched, so it won't fix an enum
+ * token buried in a backend-generated sentence — this does.)
+ */
+export function humanizeEmbedded(text: unknown): string {
+  if (text === null || text === undefined) return '';
+  return String(text).replace(/\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b/g, (token) => humanizeCode(token));
+}
+
 /** Friendly names for the common NSE indices (raw symbol -> display). */
 const INDEX_LABELS: Record<string, string> = {
   '^NSEI': 'Nifty 50',

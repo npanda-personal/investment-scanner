@@ -36,7 +36,7 @@ import type { ReactNode } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { PageHeader } from '@/shared/components/PageHeader';
-import { humanizeCode } from '@/shared/format/enumLabels';
+import { humanizeCode, humanizeEmbedded } from '@/shared/format/enumLabels';
 import { useTodayReview } from '../hooks/useTodayReview';
 import type {
   TodayReviewCandidate,
@@ -205,7 +205,7 @@ function RunStatusPanel({ run, marketPosture }: { run: TodayReviewRun | null; ma
           <Typography variant="body2" color="text.secondary">Last run: {formatDateTime(run.finishedAt || run.startedAt)}</Typography>
           <Typography variant="body2" color="text.secondary">Data-through: {formatDate(run.dataThroughDate)}</Typography>
           <Typography variant="body2" color="text.secondary">Scope: {run.region} / {run.assetType}</Typography>
-          <Typography variant="body2" color="text.secondary">Review mode: {coverageValue(run, 'mode')}</Typography>
+          <Typography variant="body2" color="text.secondary">Review mode: {humanizeCode(coverageValue(run, 'mode'))}</Typography>
           <Typography variant="body2" color="text.secondary">Trusted universe: {formatNumber(Number(coverageValue(run, 'trustedCount') || 0))} / Catalog {formatNumber(Number(coverageValue(run, 'catalogCount') || 0))}</Typography>
           <Typography variant="body2" color="text.secondary">Required data-through: {reviewUniverse.requiredDataThroughDate || reviewReadiness.requiredDataThroughDate || 'Unavailable'}</Typography>
           <Typography variant="body2" color="text.secondary">Stored data-through: {reviewUniverse.storedDataThroughDate || reviewReadiness.storedDataThroughDate || reviewUniverse.dataThroughDate || 'Unavailable'}</Typography>
@@ -231,7 +231,7 @@ function CoveragePanel({ run }: { run: TodayReviewRun }) {
         <Stack spacing={1.5}>
           <Typography variant="subtitle2">Trusted baseline context (read-only source: Market Data Foundation)</Typography>
           <Stack direction={{ xs: 'column', md: 'row' }} spacing={1} useFlexGap flexWrap="wrap">
-            <Chip label={`Review mode: ${coverageValue(run, 'mode')}`} color={coverageValue(run, 'mode') === 'FULL_REVIEW' ? 'success' : coverageValue(run, 'mode') === 'LIMITED_REVIEW' ? 'warning' : 'default'} />
+            <Chip label={`Review mode: ${humanizeCode(coverageValue(run, 'mode'))}`} color={coverageValue(run, 'mode') === 'FULL_REVIEW' ? 'success' : coverageValue(run, 'mode') === 'LIMITED_REVIEW' ? 'warning' : 'default'} />
             <Chip label={`Trusted universe: ${formatNumber(Number(coverageValue(run, 'trustedCount') || 0))}`} variant="outlined" />
             <Chip label={`Catalog: ${formatNumber(Number(coverageValue(run, 'catalogCount') || 0))}`} variant="outlined" />
             <Chip label={`Review session: ${reviewUniverse.targetTradingDate || 'Unavailable'}`} variant="outlined" />
@@ -251,8 +251,8 @@ function CoveragePanel({ run }: { run: TodayReviewRun }) {
           )}
           {reviewReadiness.reviewMode && (
             <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} useFlexGap flexWrap="wrap">
-              <Typography variant="caption">Market Data summary mode: {reviewReadiness.reviewMode}</Typography>
-              <Typography variant="caption">Trust status: {reviewReadiness.trustStatus || 'UNKNOWN'}</Typography>
+              <Typography variant="caption">Market Data summary mode: {humanizeCode(reviewReadiness.reviewMode)}</Typography>
+              <Typography variant="caption">Trust status: {humanizeCode(reviewReadiness.trustStatus || 'UNKNOWN')}</Typography>
               <Typography variant="caption">Next bounded action: {reviewReadiness.nextAction?.label || 'none'}</Typography>
               <Typography variant="caption">Batch size: {reviewReadiness.nextAction?.boundedRequest?.batchSize || 'n/a'}</Typography>
             </Stack>
@@ -413,7 +413,7 @@ function BoardSelectionPanel({ run }: { run: TodayReviewRun }) {
           </Stack>
           {boardSelection.fillBackfillReasons.length > 0 && (
             <Typography variant="body2" color="text.secondary">
-              {boardSelection.fillBackfillReasons.join(' ')}
+              {humanizeEmbedded(boardSelection.fillBackfillReasons.join(' '))}
             </Typography>
           )}
         </Stack>
@@ -460,7 +460,7 @@ const todayReviewExportColumns: Array<{ label: string; value: (candidate: TodayR
   { label: 'Setup', value: (candidate) => candidate.setupType || candidate.strategyCode },
   { label: 'Board Section', value: (candidate) => boardSectionLabel(candidate) },
   { label: 'Board Source', value: (candidate) => boardSourceLabel(candidate) },
-  { label: 'Board Reason', value: (candidate) => candidate.boardReason },
+  { label: 'Board Reason', value: (candidate) => humanizeEmbedded(candidate.boardReason) },
   { label: 'Entry Evidence', value: (candidate) => formatEntry(candidate.tradePlanSnapshot as any) },
   { label: 'Confidence', value: (candidate) => confidenceDisplay(candidate).label },
   { label: 'Grade', value: (candidate) => candidate.grade },
@@ -574,8 +574,8 @@ function CandidateTable({ candidates }: { candidates: TodayReviewCandidate[] }) 
       id: 'board',
       label: 'Board',
       width: 230,
-      value: (candidate) => `${boardSectionLabel(candidate)} ${boardSourceLabel(candidate)} ${humanizeCode(candidate.boardReason) || ''}`,
-      render: (candidate) => <EllipsisCell fullText={`${boardSectionLabel(candidate)} / ${boardSourceLabel(candidate)} - ${humanizeCode(candidate.boardReason) || 'Standard board selection.'}`} />,
+      value: (candidate) => `${boardSectionLabel(candidate)} ${boardSourceLabel(candidate)} ${humanizeEmbedded(candidate.boardReason) || ''}`,
+      render: (candidate) => <EllipsisCell fullText={`${boardSectionLabel(candidate)} / ${boardSourceLabel(candidate)} - ${humanizeEmbedded(candidate.boardReason) || 'Standard board selection.'}`} />,
     },
     {
       id: 'entry',
@@ -1136,9 +1136,9 @@ function candidatesForTab(groups: TodayReviewGroups, tab: keyof TodayReviewGroup
 function emptySectionExplanation(tab: keyof TodayReviewGroups, run: TodayReviewRun) {
   const boardSelection = sourceSnapshotForRun(run).boardSelection || null;
   const eligibleCounts = boardSelection?.eligibleCounts || {};
-  if (tab === 'longReview') return `No LONG_REVIEW rows were displayed. Eligible LONG_REVIEW candidates: ${formatNumber((eligibleCounts as any).LONG_REVIEW || 0)}.`;
-  if (tab === 'watchOnly') return `No WATCH_ONLY rows were displayed. Eligible WATCH_ONLY candidates: ${formatNumber((eligibleCounts as any).WATCH_ONLY || 0)}.`;
-  if (tab === 'exitRiskReview') return `No EXIT_RISK_REVIEW or SHORT_REVIEW rows were displayed. Eligible exit/short-risk candidates: ${formatNumber((eligibleCounts as any).EXIT_RISK || 0)}.`;
+  if (tab === 'longReview') return `No Long Review rows were displayed. Eligible Long Review candidates: ${formatNumber((eligibleCounts as any).LONG_REVIEW || 0)}.`;
+  if (tab === 'watchOnly') return `No Watch Only rows were displayed. Eligible Watch Only candidates: ${formatNumber((eligibleCounts as any).WATCH_ONLY || 0)}.`;
+  if (tab === 'exitRiskReview') return `No Exit Risk or Short Review rows were displayed. Eligible exit/short-risk candidates: ${formatNumber((eligibleCounts as any).EXIT_RISK || 0)}.`;
   if (tab === 'specialCases') return `No SPECIAL_CASES rows matched existing overlap, ledger, Stock Interest, newly appeared, or high-quality missing-evidence rules. Eligible special cases: ${formatNumber((eligibleCounts as any).SPECIAL_CASES || 0)}.`;
   return 'No candidates in this section for the current persisted run.';
 }
