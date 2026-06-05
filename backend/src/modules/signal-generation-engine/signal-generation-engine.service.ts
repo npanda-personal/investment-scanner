@@ -801,13 +801,24 @@ export class SignalGenerationEngineService {
         return Math.abs(todayUtc - genDay) <= oneTradingDayMs;
       };
 
-      const [instruments, latestPrices, calibrationRows] = await Promise.all([
+      const hasLiveSignals = signals.some(isLiveSignal);
+      const serviceAny = this.marketDataService as any;
+      const [instruments, latestPrices, calibrationRows, prevCloseWindows] = await Promise.all([
         this.marketDataService.getInstrumentsByIds(instrumentIds),
         // Only fetch live prices if at least one signal in the batch is from today/yesterday
-        signals.some(isLiveSignal)
+        hasLiveSignals
           ? this.marketDataService.getLatestPricesBySymbols(symbols)
           : Promise.resolve<any[]>([]),
         calibrationPromise,
+        // P2 #124: batch previous-close fetch — one query for all live-signal instruments
+        // instead of N per-instrument queries inside the map loop.
+        // limit=2: we only need the 2 most-recent rows per instrument (current + previous).
+        // No endDate: these are live-day signals so we always want "latest available" close.
+        // Semantics are identical to the former listPricesByInstrumentId(id, 2) call —
+        // same adjusted_close field, same descending-by-timestamp order, same no-asOf guard.
+        hasLiveSignals && typeof serviceAny.listRecentPriceWindowsByInstrumentIds === 'function'
+          ? (serviceAny.listRecentPriceWindowsByInstrumentIds(instrumentIds, 2) as Promise<Map<string, any[]>>).catch(() => new Map<string, any[]>())
+          : Promise.resolve(new Map<string, any[]>()),
       ]);
 
       const instrumentMap = new Map(instruments.map((i: any) => [i.id, i]));
@@ -816,6 +827,8 @@ export class SignalGenerationEngineService {
       const calibrationMap = new Map(
         (calibrationRows as any[]).map((row: any) => [row.instrumentId, row])
       );
+      // prevCloseWindows: Map<instrumentId, priceArray[desc]> — index [1] is the previous close.
+      const prevCloseMap: Map<string, any[]> = prevCloseWindows instanceof Map ? prevCloseWindows : new Map();
       const includeStrategyContext = this.shouldAttachStrategyMatches(options);
       const ratingCache = new Map<string, Promise<StrategyPerformanceSummaryDto | null>>();
       const strategyScopeRegion = this.canonicalRegion(options.region || signals[0]?.country);
@@ -836,12 +849,13 @@ export class SignalGenerationEngineService {
 
         const currentPrice = latest ? Number((latest as any).adjusted_close ?? (latest as any).close) : null;
 
+        // P2 #124: use the pre-fetched bulk window (Map lookup, no extra query).
+        // prevCloseMap[instrumentId][1] is the second-most-recent adjusted_close —
+        // identical semantics to the former per-instrument listPricesByInstrumentId(id, 2)[1].
         let previousClose: number | null = null;
         if (latest && signalIsLive) {
-          // For previous close, we still do a targeted lookup per signal for now
-          // to avoid fetching massive amounts of price history in one go.
-          const prevPrices = await this.marketDataService.listPricesByInstrumentId(signal.instrument_id, 2).catch(() => null);
-          previousClose = prevPrices?.prices?.[1]?.adjusted_close ?? null;
+          const prevWindow = prevCloseMap.get(signal.instrument_id);
+          previousClose = prevWindow?.[1]?.adjusted_close ?? null;
         }
 
         const dailyChange = currentPrice !== null && previousClose !== null ? currentPrice - previousClose : null;

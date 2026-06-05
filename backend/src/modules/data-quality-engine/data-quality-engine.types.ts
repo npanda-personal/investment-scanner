@@ -4,6 +4,27 @@ export type LiquidityStatus = 'LIQUID' | 'THIN' | 'ILLIQUID' | 'UNKNOWN';
 export type DataQualityStatus = CoverageStatus | SignalReadinessStatus | LiquidityStatus;
 export type DataQualityUseCaseTierStatus = 'READY' | 'LIMITED' | 'BLOCKED';
 
+/**
+ * Fundamentals coverage depth tier.
+ *
+ * Counts distinct fiscal periods (periodEndDate) actually present in the
+ * fundamentals table for an instrument, then classifies:
+ *
+ *   SHALLOW  (1–2 periods)  — barely present; a single manual row or one filing.
+ *                             Do not treat this as meaningful coverage.
+ *   ADEQUATE (3–7 periods)  — several quarters of data; usable for basic analysis
+ *                             but not multi-year trend work.
+ *   DEEP     (8+ periods)   — roughly 2+ years of quarterly filings; supports
+ *                             trend analysis and multi-period comparisons.
+ *
+ * `NONE` is returned when no fundamentals records are present at all.
+ *
+ * This field is only populated on live evaluations (computed at evaluate time).
+ * Persisted-read responses from the data-quality cache will have this field
+ * absent (undefined) until the instrument is re-evaluated.
+ */
+export type FundamentalsCoverageTier = 'NONE' | 'SHALLOW' | 'ADEQUATE' | 'DEEP';
+
 export interface DataQualityUseCaseTier {
   status: DataQualityUseCaseTierStatus;
   reasons: string[];
@@ -78,6 +99,17 @@ export interface DataQualityEvaluationDto {
   recommendedFixes: string[];
   useCaseTiers?: DataQualityUseCaseTiers;
   tierEvidence?: DataQualityTierEvidence;
+  /**
+   * Depth tier for fundamentals coverage.
+   * Populated on live evaluations only; absent on cached persisted-read responses
+   * until the instrument is re-evaluated.
+   */
+  fundamentalsCoverageTier?: FundamentalsCoverageTier;
+  /**
+   * Count of distinct fiscal periods (periodEndDate) present for this instrument.
+   * Populated on live evaluations only; absent on cached persisted-read responses.
+   */
+  fundamentalsPeriodCount?: number;
   lastEvaluatedAt: string;
   researchUrl: string;
 }

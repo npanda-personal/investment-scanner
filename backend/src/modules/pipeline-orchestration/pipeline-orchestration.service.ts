@@ -75,6 +75,7 @@ const SCHEDULED_DOWNSTREAM_STAGE_KEYS = [
   'DATA_QUALITY',
   'RAW_SIGNALS',
   'SIGNAL_CALIBRATION',
+  'EARNINGS_INTELLIGENCE_REFRESH',
   'MARKET_CONTEXT',
   'MARKET_CONTEXT_SNAPSHOT_REFRESH',
   'SMART_MONEY',
@@ -85,7 +86,6 @@ const SCHEDULED_DOWNSTREAM_STAGE_KEYS = [
   'TODAY_REVIEW',
   'SIGNAL_POSITION_LEDGER',
   'SECTOR_INTELLIGENCE_REFRESH',
-  'EARNINGS_INTELLIGENCE_REFRESH',
 ];
 
 type ScheduledAdapterResult = {
@@ -3287,7 +3287,7 @@ export class PipelineOrchestrationService {
 
       const response = this.scheduledSignalCalibrationResponseFromStage(status, request, normalizedScope, completedStage, inputFingerprint, normalizedBatchSize, changedInstrumentIds.length);
       if (status === 'COMPLETED' || (status === 'PARTIAL' && completedStage.succeededCount > 0) || status === 'SKIPPED') {
-        response.downstream = await this.runScheduledMarketContextStage({
+        response.downstream = await this.runScheduledEarningsIntelligenceStage({
           region: normalizedScope.region,
           assetType: normalizedScope.assetType,
           timeframe: '1d',
@@ -3300,7 +3300,7 @@ export class PipelineOrchestrationService {
           schedulerRunStartedAt: request.schedulerRunStartedAt,
           upstreamStageRunId: completedStage.id,
         }).catch((error) => {
-          return this.logScheduledDownstreamFailure('Market Context', 'SIGNAL_CALIBRATION', {
+          return this.logScheduledDownstreamFailure('Earnings Intelligence', 'SIGNAL_CALIBRATION', {
             ...request,
             changedInstrumentIds,
             batchSize: normalizedBatchSize,
@@ -3380,7 +3380,7 @@ export class PipelineOrchestrationService {
       stageOrder: 6,
       stageSlug: 'scheduled-market-context',
       stageVersion: MARKET_CONTEXT_SCHEDULED_STAGE_VERSION,
-      sourceStage: 'SIGNAL_CALIBRATION',
+      sourceStage: 'EARNINGS_INTELLIGENCE_REFRESH',
       adapter: 'MarketContextIntelligenceService.run',
     }, async ({ normalizedScope }) => {
       const result = await this.marketContextService.run(normalizedScope.region);
@@ -4010,23 +4010,16 @@ export class PipelineOrchestrationService {
       };
     }, now);
 
-    if (response.status === 'COMPLETED' || response.status === 'PARTIAL' || response.status === 'SKIPPED') {
-      response.downstream = await this.runScheduledEarningsIntelligenceStage({
-        ...request,
-        sourceFingerprint: response.outputFingerprint || request.sourceFingerprint,
-        upstreamStageRunId: response.stageRunId,
-      }).catch((error) => this.logScheduledDownstreamFailure('Earnings Intelligence', response.stageKey, request, error));
-    }
     return response;
   }
 
   async runScheduledEarningsIntelligenceStage(request: ScheduledPipelineStageRequest, now = new Date()): Promise<ScheduledPipelineStageResponse> {
-    return this.runScheduledPipelineStage(request, {
+    const response = await this.runScheduledPipelineStage(request, {
       stageKey: 'EARNINGS_INTELLIGENCE_REFRESH',
-      stageOrder: 15,
+      stageOrder: 5,
       stageSlug: 'scheduled-earnings-intelligence',
       stageVersion: EARNINGS_INTELLIGENCE_SCHEDULED_STAGE_VERSION,
-      sourceStage: 'SECTOR_INTELLIGENCE_REFRESH',
+      sourceStage: 'SIGNAL_CALIBRATION',
       adapter: 'EarningsIntelligenceService.refreshSnapshots',
     }, async ({ normalizedScope, changedInstrumentIds, normalizedBatchSize, reportProgress }) => {
       const aggregate = {
@@ -4108,6 +4101,15 @@ export class PipelineOrchestrationService {
         },
       };
     }, now);
+
+    if (response.status === 'COMPLETED' || response.status === 'PARTIAL' || response.status === 'SKIPPED') {
+      response.downstream = await this.runScheduledMarketContextStage({
+        ...request,
+        sourceFingerprint: response.outputFingerprint || request.sourceFingerprint,
+        upstreamStageRunId: response.stageRunId,
+      }).catch((error) => this.logScheduledDownstreamFailure('Market Context', 'EARNINGS_INTELLIGENCE_REFRESH', request, error));
+    }
+    return response;
   }
 
   async recordMarketDataStageSnapshot(

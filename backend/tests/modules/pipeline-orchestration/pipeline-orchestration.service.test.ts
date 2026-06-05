@@ -2872,7 +2872,7 @@ describe('PipelineOrchestrationService', () => {
     expect(response.downstreamRawSignals?.stageKey).toBe('RAW_SIGNALS');
     expect(response.downstreamRawSignals?.downstreamSignalCalibration?.status).toBe('COMPLETED');
     expect(response.downstreamRawSignals?.downstreamSignalCalibration?.stageKey).toBe('SIGNAL_CALIBRATION');
-    expect(response.downstreamRawSignals?.downstreamSignalCalibration?.downstream?.stageKey).toBe('MARKET_CONTEXT');
+    expect(response.downstreamRawSignals?.downstreamSignalCalibration?.downstream?.stageKey).toBe('EARNINGS_INTELLIGENCE_REFRESH');
     expect(response.batch.totalInstrumentCount).toBe(2);
     expect(response.counts.processedCount).toBe(2);
     expect(evaluateScheduledStage).toHaveBeenCalledWith(expect.objectContaining({
@@ -3399,6 +3399,7 @@ describe('PipelineOrchestrationService', () => {
     expect(raw?.stageKey).toBe('RAW_SIGNALS');
     expect(calibration?.stageKey).toBe('SIGNAL_CALIBRATION');
     expect(downstreamKeys).toEqual([
+      'EARNINGS_INTELLIGENCE_REFRESH',
       'MARKET_CONTEXT',
       'MARKET_CONTEXT_SNAPSHOT_REFRESH',
       'SMART_MONEY',
@@ -3409,7 +3410,6 @@ describe('PipelineOrchestrationService', () => {
       'TODAY_REVIEW',
       'SIGNAL_POSITION_LEDGER',
       'SECTOR_INTELLIGENCE_REFRESH',
-      'EARNINGS_INTELLIGENCE_REFRESH',
     ]);
     expect(evaluateScheduledStage).toHaveBeenCalledTimes(1);
     expect(signalRun).toHaveBeenCalledTimes(1);
@@ -3790,7 +3790,7 @@ describe('PipelineOrchestrationService', () => {
     expect(response.downstreamSignalCalibration?.stageKey).toBe('SIGNAL_CALIBRATION');
     expect(response.downstreamSignalCalibration?.status).toBe('PARTIAL');
     expect(response.downstreamSignalCalibration?.counts.processedCount).toBe(2);
-    expect(response.downstreamSignalCalibration?.downstream?.stageKey).toBe('MARKET_CONTEXT');
+    expect(response.downstreamSignalCalibration?.downstream?.stageKey).toBe('EARNINGS_INTELLIGENCE_REFRESH');
     expect(calibrationAdapterRun).toHaveBeenCalledWith(expect.objectContaining({
       instrumentIds: ['stock-1', 'stock-2'],
       region: 'IN',

@@ -209,13 +209,12 @@ describe('#3 enrichSignals historical price isolation', () => {
     const getLatestPricesBySymbols = jest.fn().mockResolvedValue([
       { symbol: 'OLD', adjusted_close: 999, date: new Date().toISOString() },
     ]);
-    const listPricesByInstrumentId = jest.fn().mockResolvedValue({
-      prices: [{ adjusted_close: 999 }, { adjusted_close: 950 }],
-    });
+    // P2 #124: bulk lookup — should NOT be called for historical (non-live) signals
+    const listRecentPriceWindowsByInstrumentIds = jest.fn().mockResolvedValue(new Map());
     const marketDataService = {
       getInstrumentsByIds: jest.fn().mockResolvedValue([{ id: 'inst-old', currency: 'INR' }]),
       getLatestPricesBySymbols,
-      listPricesByInstrumentId,
+      listRecentPriceWindowsByInstrumentIds,
     };
 
     const service = new SignalGenerationEngineService({} as any, marketDataService as any, {} as any);
@@ -225,9 +224,9 @@ describe('#3 enrichSignals historical price isolation', () => {
     expect(enriched.currentPrice).toBeNull();
     expect(enriched.dailyChange).toBeNull();
     expect(enriched.dailyChangePercent).toBeNull();
-    // listPricesByInstrumentId must NOT have been called for the historical signal
-    // (since we skip previous-close lookup for non-live signals)
-    expect(listPricesByInstrumentId).not.toHaveBeenCalled();
+    // listRecentPriceWindowsByInstrumentIds must NOT have been called for the historical signal
+    // (since we skip previous-close lookup for non-live signals — hasLiveSignals=false)
+    expect(listRecentPriceWindowsByInstrumentIds).not.toHaveBeenCalled();
   });
 
   it('does attach live price context to a signal generated today', async () => {
@@ -262,9 +261,10 @@ describe('#3 enrichSignals historical price isolation', () => {
       getLatestPricesBySymbols: jest.fn().mockResolvedValue([
         { symbol: 'LIVE', adjusted_close: 500, date: new Date().toISOString() },
       ]),
-      listPricesByInstrumentId: jest.fn().mockResolvedValue({
-        prices: [{ adjusted_close: 500 }, { adjusted_close: 490 }],
-      }),
+      // P2 #124: bulk previous-close fetch — index [1] is previous close
+      listRecentPriceWindowsByInstrumentIds: jest.fn().mockResolvedValue(
+        new Map([['inst-live', [{ adjusted_close: 500 }, { adjusted_close: 490 }]]])
+      ),
     };
 
     const service = new SignalGenerationEngineService({} as any, marketDataService as any, {} as any);

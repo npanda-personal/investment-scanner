@@ -13,6 +13,7 @@ import type {
   DataQualityScheduledEvaluateResponse,
   DataQualityTierEvidence,
   DataQualityUseCaseTiers,
+  FundamentalsCoverageTier,
   LiquidityStatus,
   PriceForQuality,
   SignalReadinessStatus,
@@ -442,6 +443,7 @@ export class DataQualityEngineService {
       tierEvidence,
     });
     this.tierReasonsIntoReadiness(useCaseTiers, readinessReasons, readinessBlockers);
+    const { tier: fundamentalsCoverageTier, periodCount: fundamentalsPeriodCount } = this.fundamentalsCoverageTierFor(fundamentals);
 
     return {
       instrumentId: instrument.id,
@@ -467,6 +469,8 @@ export class DataQualityEngineService {
       recommendedFixes: this.recommendedFixes(dataGaps, readinessBlockers),
       useCaseTiers,
       tierEvidence,
+      fundamentalsCoverageTier,
+      fundamentalsPeriodCount,
       lastEvaluatedAt: new Date().toISOString(),
       researchUrl: `/research/stocks/${instrument.id}`,
     };
@@ -619,6 +623,33 @@ export class DataQualityEngineService {
     if (score >= 75) return 'READY';
     if (score >= 50) return 'LIMITED';
     return 'NOT_READY';
+  }
+
+  /**
+   * Classify fundamentals depth into a coverage tier.
+   *
+   * Boundaries are derived from the actual NSE/BSE data distribution:
+   *   - 1–2 periods: 65 instruments (~3%)  → SHALLOW
+   *   - 3–7 periods: 1961 instruments (~87%) → ADEQUATE
+   *   - 8+ periods:  241 instruments (~11%) → DEEP  (≥ 2 years of quarterly filings)
+   *
+   * Distinct periods are counted by unique `period_end_date` values in the
+   * supplied fundamentals records (the same de-duplication key the DB schema uses).
+   */
+  fundamentalsCoverageTierFor(fundamentals: any[]): { tier: FundamentalsCoverageTier; periodCount: number } {
+    if (fundamentals.length === 0) return { tier: 'NONE', periodCount: 0 };
+    const distinctDates = new Set(
+      fundamentals
+        .map((record) => record.period_end_date ?? record.periodEndDate)
+        .filter((date) => date != null)
+        .map((date) => (date instanceof Date ? date.toISOString().slice(0, 10) : String(date).slice(0, 10)))
+    );
+    const periodCount = distinctDates.size;
+    const tier: FundamentalsCoverageTier =
+      periodCount >= 8 ? 'DEEP' :
+      periodCount >= 3 ? 'ADEQUATE' :
+      'SHALLOW';
+    return { tier, periodCount };
   }
 
   private optionalNumber(value: unknown): number | null {
