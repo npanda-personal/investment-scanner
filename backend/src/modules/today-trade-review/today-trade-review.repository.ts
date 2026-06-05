@@ -106,7 +106,11 @@ export class TodayTradeReviewRepository implements TodayReviewRepositoryContract
             marketContextSnapshot: this.optionalJson(candidate.marketContextSnapshot),
             strategyProofSnapshot: this.optionalJson(candidate.strategyProofSnapshot),
             tradePlanSnapshot: this.optionalJson(candidate.tradePlanSnapshot),
-            sourceSignalSnapshot: this.optionalJson(candidate.sourceSignalSnapshot),
+            sourceSignalSnapshot: this.optionalJson(
+              candidate.earningsProximity
+                ? { ...(candidate.sourceSignalSnapshot as Record<string, unknown> ?? {}), earningsProximity: candidate.earningsProximity }
+                : candidate.sourceSignalSnapshot
+            ),
           })),
         });
       }
@@ -203,6 +207,7 @@ export class TodayTradeReviewRepository implements TodayReviewRepositoryContract
   private toCandidateDto(record: any): TodayReviewCandidateDto {
     const sourceSignalSnapshot = this.nullableJson(record.sourceSignalSnapshot);
     const boardMetadata = this.boardMetadataFromSnapshot(sourceSignalSnapshot);
+    const earningsProximity = this.earningsProximityFromSnapshot(sourceSignalSnapshot);
     const dto: TodayReviewCandidateDto = {
       id: record.id,
       runId: record.runId,
@@ -229,10 +234,26 @@ export class TodayTradeReviewRepository implements TodayReviewRepositoryContract
       boardSourceType: boardMetadata?.sourceType || null,
       boardReason: boardMetadata?.reason || null,
       boardContractVersion: boardMetadata?.contractVersion || null,
+      earningsProximity,
       createdAt: record.createdAt?.toISOString(),
       updatedAt: record.updatedAt?.toISOString(),
     };
     return { ...dto, explainability: this.candidateExplainability(dto) };
+  }
+
+  private earningsProximityFromSnapshot(sourceSignalSnapshot: Record<string, any> | null): import('./today-trade-review.types').TodayReviewEarningsProximity | null {
+    if (!sourceSignalSnapshot) return null;
+    const ep = sourceSignalSnapshot.earningsProximity;
+    if (!ep || typeof ep !== 'object' || Array.isArray(ep)) return null;
+    // Validate required shape before returning
+    if (typeof ep.symbol !== 'string') return null;
+    return {
+      symbol: ep.symbol,
+      daysToResult: typeof ep.daysToResult === 'number' ? ep.daysToResult : null,
+      resultDateSource: typeof ep.resultDateSource === 'string' ? ep.resultDateSource : '',
+      resultDateLabel: typeof ep.resultDateLabel === 'string' ? ep.resultDateLabel : null,
+      resultDate: typeof ep.resultDate === 'string' ? ep.resultDate : null,
+    };
   }
 
   private boardMetadataFromSnapshot(sourceSignalSnapshot: Record<string, any> | null) {

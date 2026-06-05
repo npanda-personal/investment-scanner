@@ -712,6 +712,7 @@ export class TodayTradeReviewService {
         scanFunnel.promotedCandidates += 1;
       }
       const earningsCaveat = this.earningsCaveat(instrument.symbol, earningsProximity);
+      const earningsProximityForCandidate = this.resolvedEarningsProximity(instrument.symbol, earningsProximity);
       const rawScore = state === 'BLOCKED' || state === 'AVOID' ? 0 : this.liteScore(setup, evidence, tradePlan.rewardRiskRatio, instrument, contextGapPenalty);
       // Down-rank long entries by 10 points when results are imminent; short/blocked paths unaffected.
       const score = (earningsCaveat && state === 'LONG_REVIEW') ? Math.max(0, rawScore - 10) : rawScore;
@@ -737,6 +738,7 @@ export class TodayTradeReviewService {
         reasonSummary: this.liteReasonSummary(state, evidence, blockers, watchReasons),
         blockers,
         watchReasons,
+        earningsProximity: earningsProximityForCandidate,
         dataQualitySnapshot: {
           source: 'trusted-review-universe',
           latestPriceDate: instrument.latestPriceDate,
@@ -1003,6 +1005,19 @@ export class TodayTradeReviewService {
     return `Earnings result in ${days} trading days${dateStr} [${label}] — long entry caution: consider waiting until after results.`;
   }
 
+  /**
+   * Returns the persisted TodayReviewEarningsProximity for a symbol when
+   * daysToResult is within the blackout window (≤ EARNINGS_BLACKOUT_TRADING_DAYS).
+   * Returns null when no proximity data exists or results are outside the window.
+   */
+  private resolvedEarningsProximity(symbol: string, earningsProximity: Map<string, TodayReviewEarningsProximity>): TodayReviewEarningsProximity | null {
+    const key = symbol.toUpperCase();
+    const proximity = earningsProximity.get(key);
+    if (!proximity || proximity.daysToResult === null) return null;
+    if (proximity.daysToResult > EARNINGS_BLACKOUT_TRADING_DAYS) return null;
+    return proximity;
+  }
+
   private liteReasonSummary(state: TodayReviewCandidateState, evidence: { label: string; sampleSize: number }, blockers: string[], watchReasons: string[]) {
     if (state === 'BLOCKED') return `Blocked: ${blockers[0] || 'hard blocker exists.'}`;
     if (state === 'WATCH_ONLY') return `Watch only: ${watchReasons[0] || 'lite evidence is not strong enough for research review.'}`;
@@ -1066,6 +1081,7 @@ export class TodayTradeReviewService {
   private mapCandidate(source: TodayReviewCandidateSource, earningsProximity: Map<string, TodayReviewEarningsProximity> = new Map()): TodayReviewCandidateDto {
     const blockers = this.blockersFor(source);
     const earningsCaveat = this.earningsCaveat(source.decision.symbol || '', earningsProximity);
+    const earningsProximityForCandidate = this.resolvedEarningsProximity(source.decision.symbol || '', earningsProximity);
     const baseWatchReasons = this.watchReasonsFor(source);
     const watchReasons = earningsCaveat ? [earningsCaveat, ...baseWatchReasons] : baseWatchReasons;
     const hardBlocked = blockers.length > 0;
@@ -1100,6 +1116,7 @@ export class TodayTradeReviewService {
       strategyProofSnapshot: this.strategyProofSnapshotFor(source),
       tradePlanSnapshot: tradePlan,
       sourceSignalSnapshot: this.sourceSignalSnapshotFor(source),
+      earningsProximity: earningsProximityForCandidate,
     };
   }
 

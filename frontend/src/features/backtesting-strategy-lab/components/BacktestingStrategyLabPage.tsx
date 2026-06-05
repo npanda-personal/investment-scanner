@@ -44,7 +44,7 @@ import {
   YAxis,
 } from 'recharts';
 import { useBacktestingStrategyLab } from '../hooks';
-import type { BacktestRun, BacktestStrategyConfig, EntryRuleType, ExitRuleType, MonthlyReturnCell, PositionSizeType, UniverseType } from '../types';
+import type { BacktestMetrics, BacktestRun, BacktestStrategyConfig, EntryRuleType, ExitRuleType, MonthlyReturnCell, PositionSizeType, UniverseType } from '../types';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
 import { fetchStrategies, type StrategyDefinition, type StrategyTimeframe } from '@/features/strategy-framework';
 
@@ -680,19 +680,7 @@ function ResultsPanel({ run, chartData }: { run: BacktestRun | null; chartData: 
         </Alert>
       )}
       {metrics?.exitDiagnostics && (
-        <Paper sx={{ p: 2 }}>
-          <Typography variant="h6" sx={{ mb: 1 }}>Exit Diagnostics</Typography>
-          <Stack direction="row" spacing={1} flexWrap="wrap">
-            <Chip size="small" label={`Strategy exits ${metrics.exitDiagnostics.strategyExitCount}`} />
-            <Chip size="small" label={`Stop loss ${metrics.exitDiagnostics.stopLossExitCount}`} />
-            <Chip size="small" label={`Trailing stop ${metrics.exitDiagnostics.trailingStopExitCount}`} />
-            <Chip size="small" label={`Take profit ${metrics.exitDiagnostics.takeProfitExitCount}`} />
-            <Chip size="small" label={`Max hold ${metrics.exitDiagnostics.maxHoldExitCount}`} />
-            <Chip size="small" label={`End of test ${fmtPercent(metrics.exitDiagnostics.endOfTestExitPercent)}`} color={metrics.exitDiagnostics.endOfTestExitPercent >= 0.4 ? 'warning' : 'default'} />
-            <Chip size="small" label={`Median hold ${metrics.exitDiagnostics.medianHoldingDays?.toFixed(0) ?? 'N/A'}d`} />
-            <Chip size="small" label={`Longest hold ${metrics.exitDiagnostics.longestHoldingDays?.toFixed(0) ?? 'N/A'}d`} />
-          </Stack>
-        </Paper>
+        <ExitBreakdownSection exitDiagnostics={metrics.exitDiagnostics} totalTrades={metrics.numberOfTrades} />
       )}
       <Paper sx={{ p: 2 }}>
         <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
@@ -746,6 +734,93 @@ function ResultsPanel({ run, chartData }: { run: BacktestRun | null; chartData: 
         )}
       </Paper>
     </Stack>
+  );
+}
+
+/** NR-47: Exit breakdown table with percentage bars and max-hold dominance warning. */
+function ExitBreakdownSection({
+  exitDiagnostics,
+  totalTrades,
+}: {
+  exitDiagnostics: NonNullable<BacktestMetrics['exitDiagnostics']>;
+  totalTrades: number;
+}) {
+  const total = totalTrades > 0 ? totalTrades : 1; // guard against division by zero
+
+  const rows: Array<{ label: string; count: number; pct: number; color: string }> = [
+    { label: 'Strategy / signal exit', count: exitDiagnostics.strategyExitCount, pct: exitDiagnostics.strategyExitCount / total, color: '#1976d2' },
+    { label: 'Max-hold period', count: exitDiagnostics.maxHoldExitCount, pct: exitDiagnostics.maxHoldExitCount / total, color: '#ed6c02' },
+    { label: 'Stop loss', count: exitDiagnostics.stopLossExitCount, pct: exitDiagnostics.stopLossExitCount / total, color: '#d32f2f' },
+    { label: 'Trailing stop', count: exitDiagnostics.trailingStopExitCount, pct: exitDiagnostics.trailingStopExitCount / total, color: '#c62828' },
+    { label: 'Take profit', count: exitDiagnostics.takeProfitExitCount, pct: exitDiagnostics.takeProfitExitCount / total, color: '#2e7d32' },
+    { label: 'End of test (forced)', count: exitDiagnostics.endOfTestExitCount, pct: exitDiagnostics.endOfTestExitPercent, color: '#757575' },
+  ];
+
+  const maxHoldPct = exitDiagnostics.maxHoldExitCount / total;
+  const maxHoldDominant = maxHoldPct > 0.7 && totalTrades > 0;
+
+  return (
+    <Paper sx={{ p: 2 }}>
+      <Typography variant="h6" sx={{ mb: 0.5 }}>Exit Breakdown</Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+        How each trade exited — a trustworthiness signal for the strategy&apos;s risk logic.
+      </Typography>
+
+      {maxHoldDominant && (
+        <Alert severity="warning" sx={{ mb: 1.5 }}>
+          {Math.round(maxHoldPct * 100)}% of trades exited on the max-hold period limit ({exitDiagnostics.maxHoldExitCount}/{totalTrades} trades).
+          The strategy rarely triggered its own stop-loss or take-profit rules — most positions were simply held to the time limit.
+          This is a research observation, not advice.
+        </Alert>
+      )}
+
+      <Box sx={{ overflowX: 'auto' }}>
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+              <TableCell sx={{ fontWeight: 700 }}>Exit reason</TableCell>
+              <TableCell align="right" sx={{ fontWeight: 700 }}>Count</TableCell>
+              <TableCell align="right" sx={{ fontWeight: 700 }}>%</TableCell>
+              <TableCell sx={{ fontWeight: 700, minWidth: 140 }}>Distribution</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {rows.map((row) => (
+              <TableRow key={row.label}>
+                <TableCell>{row.label}</TableCell>
+                <TableCell align="right">{row.count}</TableCell>
+                <TableCell align="right">{fmtPercent(row.pct)}</TableCell>
+                <TableCell>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <Box
+                      sx={{
+                        height: 10,
+                        borderRadius: 1,
+                        bgcolor: row.color,
+                        width: `${Math.round(row.pct * 100)}%`,
+                        minWidth: row.count > 0 ? 3 : 0,
+                        transition: 'width 0.3s',
+                      }}
+                    />
+                  </Box>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </Box>
+      <Stack direction="row" spacing={2} sx={{ mt: 1.5 }} flexWrap="wrap">
+        <Typography variant="caption" color="text.secondary">
+          Avg hold: {exitDiagnostics.averageHoldingDays?.toFixed(0) ?? 'N/A'} d
+        </Typography>
+        <Typography variant="caption" color="text.secondary">
+          Median hold: {exitDiagnostics.medianHoldingDays?.toFixed(0) ?? 'N/A'} d
+        </Typography>
+        <Typography variant="caption" color="text.secondary">
+          Longest hold: {exitDiagnostics.longestHoldingDays?.toFixed(0) ?? 'N/A'} d
+        </Typography>
+      </Stack>
+    </Paper>
   );
 }
 

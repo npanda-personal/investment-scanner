@@ -41,6 +41,7 @@ import { useTodayReview } from '../hooks/useTodayReview';
 import type {
   TodayReviewCandidate,
   TodayReviewCandidateDataQualitySnapshot,
+  TodayReviewEarningsProximity,
   TodayReviewGroups,
   TodayReviewMarketPosture,
   TodayReviewRun,
@@ -540,20 +541,23 @@ function CandidateTable({ candidates }: { candidates: TodayReviewCandidate[] }) 
     {
       id: 'symbol',
       label: 'Symbol',
-      width: 150,
+      width: 170,
       value: (candidate) => `${candidate.symbol} ${candidate.companyName || ''}`,
       render: (candidate) => (
-        <Tooltip title={`${candidate.symbol} - ${candidate.companyName || 'Company unavailable'}`} arrow enterDelay={350}>
-          <Link
-            component={RouterLink}
-            to={`/today-review/candidates/${candidate.id}`}
-            fontWeight={700}
-            onClick={(event) => event.stopPropagation()}
-            sx={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-          >
-            {candidate.symbol}
-          </Link>
-        </Tooltip>
+        <Stack spacing={0.5} alignItems="flex-start">
+          <Tooltip title={`${candidate.symbol} - ${candidate.companyName || 'Company unavailable'}`} arrow enterDelay={350}>
+            <Link
+              component={RouterLink}
+              to={`/today-review/candidates/${candidate.id}`}
+              fontWeight={700}
+              onClick={(event) => event.stopPropagation()}
+              sx={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+            >
+              {candidate.symbol}
+            </Link>
+          </Tooltip>
+          <EarningsProximityChip earningsProximity={candidate.earningsProximity} />
+        </Stack>
       ),
     },
     {
@@ -1005,9 +1009,41 @@ function TierChip({ tier }: { tier: TierCellContext }) {
   );
 }
 
+/**
+ * Small amber chip shown on candidate list rows when results are within the
+ * earnings-blackout window. Only renders when structured earningsProximity is present.
+ */
+function EarningsProximityChip({ earningsProximity }: { earningsProximity?: TodayReviewEarningsProximity | null }) {
+  if (!earningsProximity || earningsProximity.daysToResult === null) return null;
+  const days = earningsProximity.daysToResult;
+  const label = days === 0 ? 'Earnings today' : days === 1 ? 'Earnings in 1d' : `Earnings in ${days}d`;
+  const dateStr = earningsProximity.resultDate ? earningsProximity.resultDate.slice(0, 10) : null;
+  const sourceLabel = earningsProximity.resultDateLabel ?? (earningsProximity.resultDateSource === 'OFFICIAL_CALENDAR' ? 'Official' : 'Estimated');
+  const tooltip = dateStr
+    ? `${label} (${dateStr}) [${sourceLabel}] — earnings reaction window. Consider waiting for post-result price discovery.`
+    : `${label} [${sourceLabel}] — earnings reaction window. Consider waiting for post-result price discovery.`;
+  return (
+    <Tooltip title={tooltip} arrow enterDelay={200}>
+      <Chip
+        label={label}
+        size="small"
+        sx={{
+          bgcolor: 'warning.light',
+          color: 'warning.contrastText',
+          fontWeight: 700,
+          fontSize: 10,
+          height: 18,
+          '& .MuiChip-label': { px: 0.75 },
+        }}
+      />
+    </Tooltip>
+  );
+}
+
 function searchableCandidateText(candidate: TodayReviewCandidate) {
   const context = tierContextForCandidate(candidate);
   const plan = candidate.tradePlanSnapshot as any;
+  const ep = candidate.earningsProximity;
   return [
     candidate.symbol,
     candidate.companyName,
@@ -1033,6 +1069,7 @@ function searchableCandidateText(candidate: TodayReviewCandidate) {
     proofLabel(candidate),
     marketLabel(candidate),
     sectorAlignment(candidate),
+    ep ? `earnings ${ep.daysToResult}d` : null,
   ].filter(Boolean).join(' ').toLowerCase();
 }
 

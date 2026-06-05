@@ -31,6 +31,7 @@ import {
 } from '@mui/material';
 import { useMemo, useState, type ReactNode } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
+import { StalenessBadge } from '@/shared/components';
 import { useDailyOverviewDashboard } from '../hooks/useDailyOverviewDashboard';
 import type {
   CandidateGroupSummary,
@@ -111,11 +112,12 @@ export function DailyOverviewDashboardPage() {
                 </Button>
               </Stack>
             </Stack>
-            <Stack direction={{ xs: 'column', sm: 'row' }} gap={1} flexWrap="wrap" useFlexGap>
+            <Stack direction={{ xs: 'column', sm: 'row' }} gap={1} flexWrap="wrap" useFlexGap alignItems="center">
               <Chip label={`${dashboard.scope.region} / ${dashboard.scope.assetType}`} color="primary" variant="outlined" />
               <Chip label={`Today Review: ${formatStatus(todayReview?.run?.status)}`} variant="outlined" />
               <Chip label={`Data through: ${formatDate(todayReview?.run?.dataThroughDate)}`} variant="outlined" />
-              <Chip label={`Data as of: ${formatDate(todayReview?.run?.dataThroughDate)}`} variant="outlined" />
+              {/* NR-37: visible staleness badge for today-review dataThroughDate */}
+              <StalenessBadge asOf={todayReview?.run?.dataThroughDate} label="Today Review" />
             </Stack>
           </Stack>
         </Paper>
@@ -131,7 +133,11 @@ export function DailyOverviewDashboardPage() {
             <Paper variant="outlined" sx={{ p: 2, height: '100%' }}>
               <Stack spacing={1.5}>
                 <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', md: 'center' }} gap={1}>
-                  <Typography variant="h6">Market Price Movers</Typography>
+                  <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+                    <Typography variant="h6">Market Price Movers</Typography>
+                    {/* NR-37: surface movers generatedAt staleness — visible when data is days old */}
+                    <StalenessBadge asOf={marketMovers?.generatedAt} label="Movers" />
+                  </Stack>
                   <ToggleButtonGroup
                     value={moverRange}
                     exclusive

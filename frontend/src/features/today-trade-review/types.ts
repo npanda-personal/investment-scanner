@@ -112,6 +112,14 @@ export interface TodayReviewCandidateDataQualitySnapshot extends Partial<DataQua
   [key: string]: unknown;
 }
 
+export interface TodayReviewEarningsProximity {
+  symbol: string;
+  daysToResult: number | null;
+  resultDateSource: string;
+  resultDateLabel: string | null;
+  resultDate: string | null;
+}
+
 export interface TodayReviewCandidate {
   id: string;
   runId: string;
@@ -139,6 +147,8 @@ export interface TodayReviewCandidate {
   boardReason?: string | null;
   boardContractVersion?: string | null;
   explainability?: TodayReviewCandidateExplainability;
+  /** Structured earnings-proximity snapshot. Present only when results are within the blackout window. */
+  earningsProximity?: TodayReviewEarningsProximity | null;
   createdAt: string;
   updatedAt: string;
 }

@@ -130,15 +130,19 @@ export function SignalTable({ signals, totalCount, loading, page, pageSize, sort
           return (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, justifyContent: 'flex-end' }}>
               <Typography variant="body2">{signal.calibratedScore}</Typography>
-              {tier && (
+              {tier ? (
                 <Chip size="small" label={tier} color={tier === 'FULL' ? 'success' : 'warning'} variant="outlined" sx={{ height: 18, fontSize: 10 }} />
+              ) : (
+                <Tooltip title="Reliability tier is assigned once the signal has a sufficient track record of matured outcomes." arrow>
+                  <Typography variant="body2" color="text.disabled" sx={{ cursor: 'help' }}>—</Typography>
+                </Tooltip>
               )}
             </Box>
           );
         }
         return (
-          <Tooltip title="Calibration pending — insufficient evidence for this signal" arrow>
-            <Typography variant="body2" color="text.disabled" sx={{ cursor: 'help' }}>—</Typography>
+          <Tooltip title="Calibration pending — not enough matured outcomes yet for this signal." arrow>
+            <Typography variant="body2" color="text.disabled" sx={{ cursor: 'help' }}>Pending</Typography>
           </Tooltip>
         );
       },

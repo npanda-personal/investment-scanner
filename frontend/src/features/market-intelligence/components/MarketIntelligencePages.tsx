@@ -24,7 +24,7 @@ import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import type { MarketPulseAdvanceDeclineSummary, MarketPulseVixSummary } from '../types';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
-import { InstrumentSearchSelect, PageHeader } from '@/shared/components';
+import { InstrumentSearchSelect, PageHeader, StalenessBadge } from '@/shared/components';
 import type { V1Instrument } from '@/features/market-data-foundation';
 import { humanizeCode, indexLabel, isHeadlineIndex } from '@/shared/format/enumLabels';
 import { inr, changeColor } from '@/shared/format/money';
@@ -463,7 +463,11 @@ function MarketPulseSnapshotView({
 
   return (
     <Stack spacing={2}>
-      <SectionHeader title="Market Health" subtitle="Displayed exactly as provided by the Market Pulse read model." />
+      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ xs: 'flex-start', sm: 'center' }} flexWrap="wrap" useFlexGap>
+        <SectionHeader title="Market Health" subtitle="Displayed exactly as provided by the Market Pulse read model." />
+        {/* NR-37: visible staleness badge — shown whenever snapshot.dataThroughDate is more than 0 calendar days behind today */}
+        <StalenessBadge asOf={snapshot.dataThroughDate} label="Market Pulse" />
+      </Stack>
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(4, 1fr)' }, gap: 2 }}>
         <ScoreCard label="Health Label" value={snapshot.marketHealthLabel} />
         <ScoreCard
@@ -569,14 +573,18 @@ function VixWidget({ vix }: { vix: MarketPulseVixSummary | null | undefined }) {
     : '';
 
   return (
-    <Tooltip title={unavailable ? 'India VIX data is not available in the persisted snapshot.' : `Posture: ${postureLabel}${vix?.asOf ? ` (as of ${vix.asOf})` : ''}`} arrow>
-      <Chip
-        label={`${vixText}${rangeText}`}
-        color={postureColor as 'default' | 'error' | 'warning' | 'success'}
-        variant="outlined"
-        size="small"
-      />
-    </Tooltip>
+    <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" useFlexGap>
+      <Tooltip title={unavailable ? 'India VIX data is not available in the persisted snapshot.' : `Posture: ${postureLabel}${vix?.asOf ? ` (as of ${vix.asOf})` : ''}`} arrow>
+        <Chip
+          label={`${vixText}${rangeText}`}
+          color={postureColor as 'default' | 'error' | 'warning' | 'success'}
+          variant="outlined"
+          size="small"
+        />
+      </Tooltip>
+      {/* NR-38: surface VIX asOf date as a visible staleness badge — previously hidden in tooltip only */}
+      {!unavailable && <StalenessBadge asOf={vix!.asOf} label="VIX" />}
+    </Stack>
   );
 }
 

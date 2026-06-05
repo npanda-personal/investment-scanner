@@ -123,6 +123,13 @@ export interface TodayReviewCandidateDto {
   boardReason?: string | null;
   boardContractVersion?: string | null;
   explainability?: TodayReviewCandidateExplainability;
+  /**
+   * Structured earnings-proximity snapshot for this candidate.
+   * Present only when the persisted earnings data has a result within the
+   * earnings-blackout window (≤3 trading days). Null/undefined otherwise.
+   * Frontend uses this to render the "Earnings in Nd" chip on list rows.
+   */
+  earningsProximity?: TodayReviewEarningsProximity | null;
   createdAt?: string;
   updatedAt?: string;
 }
