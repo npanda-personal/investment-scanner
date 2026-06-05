@@ -152,6 +152,29 @@ export function StockInterestRadarPage() {
   );
 }
 
+/** Per-category empty-state messages for the Earnings Intelligence screen. */
+const EARNINGS_EMPTY_MESSAGES: Record<string, string> = {
+  UPCOMING_RESULTS:
+    'No stocks have a result date within the next 90 days in the persisted snapshot. ' +
+    'This category populates when the NSE board-meeting calendar has been ingested or when ' +
+    'period-cadence estimates fall within 90 days. Run the earnings-intelligence refresh ' +
+    'pipeline to re-materialise with today\'s date.',
+  PRE_RESULT_INTEREST:
+    'No upcoming-result stocks showed elevated pre-result delivery or price-move interest. ' +
+    'Pre-result Interest rows require an Upcoming Results classification first.',
+  RESULT_WINNERS:
+    'No stocks showed strong post-result growth in the last 60 days in the snapshot. ' +
+    'Winners are identified from revenue, profit, and EPS growth with at least 2 positive metrics.',
+  RESULT_DISAPPOINTMENTS:
+    'No stocks showed a significant earnings miss or price drop in the last 60 days in the snapshot.',
+  RESULT_REACTION_HISTORY:
+    'No stocks have a price-reaction history calculated yet. ' +
+    'This category requires an official NSE board-meeting date (via the ingest pipeline) ' +
+    'and at least one price bar 5 trading sessions after the result date.',
+  EARNINGS_WATCHLIST:
+    'No stocks qualified for the earnings watchlist. This is unusual — run the refresh pipeline to materialise.',
+};
+
 export function EarningsIntelligencePage() {
   const view = useReadModelSnapshot(fetchEarningsIntelligenceSnapshot);
   return (
@@ -165,6 +188,7 @@ export function EarningsIntelligencePage() {
       missingTitle="Earnings Intelligence backend not available yet."
       getRowCategories={(row) => (row as EarningsIntelligenceSnapshot).categories}
       renderTable={(rows) => <EarningsTable rows={rows as EarningsIntelligenceSnapshot[]} />}
+      tabEmptyMessages={EARNINGS_EMPTY_MESSAGES}
     />
   );
 }
@@ -343,6 +367,7 @@ function RadarPage<T>({
   suggestionLink,
   getRowCategories,
   renderTable,
+  tabEmptyMessages,
 }: {
   title: string;
   subtitle: string;
@@ -354,11 +379,15 @@ function RadarPage<T>({
   suggestionLink?: { to: string; label: string };
   getRowCategories: (row: T) => string[];
   renderTable: (rows: T[]) => ReactNode;
+  /** Optional per-tab empty-state messages keyed by tab value. */
+  tabEmptyMessages?: Record<string, string>;
 }) {
   const [activeTab, setActiveTab] = useState(tabs[0]?.value ?? '');
   const activeLabel = tabs.find((tab) => tab.value === activeTab)?.label ?? activeTab;
   const rows = envelope?.snapshot ?? [];
   const filteredRows = rows.filter((row) => getRowCategories(row).includes(activeTab));
+  const emptyMessage = tabEmptyMessages?.[activeTab]
+    ?? `No ${activeLabel} rows were present in the backend snapshot.`;
 
   return (
     <SnapshotPageShell title={title} subtitle={subtitle} loading={loading} error={error} envelope={envelope} missingTitle={missingTitle} suggestionLink={suggestionLink}>
@@ -370,7 +399,7 @@ function RadarPage<T>({
       {rows.length > 0 && (
         filteredRows.length > 0
           ? renderTable(filteredRows)
-          : <EmptyState title="No persisted rows for this tab." message={`No ${activeLabel} rows were present in the backend snapshot.`} />
+          : <EmptyState title={`No ${activeLabel} rows in snapshot.`} message={emptyMessage} />
       )}
     </SnapshotPageShell>
   );

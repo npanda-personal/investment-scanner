@@ -18,7 +18,16 @@ import type {
 } from './earnings-intelligence.types';
 
 const CALCULATION_VERSION = 'earnings-intelligence-v1';
-const UPCOMING_WINDOW_DAYS = 45;
+/**
+ * How many calendar days ahead of the snapshot date to look for upcoming results.
+ *
+ * NSE Q4FY results typically fall 45–75 days after the period end (March 31),
+ * i.e. mid-May through mid-July.  90 days covers the full Q4 result window
+ * and also the first weeks of the Q1FY window when the calendar is clear.
+ * 45 days was too tight: Q4FY26 results (estimated ~Aug 14) were 70+ days
+ * from the June 2026 snapshot dates, leaving UPCOMING_RESULTS permanently empty.
+ */
+const UPCOMING_WINDOW_DAYS = 90;
 const RECENT_RESULT_WINDOW_DAYS = 60;
 
 /**
@@ -381,7 +390,14 @@ export class EarningsIntelligenceService {
   }): EarningsIntelligenceCategory[] {
     const categories: EarningsIntelligenceCategory[] = [];
     const hasAuthoritativeResultDate = input.resultDateSource === 'OFFICIAL_CALENDAR';
-    const recentResult = Boolean(hasAuthoritativeResultDate && input.resultDate && this.daysBetween(input.resultDate, input.snapshotDate) <= RECENT_RESULT_WINDOW_DAYS && input.resultDate <= input.snapshotDate);
+    // Treat ESTIMATED_FROM_PERIOD_CADENCE as a plausible result date for the
+    // recent-result window.  Without official NSE board-meeting dates (which
+    // require the ingest script to have run), estimated cadence is the best
+    // available signal for Q3/Q4 results that landed in the last 60 days.
+    // RESULT_WINNERS / RESULT_DISAPPOINTMENTS are labelled with ESTIMATED_RESULT_DATE
+    // so the trader can see the provenance.
+    const hasUsableResultDate = hasAuthoritativeResultDate || input.resultDateSource === 'ESTIMATED_FROM_PERIOD_CADENCE';
+    const recentResult = Boolean(hasUsableResultDate && input.resultDate && this.daysBetween(input.resultDate, input.snapshotDate) <= RECENT_RESULT_WINDOW_DAYS && input.resultDate <= input.snapshotDate);
     const upcoming = input.daysToResult !== null
       && input.daysToResult >= 0
       && input.daysToResult <= UPCOMING_WINDOW_DAYS

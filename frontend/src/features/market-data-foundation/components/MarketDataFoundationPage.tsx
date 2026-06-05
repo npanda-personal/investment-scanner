@@ -969,12 +969,28 @@ const MarketDataFoundationPage: React.FC = () => {
       label: 'Symbol',
       sortable: true,
       render: (instrument) => (
-        <Tooltip title={instrument.symbol !== formatDisplaySymbol(instrument) ? `Stored symbol: ${instrument.symbol}` : ''} arrow>
-          <Typography fontWeight={700} fontSize={13}>{formatDisplaySymbol(instrument)}</Typography>
-        </Tooltip>
+        <Stack direction="row" spacing={0.5} alignItems="center">
+          <Tooltip title={instrument.symbol !== formatDisplaySymbol(instrument) ? `Stored symbol: ${instrument.symbol}` : ''} arrow>
+            <Typography fontWeight={700} fontSize={13}>{formatDisplaySymbol(instrument)}</Typography>
+          </Tooltip>
+          {instrument.catalog_source === 'NSE_SME_EQUITY_SECURITIES' && (
+            <Tooltip title="NSE SME platform — limited liquidity; verify tradability before acting" arrow>
+              <Chip size="small" label="SME" color="warning" sx={{ height: 18, fontSize: 11, fontWeight: 700, cursor: 'default' }} />
+            </Tooltip>
+          )}
+        </Stack>
       ),
     },
     { id: 'name', label: 'Company', sortable: true, render: (instrument) => instrument.company_name },
+    {
+      id: 'isin',
+      label: 'ISIN',
+      render: (instrument) => (
+        <Typography sx={{ ...subtleCellText, fontFamily: 'monospace', fontSize: 12 }}>
+          {instrument.isin || '—'}
+        </Typography>
+      ),
+    },
     { id: 'exchange', label: 'Exchange', sortable: true, render: (instrument) => <Typography sx={subtleCellText}>{instrument.exchange || 'UNKNOWN'}</Typography> },
     { id: 'assetType', label: 'Asset Type', sortable: true, render: (instrument) => <Typography sx={subtleCellText}>{formatAssetType(instrument.asset_type)}</Typography> },
     { id: 'instrumentSegment', label: 'Segment/Class', render: (instrument) => <Typography sx={subtleCellText}>{instrument.instrument_segment || 'UNKNOWN'}</Typography> },
@@ -1087,6 +1103,7 @@ const MarketDataFoundationPage: React.FC = () => {
     instrumentSegment.trim() ? `Segment = ${instrumentSegment.trim().toUpperCase()}` : null,
     currency.trim() ? `Currency = ${currency.trim().toUpperCase()}` : null,
     derivativesEligible ? `F&O Eligible = ${derivativesEligible === 'true' ? 'YES' : 'NO'}` : null,
+    catalogSource.trim() === 'NSE_SME_EQUITY_SECURITIES' ? 'SME only' : catalogSource.trim() === 'NSE_EQUITY_SECURITIES' ? 'Main Board only' : null,
   ].filter((item): item is string => Boolean(item));
   const hasLocalFilters = activeFilters.length > 0;
   const availableCatalogSources = catalogSources.length > 0 ? catalogSources : fallbackCatalogSources;
@@ -1563,6 +1580,13 @@ const MarketDataFoundationPage: React.FC = () => {
             <MenuItem value="true">Yes</MenuItem>
             <MenuItem value="false">No</MenuItem>
           </TextField>
+          <TextField select size="small" label="SME / Segment" value={catalogSource} onChange={(event) => { setCatalogSource(event.target.value); setPage(0); }}
+            title="Filter by NSE segment. SME stocks have limited liquidity — verify tradability before acting."
+          >
+            <MenuItem value="">All</MenuItem>
+            <MenuItem value="NSE_EQUITY_SECURITIES">NSE Main Board (EQ)</MenuItem>
+            <MenuItem value="NSE_SME_EQUITY_SECURITIES">NSE SME only</MenuItem>
+          </TextField>
           <Button
             variant="outlined"
             startIcon={loading ? <CircularProgress size={18} /> : <RefreshIcon />}
@@ -1632,6 +1656,16 @@ const MarketDataFoundationPage: React.FC = () => {
                 <Typography variant="body2"><strong>Stored symbol:</strong> {selectedInstrument.symbol}</Typography>
                 <Typography variant="body2"><strong>Display symbol:</strong> {selectedInstrument.display_symbol || formatDisplaySymbol(selectedInstrument)}</Typography>
                 <Typography variant="body2"><strong>Source symbol:</strong> {selectedInstrument.source_symbol || 'Missing'}</Typography>
+                <Typography variant="body2">
+                  <strong>ISIN:</strong>{' '}
+                  <span style={{ fontFamily: 'monospace' }}>{selectedInstrument.isin || '—'}</span>
+                </Typography>
+                {selectedInstrument.catalog_source === 'NSE_SME_EQUITY_SECURITIES' && (
+                  <Stack direction="row" spacing={0.5} alignItems="center">
+                    <Chip size="small" label="SME" color="warning" />
+                    <Typography variant="caption" color="text.secondary">NSE SME platform — limited liquidity; verify tradability before acting</Typography>
+                  </Stack>
+                )}
               </Stack>
             </Box>
             <Box>

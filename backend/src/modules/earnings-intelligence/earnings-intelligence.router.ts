@@ -4,6 +4,7 @@ import { EarningsIntelligenceController } from './earnings-intelligence.controll
 export function createEarningsIntelligenceRouter(controller = new EarningsIntelligenceController()) {
   const router = Router();
   router.get('/market-intelligence/earnings', controller.latest);
+  router.post('/market-intelligence/earnings/refresh', controller.refresh);
   return router;
 }
 

@@ -145,20 +145,24 @@ describe('EarningsIntelligenceService', () => {
   it('uses period end fallback without treating validatedAt as the result date', () => {
     const service = new EarningsIntelligenceService({} as any);
 
+    // snapshotDate=2026-05-01 puts the Q4FY26 estimated result date (2026-08-14) at
+    // 105 days out — beyond UPCOMING_WINDOW_DAYS (90) — so we get PERIOD_END_DATE_FALLBACK.
+    // (snapshotDate=2026-06-01 now yields ESTIMATED_FROM_PERIOD_CADENCE because Aug-14
+    //  is only 74 days away, within the expanded 90-day window.)
     const snapshot = service.calculateSnapshot({
       stockId: 'stock-1',
       symbol: 'AAA',
       region: 'IN',
       assetType: 'STOCK',
-      snapshotDate: new Date('2026-06-01T00:00:00.000Z'),
+      snapshotDate: new Date('2026-05-01T00:00:00.000Z'),
       dataThroughDate: null,
       fundamentals: [
         fundamental('2026-03-31', 130, 18, 1.8, { validatedAt: new Date('2026-05-10T00:00:00.000Z') }),
         fundamental('2025-03-31', 100, 10, 1),
       ],
       prices: [
-        { symbol: 'AAA', timestamp: new Date('2026-05-08T00:00:00.000Z'), close: 100, adjustedClose: 100, volume: 1000 },
-        { symbol: 'AAA', timestamp: new Date('2026-05-16T00:00:00.000Z'), close: 106, adjustedClose: 106, volume: 1200 },
+        { symbol: 'AAA', timestamp: new Date('2026-04-28T00:00:00.000Z'), close: 100, adjustedClose: 100, volume: 1000 },
+        { symbol: 'AAA', timestamp: new Date('2026-05-06T00:00:00.000Z'), close: 106, adjustedClose: 106, volume: 1200 },
       ],
       deliverySnapshots: [],
     });
@@ -179,6 +183,9 @@ describe('EarningsIntelligenceService', () => {
   it('marks stale freshness from period end even when validatedAt is recent', () => {
     const service = new EarningsIntelligenceService({} as any);
 
+    // FY25 latest period (2025-03-31) — estimated result = 2025-03-31+3m+45d = 2025-08-14.
+    // Any snapshotDate after 2025-08-14 puts the estimate in the past, so the fallback
+    // path is reached regardless of window size.
     const snapshot = service.calculateSnapshot({
       stockId: 'stock-1',
       symbol: 'AAA',
@@ -229,10 +236,12 @@ describe('EarningsIntelligenceService', () => {
         symbol: 'AAA',
         region: 'IN',
         assetType: 'STOCK',
-        snapshotDate: new Date('2026-06-01T00:00:00.000Z'),
+        // Use snapshotDate in May so estimated result date (Aug-14) is >90 days away,
+        // keeping resultDateSource=PERIOD_END_DATE_FALLBACK and freshness=FRESH.
+        snapshotDate: new Date('2026-05-01T00:00:00.000Z'),
         dataThroughDate: null,
         fundamentals: [
-          fundamental('2026-03-31', 130, 18, 1.8, { validatedAt: new Date('2026-05-10T00:00:00.000Z') }),
+          fundamental('2026-03-31', 130, 18, 1.8, { validatedAt: new Date('2026-04-30T00:00:00.000Z') }),
           fundamental('2025-03-31', 100, 10, 1),
         ],
         prices: [],
@@ -455,15 +464,18 @@ describe('EarningsIntelligenceService', () => {
 
   it('CB-44: fallback (period-end) result date produces resultDateLabel=null', () => {
     const service = new EarningsIntelligenceService({} as any);
+    // snapshotDate=2026-05-01 → estimated result Aug-14 is 105 days away (>90) → PERIOD_END_DATE_FALLBACK.
+    // (snapshotDate=2026-06-01 now yields ESTIMATED_FROM_PERIOD_CADENCE because the expanded
+    //  90-day window covers the ~74 remaining days to the Aug-14 estimate.)
     const snapshot = service.calculateSnapshot({
       stockId: 'stock-1',
       symbol: 'AAA',
       region: 'IN',
       assetType: 'STOCK',
-      snapshotDate: new Date('2026-06-01T00:00:00.000Z'),
+      snapshotDate: new Date('2026-05-01T00:00:00.000Z'),
       dataThroughDate: null,
       fundamentals: [
-        fundamental('2026-03-31', 130, 18, 1.8, { validatedAt: new Date('2026-05-10T00:00:00.000Z') }),
+        fundamental('2026-03-31', 130, 18, 1.8, { validatedAt: new Date('2026-04-30T00:00:00.000Z') }),
         fundamental('2025-03-31', 100, 10, 1),
       ],
       prices: [],

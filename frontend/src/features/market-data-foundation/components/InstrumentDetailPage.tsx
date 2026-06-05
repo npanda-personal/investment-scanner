@@ -191,10 +191,18 @@ const InstrumentDetailPage: React.FC = () => {
         <Paper sx={{ p: 2 }}>
           <Typography variant="overline" color="text.secondary">Exchange</Typography>
           <Typography variant="h6">{instrument.exchange || 'UNKNOWN'}</Typography>
+          {instrument.catalog_source === 'NSE_SME_EQUITY_SECURITIES' && (
+            <Chip size="small" label="SME" color="warning" sx={{ mt: 0.5 }} title="NSE SME platform — limited liquidity; verify tradability before acting" />
+          )}
         </Paper>
         <Paper sx={{ p: 2 }}>
-          <Typography variant="overline" color="text.secondary">Currency</Typography>
-          <Typography variant="h6">{instrument.currency}</Typography>
+          <Typography variant="overline" color="text.secondary">ISIN</Typography>
+          <Typography variant="h6" sx={{ fontFamily: 'monospace', fontSize: 14, wordBreak: 'break-all' }}>
+            {instrument.isin || '—'}
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            {instrument.isin ? 'NSE catalog' : 'Not available'}
+          </Typography>
         </Paper>
         <Paper sx={{ p: 2 }}>
           <Typography variant="overline" color="text.secondary">Metadata</Typography>
