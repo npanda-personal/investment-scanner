@@ -26,6 +26,12 @@ import type {
 } from './signal-calibration-engine.types';
 
 const MODEL_VERSION = 'signal-calibration-v2';
+/**
+ * The signal-engine model version whose outcomes the calibration engine should read.
+ * Must stay in sync with MODEL_VERSION in signal-generation-engine.service.ts.
+ * Scopes quality/outcome metrics so that v1/v2/v3 corpus rows are never blended.
+ */
+const CURRENT_SIGNAL_MODEL_VERSION = 'signal-engine-v3';
 const SUPPORTED_HORIZONS: QualityHorizon[] = ['1D', '5D', '10D', '20D', '60D'];
 const DEFAULT_HORIZON: QualityHorizon = '20D';
 
@@ -680,11 +686,14 @@ export class SignalCalibrationEngineService {
    */
   private async tryPersistedMetrics(horizon: QualityHorizon): Promise<BatchQualityMetrics & { persistedMatureCount: number } | null> {
     try {
-      const matureCount = await this.qualityService.countMatureByHorizon(horizon);
+      // Scope to CURRENT_SIGNAL_MODEL_VERSION so v1/v2/v3 outcome rows are never blended.
+      // countMatureByHorizon and qualityMetricsFromPersistedOutcomes both accept an optional
+      // modelVersion; passing it here ensures calibration reads only the current-version corpus.
+      const matureCount = await this.qualityService.countMatureByHorizon(horizon, CURRENT_SIGNAL_MODEL_VERSION);
       if (matureCount < MIN_PERSISTED_SAMPLES) return null;
 
-      const metrics: PersistedQualityMetrics = await this.qualityService.qualityMetricsFromPersistedOutcomes({ horizon });
-      // Fix 2: carry the real matureCount into the BatchQualityMetrics so
+      const metrics: PersistedQualityMetrics = await this.qualityService.qualityMetricsFromPersistedOutcomes({ horizon, modelVersion: CURRENT_SIGNAL_MODEL_VERSION });
+      // Carry the real matureCount into the BatchQualityMetrics so
       // syntheticSummaryFromPersistedMetrics can use it without re-fetching.
       return {
         ...this.prepareQualityMetrics(metrics.byType, metrics.byScore, metrics.bySector, metrics.noisy, 'PERSISTED_OUTCOMES'),

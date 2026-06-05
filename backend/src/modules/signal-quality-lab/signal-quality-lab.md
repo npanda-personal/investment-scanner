@@ -208,7 +208,7 @@ If shapes vary, missing fields fall back to `UNKNOWN` or the available label/cod
 MVP rules:
 
 - `DIRECTION_FLIPS`: 3 or more direction changes for the same instrument in 30 days.
-- `FAILED_HIGH_SCORE_BULLISH`: score `>= 70` and 10D return `< -3%`.
+- `FAILED_HIGH_SCORE_BULLISH`: score `>= 85` and 10D return `< -3%`. (Raised from 70 → 85 for v3: under v3 score=70 is p90 / top-10%, not high conviction; score=85 is p97 / top-3% and maps to the 85-100 SCORE_BUCKET.)
 - `FAILED_BEARISH`: bearish signal and 10D return `> 3%`.
 - `LOW_CONFIDENCE_SIGNAL`: low-confidence signals are flagged for caution.
 - `STALE_SIGNAL`: latest signal older than 7 days.

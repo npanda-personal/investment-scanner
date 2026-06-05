@@ -23,6 +23,7 @@ const holding = (overrides: any = {}) => ({
   createdAt: '2026-04-28T00:00:00.000Z',
   updatedAt: '2026-04-28T00:00:00.000Z',
   currentPrice: overrides.currentPrice ?? 100,
+  priceDate: overrides.priceDate ?? '2026-06-04',
   marketValue: overrides.marketValue ?? 1000,
   investedAmount: 800,
   unrealizedPnL: overrides.unrealizedPnL ?? 200,

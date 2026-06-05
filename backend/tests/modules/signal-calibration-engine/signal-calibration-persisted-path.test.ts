@@ -189,8 +189,8 @@ describe('signal-calibration-engine — persisted outcomes path', () => {
     const setup = makeService();
     await setup.instance.run({ batchSize: 1, offset: 0, region: 'IN', assetType: 'STOCK', horizon: '20D' });
 
-    expect(setup.qualityService.countMatureByHorizon).toHaveBeenCalledWith('20D');
-    expect(setup.qualityService.qualityMetricsFromPersistedOutcomes).toHaveBeenCalledWith({ horizon: '20D' });
+    expect(setup.qualityService.countMatureByHorizon).toHaveBeenCalledWith('20D', 'signal-engine-v3');
+    expect(setup.qualityService.qualityMetricsFromPersistedOutcomes).toHaveBeenCalledWith({ horizon: '20D', modelVersion: 'signal-engine-v3' });
     expect(setup.qualityService.byType).not.toHaveBeenCalled();
     expect(setup.qualityService.byScoreBucket).not.toHaveBeenCalled();
     expect(setup.qualityService.bySector).not.toHaveBeenCalled();
@@ -381,7 +381,7 @@ describe('signal-calibration-engine — on-demand fallback path', () => {
 
     await setup.instance.run({ batchSize: 1, offset: 0, region: 'IN', assetType: 'STOCK', horizon: '20D' });
 
-    expect(setup.qualityService.countMatureByHorizon).toHaveBeenCalledWith('20D');
+    expect(setup.qualityService.countMatureByHorizon).toHaveBeenCalledWith('20D', 'signal-engine-v3');
     expect(setup.qualityService.qualityMetricsFromPersistedOutcomes).not.toHaveBeenCalled();
     expect(setup.qualityService.byType).toHaveBeenCalled();
     expect(setup.qualityService.byScoreBucket).toHaveBeenCalled();

@@ -556,7 +556,7 @@ describe('signal quality lab service', () => {
   it('detects failed bullish, failed bearish, low confidence, stale, and flip noise', () => {
     const service = serviceWithSignals([]);
     const signals = [
-      baseSignal({ id: 's1', direction: 'BULLISH', generated_at: new Date().toISOString(), confidence: 'LOW' }),
+      baseSignal({ id: 's1', direction: 'BULLISH', generated_at: new Date().toISOString(), confidence: 'LOW', score: 90 }),
       baseSignal({ id: 's2', direction: 'BEARISH', generated_at: new Date(Date.now() - 2 * 86400000).toISOString() }),
       baseSignal({ id: 's3', direction: 'BULLISH', generated_at: new Date(Date.now() - 4 * 86400000).toISOString() }),
       baseSignal({ id: 's4', direction: 'BEARISH', generated_at: new Date(Date.now() - 6 * 86400000).toISOString() }),

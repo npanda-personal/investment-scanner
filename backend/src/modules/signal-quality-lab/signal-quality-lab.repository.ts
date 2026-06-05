@@ -206,13 +206,14 @@ export class SignalQualityLabRepository {
   // Read / diagnostic helpers
   // ---------------------------------------------------------------------------
 
-  /** Count mature (dataComplete=true) rows for a given horizon since an optional date. */
-  async countMatureByHorizon(horizon: QualityHorizon, since?: Date): Promise<number> {
+  /** Count mature (dataComplete=true) rows for a given horizon since an optional date, optionally filtered to a modelVersion. */
+  async countMatureByHorizon(horizon: QualityHorizon, since?: Date, modelVersion?: string): Promise<number> {
     return this.db.signalOutcome.count({
       where: {
         horizon,
         dataComplete: true,
         ...(since ? { evaluatedAt: { gte: since } } : {}),
+        ...(modelVersion ? { modelVersion } : {}),
       },
     });
   }

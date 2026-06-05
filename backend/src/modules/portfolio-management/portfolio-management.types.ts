@@ -55,6 +55,8 @@ export interface PortfolioHoldingDto {
 
 export interface HoldingValuationDto extends PortfolioHoldingDto {
   currentPrice: number | null;
+  /** ISO date string of the price tick used for this holding's valuation, or null if unavailable. */
+  priceDate: string | null;
   marketValue: number;
   investedAmount: number;
   unrealizedPnL: number;

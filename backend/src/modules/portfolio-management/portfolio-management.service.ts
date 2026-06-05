@@ -85,7 +85,17 @@ export class PortfolioManagementService {
     const valuedHoldings = await Promise.all(holdings.map((holding) => this.valueHolding(holding)));
     const totalValue = this.sum(valuedHoldings.map((holding) => holding.marketValue));
     const totalInvested = this.sum(valuedHoldings.map((holding) => holding.investedAmount));
+    // dailyPnL: sum of (priceChange * quantity) for holdings that have a prior-day price.
+    // Holdings missing a prior price contribute 0 to dailyPnL and are excluded from the denominator.
     const dailyPnL = this.sum(valuedHoldings.map((holding) => holding.dailyChange !== null ? holding.dailyChange * holding.quantity : 0));
+    // dailyPnLPercent denominator = prior-day portfolio value = sum of (previousPrice * quantity)
+    // for the subset of holdings that have a valid prior price.  This keeps the percent honest:
+    // if some holdings lack a prior price they are excluded from both numerator and denominator.
+    const priorDayValue = this.sum(
+      valuedHoldings
+        .filter((holding) => holding.dailyChange !== null && holding.currentPrice !== null)
+        .map((holding) => (holding.marketValue - holding.dailyChange! * holding.quantity)),
+    );
     const withAllocation = valuedHoldings.map((holding) => ({
       ...holding,
       allocationPercent: totalValue > 0 ? holding.marketValue / totalValue : 0,
@@ -98,7 +108,7 @@ export class PortfolioManagementService {
       totalUnrealizedPnL: totalValue - totalInvested,
       totalUnrealizedPnLPercent: totalInvested > 0 ? (totalValue - totalInvested) / totalInvested : null,
       dailyPnL,
-      dailyPnLPercent: totalValue - dailyPnL > 0 ? dailyPnL / (totalValue - dailyPnL) : null,
+      dailyPnLPercent: priorDayValue > 0 ? dailyPnL / priorDayValue : null,
       numberOfHoldings: holdings.length,
       holdings: withAllocation,
       source: 'portfolio-management',
@@ -253,6 +263,18 @@ export class PortfolioManagementService {
     const latestPrice = latest?.latest?.adjusted_close ?? latest?.latest?.close ?? null;
     const previousPrice = prices?.prices?.[1]?.adjusted_close ?? prices?.prices?.[1]?.close ?? null;
     const currentPrice = typeof latestPrice === 'number' ? latestPrice : null;
+    // priceDate: the date field of the latest price tick; null when no price is available.
+    // latest?.latest?.date is typed as `any` from the market-data service, so we normalise safely.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const priceDateRaw: any = latest?.latest?.date ?? null;
+    const priceDate: string | null =
+      priceDateRaw === null || priceDateRaw === undefined
+        ? null
+        : priceDateRaw instanceof Date
+          ? priceDateRaw.toISOString()
+          : typeof priceDateRaw === 'string' && priceDateRaw.length > 0
+            ? priceDateRaw
+            : null;
     const marketValue = currentPrice !== null ? holding.quantity * currentPrice : 0;
     const investedAmount = holding.quantity * holding.averageCost;
     const dailyChange = currentPrice !== null && typeof previousPrice === 'number' ? currentPrice - previousPrice : null;
@@ -260,6 +282,7 @@ export class PortfolioManagementService {
     return {
       ...holding,
       currentPrice,
+      priceDate,
       marketValue,
       investedAmount,
       unrealizedPnL: marketValue - investedAmount,

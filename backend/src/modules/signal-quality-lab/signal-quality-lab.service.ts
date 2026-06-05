@@ -282,8 +282,8 @@ export class SignalQualityLabService {
    * Used by the calibration engine to decide whether persisted outcomes are
    * sufficient to skip on-demand price-history recomputation.
    */
-  async countMatureByHorizon(horizon: QualityHorizon): Promise<number> {
-    return this.repository.countMatureByHorizon(horizon);
+  async countMatureByHorizon(horizon: QualityHorizon, modelVersion?: string): Promise<number> {
+    return this.repository.countMatureByHorizon(horizon, undefined, modelVersion);
   }
 
   /**
@@ -1112,7 +1112,10 @@ export class SignalQualityLabService {
     for (const outcome of outcomes) {
       const tenDay = outcome.outcomes.find((item) => item.horizon === '10D');
       if (!tenDay?.available || tenDay.forwardReturnPercent === null) continue;
-      if (outcome.direction === 'BULLISH' && outcome.score >= 70 && tenDay.forwardReturnPercent < FAILED_BULLISH_10D) {
+      // v3 score distribution: p90=70, p95=74, p99≈85. Under v3, score≥70 is only the top-10% —
+      // not "high conviction". Score≥85 (~top 3%) is genuinely high conviction (85-100 bucket).
+      // Raised from 70 → 85 so the flag fires only on true high-score failures, not on above-median signals.
+      if (outcome.direction === 'BULLISH' && outcome.score >= 85 && tenDay.forwardReturnPercent < FAILED_BULLISH_10D) {
         items.push(this.noise(outcome, 'FAILED_HIGH_SCORE_BULLISH', 'MEDIUM', 'High-score bullish signal had a negative 10D outcome.', { return10D: tenDay.forwardReturnPercent, score: outcome.score }));
       }
       if (outcome.direction === 'BEARISH' && tenDay.forwardReturnPercent > FAILED_BEARISH_10D) {
