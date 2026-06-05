@@ -1,3 +1,5 @@
+import AddAlertIcon from '@mui/icons-material/AddAlert';
+import BookmarkAddIcon from '@mui/icons-material/BookmarkAdd';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import {
   Alert,
@@ -16,14 +18,19 @@ import {
   Typography,
 } from '@mui/material';
 import type React from 'react';
+import { useState } from 'react';
 import { Link as RouterLink, useParams } from 'react-router-dom';
 import { PageHeader } from '@/shared/components/PageHeader';
+import { AddToWatchlistDialog } from '@/features/watchlist-management';
+import { CreateAlertDialog } from '@/features/alerts-monitoring';
 import { useTodayReviewCandidate } from '../hooks/useTodayReview';
 import type { TodayReviewCandidate, TodayReviewCandidateDataQualitySnapshot } from '../types';
 
 export function TodayReviewCandidateDetailPage() {
   const { candidateId } = useParams();
   const { candidate, loading, error, reload } = useTodayReviewCandidate(candidateId);
+  const [watchlistOpen, setWatchlistOpen] = useState(false);
+  const [alertOpen, setAlertOpen] = useState(false);
 
   if (loading) {
     return (
@@ -69,7 +76,25 @@ export function TodayReviewCandidateDetailPage() {
         backTo="/today-review"
         backLabel="Today Review"
         badges={<Stack direction="row" spacing={1} flexWrap="wrap"><Chip label={stateLabel(candidate.state)} color={candidate.state === 'BLOCKED' ? 'error' : 'primary'} /><Chip label={`Grade ${candidate.grade}`} variant="outlined" /></Stack>}
-        secondaryActions={<Button startIcon={<RefreshIcon />} onClick={() => void reload()}>Refresh</Button>}
+        secondaryActions={
+          <Stack direction="row" spacing={1}>
+            <Button startIcon={<BookmarkAddIcon />} variant="outlined" size="small" onClick={() => setWatchlistOpen(true)}>Add to Watchlist</Button>
+            <Button startIcon={<AddAlertIcon />} variant="outlined" size="small" onClick={() => setAlertOpen(true)}>Set Alert</Button>
+            <Button startIcon={<RefreshIcon />} onClick={() => void reload()}>Refresh</Button>
+          </Stack>
+        }
+      />
+      <AddToWatchlistDialog
+        open={watchlistOpen}
+        instrumentId={candidate.instrumentId}
+        symbol={candidate.symbol}
+        companyName={candidate.companyName}
+        onClose={() => setWatchlistOpen(false)}
+      />
+      <CreateAlertDialog
+        open={alertOpen}
+        onClose={() => setAlertOpen(false)}
+        defaults={{ scope: 'STOCK', instrumentId: candidate.instrumentId }}
       />
 
       <Card variant="outlined">
@@ -201,6 +226,7 @@ export function TodayReviewCandidateDetailPage() {
         <CardContent>
           <Typography variant="h6" gutterBottom>Drilldowns</Typography>
           <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>
+            <Link component={RouterLink} to={`/stocks/${candidate.symbol}`}>{candidate.symbol} Stock Page</Link>
             <Link component={RouterLink} to={`/stocks/${candidate.instrumentId}`}>Instrument Workspace</Link>
             <Link component={RouterLink} to="/watchlists">Watchlists</Link>
             <Link component={RouterLink} to="/alerts">Alerts</Link>

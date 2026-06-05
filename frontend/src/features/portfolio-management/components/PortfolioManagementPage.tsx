@@ -6,6 +6,11 @@ import {
   Button,
   Chip,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
   Divider,
   IconButton,
   MenuItem,
@@ -23,6 +28,7 @@ import {
   Typography,
 } from '@mui/material';
 import { EditOutlined, DeleteOutline } from '@mui/icons-material';
+import axios from 'axios';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { SignalBadge } from '@/features/signal-generation-engine';
 import { PortfolioIntelligencePanel } from '@/features/portfolio-intelligence';
@@ -37,8 +43,30 @@ import {
   updateHolding,
 } from '../api/portfolioManagementService';
 import { usePortfolioManagement } from '../hooks';
-import type { CreateHoldingInput, CreateTransactionInput, HoldingValuation, PortfolioHolding, PortfolioTransactionType } from '../types';
+import type { CreateHoldingInput, CreateTransactionInput, HoldingValuation, PortfolioHolding, PortfolioTransaction, PortfolioTransactionType } from '../types';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
+
+interface CapitalPostureData {
+  postureLabel: string;
+  suggestedExposureBand: { minPct: number; maxPct: number };
+  action: string;
+  message: string;
+  availability: string;
+}
+
+const postureBandColor = (label: string): 'success' | 'warning' | 'error' | 'info' => {
+  if (label === 'AGGRESSIVE') return 'success';
+  if (label === 'NEUTRAL') return 'info';
+  if (label === 'CAUTIOUS') return 'warning';
+  if (label === 'DEFENSIVE') return 'error';
+  return 'info';
+};
+
+/** Resolve instrument symbol from a holdings map, falling back to a short id excerpt. */
+const resolveSymbol = (instrumentId: string | null, holdingsMap: Map<string, string>): string => {
+  if (!instrumentId) return 'Cash';
+  return holdingsMap.get(instrumentId) || instrumentId.slice(0, 12) + (instrumentId.length > 12 ? '…' : '');
+};
 
 const money = (value: number | null | undefined, currency = 'USD') =>
   value === null || value === undefined
@@ -120,7 +148,35 @@ const PortfolioManagementPage: React.FC = () => {
   const [selectedHoldingInstrument, setSelectedHoldingInstrument] = useState<V1Instrument | null>(null);
   const [selectedTransactionInstrument, setSelectedTransactionInstrument] = useState<V1Instrument | null>(null);
   const [activeSection, setActiveSection] = useState<'overview' | 'holdings' | 'allocation' | 'intelligence' | 'transactions'>('overview');
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [capitalPosture, setCapitalPosture] = useState<CapitalPostureData | null>(null);
+  const [postureLoading, setPostureLoading] = useState(false);
+  const [postureError, setPostureError] = useState<string | null>(null);
   const baseCurrency = selectedPortfolio?.baseCurrency || 'USD';
+
+  // Build a map from instrumentId -> symbol from holdings data for transaction display
+  const holdingsSymbolMap = useMemo<Map<string, string>>(() => {
+    const map = new Map<string, string>();
+    if (summary?.holdings) {
+      for (const h of summary.holdings) map.set(h.instrumentId, h.symbol);
+    }
+    if (detail?.holdings) {
+      for (const h of detail.holdings) map.set(h.instrumentId, h.symbol);
+    }
+    return map;
+  }, [summary, detail]);
+
+  // Fetch capital posture when overview tab is active
+  React.useEffect(() => {
+    if (activeSection !== 'overview' || !selectedId) return;
+    setPostureLoading(true);
+    setPostureError(null);
+    axios
+      .get<CapitalPostureData>(`/api/v1/market-context/capital-posture?region=${scope.region}`)
+      .then((res) => setCapitalPosture(res.data))
+      .catch((err: any) => setPostureError(err.response?.data?.error || err.message || 'Failed to load market posture'))
+      .finally(() => setPostureLoading(false));
+  }, [activeSection, selectedId, scope.region]);
 
   const summaryTone = useMemo(() => {
     if (!summary) return undefined;
@@ -215,6 +271,14 @@ const PortfolioManagementPage: React.FC = () => {
     });
   };
 
+  const handleDeletePortfolio = async () => {
+    if (!selectedPortfolio) return;
+    setDeleteConfirmOpen(false);
+    await deletePortfolio(selectedPortfolio.id);
+    navigate('/portfolios');
+    await reload();
+  };
+
   if (loading) {
     return <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress /></Box>;
   }
@@ -233,18 +297,6 @@ const PortfolioManagementPage: React.FC = () => {
       />
 
       {(error || formError) && <Alert severity="error" sx={{ mb: 2 }}>{error || formError}</Alert>}
-
-      <Paper sx={{ p: 2, mb: 3 }}>
-        <Typography variant="h6" sx={{ mb: 1 }}>Portfolio Intelligence Overlays</Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-          Portfolio intelligence read models are not available yet. These overlays will display persisted backend snapshots only when supported.
-        </Typography>
-        <Stack direction="row" gap={1} flexWrap="wrap" useFlexGap>
-          {['Sector Exposure', 'Weak Sector Exposure', 'Upcoming Result Exposure', 'Risk Exposure', 'Freshness'].map((item) => (
-            <Chip key={item} label={item} variant="outlined" />
-          ))}
-        </Stack>
-      </Paper>
 
       <Paper sx={{ p: 2, mb: 3 }}>
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={3} alignItems="flex-start">
@@ -288,11 +340,7 @@ const PortfolioManagementPage: React.FC = () => {
                 <Typography variant="h5">{selectedPortfolio.name}</Typography>
                 <Typography color="text.secondary">{selectedPortfolio.description || 'No description'}</Typography>
               </Box>
-              <Button color="error" variant="outlined" onClick={async () => {
-                await deletePortfolio(selectedPortfolio.id);
-                navigate('/portfolios');
-                await reload();
-              }}>
+              <Button color="error" variant="outlined" onClick={() => setDeleteConfirmOpen(true)}>
                 Delete Portfolio
               </Button>
             </Stack>
@@ -308,13 +356,54 @@ const PortfolioManagementPage: React.FC = () => {
             </Tabs>
           </Paper>
 
-          {activeSection === 'overview' && summary && (
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(4, 1fr)' }, gap: 2 }}>
-              <SummaryCard label="Total Value" value={money(summary.totalValue, baseCurrency)} />
-              <SummaryCard label="Unrealized P&L" value={`${money(summary.totalUnrealizedPnL, baseCurrency)} (${percent(summary.totalUnrealizedPnLPercent)})`} tone={summaryTone} />
-              <SummaryCard label="Daily Change" value={`${money(summary.dailyPnL, baseCurrency)} (${percent(summary.dailyPnLPercent)})`} tone={summary.dailyPnL >= 0 ? 'success' : 'error'} />
-              <SummaryCard label="Holdings" value={String(summary.numberOfHoldings)} />
-            </Box>
+          {activeSection === 'overview' && (
+            <Stack spacing={2}>
+              {/* Capital Posture banner */}
+              {postureLoading && (
+                <Paper sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <CircularProgress size={16} />
+                  <Typography variant="body2" color="text.secondary">Loading market posture…</Typography>
+                </Paper>
+              )}
+              {postureError && (
+                <Alert severity="warning">Market posture unavailable: {postureError}</Alert>
+              )}
+              {capitalPosture && capitalPosture.availability === 'READY' && (
+                <Paper sx={{ p: 2, borderLeft: '4px solid', borderColor: `${postureBandColor(capitalPosture.postureLabel)}.main` }}>
+                  <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems="flex-start" spacing={1}>
+                    <Box>
+                      <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
+                        <Typography variant="subtitle1" fontWeight={700}>Market Posture</Typography>
+                        <Chip size="small" label={capitalPosture.postureLabel} color={postureBandColor(capitalPosture.postureLabel)} />
+                        <Chip size="small" label={`Exposure ${capitalPosture.suggestedExposureBand.minPct}–${capitalPosture.suggestedExposureBand.maxPct}%`} variant="outlined" />
+                      </Stack>
+                      <Typography variant="body2" color="text.secondary">{capitalPosture.message}</Typography>
+                      <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                        Research-support context only — not investment advice. Verify signals independently before any trade decision.
+                      </Typography>
+                    </Box>
+                    <Chip size="small" label={`Action: ${capitalPosture.action}`} variant="outlined" />
+                  </Stack>
+                </Paper>
+              )}
+
+              {summary && summary.numberOfHoldings === 0 ? (
+                <Paper sx={{ p: 3, textAlign: 'center' }}>
+                  <Typography variant="h6" color="text.secondary">No holdings yet</Typography>
+                  <Typography color="text.secondary" sx={{ mb: 2 }}>
+                    Add your first holding to start tracking portfolio value, P&amp;L, and signal overlays.
+                  </Typography>
+                  <Button variant="contained" onClick={() => setActiveSection('holdings')}>Add a Holding</Button>
+                </Paper>
+              ) : summary ? (
+                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(4, 1fr)' }, gap: 2 }}>
+                  <SummaryCard label="Total Value" value={money(summary.totalValue, baseCurrency)} />
+                  <SummaryCard label="Unrealized P&L" value={`${money(summary.totalUnrealizedPnL, baseCurrency)} (${percent(summary.totalUnrealizedPnLPercent)})`} tone={summaryTone} />
+                  <SummaryCard label="Daily Change" value={`${money(summary.dailyPnL, baseCurrency)} (${percent(summary.dailyPnLPercent)})`} tone={summary.dailyPnL >= 0 ? 'success' : 'error'} />
+                  <SummaryCard label="Holdings" value={String(summary.numberOfHoldings)} />
+                </Box>
+              ) : null}
+            </Stack>
           )}
 
           {activeSection === 'holdings' && <Paper sx={{ p: 2, overflowX: 'auto' }}>
@@ -454,11 +543,11 @@ const PortfolioManagementPage: React.FC = () => {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {transactions.map((transaction) => (
+                  {transactions.map((transaction: PortfolioTransaction) => (
                     <TableRow key={transaction.id}>
                       <TableCell>{new Date(transaction.transactionDate).toLocaleDateString()}</TableCell>
                       <TableCell>{transaction.type}</TableCell>
-                      <TableCell>{transaction.instrumentId || 'Cash'}</TableCell>
+                      <TableCell>{resolveSymbol(transaction.instrumentId, holdingsSymbolMap)}</TableCell>
                       <TableCell align="right">{transaction.quantity ?? 'N/A'}</TableCell>
                       <TableCell align="right">{money(transaction.price, transaction.currency)}</TableCell>
                       <TableCell align="right">{money(transaction.amount, transaction.currency)}</TableCell>
@@ -470,6 +559,20 @@ const PortfolioManagementPage: React.FC = () => {
           </Paper>}
         </Stack>
       )}
+
+      {/* Delete portfolio confirmation */}
+      <Dialog open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)}>
+        <DialogTitle>Delete Portfolio</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to delete &ldquo;{selectedPortfolio?.name}&rdquo;? All holdings and transactions will be permanently removed. This action cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteConfirmOpen(false)}>Cancel</Button>
+          <Button color="error" variant="contained" onClick={() => void handleDeletePortfolio()}>Delete</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

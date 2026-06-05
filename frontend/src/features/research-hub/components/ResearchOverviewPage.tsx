@@ -149,7 +149,7 @@ const ResearchOverviewPage: React.FC = () => {
               <Typography variant="h6" sx={{ mb: 2, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
                 <TimelineOutlined color="info" /> What Changed
               </Typography>
-              <WhatChangedPanel whatChanged={whatChanged} />
+              <WhatChangedPanel whatChanged={whatChanged} generatedAt={data.generatedAt} />
             </Box>
 
             <Box>
@@ -537,10 +537,39 @@ const ProofMetric: React.FC<{ label: string; value: number }> = ({ label, value 
   </Box>
 );
 
-const WhatChangedPanel: React.FC<{ whatChanged: ResearchOverview['whatChanged'] }> = ({ whatChanged }) => {
+const WhatChangedPanel: React.FC<{
+  whatChanged: ResearchOverview['whatChanged'];
+  generatedAt?: string;
+}> = ({ whatChanged, generatedAt }) => {
+  const snapshotDate = generatedAt ? new Date(generatedAt) : null;
+  const ageMs = snapshotDate ? Date.now() - snapshotDate.getTime() : null;
+  const isStale = ageMs !== null && ageMs > 24 * 60 * 60 * 1000; // older than 1 day
+
+  const hasNoPriorSnapshot = (whatChanged?.warnings || []).some(
+    (w) => typeof w === 'string' && w.toLowerCase().includes('no prior snapshot')
+  );
+
   return (
     <Card variant="outlined" sx={{ bgcolor: 'background.paper' }}>
       <CardContent>
+        {/* Snapshot timestamp + stale indicator */}
+        {snapshotDate && (
+          <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
+            <Typography variant="caption" color="text.secondary">
+              Snapshot: {snapshotDate.toLocaleString()}
+            </Typography>
+            {isStale && (
+              <Chip
+                label="Stale — over 1 day old"
+                size="small"
+                color="warning"
+                variant="filled"
+                sx={{ fontWeight: 700, fontSize: '0.65rem' }}
+              />
+            )}
+          </Stack>
+        )}
+
         {(whatChanged?.newTradeCandidates?.length || 0) > 0 ? (
           <Box>
             <Typography variant="caption" fontWeight={700} color="primary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
@@ -555,13 +584,31 @@ const WhatChangedPanel: React.FC<{ whatChanged: ResearchOverview['whatChanged'] 
         ) : (
           <Typography variant="body2" color="text.secondary">No new review candidates since the last evaluation.</Typography>
         )}
-        
+
         {(whatChanged?.warnings?.length || 0) > 0 && (
           <Box sx={{ mt: 2 }}>
             <Typography variant="caption" fontWeight={700} color="error" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
               <WarningAmberOutlined fontSize="inherit" /> WARNINGS
             </Typography>
-            <Typography variant="caption" color="text.secondary">{whatChanged.warnings[0]}</Typography>
+            {hasNoPriorSnapshot ? (
+              <Stack spacing={1}>
+                <Typography variant="caption" color="text.secondary">
+                  No prior snapshot found — a baseline evaluation has not been run yet.
+                </Typography>
+                <Button
+                  component={Link}
+                  to="/admin/strategy-evaluation"
+                  variant="outlined"
+                  size="small"
+                  endIcon={<ArrowForwardOutlined />}
+                  sx={{ alignSelf: 'flex-start' }}
+                >
+                  Run strategy evaluation
+                </Button>
+              </Stack>
+            ) : (
+              <Typography variant="caption" color="text.secondary">{whatChanged.warnings[0]}</Typography>
+            )}
           </Box>
         )}
       </CardContent>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Alert, Box, CircularProgress, IconButton, Paper, Tooltip, Typography } from '@mui/material';
+import { Alert, Box, Chip, CircularProgress, IconButton, Paper, Tooltip, Typography } from '@mui/material';
 import { LaunchOutlined } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useInstrumentSignal } from '../hooks/useInstrumentSignal';
@@ -23,7 +23,24 @@ export const SignalWidget: React.FC<{ instrumentId?: string }> = ({ instrumentId
         <Alert severity="warning">{error}</Alert>
       ) : signal ? (
         <>
-          <Typography variant="h4">{signal.score}</Typography>
+          <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, flexWrap: 'wrap' }}>
+            {signal.calibratedScore != null && signal.calibrationStatus === 'CALIBRATED' ? (
+              <>
+                <Typography variant="h4">{signal.score}</Typography>
+                <Typography variant="body2" color="text.secondary">→ {signal.calibratedScore} (calibrated)</Typography>
+                {signal.reliabilityTier && (
+                  <Chip size="small" label={signal.reliabilityTier} color={signal.reliabilityTier === 'FULL' ? 'success' : 'warning'} sx={{ height: 18, fontSize: 10 }} />
+                )}
+              </>
+            ) : (
+              <>
+                <Typography variant="h4">{signal.score}</Typography>
+                <Tooltip title="Not enough historical evidence to calibrate this signal yet" arrow>
+                  <Typography variant="caption" color="text.disabled" sx={{ cursor: 'help' }}>calibration pending</Typography>
+                </Tooltip>
+              </>
+            )}
+          </Box>
           <Typography variant="body2" color="text.secondary">Confidence: {signal.confidence}</Typography>
           <Box component="ul" sx={{ pl: 2, my: 1 }}>
             {(signal.triggered_signals.length > 0 ? signal.triggered_signals : signal.negative_signals).slice(0, 3).map((reason) => (

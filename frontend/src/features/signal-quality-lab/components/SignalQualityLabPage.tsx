@@ -38,7 +38,21 @@ import { signal_quality_lab_batch_request_workers_count, signal_quality_lab_batc
 const horizons: QualityHorizon[] = ['1D', '5D', '10D', '20D', '60D'];
 const qualityTabs = ['overview', 'performance', 'noise', 'instrument'] as const;
 type QualityTab = typeof qualityTabs[number];
-const percent = (value: number | null | undefined) => value === null || value === undefined ? 'N/A' : `${(value * 100).toFixed(2)}%`;
+function percent(value: number | null | undefined): string;
+function percent(value: number | null | undefined, tooltip: string): string | React.ReactElement;
+function percent(value: number | null | undefined, tooltip?: string): string | React.ReactElement {
+  if (value === null || value === undefined) {
+    if (tooltip) {
+      return (
+        <Tooltip title={tooltip} arrow>
+          <Typography component="span" variant="inherit" sx={{ cursor: 'help', borderBottom: '1px dotted', borderColor: 'text.disabled', color: 'text.disabled' }}>—</Typography>
+        </Tooltip>
+      );
+    }
+    return '—';
+  }
+  return `${(value * 100).toFixed(2)}%`;
+}
 const number = (value: number | null | undefined) => value === null || value === undefined ? 'N/A' : value.toLocaleString();
 const plural = (count: number, singular: string, pluralLabel = `${singular}s`) => `${number(count)} ${count === 1 ? singular : pluralLabel}`;
 const evidenceTone = (value: string | undefined): 'success' | 'warning' | 'error' | undefined => (
@@ -60,11 +74,15 @@ const MetricCard: React.FC<{ label: string; value: string; tone?: 'success' | 'w
   </Paper>
 );
 
-const MetricTable: React.FC<{ title: string; rows: (QualityMetricGroup | SignalTypePerformance)[]; nameKey?: 'group' | 'signalType' }> = ({ title, rows, nameKey = 'group' }) => (
+const NULL_COL_TOOLTIP = 'not computed in persisted path';
+
+const MetricTable: React.FC<{ title: string; rows: (QualityMetricGroup | SignalTypePerformance)[]; nameKey?: 'group' | 'signalType'; emptyReason?: string }> = ({ title, rows, nameKey = 'group', emptyReason }) => (
   <Paper sx={{ p: 2, overflowX: 'auto' }}>
     <Typography variant="h6" sx={{ mb: 2 }}>{title}</Typography>
     {rows.length === 0 ? (
-      <Typography color="text.secondary">No evaluated samples yet. Generate older signals and keep price history current to measure this view.</Typography>
+      emptyReason
+        ? <Alert severity="info" sx={{ mt: 1 }}>{emptyReason}</Alert>
+        : <Typography color="text.secondary">No evaluated samples yet. Keep price history current to measure this view.</Typography>
     ) : (
       <Table size="small">
         <TableHead>
@@ -84,15 +102,22 @@ const MetricTable: React.FC<{ title: string; rows: (QualityMetricGroup | SignalT
         <TableBody>
           {rows.slice(0, 10).map((row: any) => (
             <TableRow key={`${row[nameKey]}-${row.horizon}`}>
-              <TableCell>{row[nameKey]} {row.sampleSize < 5 && <Chip size="small" label="small sample" color="warning" variant="outlined" />}</TableCell>
+              <TableCell>
+                {row[nameKey]}
+                {row.sampleSize < 30 && row.sampleSize > 0 && (
+                  <Tooltip title={`n=${row.sampleSize}, low confidence`} arrow>
+                    <Chip size="small" label="low n" color="warning" variant="outlined" sx={{ ml: 0.5, cursor: 'help' }} />
+                  </Tooltip>
+                )}
+              </TableCell>
               <TableCell>{row.rawSignalCount ?? row.sampleSize}</TableCell>
               <TableCell>{row.sampleSize}</TableCell>
               <TableCell>{row.unevaluatedCount ?? 0}</TableCell>
               <TableCell>{percent(row.winRate)}</TableCell>
               <TableCell>{percent(row.averageForwardReturn)}</TableCell>
-              <TableCell>{percent(row.medianForwardReturn)}</TableCell>
-              <TableCell>{percent(row.bestReturn)}</TableCell>
-              <TableCell>{percent(row.worstReturn)}</TableCell>
+              <TableCell>{percent(row.medianForwardReturn, NULL_COL_TOOLTIP)}</TableCell>
+              <TableCell>{percent(row.bestReturn, NULL_COL_TOOLTIP)}</TableCell>
+              <TableCell>{percent(row.worstReturn, NULL_COL_TOOLTIP)}</TableCell>
               <TableCell>
                 <Chip size="small" label={row.status || (row.sampleSize > 0 ? 'EVALUATED' : 'INSUFFICIENT_FUTURE_DATA')} color={row.sampleSize > 0 ? 'success' : 'warning'} variant="outlined" />
                 {row.reason && <Typography variant="caption" color="text.secondary" display="block">{row.reason}</Typography>}
@@ -165,7 +190,7 @@ const SignalQualityLabPage: React.FC = () => {
       });
       if (result) {
         await reload();
-        setActionMessage(`Signal quality refresh complete. Processed ${result.aggregate.processedCount} / ${result.aggregate.totalCount ?? result.aggregate.processedCount} signal records. Evaluated ${result.aggregate.evaluatedCount}, insufficient future price rows ${result.aggregate.unevaluatedCount}, missing local price history ${result.aggregate.missingPriceHistoryCount}. Outcomes are calculated on demand and not persisted.`);
+        setActionMessage(`Signal quality refresh complete. Processed ${result.aggregate.processedCount} / ${result.aggregate.totalCount ?? result.aggregate.processedCount} signal records. Evaluated ${result.aggregate.evaluatedCount}, insufficient future price rows ${result.aggregate.unevaluatedCount}, missing local price history ${result.aggregate.missingPriceHistoryCount}. Outcomes are refreshed and persisted.`);
       }
     } catch (err: any) {
       setFormError(err.response?.data?.error || err.message || 'Signal quality diagnostics refresh failed');
@@ -231,6 +256,13 @@ const SignalQualityLabPage: React.FC = () => {
         <Alert severity="info" sx={{ mb: 2 }}>
           Data quality filter applied: {summary.dataQualityFilterSummary.totalSignalsAfterFilter} / {summary.dataQualityFilterSummary.totalSignalsBeforeFilter} signals included,
           excluded {summary.dataQualityFilterSummary.excludedByDataQuality}, missing evaluations {summary.dataQualityFilterSummary.missingQualityEvaluationCount}.
+        </Alert>
+      )}
+      {summary?.warnings && summary.warnings.length > 0 && (
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          {summary.warnings.map((w, i) => (
+            <Typography key={i} variant="body2">{w}</Typography>
+          ))}
         </Alert>
       )}
       {summary && summary.totalSignals === 0 && (
@@ -350,8 +382,16 @@ const SignalQualityLabPage: React.FC = () => {
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', xl: '1fr 1fr' }, gap: 3, mb: 3 }}>
           <MetricTable title="Performance by Signal Type" rows={byType} nameKey="signalType" />
           <MetricTable title="Performance by Sector" rows={bySector} />
-          <MetricTable title="Performance by Regime" rows={byRegime} />
-          <MetricTable title="Performance by Data Quality" rows={byDataQuality} />
+          <MetricTable
+            title="Performance by Regime"
+            rows={byRegime}
+            emptyReason={summary?.warnings?.find((w) => /regime/i.test(w)) || (byRegime.length === 0 ? 'By-regime breakdown is not available in the persisted path.' : undefined)}
+          />
+          <MetricTable
+            title="Performance by Data Quality"
+            rows={byDataQuality}
+            emptyReason={summary?.warnings?.find((w) => /data.quality/i.test(w)) || (byDataQuality.length === 0 ? 'By-data-quality breakdown is not available in the persisted path.' : undefined)}
+          />
         </Box>
       )}
       {activeTab === 'noise' && (

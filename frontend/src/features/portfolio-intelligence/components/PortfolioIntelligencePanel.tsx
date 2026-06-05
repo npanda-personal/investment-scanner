@@ -2,6 +2,7 @@ import React from 'react';
 import {
   Alert,
   Box,
+  Button,
   Chip,
   CircularProgress,
   IconButton,
@@ -105,30 +106,47 @@ const ReviewCard: React.FC<{ item: ReviewItem }> = ({ item }) => (
   </Paper>
 );
 
-const GroupSection: React.FC<{ title: string; items: GroupedHoldingSummary[] }> = ({ title, items }) => (
-  <Paper sx={{ p: 2 }}>
-    <Typography variant="h6" sx={{ mb: 1 }}>{title}</Typography>
-    {items.length === 0 ? (
-      <Typography color="text.secondary">No items in this group.</Typography>
-    ) : (
-      <Stack spacing={1}>
-        {items.slice(0, 5).map((item) => (
-          <Box key={item.holdingId} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Tooltip title="View Research" arrow>
-              <IconButton component={Link} to={`/research/stocks/${item.instrumentId}`} size="small">
-                <LaunchOutlined fontSize="small" />
-              </IconButton>
-            </Tooltip>
-            <Box>
-              <Typography variant="body2" fontWeight={700}>{item.symbol}</Typography>
-              <Typography variant="body2" color="text.secondary" noWrap sx={{ maxWidth: 150 }}>{item.reasons[0]}</Typography>
-            </Box>
-          </Box>
-        ))}
+const GroupSection: React.FC<{ title: string; items: GroupedHoldingSummary[] }> = ({ title, items }) => {
+  const [showAll, setShowAll] = React.useState(false);
+  const PAGE = 5;
+  const visible = showAll ? items : items.slice(0, PAGE);
+  return (
+    <Paper sx={{ p: 2 }}>
+      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+        <Typography variant="h6">{title}</Typography>
+        {items.length > 0 && (
+          <Typography variant="caption" color="text.secondary">{items.length} total</Typography>
+        )}
       </Stack>
-    )}
-  </Paper>
-);
+      {items.length === 0 ? (
+        <Typography color="text.secondary">No items in this group.</Typography>
+      ) : (
+        <>
+          <Stack spacing={1}>
+            {visible.map((item) => (
+              <Box key={item.holdingId} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Tooltip title="View Research" arrow>
+                  <IconButton component={Link} to={`/research/stocks/${item.instrumentId}`} size="small">
+                    <LaunchOutlined fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+                <Box>
+                  <Typography variant="body2" fontWeight={700}>{item.symbol}</Typography>
+                  <Typography variant="body2" color="text.secondary" noWrap sx={{ maxWidth: 150 }}>{item.reasons[0]}</Typography>
+                </Box>
+              </Box>
+            ))}
+          </Stack>
+          {items.length > PAGE && (
+            <Button size="small" sx={{ mt: 1 }} onClick={() => setShowAll((prev) => !prev)}>
+              {showAll ? 'Show less' : `Show ${items.length - PAGE} more`}
+            </Button>
+          )}
+        </>
+      )}
+    </Paper>
+  );
+};
 
 export const PortfolioIntelligencePanel: React.FC<{ portfolioId?: string }> = ({ portfolioId }) => {
   const { scope } = useMarketScope();

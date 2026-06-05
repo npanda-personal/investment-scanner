@@ -7,7 +7,6 @@ import {
   Button,
   Chip,
   CircularProgress,
-  Divider,
   FormControl,
   FormControlLabel,
   Checkbox,
@@ -21,6 +20,7 @@ import {
   TableBody,
   TableCell,
   TableHead,
+  TablePagination,
   TableRow,
   TextField,
   Tooltip,
@@ -31,6 +31,7 @@ import {
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import SaveIcon from '@mui/icons-material/Save';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import DownloadOutlinedIcon from '@mui/icons-material/DownloadOutlined';
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import PlayArrowOutlinedIcon from '@mui/icons-material/PlayArrowOutlined';
 import {
@@ -93,11 +94,13 @@ export default function BacktestingStrategyLabPage() {
     selectedRun,
     loading,
     running,
+    runSlowWarning,
     error,
     setError,
     setSelectedRun,
     createStrategy,
     runConfig,
+    cancelRun,
     rerunStrategy,
     removeStrategy,
     removeRun,
@@ -220,11 +223,15 @@ export default function BacktestingStrategyLabPage() {
             <Chip label={`Scope: ${scope.region} / ${scope.assetType}`} size="small" variant="outlined" color="info" />
           </Stack>
         </Box>
-        <Button data-testid="run-backtest-primary" variant="contained" startIcon={<PlayArrowIcon />} onClick={() => void runConfig(mode === 'registered' ? registeredConfig() : normalizedConfig())} disabled={running || (mode === 'registered' && !registeredCode)}>
-          {running ? 'Running...' : mode === 'registered' ? 'Run Registered Backtest' : 'Run Backtest'}
-        </Button>
+        <Stack direction="row" spacing={1}>
+          <Button data-testid="run-backtest-primary" variant="contained" startIcon={<PlayArrowIcon />} onClick={() => void runConfig(mode === 'registered' ? registeredConfig() : normalizedConfig())} disabled={running || (mode === 'registered' && !registeredCode)}>
+            {running ? 'Running...' : mode === 'registered' ? 'Run Registered Backtest' : 'Run Backtest'}
+          </Button>
+          {running && <Button variant="outlined" color="warning" onClick={cancelRun}>Cancel</Button>}
+        </Stack>
       </Stack>
 
+      {runSlowWarning && <Alert severity="warning" sx={{ mb: 2 }}>Backtest is taking longer than expected. The backend is still processing — this may take up to 2 minutes. You can Cancel and retry with a shorter timeframe or smaller universe.</Alert>}
       {error && <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 2 }}>{error}</Alert>}
 
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '380px 1fr' }, gap: 2 }}>
@@ -271,20 +278,23 @@ export default function BacktestingStrategyLabPage() {
                   <Typography variant="subtitle2" sx={{ mb: 1 }}>Realistic Assumptions</Typography>
                   <Stack spacing={1}>
                     <Stack direction="row" spacing={1}>
-                      <TextField label="Cost %" type="number" value={registeredCost * 100} onChange={(event) => setRegisteredCost(Number(event.target.value) / 100)} size="small" fullWidth />
-                      <TextField label="Slippage %" type="number" value={registeredSlippage * 100} onChange={(event) => setRegisteredSlippage(Number(event.target.value) / 100)} size="small" fullWidth />
+                      <TextField label="Cost %" type="number" value={registeredCost * 100} onChange={(event) => setRegisteredCost(Number(event.target.value) / 100)} size="small" fullWidth inputProps={{ min: 0, max: 5, step: 0.01 }} helperText="0–5%" />
+                      <TextField label="Slippage %" type="number" value={registeredSlippage * 100} onChange={(event) => setRegisteredSlippage(Number(event.target.value) / 100)} size="small" fullWidth inputProps={{ min: 0, max: 5, step: 0.01 }} helperText="0–5%" />
                     </Stack>
                     <Stack direction="row" spacing={1}>
-                      <TextField label="Max hold days" type="number" value={registeredMaxHoldingDays} onChange={(event) => setRegisteredMaxHoldingDays(Number(event.target.value))} size="small" fullWidth />
-                      <TextField label="Stop loss %" type="number" value={registeredStopLoss * 100} onChange={(event) => setRegisteredStopLoss(Number(event.target.value) / 100)} size="small" fullWidth />
+                      <TextField label="Max hold days" type="number" value={registeredMaxHoldingDays} onChange={(event) => setRegisteredMaxHoldingDays(Number(event.target.value))} size="small" fullWidth inputProps={{ min: 1, max: 1000 }} />
+                      <TextField label="Stop loss %" type="number" value={registeredStopLoss * 100} onChange={(event) => setRegisteredStopLoss(Number(event.target.value) / 100)} size="small" fullWidth inputProps={{ min: 0, max: 50, step: 0.1 }} helperText="0–50%" />
                     </Stack>
                     <Stack direction="row" spacing={1}>
-                      <TextField label="Trailing stop %" type="number" value={registeredTrailingStop * 100} onChange={(event) => setRegisteredTrailingStop(Number(event.target.value) / 100)} size="small" fullWidth />
-                      <TextField label="Take profit %" type="number" value={registeredTakeProfit ? registeredTakeProfit * 100 : 0} onChange={(event) => setRegisteredTakeProfit(Number(event.target.value) / 100)} size="small" fullWidth />
+                      <TextField label="Trailing stop %" type="number" value={registeredTrailingStop * 100} onChange={(event) => setRegisteredTrailingStop(Number(event.target.value) / 100)} size="small" fullWidth inputProps={{ min: 0, max: 50, step: 0.1 }} helperText="0–50%" />
+                      <TextField label="Take profit %" type="number" value={registeredTakeProfit ? registeredTakeProfit * 100 : 0} onChange={(event) => setRegisteredTakeProfit(Number(event.target.value) / 100)} size="small" fullWidth inputProps={{ min: 0, max: 200, step: 0.1 }} helperText="0 = disabled" />
                     </Stack>
                   </Stack>
                 </Paper>
-                <Button data-testid="run-registered-backtest-panel" startIcon={<PlayArrowIcon />} variant="contained" onClick={() => void runConfig(registeredConfig())} disabled={running || !registeredCode}>Run Registered Backtest</Button>
+                <Stack direction="row" spacing={1}>
+                  <Button data-testid="run-registered-backtest-panel" startIcon={<PlayArrowIcon />} variant="contained" onClick={() => void runConfig(registeredConfig())} disabled={running || !registeredCode}>Run Registered Backtest</Button>
+                  {running && <Button variant="outlined" color="warning" onClick={cancelRun}>Cancel</Button>}
+                </Stack>
               </Stack>
             )}
             {mode === 'custom' && (
@@ -330,21 +340,21 @@ export default function BacktestingStrategyLabPage() {
               {config.exitRule.type === 'FIXED_HOLDING_PERIOD' && <TextField label="Holding days" type="number" value={config.exitRule.holdingDays ?? 30} onChange={(event) => updateConfig({ exitRule: { ...config.exitRule, holdingDays: Number(event.target.value) } })} size="small" />}
               <TextField label="Initial capital" type="number" value={config.initialCapital} onChange={(event) => updateConfig({ initialCapital: Number(event.target.value) })} size="small" />
               <Stack direction="row" spacing={1}>
-                <TextField label="Max positions" type="number" value={config.maxPositions} onChange={(event) => updateConfig({ maxPositions: Number(event.target.value) })} size="small" fullWidth />
-                <TextField label="Cost %" type="number" value={config.transactionCostPercent * 100} onChange={(event) => updateConfig({ transactionCostPercent: Number(event.target.value) / 100 })} size="small" fullWidth />
+                <TextField label="Max positions" type="number" value={config.maxPositions} onChange={(event) => updateConfig({ maxPositions: Number(event.target.value) })} size="small" fullWidth inputProps={{ min: 1, max: 200 }} />
+                <TextField label="Cost %" type="number" value={config.transactionCostPercent * 100} onChange={(event) => updateConfig({ transactionCostPercent: Number(event.target.value) / 100 })} size="small" fullWidth inputProps={{ min: 0, max: 5, step: 0.01 }} helperText="0–5%" />
               </Stack>
               <Paper variant="outlined" sx={{ p: 1.5 }}>
                 <Typography variant="subtitle2" sx={{ mb: 1 }}>Realistic Assumptions</Typography>
                 <Stack spacing={1}>
                   <Stack direction="row" spacing={1}>
-                    <TextField label="Slippage %" type="number" value={(config.slippagePercent ?? 0) * 100} onChange={(event) => updateConfig({ slippagePercent: Number(event.target.value) / 100 })} size="small" fullWidth />
-                    <TextField label="Max hold days" type="number" value={config.maxHoldingDays ?? ''} onChange={(event) => updateConfig({ maxHoldingDays: Number(event.target.value) || undefined })} size="small" fullWidth />
+                    <TextField label="Slippage %" type="number" value={(config.slippagePercent ?? 0) * 100} onChange={(event) => updateConfig({ slippagePercent: Number(event.target.value) / 100 })} size="small" fullWidth inputProps={{ min: 0, max: 5, step: 0.01 }} helperText="0–5%" />
+                    <TextField label="Max hold days" type="number" value={config.maxHoldingDays ?? ''} onChange={(event) => updateConfig({ maxHoldingDays: Number(event.target.value) || undefined })} size="small" fullWidth inputProps={{ min: 1, max: 1000 }} />
                   </Stack>
                   <Stack direction="row" spacing={1}>
-                    <TextField label="Stop loss %" type="number" value={(config.stopLossPercent ?? 0) * 100} onChange={(event) => updateConfig({ stopLossPercent: Number(event.target.value) / 100 || undefined })} size="small" fullWidth />
-                    <TextField label="Trailing stop %" type="number" value={(config.trailingStopPercent ?? 0) * 100} onChange={(event) => updateConfig({ trailingStopPercent: Number(event.target.value) / 100 || undefined })} size="small" fullWidth />
+                    <TextField label="Stop loss %" type="number" value={(config.stopLossPercent ?? 0) * 100} onChange={(event) => updateConfig({ stopLossPercent: Number(event.target.value) / 100 || undefined })} size="small" fullWidth inputProps={{ min: 0, max: 50, step: 0.1 }} helperText="0–50%" />
+                    <TextField label="Trailing stop %" type="number" value={(config.trailingStopPercent ?? 0) * 100} onChange={(event) => updateConfig({ trailingStopPercent: Number(event.target.value) / 100 || undefined })} size="small" fullWidth inputProps={{ min: 0, max: 50, step: 0.1 }} helperText="0–50%" />
                   </Stack>
-                  <TextField label="Take profit %" type="number" value={(config.takeProfitPercent ?? 0) * 100} onChange={(event) => updateConfig({ takeProfitPercent: Number(event.target.value) / 100 || undefined })} size="small" />
+                  <TextField label="Take profit %" type="number" value={(config.takeProfitPercent ?? 0) * 100} onChange={(event) => updateConfig({ takeProfitPercent: Number(event.target.value) / 100 || undefined })} size="small" inputProps={{ min: 0, max: 200, step: 0.1 }} helperText="0 = disabled" />
                 </Stack>
               </Paper>
               <FormControlLabel
@@ -440,7 +450,31 @@ export default function BacktestingStrategyLabPage() {
   );
 }
 
+const BENCHMARK_STATUS_LABELS: Record<string, string> = {
+  AVAILABLE: 'Nifty 50 index data used',
+  FALLBACK_EQUAL_WEIGHT: 'Equal-weight proxy (Nifty 50 unavailable for this period)',
+  UNAVAILABLE: 'Benchmark data unavailable',
+};
+
+function downloadTradesCsv(run: BacktestRun) {
+  const header = 'Symbol,Entry Date,Entry Price,Exit Date,Exit Price,Return %,Net P&L,Exit Reason';
+  const rows = run.trades.map((t) =>
+    [t.symbol, t.entryDate, t.entryPrice.toFixed(2), t.exitDate, t.exitPrice.toFixed(2),
+      (t.returnPercent * 100).toFixed(2), t.netPnL.toFixed(2), t.exitReason].join(',')
+  );
+  const blob = new Blob([[header, ...rows].join('\n')], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `trades-${run.id}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 function ResultsPanel({ run, chartData }: { run: BacktestRun | null; chartData: Array<{ equityLabel: number; drawdownLabel: number; date: string; equity: number; cash: number; investedValue: number; drawdownPercent: number }> }) {
+  const [tradePage, setTradePage] = useState(0);
+  const [tradeRowsPerPage, setTradeRowsPerPage] = useState(25);
+
   if (!run) {
     return (
       <Paper sx={{ p: 3 }}>
@@ -456,7 +490,17 @@ function ResultsPanel({ run, chartData }: { run: BacktestRun | null; chartData: 
 
   const metrics = run.metrics;
   const isRegistered = run.config.mode === 'REGISTERED_STRATEGY' || Boolean(run.config.strategyCode);
+  const isCustom = run.config.mode === 'CUSTOM_RULES' && !run.config.strategyCode;
   const aggregateInvalid = metrics?.calculationAudit?.aggregateStatus === 'LEGACY_INVALID';
+  const benchmarkIsReal = metrics?.benchmarkComparison?.benchmarkDataStatus === 'AVAILABLE';
+  const xAxisTickFormatter = (dateStr: string) => {
+    try {
+      const d = new Date(dateStr);
+      return d.toLocaleDateString('en-GB', { month: 'short', year: '2-digit' });
+    } catch { return dateStr; }
+  };
+  const pagedTrades = run.trades.slice(tradePage * tradeRowsPerPage, (tradePage + 1) * tradeRowsPerPage);
+
   return (
     <Stack spacing={2}>
       {isRegistered && (
@@ -478,6 +522,9 @@ function ResultsPanel({ run, chartData }: { run: BacktestRun | null; chartData: 
           {metrics?.frameworkRating?.ratingCapsApplied?.length ? <Typography variant="caption" color="text.secondary">Caps applied: {metrics.frameworkRating.ratingCapsApplied.join(', ')}</Typography> : null}
         </Paper>
       )}
+      {isCustom && (
+        <Alert severity="info">Strategy rating and readiness only populate for Registered Strategy backtests. Custom Rule backtests use ad-hoc rules and do not produce a Framework rating.</Alert>
+      )}
       {metrics?.calculationAudit?.warnings.length ? <Alert severity={aggregateInvalid ? 'error' : 'warning'}>{metrics.calculationAudit.warnings.join(' ')}</Alert> : null}
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' }, gap: 1.5 }}>
         <MetricCard label="Ending Capital" value={aggregateInvalid ? 'Legacy invalid' : fmtMoney((run.config.initialCapital || 0) * (1 + (metrics?.totalReturn || 0)), run.config.region)} />
@@ -495,16 +542,26 @@ function ResultsPanel({ run, chartData }: { run: BacktestRun | null; chartData: 
         <Paper sx={{ p: 2 }}>
           <Typography variant="h6" sx={{ mb: 1 }}>Benchmark Comparison</Typography>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} flexWrap="wrap">
-            <Chip size="small" label={metrics.benchmarkComparison.benchmarkDataStatus} />
+            <Tooltip title={BENCHMARK_STATUS_LABELS[metrics.benchmarkComparison.benchmarkDataStatus] || metrics.benchmarkComparison.benchmarkDataStatus} arrow>
+              <Chip size="small" label={metrics.benchmarkComparison.benchmarkDataStatus} color={benchmarkIsReal ? 'success' : 'warning'} />
+            </Tooltip>
             <Chip size="small" label={metrics.benchmarkComparison.benchmarkName || 'Benchmark unavailable'} />
-            <Chip size="small" label={`Strategy CAGR ${fmtPercent(metrics.cagr)}`} />
-            <Chip size="small" label={`Benchmark CAGR ${fmtPercent(metrics.benchmarkComparison.benchmarkCagr)}`} />
+            <Chip size="small" label={`Strategy CAGR ${fmtPercent(metrics.cagr)}`} color={benchmarkIsReal ? 'primary' : 'default'} />
+            <Tooltip title={benchmarkIsReal ? 'Real Nifty 50 CAGR' : 'Equal-weight proxy — treat as approximate only'} arrow>
+              <Chip size="small" label={`Benchmark CAGR ${fmtPercent(metrics.benchmarkComparison.benchmarkCagr)}`} variant={benchmarkIsReal ? 'filled' : 'outlined'} />
+            </Tooltip>
             <Chip size="small" label={`Excess CAGR ${fmtPercent(metrics.benchmarkComparison.excessCagr)}`} color={(metrics.benchmarkComparison.excessCagr ?? 0) < 0 ? 'warning' : 'success'} />
           </Stack>
           {metrics.benchmarkComparison.dataGap && <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>{metrics.benchmarkComparison.dataGap}</Typography>}
         </Paper>
       )}
-      {metrics?.realismWarnings?.length ? <Alert severity="warning">{metrics.realismWarnings.join(' ')}</Alert> : null}
+      {metrics?.realismWarnings?.length ? (
+        <Alert severity="warning">
+          <ul style={{ margin: 0, paddingLeft: 20 }}>
+            {metrics.realismWarnings.map((w, i) => <li key={i}>{w}</li>)}
+          </ul>
+        </Alert>
+      ) : null}
       <Paper sx={{ p: 2 }}>
         <Stack direction="row" justifyContent="space-between" sx={{ mb: 1 }}>
           <Typography variant="h6">Equity Curve</Typography>
@@ -514,7 +571,7 @@ function ResultsPanel({ run, chartData }: { run: BacktestRun | null; chartData: 
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="date" minTickGap={32} />
+              <XAxis dataKey="date" minTickGap={48} tickFormatter={xAxisTickFormatter} />
               <YAxis yAxisId="left" tickFormatter={(value) => compactMoneyTick(Number(value), run.config.region)} />
               <YAxis yAxisId="right" orientation="right" tickFormatter={(value) => `${value}%`} />
               <ChartTooltip formatter={(value, name) => name === 'drawdownLabel' ? [`${value}%`, 'Drawdown'] : [fmtMoney(Number(value), run.config.region), 'Equity']} />
@@ -554,39 +611,53 @@ function ResultsPanel({ run, chartData }: { run: BacktestRun | null; chartData: 
         </Paper>
       )}
       <Paper sx={{ p: 2 }}>
-        <Typography variant="h6" sx={{ mb: 1 }}>Trade Log</Typography>
+        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+          <Typography variant="h6">Trade Log ({run.trades.length})</Typography>
+          {run.trades.length > 0 && (
+            <Tooltip title="Download all trades as CSV" arrow>
+              <IconButton size="small" onClick={() => downloadTradesCsv(run)}>
+                <DownloadOutlinedIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          )}
+        </Stack>
         {run.trades.length === 0 ? <Typography color="text.secondary">No trades were generated for this configuration.</Typography> : (
-          <Box sx={{ overflowX: 'auto' }}>
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell>Symbol</TableCell>
-                  <TableCell>Entry</TableCell>
-                  <TableCell>Exit</TableCell>
-                  <TableCell align="right">Return</TableCell>
-                  <TableCell align="right">Net P&L</TableCell>
-                  <TableCell>Reason</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {run.trades.slice(0, 25).map((trade, index) => (
-                  <TableRow key={`${trade.symbol}-${trade.entryDate}-${index}`}>
-                    <TableCell>{trade.symbol}</TableCell>
-                    <TableCell>{trade.entryDate} @ {trade.entryPrice.toFixed(2)}</TableCell>
-                    <TableCell>{trade.exitDate} @ {trade.exitPrice.toFixed(2)}</TableCell>
-                    <TableCell align="right" sx={{ color: trade.returnPercent >= 0 ? 'success.main' : 'error.main' }}>{fmtPercent(trade.returnPercent)}</TableCell>
-                    <TableCell align="right">{fmtMoney(trade.netPnL, run.config.region)}</TableCell>
-                    <TableCell>{[trade.entryReason, trade.exitReason].filter(Boolean).join(' / ')}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </Box>
-        )}
-        {run.trades.length > 25 && (
           <>
-            <Divider sx={{ my: 1 }} />
-            <Typography variant="body2" color="text.secondary">Showing first 25 trades of {run.trades.length}.</Typography>
+            <Box sx={{ overflowX: 'auto' }}>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Symbol</TableCell>
+                    <TableCell>Entry</TableCell>
+                    <TableCell>Exit</TableCell>
+                    <TableCell align="right">Return</TableCell>
+                    <TableCell align="right">Net P&L</TableCell>
+                    <TableCell>Reason</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {pagedTrades.map((trade, index) => (
+                    <TableRow key={`${trade.symbol}-${trade.entryDate}-${index}`}>
+                      <TableCell>{trade.symbol}</TableCell>
+                      <TableCell>{trade.entryDate} @ {trade.entryPrice.toFixed(2)}</TableCell>
+                      <TableCell>{trade.exitDate} @ {trade.exitPrice.toFixed(2)}</TableCell>
+                      <TableCell align="right" sx={{ color: trade.returnPercent >= 0 ? 'success.main' : 'error.main' }}>{fmtPercent(trade.returnPercent)}</TableCell>
+                      <TableCell align="right">{fmtMoney(trade.netPnL, run.config.region)}</TableCell>
+                      <TableCell>{[trade.entryReason, trade.exitReason].filter(Boolean).join(' / ')}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </Box>
+            <TablePagination
+              component="div"
+              count={run.trades.length}
+              page={tradePage}
+              onPageChange={(_e, p) => setTradePage(p)}
+              rowsPerPage={tradeRowsPerPage}
+              onRowsPerPageChange={(e) => { setTradeRowsPerPage(Number(e.target.value)); setTradePage(0); }}
+              rowsPerPageOptions={[25, 50, 100]}
+            />
           </>
         )}
       </Paper>

@@ -1,5 +1,8 @@
 import axios from 'axios';
 import type { CountryStrengthItem, MacroSnapshot, MarketBreadth, MarketContextSummary, MarketRegimeSummary, PersistedMarketBreadthResponse, SectorRotationItem } from '../types';
+import type { CapitalPostureDto } from '../capitalPostureTypes';
+
+export type { CapitalPostureDto };
 
 const API_BASE = '/api/v1/market-context';
 
@@ -42,5 +45,9 @@ export async function fetchCountryStrength(): Promise<CountryStrengthItem[]> {
 }
 export async function fetchMacroSnapshot(): Promise<MacroSnapshot> {
   const response = await axios.get<MacroSnapshot>(`${API_BASE}/macro`);
+  return response.data;
+}
+export async function fetchCapitalPosture(params: { region?: string } = {}): Promise<CapitalPostureDto> {
+  const response = await axios.get<CapitalPostureDto>(`${API_BASE}/capital-posture`, { params });
   return response.data;
 }

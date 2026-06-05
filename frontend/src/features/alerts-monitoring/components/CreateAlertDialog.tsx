@@ -7,6 +7,9 @@ import type { V1Instrument } from '@/features/market-data-foundation';
 import { fetchPortfolios, type Portfolio } from '@/features/portfolio-management';
 import { fetchWatchlists, type Watchlist } from '@/features/watchlist-management';
 
+/** Alert types that do not require a numeric threshold. */
+const THRESHOLD_FREE_TYPES: AlertType[] = ['SIGNAL_DIRECTION_CHANGED'];
+
 interface CreateAlertDialogProps {
   open: boolean;
   onClose: () => void;
@@ -30,6 +33,10 @@ export const CreateAlertDialog: React.FC<CreateAlertDialogProps> = ({ open, onCl
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
+  const thresholdFree = THRESHOLD_FREE_TYPES.includes(type);
+  const thresholdValue = Number(threshold);
+  const thresholdInvalid = !thresholdFree && (threshold.trim() === '' || isNaN(thresholdValue));
+
   React.useEffect(() => {
     if (!open) return;
     setName(defaults?.name || '');
@@ -51,16 +58,17 @@ export const CreateAlertDialog: React.FC<CreateAlertDialogProps> = ({ open, onCl
     setSaving(true);
     setError(null);
     try {
-      await createAlertRule({
+      const input: CreateAlertRuleInput = {
         name,
         type,
         scope,
         instrumentId: instrumentId || null,
         portfolioId: portfolioId || null,
         watchlistId: watchlistId || null,
-        condition: { threshold: Number(threshold) },
+        condition: thresholdFree ? {} : { threshold: thresholdValue },
         enabled: true,
-      });
+      };
+      await createAlertRule(input);
       onCreated?.();
       onClose();
     } catch (err: any) {
@@ -88,6 +96,7 @@ export const CreateAlertDialog: React.FC<CreateAlertDialogProps> = ({ open, onCl
             <MenuItem value="DAILY_MOVE_ABOVE">Daily Move Above</MenuItem>
             <MenuItem value="DAILY_MOVE_BELOW">Daily Move Below</MenuItem>
             <MenuItem value="SIGNAL_SCORE_ABOVE">Signal Score Above</MenuItem>
+            <MenuItem value="SIGNAL_DIRECTION_CHANGED">Signal Direction Changed</MenuItem>
             <MenuItem value="PORTFOLIO_HOLDING_DRAWDOWN">Portfolio Holding Drawdown</MenuItem>
             <MenuItem value="PORTFOLIO_BEARISH_SIGNAL">Portfolio Bearish Signal</MenuItem>
             <MenuItem value="WATCHLIST_SIGNAL_SCORE_ABOVE">Watchlist Signal Score Above</MenuItem>
@@ -130,12 +139,27 @@ export const CreateAlertDialog: React.FC<CreateAlertDialogProps> = ({ open, onCl
               renderInput={(params) => <TextField {...params} label={defaults?.watchlistId ? `Watchlist (${defaults.watchlistId})` : 'Watchlist'} />}
             />
           )}
-          <TextField label="Threshold" value={threshold} onChange={(event) => setThreshold(event.target.value)} />
+          {!thresholdFree && (
+            <TextField
+              label="Threshold"
+              value={threshold}
+              type="number"
+              onChange={(event) => setThreshold(event.target.value)}
+              error={thresholdInvalid && threshold.trim() !== ''}
+              helperText={thresholdInvalid && threshold.trim() !== '' ? 'Enter a valid number' : undefined}
+            />
+          )}
         </Stack>
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose} disabled={saving}>Cancel</Button>
-        <Button variant="contained" onClick={submit} disabled={saving}>{saving ? 'Saving...' : 'Create'}</Button>
+        <Button
+          variant="contained"
+          onClick={submit}
+          disabled={saving || thresholdInvalid}
+        >
+          {saving ? 'Saving...' : 'Create'}
+        </Button>
       </DialogActions>
     </Dialog>
   );

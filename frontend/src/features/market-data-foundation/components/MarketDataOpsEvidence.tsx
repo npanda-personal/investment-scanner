@@ -3,6 +3,7 @@ import {
   Alert,
   Box,
   Button,
+  Chip,
   Dialog,
   DialogContent,
   DialogTitle,
@@ -143,12 +144,28 @@ export function SourceFileImportEvidence({
   onSortChange: (sortBy: SourceFileImportSortBy) => void;
 }) {
   const [selectedImport, setSelectedImport] = useState<MarketDataSourceFileImportRecord | null>(null);
-  const visibleImports = imports.slice(0, 10);
+  const [hideTestFixtures, setHideTestFixtures] = useState(true);
+  const hasTestFixtures = imports.some((item) => item.source?.startsWith('TEST_'));
+  const filteredImports = hideTestFixtures
+    ? imports.filter((item) => !item.source?.startsWith('TEST_'))
+    : imports;
+  const visibleImports = filteredImports.slice(0, 10);
 
   return (
     <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, bgcolor: 'background.paper', overflow: 'hidden' }}>
       <Box sx={{ p: 2, pb: 1 }}>
-        <Typography variant="subtitle2">SourceFileImport Evidence</Typography>
+        <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
+          <Typography variant="subtitle2">SourceFileImport Evidence</Typography>
+          {hasTestFixtures && (
+            <Chip
+              size="small"
+              label={hideTestFixtures ? 'Show test fixtures' : 'Hide test fixtures'}
+              variant="outlined"
+              onClick={() => setHideTestFixtures((prev) => !prev)}
+              sx={{ cursor: 'pointer' }}
+            />
+          )}
+        </Stack>
       </Box>
       <TableContainer sx={{ maxWidth: '100%', overflowX: 'auto' }}>
         <Table

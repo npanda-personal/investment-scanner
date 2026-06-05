@@ -6,6 +6,7 @@ import { fetchSignalPositionLedgerActiveRows, fetchSignalPositionLedgerClosedRow
 import { useSignalPositionLedgerActiveRows } from '../hooks/useSignalPositionLedgerActiveRows';
 import { useSignalPositionLedgerClosedRows } from '../hooks/useSignalPositionLedgerClosedRows';
 import { ActivePositionsTable } from './ActivePositionsTable';
+import { SignalPositionSummaryStrip } from './SignalPositionSummaryStrip';
 import type { SignalPositionLedgerActiveRow } from '../types';
 
 type LedgerTab = 'active' | 'history';
@@ -111,6 +112,8 @@ const SignalPositionLedgerPage: React.FC = () => {
       {exportError && (
         <Alert severity="error" sx={{ mb: 2 }}>{exportError}</Alert>
       )}
+
+      <SignalPositionSummaryStrip data={data} scopeLabel={scopeLabel} loading={loading} />
 
       <Paper variant="outlined" sx={{ mb: 2 }}>
         <Tabs

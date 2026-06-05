@@ -5,6 +5,11 @@ import {
   Button,
   Chip,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
   Paper,
   Stack,
   Table,
@@ -37,6 +42,8 @@ const CoverageCard: React.FC<{ label: string; value: number | string }> = ({ lab
   </Paper>
 );
 
+const SNAPSHOT_TABLE_DEFAULT_ROWS = 20;
+
 const HistoricalContextSnapshotsPage: React.FC = () => {
   const { coverage, market, sectors, countries, loading, error, reload } = useHistoricalContextSnapshots();
   const { scope } = useMarketScope();
@@ -49,10 +56,22 @@ const HistoricalContextSnapshotsPage: React.FC = () => {
   const [lookup, setLookup] = useState<SnapshotLookupResult | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  // Pagination / show-more state for each table
+  const [marketRows, setMarketRows] = useState(SNAPSHOT_TABLE_DEFAULT_ROWS);
+  const [sectorRows, setSectorRows] = useState(SNAPSHOT_TABLE_DEFAULT_ROWS);
+  const [countryRows, setCountryRows] = useState(SNAPSHOT_TABLE_DEFAULT_ROWS);
+  // Confirmation dialog for duplicate date generation
+  const [generateConfirmOpen, setGenerateConfirmOpen] = useState(false);
+
   const rankedSectors = sectors.filter((item) => knownSector(item.sector));
   const hiddenMetadataGapSectors = sectors.length - rankedSectors.length;
 
-  const runGenerate = async () => {
+  // Check if a snapshot already exists for the selected date
+  const dateAlreadyHasSnapshot = coverage?.latestSnapshotDate
+    ? market.some((item) => item.snapshotDate.slice(0, 10) === snapshotDate.slice(0, 10))
+    : false;
+
+  const executeGenerate = async () => {
     setMessage(null);
     setFormError(null);
     try {
@@ -61,6 +80,14 @@ const HistoricalContextSnapshotsPage: React.FC = () => {
       await reload();
     } catch (err: any) {
       setFormError(err.response?.data?.error || err.message || 'Failed to generate snapshots');
+    }
+  };
+
+  const runGenerate = () => {
+    if (dateAlreadyHasSnapshot) {
+      setGenerateConfirmOpen(true);
+    } else {
+      void executeGenerate();
     }
   };
 
@@ -89,7 +116,7 @@ const HistoricalContextSnapshotsPage: React.FC = () => {
       <PageHeader
         title="Historical Context Snapshots"
         subtitle={`Persist scoped market regime, breadth, sector, country, smart-money, and data-quality context for ${scope.region} / ${scope.assetType}.`}
-        primaryAction={<Button component={Link} to="/signals/quality" variant="outlined">Open Signal Quality Lab</Button>}
+        primaryAction={<Button component={Link} to="/admin/signals/quality" variant="outlined">Open Signal Quality Lab</Button>}
       />
 
       {(error || formError) && <Alert severity="error" sx={{ mb: 2 }}>{error || formError}</Alert>}
@@ -149,32 +176,75 @@ const HistoricalContextSnapshotsPage: React.FC = () => {
         <Paper sx={{ p: 2, overflowX: 'auto' }}>
           <Typography variant="h6" sx={{ mb: 2 }}>Market Regime Snapshots</Typography>
           {market.length === 0 ? <Typography color="text.secondary">No market snapshots yet.</Typography> : (
-            <Table size="small">
-              <TableHead><TableRow><TableCell>Date</TableCell><TableCell>Region</TableCell><TableCell>Regime</TableCell><TableCell>Score</TableCell><TableCell>SMA50</TableCell></TableRow></TableHead>
-              <TableBody>{market.map((item) => <TableRow key={item.id}><TableCell>{new Date(item.snapshotDate).toLocaleDateString()}</TableCell><TableCell>{item.region || scope.region}</TableCell><TableCell>{item.regime}</TableCell><TableCell>{item.regimeScore}</TableCell><TableCell>{pct(item.breadthPercentAboveSma50)}</TableCell></TableRow>)}</TableBody>
-            </Table>
+            <>
+              <Table size="small">
+                <TableHead><TableRow><TableCell>Date</TableCell><TableCell>Region</TableCell><TableCell>Regime</TableCell><TableCell>Score</TableCell><TableCell>SMA50</TableCell></TableRow></TableHead>
+                <TableBody>{market.slice(0, marketRows).map((item) => <TableRow key={item.id}><TableCell>{new Date(item.snapshotDate).toLocaleDateString()}</TableCell><TableCell>{item.region || scope.region}</TableCell><TableCell>{item.regime}</TableCell><TableCell>{item.regimeScore}</TableCell><TableCell>{pct(item.breadthPercentAboveSma50)}</TableCell></TableRow>)}</TableBody>
+              </Table>
+              {market.length > marketRows && (
+                <Button size="small" sx={{ mt: 1 }} onClick={() => setMarketRows((n) => n + SNAPSHOT_TABLE_DEFAULT_ROWS)}>
+                  Show more ({market.length - marketRows} remaining)
+                </Button>
+              )}
+            </>
           )}
         </Paper>
         <Paper sx={{ p: 2, overflowX: 'auto' }}>
           <Typography variant="h6" sx={{ mb: 2 }}>Sector Snapshots</Typography>
           {hiddenMetadataGapSectors > 0 && <Alert severity="info" sx={{ mb: 2 }}>{hiddenMetadataGapSectors} sector metadata-gap row{hiddenMetadataGapSectors === 1 ? '' : 's'} hidden from ranked sector evidence.</Alert>}
           {rankedSectors.length === 0 ? <Typography color="text.secondary">No ranked sector snapshots yet. Unknown or missing sector metadata is tracked as a data-quality gap, not sector leadership.</Typography> : (
-            <Table size="small">
-              <TableHead><TableRow><TableCell>Date</TableCell><TableCell>Region</TableCell><TableCell>Sector</TableCell><TableCell>Status</TableCell><TableCell>Score</TableCell></TableRow></TableHead>
-              <TableBody>{rankedSectors.slice(0, 12).map((item) => <TableRow key={item.id}><TableCell>{new Date(item.snapshotDate).toLocaleDateString()}</TableCell><TableCell>{item.region || scope.region}</TableCell><TableCell>{item.sector}</TableCell><TableCell>{item.leadershipStatus}</TableCell><TableCell>{item.relativeStrengthScore}</TableCell></TableRow>)}</TableBody>
-            </Table>
+            <>
+              <Table size="small">
+                <TableHead><TableRow><TableCell>Date</TableCell><TableCell>Region</TableCell><TableCell>Sector</TableCell><TableCell>Status</TableCell><TableCell>Score</TableCell></TableRow></TableHead>
+                <TableBody>{rankedSectors.slice(0, sectorRows).map((item) => <TableRow key={item.id}><TableCell>{new Date(item.snapshotDate).toLocaleDateString()}</TableCell><TableCell>{item.region || scope.region}</TableCell><TableCell>{item.sector}</TableCell><TableCell>{item.leadershipStatus}</TableCell><TableCell>{item.relativeStrengthScore}</TableCell></TableRow>)}</TableBody>
+              </Table>
+              {rankedSectors.length > sectorRows && (
+                <Button size="small" sx={{ mt: 1 }} onClick={() => setSectorRows((n) => n + SNAPSHOT_TABLE_DEFAULT_ROWS)}>
+                  Show more ({rankedSectors.length - sectorRows} remaining)
+                </Button>
+              )}
+            </>
           )}
         </Paper>
         <Paper sx={{ p: 2, overflowX: 'auto' }}>
           <Typography variant="h6" sx={{ mb: 2 }}>Country Snapshots</Typography>
           {countries.length === 0 ? <Typography color="text.secondary">No country snapshots yet.</Typography> : (
-            <Table size="small">
-              <TableHead><TableRow><TableCell>Date</TableCell><TableCell>Region</TableCell><TableCell>Country</TableCell><TableCell>Score</TableCell><TableCell>Status</TableCell></TableRow></TableHead>
-              <TableBody>{countries.slice(0, 12).map((item) => <TableRow key={item.id}><TableCell>{new Date(item.snapshotDate).toLocaleDateString()}</TableCell><TableCell>{item.region || scope.region}</TableCell><TableCell>{item.country}</TableCell><TableCell>{item.relativeStrengthScore}</TableCell><TableCell>{item.dataStatus}</TableCell></TableRow>)}</TableBody>
-            </Table>
+            <>
+              <Table size="small">
+                <TableHead><TableRow><TableCell>Date</TableCell><TableCell>Region</TableCell><TableCell>Country</TableCell><TableCell>Score</TableCell><TableCell>Status</TableCell></TableRow></TableHead>
+                <TableBody>{countries.slice(0, countryRows).map((item) => <TableRow key={item.id}><TableCell>{new Date(item.snapshotDate).toLocaleDateString()}</TableCell><TableCell>{item.region || scope.region}</TableCell><TableCell>{item.country}</TableCell><TableCell>{item.relativeStrengthScore}</TableCell><TableCell>{item.dataStatus}</TableCell></TableRow>)}</TableBody>
+              </Table>
+              {countries.length > countryRows && (
+                <Button size="small" sx={{ mt: 1 }} onClick={() => setCountryRows((n) => n + SNAPSHOT_TABLE_DEFAULT_ROWS)}>
+                  Show more ({countries.length - countryRows} remaining)
+                </Button>
+              )}
+            </>
           )}
         </Paper>
       </Box>
+
+      {/* Confirmation dialog when regenerating a snapshot for a date that already has data */}
+      <Dialog open={generateConfirmOpen} onClose={() => setGenerateConfirmOpen(false)}>
+        <DialogTitle>Regenerate existing snapshot?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            A snapshot for <strong>{snapshotDate}</strong> already exists. Regenerating will overwrite the existing data. Continue?
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setGenerateConfirmOpen(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            onClick={() => {
+              setGenerateConfirmOpen(false);
+              void executeGenerate();
+            }}
+          >
+            Regenerate
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

@@ -314,7 +314,7 @@ const DataQualityEnginePage: React.FC = () => {
 
       {summary && (
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' }, gap: 2, mb: 2 }}>
-          <MetricCard label="Evaluated Coverage" value={`${evaluatedCount}/${summary.totalInstruments}`} detail={`${formatPercent(evaluatedCount, summary.totalInstruments)} of scoped instruments`} />
+          <MetricCard label="Signal Ready / Total" value={`${summary.signalReadyCount}/${summary.totalInstruments}`} detail={`${formatPercent(summary.signalReadyCount, summary.totalInstruments)} signal-ready | ${evaluatedCount} evaluated`} />
           <MetricCard label="Signal Ready" value={summary.signalReadyCount} detail={`${formatPercent(summary.signalReadyCount, Math.max(evaluatedCount, 1))} of evaluated rows`} />
           <MetricCard label="Blocked Or Limited" value={blockedCount} detail="Not ready for signal generation" />
           <MetricCard label="Issue Flags" value={summary.stalePriceCount + summary.missingVolumeCount + summary.lowLiquidityCount} detail="Overlapping stale, volume, and liquidity flags" />

@@ -246,6 +246,13 @@ export interface TodayReviewGroups {
   unproven: TodayReviewCandidate[];
 }
 
+export interface TodayReviewMarketPosture {
+  postureLabel: string | null;
+  suggestedExposureBand: { minPct: number; maxPct: number } | null;
+  availability: 'READY' | 'UNAVAILABLE';
+  message?: string;
+}
+
 export interface TodayReviewResponse {
   run: TodayReviewRun | null;
   groups: TodayReviewGroups;
@@ -253,6 +260,7 @@ export interface TodayReviewResponse {
     region: string;
     assetType: string;
   };
+  marketPosture?: TodayReviewMarketPosture | null;
 }
 
 export interface TodayReviewRunsResponse {

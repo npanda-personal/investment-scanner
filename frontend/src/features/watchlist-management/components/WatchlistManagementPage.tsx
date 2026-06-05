@@ -6,16 +6,22 @@ import {
   Button,
   Chip,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
   Divider,
   IconButton,
   MenuItem,
   Paper,
+  Snackbar,
   Stack,
   TextField,
   Tooltip,
   Typography,
 } from '@mui/material';
-import { SaveOutlined, DeleteOutline } from '@mui/icons-material';
+import { SaveOutlined, DeleteOutline, NotificationsOutlined } from '@mui/icons-material';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { SignalBadge } from '@/features/signal-generation-engine';
 import { DataTable, InstrumentSearchSelect, PageHeader, StatusBadge, type DataTableColumn } from '@/shared/components';
@@ -30,25 +36,35 @@ import {
 import { useWatchlistManagement } from '../hooks';
 import type { WatchlistDashboardItem, WatchlistSortOption } from '../types';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
+import { CreateAlertDialog } from '@/features/alerts-monitoring';
 
-const money = (value: number | null, currency: string | null) => {
+const money = (value: number | null, currency: string | null, regionCurrency: string) => {
   if (value === null) return 'N/A';
+  const resolvedCurrency = currency || regionCurrency;
   try {
-    return new Intl.NumberFormat(undefined, { style: 'currency', currency: currency || 'USD', maximumFractionDigits: 2 }).format(value);
+    return new Intl.NumberFormat(undefined, { style: 'currency', currency: resolvedCurrency, maximumFractionDigits: 2 }).format(value);
   } catch {
-    return `${currency || ''} ${value.toFixed(2)}`.trim();
+    return `${resolvedCurrency} ${value.toFixed(2)}`.trim();
   }
 };
 
 const percent = (value: number | null) => value === null ? 'N/A' : `${value >= 0 ? '+' : ''}${(value * 100).toFixed(1)}%`;
 
+const confidenceColor = (confidence: 'LOW' | 'MEDIUM' | 'HIGH') => {
+  if (confidence === 'HIGH') return 'success' as const;
+  if (confidence === 'MEDIUM') return 'warning' as const;
+  return 'default' as const;
+};
+
 const WatchlistManagementPage: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { scope } = useMarketScope();
+  const regionCurrency = scope.region === 'IN' ? 'INR' : 'USD';
   const [sort, setSort] = useState<WatchlistSortOption>('recentlyAdded');
   const { watchlists, detail, loading, error, reload } = useWatchlistManagement(id, sort);
   const [formError, setFormError] = useState<string | null>(null);
+  const [snackbar, setSnackbar] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [selectedInstrument, setSelectedInstrument] = useState<V1Instrument | null>(null);
@@ -56,6 +72,9 @@ const WatchlistManagementPage: React.FC = () => {
   const [tagDrafts, setTagDrafts] = useState<Record<string, string>>({});
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(25);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [alertDialogOpen, setAlertDialogOpen] = useState(false);
+  const [alertDialogDefaults, setAlertDialogDefaults] = useState<{ scope: 'STOCK'; type: 'PRICE_ABOVE'; instrumentId: string } | undefined>(undefined);
 
   const submitWatchlist = async () => {
     setFormError(null);
@@ -84,11 +103,41 @@ const WatchlistManagementPage: React.FC = () => {
 
   const saveItem = async (item: WatchlistDashboardItem) => {
     if (!id) return;
-    await updateWatchlistItem(id, item.id, {
-      notes: noteDrafts[item.id] ?? item.notes,
-      tags: (tagDrafts[item.id] ?? item.tags.join(',')).split(',').map((tag) => tag.trim()).filter(Boolean),
-    });
-    await reload();
+    try {
+      await updateWatchlistItem(id, item.id, {
+        notes: noteDrafts[item.id] ?? item.notes,
+        tags: (tagDrafts[item.id] ?? item.tags.join(',')).split(',').map((tag) => tag.trim()).filter(Boolean),
+      });
+      await reload();
+    } catch (err: any) {
+      setSnackbar(err.response?.data?.error || err.message || 'Failed to save notes/tags');
+    }
+  };
+
+  const handleRemoveItem = async (watchlistId: string, itemId: string) => {
+    try {
+      await removeWatchlistItem(watchlistId, itemId);
+      await reload();
+    } catch (err: any) {
+      setSnackbar(err.response?.data?.error || err.message || 'Failed to remove item');
+    }
+  };
+
+  const handleDeleteWatchlist = async () => {
+    if (!detail) return;
+    setDeleteConfirmOpen(false);
+    try {
+      await deleteWatchlist(detail.watchlist.id);
+      navigate('/watchlists');
+      await reload();
+    } catch (err: any) {
+      setSnackbar(err.response?.data?.error || err.message || 'Failed to delete watchlist');
+    }
+  };
+
+  const openSetPriceAlert = (item: WatchlistDashboardItem) => {
+    setAlertDialogDefaults({ scope: 'STOCK', type: 'PRICE_ABOVE', instrumentId: item.instrumentId });
+    setAlertDialogOpen(true);
   };
 
   const itemColumns: DataTableColumn<WatchlistDashboardItem>[] = [
@@ -96,12 +145,29 @@ const WatchlistManagementPage: React.FC = () => {
     { id: 'companyName', label: 'Company', render: (item) => item.companyName || 'Unknown company' },
     { id: 'sector', label: 'Sector', render: (item) => item.sector || 'N/A' },
     { id: 'country', label: 'Country', render: (item) => item.country || 'N/A' },
-    { id: 'currentPrice', label: 'Price', align: 'right', render: (item) => money(item.currentPrice, item.currency) },
+    { id: 'currentPrice', label: 'Price', align: 'right', render: (item) => money(item.currentPrice, item.currency, regionCurrency) },
     { id: 'dailyChange', label: 'Daily', align: 'right', render: (item) => <Typography color={item.dailyChangePercent === null ? 'text.secondary' : item.dailyChangePercent >= 0 ? 'success.main' : 'error.main'}>{percent(item.dailyChangePercent)}</Typography> },
     {
       id: 'signal',
       label: 'Signal',
-      render: (item) => item.latestSignal ? <SignalBadge direction={item.latestSignal.direction} label={`${item.latestSignal.direction} ${item.latestSignal.score}`} /> : <StatusBadge label="No signal" />,
+      render: (item) => item.latestSignal ? (
+        <Stack spacing={0.5}>
+          <SignalBadge
+            direction={item.latestSignal.direction}
+            label={`${item.latestSignal.direction} ${item.latestSignal.score} · ${item.latestSignal.confidence}`}
+          />
+          <Chip
+            size="small"
+            label={item.latestSignal.confidence}
+            color={confidenceColor(item.latestSignal.confidence)}
+            variant="outlined"
+            sx={{ alignSelf: 'flex-start' }}
+          />
+          <Typography variant="caption" color="text.secondary">
+            {new Date(item.latestSignal.generatedAt).toLocaleDateString()}
+          </Typography>
+        </Stack>
+      ) : <StatusBadge label="No signal" />,
     },
     {
       id: 'notes',
@@ -123,11 +189,15 @@ const WatchlistManagementPage: React.FC = () => {
               <SaveOutlined fontSize="small" />
             </IconButton>
           </Tooltip>
+          <Tooltip title="Set Price Alert" arrow>
+            <IconButton size="small" color="primary" onClick={() => openSetPriceAlert(item)}>
+              <NotificationsOutlined fontSize="small" />
+            </IconButton>
+          </Tooltip>
           <Tooltip title="Remove from Watchlist" arrow>
             <IconButton size="small" color="error" onClick={async () => {
               if (!id) return;
-              await removeWatchlistItem(id, item.id);
-              await reload();
+              await handleRemoveItem(id, item.id);
             }}>
               <DeleteOutline fontSize="small" />
             </IconButton>
@@ -201,11 +271,9 @@ const WatchlistManagementPage: React.FC = () => {
                 <Typography variant="h5">{detail.watchlist.name}</Typography>
                 <Typography color="text.secondary">{detail.watchlist.description || 'No description'}</Typography>
               </Box>
-              <Button color="error" variant="outlined" onClick={async () => {
-                await deleteWatchlist(detail.watchlist.id);
-                navigate('/watchlists');
-                await reload();
-              }}>Delete Watchlist</Button>
+              <Button color="error" variant="outlined" onClick={() => setDeleteConfirmOpen(true)}>
+                Delete Watchlist
+              </Button>
             </Stack>
           </Paper>
 
@@ -238,6 +306,38 @@ const WatchlistManagementPage: React.FC = () => {
           />
         </Stack>
       )}
+
+      {/* Delete watchlist confirmation */}
+      <Dialog open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)}>
+        <DialogTitle>Delete Watchlist</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to delete &ldquo;{detail?.watchlist.name}&rdquo;? This will remove all tracked stocks from this watchlist. This action cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteConfirmOpen(false)}>Cancel</Button>
+          <Button color="error" variant="contained" onClick={() => void handleDeleteWatchlist()}>Delete</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Set Price Alert dialog */}
+      <CreateAlertDialog
+        open={alertDialogOpen}
+        onClose={() => setAlertDialogOpen(false)}
+        onCreated={reload}
+        defaults={alertDialogDefaults}
+      />
+
+      {/* Error snackbar for silent failures */}
+      <Snackbar
+        open={!!snackbar}
+        autoHideDuration={5000}
+        onClose={() => setSnackbar(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert severity="error" onClose={() => setSnackbar(null)}>{snackbar}</Alert>
+      </Snackbar>
     </Box>
   );
 };

@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import {
   AppBar,
+  Badge,
   Box,
   CssBaseline,
   Drawer,
@@ -12,6 +13,7 @@ import {
   ListItemIcon,
   ListItemText,
   Toolbar,
+  Tooltip,
   Typography,
   useTheme,
   useMediaQuery,
@@ -29,9 +31,52 @@ import { useThemeMode } from './ThemeContext';
 import { useAuthIdentity } from '@/features/auth-identity';
 import { MarketScopeSelector } from '@/shared/components/MarketScopeSelector';
 import { getNavGroupsForPathname, isNavItemActive, resolveNavItem } from './navigationMetadata';
+import { fetchAlertEvents } from '@/features/alerts-monitoring';
+import { fetchCapitalPosture } from '@/features/market-context-intelligence';
 
 const drawerWidth = 260;
 const collapsedWidth = 72;
+
+function useUnreadAlertCount() {
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
+    fetchAlertEvents()
+      .then((events) => {
+        if (!cancelled) setCount(events.filter((e) => !e.readAt && !e.dismissedAt).length);
+      })
+      .catch(() => { /* best-effort; badge stays 0 */ });
+    return () => { cancelled = true; };
+  }, []);
+  return count;
+}
+
+function useCapitalPosture() {
+  const [posture, setPosture] = useState<{ label: string; color: 'success' | 'warning' | 'error' | 'default'; band: string } | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetchCapitalPosture()
+      .then((dto) => {
+        if (cancelled) return;
+        if (dto.availability !== 'READY' || !dto.postureLabel) {
+          setPosture({ label: 'Regime: unavailable', color: 'default', band: '' });
+          return;
+        }
+        const color: 'success' | 'warning' | 'error' =
+          dto.postureLabel === 'RISK_ON' ? 'success' :
+          dto.postureLabel === 'RISK_OFF' ? 'error' : 'warning';
+        const band = dto.suggestedExposureBand
+          ? `${dto.suggestedExposureBand.minPct}–${dto.suggestedExposureBand.maxPct}%`
+          : '';
+        setPosture({ label: dto.postureLabel, color, band });
+      })
+      .catch(() => {
+        if (!cancelled) setPosture({ label: 'Regime: unavailable', color: 'default', band: '' });
+      });
+    return () => { cancelled = true; };
+  }, []);
+  return posture;
+}
 
 export default function NavigationLayout() {
   const theme = useTheme();
@@ -40,6 +85,8 @@ export default function NavigationLayout() {
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [open, setOpen] = useState(!isMobile);
   const location = useLocation();
+  const unreadAlerts = useUnreadAlertCount();
+  const capitalPosture = useCapitalPosture();
 
   const handleDrawerToggle = () => setOpen(!open);
   const activeLabel = resolveNavItem(location.pathname)?.label || 'Investment Scanner';
@@ -71,22 +118,31 @@ export default function NavigationLayout() {
             )}
             {group.items.map((item) => {
               const isActive = isNavItemActive(location.pathname, item);
+              const isAlertsItem = item.path === '/alerts';
               return (
                 <ListItem key={item.path} disablePadding sx={{ mb: 0.5 }}>
-                  <ListItemButton
-                    component={Link}
-                    to={item.path}
-                    selected={isActive}
-                    sx={{
-                      borderRadius: 2,
-                      py: 1,
-                      border: item.operatorOnly ? '1px solid' : '1px solid transparent',
-                      borderColor: item.operatorOnly ? 'divider' : 'transparent',
-                    }}
-                  >
-                    <ListItemIcon sx={{ minWidth: 40 }}>{item.icon}</ListItemIcon>
-                    {open && <ListItemText primary={item.label} primaryTypographyProps={{ variant: 'body2' }} />}
-                  </ListItemButton>
+                  <Tooltip title={item.label} placement="right" disableHoverListener={open} arrow>
+                    <ListItemButton
+                      component={Link}
+                      to={item.path}
+                      selected={isActive}
+                      sx={{
+                        borderRadius: 2,
+                        py: 1,
+                        border: item.operatorOnly ? '1px solid' : '1px solid transparent',
+                        borderColor: item.operatorOnly ? 'divider' : 'transparent',
+                      }}
+                    >
+                      <ListItemIcon sx={{ minWidth: 40 }}>
+                        {isAlertsItem && unreadAlerts > 0 ? (
+                          <Badge badgeContent={unreadAlerts > 99 ? '99+' : unreadAlerts} color="error">
+                            {item.icon}
+                          </Badge>
+                        ) : item.icon}
+                      </ListItemIcon>
+                      {open && <ListItemText primary={item.label} primaryTypographyProps={{ variant: 'body2' }} />}
+                    </ListItemButton>
+                  </Tooltip>
                 </ListItem>
               );
             })}
@@ -94,15 +150,6 @@ export default function NavigationLayout() {
           </React.Fragment>
         ))}
       </List>
-      <Divider sx={{ mt: 'auto' }} />
-      <Box sx={{ p: 2 }}>
-        <Stack direction="row" alignItems="center" spacing={2}>
-          {open && <Typography variant="body2" color="text.secondary">Theme</Typography>}
-          <IconButton size="small" onClick={toggleTheme}>
-            {themeMode === 'dark' ? <Brightness7Icon /> : <Brightness4Icon />}
-          </IconButton>
-        </Stack>
-      </Box>
     </>
   );
 
@@ -116,9 +163,27 @@ export default function NavigationLayout() {
             <Typography variant="h6" noWrap sx={{ fontWeight: 700 }}>{activeLabel}</Typography>
           </Stack>
           <Stack direction="row" alignItems="center" spacing={1.5}>
+            {capitalPosture && (
+              <Tooltip title={capitalPosture.band ? `Suggested exposure: ${capitalPosture.band}` : 'Capital posture is based on persisted market context snapshots.'} arrow>
+                <Chip
+                  label={capitalPosture.label}
+                  color={capitalPosture.color}
+                  size="small"
+                  variant="outlined"
+                  sx={{ fontWeight: 700 }}
+                />
+              </Tooltip>
+            )}
             <MarketScopeSelector />
             <Divider orientation="vertical" flexItem sx={{ height: 24, alignSelf: 'center', mx: 0.5 }} />
-            <Switch checked={themeMode === 'dark'} onChange={toggleTheme} size="small" icon={<Brightness4Icon fontSize="small" />} checkedIcon={<Brightness7Icon fontSize="small" />} />
+            <Switch
+              checked={themeMode === 'dark'}
+              onChange={toggleTheme}
+              size="small"
+              icon={<Brightness4Icon fontSize="small" />}
+              checkedIcon={<Brightness7Icon fontSize="small" />}
+              inputProps={{ 'aria-label': themeMode === 'dark' ? 'Switch to light theme' : 'Switch to dark theme' }}
+            />
             {user && <Typography variant="body2" color="text.secondary" sx={{ ml: 1, display: { xs: 'none', lg: 'block' } }}>{user.email}</Typography>}
             {user && <IconButton color="inherit" size="small" onClick={() => void logout()} title="Log out"><AccountCircleIcon fontSize="small" /></IconButton>}
           </Stack>

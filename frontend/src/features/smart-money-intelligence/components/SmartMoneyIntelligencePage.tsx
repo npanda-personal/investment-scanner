@@ -132,6 +132,10 @@ export default function SmartMoneyIntelligencePage() {
         primaryAction={<Button variant="contained" onClick={handleRun} disabled={refreshingSnapshots}>{refreshingSnapshots ? 'Refreshing...' : 'Refresh Snapshots'}</Button>}
       />
 
+      <Alert severity="warning" sx={{ mb: 2 }}>
+        Insider and institutional ownership data is unavailable. Scores reflect price-volume accumulation and distribution patterns only — they do not represent real smart-money flows or actual ownership changes.
+      </Alert>
+
       <FilterBar onReset={() => { setSector(''); setRange('3M'); }}>
         <TextField 
           select 

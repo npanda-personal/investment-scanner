@@ -223,6 +223,7 @@ const SignalCalibrationEnginePage: React.FC = () => {
   const columns: DataTableColumn<SignalCalibrationResult>[] = [
     { id: 'symbol', label: 'Symbol', sortable: true, render: (row) => <Typography variant="body2" fontWeight={700}>{row.symbol}</Typography> },
     { id: 'companyName', label: 'Company', render: (row) => <Typography variant="body2">{row.companyName || '-'}</Typography> },
+    { id: 'rawScore', label: 'Raw Score', sortable: true, render: (row) => row.rawScore },
     { id: 'calibratedScore', label: 'Calibrated', sortable: true, render: (row) => row.calibratedScore },
     { id: 'scoreDelta', label: 'Score Adjustment', sortable: true, render: (row) => <Chip size="small" label={delta(row.scoreDelta)} color={row.scoreDelta > 0 ? 'success' : row.scoreDelta < 0 ? 'warning' : 'default'} /> },
     { id: 'calibratedDirection', label: 'Direction', render: (row) => <DirectionChip value={row.calibratedDirection} /> },

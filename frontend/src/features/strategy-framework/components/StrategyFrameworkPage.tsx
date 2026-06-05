@@ -404,6 +404,14 @@ function RuleSection({ title, rules }: { title: string; rules: Array<{ code: str
   return <Box><Typography variant="subtitle2" gutterBottom>{title}</Typography><Stack spacing={0.5}>{rules.length ? rules.map((rule) => <Typography key={rule.code} variant="body2">- {rule.label}</Typography>) : <Typography variant="body2" color="text.secondary">None configured.</Typography>}</Stack></Box>;
 }
 
+function coloredMetric(val: number | null | undefined, formatted: string, invert = false) {
+  if (val === null || val === undefined) return <Typography variant="body2">{formatted}</Typography>;
+  const positive = invert ? val < 0 : val > 0;
+  const negative = invert ? val > 0 : val < 0;
+  const color = positive ? 'success.main' : negative ? 'error.main' : 'text.primary';
+  return <Typography variant="body2" sx={{ color }}>{formatted}</Typography>;
+}
+
 function PerformanceMatrix({ summaries, selected, region, assetType }: { summaries: StrategyPerformanceSummary[]; selected: StrategyDefinition | null; region: string; assetType: string }) {
   const byTimeframe = new Map(summaries.map((summary) => [summary.timeframe, summary]));
   return (
@@ -411,12 +419,21 @@ function PerformanceMatrix({ summaries, selected, region, assetType }: { summari
       columns={[
         { id: 'timeframe', label: 'Timeframe', render: (row) => row.timeframe },
         { id: 'availability', label: 'Availability', render: (row) => row.summary ? <Chip size="small" label="AVAILABLE" color="success" /> : <Chip size="small" label="NOT_RUN" /> },
-        { id: 'cagr', label: 'CAGR', render: (row) => percent(row.summary?.cagr) },
-        { id: 'totalReturn', label: 'Total return', render: (row) => percent(row.summary?.totalReturn) },
+        { id: 'cagr', label: 'CAGR', render: (row) => coloredMetric(row.summary?.cagr, percent(row.summary?.cagr)) },
+        { id: 'totalReturn', label: 'Total return', render: (row) => coloredMetric(row.summary?.totalReturn, percent(row.summary?.totalReturn)) },
         { id: 'benchmark', label: 'Benchmark', render: (row) => percent(row.summary?.benchmarkCagr) },
-        { id: 'excess', label: 'Excess', render: (row) => percent(row.summary?.excessCagr) },
-        { id: 'maxDrawdown', label: 'Max drawdown', render: (row) => percent(row.summary?.maxDrawdown) },
-        { id: 'sharpe', label: 'Sharpe', render: (row) => value(row.summary?.sharpe) },
+        { id: 'excess', label: 'Excess', render: (row) => coloredMetric(row.summary?.excessCagr, percent(row.summary?.excessCagr)) },
+        { id: 'maxDrawdown', label: 'Max drawdown', render: (row) => coloredMetric(row.summary?.maxDrawdown, percent(row.summary?.maxDrawdown), true) },
+        { id: 'sharpe', label: 'Sharpe', render: (row) => {
+          const s = row.summary?.sharpe;
+          const v = value(s);
+          if (s === null || s === undefined) return <Typography variant="body2">{v}</Typography>;
+          return (
+            <Tooltip title={s < 0 ? 'Sharpe < 0: strategy lost money on a risk-adjusted basis' : s >= 1 ? 'Sharpe ≥ 1: good risk-adjusted return' : 'Sharpe 0–1: modest risk-adjusted return'} arrow>
+              <Typography variant="body2" sx={{ color: s < 0 ? 'error.main' : s >= 1 ? 'success.main' : 'text.primary' }}>{v}</Typography>
+            </Tooltip>
+          );
+        }},
         { id: 'trades', label: 'Trades', render: (row) => row.summary?.tradeCount ?? 0 },
         { id: 'rating', label: 'Rating', render: (row) => <Stack direction="row" spacing={1} alignItems="center">{ratingChip(row.summary?.ratingGrade)}{hasWarnings(row.summary) && <Chip size="small" label="Warnings" color="warning" />}</Stack> },
         { id: 'readiness', label: 'Readiness', render: (row) => readinessChip(row.summary?.readinessLabel) },
@@ -510,8 +527,10 @@ function canRunStandaloneBacktest(strategy: StrategyDefinition) {
 }
 
 function backtestUnavailableReason(strategy: StrategyDefinition) {
+  if (strategy.status === 'DRAFT') return `${strategy.name} is a draft strategy and is not available for registered backtests.`;
   if (strategy.status !== 'ACTIVE') return `${strategy.name} is ${strategy.status.toLowerCase()} and is not available for registered backtests.`;
-  return `${strategy.name} is a ${strategy.category.toLowerCase()} rule. Registered backtests currently support active entry strategies only.`;
+  const article = /^[aeiou]/i.test(strategy.category) ? 'an' : 'a';
+  return `${strategy.name} is ${article} ${strategy.category.toLowerCase()} rule. Registered backtests currently support active entry strategies only.`;
 }
 
 function categoryChip(category: string) {

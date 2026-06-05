@@ -8,6 +8,10 @@ export interface SignalItem {
   category: SignalCategory;
 }
 
+export type ReliabilityTier = 'FULL' | 'PARTIAL';
+export type CalibrationStatus = 'CALIBRATED' | 'PARTIAL' | 'PENDING' | 'UNAVAILABLE';
+export type LifecycleState = 'ACTIVE' | 'WEAKENING' | 'STALE' | 'EXITED' | 'UNKNOWN';
+
 export interface SignalResult {
   id?: string;
   instrument_id: string;
@@ -43,6 +47,13 @@ export interface SignalResult {
   warnings?: string[];
   strategyMatches?: SignalStrategyMatch[];
   blockedStrategies?: SignalBlockedStrategy[];
+  // Calibration fields (v3+)
+  calibratedScore?: number | null;
+  reliabilityTier?: ReliabilityTier | null;
+  calibrationStatus?: CalibrationStatus | null;
+  calibrationHorizon?: string | null;
+  calibrationSampleSize?: number | null;
+  lifecycleState?: LifecycleState | null;
 }
 
 export interface SignalScoringInputSummary {
@@ -138,6 +149,7 @@ export interface SignalQuery {
   hasStrategyMatch?: boolean;
   hasBlockedStrategies?: boolean;
   frameworkBackedDecisionAvailable?: boolean;
+  reliabilityTier?: ReliabilityTier;
 }
 
 export interface PaginatedSignalResponse {

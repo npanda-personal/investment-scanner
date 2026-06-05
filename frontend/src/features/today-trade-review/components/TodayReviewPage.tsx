@@ -41,6 +41,7 @@ import type {
   TodayReviewCandidate,
   TodayReviewCandidateDataQualitySnapshot,
   TodayReviewGroups,
+  TodayReviewMarketPosture,
   TodayReviewRun,
   TodayReviewScanFunnel,
   TodayReviewSourceSnapshot,
@@ -59,6 +60,7 @@ export function TodayReviewPage() {
   const [tab, setTab] = useState<keyof TodayReviewGroups>('longReview');
   const run = data?.run || null;
   const groups = data?.groups || emptyGroups();
+  const marketPosture = data?.marketPosture ?? null;
   const boardSelection = run ? sourceSnapshotForRun(run).boardSelection || null : null;
   const activeCandidates = candidatesForTab(groups, tab);
   const totals = useMemo(() => ({
@@ -113,9 +115,8 @@ export function TodayReviewPage() {
 
       {run && (
         <>
-          <RunStatusPanel run={run} />
+          <RunStatusPanel run={run} marketPosture={marketPosture} />
           <CoveragePanel run={run} />
-          <DailyReviewRevampPanel />
           {run.warnings.length > 0 && (
             <Alert severity={run.status === 'PARTIAL' ? 'warning' : 'info'}>
               {run.warnings.join(' ')}
@@ -172,31 +173,18 @@ export function TodayReviewPage() {
   );
 }
 
-function DailyReviewRevampPanel() {
-  return (
-    <Card variant="outlined">
-      <CardContent>
-        <Stack spacing={1.25}>
-          <Typography variant="h6">Radar Context</Typography>
-          <Typography variant="body2" color="text.secondary">
-            Market Pulse Context, Source Radar, Score, Reasons, Risks, Sector State, and Freshness will display persisted read-model fields when backend support exists. This page does not duplicate Market Pulse or recalculate intelligence.
-          </Typography>
-          <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-            {['Market Pulse Context', 'Source Radar', 'Score', 'Reasons', 'Risks', 'Sector State', 'Freshness'].map((item) => (
-              <Chip key={item} label={`${item}: unavailable`} variant="outlined" />
-            ))}
-          </Stack>
-        </Stack>
-      </CardContent>
-    </Card>
-  );
-}
-
-function RunStatusPanel({ run }: { run: TodayReviewRun | null }) {
+function RunStatusPanel({ run, marketPosture }: { run: TodayReviewRun | null; marketPosture: TodayReviewMarketPosture | null }) {
   if (!run) return null;
   const sourceSnapshot = sourceSnapshotForRun(run);
   const reviewReadiness = sourceSnapshot.reviewReadiness || {};
   const reviewUniverse = sourceSnapshot.reviewUniverse || {};
+  const postureLabel = marketPosture?.availability === 'READY' && marketPosture.postureLabel
+    ? marketPosture.postureLabel
+    : null;
+  const postureColor = postureLabel === 'RISK_ON' ? 'success' : postureLabel === 'RISK_OFF' ? 'error' : postureLabel ? 'warning' : 'default';
+  const postureBandText = marketPosture?.suggestedExposureBand
+    ? ` (${marketPosture.suggestedExposureBand.minPct}–${marketPosture.suggestedExposureBand.maxPct}%)`
+    : '';
   return (
     <Card variant="outlined">
       <CardContent>
@@ -204,6 +192,15 @@ function RunStatusPanel({ run }: { run: TodayReviewRun | null }) {
           <Chip label={`Run status: ${run.status}`} color={run.status === 'COMPLETED' ? 'success' : run.status === 'PARTIAL' ? 'warning' : 'error'} />
           <Chip label={`Trust: ${run.trustStatus}`} color={run.trustStatus === 'OK' ? 'success' : run.trustStatus === 'FAILED' ? 'error' : 'warning'} variant="outlined" />
           <Chip label={`Market Data trust: ${reviewReadiness.trustStatus || 'UNKNOWN'}`} variant="outlined" />
+          {marketPosture ? (
+            <Tooltip title={marketPosture.availability !== 'READY' ? 'Capital posture data is unavailable for this run.' : `Suggested exposure band${postureBandText}`} arrow>
+              <Chip
+                label={`Capital Posture: ${postureLabel ?? 'Unavailable'}`}
+                color={postureColor as any}
+                variant="outlined"
+              />
+            </Tooltip>
+          ) : null}
           <Typography variant="body2" color="text.secondary">Last run: {formatDateTime(run.finishedAt || run.startedAt)}</Typography>
           <Typography variant="body2" color="text.secondary">Data-through: {formatDate(run.dataThroughDate)}</Typography>
           <Typography variant="body2" color="text.secondary">Scope: {run.region} / {run.assetType}</Typography>

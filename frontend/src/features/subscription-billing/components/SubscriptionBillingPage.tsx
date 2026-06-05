@@ -93,17 +93,32 @@ function PlanCard({ plan, current, saving, onSelect }: { plan: SubscriptionPlan;
 }
 
 function FeatureUsage({ feature }: { feature: FeatureLimit }) {
-  const percent = feature.limit === null ? 0 : Math.min(100, (feature.used / Math.max(1, feature.limit)) * 100);
+  const pct = feature.limit === null ? 0 : Math.min(100, (feature.used / Math.max(1, feature.limit)) * 100);
+  const atLimit = !feature.allowed;
   return (
-    <Paper variant="outlined" sx={{ p: 1.5 }}>
+    <Paper variant="outlined" sx={{ p: 1.5, borderColor: atLimit ? 'warning.main' : undefined }}>
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
         <Typography fontWeight={700}>{feature.label}</Typography>
-        <Chip size="small" label={feature.allowed ? 'Available' : 'Limit reached'} color={feature.allowed ? 'success' : 'warning'} />
+        {feature.limit === null
+          ? <Chip size="small" label="Unlimited" color="success" variant="outlined" />
+          : <Chip size="small" label={atLimit ? 'Limit reached' : 'Available'} color={atLimit ? 'warning' : 'success'} />
+        }
       </Stack>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
         {feature.used} / {feature.limit === null ? 'Unlimited' : feature.limit}
       </Typography>
-      {feature.limit !== null && <LinearProgress variant="determinate" value={percent} />}
+      {feature.limit !== null && (
+        <LinearProgress
+          variant="determinate"
+          value={pct}
+          color={atLimit ? 'warning' : pct >= 80 ? 'warning' : 'primary'}
+        />
+      )}
+      {atLimit && (
+        <Alert severity="warning" sx={{ mt: 1, py: 0 }}>
+          Usage limit reached for <strong>{feature.label}</strong>. Upgrade your plan to continue using this feature.
+        </Alert>
+      )}
     </Paper>
   );
 }

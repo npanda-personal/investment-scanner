@@ -1115,7 +1115,7 @@ const MarketDataFoundationPage: React.FC = () => {
         title="Market Data Foundation"
         subtitle="Explore instruments, exchange-file evidence, persisted prices, fundamentals, corporate actions, and data health."
         primaryAction={
-          <Button variant="contained" startIcon={<AddIcon />} onClick={() => navigate('/market-data-foundation/add')}>
+          <Button variant="contained" startIcon={<AddIcon />} onClick={() => navigate('/admin/market-data-foundation/add')}>
             Add Instrument
           </Button>
         }

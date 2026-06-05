@@ -283,15 +283,38 @@ export class StockResearchWorkbenchService {
   }
 
   private async peerComparison(instrument: any, instrumentId: string, range: ResearchRange) {
-    const universe = await this.marketDataService.listInstruments({ page: 1, pageSize: 10000 });
-    const candidates = universe.instruments
+    // Fetch peers directly by sector/industry without loading the full universe or
+    // running the expensive universeReadinessAndStatsForStocks + trustedBaselineByStockId
+    // enrichment that caused ~10 s latency and HTTP 500 on the research workbench endpoint.
+    //
+    // Strategy: prefer industry match first; if that returns fewer than 3 results
+    // (sparse industry), fall back to sector match.  Hard limit of 20 rows from DB.
+    const PEER_LIMIT = 20;
+    const PEER_RETURN_CAP = 10;
+
+    const buildFilter = (sector?: string | null, industry?: string | null) => ({
+      page: 1 as const,
+      pageSize: PEER_LIMIT,
+      sortBy: 'marketCap' as const,
+      sortOrder: 'desc' as const,
+      ...(industry ? { industry } : sector ? { sector } : {}),
+    });
+
+    let rawResult = instrument.industry
+      ? await this.marketDataService.list(buildFilter(instrument.sector, instrument.industry))
+      : null;
+
+    // Fall back to sector-only when industry yields too few peers
+    if (!rawResult || rawResult.stocks.filter((s: any) => s.id !== instrumentId).length < 3) {
+      if (instrument.sector) {
+        rawResult = await this.marketDataService.list(buildFilter(instrument.sector, null));
+      }
+    }
+
+    const candidates = (rawResult?.stocks ?? [])
       .filter((peer: any) => peer.id !== instrumentId)
-      .filter((peer: any) => {
-        if (instrument.industry && peer.industry === instrument.industry) return true;
-        return Boolean(instrument.sector && peer.sector === instrument.sector);
-      })
-      .sort((a: any, b: any) => (b.market_cap || 0) - (a.market_cap || 0))
-      .slice(0, 10);
+      .sort((a: any, b: any) => (b.marketCap || b.market_cap || 0) - (a.marketCap || a.market_cap || 0))
+      .slice(0, PEER_RETURN_CAP);
 
     return Promise.all(candidates.map(async (peer: any) => {
       const [latest, fundamentals, prices] = await Promise.all([
@@ -302,19 +325,22 @@ export class StockResearchWorkbenchService {
       const points = this.toPricePoints(prices?.prices || []);
       const selectedPeerPrices = this.filterByRange(points, range);
       const latestFundamental = fundamentals?.records?.[0] || null;
+      // Raw Prisma Stock rows use camelCase; fall back gracefully for both
+      // the enriched V1Instrument shape (company_name/market_cap/data_status)
+      // and the raw DB shape (name/marketCap/dataStatus).
       return {
         instrument_id: peer.id,
         symbol: peer.symbol,
-        company_name: peer.company_name,
-        exchange: peer.exchange,
-        market_cap: peer.market_cap,
+        company_name: peer.company_name ?? peer.name ?? null,
+        exchange: peer.exchange ?? null,
+        market_cap: peer.market_cap ?? (peer.marketCap !== undefined ? Number(peer.marketCap) : null),
         latest_price: latest?.latest?.close ?? null,
         return_selected: this.periodReturn(selectedPeerPrices),
         return_1m: this.returnAtOffset(points, 21),
         return_1y: this.returnAtOffset(points, 252),
         pe_ratio: latestFundamental?.pe_ratio ?? null,
         dividend_yield: latestFundamental?.dividend_yield ?? null,
-        data_status: peer.data_status,
+        data_status: peer.data_status ?? peer.dataStatus ?? null,
       };
     }));
   }

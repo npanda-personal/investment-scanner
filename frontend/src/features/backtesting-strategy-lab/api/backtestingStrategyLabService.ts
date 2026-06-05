@@ -17,8 +17,8 @@ export async function deleteBacktestStrategy(id: string): Promise<void> {
   await axios.delete(`${API_BASE}/strategies/${id}`);
 }
 
-export async function runBacktest(input: { strategyId?: string | null; config?: BacktestStrategyConfig }): Promise<BacktestRun> {
-  const response = await axios.post<BacktestRun>(`${API_BASE}/run`, input);
+export async function runBacktest(input: { strategyId?: string | null; config?: BacktestStrategyConfig }, signal?: AbortSignal): Promise<BacktestRun> {
+  const response = await axios.post<BacktestRun>(`${API_BASE}/run`, input, { signal });
   return response.data;
 }
 

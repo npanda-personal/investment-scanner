@@ -13,8 +13,20 @@ interface ThemeContextValue {
 
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
+const STORAGE_KEY = 'theme_mode';
+
+function readStoredTheme(): ThemeMode {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored === 'light' || stored === 'dark') return stored;
+  } catch {
+    // localStorage unavailable (e.g. SSR or restricted)
+  }
+  return 'dark';
+}
+
 export const CustomThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [themeMode, setThemeMode] = useState<ThemeMode>('dark');
+  const [themeMode, setThemeMode] = useState<ThemeMode>(readStoredTheme);
   const theme = useMemo(() => {
     const baseTheme = createTheme(createVisualThemeOptions(themeMode));
     return createTheme(baseTheme, { components: createComponentOverrides(baseTheme) });
@@ -22,7 +34,11 @@ export const CustomThemeProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
   const value = useMemo(() => ({
     themeMode,
-    toggleTheme: () => setThemeMode((mode) => mode === 'light' ? 'dark' : 'light'),
+    toggleTheme: () => setThemeMode((mode) => {
+      const next: ThemeMode = mode === 'light' ? 'dark' : 'light';
+      try { localStorage.setItem(STORAGE_KEY, next); } catch { /* ignore */ }
+      return next;
+    }),
   }), [themeMode]);
 
   return (

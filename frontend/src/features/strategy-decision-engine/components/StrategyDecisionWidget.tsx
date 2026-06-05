@@ -5,6 +5,7 @@ import { fetchLatestDecision, fetchMarketGate } from '../api/strategyDecisionApi
 import type { StrategyDecisionDto, MarketGateResponse } from '../types';
 import { StatusBadge } from '@/shared/components';
 import { Link } from 'react-router-dom';
+import { useMarketScope } from '@/contexts/MarketScopeContext';
 
 const titleCase = (value: string) =>
   value
@@ -35,6 +36,7 @@ interface StrategyDecisionWidgetProps {
 }
 
 const StrategyDecisionWidget: React.FC<StrategyDecisionWidgetProps> = ({ instrumentId }) => {
+  const { scope } = useMarketScope();
   const [decision, setDecision] = useState<StrategyDecisionDto | null>(null);
   const [gate, setGate] = useState<MarketGateResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -44,7 +46,7 @@ const StrategyDecisionWidget: React.FC<StrategyDecisionWidgetProps> = ({ instrum
     setLoading(true);
     Promise.all([
       fetchLatestDecision(instrumentId),
-      fetchMarketGate()
+      fetchMarketGate({ region: scope.region })
     ])
     .then(([d, g]) => {
       setDecision(d);
@@ -52,7 +54,7 @@ const StrategyDecisionWidget: React.FC<StrategyDecisionWidgetProps> = ({ instrum
     })
     .catch(err => setError(err.message || 'Failed to load decision'))
     .finally(() => setLoading(false));
-  }, [instrumentId]);
+  }, [instrumentId, scope.region]);
 
   if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}><CircularProgress size={24} /></Box>;
   if (error) return <Alert severity="error">{error}</Alert>;

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Alert, Box, Button, Checkbox, Chip, CircularProgress, FormControlLabel, MenuItem, Paper, Stack, Tab, Tabs, TextField, Typography } from '@mui/material';
 import { fetchLatestSignalRun, fetchSignalScreener, fetchTopSignals, runSignals } from '../api/signalGenerationEngineService';
-import type { SignalConfidence, SignalDirection, SignalGenerationRunAudit, SignalResult, SignalRunResponse } from '../types';
+import type { ReliabilityTier, SignalConfidence, SignalDirection, SignalGenerationRunAudit, SignalResult, SignalRunResponse } from '../types';
 import { MarketRegimeWidget } from '@/features/market-context-intelligence';
 import { Link } from 'react-router-dom';
 import { SignalTable } from './SignalTable';
@@ -45,6 +45,7 @@ const SignalsDashboardPage: React.FC = () => {
   const [signalType, setSignalType] = useState('');
   const [search, setSearch] = useState('');
   const [strategyCode, setStrategyCode] = useState('');
+  const [reliabilityTier, setReliabilityTier] = useState<ReliabilityTier | ''>('');
   const [onlyStrategyEligible, setOnlyStrategyEligible] = useState(false);
   const [excludeNoiseFiltered, setExcludeNoiseFiltered] = useState(false);
   const [hasBlockedStrategies, setHasBlockedStrategies] = useState(false);
@@ -90,6 +91,7 @@ const SignalsDashboardPage: React.FC = () => {
         confidence: confidence || undefined,
         signalType: signalType || undefined,
         search: search || undefined,
+        reliabilityTier: reliabilityTier || undefined,
       }); break;
     }
 
@@ -103,7 +105,7 @@ const SignalsDashboardPage: React.FC = () => {
       .finally(() => setLoading(false));
   };
 
-  useEffect(load, [activeTab, pageByTab[activeTab], pageSizeByTab[activeTab], sortBy, sortDirection, direction, minScore, sector, country, confidence, signalType, search, strategyCode, onlyStrategyEligible, excludeNoiseFiltered, hasBlockedStrategies, showStrategyContext, scope.region, scope.assetType]);
+  useEffect(load, [activeTab, pageByTab[activeTab], pageSizeByTab[activeTab], sortBy, sortDirection, direction, minScore, sector, country, confidence, signalType, search, strategyCode, reliabilityTier, onlyStrategyEligible, excludeNoiseFiltered, hasBlockedStrategies, showStrategyContext, scope.region, scope.assetType]);
 
   useEffect(() => {
     // Reset pages when scope changes
@@ -111,14 +113,14 @@ const SignalsDashboardPage: React.FC = () => {
   }, [scope.region, scope.assetType]);
 
   useEffect(() => {
-    fetchLatestSignalRun({ region: scope.region, assetType: scope.assetType, modelVersion: 'signal-engine-v1' })
+    fetchLatestSignalRun({ region: scope.region, assetType: scope.assetType })
       .then(setLatestRun)
       .catch(() => setLatestRun(null));
   }, [scope.region, scope.assetType]);
 
   useEffect(() => {
     resetPages();
-  }, [direction, minScore, sector, country, confidence, signalType, search, strategyCode, onlyStrategyEligible, excludeNoiseFiltered, hasBlockedStrategies, showStrategyContext]);
+  }, [direction, minScore, sector, country, confidence, signalType, search, strategyCode, reliabilityTier, onlyStrategyEligible, excludeNoiseFiltered, hasBlockedStrategies, showStrategyContext]);
 
   const runManualSignals = async () => {
     if (batchRunner.running) return;
@@ -274,7 +276,7 @@ const SignalsDashboardPage: React.FC = () => {
 
       {activeTab === 'screener' && (
         <Box sx={{ mb: 3 }}>
-          <FilterBar onReset={() => { setDirection(''); setMinScore('60'); setSector(''); setCountry(''); setConfidence(''); setSignalType(''); setSearch(''); setStrategyCode(''); setOnlyStrategyEligible(false); setExcludeNoiseFiltered(false); setHasBlockedStrategies(false); setShowStrategyContext(false); }}>
+          <FilterBar onReset={() => { setDirection(''); setMinScore('60'); setSector(''); setCountry(''); setConfidence(''); setSignalType(''); setSearch(''); setStrategyCode(''); setReliabilityTier(''); setOnlyStrategyEligible(false); setExcludeNoiseFiltered(false); setHasBlockedStrategies(false); setShowStrategyContext(false); }}>
             <TextField label="Search" value={search} onChange={(event) => setSearch(event.target.value)} />
             <TextField select label="Direction" value={direction} onChange={(event) => setDirection(event.target.value as SignalDirection | '')}>
               <MenuItem value="">Any</MenuItem>
@@ -297,6 +299,11 @@ const SignalsDashboardPage: React.FC = () => {
               <MenuItem value="TREND_MOMENTUM">Trend Momentum</MenuItem>
               <MenuItem value="PULLBACK_IN_UPTREND">Pullback In Uptrend</MenuItem>
               <MenuItem value="DEFENSIVE_EXIT">Defensive Exit</MenuItem>
+            </TextField>
+            <TextField select label="Reliability Tier" value={reliabilityTier} onChange={(event) => setReliabilityTier(event.target.value as ReliabilityTier | '')}>
+              <MenuItem value="">Any</MenuItem>
+              <MenuItem value="FULL">Full</MenuItem>
+              <MenuItem value="PARTIAL">Partial</MenuItem>
             </TextField>
             <FormControlLabel control={<Checkbox checked={onlyStrategyEligible} onChange={(event) => setOnlyStrategyEligible(event.target.checked)} />} label="Only strategy-eligible" />
             <FormControlLabel control={<Checkbox checked={excludeNoiseFiltered} onChange={(event) => setExcludeNoiseFiltered(event.target.checked)} />} label="Exclude noise-filtered" />

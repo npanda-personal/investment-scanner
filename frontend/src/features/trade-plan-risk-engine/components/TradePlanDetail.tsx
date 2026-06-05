@@ -57,7 +57,7 @@ export const TradePlanDetail: React.FC = () => {
       // Basic generate request without portfolio or specific config.
       const data = await TradePlanApi.generatePlan({
          instrumentId,
-         symbol: plan.symbol || instrumentId, // Will fail if symbol is not known. Usually instrumentId is symbol in MVP or symbol is passed via state.
+         symbol: plan.symbol,
          region: scope.region,
          assetType: scope.assetType,
       });
@@ -108,7 +108,7 @@ export const TradePlanDetail: React.FC = () => {
 
       <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Typography variant="h4">Trade Plan: {plan.symbol}</Typography>
-        <Button variant="outlined" onClick={handleGenerate} disabled={generating}>
+        <Button variant="outlined" onClick={handleGenerate} disabled={generating || !plan?.symbol}>
             {generating ? 'Regenerating...' : 'Regenerate Plan'}
         </Button>
       </Box>

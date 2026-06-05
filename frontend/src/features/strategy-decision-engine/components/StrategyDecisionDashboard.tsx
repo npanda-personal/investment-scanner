@@ -283,7 +283,7 @@ const StrategyDecisionDashboard: React.FC = () => {
     { id: 'confidence', label: 'Confidence', sortable: true, render: (d) => d.confidence },
     { id: 'entryZone', label: 'Entry Zone', render: (d) => d.entryZone ? `${d.entryZone.preferredEntryMin} - ${d.entryZone.preferredEntryMax}` : 'N/A' },
     { id: 'generatedAt', label: 'Generated', sortable: true, render: (d) => new Date(d.generatedAt).toLocaleDateString() },
-    { id: 'actions', label: 'Actions', render: () => <Button size="small" component={Link} to={`/trade-plans`}>Risk Plan</Button> },
+    { id: 'actions', label: 'Actions', render: (d) => <Button size="small" component={Link} to={`/admin/trade-plans/${d.instrumentId}`}>Risk Plan</Button> },
   ];
 
   const evaluatableStrategies = model?.strategies.filter((strategy) => strategy.evaluationSupported) ?? [];

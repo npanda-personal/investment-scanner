@@ -120,6 +120,29 @@ export function SignalTable({ signals, totalCount, loading, page, pageSize, sort
     { id: 'symbol', label: 'Symbol', sortable: true, render: (signal) => <Button size="small" onClick={(event) => { event.stopPropagation(); navigate(`/research/stocks/${signal.instrument_id}`); }}>{signal.symbol}</Button> },
     { id: 'company', label: 'Company', render: (signal) => signal.company_name || 'N/A' },
     { id: 'score', label: 'Raw Score', sortable: true, align: 'right', render: (signal) => signal.score },
+    {
+      id: 'calibratedScore',
+      label: 'Calibrated',
+      align: 'right',
+      render: (signal) => {
+        if (signal.calibratedScore != null && signal.calibrationStatus === 'CALIBRATED') {
+          const tier = signal.reliabilityTier;
+          return (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, justifyContent: 'flex-end' }}>
+              <Typography variant="body2">{signal.calibratedScore}</Typography>
+              {tier && (
+                <Chip size="small" label={tier} color={tier === 'FULL' ? 'success' : 'warning'} variant="outlined" sx={{ height: 18, fontSize: 10 }} />
+              )}
+            </Box>
+          );
+        }
+        return (
+          <Tooltip title="Calibration pending — insufficient evidence for this signal" arrow>
+            <Typography variant="body2" color="text.disabled" sx={{ cursor: 'help' }}>—</Typography>
+          </Tooltip>
+        );
+      },
+    },
     { id: 'direction', label: 'Raw Direction', sortable: true, render: (signal) => <StatusBadge label={signal.direction} /> },
     { id: 'confidence', label: 'Confidence', sortable: true, render: (signal) => <StatusBadge label={signal.confidence} /> },
     {
@@ -306,6 +329,29 @@ export function SignalTable({ signals, totalCount, loading, page, pageSize, sort
                 <Typography variant="body2" color="text.secondary">Write status: {selectedSignal.writeStatus || 'N/A'}</Typography>
                 <Typography variant="body2" color="text.secondary">Audit status: {selectedSignal.auditStatus || 'N/A'}</Typography>
               </Stack>
+            </Box>
+
+            <Box>
+              <Typography variant="subtitle2" gutterBottom>Calibration</Typography>
+              {selectedSignal.calibrationStatus === 'CALIBRATED' && selectedSignal.calibratedScore != null ? (
+                <Stack spacing={0.75}>
+                  <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" alignItems="center">
+                    <Typography variant="body2" color="text.secondary">Raw score: {selectedSignal.score}</Typography>
+                    <Typography variant="body2" color="text.secondary">→ Calibrated: <strong>{selectedSignal.calibratedScore}</strong></Typography>
+                    {selectedSignal.reliabilityTier && (
+                      <Chip size="small" label={selectedSignal.reliabilityTier} color={selectedSignal.reliabilityTier === 'FULL' ? 'success' : 'warning'} />
+                    )}
+                  </Stack>
+                  <Typography variant="body2" color="text.secondary">Horizon: {selectedSignal.calibrationHorizon || 'N/A'} · Samples: {selectedSignal.calibrationSampleSize ?? 'N/A'}</Typography>
+                  <Typography variant="body2" color="text.secondary">Lifecycle: {selectedSignal.lifecycleState || 'N/A'}</Typography>
+                </Stack>
+              ) : (
+                <Typography variant="body2" color="text.secondary">
+                  {selectedSignal.calibrationStatus
+                    ? `Calibration ${selectedSignal.calibrationStatus.toLowerCase()} — raw score shown, no adjustment applied.`
+                    : 'Calibration not yet available for this signal.'}
+                </Typography>
+              )}
             </Box>
 
             <Box>

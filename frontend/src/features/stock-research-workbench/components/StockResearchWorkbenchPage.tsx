@@ -31,7 +31,7 @@ import {
   YAxis,
 } from 'recharts';
 import { fetchStockResearchWorkbench } from '../api/stockResearchWorkbenchService';
-import type { ResearchRange, ResearchWorkbenchResponse } from '../types';
+import type { ResearchRange, ResearchWorkbenchResponse, SignalEvidenceSection } from '../types';
 import { SignalWidget } from '@/features/signal-generation-engine';
 import { StrategyDecisionWidget } from '@/features/strategy-decision-engine';
 import { AddToWatchlistDialog } from '@/features/watchlist-management';
@@ -309,6 +309,8 @@ const StockResearchWorkbenchPage: React.FC = () => {
           </Box>
         )}
       </Section>
+
+      <SignalEvidencePanel evidence={data.signalEvidence} />
     </Box>
   );
 };
@@ -340,5 +342,76 @@ const MetricGrid: React.FC<{ items: Record<string, string> }> = ({ items }) => (
     ))}
   </Box>
 );
+
+/**
+ * Signal Evidence / Track Record section.
+ *
+ * Shows persisted signal quality data only — nothing is live-recomputed on page load.
+ * When no track record exists yet, says so honestly instead of hiding the section.
+ */
+const SignalEvidencePanel: React.FC<{ evidence?: SignalEvidenceSection }> = ({ evidence }) => {
+  if (!evidence) {
+    return (
+      <Paper sx={{ p: 2, mb: 3 }}>
+        <Typography variant="h6" sx={{ mb: 1 }}>Signal Evidence / Track Record</Typography>
+        <Typography color="text.secondary">Signal evidence not available for this instrument.</Typography>
+      </Paper>
+    );
+  }
+
+  const statusColor = evidence.status === 'AVAILABLE' ? 'success' : evidence.status === 'CALIBRATION_PENDING' ? 'warning' : 'default';
+  const tierColor = evidence.reliabilityTier === 'FULL' ? 'success' : evidence.reliabilityTier === 'PARTIAL' ? 'warning' : 'default';
+
+  return (
+    <Paper sx={{ p: 2, mb: 3 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        <Box>
+          <Typography variant="h6">Signal Evidence / Track Record</Typography>
+          <Typography variant="caption" color="text.secondary">
+            Persisted read — sourced from signal outcomes and calibration records. Not recomputed on page load.
+          </Typography>
+        </Box>
+        <Stack direction="row" spacing={1} alignItems="center">
+          <Chip
+            label={evidence.status.replace(/_/g, ' ')}
+            size="small"
+            color={statusColor}
+            variant="outlined"
+          />
+          {evidence.reliabilityTier && (
+            <Chip
+              label={`${evidence.reliabilityTier} reliability`}
+              size="small"
+              color={tierColor}
+              variant="outlined"
+            />
+          )}
+        </Stack>
+      </Box>
+
+      {evidence.status === 'NO_TRACK_RECORD' ? (
+        <Alert severity="info" sx={{ mb: 1 }}>
+          No track record yet — outcome data will populate as signals mature over time. This is expected for recently listed stocks or instruments with no recent signals.
+        </Alert>
+      ) : (
+        <MetricGrid items={{
+          'Sample Size': evidence.outcomeDepth !== null ? String(evidence.outcomeDepth) : 'N/A',
+          'Horizon': evidence.trackRecordHorizon ?? 'N/A',
+          'Win Rate': evidence.winRate !== null ? formatPercent(evidence.winRate) : 'N/A',
+          'Avg Forward Return': evidence.avgForwardReturn !== null ? formatPercent(evidence.avgForwardReturn) : 'N/A',
+          'Calibrated Score': evidence.calibratedScore !== null ? formatNumber(evidence.calibratedScore) : 'N/A',
+          'Calibrated Direction': evidence.calibratedDirection ?? 'N/A',
+          'Reliability Tier': evidence.reliabilityTier ?? 'N/A',
+        }} />
+      )}
+
+      {evidence.note && (
+        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1.5 }}>
+          {evidence.note}
+        </Typography>
+      )}
+    </Paper>
+  );
+};
 
 export default StockResearchWorkbenchPage;

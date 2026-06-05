@@ -34,51 +34,77 @@ export const TradePlanTable: React.FC<TradePlanTableProps> = ({
   const currencyCode = (plan: TradePlanResultDto) => plan.marketDataSnapshot?.currency || (plan.region === 'IN' ? 'INR' : 'USD');
   const fmtMoney = (plan: TradePlanResultDto, value: number | null | undefined) =>
     value === null || value === undefined ? '-' : `${currencyCode(plan)} ${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const fmtRR = (p: TradePlanResultDto) => typeof p.rewardRiskRatio === 'number' ? `${p.rewardRiskRatio.toFixed(1)}R` : '-';
   const columns: DataTableColumn<TradePlanResultDto>[] = [
     { id: 'symbol', label: 'Symbol', render: (p) => <strong>{p.symbol}</strong> },
     { id: 'strategy', label: 'Strategy', render: (p) => <Typography variant="body2">{p.strategy}</Typography> },
-    { 
-      id: 'planStatus', 
-      label: 'Status', 
+    {
+      id: 'planStatus',
+      label: 'Status',
       sortable: true,
       render: (p) => (
-        <Chip 
-          label={p.planStatus} 
-          color={p.planStatus === 'VALID' ? 'success' : p.planStatus === 'WATCH' ? 'warning' : 'error'} 
-          size="small" 
+        <Chip
+          label={p.planStatus}
+          color={p.planStatus === 'VALID' ? 'success' : p.planStatus === 'WATCH' ? 'warning' : 'error'}
+          size="small"
         />
       )
     },
-    { 
-      id: 'riskGrade', 
-      label: 'Risk Grade', 
+    {
+      id: 'riskGrade',
+      label: 'Risk',
       sortable: true,
       render: (p) => (
-        <Chip 
-          label={p.riskGrade} 
-          color={p.riskGrade === 'LOW' ? 'success' : p.riskGrade === 'MEDIUM' ? 'warning' : 'error'} 
-          size="small" 
+        <Chip
+          label={p.riskGrade}
+          color={p.riskGrade === 'LOW' ? 'success' : p.riskGrade === 'MEDIUM' ? 'warning' : 'error'}
+          size="small"
           variant="outlined"
         />
       )
     },
     {
+      id: 'entryZone',
+      label: 'Entry',
+      render: (p) => p.entryZone
+        ? <Typography variant="body2" noWrap>{fmtMoney(p, p.entryZone.preferredEntryMin)}–{fmtMoney(p, p.entryZone.preferredEntryMax)}</Typography>
+        : <Typography variant="body2" color="text.secondary">-</Typography>,
+    },
+    {
+      id: 'stopLoss',
+      label: 'Stop',
+      render: (p) => p.stopLoss
+        ? <Typography variant="body2" color="error.main">{fmtMoney(p, p.stopLoss.price)}</Typography>
+        : <Typography variant="body2" color="text.secondary">-</Typography>,
+    },
+    {
+      id: 'target',
+      label: 'Target',
+      render: (p) => p.target
+        ? <Typography variant="body2" color="success.main">{fmtMoney(p, p.target.price)}</Typography>
+        : <Typography variant="body2" color="text.secondary">-</Typography>,
+    },
+    {
+      id: 'rewardRiskRatio',
+      label: 'R:R',
+      sortable: true,
+      render: (p) => <Typography variant="body2">{fmtRR(p)}</Typography>,
+    },
+    {
       id: 'paperReadinessStatus',
-      label: 'Paper Readiness',
+      label: 'Readiness',
       render: (p) => (
         <Chip
-          label={p.paperReadinessStatus === 'READY_FOR_PAPER_REVIEW' ? 'Paper Review Candidate' : p.paperReadinessStatus || 'Not Classified'}
+          label={p.paperReadinessStatus === 'READY_FOR_PAPER_REVIEW' ? 'Paper Review' : p.paperReadinessStatus || 'N/A'}
           color={p.paperReadinessStatus === 'READY_FOR_PAPER_REVIEW' ? 'success' : p.paperReadinessStatus === 'WATCH_ONLY' ? 'warning' : 'default'}
           size="small"
           variant="outlined"
         />
       )
     },
-    { id: 'strategyRating', label: 'Strategy Rating', sortable: true, render: (p) => <Chip size="small" label={p.strategyRating || 'UNPROVEN'} variant="outlined" /> },
-    { id: 'backtestTimeframe', label: 'Proof Timeframe', render: (p) => p.backtestTimeframe || '-' },
-    { id: 'latestPrice', label: 'Latest Price', render: (p) => fmtMoney(p, p.latestPrice ?? p.marketDataSnapshot?.latestPrice) },
-    { id: 'decision', label: 'Decision Evidence', render: (p) => <Typography variant="body2">{p.strategyDecisionSnapshot?.decision || p.planStatus}</Typography> },
-    { id: 'reason', label: 'Reason', render: (p) => <Typography variant="body2" noWrap sx={{ maxWidth: 240 }}>{p.strategyDecisionSnapshot?.reasons?.[0] || p.paperReadinessReasons?.[0] || p.warnings?.[0] || '-'}</Typography> },
+    { id: 'strategyRating', label: 'Rating', sortable: true, render: (p) => <Chip size="small" label={p.strategyRating || 'UNPROVEN'} variant="outlined" /> },
+    { id: 'latestPrice', label: 'Price', render: (p) => fmtMoney(p, p.latestPrice ?? p.marketDataSnapshot?.latestPrice) },
+    { id: 'reason', label: 'Reason', render: (p) => <Typography variant="body2" noWrap sx={{ maxWidth: 200 }}>{p.strategyDecisionSnapshot?.reasons?.[0] || p.paperReadinessReasons?.[0] || p.warnings?.[0] || '-'}</Typography> },
     { id: 'actions', label: 'Actions', align: 'right', render: (p) => <Button size="small" component={Link} to={`/trade-plans/${p.instrumentId}`}>View</Button> },
   ];
 

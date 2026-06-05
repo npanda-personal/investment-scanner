@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   createBacktestStrategy,
   deleteBacktestRun,
@@ -11,6 +11,9 @@ import {
 import type { BacktestRun, BacktestStrategy, BacktestStrategyConfig } from '../types';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
 
+const BACKTEST_TIMEOUT_MS = 120_000;   // 2 min hard abort
+const BACKTEST_SLOW_WARN_MS = 30_000;  // 30s "taking longer" warning
+
 export function useBacktestingStrategyLab() {
   const { scope } = useMarketScope();
   const [strategies, setStrategies] = useState<BacktestStrategy[]>([]);
@@ -18,7 +21,9 @@ export function useBacktestingStrategyLab() {
   const [selectedRun, setSelectedRun] = useState<BacktestRun | null>(null);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
+  const [runSlowWarning, setRunSlowWarning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -47,19 +52,48 @@ export function useBacktestingStrategyLab() {
     return strategy;
   };
 
+  const cancelRun = () => {
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = null;
+    setRunning(false);
+    setRunSlowWarning(false);
+    setError('Backtest cancelled.');
+  };
+
   const runConfig = async (config: BacktestStrategyConfig) => {
+    // Cancel any previous in-flight request
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     setRunning(true);
+    setRunSlowWarning(false);
     setError(null);
+
+    const slowTimer = setTimeout(() => setRunSlowWarning(true), BACKTEST_SLOW_WARN_MS);
+    const hardTimer = setTimeout(() => {
+      controller.abort();
+    }, BACKTEST_TIMEOUT_MS);
+
     try {
-      const run = await runBacktest({ config });
+      const run = await runBacktest({ config }, controller.signal);
       setRuns((items) => [run, ...items]);
       setSelectedRun(run);
       return run;
     } catch (err: any) {
-      setError(err.response?.data?.error || err.message || 'Backtest failed');
+      if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED' || controller.signal.aborted) {
+        // cancelled — error already set by cancelRun or timeout path
+        if (!error) setError('Backtest timed out after 2 minutes. The backend is taking longer than expected.');
+      } else {
+        setError(err.response?.data?.error || err.message || 'Backtest failed');
+      }
       return null;
     } finally {
+      clearTimeout(slowTimer);
+      clearTimeout(hardTimer);
       setRunning(false);
+      setRunSlowWarning(false);
+      abortControllerRef.current = null;
     }
   };
 
@@ -94,12 +128,14 @@ export function useBacktestingStrategyLab() {
     selectedRun,
     loading,
     running,
+    runSlowWarning,
     error,
     setError,
     setSelectedRun,
     reload,
     createStrategy,
     runConfig,
+    cancelRun,
     rerunStrategy,
     removeStrategy,
     removeRun,

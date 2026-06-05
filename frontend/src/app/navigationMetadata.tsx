@@ -8,7 +8,9 @@ import NotificationsNoneIcon from '@mui/icons-material/NotificationsNone';
 import SavedSearchIcon from '@mui/icons-material/SavedSearch';
 import ShowChartIcon from '@mui/icons-material/ShowChart';
 import StarBorderIcon from '@mui/icons-material/StarBorder';
+import TodayIcon from '@mui/icons-material/Today';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import WorkspacesIcon from '@mui/icons-material/Workspaces';
 
 export type NavItem = {
   path: string;
@@ -30,7 +32,9 @@ export const navGroups: NavGroup[] = [
     group: 'Trader Workflow',
     items: [
       { path: '/', label: 'Market Pulse', icon: <DashboardIcon />, aliases: ['/market-pulse'] },
-      { path: '/daily-review-shortlist', label: 'Daily Review Shortlist', icon: <FactCheckIcon /> },
+      { path: '/today-review', label: 'Daily Review', icon: <TodayIcon />, matchPrefixes: ['/today-review/'] },
+      { path: '/research', label: 'Research Hub', icon: <WorkspacesIcon /> },
+      { path: '/daily-review-shortlist', label: 'Review Shortlist', icon: <FactCheckIcon /> },
       { path: '/stock-interest-radar', label: 'Stock Interest Radar', icon: <SavedSearchIcon /> },
       { path: '/earnings-intelligence', label: 'Earnings Intelligence', icon: <CalendarMonthIcon /> },
       { path: '/compounder-radar', label: 'Compounder Radar', icon: <TrendingUpIcon /> },

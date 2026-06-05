@@ -145,6 +145,8 @@ export function EarningsIntelligencePage() {
   );
 }
 
+const deadEndSuggestionLink = { to: '/stock-interest-radar', label: 'Open Stock Interest Radar (available now)' };
+
 export function CompounderRadarPage() {
   const view = useReadModelSnapshot(fetchCompounderRadarSnapshot);
   return (
@@ -156,6 +158,7 @@ export function CompounderRadarPage() {
       loading={view.loading}
       error={view.error}
       missingTitle="Compounder Radar backend not available yet."
+      suggestionLink={deadEndSuggestionLink}
       getRowCategories={() => []}
       renderTable={(rows) => <CompounderTable rows={rows as CompounderSnapshot[]} />}
     />
@@ -173,6 +176,7 @@ export function TraderSetupRadarPage() {
       loading={view.loading}
       error={view.error}
       missingTitle="Trader Setup Radar backend not available yet."
+      suggestionLink={deadEndSuggestionLink}
       getRowCategories={() => []}
       renderTable={(rows) => <TraderSetupTable rows={rows as TraderSetupSnapshot[]} />}
     />
@@ -190,6 +194,7 @@ export function RiskRadarPage() {
       loading={view.loading}
       error={view.error}
       missingTitle="Risk Radar backend not available yet."
+      suggestionLink={deadEndSuggestionLink}
       getRowCategories={() => []}
       renderTable={(rows) => <RiskTable rows={rows as RiskRadarSnapshot[]} />}
     />
@@ -251,6 +256,7 @@ function SnapshotPageShell({
   error,
   envelope,
   missingTitle,
+  suggestionLink,
   children,
 }: {
   title: string;
@@ -259,6 +265,7 @@ function SnapshotPageShell({
   error: string | null;
   envelope: SnapshotEnvelope<unknown> | null;
   missingTitle: string;
+  suggestionLink?: { to: string; label: string };
   children: ReactNode;
 }) {
   const showUnavailable = !loading
@@ -291,8 +298,9 @@ function SnapshotPageShell({
       {showUnavailable && (
         <DataUnavailableState
           title={missingTitle}
-          message={envelope?.message && envelope.message !== missingTitle ? envelope.message : 'Future persisted read API capability is required before this page can show snapshot rows.'}
+          message={envelope?.message && envelope.message !== missingTitle ? envelope.message : 'This radar requires a persisted read API that has not been produced yet.'}
           warnings={envelope?.warnings ?? []}
+          suggestionLink={suggestionLink}
         />
       )}
       {children}
@@ -308,6 +316,7 @@ function RadarPage<T>({
   loading,
   error,
   missingTitle,
+  suggestionLink,
   getRowCategories,
   renderTable,
 }: {
@@ -318,6 +327,7 @@ function RadarPage<T>({
   loading: boolean;
   error: string | null;
   missingTitle: string;
+  suggestionLink?: { to: string; label: string };
   getRowCategories: (row: T) => string[];
   renderTable: (rows: T[]) => ReactNode;
 }) {
@@ -327,7 +337,7 @@ function RadarPage<T>({
   const filteredRows = rows.filter((row) => getRowCategories(row).includes(activeTab));
 
   return (
-    <SnapshotPageShell title={title} subtitle={subtitle} loading={loading} error={error} envelope={envelope} missingTitle={missingTitle}>
+    <SnapshotPageShell title={title} subtitle={subtitle} loading={loading} error={error} envelope={envelope} missingTitle={missingTitle} suggestionLink={suggestionLink}>
       <Paper variant="outlined" sx={{ mb: 2 }}>
         <Tabs value={activeTab} onChange={(_event, value) => setActiveTab(value)} variant="scrollable" scrollButtons="auto">
           {tabs.map((tab) => <Tab key={tab.value} value={tab.value} label={tab.label} />)}
@@ -645,13 +655,18 @@ function EmptyState({ title, message }: { title: string; message?: string }) {
   );
 }
 
-function DataUnavailableState({ title, message, warnings }: { title: string; message: string; warnings: string[] }) {
+function DataUnavailableState({ title, message, warnings, suggestionLink }: { title: string; message: string; warnings: string[]; suggestionLink?: { to: string; label: string } }) {
   return (
     <Alert severity="info" sx={{ mb: 2 }}>
       <Stack spacing={0.75}>
         <Typography fontWeight={800}>{title}</Typography>
         <Typography variant="body2">{message}</Typography>
-        <Typography variant="body2">No fake rows are shown.</Typography>
+        <Typography variant="body2">No placeholder rows are shown.</Typography>
+        {suggestionLink && (
+          <Button size="small" component={RouterLink} to={suggestionLink.to} sx={{ alignSelf: 'flex-start', mt: 0.5 }}>
+            {suggestionLink.label}
+          </Button>
+        )}
         {warnings.map((warning) => <Typography key={warning} variant="caption" color="text.secondary">{warning}</Typography>)}
       </Stack>
     </Alert>

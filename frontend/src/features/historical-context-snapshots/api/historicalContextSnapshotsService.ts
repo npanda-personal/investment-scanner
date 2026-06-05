@@ -21,18 +21,18 @@ export async function generateSnapshots(input: { snapshotDate?: string; limit?: 
   return response.data;
 }
 
-export async function fetchMarketSnapshots(scope: ScopeParams = {}): Promise<MarketContextSnapshot[]> {
-  const response = await axios.get<{ items: MarketContextSnapshot[] }>(`${API_BASE}/market`, { params: { limit: 25, ...scope } });
+export async function fetchMarketSnapshots(scope: ScopeParams = {}, limit = 100): Promise<MarketContextSnapshot[]> {
+  const response = await axios.get<{ items: MarketContextSnapshot[] }>(`${API_BASE}/market`, { params: { limit, ...scope } });
   return response.data.items;
 }
 
-export async function fetchSectorSnapshots(scope: ScopeParams = {}): Promise<SectorContextSnapshot[]> {
-  const response = await axios.get<{ items: SectorContextSnapshot[] }>(`${API_BASE}/sectors`, { params: { limit: 25, ...scope } });
+export async function fetchSectorSnapshots(scope: ScopeParams = {}, limit = 100): Promise<SectorContextSnapshot[]> {
+  const response = await axios.get<{ items: SectorContextSnapshot[] }>(`${API_BASE}/sectors`, { params: { limit, ...scope } });
   return response.data.items;
 }
 
-export async function fetchCountrySnapshots(scope: ScopeParams = {}): Promise<CountryContextSnapshot[]> {
-  const response = await axios.get<{ items: CountryContextSnapshot[] }>(`${API_BASE}/countries`, { params: { limit: 25, ...scope } });
+export async function fetchCountrySnapshots(scope: ScopeParams = {}, limit = 100): Promise<CountryContextSnapshot[]> {
+  const response = await axios.get<{ items: CountryContextSnapshot[] }>(`${API_BASE}/countries`, { params: { limit, ...scope } });
   return response.data.items;
 }
 

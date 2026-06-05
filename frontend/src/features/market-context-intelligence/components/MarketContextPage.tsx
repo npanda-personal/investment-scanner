@@ -1,5 +1,6 @@
 import React from 'react';
-import { Alert, Box, Chip, CircularProgress, LinearProgress, Paper, Stack, Typography } from '@mui/material';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import { Alert, Box, Button, Chip, CircularProgress, LinearProgress, Paper, Stack, Tooltip, Typography } from '@mui/material';
 import { useMarketContext } from '../hooks';
 
 const pct = (value: number | null) => value === null ? 'N/A' : `${(value * 100).toFixed(1)}%`;
@@ -18,15 +19,38 @@ const breadthSmaSamples = (summary: { breadth: { instrumentCount: number; sma50S
   return `${sma50} / ${sma200}`;
 };
 
+function formatDateTime(value?: string | null) {
+  if (!value) return 'Unavailable';
+  return new Date(value).toLocaleString();
+}
+
 export const MarketContextPage: React.FC = () => {
-  const { summary, loading, error } = useMarketContext();
+  const { summary, loading, error, reload } = useMarketContext();
   if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress /></Box>;
   if (error || !summary) return <Alert severity="error">{error || 'Market context unavailable'}</Alert>;
 
   return (
     <Box sx={{ p: 3, maxWidth: 1500, mx: 'auto' }}>
-      <Typography variant="h4">Market Context Intelligence</Typography>
-      <Typography color="text.secondary" sx={{ mb: 3 }}>Broader market regime, sector rotation, breadth, country strength, and macro context.</Typography>
+      <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }} spacing={2} sx={{ mb: 1 }}>
+        <Box>
+          <Typography variant="h4">Market Context Intelligence</Typography>
+          <Typography color="text.secondary">Broader market regime, sector rotation, breadth, country strength, and macro context.</Typography>
+        </Box>
+        <Stack direction="row" spacing={1} alignItems="center">
+          {summary.updatedAt && (
+            <Tooltip title={`Last updated: ${formatDateTime(summary.updatedAt)}`} arrow>
+              <Chip size="small" variant="outlined" label={`Updated: ${formatDateTime(summary.updatedAt)}`} />
+            </Tooltip>
+          )}
+          <Button startIcon={<RefreshIcon />} variant="outlined" size="small" onClick={() => void reload()}>Refresh</Button>
+        </Stack>
+      </Stack>
+
+      {summary.dataStatus === 'PARTIAL' && (
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          Market context data is partial. Some indicators may be incomplete or missing. Results should be interpreted cautiously.
+        </Alert>
+      )}
 
       <Paper sx={{ p: 2, mb: 3 }}>
         <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={2}>

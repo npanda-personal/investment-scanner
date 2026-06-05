@@ -115,7 +115,7 @@ export function DailyOverviewDashboardPage() {
               <Chip label={`${dashboard.scope.region} / ${dashboard.scope.assetType}`} color="primary" variant="outlined" />
               <Chip label={`Today Review: ${formatStatus(todayReview?.run?.status)}`} variant="outlined" />
               <Chip label={`Data through: ${formatDate(todayReview?.run?.dataThroughDate)}`} variant="outlined" />
-              <Chip label={`Updated: ${formatDateTime(dashboard.latestSourceTimestamp)}`} variant="outlined" />
+              <Chip label={`Data as of: ${formatDate(todayReview?.run?.dataThroughDate)}`} variant="outlined" />
             </Stack>
           </Stack>
         </Paper>
@@ -186,9 +186,11 @@ export function DailyOverviewDashboardPage() {
                   </Stack>
                 )}
                 <Divider />
-                <Typography variant="body2" color="text.secondary">
-                  Market breadth: {formatPercent(marketContext?.breadth?.advanceDeclineRatio)}
-                </Typography>
+                <Tooltip title="Advance/decline ratio: number of advancing stocks divided by declining stocks. Values above 1.0 indicate more advancers than decliners." arrow>
+                  <Typography variant="body2" color="text.secondary">
+                    A/D ratio: {formatRatio(marketContext?.breadth?.advanceDeclineRatio)}
+                  </Typography>
+                </Tooltip>
                 <Typography variant="body2" color="text.secondary">
                   Regime: {formatStatus(marketContext?.regime?.regime)}
                 </Typography>
@@ -490,4 +492,9 @@ function labelize(value: string | null | undefined): string {
 function formatPercent(value: number | null | undefined) {
   if (typeof value !== 'number' || Number.isNaN(value)) return unavailableLabel;
   return `${value >= 0 ? '+' : ''}${(value * 100).toFixed(2)}%`;
+}
+
+function formatRatio(value: number | null | undefined) {
+  if (typeof value !== 'number' || Number.isNaN(value)) return unavailableLabel;
+  return value.toFixed(2);
 }

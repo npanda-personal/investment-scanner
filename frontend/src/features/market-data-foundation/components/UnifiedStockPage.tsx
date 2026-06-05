@@ -1,5 +1,6 @@
-import { Alert, Box, Chip, Grid, Paper, Stack, Tab, Tabs, Typography } from '@mui/material';
-import { useSearchParams } from 'react-router-dom';
+import { Alert, Box, Button, Chip, Grid, Paper, Stack, Tab, Tabs, Typography } from '@mui/material';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { ArrowForwardOutlined } from '@mui/icons-material';
 import InstrumentDetailPage from './InstrumentDetailPage';
 import StockResearchWorkbenchPage from '@/features/stock-research-workbench';
 import { PageHeader } from '@/shared/components';
@@ -17,9 +18,40 @@ const tabs = [
   { value: 'smart-money', label: 'Smart Money' },
 ];
 
+/**
+ * Map of module tab values to their admin dashboard base paths.
+ * Each link is deep-linked with ?instrumentId=<id> so the dashboard
+ * can pre-filter to this instrument.
+ */
+const MODULE_TAB_LINKS: Record<string, { label: string; path: string; description: string }> = {
+  signals: {
+    label: 'Signals dashboard',
+    path: '/signal-generation-engine',
+    description: 'View all signal results and history for this instrument in the Signal Generation Engine dashboard.',
+  },
+  quality: {
+    label: 'Signal Quality Lab dashboard',
+    path: '/signal-quality-lab',
+    description: 'Review outcome accuracy, win rates, and track record depth for this instrument.',
+  },
+  calibration: {
+    label: 'Calibration dashboard',
+    path: '/signal-calibration-engine',
+    description: 'Inspect calibration results, score distribution, and confidence for this instrument.',
+  },
+  'smart-money': {
+    label: 'Smart Money dashboard',
+    path: '/smart-money-intelligence',
+    description: 'View institutional flow and smart money signals for this instrument.',
+  },
+};
+
 export default function UnifiedStockPage() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const { id } = useParams<{ id: string }>();
   const activeTab = searchParams.get('tab') || 'overview';
+
+  const moduleTabLink = id ? MODULE_TAB_LINKS[activeTab] : null;
 
   return (
     <Box sx={{ maxWidth: 1500, mx: 'auto' }}>
@@ -50,11 +82,28 @@ export default function UnifiedStockPage() {
             <MarketContextRail />
           </Grid>
         </Grid>
+      ) : moduleTabLink ? (
+        <Paper sx={{ p: 4 }}>
+          <Stack spacing={2}>
+            <Typography variant="h6">{tabs.find((tab) => tab.value === activeTab)?.label}</Typography>
+            <Typography color="text.secondary">{moduleTabLink.description}</Typography>
+            <Box>
+              <Button
+                component={Link}
+                to={`${moduleTabLink.path}?instrumentId=${id}`}
+                variant="contained"
+                endIcon={<ArrowForwardOutlined />}
+              >
+                {moduleTabLink.label}
+              </Button>
+            </Box>
+          </Stack>
+        </Paper>
       ) : (
         <Paper sx={{ p: 3 }}>
           <Typography variant="h6">{tabs.find((tab) => tab.value === activeTab)?.label}</Typography>
           <Typography color="text.secondary">
-            This stock tab is reserved for the module-owned view. Use the main module dashboards for full analysis while this unified page is expanded.
+            This tab is reserved for the module-owned view. Use the main module dashboards for full analysis.
           </Typography>
         </Paper>
       )}

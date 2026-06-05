@@ -1,5 +1,5 @@
 import React from 'react';
-import { Alert, Box, Button, IconButton, Paper, Snackbar, Tooltip, Typography } from '@mui/material';
+import { Alert, Box, Button, Chip, IconButton, Paper, Snackbar, Tooltip, Typography } from '@mui/material';
 import { 
   VisibilityOutlined, 
   AccountBalanceWalletOutlined, 
@@ -52,7 +52,22 @@ export const SignalCard: React.FC<{ signal: SignalResult }> = ({ signal }) => {
           </Box>
           <SignalBadge direction={signal.direction} />
         </Box>
-        <Typography variant="h5">{signal.score}</Typography>
+        <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, flexWrap: 'wrap' }}>
+          {signal.calibratedScore != null && signal.calibrationStatus === 'CALIBRATED' ? (
+            <>
+              <Typography variant="h5">{signal.score}</Typography>
+              <Typography variant="body2" color="text.secondary">→ {signal.calibratedScore} (calibrated)</Typography>
+              {signal.reliabilityTier && (
+                <Chip size="small" label={signal.reliabilityTier} color={signal.reliabilityTier === 'FULL' ? 'success' : 'warning'} sx={{ height: 18, fontSize: 10 }} />
+              )}
+            </>
+          ) : (
+            <>
+              <Typography variant="h5">{signal.score}</Typography>
+              <Typography variant="caption" color="text.disabled">calibration pending</Typography>
+            </>
+          )}
+        </Box>
         <Typography variant="caption" color="text.secondary">Confidence: {signal.confidence}</Typography>
         <Box sx={{ mt: 1, display: 'flex', gap: 1, alignItems: 'baseline', flexWrap: 'wrap' }}>
           <Typography fontWeight={700}>{formatPrice(signal.currentPrice, signal.currency)}</Typography>

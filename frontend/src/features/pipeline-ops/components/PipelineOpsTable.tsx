@@ -35,26 +35,32 @@ type OperationDefinition = {
   moduleName: string;
   operationName: string;
   sourcePath: string;
+  /** Stages that have never run and should be labelled "not yet active" instead of showing dead links */
+  notYetActive?: true;
 };
 
+// Stages listed here have never run in production; mark them explicitly so the
+// table renders a "not yet active" label rather than a dead "View source" link.
+const NOT_YET_ACTIVE_STAGE_KEYS = new Set(['BACKTEST_PROOF', 'MARKET_PULSE', 'STOCK_INTEREST_REFRESH']);
+
 const OPERATION_CATALOG: OperationDefinition[] = [
-  { stageKey: 'MARKET_DATA', stageOrder: 1, moduleName: 'Market Data', operationName: 'Incremental EOD data load', sourcePath: '/market-data-foundation' },
-  { stageKey: 'DATA_QUALITY', stageOrder: 2, moduleName: 'Data Quality', operationName: 'Readiness evaluation', sourcePath: '/data-quality' },
+  { stageKey: 'MARKET_DATA', stageOrder: 1, moduleName: 'Market Data', operationName: 'Incremental EOD data load', sourcePath: '/admin/market-data-foundation' },
+  { stageKey: 'DATA_QUALITY', stageOrder: 2, moduleName: 'Data Quality', operationName: 'Readiness evaluation', sourcePath: '/admin/data-quality' },
   { stageKey: 'RAW_SIGNALS', stageOrder: 3, moduleName: 'Signals', operationName: 'Raw signal generation', sourcePath: '/signals' },
   { stageKey: 'SIGNAL_CALIBRATION', stageOrder: 4, moduleName: 'Signal Calibration', operationName: 'Calibration refresh', sourcePath: '/signals/calibration' },
-  { stageKey: 'CONTEXT_SNAPSHOTS', stageOrder: 5, moduleName: 'Context Snapshots', operationName: 'Historical context snapshots', sourcePath: '/context-snapshots' },
+  { stageKey: 'CONTEXT_SNAPSHOTS', stageOrder: 5, moduleName: 'Context Snapshots', operationName: 'Historical context snapshots', sourcePath: '/admin/context-snapshots' },
   { stageKey: 'MARKET_CONTEXT', stageOrder: 6, moduleName: 'Market Context', operationName: 'Market and sector context', sourcePath: '/market-context' },
-  { stageKey: 'MARKET_PULSE', stageOrder: 7, moduleName: 'Market Pulse', operationName: 'Market Pulse snapshot refresh', sourcePath: '/market-pulse' },
-  { stageKey: 'SIGNAL_QUALITY', stageOrder: 7, moduleName: 'Signal Quality', operationName: 'Outcome quality refresh', sourcePath: '/signals/quality' },
+  { stageKey: 'MARKET_PULSE', stageOrder: 7, moduleName: 'Market Pulse', operationName: 'Market Pulse snapshot refresh', sourcePath: '/market-pulse', notYetActive: true },
+  { stageKey: 'SIGNAL_QUALITY', stageOrder: 7, moduleName: 'Signal Quality', operationName: 'Outcome quality refresh', sourcePath: '/admin/signals/quality' },
   { stageKey: 'SMART_MONEY', stageOrder: 8, moduleName: 'Smart Money', operationName: 'Smart money context', sourcePath: '/smart-money' },
   { stageKey: 'STRATEGY_DECISION', stageOrder: 9, moduleName: 'Strategy', operationName: 'Strategy decision refresh', sourcePath: '/strategy' },
-  { stageKey: 'BACKTEST_PROOF', stageOrder: 10, moduleName: 'Backtests', operationName: 'Backtest proof refresh', sourcePath: '/backtests' },
+  { stageKey: 'BACKTEST_PROOF', stageOrder: 10, moduleName: 'Backtests', operationName: 'Backtest proof refresh', sourcePath: '/backtests', notYetActive: true },
   { stageKey: 'RESEARCH_PROJECTION', stageOrder: 11, moduleName: 'Research', operationName: 'Research command projection', sourcePath: '/research' },
   { stageKey: 'TODAY_REVIEW', stageOrder: 12, moduleName: 'Today Review', operationName: 'Daily candidate publication', sourcePath: '/today-review' },
   { stageKey: 'SIGNAL_POSITION_LEDGER', stageOrder: 13, moduleName: 'Signal Position Ledger', operationName: 'Entry/exit trigger lifecycle refresh', sourcePath: '/signals/position-ledger' },
   { stageKey: 'SECTOR_INTELLIGENCE_REFRESH', stageOrder: 14, moduleName: 'Sector Intelligence', operationName: 'Sector snapshot refresh', sourcePath: '/market-map' },
   { stageKey: 'EARNINGS_INTELLIGENCE_REFRESH', stageOrder: 15, moduleName: 'Earnings Intelligence', operationName: 'Earnings snapshot refresh', sourcePath: '/earnings-intelligence' },
-  { stageKey: 'STOCK_INTEREST_REFRESH', stageOrder: 16, moduleName: 'Stock Interest', operationName: 'Stock interest snapshot refresh', sourcePath: '/stock-interest-radar' },
+  { stageKey: 'STOCK_INTEREST_REFRESH', stageOrder: 16, moduleName: 'Stock Interest', operationName: 'Stock interest snapshot refresh', sourcePath: '/stock-interest-radar', notYetActive: true },
 ];
 
 type PipelineOpsRow = OperationDefinition & PipelineStatusStageGroup;
@@ -155,9 +161,11 @@ export function PipelineOpsTable({
           {rows.map((row) => {
             const stage = row.activeStage || row.lastStage;
             const isExpanded = expandedRows.has(row.stageKey);
+            // A row is "phantom" if it has no run evidence AND is flagged as not yet active
+            const isPhantom = !stage && NOT_YET_ACTIVE_STAGE_KEYS.has(row.stageKey);
             return (
               <Fragment key={row.stageKey}>
-                <TableRow hover>
+                <TableRow hover sx={isPhantom ? { opacity: 0.55 } : undefined}>
                   <TableCell>
                     <IconButton size="small" onClick={() => toggleRow(row.stageKey)} aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${row.stageKey}`}>
                       {isExpanded ? <KeyboardArrowDownIcon fontSize="small" /> : <KeyboardArrowRightIcon fontSize="small" />}
@@ -175,11 +183,19 @@ export function PipelineOpsTable({
                     <Tooltip title={row.operationName}>
                       <Typography variant="body2" noWrap sx={clippedTextSx}>{row.operationName}</Typography>
                     </Tooltip>
-                    <Link component={RouterLink} to={row.sourcePath} variant="caption" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
-                      View source <OpenInNewIcon sx={{ fontSize: 14 }} />
-                    </Link>
+                    {isPhantom ? (
+                      <Typography variant="caption" color="text.disabled" noWrap sx={clippedTextSx}>Not yet active</Typography>
+                    ) : (
+                      <Link component={RouterLink} to={row.sourcePath} variant="caption" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
+                        View source <OpenInNewIcon sx={{ fontSize: 14 }} />
+                      </Link>
+                    )}
                   </TableCell>
-                  <TableCell><StatusBadge label={stage?.status || 'NO_RUN_EVIDENCE'} /></TableCell>
+                  <TableCell>
+                    {isPhantom
+                      ? <Chip size="small" label="Not yet active" variant="outlined" />
+                      : <StatusBadge label={stage?.status || 'NO_RUN_EVIDENCE'} />}
+                  </TableCell>
                   <TableCell><ProgressCell stage={stage} /></TableCell>
                   <TableCell>
                     <Typography variant="body2" noWrap sx={clippedTextSx}>{formatDateTime(stage?.completedAt || stage?.startedAt || stage?.updatedAt)}</Typography>

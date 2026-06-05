@@ -230,6 +230,12 @@ export const TradePlanDashboard: React.FC = () => {
 
   return (
     <Box className="page-container page-container--workspace">
+      <Alert
+        severity="warning"
+        sx={{ mb: 2, position: 'sticky', top: 0, zIndex: 100 }}
+      >
+        <strong>Evidence only — not trade instructions.</strong> These rows are generated research evidence derived from strategy decisions. They are NOT recommendations to enter or exit positions. Use Today Review and Signal Position Ledger for the current trusted signal workflow.
+      </Alert>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Typography variant="h5">Legacy Trade Plan Evidence</Typography>
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ xs: 'stretch', sm: 'center' }}>

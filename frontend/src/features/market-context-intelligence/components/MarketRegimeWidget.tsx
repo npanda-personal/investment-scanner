@@ -9,6 +9,25 @@ export const MarketRegimeWidget: React.FC = () => {
   if (loading) return <Paper sx={{ p: 2 }}><CircularProgress size={20} /></Paper>;
   if (error) return <Alert severity="warning">{error}</Alert>;
   if (!summary) return null;
+
+  const dataMissing = summary.dataStatus === 'MISSING' || (summary.breadth.sma50SampleCount !== undefined && summary.breadth.sma50SampleCount === 0);
+  if (dataMissing) {
+    return (
+      <Paper sx={{ p: 2, mb: 3 }}>
+        <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={1}>
+          <div>
+            <Typography variant="h6">Current Market Regime</Typography>
+            <Typography color="text.secondary">Insufficient market breadth data to determine regime.</Typography>
+          </div>
+          <Stack alignItems={{ xs: 'flex-start', md: 'flex-end' }} spacing={1}>
+            <Chip color="default" label="Data unavailable" variant="outlined" />
+            <Typography variant="body2" color="text.secondary">{summary.dataStatus}</Typography>
+          </Stack>
+        </Stack>
+      </Paper>
+    );
+  }
+
   return (
     <Paper sx={{ p: 2, mb: 3 }}>
       <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={1}>
