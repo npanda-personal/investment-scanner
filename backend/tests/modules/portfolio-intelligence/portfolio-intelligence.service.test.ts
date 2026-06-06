@@ -65,9 +65,13 @@ const allocation = (holdings: any[]) => ({
   generatedAt: '2026-04-28T00:00:00.000Z',
 });
 
-/** Mock repository: always a cache miss so the service falls through to compute + persist. */
+/**
+ * Mock repository: cache miss on findByPortfolioId + findComputedAt so the
+ * service falls through to compute + persist on every intelligence() call.
+ */
 const mockRepo = () => ({
   findByPortfolioId: jest.fn().mockResolvedValue(null),
+  findComputedAt: jest.fn().mockResolvedValue(null),
   upsertSnapshot: jest.fn().mockResolvedValue(undefined),
 });
 
@@ -75,6 +79,8 @@ const serviceWith = (holdings: any[]) => new PortfolioIntelligenceService(
   {
     summary: jest.fn().mockResolvedValue(summary(holdings)),
     allocation: jest.fn().mockResolvedValue(allocation(holdings)),
+    // getPortfolioDetail is called by intelligence() for the staleness guard.
+    getPortfolioDetail: jest.fn().mockResolvedValue({ portfolio, holdings }),
   } as any,
   undefined,   // default thresholds
   undefined,   // no capitalPostureService
@@ -156,5 +162,95 @@ describe('PortfolioIntelligenceService', () => {
     expect(result?.status).toBe('AT_RISK');
     expect(result?.holdings).toEqual([]);
     expect(result?.redFlags.some((flag) => flag.category === 'diversification')).toBe(true);
+  });
+
+  // ── Staleness-guard tests ──────────────────────────────────────────────────
+
+  describe('staleness guard', () => {
+    const freshSnapshot = { portfolioId: 'portfolio-1', healthScore: 80, status: 'HEALTHY' } as any;
+
+    it('serves the cached snapshot when computedAt is newer than portfolio.updatedAt', async () => {
+      const portfolioUpdatedAt = new Date('2026-04-28T00:00:00.000Z');
+      const computedAt = new Date('2026-04-29T00:00:00.000Z'); // computed AFTER last holdings change
+      const repo = {
+        findByPortfolioId: jest.fn().mockResolvedValue(freshSnapshot),
+        findComputedAt: jest.fn().mockResolvedValue(computedAt),
+        upsertSnapshot: jest.fn(),
+      };
+      const portfolioDetail = { portfolio: { ...portfolio, updatedAt: portfolioUpdatedAt.toISOString() }, holdings: [] };
+      const svc = new PortfolioIntelligenceService(
+        { summary: jest.fn(), allocation: jest.fn(), getPortfolioDetail: jest.fn().mockResolvedValue(portfolioDetail) } as any,
+        undefined, undefined, repo as any,
+      );
+
+      const result = await svc.intelligence('portfolio-1');
+
+      // Should have served the cached snapshot without recomputing
+      expect(result).toBe(freshSnapshot);
+      expect(repo.upsertSnapshot).not.toHaveBeenCalled();
+    });
+
+    it('recomputes when portfolio.updatedAt is newer than snapshot.computedAt (stale)', async () => {
+      const computedAt = new Date('2026-04-28T00:00:00.000Z');
+      const portfolioUpdatedAt = new Date('2026-04-29T00:00:00.000Z'); // holdings changed AFTER last compute
+      const repo = {
+        findByPortfolioId: jest.fn().mockResolvedValue(freshSnapshot),
+        findComputedAt: jest.fn().mockResolvedValue(computedAt),
+        upsertSnapshot: jest.fn().mockResolvedValue(undefined),
+      };
+      const h = [holding()];
+      const portfolioDetail = { portfolio: { ...portfolio, updatedAt: portfolioUpdatedAt.toISOString() }, holdings: h };
+      const svc = new PortfolioIntelligenceService(
+        {
+          summary: jest.fn().mockResolvedValue(summary(h)),
+          allocation: jest.fn().mockResolvedValue(allocation(h)),
+          getPortfolioDetail: jest.fn().mockResolvedValue(portfolioDetail),
+        } as any,
+        undefined, undefined, repo as any,
+      );
+
+      await svc.intelligence('portfolio-1');
+
+      // upsertSnapshot must have been called once — snapshot was stale
+      expect(repo.upsertSnapshot).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns null when portfolio does not exist', async () => {
+      const repo = {
+        findByPortfolioId: jest.fn().mockResolvedValue(null),
+        findComputedAt: jest.fn().mockResolvedValue(null),
+        upsertSnapshot: jest.fn(),
+      };
+      const svc = new PortfolioIntelligenceService(
+        { summary: jest.fn(), allocation: jest.fn(), getPortfolioDetail: jest.fn().mockResolvedValue(null) } as any,
+        undefined, undefined, repo as any,
+      );
+
+      const result = await svc.intelligence('nonexistent');
+      expect(result).toBeNull();
+    });
+
+    it('lazy-materialises (computes + persists) when no snapshot exists yet', async () => {
+      const repo = {
+        findByPortfolioId: jest.fn().mockResolvedValue(null),
+        findComputedAt: jest.fn().mockResolvedValue(null),
+        upsertSnapshot: jest.fn().mockResolvedValue(undefined),
+      };
+      const h = [holding()];
+      const portfolioDetail = { portfolio, holdings: h };
+      const svc = new PortfolioIntelligenceService(
+        {
+          summary: jest.fn().mockResolvedValue(summary(h)),
+          allocation: jest.fn().mockResolvedValue(allocation(h)),
+          getPortfolioDetail: jest.fn().mockResolvedValue(portfolioDetail),
+        } as any,
+        undefined, undefined, repo as any,
+      );
+
+      await svc.intelligence('portfolio-1');
+
+      // Must have persisted the first snapshot
+      expect(repo.upsertSnapshot).toHaveBeenCalledTimes(1);
+    });
   });
 });

@@ -71,9 +71,13 @@ const allocationFor = (holdings: any[]) => ({
 
 const ASSEMBLED_AT = '2026-06-04T10:00:00.000Z';
 
-/** Mock repository: always a cache miss so the service falls through to compute + persist. */
+/**
+ * Mock repository: always a cache miss on findByPortfolioId + findComputedAt
+ * so the service falls through to compute + persist on every intelligence() call.
+ */
 const mockRepo = () => ({
   findByPortfolioId: jest.fn().mockResolvedValue(null),
+  findComputedAt: jest.fn().mockResolvedValue(null),
   upsertSnapshot: jest.fn().mockResolvedValue(undefined),
 });
 
@@ -86,6 +90,8 @@ const serviceWith = (
     {
       summary: jest.fn().mockResolvedValue(summaryFor(holdings)),
       allocation: jest.fn().mockResolvedValue(allocationFor(holdings)),
+      // getPortfolioDetail is called by intelligence() for the staleness guard.
+      getPortfolioDetail: jest.fn().mockResolvedValue({ portfolio, holdings }),
     } as any,
     undefined,         // use default thresholds
     capitalPostureMock,

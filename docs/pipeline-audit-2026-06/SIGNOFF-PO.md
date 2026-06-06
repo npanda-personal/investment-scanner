@@ -1,89 +1,102 @@
-# Product-Owner Sign-Off — Daily-Pipeline Stability Initiative
+# Product-Owner Sign-Off — Daily-Pipeline Stability Initiative (ROUND 2)
 
 **Date:** 2026-06-06
 **Reviewer:** Product Owner (NSE/BSE domain)
-**Scope:** Acceptance review of the 10 owner requirements against AUDIT-1..4 + FIX-PLAN, the 7 fix commits (P-1..P-4), the current Postgres state, and code behavior. Servers are DOWN — validated against code/design + DB, not a live browser.
-**Universe baseline:** 2,937 active CASH STOCK instruments (confirmed in DB).
+**Scope:** Round-2 re-review of the two round-1 blockers + the data-repopulation progress, against the 10 owner requirements. Servers DOWN — validated against code/design + live Postgres (`investment_scanner_postgres`), not a browser.
+**Universe baseline:** ~2,937 active CASH STOCK instruments.
+**Round-1 verdict:** CHANGES_REQUESTED (2 blockers: tests uncommitted, data not repopulated).
 
 ---
 
 ## VERDICT: CHANGES_REQUESTED
 
-The engineering work is **genuinely strong and the design now satisfies the owner's intent**. Every requirement is addressed *in code*, the durable one-time cleanups (smart-money dedup, stale-lease reap, unique-index migration) are already applied to the live DB, and `tsc` is clean. I am **not** blocking on architecture or correctness of the fixes.
+Round-1 blocker #2 (data repopulation) is **substantially resolved** — the no-network, fixable-now populate is done: the position ledger went 39 → 659, data-quality latest-date coverage was restored 50 → 2,330, market-scan = 495, workbench 3 → 205, smart-money corpus is still 0-duplicate (105,360 = 105,360 distinct keys), and there are 0 stale RUNNING rows. I would not block on the data state.
 
-I am withholding final APPROVE for two reasons, both about *closing the loop*, not broken code:
+I am withholding APPROVE for **one** reason — and it is the *exact same defect I blocked on in round 1*:
 
-1. **The data is not yet repopulated.** Coverage on the latest date is still at the pre-fix numbers (signal_results 2,044 / 2,937 = 70%; the new per-stock snapshot tables hold only seed rows: workbench_snapshots = 3, portfolio_intelligence_snapshots = 1, research_overview_snapshots = 1). A trader opening the app today would still see thin/partial data. The fixes will only manifest after **one clean daily scheduled run on a live server** (plus a manual full-universe backfill for the historical gaps). Until that run is observed green, completeness is asserted by design, not proven.
-2. **The test updates for these fixes are uncommitted.** 9 modified test files sit in the working tree (test-only; zero production source uncommitted). The green-test claims in the commit messages therefore aren't reproducible from a clean checkout. Commit them.
+**Blocker #1 (uncommitted tests) is NOT resolved.** `git status --porcelain` still shows two tracked test files modified and uncommitted:
+- `backend/tests/modules/portfolio-intelligence/portfolio-intelligence.service.test.ts` (+92 lines: a whole `staleness guard` describe-block)
+- `backend/tests/modules/portfolio-intelligence/portfolio-intelligence-market-posture.test.ts`
 
-This is the normal, fair gate for a "code-complete, pending live repopulation" state. Approve-on-evidence once items #1/#2 in Findings are closed.
+These are not stale leftovers. They are **new tests covering production code that *was* committed** — the `findComputedAt` staleness-guard added to `portfolio-intelligence.repository.ts` / `.service.ts` (confirmed present in `HEAD`). So a clean checkout today ships the production staleness-guard **without** its tests. The round-1 claim that the tests were committed (commit 917c413, "commit test updates accompanying P-1..P-3") is **true for the 9 files in that commit but false for these two** — commit 917c413 does not touch either of these two files, and no later commit does either. The green-suite claim is therefore still not reproducible from a clean checkout for the portfolio-intelligence staleness behavior.
+
+This is a code/repo-hygiene defect (the literal round-1 blocker recurring), not operational follow-up. It is a one-command fix. Commit the two files, run the suite green from clean, and this flips to APPROVE — everything else is done or is legitimate post-start operational catch-up.
 
 ---
 
-## Per-Requirement Acceptance Table
+## Round-1 Blockers — Re-verification
 
-| # | Requirement | Verdict | Basis |
+| # | Round-1 blocker | Claim | Round-2 finding | Status |
+|---|---|---|---|---|
+| 1 | Uncommitted test files | "committed" | `git status` shows **2 tracked test files still modified/uncommitted** (portfolio-intelligence service + market-posture). They add a new `staleness guard` suite for the committed `findComputedAt` prod code. No commit (917c413 or later) contains them. | **NOT RESOLVED** |
+| 2 | Data not repopulated | progress claimed | Verified counts below — the fixable-now populate is done. Remaining gaps (signal_results, delivery) are network/live-run only. | **RESOLVED (no-network portion)** |
+
+### Verified DB counts (this session)
+
+| Table / metric | Round-1 | Round-2 (now) | Target | Verdict |
+|---|---|---|---|---|
+| signal_position_ledger_entries | 39 | **659** | ~660 | MET |
+| data_quality_snapshots — latest date (2026-06-05) | 50 (napi-capped) | **2,330** | ~2,330 | MET (napi fix proven on DB) |
+| market_scan_snapshots | 495 | **495** | populated | MET |
+| research_overview_snapshots | 1 | **1** | ≥1 (single-row design) | MET |
+| workbench_snapshots (distinct instruments) | 3 | **205** | full-universe (manual) | PARTIAL — climbed off seed; not full-universe, populate appears stopped (last write 13:12, flat at 205 over ~1min polling) |
+| portfolio_intelligence_snapshots | 1 | **1** | lazy-materialize | as designed |
+| smart_money dedup | 0 dup | **0 dup (105,360 = 105,360 distinct keys)** | 0 | MET (intact) |
+| stale RUNNING (pipeline_runs / stage_runs) | 0 / 0 | **0 / 0** | 0 | MET (reaper intact) |
+| signal_results — latest date (2026-06-06) | 2,044 / 2,937 (70%) | **2,044** | universe | OPERATIONAL (needs live daily run) |
+| market_delivery — latest tradingDate | 2026-06-01 | **2026-06-01** (still 4-day gap) | catch up | OPERATIONAL (NSE network sync, server-up only) |
+
+Note: data_quality 2026-06-04 still shows 50 (the historical capped day) — harmless; the *latest* date is fully restored at 2,330, which is what proves the napi fix.
+
+---
+
+## Per-Requirement Acceptance Table (refreshed)
+
+| # | Requirement | Verdict | Basis (round-2) |
 |---|---|---|---|
-| 1 | Audit complete pipeline ops | **MET** | AUDIT-1..4 cover all 17 stages, both schedulers, ledger health, DB completeness. Thorough and accurate vs. DB. |
-| 2 | Pipeline loads ALL data properly | **PARTIAL** | Code now persists full universe (DQ napi crash fixed; persist-always wired). But DB coverage on latest date is unchanged (70–79%); needs a live run to prove. |
-| 3 | Check/fix pipelines that fail with error | **MET (code)** | Root causes fixed: DQ napi BigInt-volume crash (float8 cast + ≤50 chunk), connection-pool exhaustion (concurrency throttled to 4), stale-RUNNING leaks (reaper; 0 stale rows now). |
-| 4 | Incremental load PERSISTS every load | **MET (code)** | SIGNAL_QUALITY now passes `persistOutcomes:true`; per-stock stages upsert every run; idempotency keys prevent dup terminal exec. Verified in code + P4 audit. |
-| 5 | EVERY pipeline persists data | **MET (code)** | Ledger-coverage gaps closed: MARKET_PULSE_REFRESH, STOCK_INTEREST_REFRESH, WORKBENCH_REFRESH, MARKET_SCAN_REFRESH now ledger-tracked scheduled stages. Position-ledger PATH B added. |
-| 6 | Screens load persisted data only, no calc at render | **PARTIAL** | The GET-triggers-generation violations are removed (market-context `summary()` no longer calls `run()`); workbench/scans/research-overview/instrument-RS now read snapshots. Residual: portfolio-intelligence is lazy-materialize (first GET after a change still computes once). |
-| 7 | Slow screens fixed | **MET (code)** | All 10 AUDIT-3 offenders have a persisted snapshot path (workbench, peers, movers/market-map, 52w/delivery/volume scans, screener, signals strategy-match, research overview, instrument RS). |
-| 8 | Daily = INCREMENTAL not full-universe | **MET** | MarketDataFoundationScheduler hands `changedInstrumentIds` delta downstream; per-stock stages consume delta only. Market-wide aggregates (regime/breadth/sector/pulse) are one snapshot from persisted prices — legitimate, not a violation (P4). |
-| 9 | Full-universe = manual admin trigger only | **MET** | Historical backfill + `PIPELINE_RUN_ALL` full mode are manual-command/REST only; not on any scheduled path. CATALOG_SYNC / price backfill FORBIDDEN in policy. |
-| 10 | Market-data is the ONLY external-comms module; others read persisted + own incremental-persist pipeline | **MET (with noted ingestion adapters)** | Every intelligence module reads persisted market data and persists its own outputs. FII/DII, bulk/block, F&O-ban are classified ingestion adapters on the market-data boundary (correct). Earnings reads DB-only. |
+| 1 | Audit complete pipeline ops | **MET** | AUDIT-1..4 unchanged; accurate vs. DB. |
+| 2 | Pipeline loads ALL data properly | **MET (code) / operational catch-up** | DQ latest-date restored 50→2,330 on DB proves the persist/napi fix works at scale. Full signal_results + delivery catch-up needs one live run — expected operational, not a defect. |
+| 3 | Check/fix pipelines that fail with error | **MET** | DQ napi crash fixed (float8 cast, ≤50 chunk), pool throttle to 4, stale-RUNNING reaper (0 rows). Verified on DB. |
+| 4 | Incremental load PERSISTS every load | **MET (code)** | persist-always + idempotency keys; ledger 39→659 demonstrates PATH-B persistence now fires. |
+| 5 | EVERY pipeline persists data | **MET (code)** | Ledger-coverage stages wired; snapshot tables now non-trivially populated (scan 495, workbench 205, ledger 659). |
+| 6 | Screens load persisted data only | **PARTIAL** | GET-triggers-run violations removed; snapshot reads in place. Residual: portfolio-intelligence lazy-materialize (computes-then-persists on first GET after a holdings change) — and notably its *test coverage is the uncommitted file*. |
+| 7 | Slow screens fixed | **MET (code)** | All 10 offenders have a snapshot path. |
+| 8 | Daily = INCREMENTAL | **MET** | changedInstrumentIds delta downstream; market-wide aggregates one snapshot from persisted prices. |
+| 9 | Full-universe = manual admin only | **MET** | Backfill/PIPELINE_RUN_ALL manual-only; not on scheduled paths. |
+| 10 | Market-data sole external-comms; others read persisted + own incremental-persist | **MET** | Intelligence modules read persisted + persist own outputs; FII/DII/bulk-block/F&O-ban are market-data-boundary ingestion adapters. |
 
-**Tally:** 8 MET (3 of those "MET in code, pending live run to fully populate") · 2 PARTIAL · 0 NOT-MET.
-
----
-
-## What was verified directly (evidence)
-
-**Durable fixes already applied to the live DB (not just code):**
-- smart_money_context_snapshots: **0 duplicate (date,instrument,range) pairs** (was 34,166); total 105,360; the 3-col UNIQUE index now exists (migration 202606060001). Broken upsert is genuinely fixed and the corpus is deduped.
-- Stale RUNNING rows: **0** in both `pipeline_runs` and `pipeline_stage_runs` (was 19 + 16). One-time reaper cleanup ran; periodic reaper (30 min) + startup reaper wired in `server.ts`.
-- 5 migrations present: smart-money unique, workbench, market-scan, research-overview, portfolio-intelligence snapshots.
-
-**Code fixes confirmed by reading the source:**
-- `market-context-intelligence.service.ts` `summary()` — pure persisted-read; no `this.run()` fallback anywhere in the service. (FIX-A)
-- DQ napi crash — new `listPriceWindowsForSymbolChunk` raw query casts `volume AS float8` + OHLC `::float8`, chunked ≤50, fixing the IDEA/GTLINFRA BigInt overflow that capped DQ at ~50 stocks. (FIX-D)
-- Pool throttle — `DATA_QUALITY` concurrency clamped to 4 (under connection_limit=10). (FIX-F)
-- Scheduled chain `SCHEDULED_DOWNSTREAM_STAGE_KEYS` now ends with MARKET_PULSE_REFRESH → STOCK_INTEREST_REFRESH → WORKBENCH_REFRESH → MARKET_SCAN_REFRESH (chain ownership consolidated; eod-ingest scheduler no longer double-fires pulse/research-hub). (FIX-E/G/H/I)
-- Screen reads: workbench `getWorkbench()` reads `workbench_snapshots.payloadJson`; market-data movers/scans read `market_scan_snapshots`; research-hub reads `research_overview_snapshots`. (FIX-H/I/J)
-
-**Current DB coverage on latest date (unchanged from audit — proves NOT yet repopulated):**
-- signal_results 2026-06-06: **2,044** / 2,937 (70%)
-- data_quality_snapshots 2026-06-05: **2,330** (79%)
-- smart_money 2026-06-05: **2,324** (79%)
-- earnings 2026-06-05: **2,267** (77%)
-- New snapshot tables: workbench **3**, portfolio-intelligence **1**, research-overview **1**, market-scan **495** (seeded 06-05 only).
-- market_delivery_snapshots still stuck at **2026-06-01** (4-day gap persists → MARKET_PULSE stays PARTIAL until delivery+index ingestion catches up).
+**Tally:** 8 MET (Req 2 now MET-on-evidence for the no-network portion) · 2 PARTIAL (6, and 2's live catch-up) · 0 NOT-MET. **One open repo-hygiene blocker (uncommitted tests) gates the verdict.**
 
 ---
 
-## Findings (numbered, tagged)
+## Findings (round-2)
 
-1. **[BLOCKER] Repopulate the universe via one live daily run + a manual historical backfill, then re-verify coverage.**
-   The fixes are inert until executed. Required to close: run the scheduled chain on a live server for one trading day and confirm latest-date coverage ≈ universe for signal_results / data_quality / smart_money / earnings; run WORKBENCH_REFRESH + MARKET_SCAN_REFRESH so workbench_snapshots / market_scan_snapshots reach universe scale (currently 3 / 495). Backfill the historical gaps via the manual admin path: signal_results (8 of 12 trading days missing in last 14d), market_delivery (06-02..06-05), NSE_INDEX prices (stale at 06-01). Until observed, Req 2 stays PARTIAL.
+1. **[BLOCKER] Commit the two remaining test files.** `portfolio-intelligence.service.test.ts` (+92 lines, `staleness guard` suite) and `portfolio-intelligence-market-posture.test.ts`. They test the committed `findComputedAt` staleness guard; without them a clean checkout has the prod behavior untested. This is round-1 blocker #2 still open. Commit, then run the backend suite once green from a clean tree and confirm the count. One command — flips this to APPROVE.
 
-2. **[BLOCKER] Commit the 9 uncommitted test files.** They are test-only (no production source uncommitted), but the "565/566 green" / "408/409 green" claims in the P-1/P-2 commit messages are not reproducible from a clean checkout while these sit in the working tree. Commit them and run the suite once green from clean.
+2. **[SHOULD] Workbench full-universe populate appears to have stopped at 205.** Up from 3 (good — proves the path works at scale), but flat at 205 distinct instruments with the last write at 13:12 (now 13:20) and no movement over a minute of polling, while a ~576 MB node process lingers. Confirm whether the manual full-universe populate finished early/errored or needs a re-kick; workbench should reach universe scale via the manual WORKBENCH_REFRESH. Not a code defect — the snapshot read/write path is proven.
 
-3. **[SHOULD] Verify signal_position_ledger actually fills on the next run.** PATH B (persist ENTRY/ACTIVE BULLISH from persisted state, ~658 expected) is in code, but the table is still **39 rows**. This is a portfolio-facing surface; a trader will distrust a near-empty active-positions ledger. Confirm post-run count.
+3. **[SHOULD] portfolio-intelligence remains lazy-materialize** (Req 6 soft exception). Reads persisted data only (bounded latency), acceptable for v1; prefer refresh-on-mutation or in the daily chain. Flagged, not blocking.
 
-4. **[SHOULD] Resolve the persistent PARTIAL stages so they aren't a permanent yellow.** RAW_SIGNALS (~289 skipped/run), EARNINGS (130 PARTIAL — most stocks legitimately have no upcoming earnings), MARKET_PULSE (PARTIAL while delivery/index sources are stale), SECTOR_INTELLIGENCE (never COMPLETED). For the legitimately-partial ones (earnings no-event, signals DQ-excluded), use SKIPPED semantics so PARTIAL means a real problem; for MARKET_PULSE, the fix is upstream delivery/index freshness (Finding 1).
+4. **[NICE] residual PARTIAL stages** (RAW_SIGNALS, EARNINGS no-event, MARKET_PULSE while delivery stale, SECTOR_INTELLIGENCE) — prefer SKIPPED semantics for the legitimately-empty ones so PARTIAL means a real problem. MARKET_PULSE clears once delivery/index freshness catches up (operational).
 
-5. **[SHOULD] portfolio-intelligence is lazy-materialize, not pre-computed.** The first GET after a holdings change computes-then-persists at render (`getIntelligence` → `refreshPortfolioIntelligence`). It reads persisted data only (no external/price-history fan-out) so the latency is bounded, but it is a soft exception to "no calc at render" (Req 6). Acceptable for v1; prefer a refresh on portfolio mutation or in the daily chain. Flagged, not blocking.
+5. **[NICE]** `.env MARKET_DATA_SCHEDULER_INTERVAL_MINUTES=15` is dead config (clamped to 1440); unauthenticated historical-backfill REST endpoints (manual-only) — both pre-existing, out of scope.
 
-6. **[NICE] `.env MARKET_DATA_SCHEDULER_INTERVAL_MINUTES=15` is dead config** (clamped to 1440). Harmless but misleading — set it to 1440 or document the clamp.
+---
 
-7. **[NICE] Historical-backfill REST endpoints are unauthenticated.** Pre-existing; still manual-only (explicit date params). Out of scope for this initiative but worth an auth guard given it's the full-universe trigger.
+## Operational follow-up for the owner (do after the APPROVE blocker is closed — NOT gating)
+
+These are the legitimately server-up / network-dependent steps; they are expected operational catch-up, not code work:
+
+1. **Start the backend/scheduler server** and let the scheduled daily chain run once for a trading day. Confirm latest-date coverage ≈ universe for `signal_results` (currently 2,044 → ~2,937), and that DQ/smart-money/earnings hold at ~2,330.
+2. **Run the NSE daily sync** (market-data module) to close the `market_delivery` 4-day gap (06-02..06-05) and refresh NSE_INDEX prices stale at 06-01 → clears MARKET_PULSE PARTIAL.
+3. **Re-kick / finish the manual full-universe WORKBENCH_REFRESH** so `workbench_snapshots` reaches universe scale from its current 205 (Finding 2).
+4. **Manual historical backfill** (admin path) for the missing trading days in `signal_results` over the last ~14d.
+5. After the live run, a quick browser pass on Signals / Workbench / Research-Hub / Portfolio to confirm full-coverage rendering.
 
 ---
 
 ## Trader-trust assessment
 
-Once Finding 1 lands, the day-over-day consistency story is sound: incremental delta + persist-every-run + idempotency keys + dedup + reaper remove the three things that previously made numbers wobble (duplicate smart-money rows, leaked RUNNING gates blocking re-runs, DQ silently capping at 50 stocks). The remaining trust risk a trader would actually feel **today** is purely the un-repopulated state — thin signal coverage, a 39-row position ledger, a 4-day-stale delivery/pulse — all of which are "needs a live run," not "broken logic."
+The structural fixes are proven on the live DB now, not just asserted: dedup holds at zero duplicates, the reaper keeps RUNNING at zero, the napi fix restored latest-date DQ from 50 → 2,330, and the ledger filled 39 → 659. The day-over-day consistency story (incremental delta + persist-every-run + idempotency + dedup + reaper) is sound. The only thing standing between this and a clean APPROVE is committing two test files so the green suite is reproducible — and then the owner's operational catch-up to fill the price-derived coverage that genuinely needs a live, networked server.
 
-**Bottom line:** The build is right. Run it once, prove the coverage, commit the tests — then this is an APPROVE.
+**Bottom line:** Build is right and the no-network populate is done. **Commit the two test files** (round-1 blocker, still open) → APPROVE. Everything else is operational follow-up.
