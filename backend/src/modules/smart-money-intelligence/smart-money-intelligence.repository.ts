@@ -358,25 +358,21 @@ export class SmartMoneyIntelligenceRepository {
       by: ['snapshotDate'],
       where,
       _count: { _all: true },
-      _max: { updatedAt: true },
       orderBy: { snapshotDate: 'desc' },
     });
     if (!groups.length) return null;
+    // Pick the LATEST snapshot date that has SUBSTANTIAL coverage — not the single
+    // highest-count date. The previous logic filtered to `count >= maxCount` (the
+    // absolute peak), so once any one day had the most rows ever (e.g. 28 May with
+    // 2,660) every later day with slightly lower coverage (~2,324) was skipped and
+    // the reads got permanently stuck on that old peak day. Floor = >=50% of the best
+    // recent day (and >=20 rows): a normal day with minor coverage variance is accepted,
+    // but a tiny partial/test day is still skipped. `groups` is ordered snapshotDate desc,
+    // so the first match is the latest qualifying date.
     const maxCount = Math.max(...groups.map((item: any) => Number(item._count?._all || 0)));
-    const stableGroups = groups
-      .filter((item: any) => Number(item._count?._all || 0) >= maxCount)
-      .sort((a: any, b: any) => {
-        const updatedDelta = this.timeValue(b._max?.updatedAt) - this.timeValue(a._max?.updatedAt);
-        if (updatedDelta !== 0) return updatedDelta;
-        return this.timeValue(b.snapshotDate) - this.timeValue(a.snapshotDate);
-      });
-    return stableGroups[0]?.snapshotDate ?? groups[0]?.snapshotDate ?? null;
-  }
-
-  private timeValue(value: unknown): number {
-    if (!value) return 0;
-    const date = value instanceof Date ? value : new Date(String(value));
-    return Number.isFinite(date.getTime()) ? date.getTime() : 0;
+    const floor = Math.max(20, Math.floor(maxCount * 0.5));
+    const latestSubstantial = groups.find((item: any) => Number(item._count?._all || 0) >= floor);
+    return latestSubstantial?.snapshotDate ?? groups[0]?.snapshotDate ?? null;
   }
 
   private mapSnapshotToSummary(row: any): SmartMoneyStockSummary {
