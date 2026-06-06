@@ -1,5 +1,5 @@
 import type { Request, Response } from 'express';
-import { StockResearchWorkbenchService } from './stock-research-workbench.service';
+import { StockResearchWorkbenchService, WORKBENCH_NOT_YET_COMPUTED } from './stock-research-workbench.service';
 import { normalizeResearchRange, validateInstrumentId } from './stock-research-workbench.validation';
 
 export class StockResearchWorkbenchController {
@@ -15,8 +15,12 @@ export class StockResearchWorkbenchController {
     if (validationError) return res.status(400).json({ error: validationError });
 
     try {
-      const result = await this.service.workbench(instrumentId, normalizeResearchRange(req.query.range));
+      // Persisted-read: reads workbench_snapshots; never recomputes live on GET.
+      const result = await this.service.getWorkbench(instrumentId);
       if (!result) return res.status(404).json({ error: 'Instrument not found' });
+      if ('_status' in result && result._status === WORKBENCH_NOT_YET_COMPUTED._status) {
+        return res.status(202).json(result);
+      }
       return res.json(result);
     } catch (error) {
       console.error('Stock research workbench error:', error);
@@ -48,8 +52,12 @@ export class StockResearchWorkbenchController {
 
   peers = async (req: Request, res: Response) => {
     try {
-      const result = await this.service.peers(this.instrumentId(req));
+      // Persisted-read: reads peers from workbench_snapshots; never recomputes live on GET.
+      const result = await this.service.getPersistedPeers(this.instrumentId(req));
       if (!result) return res.status(404).json({ error: 'Instrument not found' });
+      if (!Array.isArray(result) && '_status' in result && result._status === WORKBENCH_NOT_YET_COMPUTED._status) {
+        return res.status(202).json(result);
+      }
       return res.json({ peers: result });
     } catch (error) {
       console.error('Stock research peers error:', error);

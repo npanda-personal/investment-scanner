@@ -14,6 +14,7 @@ import { SmartMoneyIntelligenceService } from '../smart-money-intelligence';
 import { StrategyDecisionEngineService } from '../strategy-decision-engine';
 import { TodayTradeReviewService } from '../today-trade-review';
 import { StockInterestSnapshotService } from '../market-intelligence';
+import { WorkbenchRefreshService } from '../stock-research-workbench';
 import { PipelineOrchestrationRepository } from './pipeline-orchestration.repository';
 import type {
   PipelineCommandAvailability,
@@ -73,6 +74,7 @@ const EARNINGS_INTELLIGENCE_SCHEDULED_STAGE_VERSION = 'scheduled-earnings-intell
 const MARKET_CONTEXT_SNAPSHOT_SCHEDULED_STAGE_VERSION = 'scheduled-market-context-snapshot-v1';
 const MARKET_PULSE_SCHEDULED_STAGE_VERSION = 'scheduled-market-pulse-v1';
 const STOCK_INTEREST_SCHEDULED_STAGE_VERSION = 'scheduled-stock-interest-v1';
+const WORKBENCH_REFRESH_SCHEDULED_STAGE_VERSION = 'scheduled-workbench-refresh-v1';
 const SCHEDULED_DOWNSTREAM_STAGE_KEYS = [
   'DATA_QUALITY',
   'RAW_SIGNALS',
@@ -90,6 +92,7 @@ const SCHEDULED_DOWNSTREAM_STAGE_KEYS = [
   'SECTOR_INTELLIGENCE_REFRESH',
   'MARKET_PULSE_REFRESH',
   'STOCK_INTEREST_REFRESH',
+  'WORKBENCH_REFRESH',
 ];
 
 type ScheduledAdapterResult = {
@@ -201,7 +204,8 @@ export class PipelineOrchestrationService {
     private readonly marketDataService = new MarketDataFoundationService(),
     private readonly marketPulseService = new MarketPulseSnapshotService(),
     private readonly earningsIntelligenceService = new EarningsIntelligenceService(),
-    private readonly stockInterestService = new StockInterestSnapshotService()
+    private readonly stockInterestService = new StockInterestSnapshotService(),
+    private readonly workbenchRefreshService = new WorkbenchRefreshService()
   ) {}
 
   createRun(input: PipelineRunCreateInput): Promise<PipelineRunRecord> {
@@ -4110,6 +4114,46 @@ export class PipelineOrchestrationService {
           dataThroughDate: result.dataThroughDate,
           status: result.status,
           categories: result.categories,
+        },
+      };
+    }, now);
+
+    if (response.status === 'COMPLETED' || response.status === 'PARTIAL' || response.status === 'SKIPPED') {
+      response.downstream = await this.runScheduledWorkbenchRefreshStage({
+        ...request,
+        sourceFingerprint: response.outputFingerprint || request.sourceFingerprint,
+        upstreamStageRunId: response.stageRunId,
+      }).catch((error) => this.logScheduledDownstreamFailure('Workbench Refresh', response.stageKey, request, error));
+    }
+    return response;
+  }
+
+  async runScheduledWorkbenchRefreshStage(request: ScheduledPipelineStageRequest, now = new Date()): Promise<ScheduledPipelineStageResponse> {
+    const response = await this.runScheduledPipelineStage(request, {
+      stageKey: 'WORKBENCH_REFRESH',
+      stageOrder: 17,
+      stageSlug: 'scheduled-workbench-refresh',
+      stageVersion: WORKBENCH_REFRESH_SCHEDULED_STAGE_VERSION,
+      sourceStage: 'STOCK_INTEREST_REFRESH',
+      adapter: 'WorkbenchRefreshService.refreshWorkbenchSnapshots',
+    }, async ({ normalizedScope, changedInstrumentIds, normalizedBatchSize }) => {
+      const result = await this.workbenchRefreshService.refreshWorkbenchSnapshots({
+        instrumentIds: changedInstrumentIds,
+        region: normalizedScope.region,
+        assetType: normalizedScope.assetType,
+        batchSize: normalizedBatchSize,
+      });
+      return {
+        totalCount: result.totalCount,
+        processedCount: result.processedCount,
+        succeededCount: result.succeededCount,
+        failedCount: result.failedCount,
+        skippedCount: result.skippedCount,
+        unchangedCount: 0,
+        warnings: result.warnings,
+        errors: result.errors,
+        metadata: {
+          computedAt: result.computedAt,
         },
       };
     }, now);

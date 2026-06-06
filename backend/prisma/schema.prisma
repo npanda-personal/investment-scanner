@@ -96,6 +96,7 @@ model Stock {
   deliverySnapshots               MarketDeliverySnapshot[]
   stockInterestSnapshots          StockInterestSnapshot[]
   earningsIntelligenceSnapshots   EarningsIntelligenceSnapshot[]
+  workbenchSnapshots               WorkbenchSnapshot[]
 
   @@index([region, assetType, symbol], map: "stocks_region_assetType_symbol_idx")
   @@index([region, assetType, providerSupportStatus, isActive, isDelisted], map: "stocks_region_assetType_providerSupport_active_delisted_idx")
@@ -1436,6 +1437,23 @@ model SignalPositionLedgerEntry {
   @@index([scopeRegion, scopeAssetType, status, exitTriggerTimestamp], map: "spl_entries_scope_status_exit_idx")
   @@index([instrumentId, status], map: "spl_entries_instrument_status_idx")
   @@map("signal_position_ledger_entries")
+}
+
+model WorkbenchSnapshot {
+  id             String   @id @default(cuid())
+  instrumentId   String   @unique
+  stock          Stock    @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+  symbol         String
+  computedAt     DateTime @default(now())
+  dataThroughDate DateTime?
+  /// Full workbench payload: overview/chart/performance/fundamentals/valuation/peers/relative_strength/corporate_actions/trust/signalEvidence
+  payloadJson    Json
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([instrumentId])
+  @@index([computedAt])
+  @@map("workbench_snapshots")
 }
 
 model PipelineStageRun {

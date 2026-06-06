@@ -1,4 +1,5 @@
 import { MarketDataFoundationService } from '../market-data-foundation';
+import { WorkbenchSnapshotRepository } from './workbench-snapshot.repository';
 import type { ResearchPerformanceMetrics, ResearchPricePoint, ResearchRange, SignalEvidenceSection } from './stock-research-workbench.types';
 
 const TRADING_DAYS_PER_YEAR = 252;
@@ -46,13 +47,68 @@ export interface WorkbenchSignalReader {
 
 const DEFAULT_CALIBRATION_HORIZON = '20D';
 
+/** Sentinel payload returned when no snapshot has been computed yet for the instrument. */
+export const WORKBENCH_NOT_YET_COMPUTED = {
+  _status: 'NOT_YET_COMPUTED' as const,
+  message: 'Workbench snapshot not yet computed. Run the WORKBENCH_REFRESH pipeline stage to populate.',
+};
+
+export type WorkbenchNotYetComputed = typeof WORKBENCH_NOT_YET_COMPUTED;
+
 export class StockResearchWorkbenchService {
+  private readonly snapshotRepository: WorkbenchSnapshotRepository;
+
   constructor(
     private readonly marketDataService = new MarketDataFoundationService(),
     private readonly calibrationReader?: WorkbenchCalibrationReader | null,
     private readonly outcomeAggregateReader?: WorkbenchOutcomeAggregateReader | null,
     private readonly signalReader?: WorkbenchSignalReader | null,
-  ) {}
+    snapshotRepository?: WorkbenchSnapshotRepository,
+  ) {
+    this.snapshotRepository = snapshotRepository ?? new WorkbenchSnapshotRepository();
+  }
+
+  /**
+   * PERSISTED-READ entry point for GET /workbench.
+   *
+   * Reads workbench_snapshots for the instrument. Returns the persisted payload
+   * (preserving the DTO shape the FE expects) or a NOT_YET_COMPUTED sentinel when
+   * the pipeline has not run yet for this instrument.
+   *
+   * NEVER recomputes live on a GET.
+   */
+  async getWorkbench(instrumentId: string): Promise<Record<string, unknown> | WorkbenchNotYetComputed | null> {
+    const snapshot = await this.snapshotRepository.findByInstrumentId(instrumentId);
+    if (!snapshot) {
+      return WORKBENCH_NOT_YET_COMPUTED;
+    }
+    // Return the stored payload directly — shape is the same as workbench() output.
+    const payload = snapshot.payloadJson as Record<string, unknown>;
+    // Attach snapshot metadata so callers can inspect freshness.
+    return {
+      ...payload,
+      _snapshot: {
+        computedAt: snapshot.computedAt.toISOString(),
+        dataThroughDate: snapshot.dataThroughDate?.toISOString() ?? null,
+        instrumentId: snapshot.instrumentId,
+      },
+    };
+  }
+
+  /**
+   * PERSISTED-READ entry point for GET /peers.
+   *
+   * Reads workbench_snapshots and returns just the peers array.
+   * Returns NOT_YET_COMPUTED sentinel if no snapshot exists.
+   */
+  async getPersistedPeers(instrumentId: string): Promise<Array<Record<string, unknown>> | WorkbenchNotYetComputed | null> {
+    const snapshot = await this.snapshotRepository.findByInstrumentId(instrumentId);
+    if (!snapshot) {
+      return WORKBENCH_NOT_YET_COMPUTED;
+    }
+    const payload = snapshot.payloadJson as Record<string, unknown>;
+    return (payload.peers as Array<Record<string, unknown>>) ?? [];
+  }
 
   /**
    * Lazily resolve calibration reader from SignalCalibrationEngineRepository.

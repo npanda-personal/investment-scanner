@@ -5,7 +5,9 @@ export {
   stockResearchWorkbenchRouter as stockResearchWorkbenchRouterInstance,
 } from './stock-research-workbench.router';
 export { StockResearchWorkbenchController } from './stock-research-workbench.controller';
-export { StockResearchWorkbenchService } from './stock-research-workbench.service';
+export { StockResearchWorkbenchService, WORKBENCH_NOT_YET_COMPUTED } from './stock-research-workbench.service';
+export { WorkbenchRefreshService } from './workbench-refresh.service';
+export { WorkbenchSnapshotRepository } from './workbench-snapshot.repository';
 export {
   normalizeResearchRange,
   RESEARCH_RANGES,

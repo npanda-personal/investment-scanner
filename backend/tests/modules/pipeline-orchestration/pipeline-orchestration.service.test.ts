@@ -3397,7 +3397,8 @@ describe('PipelineOrchestrationService', () => {
       {} as any,
       { refreshSnapshot: marketPulseRefresh } as any,
       { refreshSnapshots: earningsRefresh } as any,
-      { refreshSnapshots: stockInterestRefresh } as any
+      { refreshSnapshots: stockInterestRefresh } as any,
+      { refreshWorkbenchSnapshots: jest.fn().mockResolvedValue({ totalCount: 0, processedCount: 0, succeededCount: 0, failedCount: 0, skippedCount: 0, warnings: [], errors: [] }) } as any
     );
 
     const response = await service.runScheduledDataQualityStage({
@@ -3439,6 +3440,7 @@ describe('PipelineOrchestrationService', () => {
       'SECTOR_INTELLIGENCE_REFRESH',
       'MARKET_PULSE_REFRESH',
       'STOCK_INTEREST_REFRESH',
+      'WORKBENCH_REFRESH',
     ]);
     expect(evaluateScheduledStage).toHaveBeenCalledTimes(1);
     expect(signalRun).toHaveBeenCalledTimes(1);
