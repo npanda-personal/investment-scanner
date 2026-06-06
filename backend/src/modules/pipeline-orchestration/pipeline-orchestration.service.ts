@@ -4225,16 +4225,25 @@ export class PipelineOrchestrationService {
         assetType: normalizedScope.assetType,
         timeframe: normalizedScope.timeframe,
       });
-      const succeeded = snapshot.status === 'FRESH';
+      // The snapshot IS computed + persisted regardless of status. A non-FRESH status (STALE/
+      // PARTIAL) reflects stale UNDERLYING data (e.g. the delivery/index gap) — that is an honest
+      // data-quality signal carried as a WARNING + the snapshot's own status, NOT a stage failure.
+      // Treating it as FAILED previously both mis-reported the stage and blocked the downstream
+      // STOCK_INTEREST stage.
+      const isFresh = snapshot.status === 'FRESH';
+      const snapshotWarnings = Array.isArray(snapshot.warningsJson) ? snapshot.warningsJson : [];
       return {
         totalCount: 1,
         processedCount: 1,
-        succeededCount: succeeded ? 1 : 0,
-        failedCount: succeeded ? 0 : 1,
+        succeededCount: 1,
+        failedCount: 0,
+        partialCount: isFresh ? 0 : 1,
         skippedCount: 0,
         unchangedCount: 0,
-        warnings: Array.isArray(snapshot.warningsJson) ? snapshot.warningsJson : [],
-        errors: succeeded ? [] : ['Market Pulse snapshot did not report FRESH status.'],
+        warnings: isFresh
+          ? snapshotWarnings
+          : [...snapshotWarnings, `Market Pulse snapshot status is ${snapshot.status} (underlying market data not fully fresh).`],
+        errors: [],
         metadata: {
           snapshotId: snapshot.id,
           snapshotStatus: snapshot.status,
@@ -4245,13 +4254,13 @@ export class PipelineOrchestrationService {
       };
     }, now);
 
-    if (response.status === 'COMPLETED' || response.status === 'PARTIAL' || response.status === 'SKIPPED') {
-      response.downstream = await this.runScheduledStockInterestStage({
-        ...request,
-        sourceFingerprint: response.outputFingerprint || request.sourceFingerprint,
-        upstreamStageRunId: response.stageRunId,
-      }).catch((error) => this.logScheduledDownstreamFailure('Stock Interest', response.stageKey, request, error));
-    }
+    // STOCK_INTEREST is INDEPENDENT of Market Pulse (chained here only for ordering) — always
+    // run it, even if Market Pulse degraded/failed, so a pulse issue never silently skips it.
+    response.downstream = await this.runScheduledStockInterestStage({
+      ...request,
+      sourceFingerprint: response.outputFingerprint || request.sourceFingerprint,
+      upstreamStageRunId: response.stageRunId,
+    }).catch((error) => this.logScheduledDownstreamFailure('Stock Interest', response.stageKey, request, error));
     return response;
   }
 
