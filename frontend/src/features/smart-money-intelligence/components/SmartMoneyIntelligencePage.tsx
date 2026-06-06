@@ -175,8 +175,8 @@ export default function SmartMoneyIntelligencePage() {
         primaryAction={<Button variant="contained" onClick={handleRun} disabled={refreshingSnapshots}>{refreshingSnapshots ? 'Refreshing...' : 'Refresh Snapshots'}</Button>}
       />
 
-      <Alert severity="warning" sx={{ mb: 2 }}>
-        Insider and institutional ownership data is unavailable. Scores reflect price-volume accumulation and distribution patterns only — they do not represent real smart-money flows or actual ownership changes.
+      <Alert severity="info" sx={{ mb: 2 }}>
+        Scores are based on price-volume accumulation and distribution patterns only. NSE/BSE free data does not include institutional-ownership filings or insider-transaction disclosures, so the analysis cannot confirm actual smart-money positioning — use it as a directional screening tool alongside your own research.
       </Alert>
 
       <FilterBar onReset={() => { setSector(''); setRange('3M'); }}>
@@ -231,7 +231,10 @@ export default function SmartMoneyIntelligencePage() {
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1.2fr 0.8fr' }, gap: 3, mt: 3 }}>
         <Stack spacing={3}>
           <Box>
-            <Typography variant="h6" sx={{ mb: 1 }}>Top Accumulation Candidates</Typography>
+            <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+              <Typography variant="h6">Top Accumulation Candidates</Typography>
+              <StalenessBadge asOf={top[0]?.dataThroughDate ?? top[0]?.snapshotDate} label="Accumulation data" />
+            </Stack>
             <DataTable
               columns={columns}
               rows={top}
@@ -247,7 +250,10 @@ export default function SmartMoneyIntelligencePage() {
             />
           </Box>
           <Box>
-            <Typography variant="h6" sx={{ mb: 1 }}>Top Distribution Warnings</Typography>
+            <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+              <Typography variant="h6">Top Distribution Warnings</Typography>
+              <StalenessBadge asOf={distribution[0]?.dataThroughDate ?? distribution[0]?.snapshotDate} label="Distribution data" />
+            </Stack>
             <DataTable
               columns={columns}
               rows={distribution}
@@ -273,7 +279,7 @@ export default function SmartMoneyIntelligencePage() {
               <Chip size="small" label={health?.dataStatus || 'PARTIAL'} color="warning" />
             </Stack>
             <Typography color="text.secondary" sx={{ mb: 1 }}>
-              This MVP uses persisted price and volume from Market Data Foundation. Insider and institutional ownership are explicit placeholders unless a free provider is configured.
+              Analysis is based on persisted NSE/BSE price and volume data. Institutional-ownership filings and insider-transaction records are not available from free NSE/BSE data feeds, so this module reflects price-volume patterns only.
             </Typography>
             <Stack spacing={0.5}>
               {(health?.notes || []).map((note) => <Typography key={note} variant="body2" color="text.secondary">{note}</Typography>)}
@@ -286,9 +292,21 @@ export default function SmartMoneyIntelligencePage() {
 }
 
 function SectorView({ sectors }: { sectors: SectorSmartMoneySummary[] }) {
+  // Use the earliest updatedAt across sectors — if any sector is stale, the view is stale.
+  const sectorAsOf = sectors.length > 0
+    ? sectors.reduce<string | null>((oldest, s) => {
+        if (!s.updatedAt) return oldest;
+        if (!oldest) return s.updatedAt;
+        return s.updatedAt < oldest ? s.updatedAt : oldest;
+      }, null)
+    : null;
+
   return (
     <Paper sx={{ p: 2 }}>
-      <Typography variant="h6" sx={{ mb: 1 }}>Sector Smart Money View</Typography>
+      <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+        <Typography variant="h6">Sector Smart Money View</Typography>
+        <StalenessBadge asOf={sectorAsOf} label="Sector data" />
+      </Stack>
       {sectors.length === 0 ? <Typography color="text.secondary">No sector data available.</Typography> : (
         <Box sx={{ overflowX: 'auto' }}>
           <Table size="small">
@@ -338,11 +356,16 @@ function StockDetail({ stock, loading }: { stock: SmartMoneyStockSummary | null;
     );
   }
 
+  const stockAsOf = stock.dataThroughDate ?? stock.snapshotDate ?? null;
+
   return (
     <Paper sx={{ p: 2 }}>
       <Stack direction="row" justifyContent="space-between" gap={2} sx={{ mb: 1 }}>
         <Box>
-          <Typography variant="h6">{stock.symbol}</Typography>
+          <Stack direction="row" spacing={1} alignItems="center">
+            <Typography variant="h6">{stock.symbol}</Typography>
+            <StalenessBadge asOf={stockAsOf} label="Snapshot" />
+          </Stack>
           <Typography color="text.secondary">{stock.companyName || 'Unknown company'}</Typography>
         </Box>
         <Stack alignItems="flex-end">
@@ -373,10 +396,14 @@ function StockDetail({ stock, loading }: { stock: SmartMoneyStockSummary | null;
       )}
       <Divider sx={{ my: 2 }} />
       <Stack direction="row" justifyContent="space-between" alignItems="center">
-        <Typography variant="subtitle2">Insider / Ownership</Typography>
+        <Typography variant="subtitle2">Ownership Data</Typography>
         <Button size="small" component={Link} to={stock.researchUrl}>Open Research</Button>
       </Stack>
-      <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>{stock.insiderOwnership.explanation}</Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+        {stock.insiderOwnership.ownershipDataStatus === 'MISSING'
+          ? 'Institutional-ownership filings and insider-transaction data are not available from free NSE/BSE feeds. This analysis is based on price and volume patterns only.'
+          : stock.insiderOwnership.explanation}
+      </Typography>
     </Paper>
   );
 }

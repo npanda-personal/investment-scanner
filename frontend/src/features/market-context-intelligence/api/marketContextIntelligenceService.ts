@@ -111,3 +111,62 @@ export async function fetchBulkBlockDeals(params: { days?: number } = {}): Promi
   const response = await axios.get<BulkBlockDealsResponse>(`${API_BASE}/bulk-block-deals`, { params });
   return response.data;
 }
+
+// ---------------------------------------------------------------------------
+// CB-25: Institutional Activity aggregate
+// ---------------------------------------------------------------------------
+
+export interface InstitutionalActivityFiiDiiSection {
+  status: 'ready' | 'missing' | 'error';
+  asOf: string | null;
+  fiiNetCr: number | null;
+  diiNetCr: number | null;
+  fiiNetPositive: boolean | null;
+  diiNetPositive: boolean | null;
+  narrative: string;
+}
+
+export interface InstitutionalActivityDealHighlight {
+  symbol: string;
+  clientName: string;
+  buySell: 'BUY' | 'SELL';
+  dealType: 'BULK' | 'BLOCK';
+  notionalCr: number;
+}
+
+export interface InstitutionalActivityDealsSection {
+  status: 'ready' | 'missing' | 'error';
+  asOf: string | null;
+  totalDeals: number;
+  buyCount: number;
+  sellCount: number;
+  highlights: InstitutionalActivityDealHighlight[];
+}
+
+export interface InstitutionalActivityFnoBanSection {
+  status: 'ready' | 'missing' | 'error';
+  banDate: string | null;
+  count: number;
+  symbols: string[];
+}
+
+export interface InstitutionalActivitySectorsSection {
+  status: 'ready' | 'missing' | 'error';
+  asOf: string | null;
+  topAccumulating: Array<{ sector: string; sectorStatus: string }>;
+  topDistributing: Array<{ sector: string; sectorStatus: string }>;
+}
+
+export interface InstitutionalActivityResponse {
+  assembledAt: string;
+  narrative: string;
+  fiiDii: InstitutionalActivityFiiDiiSection;
+  deals: InstitutionalActivityDealsSection;
+  fnoBan: InstitutionalActivityFnoBanSection;
+  sectors: InstitutionalActivitySectorsSection;
+}
+
+export async function fetchInstitutionalActivity(): Promise<InstitutionalActivityResponse> {
+  const response = await axios.get<InstitutionalActivityResponse>(`${API_BASE}/institutional-activity`);
+  return response.data;
+}

@@ -361,8 +361,8 @@ function ExclusionExplainabilityPanel({ run }: { run: TodayReviewRun }) {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {examples.map((example: any, exampleIndex: number) => (
-                    <TableRow key={`${example.instrumentId}:${example.primaryReasonCode}:${exampleIndex}`}>
+                  {examples.map((example: any) => (
+                    <TableRow key={`${example.instrumentId}:${example.primaryReasonCode}`}>
                       <TableCell>
                         <Typography fontWeight={700}>{example.symbol}</Typography>
                         <Typography variant="caption" color="text.secondary">{example.companyName || example.instrumentId}</Typography>
@@ -578,6 +578,7 @@ function CandidateTable({ candidates, run }: { candidates: TodayReviewCandidate[
             </Link>
           </Tooltip>
           <EarningsProximityChip earningsProximity={candidate.earningsProximity} />
+          <RangePositionIndicator candidate={candidate} />
         </Stack>
       ),
     },
@@ -1057,6 +1058,54 @@ function EarningsProximityChip({ earningsProximity }: { earningsProximity?: Toda
           '& .MuiChip-label': { px: 0.75 },
         }}
       />
+    </Tooltip>
+  );
+}
+
+/**
+ * NR-85: Reads 52-week range position from the persisted priceBehaviour snapshot
+ * (lite path: price52wHigh/Low/PositionPct stored at run time from OHLCV history).
+ * Returns null when data is absent (strategy-backed candidates or legacy runs).
+ */
+function range52wFromCandidate(candidate: TodayReviewCandidate): { positionPct: number; high: number; low: number; current: number } | null {
+  const signal = candidate.sourceSignalSnapshot as any;
+  const pb = signal?.priceBehaviour;
+  if (!pb) return null;
+  const positionPct = typeof pb.price52wPositionPct === 'number' ? pb.price52wPositionPct : null;
+  const high = typeof pb.price52wHigh === 'number' ? pb.price52wHigh : null;
+  const low = typeof pb.price52wLow === 'number' ? pb.price52wLow : null;
+  const current = typeof pb.price52wCurrentClose === 'number' ? pb.price52wCurrentClose : null;
+  if (positionPct === null || high === null || low === null || current === null) return null;
+  return { positionPct, high, low, current };
+}
+
+/**
+ * NR-85: Small inline 52-week range position indicator shown below the symbol.
+ * Shows "X% of 52w range" as a percentage text + mini progress bar.
+ * Renders "—" when 52w data is absent (strategy path or legacy runs).
+ */
+function RangePositionIndicator({ candidate }: { candidate: TodayReviewCandidate }) {
+  const range = range52wFromCandidate(candidate);
+  if (!range) {
+    return (
+      <Typography component="span" variant="caption" color="text.disabled" sx={{ fontSize: 10, lineHeight: 1 }}>
+        52w —
+      </Typography>
+    );
+  }
+  const pct = Math.max(0, Math.min(100, range.positionPct));
+  const barColor = pct >= 70 ? '#2e7d32' : pct >= 35 ? '#ed6c02' : '#d32f2f';
+  const tooltipText = `52w range: low ${range.low.toFixed(2)} – high ${range.high.toFixed(2)} · current ${range.current.toFixed(2)} · ${pct.toFixed(1)}% above 52w low`;
+  return (
+    <Tooltip title={tooltipText} arrow enterDelay={200}>
+      <Box sx={{ width: 110, userSelect: 'none' }}>
+        <Typography component="span" variant="caption" color="text.secondary" sx={{ fontSize: 10, lineHeight: 1, display: 'block' }}>
+          {pct.toFixed(1)}% of 52w range
+        </Typography>
+        <Box sx={{ height: 3, borderRadius: 1.5, bgcolor: 'action.disabledBackground', mt: 0.25, position: 'relative', overflow: 'hidden' }}>
+          <Box sx={{ position: 'absolute', left: 0, top: 0, height: '100%', width: `${pct}%`, bgcolor: barColor, borderRadius: 1.5, transition: 'width 0.2s' }} />
+        </Box>
+      </Box>
     </Tooltip>
   );
 }

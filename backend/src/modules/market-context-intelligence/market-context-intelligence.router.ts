@@ -24,6 +24,8 @@ export const createMarketContextIntelligenceRouter = (
   // CB-22: Bulk & Block Deals
   router.get('/market-context/bulk-block-deals', controller.bulkBlockDeals);
   router.post('/market-context/bulk-block-deals/ingest', controller.bulkBlockDealsIngest);
+  // CB-25: Institutional Activity aggregate
+  router.get('/market-context/institutional-activity', controller.institutionalActivity);
   return router;
 };
 

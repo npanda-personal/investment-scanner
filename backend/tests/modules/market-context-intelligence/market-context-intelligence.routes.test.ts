@@ -24,6 +24,7 @@ describe('market context routes', () => {
       fiiDiiIngest: jest.fn(),
       bulkBlockDeals: jest.fn(),
       bulkBlockDealsIngest: jest.fn(),
+      institutionalActivity: jest.fn(),
     } as any);
     const routes = router.stack.filter((layer: any) => layer.route).map((layer: any) => `${Object.keys(layer.route.methods)[0].toUpperCase()} ${layer.route.path}`);
 
@@ -45,6 +46,7 @@ describe('market context routes', () => {
       'POST /market-context/fii-dii/ingest',
       'GET /market-context/bulk-block-deals',
       'POST /market-context/bulk-block-deals/ingest',
+      'GET /market-context/institutional-activity',
     ]);
   });
 

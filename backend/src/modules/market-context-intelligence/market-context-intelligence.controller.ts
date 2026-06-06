@@ -4,6 +4,7 @@ import { MarketPulseSnapshotService } from './market-pulse-snapshot.service';
 import { CapitalPostureService } from './capital-posture.service';
 import { ingestFiiDii, getLatestFiiDiiActivity } from './fii-dii.service';
 import { ingestBulkBlockDeals, getLatestBulkBlockDeals } from './bulk-block-deals.service';
+import { getInstitutionalActivity } from './institutional-activity.service';
 
 export class MarketContextIntelligenceController {
   constructor(
@@ -131,6 +132,17 @@ export class MarketContextIntelligenceController {
 
   bulkBlockDealsIngest = async (_req: Request, res: Response) =>
     this.respond(res, () => ingestBulkBlockDeals());
+
+  /**
+   * CB-25: Institutional Activity Aggregate
+   * GET /market-context/institutional-activity
+   * Composes FII/DII + bulk/block deals + F&O ban + smart-money sectors
+   * into a single persisted-read summary DTO.
+   */
+  institutionalActivity = async (_req: Request, res: Response) => {
+    res.setHeader('Cache-Control', 'no-store');
+    return this.respond(res, () => getInstitutionalActivity());
+  };
 
   regime = async (req: Request, res: Response) => this.respond(res, () => this.service.regime(this.region(req)));
   sectors = async (req: Request, res: Response) => this.respond(res, () => this.service.sectors(this.region(req)));

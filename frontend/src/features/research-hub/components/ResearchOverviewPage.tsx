@@ -39,7 +39,7 @@ import { humanizeCode } from '@/shared/format/enumLabels';
 import { useResearchOverview } from '../hooks/useResearchOverview';
 import { PageHeader } from '@/shared/components';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
-import type { ActionabilityDimension, ActionabilityStatus, ResearchOverview, NextAction, ResearchPriorityCandidate } from '../api/researchHubApi';
+import type { ActionabilityDimension, ActionabilityStatus, ResearchOverview, NextAction, ResearchPriorityCandidate, ResearchWhatChangedDelta } from '../api/researchHubApi';
 import { ResearchDrilldownTabs } from './ResearchDrilldownTabs';
 
 const ResearchOverviewPage: React.FC = () => {
@@ -96,7 +96,10 @@ const ResearchOverviewPage: React.FC = () => {
     },
     whatChanged = {
       newTradeCandidates: [],
+      droppedCandidates: [],
       downgradedCandidates: [],
+      upgradedCandidates: [],
+      demotedCandidates: [],
       marketGateChange: null,
       warnings: []
     },
@@ -591,6 +594,24 @@ const ProofMetric: React.FC<{ label: string; value: number }> = ({ label, value 
   </Box>
 );
 
+const DeltaChip: React.FC<{ delta: ResearchWhatChangedDelta }> = ({ delta }) => {
+  const sign = delta.scoreDelta > 0 ? '+' : '';
+  const color = delta.scoreDelta > 0 ? 'success' : delta.scoreDelta < 0 ? 'error' : 'default';
+  const readinessLabel = delta.readinessChange !== 'UNCHANGED' ? ` (${delta.readinessChange.toLowerCase()})` : '';
+  return (
+    <Chip
+      key={delta.symbol}
+      size="small"
+      label={`${delta.symbol} ${sign}${delta.scoreDelta}${readinessLabel}`}
+      color={color as any}
+      variant="outlined"
+      component={Link}
+      to={`/stocks/${delta.symbol}`}
+      sx={{ cursor: 'pointer', fontWeight: 700 }}
+    />
+  );
+};
+
 const WhatChangedPanel: React.FC<{
   whatChanged: ResearchOverview['whatChanged'];
   generatedAt?: string;
@@ -602,6 +623,15 @@ const WhatChangedPanel: React.FC<{
   const hasNoPriorSnapshot = (whatChanged?.warnings || []).some(
     (w) => typeof w === 'string' && w.toLowerCase().includes('no prior snapshot')
   );
+
+  const droppedCandidates = whatChanged?.droppedCandidates || [];
+  const upgradedCandidates = whatChanged?.upgradedCandidates || [];
+  const demotedCandidates = whatChanged?.demotedCandidates || [];
+  const hasAnyChange =
+    (whatChanged?.newTradeCandidates?.length || 0) > 0 ||
+    droppedCandidates.length > 0 ||
+    upgradedCandidates.length > 0 ||
+    demotedCandidates.length > 0;
 
   return (
     <Card variant="outlined" sx={{ bgcolor: 'background.paper' }}>
@@ -624,45 +654,94 @@ const WhatChangedPanel: React.FC<{
           </Stack>
         )}
 
-        {(whatChanged?.newTradeCandidates?.length || 0) > 0 ? (
-          <Box>
-            <Typography variant="caption" fontWeight={700} color="primary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
-              <FlashOnOutlined fontSize="inherit" /> NEW REVIEW CANDIDATES
+        {hasNoPriorSnapshot ? (
+          <Stack spacing={1}>
+            <Typography variant="body2" color="text.secondary">
+              No prior snapshot — a second pipeline run is needed to compute the diff.
             </Typography>
-            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-              {whatChanged.newTradeCandidates.map(symbol => (
-                <Chip key={symbol} label={symbol} size="small" component={Link} to={`/stocks/${symbol}`} sx={{ cursor: 'pointer' }} />
-              ))}
-            </Stack>
-          </Box>
+            <Button
+              component={Link}
+              to="/admin/strategy-evaluation"
+              variant="outlined"
+              size="small"
+              endIcon={<ArrowForwardOutlined />}
+              sx={{ alignSelf: 'flex-start' }}
+            >
+              Run strategy evaluation
+            </Button>
+          </Stack>
+        ) : hasAnyChange ? (
+          <Stack spacing={1.5}>
+            {/* Newly appeared */}
+            {(whatChanged?.newTradeCandidates?.length || 0) > 0 && (
+              <Box>
+                <Typography variant="caption" fontWeight={700} color="success.main" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.75 }}>
+                  <FlashOnOutlined fontSize="inherit" /> NEW
+                </Typography>
+                <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
+                  {whatChanged.newTradeCandidates.map(symbol => (
+                    <Chip key={symbol} label={symbol} size="small" color="success" component={Link} to={`/stocks/${symbol}`} sx={{ cursor: 'pointer' }} />
+                  ))}
+                </Stack>
+              </Box>
+            )}
+
+            {/* Dropped */}
+            {droppedCandidates.length > 0 && (
+              <Box>
+                <Typography variant="caption" fontWeight={700} color="error.main" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.75 }}>
+                  <WarningAmberOutlined fontSize="inherit" /> DROPPED
+                </Typography>
+                <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
+                  {droppedCandidates.map(symbol => (
+                    <Chip key={symbol} label={symbol} size="small" color="error" variant="outlined" component={Link} to={`/stocks/${symbol}`} sx={{ cursor: 'pointer' }} />
+                  ))}
+                </Stack>
+              </Box>
+            )}
+
+            {/* Upgraded (score/readiness improved) */}
+            {upgradedCandidates.length > 0 && (
+              <Box>
+                <Typography variant="caption" fontWeight={700} color="success.main" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.75 }}>
+                  <TrendingUpOutlined fontSize="inherit" /> IMPROVED
+                </Typography>
+                <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
+                  {upgradedCandidates.map(d => <DeltaChip key={d.symbol} delta={d} />)}
+                </Stack>
+              </Box>
+            )}
+
+            {/* Demoted (score/readiness worsened but still present) */}
+            {demotedCandidates.length > 0 && (
+              <Box>
+                <Typography variant="caption" fontWeight={700} color="warning.main" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.75 }}>
+                  <WarningAmberOutlined fontSize="inherit" /> WEAKENED
+                </Typography>
+                <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
+                  {demotedCandidates.map(d => <DeltaChip key={d.symbol} delta={d} />)}
+                </Stack>
+              </Box>
+            )}
+          </Stack>
         ) : (
-          <Typography variant="body2" color="text.secondary">No new review candidates since the last evaluation.</Typography>
+          <Typography variant="body2" color="text.secondary">No changes since the last snapshot.</Typography>
         )}
 
-        {(whatChanged?.warnings?.length || 0) > 0 && (
-          <Box sx={{ mt: 2 }}>
-            <Typography variant="caption" fontWeight={700} color="error" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
-              <WarningAmberOutlined fontSize="inherit" /> WARNINGS
-            </Typography>
-            {hasNoPriorSnapshot ? (
-              <Stack spacing={1}>
-                <Typography variant="caption" color="text.secondary">
-                  No prior snapshot found — a baseline evaluation has not been run yet.
-                </Typography>
-                <Button
-                  component={Link}
-                  to="/admin/strategy-evaluation"
-                  variant="outlined"
-                  size="small"
-                  endIcon={<ArrowForwardOutlined />}
-                  sx={{ alignSelf: 'flex-start' }}
-                >
-                  Run strategy evaluation
-                </Button>
-              </Stack>
-            ) : (
-              <Typography variant="caption" color="text.secondary">{whatChanged.warnings[0]}</Typography>
-            )}
+        {(whatChanged?.marketGateChange) && (
+          <Box sx={{ mt: 1.5 }}>
+            <Chip
+              size="small"
+              label={`Market gate: ${whatChanged.marketGateChange.from} → ${whatChanged.marketGateChange.to}`}
+              color="warning"
+              variant="outlined"
+            />
+          </Box>
+        )}
+
+        {(whatChanged?.warnings?.length || 0) > 0 && !hasNoPriorSnapshot && (
+          <Box sx={{ mt: 1.5 }}>
+            <Typography variant="caption" color="warning.main">{whatChanged.warnings[0]}</Typography>
           </Box>
         )}
       </CardContent>

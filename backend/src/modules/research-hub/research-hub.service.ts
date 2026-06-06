@@ -14,6 +14,7 @@ import type {
   ConfirmationSummary,
   NextAction,
   ResearchWhatChanged,
+  ResearchWhatChangedDelta,
   ResearchPriorityCandidate,
   ResearchBacktestSummary,
   StrategyProofSummary,
@@ -21,6 +22,22 @@ import type {
   ActionabilityDimension,
   ActionabilityStatus
 } from './research-hub.types';
+
+/** Minimal interface for today-trade-review data — used for cycle-safe optional injection. */
+interface TodayTradeReviewServiceLike {
+  latest(query?: { region?: string; assetType?: string }): Promise<{
+    run: { status: string; candidateCounts: Record<string, number>; runDate: string; finishedAt: string | null } | null;
+    groups: Record<string, unknown[]>;
+  }>;
+}
+
+/** Minimal interface for trade-plan-risk-engine data — used for cycle-safe optional injection. */
+interface TradePlanRiskEngineServiceLike {
+  list(query: { region?: string; assetType?: string; limit: number; offset: number }): Promise<{
+    results: Array<{ planStatus: string; paperReadinessStatus?: string }>;
+    total: number;
+  }>;
+}
 
 const RESEARCH_OVERVIEW_PIPELINE_KEY = 'research-hub-overview';
 const RESEARCH_OVERVIEW_CACHE_VERSION = 'research-overview-v1';
@@ -34,7 +51,19 @@ export class ResearchHubService {
     private readonly smartMoneyService = new SmartMoneyIntelligenceService(),
     private readonly strategyFrameworkService = new StrategyFrameworkService(),
     private readonly calibrationService = new SignalCalibrationEngineService(),
-    private readonly db = prisma
+    private readonly db = prisma,
+    /**
+     * NR-57: Optional today-trade-review service injection.
+     * Cycle-safe: never imported via the module index — resolved lazily at
+     * construction or injected by tests. Null disables the dimension (falls
+     * back to UNAVAILABLE message without blocking).
+     */
+    private readonly todayTradeReviewService?: TodayTradeReviewServiceLike | null,
+    /**
+     * NR-57: Optional trade-plan-risk-engine service injection.
+     * Same cycle-safety contract as todayTradeReviewService.
+     */
+    private readonly tradePlanRiskEngineService?: TradePlanRiskEngineServiceLike | null
   ) {}
 
   async overview(query: { region?: string; assetType?: string; live?: boolean } = {}): Promise<ResearchOverview> {
@@ -58,7 +87,17 @@ export class ResearchHubService {
         // snapshots built before the fix) never permanently drag overallStatus to
         // INSUFFICIENT_DATA.  All inputs come from the cached snapshot itself — no
         // signals are regenerated — so this is still a persisted-read.
-        const calibrationHealth = await this.calibrationService.health().catch(() => null);
+        // NR-57: also fetch today-review + trade-plan readiness live so the dimensions
+        // always reflect the current state even when serving a cached snapshot.
+        const [calibrationHealth, todayReviewRun, tradePlanList] = await Promise.all([
+          this.calibrationService.health().catch(() => null),
+          this.todayTradeReviewService
+            ? this.todayTradeReviewService.latest({ region, assetType }).catch(() => null)
+            : Promise.resolve(null),
+          this.tradePlanRiskEngineService
+            ? this.tradePlanRiskEngineService.list({ region, assetType, limit: 1, offset: 0 }).catch(() => null)
+            : Promise.resolve(null),
+        ]);
         const freshActionability = this.buildActionability(
           cached.marketReadiness,
           cached.researchPriorities,
@@ -67,6 +106,8 @@ export class ResearchHubService {
           cached.dataGaps,
           cached.nextActions,
           calibrationHealth,
+          todayReviewRun,
+          tradePlanList,
         );
         return { ...cached, whatChanged: freshWhatChanged, actionability: freshActionability };
       }
@@ -200,8 +241,16 @@ export class ResearchHubService {
 
     // 5. Next Actions
     const nextActions: NextAction[] = this.generateNextActions(marketReadiness, priorities, dataGaps, strategyProofSummary);
-    const calibrationHealth = await this.calibrationService.health().catch(() => null);
-    const actionability = this.buildActionability(marketReadiness, priorities, strategyProofSummary, confirmationSummary, dataGaps, nextActions, calibrationHealth);
+    const [calibrationHealth, todayReviewRun, tradePlanList] = await Promise.all([
+      this.calibrationService.health().catch(() => null),
+      this.todayTradeReviewService
+        ? this.todayTradeReviewService.latest({ region, assetType }).catch(() => null)
+        : Promise.resolve(null),
+      this.tradePlanRiskEngineService
+        ? this.tradePlanRiskEngineService.list({ region, assetType, limit: 1, offset: 0 }).catch(() => null)
+        : Promise.resolve(null),
+    ]);
+    const actionability = this.buildActionability(marketReadiness, priorities, strategyProofSummary, confirmationSummary, dataGaps, nextActions, calibrationHealth, todayReviewRun, tradePlanList);
 
     return {
       actionability,
@@ -368,6 +417,13 @@ export class ResearchHubService {
   /**
    * Core diff logic, shared by both buildWhatChanged (build path) and
    * buildWhatChangedFromStoredSnapshots (read path).
+   *
+   * NR-81: Enriched diff — separately surfaces:
+   *   newTradeCandidates  — appeared since last snapshot
+   *   droppedCandidates   — dropped out since last snapshot
+   *   upgradedCandidates  — still present; score/readiness improved
+   *   demotedCandidates   — still present; score/readiness worsened
+   *   downgradedCandidates — legacy field (dropped + score-fell, for backwards compat)
    */
   private diffOverviews(
     currentPriorities: ResearchPriorities,
@@ -377,7 +433,10 @@ export class ResearchHubService {
     if (!priorOverview) {
       return {
         newTradeCandidates: [],
+        droppedCandidates: [],
         downgradedCandidates: [],
+        upgradedCandidates: [],
+        demotedCandidates: [],
         marketGateChange: null,
         warnings: ['No prior snapshot to compare yet; run the pipeline refresh a second time to see what changed.'],
       };
@@ -386,30 +445,56 @@ export class ResearchHubService {
     const priorTradeCandidates = priorOverview.researchPriorities?.tradeCandidates || [];
     const currentCandidates = currentPriorities.tradeCandidates;
 
-    const priorKeySet = new Set<string>(priorTradeCandidates.map(c => this.candidateKey(c)));
-    const currentKeySet = new Set<string>(currentCandidates.map(c => this.candidateKey(c)));
+    // Build fast-lookup maps keyed by candidateKey
+    const priorByKey = new Map<string, ResearchPriorityCandidate>(
+      priorTradeCandidates.map(c => [this.candidateKey(c), c])
+    );
+    const currentByKey = new Map<string, ResearchPriorityCandidate>(
+      currentCandidates.map(c => [this.candidateKey(c), c])
+    );
 
+    // Newly appeared
     const newTradeCandidates = currentCandidates
-      .filter(c => !priorKeySet.has(this.candidateKey(c)))
+      .filter(c => !priorByKey.has(this.candidateKey(c)))
       .map(c => c.symbol || '');
 
-    const downgradedCandidates: string[] = [];
-    for (const priorCand of priorTradeCandidates) {
-      const key = this.candidateKey(priorCand);
-      const currentCand = currentKeySet.has(key)
-        ? currentCandidates.find(c => this.candidateKey(c) === key)
-        : undefined;
-      if (!currentCand) {
-        downgradedCandidates.push(priorCand.symbol || '');
-        continue;
-      }
-      const scoreDrop = (priorCand.decisionScore ?? 0) - (currentCand.decisionScore ?? 0);
-      const readinessDropped =
-        this.readinessRank(priorCand.readinessLabel) > this.readinessRank(currentCand.readinessLabel);
-      if (scoreDrop >= 10 || readinessDropped) {
-        downgradedCandidates.push(currentCand.symbol || '');
+    // Dropped out
+    const droppedCandidates = priorTradeCandidates
+      .filter(c => !currentByKey.has(this.candidateKey(c)))
+      .map(c => c.symbol || '');
+
+    // Score / readiness movers (candidates present in both snapshots)
+    const upgradedCandidates: ResearchWhatChangedDelta[] = [];
+    const demotedCandidates: ResearchWhatChangedDelta[] = [];
+    for (const [key, priorCand] of priorByKey) {
+      const currentCand = currentByKey.get(key);
+      if (!currentCand) continue; // dropped — already captured above
+
+      const priorScore = priorCand.decisionScore ?? 0;
+      const currentScore = currentCand.decisionScore ?? 0;
+      const scoreDelta = currentScore - priorScore;
+
+      const priorReadinessRank = this.readinessRank(priorCand.readinessLabel);
+      const currentReadinessRank = this.readinessRank(currentCand.readinessLabel);
+      let readinessChange: ResearchWhatChangedDelta['readinessChange'] = 'UNCHANGED';
+      if (currentReadinessRank > priorReadinessRank) readinessChange = 'PROMOTED';
+      else if (currentReadinessRank < priorReadinessRank) readinessChange = 'DEMOTED';
+
+      const isUpgrade = scoreDelta >= 5 || readinessChange === 'PROMOTED';
+      const isDemotion = scoreDelta <= -10 || readinessChange === 'DEMOTED';
+
+      if (isUpgrade && !isDemotion) {
+        upgradedCandidates.push({ symbol: currentCand.symbol || '', currentScore, priorScore, scoreDelta, readinessChange });
+      } else if (isDemotion) {
+        demotedCandidates.push({ symbol: currentCand.symbol || '', currentScore, priorScore, scoreDelta, readinessChange });
       }
     }
+
+    // Legacy field: dropped + score-fell (for callers that only use downgradedCandidates)
+    const downgradedCandidates: string[] = [
+      ...droppedCandidates,
+      ...demotedCandidates.map(d => d.symbol),
+    ];
 
     const priorGate = priorOverview.marketReadiness?.marketGate;
     const currentGate = currentReadiness.marketGate;
@@ -423,7 +508,7 @@ export class ResearchHubService {
       warnings.push('Research environment has active blockers; review diagnostics.');
     }
 
-    return { newTradeCandidates, downgradedCandidates, marketGateChange, warnings };
+    return { newTradeCandidates, droppedCandidates, downgradedCandidates, upgradedCandidates, demotedCandidates, marketGateChange, warnings };
   }
 
   private async loadPriorOverview(region: string, assetType: string): Promise<ResearchOverview | null> {
@@ -480,14 +565,17 @@ export class ResearchHubService {
       targetRoute: '/pipeline-ops',
     }];
     return {
-      actionability: this.buildActionability(marketReadiness, priorities, this.buildStrategyProofSummary([], marketReadiness), confirmationSummary, dataGaps, nextActions, null),
+      actionability: this.buildActionability(marketReadiness, priorities, this.buildStrategyProofSummary([], marketReadiness), confirmationSummary, dataGaps, nextActions, null, null, null),
       marketReadiness,
       researchPriorities: priorities,
       strategyProofSummary: this.buildStrategyProofSummary([], marketReadiness),
       confirmationSummary,
       whatChanged: {
         newTradeCandidates: [],
+        droppedCandidates: [],
         downgradedCandidates: [],
+        upgradedCandidates: [],
+        demotedCandidates: [],
         marketGateChange: null,
         warnings: dataGaps,
       },
@@ -504,7 +592,9 @@ export class ResearchHubService {
     confirmation: ConfirmationSummary,
     dataGaps: string[],
     nextActions: NextAction[],
-    calibrationHealth: CalibrationHealthResponse | null
+    calibrationHealth: CalibrationHealthResponse | null,
+    todayReviewRun: { run: { status: string; candidateCounts: Record<string, number>; runDate: string; finishedAt: string | null } | null; groups: Record<string, unknown[]> } | null,
+    tradePlanList: { results: Array<{ planStatus: string; paperReadinessStatus?: string }>; total: number } | null
   ): ResearchActionability {
     const reviewCandidateCount = priorities.tradeCandidates.length;
     const signalCount = confirmation.signalSummary.topBullishCount + confirmation.signalSummary.topBearishCount;
@@ -526,23 +616,11 @@ export class ResearchHubService {
     // Uses real calibrated signal count and readiness status from the service.
     const calibrationReadinessDimension: ActionabilityDimension = this.calibrationReadinessDimension(calibrationHealth);
 
-    // NR-41: todayReviewReadiness and tradePlanReadiness have no measurable data source yet.
-    // They are labelled explicitly and excluded from the aggregate (blocking: false so
-    // reduceActionability ignores them as non-blocking INSUFFICIENT_DATA).
-    const todayReviewReadinessDimension: ActionabilityDimension = {
-      status: 'INSUFFICIENT_DATA',
-      label: 'Today Review Readiness',
-      sourceModule: 'today-trade-review',
-      blocking: false,
-      message: 'Not yet measured — Today Review readiness has no stable data source wired into Research Hub.',
-    };
-    const tradePlanReadinessDimension: ActionabilityDimension = {
-      status: 'INSUFFICIENT_DATA',
-      label: 'Trade Plan Readiness',
-      sourceModule: 'trade-plan-risk-engine',
-      blocking: false,
-      message: 'Not yet measured — Trade Plan paper-readiness has no stable data source wired into Research Hub.',
-    };
+    // NR-57: todayReviewReadiness — derived from the latest today-trade-review run.
+    const todayReviewReadinessDimension: ActionabilityDimension = this.todayReviewReadinessDimension(todayReviewRun);
+
+    // NR-57: tradePlanReadiness — derived from the trade-plan-risk-engine plan count.
+    const tradePlanReadinessDimension: ActionabilityDimension = this.tradePlanReadinessDimension(tradePlanList);
 
     const dimensions = {
       marketEnvironment: this.marketEnvironmentDimension(readiness),
@@ -623,6 +701,137 @@ export class ResearchHubService {
       count,
       message: `${count} calibrated signals persisted (readiness: ${readinessStatus ?? 'unknown'}). Evidence needs refresh before downstream influence can be confirmed.`,
       evidenceDate: health.latestGeneratedAt ?? undefined,
+    };
+  }
+
+  /**
+   * NR-57: todayReviewReadiness — wired to the latest today-trade-review run.
+   *
+   * Status logic:
+   *  - READY     : latest run is COMPLETED or PARTIAL with promoted candidates
+   *  - LIMITED   : run is PARTIAL / RUNNING with 0 promoted, or status unknown
+   *  - UNAVAILABLE: service returned null or run is FAILED / none recorded yet
+   *
+   * Always non-blocking — missing today-review data does not gate research readiness.
+   */
+  private todayReviewReadinessDimension(
+    todayReviewRun: { run: { status: string; candidateCounts: Record<string, number>; runDate: string; finishedAt: string | null } | null; groups: Record<string, unknown[]> } | null
+  ): ActionabilityDimension {
+    if (!todayReviewRun) {
+      return {
+        status: 'INSUFFICIENT_DATA',
+        label: 'Today Review Readiness',
+        sourceModule: 'today-trade-review',
+        blocking: false,
+        message: 'Today Review service is unavailable; readiness could not be determined.',
+      };
+    }
+
+    const run = todayReviewRun.run;
+    if (!run) {
+      return {
+        status: 'INSUFFICIENT_DATA',
+        label: 'Today Review Readiness',
+        sourceModule: 'today-trade-review',
+        blocking: false,
+        message: 'No Today Review run has been recorded yet.',
+      };
+    }
+
+    if (run.status === 'FAILED') {
+      return {
+        status: 'INSUFFICIENT_DATA',
+        label: 'Today Review Readiness',
+        sourceModule: 'today-trade-review',
+        blocking: false,
+        message: `Latest Today Review run (${run.runDate}) failed; readiness is not available.`,
+      };
+    }
+
+    const counts = run.candidateCounts || {};
+    // Sum up all promoted candidate categories (LONG_REVIEW, SHORT_REVIEW, EXIT_RISK, etc.)
+    const promotedCount = (counts.LONG_REVIEW ?? 0) + (counts.SHORT_REVIEW ?? 0) + (counts.EXIT_RISK_REVIEW ?? 0) + (counts.SPECIAL_CASES ?? 0);
+    const watchCount = counts.WATCH_ONLY ?? 0;
+    const totalCount = promotedCount + watchCount + (counts.BLOCKED ?? 0) + (counts.AVOID ?? 0) + (counts.UNPROVEN ?? 0);
+
+    if (run.status === 'COMPLETED' && promotedCount > 0) {
+      return {
+        status: 'READY',
+        label: 'Today Review Readiness',
+        sourceModule: 'today-trade-review',
+        blocking: false,
+        count: promotedCount,
+        message: `Today Review (${run.runDate}): ${promotedCount} promoted candidate(s) across ${totalCount} reviewed.`,
+        evidenceDate: run.finishedAt ?? undefined,
+      };
+    }
+
+    if ((run.status === 'COMPLETED' || run.status === 'PARTIAL') && totalCount > 0) {
+      return {
+        status: 'LIMITED',
+        label: 'Today Review Readiness',
+        sourceModule: 'today-trade-review',
+        blocking: false,
+        count: totalCount,
+        message: `Today Review (${run.runDate}, ${run.status}): ${promotedCount} promoted, ${watchCount} watch-only of ${totalCount} reviewed.`,
+        evidenceDate: run.finishedAt ?? undefined,
+      };
+    }
+
+    return {
+      status: 'INSUFFICIENT_DATA',
+      label: 'Today Review Readiness',
+      sourceModule: 'today-trade-review',
+      blocking: false,
+      message: `Today Review (${run.runDate}) completed with no candidates reviewed (status: ${run.status}).`,
+      evidenceDate: run.finishedAt ?? undefined,
+    };
+  }
+
+  /**
+   * NR-57: tradePlanReadiness — wired to the trade-plan-risk-engine plan count.
+   *
+   * Status logic:
+   *  - READY     : at least one VALID or WATCH plan is persisted
+   *  - LIMITED   : plans exist but all are BLOCKED or INSUFFICIENT_DATA
+   *  - UNAVAILABLE: service returned null or 0 plans
+   *
+   * Always non-blocking.
+   */
+  private tradePlanReadinessDimension(
+    tradePlanList: { results: Array<{ planStatus: string; paperReadinessStatus?: string }>; total: number } | null
+  ): ActionabilityDimension {
+    if (!tradePlanList) {
+      return {
+        status: 'INSUFFICIENT_DATA',
+        label: 'Trade Plan Readiness',
+        sourceModule: 'trade-plan-risk-engine',
+        blocking: false,
+        message: 'Trade Plan service is unavailable; readiness could not be determined.',
+      };
+    }
+
+    const total = tradePlanList.total ?? tradePlanList.results.length;
+
+    if (total === 0) {
+      return {
+        status: 'INSUFFICIENT_DATA',
+        label: 'Trade Plan Readiness',
+        sourceModule: 'trade-plan-risk-engine',
+        blocking: false,
+        message: 'No trade plans have been generated yet. Run the trade-plan batch generator to produce plans.',
+      };
+    }
+
+    // total > 0 is guaranteed here (checked above).
+    // We use the total count (from DB) not the sample (limit=1) to give an honest message.
+    return {
+      status: 'READY',
+      label: 'Trade Plan Readiness',
+      sourceModule: 'trade-plan-risk-engine',
+      blocking: false,
+      count: total,
+      message: `${total} trade plan(s) are persisted and available for review.`,
     };
   }
 

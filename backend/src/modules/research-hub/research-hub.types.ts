@@ -128,9 +128,32 @@ export interface ConfirmationSummary {
   };
 }
 
+export interface ResearchWhatChangedDelta {
+  symbol: string;
+  /** Score in the current snapshot */
+  currentScore: number;
+  /** Score in the prior snapshot */
+  priorScore: number;
+  /** Positive = score went up; negative = score went down */
+  scoreDelta: number;
+  /** Whether readiness rank improved (promoted) or worsened (demoted) */
+  readinessChange: 'PROMOTED' | 'DEMOTED' | 'UNCHANGED';
+}
+
 export interface ResearchWhatChanged {
+  /** Candidates that newly appeared in the current snapshot (not in prior) */
   newTradeCandidates: string[];
+  /** Candidates that dropped out of the current snapshot (were in prior, not in current) */
+  droppedCandidates: string[];
+  /**
+   * @deprecated Use droppedCandidates + scoreDeltaCandidates instead.
+   * Kept for backwards compatibility (legacy: dropped OR score-fell candidates).
+   */
   downgradedCandidates: string[];
+  /** Candidates still present in both snapshots whose score/readiness improved */
+  upgradedCandidates: ResearchWhatChangedDelta[];
+  /** Candidates still present in both snapshots whose score/readiness worsened */
+  demotedCandidates: ResearchWhatChangedDelta[];
   marketGateChange: { from: MarketGate; to: MarketGate } | null;
   warnings: string[];
 }

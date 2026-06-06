@@ -3,6 +3,7 @@ import prisma from '../../db/prisma';
 import type {
   TodayReviewCandidateDto,
   TodayReviewCandidateReason,
+  TodayReviewExcludedExample,
   TodayReviewExplainability,
   TodayReviewRepository as TodayReviewRepositoryContract,
   TodayReviewRunDto,
@@ -305,7 +306,18 @@ export class TodayTradeReviewRepository implements TodayReviewRepositoryContract
     warnings: unknown
   ): TodayReviewExplainability {
     const existing = this.nullableJson(sourceSnapshot.explainability) as TodayReviewExplainability | null;
-    if (existing) return existing;
+    if (existing) {
+      // NR-82: dedupe inspectableExcludedExamples by symbol+primaryReasonCode on read
+      // (covers legacy runs that stored duplicate entries before the run-generation fix).
+      const seen = new Set<string>();
+      const dedupedExamples = (existing.inspectableExcludedExamples || []).filter((example: TodayReviewExcludedExample) => {
+        const key = `${String(example.symbol).toUpperCase()}:${example.primaryReasonCode}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      return { ...existing, inspectableExcludedExamples: dedupedExamples };
+    }
     const scanFunnel = this.nullableJson(sourceSnapshot.scanFunnel) as any;
     const reviewUniverse = this.jsonObject(sourceSnapshot.reviewUniverse);
     const legacyWarnings = this.jsonArray(warnings);

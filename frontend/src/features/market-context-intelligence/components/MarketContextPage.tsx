@@ -7,6 +7,7 @@ import { useMarketContext } from '../hooks';
 import type { CapBandBreadth } from '../types';
 import { FiiDiiActivityWidget } from './FiiDiiActivityWidget';
 import { BulkBlockDealsWidget } from './BulkBlockDealsWidget';
+import { InstitutionalActivityPanel } from './InstitutionalActivityPanel';
 
 const pct = (value: number | null) => value === null ? 'N/A' : `${(value * 100).toFixed(1)}%`;
 const colorFor = (value?: string) => value === 'RISK_ON' || value === 'LEADING' || value === 'SUPPORTIVE' ? 'success' : value === 'RISK_OFF' || value === 'LAGGING' || value === 'HEADWIND' ? 'error' : 'warning';
@@ -125,6 +126,9 @@ export const MarketContextPage: React.FC = () => {
           </Stack>
         </Stack>
       </Paper>
+
+      {/* CB-25: Institutional Activity summary panel */}
+      <InstitutionalActivityPanel />
 
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' }, gap: 3 }}>
         <Paper sx={{ p: 2 }}>

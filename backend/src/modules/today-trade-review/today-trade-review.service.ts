@@ -1739,7 +1739,7 @@ export class TodayTradeReviewService {
     }
     const watchCount = candidates.filter((candidate) => candidate.state === 'WATCH_ONLY').length;
     const promotedCount = candidates.filter((candidate) => ['LONG_REVIEW', 'SHORT_REVIEW', 'EXIT_RISK_REVIEW'].includes(candidate.state)).length;
-    const examples = [
+    const rawExamples = [
       ...excludedExamples,
       ...candidates
         .filter((candidate) => ['BLOCKED', 'AVOID', 'INSUFFICIENT_DATA', 'UNPROVEN'].includes(candidate.state))
@@ -1753,7 +1753,16 @@ export class TodayTradeReviewService {
           reasonCategories: candidate.explainability?.blockers[0]?.category ? [candidate.explainability.blockers[0].category] : candidate.explainability?.watchReasons[0]?.category ? [candidate.explainability.watchReasons[0].category] : ['STRATEGY_DECISION' as TodayReviewReasonCategory],
           promoted: false as const,
         })),
-    ].slice(0, 8);
+    ];
+    // NR-82: dedupe by symbol+primaryReasonCode (true duplicates).
+    // If the same symbol appears with DIFFERENT reason codes, keep each as a separate row (legitimate multi-reason).
+    const examplesSeen = new Set<string>();
+    const examples = rawExamples.filter((example) => {
+      const dedupKey = `${example.symbol.toUpperCase()}:${example.primaryReasonCode}`;
+      if (examplesSeen.has(dedupKey)) return false;
+      examplesSeen.add(dedupKey);
+      return true;
+    }).slice(0, 8);
     return {
       runId,
       scope,
@@ -1848,11 +1857,14 @@ export class TodayTradeReviewService {
     deliveryEvidence: null;
     sector: string | null;
     dailyChangePercent: number | null;
+    price52wHigh: number | null;
+    price52wLow: number | null;
+    price52wPositionPct: number | null;
+    price52wCurrentClose: number | null;
   } {
     const n = history.length;
-    if (n < 2) {
-      return { recentReturn3D: null, volumeVsAvg20D: null, deliveryPercent: null, deliveryEvidence: null, sector, dailyChangePercent: null };
-    }
+    const absent = { recentReturn3D: null, volumeVsAvg20D: null, deliveryPercent: null as null, deliveryEvidence: null as null, sector, dailyChangePercent: null, price52wHigh: null, price52wLow: null, price52wPositionPct: null, price52wCurrentClose: null };
+    if (n < 2) return absent;
     const latest = history[n - 1];
     const prev = history[n - 2];
     const dailyChangePercent = prev.close > 0
@@ -1873,6 +1885,27 @@ export class TodayTradeReviewService {
       ? Number((latestVol / avgVol20).toFixed(2))
       : null;
 
+    // NR-85: 52-week (252-bar) range position from persisted OHLCV price history.
+    // Uses up to the 252 most recent bars (the full priceHistory window loaded for the run).
+    // Derived entirely from persisted data; never live-computed.
+    const window252 = history.slice(Math.max(0, n - 252));
+    let price52wHigh: number | null = null;
+    let price52wLow: number | null = null;
+    let price52wPositionPct: number | null = null;
+    const price52wCurrentClose: number | null = latest.close > 0 ? latest.close : null;
+    if (window252.length >= 2) {
+      const highs = window252.map((row) => row.high).filter(Number.isFinite);
+      const lows = window252.map((row) => row.low).filter(Number.isFinite);
+      if (highs.length > 0 && lows.length > 0) {
+        price52wHigh = Number(Math.max(...highs).toFixed(2));
+        price52wLow = Number(Math.min(...lows).toFixed(2));
+        const range = price52wHigh - price52wLow;
+        if (range > 0 && price52wCurrentClose !== null) {
+          price52wPositionPct = Number(((price52wCurrentClose - price52wLow) / range * 100).toFixed(1));
+        }
+      }
+    }
+
     return {
       recentReturn3D,
       volumeVsAvg20D,
@@ -1880,6 +1913,10 @@ export class TodayTradeReviewService {
       deliveryEvidence: null,
       sector,   // from instrument catalog metadata; null when absent
       dailyChangePercent,
+      price52wHigh,
+      price52wLow,
+      price52wPositionPct,
+      price52wCurrentClose,
     };
   }
 

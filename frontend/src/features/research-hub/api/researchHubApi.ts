@@ -123,9 +123,25 @@ export interface ConfirmationSummary {
   };
 }
 
+export interface ResearchWhatChangedDelta {
+  symbol: string;
+  currentScore: number;
+  priorScore: number;
+  scoreDelta: number;
+  readinessChange: 'PROMOTED' | 'DEMOTED' | 'UNCHANGED';
+}
+
 export interface ResearchWhatChanged {
+  /** Candidates newly appearing since the last snapshot */
   newTradeCandidates: string[];
+  /** Candidates that dropped out of the snapshot */
+  droppedCandidates?: string[];
+  /** @deprecated Legacy: dropped + score-fell; use droppedCandidates + demotedCandidates */
   downgradedCandidates: string[];
+  /** Candidates whose score/readiness improved */
+  upgradedCandidates?: ResearchWhatChangedDelta[];
+  /** Candidates whose score/readiness worsened */
+  demotedCandidates?: ResearchWhatChangedDelta[];
   marketGateChange: { from: MarketGate; to: MarketGate } | null;
   warnings: string[];
 }
