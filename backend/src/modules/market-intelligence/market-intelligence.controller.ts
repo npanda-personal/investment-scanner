@@ -5,6 +5,7 @@ import { parseStockInterestScope } from './stock-interest-snapshot.validation';
 import { assembleInstrumentContext } from './instrument-context.service';
 import { MarketContextIntelligenceService } from '../market-context-intelligence/market-context-intelligence.service';
 import type { SectorSnapshotDto } from '../market-context-intelligence/market-context-intelligence.types';
+import { getEventFeed } from './event-feed.service';
 
 export type RotationQuadrant = 'LEADING' | 'IMPROVING' | 'WEAKENING' | 'LAGGING';
 
@@ -159,6 +160,28 @@ export class MarketIntelligenceController {
         generatedAt: new Date().toISOString(),
         sectors: [],
         quadrantCounts: { LEADING: 0, IMPROVING: 0, WEAKENING: 0, LAGGING: 0 },
+        message,
+        warnings: [message],
+      });
+    }
+  };
+
+  eventFeed = async (req: Request, res: Response) => {
+    try {
+      res.setHeader('Cache-Control', 'no-store');
+      const rawDays = req.query.days;
+      const days = typeof rawDays === 'string' && /^\d+$/.test(rawDays) ? parseInt(rawDays, 10) : 5;
+      const result = await getEventFeed(days);
+      return res.json(result);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to load market event feed';
+      return res.status(500).json({
+        availability: 'ERROR',
+        generatedAt: new Date().toISOString(),
+        asOf: null,
+        days: 5,
+        events: [],
+        eventCount: 0,
         message,
         warnings: [message],
       });

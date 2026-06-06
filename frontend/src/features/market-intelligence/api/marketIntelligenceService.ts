@@ -437,3 +437,46 @@ export async function fetchSectorConstituents(
     };
   }
 }
+
+// ---------------------------------------------------------------------------
+// Event Feed  (NR-105)
+// ---------------------------------------------------------------------------
+
+export type EventTone = 'info' | 'positive' | 'negative' | 'risk';
+
+export type EventType =
+  | 'BULK_DEAL'
+  | 'BLOCK_DEAL'
+  | 'FNO_BAN_ENTRY'
+  | 'FNO_BAN_BATCH'
+  | 'BREAKOUT_52W_HIGH'
+  | 'BREAKOUT_52W_LOW'
+  | 'FII_DII_FLOWS';
+
+export interface MarketEvent {
+  id: string;
+  type: EventType;
+  date: string;
+  symbols: string[];
+  description: string;
+  tone: EventTone;
+  meta?: Record<string, unknown>;
+}
+
+export interface EventFeedEnvelope {
+  availability: 'READY' | 'EMPTY' | 'ERROR';
+  generatedAt: string;
+  asOf: string | null;
+  days: number;
+  events: MarketEvent[];
+  eventCount: number;
+  message: string;
+  warnings: string[];
+}
+
+export async function fetchEventFeed(days: number = 5): Promise<EventFeedEnvelope> {
+  const response = await axios.get<EventFeedEnvelope>(`${API_BASE}/event-feed`, {
+    params: { days },
+  });
+  return response.data;
+}

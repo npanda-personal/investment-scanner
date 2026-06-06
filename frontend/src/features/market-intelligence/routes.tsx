@@ -11,10 +11,12 @@ import {
 } from './components/MarketIntelligencePages';
 import { DailyReviewShortlistPage } from './components/DailyReviewShortlistPage';
 import { SectorRotationPage } from './components/SectorRotationPage';
+import { MarketEventsPage } from './components/MarketEventsPage';
 
 export const marketIntelligenceRoutes: RouteObject[] = [
   { path: 'market-pulse', element: <MarketPulsePage /> },
   { path: 'sector-rotation', element: <SectorRotationPage /> },
+  { path: 'market-events', element: <MarketEventsPage /> },
   { path: 'daily-review-shortlist', element: <DailyReviewShortlistPage /> },
   { path: 'stock-interest-radar', element: <StockInterestRadarPage /> },
   { path: 'earnings-intelligence', element: <EarningsIntelligencePage /> },
