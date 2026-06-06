@@ -104,10 +104,11 @@ type SignalTableProps = {
   onPageSizeChange: (pageSize: number) => void;
   onSortChange: (sortBy: string, direction: SortDirection) => void;
   strategyContextLoaded?: boolean;
+  bannedSymbols?: Set<string>;
   emptyMessage?: string;
 };
 
-export function SignalTable({ signals, totalCount, loading, page, pageSize, sortBy, sortDirection, onPageChange, onPageSizeChange, onSortChange, strategyContextLoaded = false, emptyMessage }: SignalTableProps) {
+export function SignalTable({ signals, totalCount, loading, page, pageSize, sortBy, sortDirection, onPageChange, onPageSizeChange, onSortChange, strategyContextLoaded = false, bannedSymbols, emptyMessage }: SignalTableProps) {
   const navigate = useNavigate();
   const [selectedSignal, setSelectedSignal] = React.useState<SignalResult | null>(null);
   const [portfolioSignal, setPortfolioSignal] = React.useState<SignalResult | null>(null);
@@ -117,7 +118,32 @@ export function SignalTable({ signals, totalCount, loading, page, pageSize, sort
   const [successWatchlistId, setSuccessWatchlistId] = React.useState<string | null>(null);
 
   const columns: DataTableColumn<SignalResult>[] = [
-    { id: 'symbol', label: 'Symbol', sortable: true, render: (signal) => <Button size="small" onClick={(event) => { event.stopPropagation(); navigate(`/research/stocks/${signal.instrument_id}`); }}>{signal.symbol}</Button> },
+    {
+      id: 'symbol',
+      label: 'Symbol',
+      sortable: true,
+      render: (signal) => (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+          <Button size="small" onClick={(event) => { event.stopPropagation(); navigate(`/research/stocks/${signal.instrument_id}`); }}>{signal.symbol}</Button>
+          {bannedSymbols?.has(signal.symbol) && (
+            <Tooltip title="In F&O ban period — derivatives trading restricted; elevated risk." arrow enterDelay={200}>
+              <Chip
+                label="F&O Ban"
+                size="small"
+                sx={{
+                  bgcolor: 'warning.main',
+                  color: 'warning.contrastText',
+                  fontWeight: 700,
+                  fontSize: 10,
+                  height: 18,
+                  '& .MuiChip-label': { px: 0.75 },
+                }}
+              />
+            </Tooltip>
+          )}
+        </Box>
+      ),
+    },
     { id: 'company', label: 'Company', render: (signal) => signal.company_name || 'N/A' },
     { id: 'score', label: 'Raw Score', sortable: true, align: 'right', render: (signal) => signal.score },
     {

@@ -1,7 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Box, Button, Checkbox, Chip, CircularProgress, FormControlLabel, MenuItem, Paper, Stack, Tab, Tabs, TextField, Typography } from '@mui/material';
 import { fetchLatestSignalRun, fetchSignalScreener, fetchTopSignals, runSignals } from '../api/signalGenerationEngineService';
 import type { ReliabilityTier, SignalConfidence, SignalDirection, SignalGenerationRunAudit, SignalResult, SignalRunResponse } from '../types';
+import { fetchFnoBanList } from '@/features/smart-money-intelligence/api/smartMoneyIntelligenceService';
 import { MarketRegimeWidget } from '@/features/market-context-intelligence';
 import { SignalTrackRecordPanel } from './SignalTrackRecordPanel';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -62,6 +63,7 @@ const SignalsDashboardPage: React.FC = () => {
   const [runMessage, setRunMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [fnoBanSymbols, setFnoBanSymbols] = useState<string[]>([]);
 
   const resetPages = () => setPageByTab({ bullish: 0, bearish: 0, neutral: 0, momentum: 0, recent: 0, screener: 0 });
 
@@ -136,6 +138,16 @@ const SignalsDashboardPage: React.FC = () => {
       .then(setLatestRun)
       .catch(() => setLatestRun(null));
   }, [scope.region, scope.assetType]);
+
+  // Fetch F&O ban list once on mount. Silently swallows errors — no chips shown if unavailable.
+  useEffect(() => {
+    fetchFnoBanList()
+      .then((res) => setFnoBanSymbols(res.symbols ?? []))
+      .catch(() => setFnoBanSymbols([]));
+  }, []);
+
+  // Build a Set for O(1) lookups — recomputed only when the raw symbols array changes.
+  const bannedSymbolsSet = useMemo(() => new Set(fnoBanSymbols), [fnoBanSymbols]);
 
   useEffect(() => {
     resetPages();
@@ -360,6 +372,7 @@ const SignalsDashboardPage: React.FC = () => {
           setPageByTab({ ...pageByTab, [activeTab]: 0 });
         }}
         strategyContextLoaded={showStrategyContext || Boolean(strategyCode) || onlyStrategyEligible || excludeNoiseFiltered || hasBlockedStrategies}
+        bannedSymbols={bannedSymbolsSet}
         emptyMessage={emptyMessage()}
       />
     </Box>
