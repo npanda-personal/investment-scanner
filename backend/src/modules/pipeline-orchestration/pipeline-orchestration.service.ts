@@ -71,6 +71,8 @@ const SIGNAL_POSITION_LEDGER_SCHEDULED_STAGE_VERSION = 'scheduled-signal-positio
 const SECTOR_INTELLIGENCE_SCHEDULED_STAGE_VERSION = 'scheduled-sector-intelligence-v1';
 const EARNINGS_INTELLIGENCE_SCHEDULED_STAGE_VERSION = 'scheduled-earnings-intelligence-v1';
 const MARKET_CONTEXT_SNAPSHOT_SCHEDULED_STAGE_VERSION = 'scheduled-market-context-snapshot-v1';
+const MARKET_PULSE_SCHEDULED_STAGE_VERSION = 'scheduled-market-pulse-v1';
+const STOCK_INTEREST_SCHEDULED_STAGE_VERSION = 'scheduled-stock-interest-v1';
 const SCHEDULED_DOWNSTREAM_STAGE_KEYS = [
   'DATA_QUALITY',
   'RAW_SIGNALS',
@@ -86,6 +88,8 @@ const SCHEDULED_DOWNSTREAM_STAGE_KEYS = [
   'TODAY_REVIEW',
   'SIGNAL_POSITION_LEDGER',
   'SECTOR_INTELLIGENCE_REFRESH',
+  'MARKET_PULSE_REFRESH',
+  'STOCK_INTEREST_REFRESH',
 ];
 
 type ScheduledAdapterResult = {
@@ -3687,6 +3691,7 @@ export class PipelineOrchestrationService {
           region: normalizedScope.region,
           assetType: normalizedScope.assetType,
           instrumentIds: changedInstrumentIds,
+          persistOutcomes: true,
         });
         aggregate.totalCount = result.totalCount;
         aggregate.processedCount += result.processedCount;
@@ -4017,6 +4022,94 @@ export class PipelineOrchestrationService {
           savedCount: result.savedCount,
           sectorCount: result.sectors.length,
           status: result.status,
+        },
+      };
+    }, now);
+
+    if (response.status === 'COMPLETED' || response.status === 'PARTIAL' || response.status === 'SKIPPED') {
+      response.downstream = await this.runScheduledMarketPulseStage({
+        ...request,
+        sourceFingerprint: response.outputFingerprint || request.sourceFingerprint,
+        upstreamStageRunId: response.stageRunId,
+      }).catch((error) => this.logScheduledDownstreamFailure('Market Pulse', response.stageKey, request, error));
+    }
+    return response;
+  }
+
+  async runScheduledMarketPulseStage(request: ScheduledPipelineStageRequest, now = new Date()): Promise<ScheduledPipelineStageResponse> {
+    const response = await this.runScheduledPipelineStage(request, {
+      stageKey: 'MARKET_PULSE_REFRESH',
+      stageOrder: 15,
+      stageSlug: 'scheduled-market-pulse',
+      stageVersion: MARKET_PULSE_SCHEDULED_STAGE_VERSION,
+      sourceStage: 'SECTOR_INTELLIGENCE_REFRESH',
+      adapter: 'MarketPulseSnapshotService.refreshSnapshot',
+    }, async ({ normalizedScope }) => {
+      const snapshot = await this.marketPulseService.refreshSnapshot({
+        region: normalizedScope.region,
+        assetType: normalizedScope.assetType,
+        timeframe: normalizedScope.timeframe,
+      });
+      const succeeded = snapshot.status === 'FRESH';
+      return {
+        totalCount: 1,
+        processedCount: 1,
+        succeededCount: succeeded ? 1 : 0,
+        failedCount: succeeded ? 0 : 1,
+        skippedCount: 0,
+        unchangedCount: 0,
+        warnings: Array.isArray(snapshot.warningsJson) ? snapshot.warningsJson : [],
+        errors: succeeded ? [] : ['Market Pulse snapshot did not report FRESH status.'],
+        metadata: {
+          snapshotId: snapshot.id,
+          snapshotStatus: snapshot.status,
+          marketHealthScore: snapshot.marketHealthScore,
+          marketHealthLabel: snapshot.marketHealthLabel,
+          dataThroughDate: snapshot.dataThroughDate?.toISOString() ?? null,
+        },
+      };
+    }, now);
+
+    if (response.status === 'COMPLETED' || response.status === 'PARTIAL' || response.status === 'SKIPPED') {
+      response.downstream = await this.runScheduledStockInterestStage({
+        ...request,
+        sourceFingerprint: response.outputFingerprint || request.sourceFingerprint,
+        upstreamStageRunId: response.stageRunId,
+      }).catch((error) => this.logScheduledDownstreamFailure('Stock Interest', response.stageKey, request, error));
+    }
+    return response;
+  }
+
+  async runScheduledStockInterestStage(request: ScheduledPipelineStageRequest, now = new Date()): Promise<ScheduledPipelineStageResponse> {
+    const response = await this.runScheduledPipelineStage(request, {
+      stageKey: 'STOCK_INTEREST_REFRESH',
+      stageOrder: 16,
+      stageSlug: 'scheduled-stock-interest',
+      stageVersion: STOCK_INTEREST_SCHEDULED_STAGE_VERSION,
+      sourceStage: 'MARKET_PULSE_REFRESH',
+      adapter: 'StockInterestSnapshotService.refreshSnapshots',
+    }, async ({ normalizedScope, normalizedBatchSize }) => {
+      const result = await this.stockInterestService.refreshSnapshots({
+        region: normalizedScope.region,
+        assetType: normalizedScope.assetType,
+        timeframe: normalizedScope.timeframe,
+        batchSize: normalizedBatchSize,
+        dataThroughDate: request.dataThroughDate ? new Date(`${request.dataThroughDate}T00:00:00.000Z`) : undefined,
+      });
+      return {
+        totalCount: result.totalCount,
+        processedCount: result.processedCount,
+        succeededCount: result.succeededCount,
+        failedCount: result.failedCount,
+        skippedCount: result.skippedCount,
+        unchangedCount: result.unchangedCount ?? 0,
+        warnings: result.warnings,
+        errors: result.errors,
+        metadata: {
+          snapshotDate: result.snapshotDate,
+          dataThroughDate: result.dataThroughDate,
+          status: result.status,
+          categories: result.categories,
         },
       };
     }, now);

@@ -63,6 +63,24 @@ export const SCORE_BUCKETS = [
   { label: '85-100', min: 85, max: 100 },
 ] as const;
 
+/**
+ * Advance a date by `n` trading days, skipping Saturday (day 6) and Sunday (day 0).
+ * NSE/BSE public holidays are not enumerated; the estimate may be 1-2 days early
+ * around holidays. Used for best-effort diagnostic date projections.
+ * Exported so utilities and diagnostics outside this class can reuse it without
+ * duplication.
+ */
+export function addTradingDays(from: Date, tradingDays: number): Date {
+  const result = new Date(from);
+  let remaining = tradingDays;
+  while (remaining > 0) {
+    result.setUTCDate(result.getUTCDate() + 1);
+    const dow = result.getUTCDay();
+    if (dow !== 0 && dow !== 6) remaining--;
+  }
+  return result;
+}
+
 /** Minimum number of directional outcomes needed for a group to be EVALUATED (not SMALL_SAMPLE). */
 const MIN_GROUP_SAMPLES_THRESHOLD = 10;
 const FLIP_THRESHOLD = 3;
@@ -106,11 +124,11 @@ export class SignalQualityLabService {
     const persistedPath = await this.tryPersistedDashboard(query);
     if (persistedPath !== null) return persistedPath;
 
-    // Fallback: live computation path (used only when persisted repository
-    // methods are unavailable — e.g. in legacy or minimal test contexts).
-    // Production repositories always have countMatureByHorizon so this path
-    // is unreachable in production; tryPersistedDashboard always returns
-    // a non-null result (including the pending state for matureCount=0).
+    // Fallback: live computation path.
+    // In production this path is NEVER reached: tryPersistedDashboard returns a non-null
+    // value (either persisted data, or pending state, or catches all errors and returns pending).
+    // The only way to reach here is when the repository does not implement countMatureByHorizon
+    // — i.e. lightweight unit-test mocks. It is NOT reachable via any production code path.
     const analysisQuery = this.analysisQuery(query);
     const rawSignals = await this.signalService.signalHistory(analysisQuery);
     const signals = await this.applyDataQualityFilters(rawSignals, analysisQuery);
@@ -178,11 +196,11 @@ export class SignalQualityLabService {
     const persisted = await this.tryPersistedSummary(query);
     if (persisted !== null) return persisted;
 
-    // Fallback: live computation path (used only when persisted repository
-    // methods are unavailable — e.g. in legacy or minimal test contexts).
-    // Production repositories always have countMatureByHorizon so this path
-    // is unreachable in production; tryPersistedSummary always returns
-    // a non-null result (including the pending state for matureCount=0).
+    // Fallback: live computation path.
+    // In production this path is NEVER reached: tryPersistedSummary returns a non-null
+    // value (either persisted data, or pending state, or catches all errors and returns pending).
+    // The only way to reach here is when the repository does not implement countMatureByHorizon
+    // — i.e. lightweight unit-test mocks. It is NOT reachable via any production code path.
     const analysisQuery = this.analysisQuery(query);
     const rawSignals = await this.signalService.signalHistory(analysisQuery);
     const signals = await this.applyDataQualityFilters(rawSignals, analysisQuery);
@@ -691,6 +709,9 @@ export class SignalQualityLabService {
   // ---------------------------------------------------------------------------
 
   private async tryPersistedSummary(query: QualityQuery): Promise<QualitySummary | null> {
+    // null return is the signal that the live fallback in summary() should be used.
+    // This ONLY happens when the repository lacks countMatureByHorizon (unit-test mocks);
+    // production repositories always implement it.
     if (typeof (this.repository as any).countMatureByHorizon !== 'function') return null;
     try {
       const persistedMetrics = await this.qualityMetricsFromPersistedOutcomes({
@@ -702,7 +723,9 @@ export class SignalQualityLabService {
       }
       return this.summaryFromPersistedMetrics(query, persistedMetrics);
     } catch {
-      return null;
+      // On any DB error return an honest pending state rather than falling back
+      // to live price-history computation on the GET path (persisted-read contract).
+      return this.pendingPersistedSummary(query.horizon);
     }
   }
 
@@ -788,6 +811,14 @@ export class SignalQualityLabService {
     byDataQuality: QualityMetricGroup[];
     noisy: NoisySignalItem[];
   } | null> {
+    const pendingDashboard = () => {
+      const pending = this.pendingPersistedSummary(query.horizon);
+      return { summary: pending, byType: [], bySector: [], byRegime: [], byDataQuality: [], noisy: [] };
+    };
+
+    // null return is the signal that the live fallback in dashboard() should be used.
+    // This ONLY happens when the repository lacks countMatureByHorizon (unit-test mocks);
+    // production repositories always implement it.
     if (typeof (this.repository as any).countMatureByHorizon !== 'function') return null;
     try {
       const persistedMetrics = await this.qualityMetricsFromPersistedOutcomes({
@@ -795,15 +826,7 @@ export class SignalQualityLabService {
         modelVersion: query.modelVersion,
       });
       if (persistedMetrics.matureCount === 0) {
-        const pending = this.pendingPersistedSummary(query.horizon);
-        return {
-          summary: pending,
-          byType: [],
-          bySector: [],
-          byRegime: [],
-          byDataQuality: [],
-          noisy: [],
-        };
+        return pendingDashboard();
       }
       const summary = await this.summaryFromPersistedMetrics(query, persistedMetrics);
       const minSample = query.minSampleSize;
@@ -823,7 +846,9 @@ export class SignalQualityLabService {
       ];
       return { summary: { ...summary, warnings }, byType, bySector, byRegime, byDataQuality: [], noisy };
     } catch {
-      return null;
+      // On any DB error return an honest pending state rather than falling back
+      // to live price-history computation on the GET path (persisted-read contract).
+      return pendingDashboard();
     }
   }
 
@@ -1471,32 +1496,6 @@ export class SignalQualityLabService {
     });
   }
 
-  private async countDelta(query: QualityQuery, override: Partial<QualityQuery>): Promise<number> {
-    const withoutFilter = await this.signalService.signalHistoryCount({ ...query, ...override });
-    const withFilter = await this.signalService.signalHistoryCount(query);
-    return Math.max(0, withoutFilter - withFilter);
-  }
-
-  private recommendedAction(total: number, evaluated: number, insufficient: number, missing: number, dataQuality: DataQualityFilterSummary): string {
-    if (total === 0 && dataQuality.filterApplied && dataQuality.excludedByDataQuality > 0) return '0 signals remain after data-quality filters. Reset filters or use a less restrictive readiness filter.';
-    if (total === 0) return 'Run Signal Generation for the selected market scope, then return after price data exists.';
-    if (missing >= total) return 'Sync historical market data for these instruments before measuring outcomes.';
-    if (missing > 0 && insufficient > 0) return `Only ${evaluated} of ${total} signals are evaluated. Sync missing Market Data Foundation price history, then use a shorter horizon or wait for future trading rows.`;
-    if (missing > 0) return `Only ${evaluated} of ${total} signals are evaluated. Sync missing Market Data Foundation price history before relying on this sample.`;
-    if (insufficient > 0) return 'Try a shorter horizon such as 1D or 5D, sync latest market data, or wait until enough future trading days exist.';
-    if (evaluated > 0) return 'Review evaluated historical forward returns and keep market data current.';
-    return 'Check whether signal dates, filters, and market scope match available price history.';
-  }
-
-  private diagnosticWarnings(total: number, evaluated: number, insufficient: number, missing: number, dataQuality: DataQualityFilterSummary): string[] {
-    const warnings: string[] = [];
-    if (total > 0 && evaluated === 0) warnings.push('No evaluated outcomes are available for the selected horizon.');
-    if (insufficient > 0) warnings.push('Some signals do not yet have enough future trading rows for the selected horizon.');
-    if (missing > 0) warnings.push('Some signals have no available price history in Market Data Foundation.');
-    if (dataQuality.filterApplied && dataQuality.totalSignalsAfterFilter === 0) warnings.push('0 signals remain after data-quality filters.');
-    return warnings;
-  }
-
   private averageHorizon(items: SignalOutcomeSet[], horizon: QualityHorizon): number | null {
     return this.average(items.map((item) => item.outcomes.find((outcome) => outcome.horizon === horizon)?.forwardReturnPercent).filter((value): value is number => value !== null && value !== undefined));
   }
@@ -1537,7 +1536,7 @@ export class SignalQualityLabService {
       .map((item) => new Date(item.generatedAt).getTime())
       .filter(Number.isFinite);
     const nextEvaluableDate = newestUnevaluated.length > 0
-      ? this.addTradingDays(new Date(Math.min(...newestUnevaluated)), HORIZON_DAYS[query.horizon]).toISOString()
+      ? addTradingDays(new Date(Math.min(...newestUnevaluated)), HORIZON_DAYS[query.horizon]).toISOString()
       : null;
     const [excludedByDirectionCount, excludedByDateFilterCount] = await Promise.all([
       query.direction ? this.countDelta(query, { direction: undefined }) : Promise.resolve(0),
@@ -1566,6 +1565,32 @@ export class SignalQualityLabService {
       recommendedAction: this.recommendedAction(filteredSignals.length, evaluatedSignals, insufficientFuturePriceCount, missingPriceHistoryCount, dataQualityFilterSummary),
       warnings,
     };
+  }
+
+  private async countDelta(query: QualityQuery, override: Partial<QualityQuery>): Promise<number> {
+    const withoutFilter = await this.signalService.signalHistoryCount({ ...query, ...override });
+    const withFilter = await this.signalService.signalHistoryCount(query);
+    return Math.max(0, withoutFilter - withFilter);
+  }
+
+  private recommendedAction(total: number, evaluated: number, insufficient: number, missing: number, dataQuality: DataQualityFilterSummary): string {
+    if (total === 0 && dataQuality.filterApplied && dataQuality.excludedByDataQuality > 0) return '0 signals remain after data-quality filters. Reset filters or use a less restrictive readiness filter.';
+    if (total === 0) return 'Run Signal Generation for the selected market scope, then return after price data exists.';
+    if (missing >= total) return 'Sync historical market data for these instruments before measuring outcomes.';
+    if (missing > 0 && insufficient > 0) return `Only ${evaluated} of ${total} signals are evaluated. Sync missing Market Data Foundation price history, then use a shorter horizon or wait for future trading rows.`;
+    if (missing > 0) return `Only ${evaluated} of ${total} signals are evaluated. Sync missing Market Data Foundation price history before relying on this sample.`;
+    if (insufficient > 0) return 'Try a shorter horizon such as 1D or 5D, sync latest market data, or wait until enough future trading days exist.';
+    if (evaluated > 0) return 'Review evaluated historical forward returns and keep market data current.';
+    return 'Check whether signal dates, filters, and market scope match available price history.';
+  }
+
+  private diagnosticWarnings(total: number, evaluated: number, insufficient: number, missing: number, dataQuality: DataQualityFilterSummary): string[] {
+    const warnings: string[] = [];
+    if (total > 0 && evaluated === 0) warnings.push('No evaluated outcomes are available for the selected horizon.');
+    if (insufficient > 0) warnings.push('Some signals do not yet have enough future trading rows for the selected horizon.');
+    if (missing > 0) warnings.push('Some signals have no available price history in Market Data Foundation.');
+    if (dataQuality.filterApplied && dataQuality.totalSignalsAfterFilter === 0) warnings.push('0 signals remain after data-quality filters.');
+    return warnings;
   }
 
   private evidenceUsability(total: number, evaluated: number, missing: number, insufficient: number, minSampleSize: number): EvidenceUsability {
@@ -1610,25 +1635,6 @@ export class SignalQualityLabService {
     const date = new Date(value);
     date.setUTCHours(0, 0, 0, 0);
     return date;
-  }
-
-  /**
-   * Fix 11: Advance a date by `n` trading days.
-   *
-   * Skips Saturday (day 6) and Sunday (day 0).  NSE/BSE public holidays are
-   * not enumerated here — that would require a holiday calendar that is out of
-   * scope — so the estimate may be 1-2 days early around holidays.  This is a
-   * best-effort diagnostic field and a ~1D error is acceptable.
-   */
-  private addTradingDays(from: Date, tradingDays: number): Date {
-    const result = new Date(from);
-    let remaining = tradingDays;
-    while (remaining > 0) {
-      result.setUTCDate(result.getUTCDate() + 1);
-      const dow = result.getUTCDay();
-      if (dow !== 0 && dow !== 6) remaining--;
-    }
-    return result;
   }
 
   /** Fix 5: use canonical SCORE_BUCKETS — single source of truth. */

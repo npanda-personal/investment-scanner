@@ -3355,6 +3355,32 @@ describe('PipelineOrchestrationService', () => {
       errors: [],
       categories: {},
     });
+    const marketPulseRefresh = jest.fn().mockResolvedValue({
+      id: 'pulse-snap-1',
+      status: 'FRESH',
+      marketHealthScore: 75,
+      marketHealthLabel: 'HEALTHY',
+      warningsJson: [],
+      dataThroughDate: new Date('2026-05-25T00:00:00.000Z'),
+    });
+    const stockInterestRefresh = jest.fn().mockResolvedValue({
+      status: 'COMPLETED',
+      scope: { region: 'IN', assetType: 'STOCK', timeframe: '1d' },
+      snapshotDate: '2026-05-25',
+      dataThroughDate: '2026-05-25',
+      generatedAt: '2026-05-25T03:00:00.000Z',
+      totalCount: 2,
+      processedCount: 2,
+      succeededCount: 2,
+      failedCount: 0,
+      skippedCount: 0,
+      unchangedCount: 0,
+      nextOffset: null,
+      hasMore: false,
+      warnings: [],
+      errors: [],
+      categories: {},
+    });
     const service = new PipelineOrchestrationService(
       repository as any,
       { evaluateScheduledStage, evaluate: jest.fn() } as any,
@@ -3369,8 +3395,9 @@ describe('PipelineOrchestrationService', () => {
       { run: todayReviewRun } as any,
       { refreshActiveRows: ledgerRefresh } as any,
       {} as any,
-      {} as any,
-      { refreshSnapshots: earningsRefresh } as any
+      { refreshSnapshot: marketPulseRefresh } as any,
+      { refreshSnapshots: earningsRefresh } as any,
+      { refreshSnapshots: stockInterestRefresh } as any
     );
 
     const response = await service.runScheduledDataQualityStage({
@@ -3410,6 +3437,8 @@ describe('PipelineOrchestrationService', () => {
       'TODAY_REVIEW',
       'SIGNAL_POSITION_LEDGER',
       'SECTOR_INTELLIGENCE_REFRESH',
+      'MARKET_PULSE_REFRESH',
+      'STOCK_INTEREST_REFRESH',
     ]);
     expect(evaluateScheduledStage).toHaveBeenCalledTimes(1);
     expect(signalRun).toHaveBeenCalledTimes(1);

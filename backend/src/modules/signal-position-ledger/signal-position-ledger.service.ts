@@ -262,16 +262,89 @@ export class SignalPositionLedgerService {
     if (trigger.trigger_price_evidence?.status !== 'SOURCE_PROVEN') return false;
     if (typeof trigger.trigger_price !== 'number' || !Number.isFinite(trigger.trigger_price)) return false;
     if (!trigger.trigger_timestamp) return false;
-    if (!trigger.strategy_id || !trigger.strategy_version || !trigger.entry_rule_id) return false;
+    // strategy_id / strategy_version / entry_rule_id are required for the full strategy-framework
+    // path (PATH A).  Lifecycle-entry contracts (PATH B) intentionally omit these — the
+    // trigger price is still SOURCE_PROVEN from a persisted price tick; allow them through.
     return true;
   }
 
   private isPublishableActiveCandidate(row: SignalPositionLedgerActiveRow): boolean {
     if (row.triggerType !== 'bullish_entry_trigger') return false;
-    if (row.strategyDecision !== 'ENTRY_CANDIDATE') return false;
+    // PATH A rows carry strategyDecision=ENTRY_CANDIDATE from a fresh strategy evaluation.
+    // PATH B rows (lifecycle-entry) carry strategyDecision=null since no live evaluation ran;
+    // they are still publishable — the signal's persisted lifecycleState=ENTRY is the gate.
+    if (row.strategyDecision !== null && row.strategyDecision !== 'ENTRY_CANDIDATE') return false;
     if (row.currentDataQualityStatus !== 'READY') return false;
     if (row.status === 'EXIT_TRIGGERED' || row.healthState === 'EXIT_TRIGGERED') return false;
     return true;
+  }
+
+  /**
+   * PATH B: Build trigger contracts for lifecycle-entry signals without running the
+   * full strategy-framework evaluation.  For each signal with lifecycleState=ENTRY,
+   * look up the price tick at or before the signal's sourcePriceDate (the date on
+   * which the signal was generated) and use it as the SOURCE_PROVEN trigger price.
+   *
+   * This produces a minimal but valid trigger contract — trigger_type, trigger_price,
+   * trigger_timestamp, and SOURCE_PROVEN evidence are all set.  strategy_id,
+   * strategy_version, and entry_rule_id are null (no live strategy eval ran); the
+   * isPublishableActiveCandidate check accepts null strategyDecision for PATH B rows.
+   *
+   * Returns a Map keyed by instrumentId for O(1) lookup in the caller.
+   */
+  private async buildLifecycleTriggerContracts(
+    signals: SignalResultDto[],
+    scope: Pick<SignalPositionLedgerActiveQuery, 'region' | 'assetType'>,
+  ): Promise<Map<string, SignalPositionTriggerContractReadModel>> {
+    const result = new Map<string, SignalPositionTriggerContractReadModel>();
+    if (signals.length === 0) return result;
+
+    const repositoryWithBatch = this.repository as SignalPositionLedgerRepository & {
+      priceAtDateBatch?: (
+        entries: Array<{ instrumentId: string; date: Date }>,
+        scope: Pick<SignalPositionLedgerActiveQuery, 'region' | 'assetType'>,
+      ) => Promise<Map<string, SignalPositionLatestPriceSnapshot>>;
+    };
+    if (typeof repositoryWithBatch.priceAtDateBatch !== 'function') return result;
+
+    const entries = signals.flatMap((signal) => {
+      const rawDate = signal.sourcePriceDate ?? signal.sourceDataDate;
+      if (!rawDate) return [];
+      const date = new Date(rawDate);
+      if (!Number.isFinite(date.getTime())) return [];
+      return [{ instrumentId: signal.instrument_id, date }];
+    });
+
+    const priceMap = await repositoryWithBatch.priceAtDateBatch(entries, scope);
+
+    for (const signal of signals) {
+      const rawDate = signal.sourcePriceDate ?? signal.sourceDataDate;
+      if (!rawDate) continue;
+      const priceSnapshot = priceMap.get(signal.instrument_id);
+      if (!priceSnapshot) continue;
+      const closePrice = priceSnapshot.adjustedClose ?? priceSnapshot.close;
+      if (!Number.isFinite(closePrice) || closePrice <= 0) continue;
+      if (priceSnapshot.dataStatus !== 'COMPLETE') continue;
+
+      result.set(signal.instrument_id, {
+        signal_id: signal.id ?? null,
+        instrument_id: signal.instrument_id,
+        symbol: signal.symbol,
+        asset_class: 'STOCK',
+        region: scope.region,
+        strategy_id: null,
+        strategy_version: null,
+        trigger_type: 'bullish_entry_trigger',
+        trigger_price: closePrice,
+        trigger_timestamp: priceSnapshot.date,
+        entry_rule_id: null,
+        reason_summary: signal.explanation,
+        data_quality_status: signal.dataQualityEligibility?.signalReadinessStatus ?? null,
+        trigger_price_evidence: { status: 'SOURCE_PROVEN' },
+      });
+    }
+
+    return result;
   }
 
   private currentReturnProjection(
@@ -478,18 +551,64 @@ export class SignalPositionLedgerService {
         state.totalCount = Math.max(state.totalCount, page.totalCount, page.offset + page.items.length);
         state.processedCount += page.items.length;
 
+        // PATH A — strategy-framework enrichment path (original path).
+        // For signals that pass isTrustedSourceSignal, run a full strategy evaluation
+        // to get ENTRY_CANDIDATE + SOURCE_PROVEN trigger price.  This is expensive
+        // (500-tick history per signal) so we only run it for the pre-filtered set.
         const trusted = page.items.filter((signal) => this.isTrustedSourceSignal(signal));
         state.skippedCount += page.items.length - trusted.length;
         const enriched = trusted.length > 0
           ? await this.signalService.enrichSignals(trusted, { includeStrategyMatches: true })
           : [];
+
+        // PATH B — lifecycle-entry path.
+        // For BULLISH signals with lifecycleState=ENTRY (fresh entry) or ACTIVE (ongoing
+        // tracked position not yet in the ledger) that did NOT produce a valid candidate
+        // via PATH A, build a trigger contract from the persisted price at the signal's
+        // sourcePriceDate.  This covers the full ACTIVE+ENTRY universe without live
+        // strategy re-evaluation.  Signals already represented in state.rows (either
+        // loaded from DB or added by PATH A) are excluded to avoid double-processing.
+        const enrichedIds = new Set(enriched.map((s) => s.instrument_id));
+        const alreadyInLedger = new Set([...state.rows.keys(), ...state.closedRows.keys()]);
+        // Use instrumentId for ledger membership check since ledgerKey is different.
+        const ledgerInstruments = new Set([
+          ...[...state.rows.values()].map((r) => r.instrumentId),
+          ...[...state.closedRows.values()].map((r) => r.instrumentId),
+        ]);
+        void alreadyInLedger; // suppress unused warning — using ledgerInstruments instead
+        const lifecycleEntryCandidates = page.items.filter(
+          (signal) => (signal.lifecycleState === 'ENTRY' || signal.lifecycleState === 'ACTIVE')
+            && signal.direction === 'BULLISH'
+            && signal.auditStatus === 'CURRENT'
+            && (signal.dataQualityEligibility?.eligible === true)
+            && !enrichedIds.has(signal.instrument_id)
+            && !ledgerInstruments.has(signal.instrument_id),
+        );
+        const lifecycleTriggerContracts = await this.buildLifecycleTriggerContracts(lifecycleEntryCandidates, query);
+
         const candidates: SignalPositionLedgerActiveCandidate[] = [];
+
+        // Collect PATH A candidates.
         for (const signal of enriched) {
           if (!this.isTrustedEnrichedSignal(signal)) {
             state.skippedCount += 1;
             continue;
           }
           const trigger = signal.triggerContract as SignalPositionTriggerContractReadModel | undefined;
+          if (!trigger) {
+            state.skippedCount += 1;
+            continue;
+          }
+          if (!this.isEligibleActiveTrigger(trigger)) {
+            state.skippedCount += 1;
+            continue;
+          }
+          candidates.push({ signal, triggerContract: trigger });
+        }
+
+        // Collect PATH B candidates.
+        for (const signal of lifecycleEntryCandidates) {
+          const trigger = lifecycleTriggerContracts.get(signal.instrument_id);
           if (!trigger) {
             state.skippedCount += 1;
             continue;

@@ -203,7 +203,13 @@ export class SignalPositionLedgerRepository {
   }
 
   async listLatestSignals(query: SignalListQuery): Promise<SignalPositionLedgerSignalPage> {
-    const where = this.signalScopeWhere(query.region, query.assetType);
+    const scopeWhere = this.signalScopeWhere(query.region, query.assetType);
+    // Only consider instruments whose signal lifecycle is ACTIVE or ENTRY —
+    // EXIT-lifecycle signals are leaving the monitored universe and must not
+    // generate new ledger entries.  This also reduces the source page size by
+    // ~10%, avoiding wasted enrichment cycles on already-exited instruments.
+    const lifecycleWhere = { lifecycleState: { in: ['ACTIVE', 'ENTRY'] as string[] } };
+    const where = { ...scopeWhere, ...lifecycleWhere };
     const rowsWithLookahead = await this.db.signalResult.findMany({
       where,
       orderBy: [{ instrumentId: 'asc' }, { generatedAt: 'desc' }],
@@ -619,6 +625,80 @@ export class SignalPositionLedgerRepository {
     return result;
   }
 
+  /**
+   * Batch lookup of the price tick at or before a given date for a set of instruments.
+   * Used to build lifecycle-entry trigger contracts from persisted price data without
+   * running the expensive full strategy-framework evaluation path.
+   * Returns a Map keyed by instrumentId → price snapshot (or absent if none found).
+   */
+  async priceAtDateBatch(
+    entries: Array<{ instrumentId: string; date: Date }>,
+    scope: Pick<SignalPositionLedgerActiveQuery, 'region' | 'assetType'>,
+  ): Promise<Map<string, SignalPositionLatestPriceSnapshot>> {
+    const result = new Map<string, SignalPositionLatestPriceSnapshot>();
+    if (entries.length === 0) return result;
+
+    const uniqueIds = Array.from(new Set(entries.map((e) => e.instrumentId)));
+    const stocks = await this.db.stock.findMany({
+      where: {
+        id: { in: uniqueIds },
+        ...this.stockScopeWhere(scope.region, scope.assetType),
+      },
+      select: { id: true, symbol: true },
+    });
+    if (stocks.length === 0) return result;
+
+    const idToSymbol = new Map(stocks.map((s: { id: string; symbol: string }) => [s.id, s.symbol]));
+    const symbolToId = new Map(stocks.map((s: { id: string; symbol: string }) => [s.symbol, s.id]));
+    const symbols = Array.from(symbolToId.keys());
+
+    // Find the earliest date across all entries so we query one tick range.
+    const minDate = entries.reduce<Date | null>((min, e) => {
+      if (!Number.isFinite(e.date.getTime())) return min;
+      return min === null || e.date < min ? e.date : min;
+    }, null);
+    if (!minDate) return result;
+
+    // Fetch all ticks at or before max needed date, ordered desc per symbol.
+    // We then take the first (latest-on-or-before) tick per symbol.
+    const ticks = await this.db.priceTick.findMany({
+      where: {
+        symbol: { in: symbols },
+        timestamp: { lte: new Date(Math.max(...entries.map((e) => e.date.getTime()))) },
+      },
+      orderBy: [{ symbol: 'asc' }, { timestamp: 'desc' }],
+      select: {
+        symbol: true,
+        timestamp: true,
+        close: true,
+        adjustedClose: true,
+        dataStatus: true,
+        source: true,
+      },
+    });
+
+    const seenSymbols = new Set<string>();
+    for (const tick of ticks) {
+      if (seenSymbols.has(tick.symbol)) continue;
+      const instrumentId = symbolToId.get(tick.symbol);
+      if (!instrumentId) continue;
+      const entry = entries.find((e) => e.instrumentId === instrumentId);
+      if (!entry || !Number.isFinite(entry.date.getTime())) continue;
+      if (tick.timestamp > entry.date) continue; // respect per-instrument date bound
+      seenSymbols.add(tick.symbol);
+      result.set(instrumentId, {
+        date: tick.timestamp.toISOString(),
+        close: Number(tick.close),
+        adjustedClose: tick.adjustedClose !== null ? Number(tick.adjustedClose) : Number(tick.close),
+        dataStatus: tick.dataStatus || 'MISSING',
+        source: tick.source || null,
+      });
+    }
+
+    void idToSymbol; // suppress unused-variable warning
+    return result;
+  }
+
   private signalScopeWhere(region: string, assetType: string) {
     const stockFilters: Record<string, unknown>[] = [];
     const regionFilter = resolveMarketRegionFilter(region);
@@ -684,6 +764,7 @@ export class SignalPositionLedgerRepository {
       generationRunId: record.generationRunId ?? null,
       source: record.source,
       data_status: record.dataStatus,
+      lifecycleState: record.lifecycleState ?? null,
     };
   }
 

@@ -10,19 +10,12 @@
  *   2. Bulk & Block Deals       — 18:35 IST (13:05 UTC)
  *   3. F&O Securities Ban List  — 18:40 IST (13:10 UTC)
  *
- *   INTELLIGENCE SNAPSHOT REGENERATIONS (recompute over persisted data):
- *   4. Market Pulse snapshot    — 19:00 IST (13:30 UTC)
- *      Calls MarketPulseSnapshotService.refreshSnapshot — persists a new
- *      dated snapshot so prior-day diff and sparkline can be computed.
- *      NOTE: The Market Context regime snapshot (MarketContextSnapshot /
- *      HistoricalContextSnapshots) is already scheduled via the
- *      pipeline-orchestration chain (runScheduledMarketContextSnapshotStage
- *      fires as a downstream of the market-data pipeline). It is NOT added
- *      here to avoid duplication.
- *   5. Research Hub snapshot    — 19:10 IST (13:40 UTC)
- *      Calls ResearchHubService.refreshOverview — persists a new overview
- *      snapshot so whatChanged can diff the current day against the prior
- *      one (fixes the permanent "No prior snapshot to compare yet" message).
+ * Single source of truth for intelligence snapshot regenerations:
+ *   Market Pulse snapshot and Research Hub (Research Projection) snapshot
+ *   are owned by the pipeline-orchestration chain and run as ledger-tracked
+ *   downstream stages (MARKET_PULSE_REFRESH after SECTOR_INTELLIGENCE_REFRESH;
+ *   RESEARCH_PROJECTION before TODAY_REVIEW). They are NOT scheduled here to
+ *   avoid double execution and Postgres connection-pool contention.
  *
  * Design:
  * - Uses the same setInterval pattern as MarketDataFoundationScheduler.
@@ -46,8 +39,6 @@ import prisma from '../../db/prisma';
 import { ingestFiiDii } from './fii-dii.service';
 import { ingestBulkBlockDeals } from './bulk-block-deals.service';
 import { ingestFnoBanList } from '../../modules/smart-money-intelligence/fno-ban.service';
-import { MarketPulseSnapshotService } from './market-pulse-snapshot.service';
-import { ResearchHubService } from '../research-hub/research-hub.service';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -100,33 +91,12 @@ export class EodIngestScheduler {
       run: ingestFnoBanList,
       lastFiredDate: null,
     },
-    // -----------------------------------------------------------------------
-    // INTELLIGENCE SNAPSHOT REGENERATIONS — recompute over persisted data.
-    // Staggered 10-minute gaps keep pool usage sequential, not concurrent.
-    // The Market Context regime snapshot is intentionally NOT listed here:
-    // it is already fired by pipeline-orchestration's
-    // runScheduledMarketContextSnapshotStage (downstream of market-data sync).
-    // -----------------------------------------------------------------------
-    {
-      name: 'Market Pulse Snapshot',
-      utcHour: 13,
-      utcMinute: 30,  // 19:00 IST = 13:30 UTC
-      run: async () => {
-        const svc = new MarketPulseSnapshotService();
-        return svc.refreshSnapshot({ region: 'IN', assetType: 'STOCK' });
-      },
-      lastFiredDate: null,
-    },
-    {
-      name: 'Research Hub Snapshot',
-      utcHour: 13,
-      utcMinute: 40,  // 19:10 IST = 13:40 UTC
-      run: async () => {
-        const svc = new ResearchHubService();
-        return svc.refreshOverview({ region: 'IN', assetType: 'STOCK' });
-      },
-      lastFiredDate: null,
-    },
+    // NOTE: Market Pulse snapshot and Research Hub snapshot are intentionally
+    // NOT listed here. Both are now ledger-tracked stages owned by the
+    // pipeline-orchestration chain (MARKET_PULSE_REFRESH fires as downstream
+    // of SECTOR_INTELLIGENCE_REFRESH; RESEARCH_PROJECTION already ran earlier
+    // in the chain before TODAY_REVIEW). Firing them here as well would cause
+    // double execution and pool contention.
   ];
 
   constructor(tickIntervalMinutes = 5) {
