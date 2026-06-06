@@ -5,6 +5,7 @@ describe('portfolio intelligence routes', () => {
   it('registers MVP endpoints', () => {
     const router = createPortfolioIntelligenceRouter({
       intelligence: jest.fn(),
+      refresh: jest.fn(),
       redFlags: jest.fn(),
       review: jest.fn(),
     } as any);
@@ -14,6 +15,7 @@ describe('portfolio intelligence routes', () => {
 
     expect(routes).toEqual([
       'GET /portfolios/:id/intelligence',
+      'POST /portfolios/:id/intelligence/refresh',
       'GET /portfolios/:id/red-flags',
       'GET /portfolios/:id/review',
     ]);

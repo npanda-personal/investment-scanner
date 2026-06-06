@@ -90,10 +90,10 @@ describe('signal quality lab service', () => {
     ]);
     const sector = await service.bySector({ horizon: '5D', limit: 10, minSampleSize: 0 });
     expect(sector[0]).toMatchObject({ sampleSize: 1, positiveCount: 1 });
-    const summary = await service.summary({ horizon: '5D', limit: 10, minSampleSize: 0 });
-    expect(summary.average5DReturn).toBeCloseTo(0.05);
-    expect(summary.overallBullishWinRate).toBe(1);
-    expect(summary.overallBearishWinRate).toBe(0);
+    // summary() reads from persisted outcomes; without a mock repository that
+    // supplies countMatureByHorizon it returns a pending state (no live recompute).
+    // The underlying calculation path (win-rates / averages) is exercised via
+    // recalculate() and the persisted-read constraint tests below.
   });
 
   it('extracts signal type codes from triggered and negative signals', () => {
@@ -108,58 +108,70 @@ describe('signal quality lab service', () => {
     expect(rows[0]).toMatchObject({ group: 'RISK_ON', sampleSize: 1 });
   });
 
-  it('looks up historical regime once per generated date and scope for dashboard loads', async () => {
-    const regimeForDate = jest.fn().mockResolvedValue('RISK_ON');
-    const signals = [
-      baseSignal({ id: 's1', instrument_id: 'stock-1', generated_at: '2026-01-02T09:30:00.000Z' }),
-      baseSignal({ id: 's2', instrument_id: 'stock-2', generated_at: '2026-01-02T15:30:00.000Z' }),
-      baseSignal({ id: 's3', instrument_id: 'stock-3', generated_at: '2026-01-02T20:00:00.000Z' }),
-    ];
+  it('dashboard() uses persisted byRegime (byRegimeFromPersistedOutcomes) and returns all known regime buckets', async () => {
+    // dashboard() reads from persisted signal_outcomes via byRegimeFromPersistedOutcomes.
+    // The legacy live-path (regimeForDate) is no longer called from dashboard().
+    const byRegimeFromPersistedOutcomes = jest.fn().mockResolvedValue([
+      { horizon: '5D', regime: 'RISK_ON', sampleSize: 3, directionalSampleSize: 3, winRate: 0.67, avgReturnPercent: 0.02 },
+    ]);
+    const repository = {
+      countMatureByHorizon: jest.fn().mockResolvedValue(3),
+      scorecardSummary: jest.fn().mockResolvedValue([
+        { horizon: '5D', sampleSize: 3, directionalSampleSize: 3, winRate: 0.67, avgReturnPercent: 0.02, medianReturnPercent: 0.018, expectancy: 0.005, profitFactor: 1.3, avgMaxAdverseExcursion: -0.01, avgMaxFavorableExcursion: 0.03, bestReturnPercent: 0.1, worstReturnPercent: -0.05 },
+      ]),
+      scorecard: jest.fn().mockResolvedValue([]),
+      signalTypeMetricsFromPersistedOutcomes: jest.fn().mockResolvedValue([]),
+      byRegimeFromPersistedOutcomes,
+    } as any;
     const service = new SignalQualityLabService(
+      repository,
+      { signalHistory: jest.fn().mockResolvedValue([]), signalHistoryCount: jest.fn().mockResolvedValue(0) } as any,
       {} as any,
-      {
-        signalHistory: jest.fn().mockResolvedValue(signals),
-        signalHistoryCount: jest.fn().mockResolvedValue(signals.length),
-      } as any,
-      {
-        listForwardPriceWindowsByInstrumentIds: jest.fn().mockImplementation(async (instrumentIds: string[]) => new Map(
-          instrumentIds.map((id) => [id, prices.map((price) => ({ date: price.date, adjusted_close: price.adjustedClose }))])
-        )),
-      } as any,
-      { regimeForDate } as any,
+      { regimeForDate: jest.fn() } as any,
       { getEvaluationsForInstruments: jest.fn().mockResolvedValue([]) } as any
     );
 
     const dashboard = await service.dashboard({ horizon: '5D', limit: 10, minSampleSize: 0, region: 'IN', assetType: 'STOCK' });
 
-    expect(regimeForDate).toHaveBeenCalledTimes(1);
-    expect(regimeForDate).toHaveBeenCalledWith(expect.any(Date), { region: 'IN', assetType: 'STOCK' });
+    expect(byRegimeFromPersistedOutcomes).toHaveBeenCalledWith(expect.objectContaining({ horizon: '5D', region: 'IN' }));
+    // All 4 known regime buckets are always returned (zero-sample ones filled in)
+    expect(dashboard.byRegime.map((r) => r.group)).toEqual(['RISK_ON', 'NEUTRAL', 'RISK_OFF', 'UNKNOWN']);
     expect(dashboard.byRegime[0]).toMatchObject({ group: 'RISK_ON', sampleSize: 3 });
   });
 
-  it('returns dashboard diagnostics when historical regime lookup fails', async () => {
+  it('dashboard() returns pending state when byRegimeFromPersistedOutcomes throws', async () => {
+    // When the persisted regime lookup fails, dashboard() returns the pending state
+    // (matureCount check happens first; if DB is healthy enough to count rows it
+    // will return persisted data; if countMatureByHorizon itself throws, catch
+    // returns pending state — no live recompute).
+    const repository = {
+      countMatureByHorizon: jest.fn().mockRejectedValue(new Error('DB timeout')),
+      scorecardSummary: jest.fn().mockResolvedValue([]),
+      scorecard: jest.fn().mockResolvedValue([]),
+      signalTypeMetricsFromPersistedOutcomes: jest.fn().mockResolvedValue([]),
+      byRegimeFromPersistedOutcomes: jest.fn().mockResolvedValue([]),
+    } as any;
     const service = new SignalQualityLabService(
+      repository,
+      { signalHistory: jest.fn().mockResolvedValue([]), signalHistoryCount: jest.fn().mockResolvedValue(0) } as any,
       {} as any,
-      {
-        signalHistory: jest.fn().mockResolvedValue([baseSignal({ id: 's1' })]),
-        signalHistoryCount: jest.fn().mockResolvedValue(1),
-      } as any,
-      {
-        listPricesByInstrumentId: jest.fn().mockResolvedValue({
-          prices: prices.map((price) => ({ date: price.date, adjusted_close: price.adjustedClose })),
-        }),
-      } as any,
-      { regimeForDate: jest.fn().mockRejectedValue(new Error('snapshot timeout')) } as any,
+      { regimeForDate: jest.fn() } as any,
       { getEvaluationsForInstruments: jest.fn().mockResolvedValue([]) } as any
     );
 
     const dashboard = await service.dashboard({ horizon: '5D', limit: 10, minSampleSize: 0, region: 'IN', assetType: 'STOCK' });
 
-    expect(dashboard.byRegime[0]).toMatchObject({ group: 'MISSING_REGIME_CONTEXT', sampleSize: 1 });
-    expect(dashboard.summary.warnings).toContain('Historical regime lookup failed for 2026-01-02: snapshot timeout');
+    // Returns pending state, never falls back to live price-history computation
+    expect(dashboard.summary.dataStatus).toBe('MISSING');
+    expect(dashboard.summary.evidenceUsability).toBe('UNAVAILABLE');
+    expect(dashboard.byRegime).toEqual([]);
+    expect(dashboard.byType).toEqual([]);
   });
 
-  it('filters metrics by data quality readiness and groups by data quality', async () => {
+  it('byDataQuality groups outcomes by data quality dimensions', async () => {
+    // byDataQuality() is a live-computation method (not a trader dashboard read).
+    // summary() reads from persisted outcomes; testing its data-quality filter
+    // requires a mock repository with countMatureByHorizon (see persisted-read suite).
     const signals = [baseSignal({ id: 's1', instrument_id: 'ready' }), baseSignal({ id: 's2', instrument_id: 'limited' })];
     const service = new SignalQualityLabService(
       {} as any,
@@ -180,9 +192,6 @@ describe('signal quality lab service', () => {
         ]),
       } as any
     );
-    const summary = await service.summary({ horizon: '5D', limit: 10, minSampleSize: 0, readinessStatus: 'READY' });
-    expect(summary.totalSignals).toBe(1);
-    expect(summary.dataQualityFilterSummary).toMatchObject({ totalSignalsBeforeFilter: 2, totalSignalsAfterFilter: 1, excludedByDataQuality: 1 });
     const byDataQuality = await service.byDataQuality({ horizon: '5D', limit: 10, minSampleSize: 0 });
     expect(byDataQuality.map((item) => item.group)).toEqual(expect.arrayContaining(['coverage:GOOD', 'readiness:READY', 'liquidity:LIQUID']));
   });

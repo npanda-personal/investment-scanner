@@ -183,20 +183,55 @@ describe('signal calibration engine service', () => {
     expect(bearish.calibratedScore).toBeGreaterThanOrEqual(0);
   });
 
-  it('persists on-demand latest calibration and compare response', async () => {
+  it('latestForInstrument returns null when no persisted calibration exists (no calibrateAndPersist fallback)', async () => {
+    // Persisted-read enforcement: latestForInstrument() must NOT call calibrateAndPersist() on GET.
+    // Default service() has repository.latestForInstrument returning null → latestPersistedForInstrument → null.
     const setup = service();
     const latest = await setup.instance.latestForInstrument('stock-1');
-    expect(latest?.id).toBe('calibration-1');
-    expect(setup.repository.create).toHaveBeenCalled();
+    expect(latest).toBeNull();
+    expect(setup.repository.create).not.toHaveBeenCalled();
+  });
+
+  it('latestForInstrument returns persisted calibration when it exists', async () => {
+    // Use a realistic calibrated object so withEvidenceFromSummary can process it.
+    const persistedCalibration = service().instance.calibrate(rawSignal(), context());
+    const setup = service({
+      repository: {
+        latestForInstrument: jest.fn().mockResolvedValue(persistedCalibration),
+      },
+    });
+    const latest = await setup.instance.latestForInstrument('stock-1');
+    expect(latest?.symbol).toBe('AAPL');
+    expect(setup.repository.create).not.toHaveBeenCalled();
+  });
+
+  it('compare returns null when no persisted calibration exists (no calibrateAndPersist fallback)', async () => {
+    // Persisted-read enforcement: compare() must NOT call calibrateAndPersist() on GET.
+    // Default service() has repository.latestForInstrument returning null → null calibration.
+    const setup = service();
+    const comparison = await setup.instance.compare('stock-1');
+    expect(comparison).toBeNull();
+    expect(setup.repository.create).not.toHaveBeenCalled();
+  });
+
+  it('compare returns both persisted raw signal and persisted calibrated result when both exist', async () => {
+    const persistedCalibration = service().instance.calibrate(rawSignal(), context());
+    const trustedReadEvidence = {
+      auditStatus: 'TRUSTED_READ',
+      dataQualityEligibility: { status: 'ELIGIBLE', reason: 'ok', excludedSignalTypes: [] },
+    };
+    const setup = service({
+      repository: {
+        latestForInstrument: jest.fn().mockResolvedValue(persistedCalibration),
+      },
+      signalService: {
+        latestForInstrument: jest.fn().mockResolvedValue({ ...rawSignal(), ...trustedReadEvidence }),
+      },
+    });
     const comparison = await setup.instance.compare('stock-1');
     expect(comparison?.rawSignal.symbol).toBe('AAPL');
     expect(comparison?.calibratedSignal.symbol).toBe('AAPL');
-    expect(setup.qualityService.summary).toHaveBeenCalledWith(expect.objectContaining({ horizon: '20D' }));
-    expect(comparison?.calibratedSignal.calibrationEvidence?.evidenceBasis).toMatchObject({
-      status: 'MEASURED',
-      signalQualityGeneratedAt: '2026-05-10T09:30:00.000Z',
-      latestMeasurablePriceDate: '2026-05-10',
-    });
+    expect(setup.repository.create).not.toHaveBeenCalled();
   });
 
   it('projects scoped page summary and measured evidence basis from scoped top summary', async () => {
@@ -247,7 +282,9 @@ describe('signal calibration engine service', () => {
     });
   });
 
-  it('uses the same summary scope query shape for compare and top under the same scope and horizon', async () => {
+  it('uses the correct summary scope query shape for top', async () => {
+    // compare() no longer calls qualityService.summary (persisted-read only).
+    // top() still enriches persisted items with quality evidence from summary.
     const summary = jest.fn().mockResolvedValue({
       generatedAt: '2026-05-20T10:00:00.000Z',
       dataStatus: 'PARTIAL',
@@ -261,9 +298,6 @@ describe('signal calibration engine service', () => {
       },
     });
     const setup = service({
-      signalService: {
-        latestForInstrument: jest.fn().mockResolvedValue(rawSignal({ sector: 'Technology', country: 'US' })),
-      },
       repository: {
         top: jest.fn().mockResolvedValue({
           items: [{
@@ -284,10 +318,9 @@ describe('signal calibration engine service', () => {
       },
     });
 
-    await setup.instance.compare('stock-1', 'US', 'STOCK', '20D');
     await setup.instance.top({ limit: 25, region: 'US', assetType: 'STOCK', horizon: '20D' });
 
-    expect(summary).toHaveBeenCalledTimes(2);
+    expect(summary).toHaveBeenCalledTimes(1);
     expect(summary.mock.calls[0][0]).toEqual({
       horizon: '20D',
       limit: 1,
@@ -297,7 +330,6 @@ describe('signal calibration engine service', () => {
       sector: undefined,
       country: undefined,
     });
-    expect(summary.mock.calls[1][0]).toEqual(summary.mock.calls[0][0]);
   });
 
   it('marks horizon-limited evidence basis and exposes next evaluable date', async () => {

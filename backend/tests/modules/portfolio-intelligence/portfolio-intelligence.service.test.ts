@@ -65,10 +65,21 @@ const allocation = (holdings: any[]) => ({
   generatedAt: '2026-04-28T00:00:00.000Z',
 });
 
-const serviceWith = (holdings: any[]) => new PortfolioIntelligenceService({
-  summary: jest.fn().mockResolvedValue(summary(holdings)),
-  allocation: jest.fn().mockResolvedValue(allocation(holdings)),
-} as any);
+/** Mock repository: always a cache miss so the service falls through to compute + persist. */
+const mockRepo = () => ({
+  findByPortfolioId: jest.fn().mockResolvedValue(null),
+  upsertSnapshot: jest.fn().mockResolvedValue(undefined),
+});
+
+const serviceWith = (holdings: any[]) => new PortfolioIntelligenceService(
+  {
+    summary: jest.fn().mockResolvedValue(summary(holdings)),
+    allocation: jest.fn().mockResolvedValue(allocation(holdings)),
+  } as any,
+  undefined,   // default thresholds
+  undefined,   // no capitalPostureService
+  mockRepo() as any,
+);
 
 describe('PortfolioIntelligenceService', () => {
   it('calculates health score and status thresholds', async () => {

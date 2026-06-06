@@ -730,7 +730,9 @@ describe('SignalGenerationEngineService', () => {
     expect(runSpy).not.toHaveBeenCalled();
   });
 
-  it('fails closed for untrusted latest instrument signal when DQ excludes the instrument', async () => {
+  it('returns null for untrusted latest instrument signal without triggering generation', async () => {
+    // Persisted-read enforcement: when the persisted signal is not trusted (LEGACY_MISSING),
+    // latestForInstrument() must return null without triggering run() or generateForInstrument().
     const repository = {
       latestForInstrument: jest.fn().mockResolvedValue({
         instrument_id: 'legacy',
@@ -758,24 +760,12 @@ describe('SignalGenerationEngineService', () => {
       }),
       ...runAuditRepository(),
     };
-    const dataQualityService = {
-      filterEligibleInstruments: jest.fn().mockResolvedValue({
-        eligibleInstrumentIds: [],
-        excludedInstrumentIds: ['legacy'],
-        missingQualityEvaluationCount: 1,
-        warnings: ['legacy: missing data quality evaluation'],
-        evaluationsByInstrumentId: {},
-      }),
-    };
-    const service = new SignalGenerationEngineService(repository as any, {} as any, {} as any, dataQualityService as any);
+    const service = new SignalGenerationEngineService(repository as any, {} as any, {} as any, {} as any);
     const generateSpy = jest.spyOn(service, 'generateForInstrument');
 
     const result = await service.latestForInstrument('legacy');
 
     expect(result).toBeNull();
-    expect(dataQualityService.filterEligibleInstruments).toHaveBeenCalledWith(['legacy'], expect.objectContaining({
-      missingQualityBehavior: 'SKIP',
-    }));
     expect(generateSpy).not.toHaveBeenCalled();
   });
 

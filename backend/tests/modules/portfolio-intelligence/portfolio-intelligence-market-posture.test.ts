@@ -71,6 +71,12 @@ const allocationFor = (holdings: any[]) => ({
 
 const ASSEMBLED_AT = '2026-06-04T10:00:00.000Z';
 
+/** Mock repository: always a cache miss so the service falls through to compute + persist. */
+const mockRepo = () => ({
+  findByPortfolioId: jest.fn().mockResolvedValue(null),
+  upsertSnapshot: jest.fn().mockResolvedValue(undefined),
+});
+
 /** Build a service with mocked CapitalPostureService and portfolio service. */
 const serviceWith = (
   holdings: any[],
@@ -81,8 +87,9 @@ const serviceWith = (
       summary: jest.fn().mockResolvedValue(summaryFor(holdings)),
       allocation: jest.fn().mockResolvedValue(allocationFor(holdings)),
     } as any,
-    undefined, // use default thresholds
+    undefined,         // use default thresholds
     capitalPostureMock,
+    mockRepo() as any, // no-op repository — unit tests don't touch DB
   );
 
 const mockRiskOff = () => ({

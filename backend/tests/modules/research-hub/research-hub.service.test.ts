@@ -89,13 +89,14 @@ describe('ResearchHubService', () => {
         generatedAt: '2026-05-27T00:00:00.000Z',
         dataGaps: [],
       } as any;
+      // AUDIT-2 / AUDIT-3 #8: overview() now reads from research_overview_snapshots (new dedicated table).
+      // The db mock exposes researchOverviewSnapshot.findUnique returning the pre-built payload.
       const db = {
+        researchOverviewSnapshot: {
+          findUnique: jest.fn().mockResolvedValueOnce({ overviewJson: cachedOverview }),
+        },
         pipelineRun: {
-          // First call: loadCachedOverview returns the snapshot
-          // Second call: loadPriorOverview (for NR-52 re-diff) returns null (no prior yet)
-          findFirst: jest.fn()
-            .mockResolvedValueOnce({ metadata: { version: 'research-overview-v1', overview: cachedOverview } })
-            .mockResolvedValueOnce(null),
+          findFirst: jest.fn().mockResolvedValue(null),
         },
       };
       const cachedService = new ResearchHubService(
@@ -110,18 +111,14 @@ describe('ResearchHubService', () => {
 
       const result = await cachedService.overview();
 
-      // NR-52: result is now a spread of cachedOverview with a fresh whatChanged (re-diffed).
-      // We cannot use toBe() anymore since the object is rebuilt.
+      // overview() is a pure DB read — no recomputation, returns the stored payload AS-IS.
       expect(result.generatedAt).toBe(cachedOverview.generatedAt);
-      expect(result.marketReadiness).toBe(cachedOverview.marketReadiness);
-      expect(result.researchPriorities).toBe(cachedOverview.researchPriorities);
-      expect(db.pipelineRun.findFirst).toHaveBeenCalledWith(expect.objectContaining({
-        where: expect.objectContaining({
-          pipelineKey: 'research-hub-overview',
-          scopeRegion: 'IN',
-          scopeAssetType: 'STOCK',
-        }),
-      }));
+      expect(result.marketReadiness).toEqual(cachedOverview.marketReadiness);
+      expect(result.researchPriorities).toEqual(cachedOverview.researchPriorities);
+      expect(db.researchOverviewSnapshot.findUnique).toHaveBeenCalledWith({
+        where: { region_assetType: { region: 'IN', assetType: 'STOCK' } },
+      });
+      // Must NOT fan out to heavy services on the GET path
       expect(strategyService.marketGate).not.toHaveBeenCalled();
       expect(strategyService.candidates).not.toHaveBeenCalled();
       expect(signalService.funnelDiagnostics).not.toHaveBeenCalled();

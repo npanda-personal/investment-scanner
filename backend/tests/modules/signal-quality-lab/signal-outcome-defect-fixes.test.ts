@@ -15,7 +15,7 @@
  *   Fix 11 – nextEvaluableDate uses trading-day offset (skips weekends)
  */
 
-import { SignalQualityLabService, SCORE_BUCKETS } from '../../../src/modules/signal-quality-lab/signal-quality-lab.service';
+import { SignalQualityLabService, SCORE_BUCKETS, addTradingDays } from '../../../src/modules/signal-quality-lab/signal-quality-lab.service';
 import { SignalQualityLabRepository } from '../../../src/modules/signal-quality-lab/signal-quality-lab.repository';
 import { SignalCalibrationEngineService } from '../../../src/modules/signal-calibration-engine/signal-calibration-engine.service';
 import type { CalibrationContext, SignalLikeForCalibration } from '../../../src/modules/signal-calibration-engine/signal-calibration-engine.types';
@@ -550,8 +550,6 @@ describe('Fix 10: LOW_CONFIDENCE_SIGNAL emits at most one item per instrument', 
 
 describe('Fix 11: addTradingDays skips weekends', () => {
   it('5 trading days from Friday advances to next Friday (skips Sat/Sun)', () => {
-    const svc = emptyService();
-    const addTradingDays = (svc as any).addTradingDays.bind(svc);
     // 2026-01-02 is Friday
     const result: Date = addTradingDays(new Date('2026-01-02T00:00:00.000Z'), 5);
     // Mon 05 (+1), Tue 06 (+2), Wed 07 (+3), Thu 08 (+4), Fri 09 (+5)
@@ -559,22 +557,16 @@ describe('Fix 11: addTradingDays skips weekends', () => {
   });
 
   it('1 trading day from Thursday is Friday', () => {
-    const svc = emptyService();
-    const addTradingDays = (svc as any).addTradingDays.bind(svc);
     const result: Date = addTradingDays(new Date('2026-01-08T00:00:00.000Z'), 1); // Thursday
     expect(result.toISOString().slice(0, 10)).toBe('2026-01-09'); // Friday
   });
 
   it('1 trading day from Friday is Monday', () => {
-    const svc = emptyService();
-    const addTradingDays = (svc as any).addTradingDays.bind(svc);
     const result: Date = addTradingDays(new Date('2026-01-09T00:00:00.000Z'), 1); // Friday
     expect(result.toISOString().slice(0, 10)).toBe('2026-01-12'); // Monday
   });
 
   it('60 trading days is substantially more than 60 calendar days', () => {
-    const svc = emptyService();
-    const addTradingDays = (svc as any).addTradingDays.bind(svc);
     const start = new Date('2026-01-02T00:00:00.000Z');
     const result: Date = addTradingDays(start, 60);
     const calendarDays = (result.getTime() - start.getTime()) / (24 * 60 * 60 * 1000);

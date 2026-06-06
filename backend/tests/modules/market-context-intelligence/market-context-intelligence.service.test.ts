@@ -209,34 +209,42 @@ describe('MarketContextIntelligenceService', () => {
     expect(service.macro()).toMatchObject({ macroStatus: 'UNKNOWN', dataStatus: 'MISSING' });
   });
 
-  it('builds summary response shape', async () => {
-    const marketDataService = {
-      listInstruments: jest.fn().mockResolvedValue({ instruments: [{ id: 'stock-1', symbol: 'AAA', sector: 'Technology', country: 'US' }] }),
-      listPricesByInstrumentId: jest.fn().mockResolvedValue({ prices: instrument().prices.map((close: number) => ({ adjusted_close: close })) }),
+  it('builds summary response shape (persisted-read path)', async () => {
+    const persistedSnapshot = {
+      regime: { regime: 'RISK_ON', score: 80, explanation: '', dataStatus: 'COMPLETE', updatedAt: '' },
+      topSectors: [],
+      weakSectors: [],
+      breadth: { percentAboveSma50: 0.8, percentAboveSma200: 0.8, advanceDeclineRatio: 1.5, newHigh52WeekCount: 10, newLow52WeekCount: 2, bullishSignalCount: 10, bearishSignalCount: 2, instrumentCount: 100, dataStatus: 'COMPLETE' },
+      countryStrength: [],
+      macro: { macroStatus: 'UNKNOWN', dataStatus: 'MISSING', explanation: 'Macro providers are not configured yet.', interestRateProxy: null, inflationProxy: null, usdStrengthProxy: null, commodityProxy: null },
+      explanation: ['Test'],
+      updatedAt: '2026-01-01',
+      dataStatus: 'COMPLETE'
     };
-    const signalService = { topSignals: jest.fn().mockResolvedValue({ signals: [{ instrument_id: 'stock-1', direction: 'BULLISH', score: 80 }], total: 1, limit: 100, offset: 0 }) };
     const repository = {
-      latestSnapshot: jest.fn().mockResolvedValue({
-        regime: { regime: 'RISK_ON', score: 80, explanation: '', dataStatus: 'COMPLETE', updatedAt: '' },
-        topSectors: [],
-        weakSectors: [],
-        breadth: { percentAboveSma50: 0.8, percentAboveSma200: 0.8, advanceDeclineRatio: 1.5, newHigh52WeekCount: 10, newLow52WeekCount: 2, bullishSignalCount: 10, bearishSignalCount: 2, instrumentCount: 100, dataStatus: 'COMPLETE' },
-        countryStrength: [],
-        macro: { macroStatus: 'UNKNOWN', dataStatus: 'MISSING', explanation: 'Macro providers are not configured yet.', interestRateProxy: null, inflationProxy: null, usdStrengthProxy: null, commodityProxy: null },
-        explanation: ['Test'],
-        updatedAt: '2026-01-01',
-        dataStatus: 'COMPLETE'
-      }),
+      latestPersistedSnapshot: jest.fn().mockResolvedValue(persistedSnapshot),
       saveSnapshot: jest.fn(),
     };
-    const service = new MarketContextIntelligenceService(repository as any, marketDataService as any, signalService as any);
+    const service = new MarketContextIntelligenceService(repository as any, {} as any, {} as any);
 
     const summary = await service.summary();
 
+    expect(summary).not.toBeNull();
     expect(summary).toHaveProperty('regime');
     expect(summary).toHaveProperty('topSectors');
     expect(summary).toHaveProperty('breadth');
-    expect(summary.explanation.length).toBeGreaterThan(0);
+    expect(summary!.explanation.length).toBeGreaterThan(0);
+  });
+
+  it('returns null from summary() when no persisted snapshot exists (no run() fallback)', async () => {
+    const repository = {
+      latestPersistedSnapshot: jest.fn().mockResolvedValue(null),
+    };
+    const service = new MarketContextIntelligenceService(repository as any, {} as any, {} as any);
+
+    const summary = await service.summary();
+
+    expect(summary).toBeNull();
   });
 
   it('persists generated snapshots using the requested region', async () => {
@@ -266,7 +274,8 @@ describe('MarketContextIntelligenceService', () => {
     }), 'IN', undefined);
   });
 
-  it('summary loads the requested region and re-reads that region after generation', async () => {
+  it('summary returns persisted snapshot for the requested region without triggering run()', async () => {
+    // Persisted-read enforcement: summary() must call latestPersistedSnapshot, never run().
     const summary = {
       regime: { regime: 'RISK_ON', score: 80, explanation: '', dataStatus: 'COMPLETE', updatedAt: '' },
       topSectors: [],
@@ -279,25 +288,19 @@ describe('MarketContextIntelligenceService', () => {
       dataStatus: 'COMPLETE'
     };
     const repository = {
-      latestSnapshot: jest.fn()
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce(summary),
-      saveSnapshot: jest.fn().mockResolvedValue(undefined),
-      loadIndexPrices: jest.fn().mockResolvedValue([]),
-      loadCapBandUniverse: jest.fn().mockResolvedValue([]),
+      latestPersistedSnapshot: jest.fn().mockResolvedValue(summary),
+      saveSnapshot: jest.fn(),
     };
-    const marketDataService = {
-      listInstruments: jest.fn().mockResolvedValue({ instruments: [{ id: 'stock-1', symbol: 'AAA', sector: 'Technology', country: 'India' }] }),
-      listPricesByInstrumentId: jest.fn().mockResolvedValue({ prices: instrument().prices.map((close: number) => ({ adjusted_close: close })) }),
-    };
-    const signalService = { topSignals: jest.fn().mockResolvedValue({ signals: [] }) };
+    const marketDataService = { listInstruments: jest.fn() };
+    const signalService = { topSignals: jest.fn() };
     const service = new MarketContextIntelligenceService(repository as any, marketDataService as any, signalService as any);
 
     const result = await service.summary({ region: 'IN' });
 
-    expect(repository.latestSnapshot).toHaveBeenNthCalledWith(1, 'IN');
-    expect(repository.latestSnapshot).toHaveBeenNthCalledWith(2, 'IN');
-    expect(repository.saveSnapshot).toHaveBeenCalledWith(expect.any(Object), 'IN', undefined);
+    expect(repository.latestPersistedSnapshot).toHaveBeenCalledWith('IN');
+    expect(repository.saveSnapshot).not.toHaveBeenCalled();
+    expect(marketDataService.listInstruments).not.toHaveBeenCalled();
+    expect(signalService.topSignals).not.toHaveBeenCalled();
     expect(result).toBe(summary);
   });
 
