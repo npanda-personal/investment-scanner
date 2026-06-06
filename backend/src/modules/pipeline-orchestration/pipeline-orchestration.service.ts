@@ -54,7 +54,7 @@ import type {
 
 const LEDGER_VERSION = 'pipeline-ledger-v1';
 const ACTIVE_STATUSES = new Set(['PENDING', 'RUNNING']);
-const TERMINAL_STATUSES = new Set(['COMPLETED', 'PARTIAL', 'FAILED', 'SKIPPED', 'BLOCKED']);
+const TERMINAL_STATUSES = new Set(['COMPLETED', 'PARTIAL', 'FAILED', 'SKIPPED', 'BLOCKED', 'ABANDONED']);
 const DEFAULT_LEASE_MS = 600_000;
 const DEFAULT_ACTIVE_STALE_MS = DEFAULT_LEASE_MS * 2;
 const PROCESS_LOCAL_ID = `${process.pid}-${Math.random().toString(16).slice(2, 10)}`;
@@ -5379,6 +5379,7 @@ export class PipelineOrchestrationService {
 
   private commandStatusFromStageStatus(status: PipelineStageStatus): PipelineCommandResponse['status'] {
     if (status === 'PENDING' || status === 'RUNNING') return 'PARTIAL';
+    if (status === 'ABANDONED') return 'FAILED';
     return status;
   }
 

@@ -3,10 +3,10 @@
  * Unit tests for the stale-lease reaper.
  *
  * Tests:
- *   1. Stale RUNNING stage (lease expired)  → reaped to FAILED.
- *   2. Stale RUNNING stage (no lease, old startedAt) → reaped to FAILED.
+ *   1. Stale RUNNING stage (lease expired)  → reaped to ABANDONED.
+ *   2. Stale RUNNING stage (no lease, old startedAt) → reaped to ABANDONED.
  *   3. Fresh RUNNING stage (recently updated) → untouched.
- *   4. Stale RUNNING run with no remaining RUNNING/PENDING stages → reaped to FAILED.
+ *   4. Stale RUNNING run with no remaining RUNNING/PENDING stages → reaped to ABANDONED.
  *   5. Stale RUNNING run with a still-RUNNING stage child → run not reaped.
  *   6. reapStaleLeases on PipelineOrchestrationService delegates to repository with threshold.
  *
@@ -130,9 +130,9 @@ describe('PipelineOrchestrationRepository.reapStaleLeases', () => {
     expect(stageWhere.status).toBe('RUNNING');
     expect(stageWhere.updatedAt.lt).toEqual(new Date(NOW.getTime() - THRESHOLD_MS));
 
-    // Stage data must set status: 'FAILED' and clear lease fields
+    // Stage data must set status: 'ABANDONED' and clear lease fields
     const stageData = stageUpdateMany.mock.calls[0][0].data;
-    expect(stageData.status).toBe('FAILED');
+    expect(stageData.status).toBe('ABANDONED');
     expect(stageData.leaseOwner).toBeNull();
     expect(stageData.leaseExpiresAt).toBeNull();
     expect(stageData.errors).toContain('reaped: stale lease / interrupted run');
@@ -239,7 +239,7 @@ describe('PipelineOrchestrationRepository.reapStaleLeases', () => {
 
     expect(result.runRowsReaped).toBe(1);
     const runData = runUpdateMany.mock.calls[0][0].data;
-    expect(runData.status).toBe('FAILED');
+    expect(runData.status).toBe('ABANDONED');
     expect(runData.errors).toContain('reaped: stale lease / interrupted run');
     expect(runUpdateMany.mock.calls[0][0].where.id.in).toContain('run-1');
   });

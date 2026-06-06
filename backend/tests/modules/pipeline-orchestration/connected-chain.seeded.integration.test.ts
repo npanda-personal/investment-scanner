@@ -148,8 +148,12 @@ describe('Pipeline Orchestration seeded connected-chain integration', () => {
     process.env.TRUSTED_REVIEW_MIN_LITE = originalTrustedMinLite;
     process.env.TRUSTED_REVIEW_MIN_FULL = originalTrustedMinFull;
     restoreFixedDate();
+    // Comprehensive cleanup: remove all test residue so the dev DB is left clean after every run.
+    // Uses the same scoped deletes as beforeAll/cleanupConnectedChainRows — scoped to test
+    // instruments (RELIANCE/TCS/INFY), TEST_SOURCE, and SIGNAL_GENERATED_DAY/DATA_THROUGH_DAY only.
+    await cleanupConnectedChainRows();
     await prisma.$disconnect();
-  }, 30_000);
+  }, 60_000);
 
   it('fans out a terminal MARKET_DATA snapshot through persisted downstream chain outputs', async () => {
     const services = createConnectedChainServices();

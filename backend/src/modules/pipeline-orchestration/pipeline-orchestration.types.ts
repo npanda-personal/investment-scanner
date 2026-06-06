@@ -1,4 +1,4 @@
-export type PipelineRunStatus = 'PENDING' | 'RUNNING' | 'COMPLETED' | 'PARTIAL' | 'FAILED' | 'SKIPPED' | 'BLOCKED';
+export type PipelineRunStatus = 'PENDING' | 'RUNNING' | 'COMPLETED' | 'PARTIAL' | 'FAILED' | 'SKIPPED' | 'BLOCKED' | 'ABANDONED';
 export type PipelineStageStatus = PipelineRunStatus;
 export type PipelineTriggerType = 'scheduled' | 'manual' | 'startup' | 'repair' | 'backfill' | 'test';
 export type PipelineCacheStatus = 'UNKNOWN' | 'HIT' | 'MISS' | 'STALE' | 'BYPASS';

@@ -13,9 +13,12 @@ import type {
   PipelineStageRunRecord,
 } from './pipeline-orchestration.types';
 
-const TERMINAL_STAGE_STATUSES = ['COMPLETED', 'PARTIAL', 'FAILED', 'SKIPPED', 'BLOCKED'];
+const TERMINAL_STAGE_STATUSES = ['COMPLETED', 'PARTIAL', 'FAILED', 'SKIPPED', 'BLOCKED', 'ABANDONED'];
 const ACTIVE_STATUSES = ['PENDING', 'RUNNING'];
-const TERMINAL_RUN_STATUSES = ['COMPLETED', 'PARTIAL', 'FAILED', 'SKIPPED', 'BLOCKED'];
+// Only genuine runs (real work completed) — excludes ABANDONED (reaped/interrupted), SKIPPED, and
+// BLOCKED so that a stale-lease reaped run never becomes the headline "last run" on the Pipeline
+// Ops header.
+const MEANINGFUL_RUN_STATUSES = ['COMPLETED', 'PARTIAL', 'FAILED'];
 
 export class PipelineOrchestrationRepository {
   constructor(private readonly db = prisma) {}
@@ -302,7 +305,7 @@ export class PipelineOrchestrationRepository {
         ],
       },
       data: {
-        status: 'FAILED',
+        status: 'ABANDONED',
         completedAt,
         leaseOwner: null,
         leaseExpiresAt: null,
@@ -318,7 +321,7 @@ export class PipelineOrchestrationRepository {
         createdAt: { lt: cutoff },
       },
       data: {
-        status: 'FAILED',
+        status: 'ABANDONED',
         completedAt,
         errors: [reaperError],
       },
@@ -358,7 +361,7 @@ export class PipelineOrchestrationRepository {
             status: { in: ['RUNNING', 'PENDING'] },
           },
           data: {
-            status: 'FAILED',
+            status: 'ABANDONED',
             completedAt,
             errors: [reaperError],
           },
@@ -391,9 +394,15 @@ export class PipelineOrchestrationRepository {
         scopeRegion: query.region,
         scopeAssetType: query.assetType,
         timeframe: query.timeframe,
-        status: { in: TERMINAL_RUN_STATUSES },
+        // Exclude ABANDONED (reaped/interrupted) and SKIPPED/BLOCKED so only genuine runs
+        // with real data work headline the Pipeline Ops header.
+        status: { in: MEANINGFUL_RUN_STATUSES },
       },
-      orderBy: [{ completedAt: 'desc' }, { updatedAt: 'desc' }],
+      // Prefer the run covering the freshest data, then break ties by most-recently completed.
+      // dataThroughDate is nullable and Postgres defaults to NULLS FIRST on desc — force
+      // nulls LAST so a run WITH a real data date (e.g. 06-05) outranks a dateless run
+      // (e.g. a market-pulse-only or empty run) for the header.
+      orderBy: [{ dataThroughDate: { sort: 'desc', nulls: 'last' } }, { completedAt: 'desc' }, { updatedAt: 'desc' }],
     });
     return row ? this.toRunRecord(row) : null;
   }

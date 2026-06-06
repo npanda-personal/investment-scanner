@@ -199,7 +199,7 @@ describe('PipelineOrchestrationRepository', () => {
     expect(db.pipelineStageRun.updateMany).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({
         id: 'stage-1',
-        status: { notIn: ['COMPLETED', 'PARTIAL', 'FAILED', 'SKIPPED', 'BLOCKED'] },
+        status: { notIn: ['COMPLETED', 'PARTIAL', 'FAILED', 'SKIPPED', 'BLOCKED', 'ABANDONED'] },
       }),
       data: expect.objectContaining({
         status: 'RUNNING',
@@ -363,7 +363,7 @@ describe('PipelineOrchestrationRepository', () => {
     }));
     expect(db.pipelineRun.findFirst).toHaveBeenNthCalledWith(2, expect.objectContaining({
       where: expect.objectContaining({
-        status: { in: ['COMPLETED', 'PARTIAL', 'FAILED', 'SKIPPED', 'BLOCKED'] },
+        status: { in: ['COMPLETED', 'PARTIAL', 'FAILED'] },
       }),
     }));
     expect(db.pipelineStageRun.findMany).toHaveBeenCalledWith(expect.objectContaining({
