@@ -1505,6 +1505,29 @@ model PipelineStageRun {
 }
 
 // ---------------------------------------------------------------------------
+// Research Overview Snapshots — fully-computed overview payload per (region, assetType)
+// GET /research/overview reads this table; no recomputation on read (AUDIT-2 / AUDIT-3 #8).
+// ---------------------------------------------------------------------------
+model ResearchOverviewSnapshot {
+  id            String   @id @default(cuid())
+  region        String
+  assetType     String
+  /// Fully-computed ResearchOverview DTO — includes pre-diffed whatChanged + actionability
+  overviewJson  Json
+  /// Denormalised for cheap status queries without parsing JSONB
+  marketGate    String
+  overallStatus String
+  dataGaps      String[]
+  computedAt    DateTime
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([region, assetType])
+  @@index([region, assetType, marketGate, overallStatus], map: "research_overview_snapshots_gate_status_idx")
+  @@map("research_overview_snapshots")
+}
+
+// ---------------------------------------------------------------------------
 // Market Scan Snapshots — precomputed daily aggregates served by persisted-read GETs
 // ---------------------------------------------------------------------------
 model MarketScanSnapshot {

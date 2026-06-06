@@ -66,60 +66,46 @@ export class ResearchHubService {
     private readonly tradePlanRiskEngineService?: TradePlanRiskEngineServiceLike | null
   ) {}
 
+  /**
+   * AUDIT-2 / AUDIT-3 #8 — persisted-read GET.
+   *
+   * Returns the latest row from `research_overview_snapshots` AS-IS.
+   * Zero recomputation: whatChanged + actionability are pre-baked by the pipeline's
+   * refreshOverview() call and stored in the row.  This is a single-row DB read.
+   *
+   * `live: true` bypasses the snapshot and runs the full fan-out (admin/debug only).
+   */
   async overview(query: { region?: string; assetType?: string; live?: boolean } = {}): Promise<ResearchOverview> {
     const region = query.region || 'IN';
     const assetType = query.assetType || 'STOCK';
     if (!query.live) {
-      const cached = await this.loadCachedOverview(region, assetType);
-      if (cached) {
-        // NR-52: re-diff the two most recent persisted snapshots at read time so that
-        // whatChanged is never frozen from an old build.  The snapshot itself is still
-        // served from cache (persisted-read); only the diff is re-computed live.
-        const freshWhatChanged = await this.buildWhatChangedFromStoredSnapshots(
-          cached.researchPriorities,
-          cached.marketReadiness,
-          region,
-          assetType,
-        );
-        // NR-41 stale-cache fix: recompute actionability on every read using the current
-        // aggregation logic so that blocking/non-blocking dimension changes (e.g. the
-        // "not yet measured" stub dimensions that were incorrectly set blocking:true in
-        // snapshots built before the fix) never permanently drag overallStatus to
-        // INSUFFICIENT_DATA.  All inputs come from the cached snapshot itself — no
-        // signals are regenerated — so this is still a persisted-read.
-        // NR-57: also fetch today-review + trade-plan readiness live so the dimensions
-        // always reflect the current state even when serving a cached snapshot.
-        const [calibrationHealth, todayReviewRun, tradePlanList] = await Promise.all([
-          this.calibrationService.health().catch(() => null),
-          this.todayTradeReviewService
-            ? this.todayTradeReviewService.latest({ region, assetType }).catch(() => null)
-            : Promise.resolve(null),
-          this.tradePlanRiskEngineService
-            ? this.tradePlanRiskEngineService.list({ region, assetType, limit: 1, offset: 0 }).catch(() => null)
-            : Promise.resolve(null),
-        ]);
-        const freshActionability = this.buildActionability(
-          cached.marketReadiness,
-          cached.researchPriorities,
-          cached.strategyProofSummary,
-          cached.confirmationSummary,
-          cached.dataGaps,
-          cached.nextActions,
-          calibrationHealth,
-          todayReviewRun,
-          tradePlanList,
-        );
-        return { ...cached, whatChanged: freshWhatChanged, actionability: freshActionability };
+      const snapshot = await this.loadPersistedSnapshot(region, assetType);
+      if (snapshot) {
+        return snapshot;
       }
       return this.emptyOverview(['Research overview snapshot is not ready yet. Run the backend pipeline to materialize this dashboard.']);
     }
     return this.buildOverview({ region, assetType });
   }
 
+  /**
+   * AUDIT-2 / AUDIT-3 #8 — pipeline compute+persist.
+   *
+   * Computes EVERYTHING (priorities, the real whatChanged diff vs the previous persisted
+   * snapshot, actionability from real services) then UPSERTs the finished payload into
+   * `research_overview_snapshots`.  The prior snapshot (used for the diff) is read from
+   * the same table before overwriting.
+   *
+   * Called only by the RESEARCH_PROJECTION pipeline stage — never from a GET.
+   */
   async refreshOverview(query: { region?: string; assetType?: string } = {}): Promise<ResearchOverview> {
     const region = query.region || 'IN';
     const assetType = query.assetType || 'STOCK';
     const overview = await this.buildOverview({ region, assetType });
+    // Persist the fully-computed payload (incl. whatChanged + actionability) to the
+    // dedicated snapshot table so that GET /research/overview is a pure DB read.
+    await this.upsertPersistedSnapshot(region, assetType, overview);
+    // Also persist to the legacy pipeline_runs table for backwards-compat monitoring
     await this.saveCachedOverview(region, assetType, overview);
     return overview;
   }
@@ -265,25 +251,6 @@ export class ResearchHubService {
     };
   }
 
-  private async loadCachedOverview(region: string, assetType: string): Promise<ResearchOverview | null> {
-    if (typeof (this.db as any).pipelineRun?.findFirst !== 'function') return null;
-    const row = await (this.db as any).pipelineRun.findFirst({
-      where: {
-        pipelineKey: RESEARCH_OVERVIEW_PIPELINE_KEY,
-        scopeRegion: region,
-        scopeAssetType: assetType,
-        status: { in: ['COMPLETED', 'PARTIAL'] },
-        metadata: {
-          path: ['version'],
-          equals: RESEARCH_OVERVIEW_CACHE_VERSION,
-        },
-      },
-      orderBy: { updatedAt: 'desc' },
-    });
-    const overview = (row?.metadata as any)?.overview;
-    return overview && typeof overview === 'object' ? overview as ResearchOverview : null;
-  }
-
   private async saveCachedOverview(region: string, assetType: string, overview: ResearchOverview): Promise<void> {
     if (typeof (this.db as any).pipelineRun?.upsert !== 'function') return;
     const idempotencyKey = [RESEARCH_OVERVIEW_CACHE_VERSION, region, assetType].join(':');
@@ -380,6 +347,10 @@ export class ResearchHubService {
    * Computes a real diff between the current priorities/gate and the previous
    * persisted research-hub snapshot.  Never fabricates — if no prior snapshot
    * exists it returns empty arrays and an honest note.
+   *
+   * Priority order for the "prior" snapshot:
+   *   1. The dedicated research_overview_snapshots row (AUDIT-2 replacement table)
+   *   2. The legacy pipeline_runs prior-key slot (fallback for backwards compat)
    */
   private async buildWhatChanged(
     currentPriorities: ResearchPriorities,
@@ -387,7 +358,10 @@ export class ResearchHubService {
     region: string,
     assetType: string,
   ): Promise<ResearchWhatChanged> {
-    const priorOverview = await this.loadPriorOverview(region, assetType);
+    // Prefer reading prior snapshot from the new dedicated table (it holds the last
+    // persisted run's payload; we read it BEFORE upserting the new one).
+    const priorOverview = (await this.loadPersistedSnapshot(region, assetType))
+      ?? (await this.loadPriorOverview(region, assetType));
     return this.diffOverviews(currentPriorities, currentReadiness, priorOverview);
   }
 
@@ -396,27 +370,7 @@ export class ResearchHubService {
   }
 
   /**
-   * NR-52: Build a fresh diff by loading the current + prior persisted snapshots from
-   * the database.  Used on the persisted-read (live=false) path so that whatChanged is
-   * never frozen from the time the snapshot was originally built.
-   *
-   * Priority order for the "prior" snapshot:
-   *   1. The dedicated prior-key slot (written by saveCachedOverview when ≥2 refreshes ran)
-   *   2. If no prior-key exists, we only have one snapshot — return the honest "no prior" message.
-   */
-  private async buildWhatChangedFromStoredSnapshots(
-    currentPriorities: ResearchPriorities,
-    currentReadiness: MarketReadiness,
-    region: string,
-    assetType: string,
-  ): Promise<ResearchWhatChanged> {
-    const priorOverview = await this.loadPriorOverview(region, assetType);
-    return this.diffOverviews(currentPriorities, currentReadiness, priorOverview);
-  }
-
-  /**
-   * Core diff logic, shared by both buildWhatChanged (build path) and
-   * buildWhatChangedFromStoredSnapshots (read path).
+   * Core diff logic — shared by buildWhatChanged (build/pipeline path).
    *
    * NR-81: Enriched diff — separately surfaces:
    *   newTradeCandidates  — appeared since last snapshot
@@ -520,6 +474,51 @@ export class ResearchHubService {
     });
     const overview = (row?.metadata as any)?.overview;
     return overview && typeof overview === 'object' ? overview as ResearchOverview : null;
+  }
+
+  // ---------------------------------------------------------------------------
+  // AUDIT-2 / AUDIT-3 #8 — dedicated research_overview_snapshots table helpers
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Reads the latest persisted snapshot for the given (region, assetType) scope.
+   * Returns the stored ResearchOverview AS-IS — no recomputation.
+   */
+  private async loadPersistedSnapshot(region: string, assetType: string): Promise<ResearchOverview | null> {
+    if (typeof (this.db as any).researchOverviewSnapshot?.findUnique !== 'function') return null;
+    const row = await (this.db as any).researchOverviewSnapshot.findUnique({
+      where: { region_assetType: { region, assetType } },
+    });
+    if (!row) return null;
+    const payload = row.overviewJson;
+    return payload && typeof payload === 'object' ? payload as ResearchOverview : null;
+  }
+
+  /**
+   * UPSERTs the fully-computed overview payload into `research_overview_snapshots`.
+   * Called only by refreshOverview() (pipeline compute path).
+   */
+  private async upsertPersistedSnapshot(region: string, assetType: string, overview: ResearchOverview): Promise<void> {
+    if (typeof (this.db as any).researchOverviewSnapshot?.upsert !== 'function') return;
+    await (this.db as any).researchOverviewSnapshot.upsert({
+      where: { region_assetType: { region, assetType } },
+      create: {
+        region,
+        assetType,
+        overviewJson: overview as any,
+        marketGate: overview.marketReadiness.marketGate,
+        overallStatus: overview.actionability.overallStatus,
+        dataGaps: overview.dataGaps,
+        computedAt: new Date(overview.generatedAt),
+      },
+      update: {
+        overviewJson: overview as any,
+        marketGate: overview.marketReadiness.marketGate,
+        overallStatus: overview.actionability.overallStatus,
+        dataGaps: overview.dataGaps,
+        computedAt: new Date(overview.generatedAt),
+      },
+    });
   }
 
   private emptyOverview(dataGaps: string[]): ResearchOverview {
