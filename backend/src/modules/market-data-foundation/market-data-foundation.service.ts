@@ -54,8 +54,10 @@ import type {
   ReviewReadinessSummary,
   MarketDataSyncSkipReason,
   MarketMoverRange,
+  MarketMoverRow,
   MarketMoverRangeSummary,
   MarketMoversSummary,
+  MarketMapTile,
   MarketScanRow52w,
   MarketScanSummary52w,
   MarketScanRowDeliverySpike,
@@ -962,6 +964,169 @@ export class MarketDataFoundationService {
     };
   }
 
+  // ---------------------------------------------------------------------------
+  // Market Scan Snapshots — precompute + persist, then serve from snapshot
+  // ---------------------------------------------------------------------------
+
+  /**
+   * MARKET_SCAN_REFRESH: compute all 6 scan families for the given scope and
+   * replace today's snapshot rows (delete-old-for-date + bulk insert).
+   * Called once per day by the pipeline after MARKET_DATA sync.
+   */
+  async refreshMarketScanSnapshots(options: {
+    region?: string;
+    assetType?: string;
+    now?: Date;
+  } = {}): Promise<{
+    tradingDate: string;
+    totalInserted: number;
+    scanTypes: string[];
+    warnings: string[];
+    errors: string[];
+  }> {
+    const scope = {
+      region: options.region?.trim().toUpperCase() || 'IN',
+      assetType: options.assetType?.trim().toUpperCase() || 'STOCK',
+    };
+    const now = options.now ?? new Date();
+    const warnings: string[] = [];
+    const errors: string[] = [];
+    const allRows: Array<{
+      scanType: string;
+      scanRange: string | null;
+      region: string;
+      assetType: string;
+      tradingDate: Date;
+      rank: number;
+      payloadJson: object;
+      computedAt: Date;
+    }> = [];
+
+    // ---- helpers ----
+    const latestDataTimestamp = await this.repository.latestDataTimestamp(scope).catch(() => null);
+    if (!latestDataTimestamp) {
+      warnings.push(`No price data found for ${scope.region}/${scope.assetType} — scan snapshot skipped.`);
+      return { tradingDate: now.toISOString().slice(0, 10), totalInserted: 0, scanTypes: [], warnings, errors };
+    }
+    const tradingDate = new Date(latestDataTimestamp);
+    tradingDate.setUTCHours(0, 0, 0, 0);
+
+    const latestDateStart = new Date(tradingDate);
+    const latestDateEnd = new Date(tradingDate);
+    latestDateEnd.setUTCDate(latestDateEnd.getUTCDate() + 1);
+
+    // ---- movers (6 ranges × gainers + losers) + market-map (6 ranges) ----
+    for (const range of Object.keys(MARKET_MOVER_LOOKBACK_DAYS) as MarketMoverRange[]) {
+      try {
+        const rows = await this.repository.marketMoversForRange(MARKET_MOVER_LOOKBACK_DAYS[range], {
+          ...scope,
+          limit: 20,
+          minHistoryBars: MARKET_MOVER_MIN_HISTORY_BARS[range],
+          maxAbsReturn: MARKET_MOVER_MAX_ABS_RETURN[range],
+          recentBars: Math.min(20, MARKET_MOVER_MIN_HISTORY_BARS[range]),
+          latestDateStart,
+          latestDateEnd,
+        });
+        const ordered = rows.filter((r) => Number.isFinite(r.returnPercent));
+        const gainers = ordered.filter((r) => r.returnPercent > 0).sort((a, b) => b.returnPercent - a.returnPercent).slice(0, 5);
+        const losers = ordered.filter((r) => r.returnPercent < 0).sort((a, b) => a.returnPercent - b.returnPercent).slice(0, 5);
+        gainers.forEach((r, i) => allRows.push({ scanType: 'MOVERS_GAINERS', scanRange: range, ...scope, tradingDate, rank: i + 1, payloadJson: r as unknown as object, computedAt: now }));
+        losers.forEach((r, i) => allRows.push({ scanType: 'MOVERS_LOSERS', scanRange: range, ...scope, tradingDate, rank: i + 1, payloadJson: r as unknown as object, computedAt: now }));
+
+        // market-map (top 60 by abs return, same data source)
+        const seen = new Set<string>();
+        const mapTiles = ordered
+          .sort((a, b) => Math.abs(b.returnPercent) - Math.abs(a.returnPercent))
+          .filter((r) => { if (seen.has(r.instrumentId)) return false; seen.add(r.instrumentId); return true; })
+          .slice(0, 60);
+        mapTiles.forEach((r, i) => allRows.push({ scanType: 'MARKET_MAP', scanRange: range, ...scope, tradingDate, rank: i + 1, payloadJson: r as unknown as object, computedAt: now }));
+      } catch (err) {
+        errors.push(`Movers/map range ${range}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+
+    // ---- 52w-high + 52w-low ----
+    for (const scanType of ['52w-high', '52w-low'] as const) {
+      try {
+        const rows = await this.repository.scan52wProximity({ ...scope, scanType, proximityPct: 5, limit: 50 });
+        rows.forEach((r, i) => allRows.push({ scanType: scanType === '52w-high' ? '52W_HIGH' : '52W_LOW', scanRange: null, ...scope, tradingDate, rank: i + 1, payloadJson: r as unknown as object, computedAt: now }));
+      } catch (err) {
+        errors.push(`52w ${scanType}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+
+    // ---- delivery-spike ----
+    try {
+      const rows = await this.repository.scanDeliverySpike({ ...scope, lookbackBars: 20, minSpikeRatio: 1.5, limit: 50 });
+      rows.forEach((r, i) => allRows.push({ scanType: 'DELIVERY_SPIKE', scanRange: null, ...scope, tradingDate, rank: i + 1, payloadJson: r as unknown as object, computedAt: now }));
+    } catch (err) {
+      errors.push(`delivery-spike: ${err instanceof Error ? err.message : String(err)}`);
+    }
+
+    // ---- volume-spike ----
+    try {
+      const rows = await this.repository.scanVolumeSpike({ ...scope, lookbackBars: 20, minSpikeRatio: 2.0, limit: 50 });
+      rows.forEach((r, i) => allRows.push({ scanType: 'VOLUME_SPIKE', scanRange: null, ...scope, tradingDate, rank: i + 1, payloadJson: r as unknown as object, computedAt: now }));
+    } catch (err) {
+      errors.push(`volume-spike: ${err instanceof Error ? err.message : String(err)}`);
+    }
+
+    if (allRows.length === 0) {
+      warnings.push('No scan rows computed — nothing to persist.');
+      return { tradingDate: tradingDate.toISOString().slice(0, 10), totalInserted: 0, scanTypes: [], warnings, errors };
+    }
+
+    const db = this.repository.prisma;
+
+    // Delete all existing rows for this tradingDate + scope (replace semantics)
+    await (db as any).marketScanSnapshot.deleteMany({
+      where: {
+        region: scope.region,
+        assetType: scope.assetType,
+        tradingDate,
+      },
+    });
+
+    // Batch insert (sequential chunks to keep pool-safe)
+    const CHUNK = 200;
+    for (let i = 0; i < allRows.length; i += CHUNK) {
+      const chunk = allRows.slice(i, i + CHUNK);
+      await (db as any).marketScanSnapshot.createMany({ data: chunk });
+    }
+
+    const scanTypes = [...new Set(allRows.map((r) => r.scanType))];
+    return {
+      tradingDate: tradingDate.toISOString().slice(0, 10),
+      totalInserted: allRows.length,
+      scanTypes,
+      warnings,
+      errors,
+    };
+  }
+
+  /** Read the latest snapshot rows for a given scanType+scanRange+scope. Returns null if no snapshot. */
+  private async readLatestScanSnapshot(
+    scanType: string,
+    scanRange: string | null,
+    region: string,
+    assetType: string,
+  ): Promise<{ tradingDate: Date; rows: object[] } | null> {
+    const db = this.repository.prisma;
+    // Find the latest tradingDate for this type/scope
+    const latest = await (db as any).marketScanSnapshot.findFirst({
+      where: { scanType, scanRange: scanRange ?? null, region, assetType },
+      orderBy: { tradingDate: 'desc' },
+      select: { tradingDate: true },
+    });
+    if (!latest) return null;
+    const rows = await (db as any).marketScanSnapshot.findMany({
+      where: { scanType, scanRange: scanRange ?? null, region, assetType, tradingDate: latest.tradingDate },
+      orderBy: { rank: 'asc' },
+      select: { payloadJson: true },
+    });
+    return { tradingDate: latest.tradingDate as Date, rows: rows.map((r: any) => r.payloadJson as object) };
+  }
+
   async marketMovers(options: Pick<PaginationOptions, 'region' | 'assetType'> & { limit?: number; range?: string } = {}): Promise<MarketMoversSummary> {
     const scope = {
       region: options.region?.trim().toUpperCase() || 'IN',
@@ -972,37 +1137,22 @@ export class MarketDataFoundationService {
     const requestedRanges = requestedRange
       ? [requestedRange]
       : (Object.keys(MARKET_MOVER_LOOKBACK_DAYS) as MarketMoverRange[]);
-    const latestDataTimestamp = await this.repository.latestDataTimestamp(scope).catch(() => null);
-    const latestDateStart = latestDataTimestamp ? new Date(latestDataTimestamp) : null;
-    latestDateStart?.setUTCHours(0, 0, 0, 0);
-    const latestDateEnd = latestDateStart ? new Date(latestDateStart) : null;
-    latestDateEnd?.setUTCDate(latestDateEnd.getUTCDate() + 1);
-    const ranges = await Promise.all(
-      requestedRanges.map(async (range): Promise<MarketMoverRangeSummary> => {
-        const rows = await this.repository.marketMoversForRange(MARKET_MOVER_LOOKBACK_DAYS[range], {
-          ...scope,
-          limit,
-          minHistoryBars: MARKET_MOVER_MIN_HISTORY_BARS[range],
-          maxAbsReturn: MARKET_MOVER_MAX_ABS_RETURN[range],
-          recentBars: Math.min(20, MARKET_MOVER_MIN_HISTORY_BARS[range]),
-          latestDateStart,
-          latestDateEnd,
-        });
-        const ordered = rows.filter((row) => Number.isFinite(row.returnPercent));
-        const gainers = ordered
-          .filter((row) => row.returnPercent > 0)
-          .sort((left, right) => right.returnPercent - left.returnPercent)
-          .slice(0, limit);
-        const losers = ordered
-          .filter((row) => row.returnPercent < 0)
-          .sort((left, right) => left.returnPercent - right.returnPercent)
-          .slice(0, limit);
-        const warnings = rows.length === 0
-          ? [`No priced stocks have enough ${range} history for movers in ${scope.region}/${scope.assetType}.`]
-          : ['Price movers use the latest scoped candle date available in the database and exclude unsupported instruments, stale latest candles, insufficient liquidity/history, mixed sources, and mixed adjusted/close basis.'];
-        return { range, gainers, losers, warnings };
-      }),
-    );
+
+    const ranges: MarketMoverRangeSummary[] = [];
+    for (const range of requestedRanges) {
+      const [gainersSnap, losersSnap] = await Promise.all([
+        this.readLatestScanSnapshot('MOVERS_GAINERS', range, scope.region, scope.assetType),
+        this.readLatestScanSnapshot('MOVERS_LOSERS', range, scope.region, scope.assetType),
+      ]);
+      if (!gainersSnap && !losersSnap) {
+        ranges.push({ range, gainers: [], losers: [], warnings: [`No market-scan snapshot found for movers ${range} in ${scope.region}/${scope.assetType}. Run MARKET_SCAN_REFRESH to populate.`] });
+        continue;
+      }
+      const gainers = (gainersSnap?.rows ?? []).slice(0, limit) as unknown as MarketMoverRow[];
+      const losers = (losersSnap?.rows ?? []).slice(0, limit) as unknown as MarketMoverRow[];
+      const warnings = ['Price movers served from persisted daily snapshot. Excludes unsupported instruments, stale candles, insufficient liquidity/history, mixed sources, and mixed adjusted/close basis.'];
+      ranges.push({ range, gainers, losers, warnings });
+    }
 
     return {
       scope,
@@ -1018,33 +1168,24 @@ export class MarketDataFoundationService {
     };
     const range = this.marketMoverRange(options.range) ?? '1D';
     const limit = Math.max(1, Math.min(Number(options.limit) || 60, 100));
-    const latestDataTimestamp = await this.repository.latestDataTimestamp(scope).catch(() => null);
-    const latestDateStart = latestDataTimestamp ? new Date(latestDataTimestamp) : null;
-    latestDateStart?.setUTCHours(0, 0, 0, 0);
-    const latestDateEnd = latestDateStart ? new Date(latestDateStart) : null;
-    latestDateEnd?.setUTCDate(latestDateEnd.getUTCDate() + 1);
-    const rowLimit = Math.max(1, Math.ceil(limit / 2));
-    const rows = await this.repository.marketMoversForRange(MARKET_MOVER_LOOKBACK_DAYS[range], {
-      ...scope,
-      limit: rowLimit,
-      minHistoryBars: MARKET_MOVER_MIN_HISTORY_BARS[range],
-      maxAbsReturn: MARKET_MOVER_MAX_ABS_RETURN[range],
-      recentBars: Math.min(20, MARKET_MOVER_MIN_HISTORY_BARS[range]),
-      latestDateStart,
-      latestDateEnd,
-    }).catch(() => []);
-    const seen = new Set<string>();
-    const orderedRows = rows
-      .filter((row) => Number.isFinite(row.returnPercent))
-      .sort((left, right) => Math.abs(right.returnPercent) - Math.abs(left.returnPercent))
-      .filter((row) => {
-        if (seen.has(row.instrumentId)) return false;
-        seen.add(row.instrumentId);
-        return true;
-      })
-      .slice(0, limit);
 
-    const tiles = orderedRows.map((row) => ({
+    const snap = await this.readLatestScanSnapshot('MARKET_MAP', range, scope.region, scope.assetType);
+    if (!snap) {
+      return {
+        status: 'missing',
+        scope,
+        asOf: null,
+        range,
+        materialized: false,
+        sourceLabels: { catalog: 'Market Data Foundation stock catalog', prices: 'Stored daily price history' },
+        warnings: ['No market-map snapshot found. Run MARKET_SCAN_REFRESH to populate.'],
+        gaps: ['Market map needs catalog rows and stored price movement evidence for the selected scope.'],
+        groups: [],
+        tiles: [],
+      };
+    }
+    const rawRows = snap.rows.slice(0, limit) as unknown as MarketMoverRow[];
+    const tiles: MarketMapTile[] = rawRows.map((row) => ({
       instrumentId: row.instrumentId,
       symbol: row.symbol,
       displaySymbol: row.symbol,
@@ -1059,26 +1200,18 @@ export class MarketDataFoundationService {
     const groups = this.marketMapGroups(tiles);
     const hasMissingSector = tiles.some((tile) => !tile.sector?.trim());
     const gaps = [
-      ...(tiles.length === 0 ? ['Market map needs catalog rows and stored price movement evidence for the selected scope.'] : []),
       'Additional stock overlays require later saved evidence before they can appear here.',
       'Additional grouping modes require later saved evidence before they can appear here.',
       ...(hasMissingSector ? ['Some map rows are missing sector metadata and are not included in sector groups.'] : []),
     ];
-    const warnings = tiles.length > 0
-      ? ['Map returns are based on stored daily candles for the selected range and exclude unsupported, stale, insufficient-history, low-liquidity, or mixed-source rows.']
-      : ['No priced stocks have enough stored movement evidence for the selected Market Map range.'];
-
     return {
       status: tiles.length > 0 ? 'ready' : 'missing',
       scope,
-      asOf: latestDataTimestamp?.toISOString() ?? null,
+      asOf: snap.tradingDate.toISOString(),
       range,
       materialized: false,
-      sourceLabels: {
-        catalog: 'Market Data Foundation stock catalog',
-        prices: 'Stored daily price history',
-      },
-      warnings,
+      sourceLabels: { catalog: 'Market Data Foundation stock catalog', prices: 'Stored daily price history' },
+      warnings: ['Map returns served from persisted daily snapshot. Excludes unsupported, stale, insufficient-history, low-liquidity, or mixed-source rows.'],
       gaps,
       groups,
       tiles,
@@ -15008,41 +15141,27 @@ export class MarketDataFoundationService {
     const scanType = options.scanType ?? '52w-high';
     const proximityPct = Math.max(0.5, Math.min(options.proximityPct ?? 5, 50));
     const limit = Math.max(1, Math.min(options.limit ?? 30, 100));
+    const snapKey = scanType === '52w-high' ? '52W_HIGH' : '52W_LOW';
 
-    const rows = await this.repository.scan52wProximity({
-      ...scope,
-      scanType,
-      proximityPct,
-      limit,
-    });
-
-    const results: MarketScanRow52w[] = rows.map((row) => ({
-      instrumentId: row.instrumentId,
-      symbol: row.symbol,
-      companyName: row.companyName,
-      sector: row.sector,
-      latestDate: row.latestDate instanceof Date ? row.latestDate.toISOString() : String(row.latestDate),
-      currentPrice: Number(row.currentPrice),
-      high52w: Number(row.high52w),
-      low52w: Number(row.low52w),
-      pctFromHigh: Number(row.pctFromHigh),
-      pctFromLow: Number(row.pctFromLow),
-      priceBasis: (row.priceBasis === 'CLOSE_FALLBACK' ? 'CLOSE_FALLBACK' : 'ADJUSTED_CLOSE') as 'ADJUSTED_CLOSE' | 'CLOSE_FALLBACK',
-      signalDirection: (row.signalDirection as 'BULLISH' | 'BEARISH' | 'NEUTRAL' | null) ?? null,
-      signalScore: row.signalScore != null ? Number(row.signalScore) : null,
-    }));
-
-    const warnings = results.length === 0
-      ? [`No stocks found within ${proximityPct}% of their 52-week ${scanType === '52w-high' ? 'high' : 'low'} in ${scope.region}/${scope.assetType}. Check that price history has been ingested.`]
-      : ['Prices use adjusted close where available. Proximity is to the 52-week adjusted-close high/low over ~365 calendar days of price history.'];
-
+    const snap = await this.readLatestScanSnapshot(snapKey, null, scope.region, scope.assetType);
+    if (!snap) {
+      return {
+        scanType,
+        scope,
+        generatedAt: new Date().toISOString(),
+        proximityPct,
+        results: [],
+        warnings: [`No 52w-${scanType === '52w-high' ? 'high' : 'low'} snapshot found for ${scope.region}/${scope.assetType}. Run MARKET_SCAN_REFRESH to populate.`],
+      };
+    }
+    const results = snap.rows.slice(0, limit) as unknown as MarketScanRow52w[];
     return {
       scanType,
       scope,
       generatedAt: new Date().toISOString(),
       proximityPct,
       results,
-      warnings,
+      warnings: ['Prices use adjusted close where available. Proximity is to the 52-week adjusted-close high/low over ~365 calendar days of price history. Served from persisted daily snapshot.'],
     };
   }
 
@@ -15057,42 +15176,28 @@ export class MarketDataFoundationService {
       region: options.region?.trim().toUpperCase() || 'IN',
       assetType: options.assetType?.trim().toUpperCase() || 'STOCK',
     };
-    const lookbackBars = Math.max(5, Math.min(options.lookbackBars ?? 20, 60));
     const minSpikeRatio = Math.max(1.1, Math.min(options.minSpikeRatio ?? 1.5, 10));
     const limit = Math.max(1, Math.min(options.limit ?? 30, 100));
 
-    const rows = await this.repository.scanDeliverySpike({
-      ...scope,
-      lookbackBars,
-      minSpikeRatio,
-      limit,
-    });
-
-    const results: MarketScanRowDeliverySpike[] = rows.map((row) => ({
-      instrumentId: row.instrumentId,
-      symbol: row.symbol,
-      companyName: row.companyName,
-      sector: row.sector,
-      tradingDate: row.tradingDate instanceof Date ? row.tradingDate.toISOString() : String(row.tradingDate),
-      deliveryPct: Number(row.deliveryPct),
-      avgDeliveryPct: Number(row.avgDeliveryPct),
-      spikeRatio: Number(row.spikeRatio),
-      lookbackBars: Number(row.lookbackBars),
-      signalDirection: (row.signalDirection as 'BULLISH' | 'BEARISH' | 'NEUTRAL' | null) ?? null,
-      signalScore: row.signalScore != null ? Number(row.signalScore) : null,
-    }));
-
-    const warnings = results.length === 0
-      ? [`No delivery-spike candidates found in ${scope.region}/${scope.assetType} (minimum spike ratio: ${minSpikeRatio}x). Delivery data is sourced from NSE exchange files and covers NSE-listed stocks only.`]
-      : ['Delivery% spikes reflect latest trading session vs prior rolling average. NSE delivery data only — BSE-only stocks will not appear.'];
-
+    const snap = await this.readLatestScanSnapshot('DELIVERY_SPIKE', null, scope.region, scope.assetType);
+    if (!snap) {
+      return {
+        scanType: 'delivery-spike',
+        scope,
+        generatedAt: new Date().toISOString(),
+        minSpikeRatio,
+        results: [],
+        warnings: [`No delivery-spike snapshot found for ${scope.region}/${scope.assetType}. Run MARKET_SCAN_REFRESH to populate.`],
+      };
+    }
+    const results = snap.rows.slice(0, limit) as unknown as MarketScanRowDeliverySpike[];
     return {
       scanType: 'delivery-spike',
       scope,
       generatedAt: new Date().toISOString(),
       minSpikeRatio,
       results,
-      warnings,
+      warnings: ['Delivery% spikes served from persisted daily snapshot. NSE delivery data only — BSE-only stocks will not appear.'],
     };
   }
 
@@ -15107,42 +15212,28 @@ export class MarketDataFoundationService {
       region: options.region?.trim().toUpperCase() || 'IN',
       assetType: options.assetType?.trim().toUpperCase() || 'STOCK',
     };
-    const lookbackBars = Math.max(5, Math.min(options.lookbackBars ?? 20, 60));
     const minSpikeRatio = Math.max(1.1, Math.min(options.minSpikeRatio ?? 2.0, 20));
     const limit = Math.max(1, Math.min(options.limit ?? 30, 100));
 
-    const rows = await this.repository.scanVolumeSpike({
-      ...scope,
-      lookbackBars,
-      minSpikeRatio,
-      limit,
-    });
-
-    const results: MarketScanRowVolumeSpike[] = rows.map((row) => ({
-      instrumentId: row.instrumentId,
-      symbol: row.symbol,
-      companyName: row.companyName,
-      sector: row.sector,
-      latestDate: row.latestDate instanceof Date ? row.latestDate.toISOString() : String(row.latestDate),
-      latestVolume: Number(row.latestVolume),
-      avgVolume: Number(row.avgVolume),
-      spikeRatio: Number(row.spikeRatio),
-      lookbackBars: Number(row.lookbackBars),
-      signalDirection: (row.signalDirection as 'BULLISH' | 'BEARISH' | 'NEUTRAL' | null) ?? null,
-      signalScore: row.signalScore != null ? Number(row.signalScore) : null,
-    }));
-
-    const warnings = results.length === 0
-      ? [`No volume-spike candidates found in ${scope.region}/${scope.assetType} (minimum spike ratio: ${minSpikeRatio}x). Check that recent price history has been ingested.`]
-      : ['Volume spike is latest bar vs prior rolling average. Instruments lacking consistent volume data in NSE/BSE exchange files are excluded.'];
-
+    const snap = await this.readLatestScanSnapshot('VOLUME_SPIKE', null, scope.region, scope.assetType);
+    if (!snap) {
+      return {
+        scanType: 'volume-spike',
+        scope,
+        generatedAt: new Date().toISOString(),
+        minSpikeRatio,
+        results: [],
+        warnings: [`No volume-spike snapshot found for ${scope.region}/${scope.assetType}. Run MARKET_SCAN_REFRESH to populate.`],
+      };
+    }
+    const results = snap.rows.slice(0, limit) as unknown as MarketScanRowVolumeSpike[];
     return {
       scanType: 'volume-spike',
       scope,
       generatedAt: new Date().toISOString(),
       minSpikeRatio,
       results,
-      warnings,
+      warnings: ['Volume spike served from persisted daily snapshot. Instruments lacking consistent volume data in NSE/BSE exchange files are excluded.'],
     };
   }
 

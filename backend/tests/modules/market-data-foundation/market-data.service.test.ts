@@ -2369,26 +2369,21 @@ describe('MarketDataFoundationService syncV1', () => {
     });
   });
 
-  it('anchors market movers to the latest scoped candle so stale instruments are excluded', async () => {
-    const marketMoversForRange = jest.fn().mockResolvedValue([]);
+  it('returns empty movers with not-yet-computed warning when no snapshot exists', async () => {
+    const findFirst = jest.fn().mockResolvedValue(null);
     const service = new MarketDataFoundationService({
-      latestDataTimestamp: jest.fn().mockResolvedValue(new Date('2026-05-27T00:00:00.000Z')),
-      marketMoversForRange,
+      prisma: { marketScanSnapshot: { findFirst, findMany: jest.fn().mockResolvedValue([]) } },
     } as any, {} as any);
 
-    await service.marketMovers({ region: 'IN', assetType: 'STOCK', range: '1D', limit: 5 });
+    const result = await service.marketMovers({ region: 'IN', assetType: 'STOCK', range: '1D', limit: 5 });
 
-    expect(marketMoversForRange).toHaveBeenCalledWith(1, expect.objectContaining({
-      region: 'IN',
-      assetType: 'STOCK',
-      latestDateStart: new Date('2026-05-27T00:00:00.000Z'),
-      latestDateEnd: new Date('2026-05-28T00:00:00.000Z'),
-    }));
+    expect(result.ranges[0].gainers).toEqual([]);
+    expect(result.ranges[0].losers).toEqual([]);
+    expect(result.ranges[0].warnings[0]).toMatch(/MARKET_SCAN_REFRESH/);
   });
 
-  it('builds market-map tiles from scoped stored-price movers without generating shared data', async () => {
-    const latestDataTimestamp = jest.fn().mockResolvedValue(new Date('2026-05-27T00:00:00.000Z'));
-    const marketMoversForRange = jest.fn().mockResolvedValue([
+  it('builds market-map tiles from persisted snapshot rows', async () => {
+    const snapshotRows = [
       {
         instrumentId: 'stock-1',
         symbol: 'ALPHA',
@@ -2400,7 +2395,6 @@ describe('MarketDataFoundationService syncV1', () => {
         baseClose: 115,
         returnPercent: 0.043,
         priceBasis: 'ADJUSTED_CLOSE',
-        historyBarsInWindow: 20,
       },
       {
         instrumentId: 'stock-2',
@@ -2413,12 +2407,13 @@ describe('MarketDataFoundationService syncV1', () => {
         baseClose: 88,
         returnPercent: -0.034,
         priceBasis: 'ADJUSTED_CLOSE',
-        historyBarsInWindow: 20,
       },
-    ]);
+    ];
+    const tradingDate = new Date('2026-05-27T00:00:00.000Z');
+    const findFirst = jest.fn().mockResolvedValue({ tradingDate });
+    const findMany = jest.fn().mockResolvedValue(snapshotRows.map((r) => ({ payloadJson: r })));
     const repository = {
-      latestDataTimestamp,
-      marketMoversForRange,
+      prisma: { marketScanSnapshot: { findFirst, findMany } },
       listInstruments: jest.fn(),
       listStocksForUniverseHealth: jest.fn(),
     };
@@ -2457,21 +2452,13 @@ describe('MarketDataFoundationService syncV1', () => {
       expect.objectContaining({ key: 'Financial Services', label: 'Financial Services', tileCount: 1, avgReturnPercent: 0.043 }),
       expect.objectContaining({ key: 'Utilities', label: 'Utilities', tileCount: 1, avgReturnPercent: -0.034 }),
     ]));
-    expect(marketMoversForRange).toHaveBeenCalledWith(1, expect.objectContaining({
-      region: 'IN',
-      assetType: 'STOCK',
-      limit: 30,
-      latestDateStart: new Date('2026-05-27T00:00:00.000Z'),
-      latestDateEnd: new Date('2026-05-28T00:00:00.000Z'),
-    }));
     expect(repository.listInstruments).not.toHaveBeenCalled();
     expect(repository.listStocksForUniverseHealth).not.toHaveBeenCalled();
   });
 
-  it('returns an honest missing market-map envelope without materializing when no mover rows exist', async () => {
+  it('returns an honest missing market-map envelope when no snapshot exists', async () => {
     const repository = {
-      latestDataTimestamp: jest.fn().mockResolvedValue(null),
-      marketMoversForRange: jest.fn().mockResolvedValue([]),
+      prisma: { marketScanSnapshot: { findFirst: jest.fn().mockResolvedValue(null), findMany: jest.fn().mockResolvedValue([]) } },
     };
     const service = new MarketDataFoundationService(repository as any, {} as any);
 
@@ -2486,10 +2473,7 @@ describe('MarketDataFoundationService syncV1', () => {
       tiles: [],
       groups: [],
     });
-    expect(result.gaps[0]).toBe('Market map needs catalog rows and stored price movement evidence for the selected scope.');
-    expect(result.gaps).toEqual(expect.arrayContaining([
-      expect.stringMatching(/catalog rows and stored price movement evidence/i),
-    ]));
+    expect(result.warnings[0]).toMatch(/MARKET_SCAN_REFRESH/);
   });
 
   it('keeps price fallback-blocked rows out of universe-health automatic backfill counts', async () => {
@@ -7310,12 +7294,12 @@ describe('MarketDataFoundationService syncV1', () => {
         stock: {
           findMany: jest.fn().mockResolvedValue(stocks),
         },
-        priceTick: {
-          findMany: jest.fn(async ({ where }: any) => (
-            where.symbol.in.flatMap((symbol: string) => priceRows(symbol))
-          )),
-        },
       },
+      // FIX-D: the service now reads price windows via the repository's raw-SQL chunk method
+      // (CAST(volume AS float8) to avoid the Prisma6 NAPI BigInt crash), chunked by 50.
+      listPriceWindowsForSymbolChunk: jest.fn(async (symbols: string[]) => (
+        symbols.flatMap((symbol: string) => priceRows(symbol))
+      )),
     };
     const provider = { fetchHistorical: jest.fn() };
     const service = new MarketDataFoundationService(repository as any, provider as any);
@@ -7325,8 +7309,8 @@ describe('MarketDataFoundationService syncV1', () => {
       assetType: 'STOCK',
     });
 
-    expect(repository.prisma.priceTick.findMany).toHaveBeenCalledTimes(3);
-    expect(repository.prisma.priceTick.findMany.mock.calls.map(([query]) => query.where.symbol.in.length)).toEqual([100, 100, 5]);
+    expect(repository.listPriceWindowsForSymbolChunk).toHaveBeenCalledTimes(5);
+    expect(repository.listPriceWindowsForSymbolChunk.mock.calls.map(([symbols]) => symbols.length)).toEqual([50, 50, 50, 50, 5]);
     expect(result.size).toBe(205);
     expect(result.get('stock-1')).toHaveLength(2);
     expect(result.get('stock-205')).toHaveLength(2);

@@ -93,6 +93,7 @@ const SCHEDULED_DOWNSTREAM_STAGE_KEYS = [
   'MARKET_PULSE_REFRESH',
   'STOCK_INTEREST_REFRESH',
   'WORKBENCH_REFRESH',
+  'MARKET_SCAN_REFRESH',
 ];
 
 type ScheduledAdapterResult = {
@@ -157,6 +158,7 @@ const PIPELINE_COMMAND_POLICIES: PipelineCommandPolicy[] = [
   commandPolicy('SIGNAL_POSITION_LEDGER_REFRESH', 'SIGNAL_POSITION_LEDGER', 13, 'Signal Position Ledger', 'Materialized ledger refresh', 'DEFERRED', 'Manual command remains module-owned; scheduler-only materialization is active.'),
   commandPolicy('EARNINGS_INTELLIGENCE_REFRESH', 'EARNINGS_INTELLIGENCE_REFRESH', 15, 'Earnings Intelligence', 'Earnings intelligence snapshot refresh', 'ENABLED', null),
   commandPolicy('STOCK_INTEREST_REFRESH', 'STOCK_INTEREST_REFRESH', 16, 'Market Intelligence', 'Stock Interest snapshot refresh', 'ENABLED', null),
+  commandPolicy('MARKET_SCAN_REFRESH', 'MARKET_SCAN_REFRESH', 1, 'Market Data', 'Market scan snapshot refresh (movers / 52w / spikes)', 'ENABLED', null),
   commandPolicy(
     'PIPELINE_RUN_ALL',
     'MARKET_DATA',
@@ -355,6 +357,10 @@ export class PipelineOrchestrationService {
 
     if (request.commandKey === 'STOCK_INTEREST_REFRESH') {
       return this.executeStockInterestRefreshCommand(request, context, policy, now);
+    }
+
+    if (request.commandKey === 'MARKET_SCAN_REFRESH') {
+      return this.executeMarketScanRefreshCommand(request, context, policy, now);
     }
 
     if (request.commandKey === 'PIPELINE_RETRY_FAILED_STAGE') {
@@ -1445,6 +1451,155 @@ export class PipelineOrchestrationService {
     }
   }
 
+  private async executeMarketScanRefreshCommand(
+    request: PipelineCommandRequest,
+    context: PipelineCommandExecutionContext,
+    policy: PipelineCommandPolicy,
+    now: Date
+  ): Promise<PipelineCommandResponse> {
+    const serverIdempotencyKey = this.commandIdempotencyKey(request);
+    const stageIdempotencyKey = serverIdempotencyKey;
+    const runIdempotencyKey = `${serverIdempotencyKey}:run`;
+    const leaseOwner = `manual-command:${request.commandKey}:${PROCESS_LOCAL_ID}`;
+
+    let stageLease = await this.leaseStage({
+      idempotencyKey: stageIdempotencyKey,
+      leaseOwner,
+      leaseMs: DEFAULT_LEASE_MS,
+      now,
+      allowTerminalRetry: false,
+    });
+
+    if (stageLease.reason === 'STAGE_TERMINAL') {
+      return this.duplicateTerminalResponse(request, policy, serverIdempotencyKey, stageLease);
+    }
+    if (stageLease.reason === 'LEASE_HELD') {
+      throw new PipelineCommandError(409, 'Pipeline stage lease is currently held by another command', this.leaseHeldResponse(request, policy, serverIdempotencyKey, stageLease));
+    }
+
+    if (stageLease.reason === 'STAGE_NOT_FOUND') {
+      const run = await this.createRun({
+        pipelineKey: request.pipelineKey,
+        region: request.region,
+        assetType: request.assetType,
+        timeframe: request.timeframe,
+        triggerType: 'manual',
+        status: 'RUNNING',
+        idempotencyKey: runIdempotencyKey,
+        startedAt: now,
+        metadata: { commandKey: request.commandKey, runMode: request.runMode, requestedByUserId: context.requestedByUserId, commandIdempotencyKey: serverIdempotencyKey },
+      });
+      await this.createStage({
+        pipelineRunId: run.id,
+        stageKey: policy.stageKey,
+        stageOrder: policy.stageOrder,
+        status: 'PENDING',
+        idempotencyKey: stageIdempotencyKey,
+        region: request.region,
+        assetType: request.assetType,
+        timeframe: request.timeframe,
+        batchSize: request.batchSize,
+        offset: request.offset,
+        nextOffset: request.offset,
+        hasMore: false,
+        inputFingerprint: `${request.commandKey}:${request.region}:${request.assetType}`,
+        metadata: { commandKey: request.commandKey, runMode: request.runMode, requestedByUserId: context.requestedByUserId, commandIdempotencyKey: serverIdempotencyKey },
+      });
+      stageLease = await this.leaseStage({ idempotencyKey: stageIdempotencyKey, leaseOwner, leaseMs: DEFAULT_LEASE_MS, now, allowTerminalRetry: false });
+      if (!stageLease.acquired) {
+        if (stageLease.reason === 'STAGE_TERMINAL') return this.duplicateTerminalResponse(request, policy, serverIdempotencyKey, stageLease);
+        throw new PipelineCommandError(500, `Unable to acquire stage lease after stage creation: ${stageLease.reason}`);
+      }
+    }
+    if (!stageLease.acquired) throw new PipelineCommandError(500, `Unable to acquire stage lease: ${stageLease.reason}`);
+
+    try {
+      const result = await this.marketDataService.refreshMarketScanSnapshots({
+        region: request.region,
+        assetType: request.assetType,
+        now,
+      });
+      const completedAt = new Date();
+      const durationMs = Math.max(0, completedAt.getTime() - now.getTime());
+      const status = result.errors.length > 0 ? 'PARTIAL' : 'COMPLETED';
+      const completedStage = await this.completeStage({
+        idempotencyKey: stageIdempotencyKey,
+        status,
+        totalCount: result.totalInserted,
+        processedCount: result.totalInserted,
+        succeededCount: result.totalInserted,
+        partialCount: 0,
+        failedCount: 0,
+        skippedCount: 0,
+        unchangedCount: 0,
+        nextOffset: null,
+        hasMore: false,
+        warnings: [...result.warnings, ...result.errors],
+        errors: [],
+        completedAt,
+        durationMs,
+        metadata: { commandKey: request.commandKey, requestedByUserId: context.requestedByUserId, tradingDate: result.tradingDate, totalInserted: result.totalInserted, scanTypes: result.scanTypes },
+      });
+      await this.completeRun({
+        idempotencyKey: runIdempotencyKey,
+        status,
+        totalCount: result.totalInserted,
+        processedCount: result.totalInserted,
+        succeededCount: result.totalInserted,
+        partialCount: 0,
+        failedCount: 0,
+        skippedCount: 0,
+        unchangedCount: 0,
+        warnings: [...result.warnings, ...result.errors],
+        errors: [],
+        completedAt,
+        durationMs,
+        metadata: { commandKey: request.commandKey, tradingDate: result.tradingDate, totalInserted: result.totalInserted, scanTypes: result.scanTypes },
+      });
+      return this.responseFromStage(request, policy, serverIdempotencyKey, completedStage, stageLease, status === 'PARTIAL' ? 'PARTIAL' : 'COMPLETED');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Market scan refresh failed';
+      const completedAt = new Date();
+      const durationMs = Math.max(0, completedAt.getTime() - now.getTime());
+      const leasedStage = stageLease.stage;
+      const failedStage = await this.completeStage({
+        idempotencyKey: stageIdempotencyKey,
+        status: 'FAILED',
+        totalCount: leasedStage?.totalCount ?? 0,
+        processedCount: leasedStage?.processedCount ?? 0,
+        succeededCount: leasedStage?.succeededCount ?? 0,
+        partialCount: 0,
+        failedCount: 1,
+        skippedCount: 0,
+        unchangedCount: 0,
+        nextOffset: null,
+        hasMore: false,
+        warnings: leasedStage?.warnings ?? [],
+        errors: [...(leasedStage?.errors ?? []), errorMessage],
+        completedAt,
+        durationMs,
+        metadata: { commandKey: request.commandKey, error: errorMessage },
+      });
+      await this.completeRun({
+        idempotencyKey: runIdempotencyKey,
+        status: 'FAILED',
+        totalCount: 0,
+        processedCount: 0,
+        succeededCount: 0,
+        partialCount: 0,
+        failedCount: 1,
+        skippedCount: 0,
+        unchangedCount: 0,
+        warnings: [],
+        errors: [errorMessage],
+        completedAt,
+        durationMs,
+        metadata: { commandKey: request.commandKey, error: errorMessage },
+      });
+      return this.responseFromStage(request, policy, serverIdempotencyKey, failedStage, stageLease, 'FAILED');
+    }
+  }
+
   private async executeDailyPipelineCommand(
     request: PipelineCommandRequest,
     context: PipelineCommandExecutionContext,
@@ -1531,6 +1686,19 @@ export class PipelineOrchestrationService {
         syncDuringMarketHours: false,
         skipWeekends: true,
       });
+
+      // Market scan refresh — precompute daily aggregates so GETs read from snapshot.
+      // Non-blocking: errors are fully swallowed so scan failures never block the main pipeline.
+      try {
+        await this.marketDataService.refreshMarketScanSnapshots({
+          region: request.region,
+          assetType: request.assetType,
+          now,
+        });
+      } catch (scanErr) {
+        console.warn(`[PIPELINE_RUN_ALL] market scan refresh failed (non-blocking): ${scanErr instanceof Error ? scanErr.message : String(scanErr)}`);
+      }
+
       const fullDailyMode = this.isFullDailyPipelineRun(request);
       const summary = fullDailyMode
         ? await this.withFullDailyDownstreamEligibility(initialSummary)

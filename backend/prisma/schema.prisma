@@ -1503,3 +1503,29 @@ model PipelineStageRun {
   @@index([stageKey, status, leaseExpiresAt])
   @@map("pipeline_stage_runs")
 }
+
+// ---------------------------------------------------------------------------
+// Market Scan Snapshots — precomputed daily aggregates served by persisted-read GETs
+// ---------------------------------------------------------------------------
+model MarketScanSnapshot {
+  id           String   @id @default(cuid())
+  /// One of: MOVERS_GAINERS | MOVERS_LOSERS | 52W_HIGH | 52W_LOW | DELIVERY_SPIKE | VOLUME_SPIKE
+  scanType     String
+  /// e.g. '1D' | '1W' | '1M' | '3M' | '6M' | '1Y'  (NULL for non-mover scans)
+  scanRange    String?
+  region       String
+  assetType    String
+  tradingDate  DateTime
+  /// 1-based rank within scanType+scanRange+region+assetType+tradingDate
+  rank         Int
+  /// Full row payload as stored by the refresh pipeline; shape varies by scanType
+  payloadJson  Json
+  computedAt   DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([scanType, scanRange, region, assetType, tradingDate, rank], map: "market_scan_snapshot_type_range_scope_date_rank_key")
+  @@index([scanType, scanRange, region, assetType, tradingDate], map: "market_scan_snapshot_lookup_idx")
+  @@index([tradingDate, region, assetType], map: "market_scan_snapshot_date_scope_idx")
+  @@map("market_scan_snapshots")
+}
