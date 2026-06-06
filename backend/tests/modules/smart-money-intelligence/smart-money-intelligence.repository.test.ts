@@ -93,25 +93,30 @@ describe('SmartMoneyIntelligenceRepository', () => {
     }));
   });
 
-  it('prefers fresher source-date rows over equally covered legacy runtime-date rows', async () => {
-    const legacyRuntimeDate = new Date('2026-05-29T00:00:00.000Z');
-    const sourceDate = new Date('2026-05-25T00:00:00.000Z');
+  it('selects the latest DATA date among equally-covered runs regardless of recompute time', async () => {
+    // The "as of" date is the latest snapshotDate (data date) with substantial coverage.
+    // updatedAt (recompute time) must NOT override the data date — otherwise re-writing an
+    // OLDER date (e.g. an integration-test seed recomputed today) would shadow the genuinely
+    // latest data. Here both dates are equally covered; the LATER snapshotDate (05-29) wins
+    // even though the older 05-25 row was recomputed more recently.
+    const laterDataDate = new Date('2026-05-29T00:00:00.000Z');
+    const olderDataDateRecomputedLater = new Date('2026-05-25T00:00:00.000Z');
     const db = {
       smartMoneyContextSnapshot: {
         groupBy: jest.fn().mockResolvedValue([
           {
-            snapshotDate: legacyRuntimeDate,
+            snapshotDate: laterDataDate,
             _count: { _all: 5 },
             _max: { updatedAt: new Date('2026-05-29T01:00:00.000Z') },
           },
           {
-            snapshotDate: sourceDate,
+            snapshotDate: olderDataDateRecomputedLater,
             _count: { _all: 5 },
             _max: { updatedAt: new Date('2026-05-30T01:00:00.000Z') },
           },
         ]),
         count: jest.fn().mockResolvedValue(1),
-        findMany: jest.fn().mockResolvedValue([snapshotRow({ snapshotDate: sourceDate })]),
+        findMany: jest.fn().mockResolvedValue([snapshotRow({ snapshotDate: laterDataDate })]),
       },
     };
     const repository = new SmartMoneyIntelligenceRepository(db as any);
@@ -119,7 +124,7 @@ describe('SmartMoneyIntelligenceRepository', () => {
     await repository.latestSnapshots({ limit: 10, range: '3M', region: 'IN', assetType: 'STOCK' });
 
     expect(db.smartMoneyContextSnapshot.findMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: expect.objectContaining({ snapshotDate: sourceDate }),
+      where: expect.objectContaining({ snapshotDate: laterDataDate }),
     }));
   });
 

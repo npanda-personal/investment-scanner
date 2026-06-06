@@ -60,6 +60,8 @@ export interface SectorSmartMoneySummary {
   instrumentCount: number;
   sectorStatus: SectorSmartMoneyStatus;
   dataStatus: SmartMoneyDataStatus;
+  snapshotDate?: string | null;
+  dataThroughDate?: string | null;
   updatedAt: string;
 }
 

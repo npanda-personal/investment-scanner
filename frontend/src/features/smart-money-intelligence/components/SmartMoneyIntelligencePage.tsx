@@ -192,6 +192,8 @@ export default function SmartMoneyIntelligencePage() {
     top[0]?.snapshotDate ||
     distribution[0]?.dataThroughDate ||
     distribution[0]?.snapshotDate ||
+    sectors[0]?.dataThroughDate ||
+    sectors[0]?.snapshotDate ||
     sectors[0]?.updatedAt ||
     null;
 
@@ -325,14 +327,18 @@ export default function SmartMoneyIntelligencePage() {
 }
 
 function SectorView({ sectors }: { sectors: SectorSmartMoneySummary[] }) {
-  // Use the earliest updatedAt across sectors — if any sector is stale, the view is stale.
-  const sectorAsOf = sectors.length > 0
-    ? sectors.reduce<string | null>((oldest, s) => {
-        if (!s.updatedAt) return oldest;
-        if (!oldest) return s.updatedAt;
-        return s.updatedAt < oldest ? s.updatedAt : oldest;
-      }, null)
-    : null;
+  // Show the DATA date (snapshotDate/dataThroughDate) — all sectors share the latest
+  // substantial snapshot date — not updatedAt (compute timestamp, which a no-op refresh
+  // leaves stale). Fall back to the earliest updatedAt only if no data date is present.
+  const sectorAsOf = sectors[0]?.dataThroughDate
+    ?? sectors[0]?.snapshotDate
+    ?? (sectors.length > 0
+      ? sectors.reduce<string | null>((oldest, s) => {
+          if (!s.updatedAt) return oldest;
+          if (!oldest) return s.updatedAt;
+          return s.updatedAt < oldest ? s.updatedAt : oldest;
+        }, null)
+      : null);
 
   return (
     <Paper sx={{ p: 2 }}>

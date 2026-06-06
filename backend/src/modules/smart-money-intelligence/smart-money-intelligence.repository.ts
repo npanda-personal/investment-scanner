@@ -166,6 +166,9 @@ export class SmartMoneyIntelligenceRepository {
        const sectorStatus: SectorSmartMoneyStatus = classifySectorScore(average);
        const dataStatus: any = items.some((item) => item.dataStatus === 'PARTIAL' || item.dataStatus === 'ERROR') ? 'PARTIAL' : 'COMPLETE';
        const updatedAt = items.map((item) => item.updatedAt).sort().at(-1) || new Date(0).toISOString();
+       // The DATA date (snapshotDate) is what the screen's "as of" badge should show — not
+       // updatedAt (the row's compute timestamp, which a no-op unchanged refresh leaves stale).
+       const dataThroughDate = items.map((item) => item.snapshotDate).filter(Boolean).sort().at(-1) || null;
        return {
          sector,
          averageSmartMoneyScore: average,
@@ -175,6 +178,8 @@ export class SmartMoneyIntelligenceRepository {
          instrumentCount: items.length,
          sectorStatus,
          dataStatus,
+         snapshotDate: dataThroughDate,
+         dataThroughDate,
          updatedAt,
        };
      }).sort((a, b) => b.averageSmartMoneyScore - a.averageSmartMoneyScore);
@@ -375,9 +380,13 @@ export class SmartMoneyIntelligenceRepository {
     const stableGroups = groups
       .filter((item: any) => Number(item._count?._all || 0) >= floor)
       .sort((a: any, b: any) => {
-        const updatedDelta = this.timeValue(b._max?.updatedAt) - this.timeValue(a._max?.updatedAt);
-        if (updatedDelta !== 0) return updatedDelta;
-        return this.timeValue(b.snapshotDate) - this.timeValue(a.snapshotDate);
+        // Latest DATA date (snapshotDate) wins — that is what the screen's "as of" means.
+        // updatedAt (compute time) is only a tiebreak for the SAME snapshotDate; it must NOT
+        // be the primary key, or re-computing/re-writing an OLDER date (e.g. an integration-test
+        // seed that touches 05-29 today) would shadow the genuinely latest data date (06-05).
+        const dateDelta = this.timeValue(b.snapshotDate) - this.timeValue(a.snapshotDate);
+        if (dateDelta !== 0) return dateDelta;
+        return this.timeValue(b._max?.updatedAt) - this.timeValue(a._max?.updatedAt);
       });
     return stableGroups[0]?.snapshotDate ?? groups[0]?.snapshotDate ?? null;
   }
