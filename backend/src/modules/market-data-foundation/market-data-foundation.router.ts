@@ -60,6 +60,10 @@ export const createMarketDataV1Router = (
   router.get('/market-data/review-readiness-summary', controller.reviewReadinessSummary);
   router.get('/market-data/movers', controller.marketMovers);
   router.get('/market-data/market-map', controller.marketMap);
+  router.get('/market-data/scans/52w-high', controller.marketScan52wHigh);
+  router.get('/market-data/scans/52w-low', controller.marketScan52wLow);
+  router.get('/market-data/scans/delivery-spike', controller.marketScanDeliverySpike);
+  router.get('/market-data/scans/volume-spike', controller.marketScanVolumeSpike);
   router.get('/market-data/review-universe', controller.trustedReviewUniverseHealth);
   router.get('/market-data/review-universe/instruments', controller.trustedReviewUniverseInstruments);
   router.get('/market-data/universe/repair-plan', controller.repairPlan);

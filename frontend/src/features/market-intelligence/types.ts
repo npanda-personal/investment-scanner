@@ -251,6 +251,24 @@ export interface SectorConstituentsEnvelope {
   warnings: string[];
 }
 
+export type RotationQuadrant = 'LEADING' | 'IMPROVING' | 'WEAKENING' | 'LAGGING';
+
+export interface SectorRotationRow extends SectorIntelligenceSnapshot {
+  rotationQuadrant: RotationQuadrant;
+}
+
+export interface SectorRotationEnvelope {
+  availability: 'READY' | 'EMPTY' | 'ERROR';
+  scope: { region: string; assetType: string };
+  snapshotDate: string | null;
+  dataThroughDate: string | null;
+  generatedAt: string;
+  sectors: SectorRotationRow[];
+  quadrantCounts: Record<RotationQuadrant, number>;
+  message: string;
+  warnings: string[];
+}
+
 export type MarketReadModelKey =
   | 'marketPulse'
   | 'sectorIntelligence'

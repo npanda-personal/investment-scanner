@@ -4,7 +4,7 @@ import NavigationLayout from './NavigationLayout';
 import HomePage from './HomePage';
 import AdminHomePage from './AdminHomePage';
 import { marketIntelligenceRoutes } from '@/features/market-intelligence';
-import { marketDataFoundationRoutes } from '@/features/market-data-foundation';
+import { marketDataFoundationRoutes, marketScansRoutes } from '@/features/market-data-foundation';
 import UnifiedStockPage, { InstrumentWorkspaceSymbolRedirect } from '@/features/market-data-foundation/components/UnifiedStockPage';
 import { stockResearchWorkbenchRoutes } from '@/features/stock-research-workbench';
 import { signalGenerationEngineRoutes } from '@/features/signal-generation-engine';
@@ -86,6 +86,7 @@ export const appRoutes: RouteObject[] = [
           { index: true, element: <HomePage /> },
           ...marketIntelligenceRoutes,
           ...todayTradeReviewRoutes,
+          ...marketScansRoutes,
           ...researchHubRoutes,
           ...userInstrumentRoutes,
           ...stockResearchWorkbenchRoutes,

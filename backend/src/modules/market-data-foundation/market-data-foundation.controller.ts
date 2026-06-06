@@ -633,6 +633,74 @@ export class MarketDataFoundationController {
     }
   };
 
+  // ---------------------------------------------------------------------------
+  // Market Scans
+  // ---------------------------------------------------------------------------
+
+  marketScan52wHigh = async (req: Request, res: Response) => {
+    try {
+      const { region, assetType } = this.getMarketFilter(req);
+      return res.json(await this.service.marketScan52w({
+        region,
+        assetType,
+        scanType: '52w-high',
+        proximityPct: this.numberParam(req, 'proximityPct'),
+        limit: this.numberParam(req, 'limit'),
+      }));
+    } catch (error) {
+      console.error('Market scan 52w-high error:', error);
+      return res.status(500).json({ error: 'Market scan 52w-high failed' });
+    }
+  };
+
+  marketScan52wLow = async (req: Request, res: Response) => {
+    try {
+      const { region, assetType } = this.getMarketFilter(req);
+      return res.json(await this.service.marketScan52w({
+        region,
+        assetType,
+        scanType: '52w-low',
+        proximityPct: this.numberParam(req, 'proximityPct'),
+        limit: this.numberParam(req, 'limit'),
+      }));
+    } catch (error) {
+      console.error('Market scan 52w-low error:', error);
+      return res.status(500).json({ error: 'Market scan 52w-low failed' });
+    }
+  };
+
+  marketScanDeliverySpike = async (req: Request, res: Response) => {
+    try {
+      const { region, assetType } = this.getMarketFilter(req);
+      return res.json(await this.service.marketScanDeliverySpike({
+        region,
+        assetType,
+        lookbackBars: this.numberParam(req, 'lookbackBars'),
+        minSpikeRatio: this.numberParam(req, 'minSpikeRatio'),
+        limit: this.numberParam(req, 'limit'),
+      }));
+    } catch (error) {
+      console.error('Market scan delivery-spike error:', error);
+      return res.status(500).json({ error: 'Market scan delivery-spike failed' });
+    }
+  };
+
+  marketScanVolumeSpike = async (req: Request, res: Response) => {
+    try {
+      const { region, assetType } = this.getMarketFilter(req);
+      return res.json(await this.service.marketScanVolumeSpike({
+        region,
+        assetType,
+        lookbackBars: this.numberParam(req, 'lookbackBars'),
+        minSpikeRatio: this.numberParam(req, 'minSpikeRatio'),
+        limit: this.numberParam(req, 'limit'),
+      }));
+    } catch (error) {
+      console.error('Market scan volume-spike error:', error);
+      return res.status(500).json({ error: 'Market scan volume-spike failed' });
+    }
+  };
+
   marketMovers = async (req: Request, res: Response) => {
     try {
       const { region, assetType } = this.getMarketFilter(req);

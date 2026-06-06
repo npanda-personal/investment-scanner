@@ -11,6 +11,7 @@ describe('market intelligence routes', () => {
     const router = createMarketIntelligenceRouter({
       stockInterest: jest.fn(),
       sectorConstituents: jest.fn(),
+      sectorRotation: jest.fn(),
       instrumentContext: jest.fn(),
     } as any);
 
@@ -18,6 +19,7 @@ describe('market intelligence routes', () => {
     expect(routePaths(router)).toEqual([
       'GET /market-intelligence/stock-interest',
       'GET /market-intelligence/sector-constituents',
+      'GET /market-intelligence/sector-rotation',
       'GET /market-intelligence/instrument-context/:instrumentId',
     ]);
   });

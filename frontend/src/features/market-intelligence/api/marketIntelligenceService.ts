@@ -9,6 +9,7 @@ import type {
   SectorConstituentRow,
   SectorConstituentsEnvelope,
   SectorIntelligenceSnapshot,
+  SectorRotationEnvelope,
   SnapshotAvailability,
   SnapshotEnvelope,
   StockInterestSnapshot,
@@ -344,6 +345,49 @@ export async function fetchInstrumentContextSnapshot(
     };
   } catch (caught) {
     return errorEnvelope(scope, 'Failed to load instrument context snapshot.', caught);
+  }
+}
+
+export async function fetchSectorRotation(
+  scope: Pick<MarketScope, 'region' | 'assetType'>,
+): Promise<SectorRotationEnvelope> {
+  try {
+    const response = await axios.get<SectorRotationEnvelope>(
+      `${API_BASE}/sector-rotation`,
+      { params: { region: scope.region, assetType: scope.assetType } },
+    );
+    const body = response.data;
+    return {
+      availability: body.availability ?? 'ERROR',
+      scope: body.scope ?? { region: scope.region, assetType: scope.assetType },
+      snapshotDate: body.snapshotDate ?? null,
+      dataThroughDate: body.dataThroughDate ?? null,
+      generatedAt: body.generatedAt ?? new Date().toISOString(),
+      sectors: (body.sectors ?? []).map((row) => ({
+        ...row,
+        return1W: typeof row.return1W === 'number' ? row.return1W : null,
+        return1M: typeof row.return1M === 'number' ? row.return1M : null,
+        return3M: typeof row.return3M === 'number' ? row.return3M : null,
+        reasonTags: Array.isArray(row.reasonTags) ? row.reasonTags : [],
+        warnings: Array.isArray(row.warnings) ? row.warnings : [],
+      })),
+      quadrantCounts: body.quadrantCounts ?? { LEADING: 0, IMPROVING: 0, WEAKENING: 0, LAGGING: 0 },
+      message: body.message ?? '',
+      warnings: body.warnings ?? [],
+    };
+  } catch (caught) {
+    const msg = errorMessage(caught, 'Failed to load sector rotation data.');
+    return {
+      availability: 'ERROR',
+      scope: { region: scope.region, assetType: scope.assetType },
+      snapshotDate: null,
+      dataThroughDate: null,
+      generatedAt: new Date().toISOString(),
+      sectors: [],
+      quadrantCounts: { LEADING: 0, IMPROVING: 0, WEAKENING: 0, LAGGING: 0 },
+      message: msg,
+      warnings: [msg],
+    };
   }
 }
 

@@ -12,6 +12,8 @@ import SpaceDashboardIcon from '@mui/icons-material/SpaceDashboard';
 import StarBorderIcon from '@mui/icons-material/StarBorder';
 import TodayIcon from '@mui/icons-material/Today';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import SyncAltIcon from '@mui/icons-material/SyncAlt';
+import FilterAltIcon from '@mui/icons-material/FilterAlt';
 import WorkspacesIcon from '@mui/icons-material/Workspaces';
 
 export type NavItem = {
@@ -34,12 +36,14 @@ export const navGroups: NavGroup[] = [
     group: 'Trader Workflow',
     items: [
       { path: '/', label: 'Market Pulse', icon: <DashboardIcon />, aliases: ['/market-pulse'] },
+      { path: '/sector-rotation', label: 'Sector Rotation', icon: <SyncAltIcon /> },
       { path: '/today-review', label: 'Daily Review', icon: <TodayIcon />, matchPrefixes: ['/today-review/'] },
       { path: '/daily-overview', label: 'Daily Overview', icon: <SpaceDashboardIcon /> },
       { path: '/research', label: 'Research Hub', icon: <WorkspacesIcon /> },
       { path: '/daily-review-shortlist', label: 'Review Shortlist', icon: <FactCheckIcon /> },
       { path: '/stock-interest-radar', label: 'Stock Interest Radar', icon: <SavedSearchIcon /> },
       { path: '/earnings-intelligence', label: 'Earnings Intelligence', icon: <CalendarMonthIcon /> },
+      { path: '/market-scans', label: 'Market Scans', icon: <FilterAltIcon /> },
       { path: '/watchlists', label: 'Watchlists', icon: <StarBorderIcon />, matchPrefixes: ['/watchlists/'] },
       { path: '/portfolios', label: 'Portfolios', icon: <AccountBalanceWalletIcon />, matchPrefixes: ['/portfolios/'] },
       { path: '/alerts', label: 'Alerts', icon: <NotificationsNoneIcon /> },

@@ -290,6 +290,75 @@ export interface MarketMapSummary {
   tiles: MarketMapTile[];
 }
 
+// ---------------------------------------------------------------------------
+// Market Scans
+// ---------------------------------------------------------------------------
+
+export interface MarketScanRow52w {
+  instrumentId: string;
+  symbol: string;
+  companyName: string;
+  sector: string | null;
+  latestDate: string;
+  currentPrice: number;
+  high52w: number;
+  low52w: number;
+  pctFromHigh: number;
+  pctFromLow: number;
+  priceBasis: 'ADJUSTED_CLOSE' | 'CLOSE_FALLBACK';
+}
+
+export interface MarketScanSummary52w {
+  scanType: '52w-high' | '52w-low';
+  scope: { region: string; assetType: string };
+  generatedAt: string;
+  proximityPct: number;
+  results: MarketScanRow52w[];
+  warnings: string[];
+}
+
+export interface MarketScanRowDeliverySpike {
+  instrumentId: string;
+  symbol: string;
+  companyName: string;
+  sector: string | null;
+  tradingDate: string;
+  deliveryPct: number;
+  avgDeliveryPct: number;
+  spikeRatio: number;
+  lookbackBars: number;
+}
+
+export interface MarketScanSummaryDeliverySpike {
+  scanType: 'delivery-spike';
+  scope: { region: string; assetType: string };
+  generatedAt: string;
+  minSpikeRatio: number;
+  results: MarketScanRowDeliverySpike[];
+  warnings: string[];
+}
+
+export interface MarketScanRowVolumeSpike {
+  instrumentId: string;
+  symbol: string;
+  companyName: string;
+  sector: string | null;
+  latestDate: string;
+  latestVolume: number;
+  avgVolume: number;
+  spikeRatio: number;
+  lookbackBars: number;
+}
+
+export interface MarketScanSummaryVolumeSpike {
+  scanType: 'volume-spike';
+  scope: { region: string; assetType: string };
+  generatedAt: string;
+  minSpikeRatio: number;
+  results: MarketScanRowVolumeSpike[];
+  warnings: string[];
+}
+
 export interface OfficialEodBulkSyncEvidence {
   enabled: boolean;
   attempted: boolean;
@@ -970,6 +1039,8 @@ export interface TrustedReviewUniverseInstrument {
   /** Whether this instrument is eligible for F&O / derivatives trading on NSE/BSE.
    *  Null means the flag was not available (treat as non-F&O for short-review gating). */
   derivativesEligible: boolean | null;
+  /** Stock's sector from catalog metadata. Null when absent (sector will appear in contextGaps). */
+  sector: string | null;
 }
 
 export interface MarketDataRepairRequest {

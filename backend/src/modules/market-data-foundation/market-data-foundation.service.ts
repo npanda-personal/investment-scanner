@@ -56,6 +56,12 @@ import type {
   MarketMoverRange,
   MarketMoverRangeSummary,
   MarketMoversSummary,
+  MarketScanRow52w,
+  MarketScanSummary52w,
+  MarketScanRowDeliverySpike,
+  MarketScanSummaryDeliverySpike,
+  MarketScanRowVolumeSpike,
+  MarketScanSummaryVolumeSpike,
   InstrumentUniverseReadiness,
   TrustedReviewUniverseHealth,
   TrustedReviewUniverseInstrument,
@@ -1721,6 +1727,8 @@ export class MarketDataFoundationService {
       priceHistory: historyBySymbol.get(stock.symbol) || [],
       /** derivativesEligible: sourced from the stock record when available; null means not yet populated. */
       derivativesEligible: (stock as any).derivativesEligible ?? null,
+      /** sector: sourced from catalog metadata; null when absent (will appear in contextGaps as 'sector'). */
+      sector: (stock as any).sector ?? null,
     }));
   }
 
@@ -14989,6 +14997,156 @@ export class MarketDataFoundationService {
         last_updated_timestamp: record.lastUpdatedTimestamp.toISOString(),
         data_status: record.dataStatus,
       })),
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Market Scans
+  // ---------------------------------------------------------------------------
+
+  async marketScan52w(
+    options: Pick<PaginationOptions, 'region' | 'assetType'> & {
+      scanType: '52w-high' | '52w-low';
+      proximityPct?: number;
+      limit?: number;
+    } = { scanType: '52w-high' },
+  ): Promise<MarketScanSummary52w> {
+    const scope = {
+      region: options.region?.trim().toUpperCase() || 'IN',
+      assetType: options.assetType?.trim().toUpperCase() || 'STOCK',
+    };
+    const scanType = options.scanType ?? '52w-high';
+    const proximityPct = Math.max(0.5, Math.min(options.proximityPct ?? 5, 50));
+    const limit = Math.max(1, Math.min(options.limit ?? 30, 100));
+
+    const rows = await this.repository.scan52wProximity({
+      ...scope,
+      scanType,
+      proximityPct,
+      limit,
+    });
+
+    const results: MarketScanRow52w[] = rows.map((row) => ({
+      instrumentId: row.instrumentId,
+      symbol: row.symbol,
+      companyName: row.companyName,
+      sector: row.sector,
+      latestDate: row.latestDate instanceof Date ? row.latestDate.toISOString() : String(row.latestDate),
+      currentPrice: Number(row.currentPrice),
+      high52w: Number(row.high52w),
+      low52w: Number(row.low52w),
+      pctFromHigh: Number(row.pctFromHigh),
+      pctFromLow: Number(row.pctFromLow),
+      priceBasis: (row.priceBasis === 'CLOSE_FALLBACK' ? 'CLOSE_FALLBACK' : 'ADJUSTED_CLOSE') as 'ADJUSTED_CLOSE' | 'CLOSE_FALLBACK',
+    }));
+
+    const warnings = results.length === 0
+      ? [`No stocks found within ${proximityPct}% of their 52-week ${scanType === '52w-high' ? 'high' : 'low'} in ${scope.region}/${scope.assetType}. Check that price history has been ingested.`]
+      : ['Prices use adjusted close where available. Proximity is to the 52-week adjusted-close high/low over ~365 calendar days of price history.'];
+
+    return {
+      scanType,
+      scope,
+      generatedAt: new Date().toISOString(),
+      proximityPct,
+      results,
+      warnings,
+    };
+  }
+
+  async marketScanDeliverySpike(
+    options: Pick<PaginationOptions, 'region' | 'assetType'> & {
+      lookbackBars?: number;
+      minSpikeRatio?: number;
+      limit?: number;
+    } = {},
+  ): Promise<MarketScanSummaryDeliverySpike> {
+    const scope = {
+      region: options.region?.trim().toUpperCase() || 'IN',
+      assetType: options.assetType?.trim().toUpperCase() || 'STOCK',
+    };
+    const lookbackBars = Math.max(5, Math.min(options.lookbackBars ?? 20, 60));
+    const minSpikeRatio = Math.max(1.1, Math.min(options.minSpikeRatio ?? 1.5, 10));
+    const limit = Math.max(1, Math.min(options.limit ?? 30, 100));
+
+    const rows = await this.repository.scanDeliverySpike({
+      ...scope,
+      lookbackBars,
+      minSpikeRatio,
+      limit,
+    });
+
+    const results: MarketScanRowDeliverySpike[] = rows.map((row) => ({
+      instrumentId: row.instrumentId,
+      symbol: row.symbol,
+      companyName: row.companyName,
+      sector: row.sector,
+      tradingDate: row.tradingDate instanceof Date ? row.tradingDate.toISOString() : String(row.tradingDate),
+      deliveryPct: Number(row.deliveryPct),
+      avgDeliveryPct: Number(row.avgDeliveryPct),
+      spikeRatio: Number(row.spikeRatio),
+      lookbackBars: Number(row.lookbackBars),
+    }));
+
+    const warnings = results.length === 0
+      ? [`No delivery-spike candidates found in ${scope.region}/${scope.assetType} (minimum spike ratio: ${minSpikeRatio}x). Delivery data is sourced from NSE exchange files and covers NSE-listed stocks only.`]
+      : ['Delivery% spikes reflect latest trading session vs prior rolling average. NSE delivery data only — BSE-only stocks will not appear.'];
+
+    return {
+      scanType: 'delivery-spike',
+      scope,
+      generatedAt: new Date().toISOString(),
+      minSpikeRatio,
+      results,
+      warnings,
+    };
+  }
+
+  async marketScanVolumeSpike(
+    options: Pick<PaginationOptions, 'region' | 'assetType'> & {
+      lookbackBars?: number;
+      minSpikeRatio?: number;
+      limit?: number;
+    } = {},
+  ): Promise<MarketScanSummaryVolumeSpike> {
+    const scope = {
+      region: options.region?.trim().toUpperCase() || 'IN',
+      assetType: options.assetType?.trim().toUpperCase() || 'STOCK',
+    };
+    const lookbackBars = Math.max(5, Math.min(options.lookbackBars ?? 20, 60));
+    const minSpikeRatio = Math.max(1.1, Math.min(options.minSpikeRatio ?? 2.0, 20));
+    const limit = Math.max(1, Math.min(options.limit ?? 30, 100));
+
+    const rows = await this.repository.scanVolumeSpike({
+      ...scope,
+      lookbackBars,
+      minSpikeRatio,
+      limit,
+    });
+
+    const results: MarketScanRowVolumeSpike[] = rows.map((row) => ({
+      instrumentId: row.instrumentId,
+      symbol: row.symbol,
+      companyName: row.companyName,
+      sector: row.sector,
+      latestDate: row.latestDate instanceof Date ? row.latestDate.toISOString() : String(row.latestDate),
+      latestVolume: Number(row.latestVolume),
+      avgVolume: Number(row.avgVolume),
+      spikeRatio: Number(row.spikeRatio),
+      lookbackBars: Number(row.lookbackBars),
+    }));
+
+    const warnings = results.length === 0
+      ? [`No volume-spike candidates found in ${scope.region}/${scope.assetType} (minimum spike ratio: ${minSpikeRatio}x). Check that recent price history has been ingested.`]
+      : ['Volume spike is latest bar vs prior rolling average. Instruments lacking consistent volume data in NSE/BSE exchange files are excluded.'];
+
+    return {
+      scanType: 'volume-spike',
+      scope,
+      generatedAt: new Date().toISOString(),
+      minSpikeRatio,
+      results,
+      warnings,
     };
   }
 
