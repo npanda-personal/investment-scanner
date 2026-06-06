@@ -30,6 +30,10 @@ export type {
 } from './capital-posture.types';
 export { parseOptionalText, parseRange, SUPPORTED_CONTEXT_RANGES } from './market-context-intelligence.validation';
 export type {
+  BreadthDivergenceNote,
+  BreadthInternalsDelta,
+  BreadthInternalsEnvelope,
+  BreadthInternalsPoint,
   ContextInstrument,
   CountryStrengthItem,
   LeadershipStatus,

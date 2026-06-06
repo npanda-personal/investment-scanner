@@ -69,6 +69,18 @@ export class MarketContextIntelligenceController {
     return this.respond(res, () => this.service.latestPersistedBreadth(region));
   };
 
+  /**
+   * NR-104: Breadth Internals time series
+   * GET /market-context/breadth-internals?days=60&region=GLOBAL
+   * Persisted-read only. Returns oldest→newest series of breadth metrics.
+   */
+  breadthInternals = async (req: Request, res: Response) => {
+    res.setHeader('Cache-Control', 'no-store');
+    const region = this.region(req) || 'GLOBAL';
+    const days = typeof req.query.days === 'string' ? Math.max(1, Math.min(180, Number(req.query.days) || 60)) : 60;
+    return this.respond(res, () => this.service.breadthInternals(region, days));
+  };
+
   marketPulse = async (req: Request, res: Response) => {
     res.setHeader('Cache-Control', 'no-store');
     return this.respond(res, () => this.marketPulseService.latestSnapshot({

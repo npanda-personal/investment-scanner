@@ -602,6 +602,40 @@ export class MarketContextIntelligenceRepository {
       .filter((v: number) => Number.isFinite(v) && v > 0);
   }
 
+  /**
+   * NR-104: Return up to `limit` persisted market-context snapshots for a region,
+   * ordered oldest-to-newest (ascending by snapshotDate).
+   * Persisted-read only — never generates or writes.
+   */
+  async breadthInternalsHistory(region: string = 'GLOBAL', limit: number = 60): Promise<Array<{
+    snapshotDate: Date;
+    breadthPercentAboveSma50: number | null;
+    breadthPercentAboveSma200: number | null;
+    advanceDeclineRatio: number | null;
+    newHighCount: number | null;
+    newLowCount: number | null;
+    regimeScore: number;
+    regime: string;
+  }>> {
+    const rows = await this.db.marketContextSnapshot.findMany({
+      where: { region },
+      orderBy: { snapshotDate: 'desc' },
+      take: limit,
+      select: {
+        snapshotDate: true,
+        breadthPercentAboveSma50: true,
+        breadthPercentAboveSma200: true,
+        advanceDeclineRatio: true,
+        newHighCount: true,
+        newLowCount: true,
+        regimeScore: true,
+        regime: true,
+      },
+    });
+    // Return oldest → newest
+    return rows.reverse();
+  }
+
   private weakSectorSlice(sectors: SectorRotationItem[]) {
     if (sectors.length <= 1) return [];
     return sectors.slice(-Math.min(5, sectors.length - 1)).reverse();

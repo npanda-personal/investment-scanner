@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { CountryStrengthItem, MacroSnapshot, MarketBreadth, MarketContextSummary, MarketRegimeSummary, PersistedMarketBreadthResponse, SectorRotationItem } from '../types';
+import type { BreadthInternalsEnvelope, CountryStrengthItem, MacroSnapshot, MarketBreadth, MarketContextSummary, MarketRegimeSummary, PersistedMarketBreadthResponse, SectorRotationItem } from '../types';
 import type { CapitalPostureDto } from '../capitalPostureTypes';
 
 export type { CapitalPostureDto };
@@ -168,5 +168,14 @@ export interface InstitutionalActivityResponse {
 
 export async function fetchInstitutionalActivity(): Promise<InstitutionalActivityResponse> {
   const response = await axios.get<InstitutionalActivityResponse>(`${API_BASE}/institutional-activity`);
+  return response.data;
+}
+
+// ---------------------------------------------------------------------------
+// NR-104: Breadth Internals time series
+// ---------------------------------------------------------------------------
+
+export async function fetchBreadthInternals(params: { days?: number; region?: string } = {}): Promise<BreadthInternalsEnvelope> {
+  const response = await axios.get<BreadthInternalsEnvelope>(`${API_BASE}/breadth-internals`, { params });
   return response.data;
 }

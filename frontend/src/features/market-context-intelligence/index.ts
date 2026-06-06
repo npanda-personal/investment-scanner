@@ -1,8 +1,10 @@
 export { marketContextIntelligenceRoutes } from './routes';
 export { MarketContextPage } from './components/MarketContextPage';
+export { BreadthInternalsPage } from './components/BreadthInternalsPage';
 export { MarketRegimeWidget } from './components/MarketRegimeWidget';
 export { useMarketContext } from './hooks';
 export {
+  fetchBreadthInternals,
   fetchCapitalPosture,
   fetchCountryStrength,
   fetchMacroSnapshot,
@@ -16,6 +18,10 @@ export {
 export type { CapitalPostureDto, PersistedMarketContextSummaryResponse } from './api/marketContextIntelligenceService';
 export type { PostureLabel, PostureAction } from './capitalPostureTypes';
 export type {
+  BreadthDivergenceNote,
+  BreadthInternalsDelta,
+  BreadthInternalsEnvelope,
+  BreadthInternalsPoint,
   CountryStrengthItem,
   DataStatus,
   LeadershipStatus,

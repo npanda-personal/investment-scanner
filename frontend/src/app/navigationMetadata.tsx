@@ -75,6 +75,7 @@ export const adminNavGroups: NavGroup[] = [
       { path: '/admin/data-quality', label: 'Data Quality', icon: <FactCheckIcon /> },
       { path: '/admin/context-snapshots', label: 'Historical Context', icon: <CalendarMonthIcon /> },
       { path: '/admin/market-context', label: 'Market Context', icon: <DashboardIcon /> },
+      { path: '/admin/breadth-internals', label: 'Breadth Internals', icon: <TrendingUpIcon /> },
     ],
   },
   {

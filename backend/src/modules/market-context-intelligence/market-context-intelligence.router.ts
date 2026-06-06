@@ -8,6 +8,7 @@ export const createMarketContextIntelligenceRouter = (
   router.get('/market-context/summary', controller.summary);
   router.get('/market-context/persisted-summary', controller.persistedSummary);
   router.get('/market-context/persisted-breadth', controller.persistedBreadth);
+  router.get('/market-context/breadth-internals', controller.breadthInternals);
   router.get('/market-context/capital-posture', controller.capitalPosture);
   router.get('/market-intelligence/market-pulse', controller.marketPulse);
   router.get('/market-intelligence/market-pulse/history', controller.marketPulseHistory);

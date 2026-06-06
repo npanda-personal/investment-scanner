@@ -186,3 +186,47 @@ export interface MarketContextSummary {
   updatedAt: string;
   dataStatus: MarketDataStatus;
 }
+
+// ─── NR-104: Breadth Internals time series ───────────────────────────────────
+
+export interface BreadthInternalsPoint {
+  /** ISO date string, e.g. "2026-05-01" */
+  date: string;
+  percentAboveSma50: number | null;
+  percentAboveSma200: number | null;
+  advanceDeclineRatio: number | null;
+  newHighCount: number | null;
+  newLowCount: number | null;
+  /** newHighCount - newLowCount; null when either is null */
+  newHighLowNet: number | null;
+  regimeScore: number | null;
+  regime: string | null;
+}
+
+export interface BreadthInternalsDelta {
+  field: string;
+  current: number | null;
+  nDaysAgo: number | null;
+  delta: number | null;
+}
+
+export interface BreadthDivergenceNote {
+  detected: boolean;
+  description: string | null;
+}
+
+export interface BreadthInternalsEnvelope {
+  status: 'ready' | 'limited' | 'missing';
+  scope: { region: string };
+  requestedDays: number;
+  /** Honest caveat when fewer than requestedDays snapshots exist */
+  limitedHistory: boolean;
+  limitedHistoryNote: string | null;
+  /** Oldest-to-newest */
+  series: BreadthInternalsPoint[];
+  /** Deltas between current and the oldest point in the series */
+  deltas: BreadthInternalsDelta[];
+  /** Descriptive divergence note — never advice */
+  divergence: BreadthDivergenceNote;
+  assembledAt: string;
+}

@@ -438,6 +438,7 @@ describe('market-context routes — capital-posture endpoint registered', () => 
       summary:                 jest.fn(),
       persistedSummary:        jest.fn(),
       persistedBreadth:        jest.fn(),
+      breadthInternals:        jest.fn(),
       capitalPosture:          jest.fn(),
       marketPulse:             jest.fn(),
       marketPulseHistory:      jest.fn(),

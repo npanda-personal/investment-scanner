@@ -3,6 +3,10 @@ import { SignalGenerationEngineService } from '../signal-generation-engine';
 import { isKnownSector } from '../../shared/utils/sector-metadata';
 import { MarketContextIntelligenceRepository } from './market-context-intelligence.repository';
 import type {
+  BreadthDivergenceNote,
+  BreadthInternalsDelta,
+  BreadthInternalsEnvelope,
+  BreadthInternalsPoint,
   CapBand,
   CapBandBreadth,
   ContextInstrument,
@@ -831,5 +835,132 @@ export class MarketContextIntelligenceService {
 
   private clampScore(value: number): number {
     return Math.max(0, Math.min(100, value));
+  }
+
+  // ─── NR-104: Breadth Internals time series ─────────────────────────────────
+
+  /**
+   * Return a bounded persisted-read time series of breadth internals.
+   * Bounded: max 180 days hard cap.  Returns what's in DB — never fabricates.
+   */
+  async breadthInternals(region: string = 'GLOBAL', requestedDays: number = 60): Promise<BreadthInternalsEnvelope> {
+    const days = Math.max(1, Math.min(requestedDays, 180));
+    const rows = await this.repository.breadthInternalsHistory(region, days);
+
+    if (rows.length === 0) {
+      return {
+        status: 'missing',
+        scope: { region },
+        requestedDays: days,
+        limitedHistory: true,
+        limitedHistoryNote: 'No market context snapshots are persisted yet for this region. Run the market context pipeline to generate history.',
+        series: [],
+        deltas: [],
+        divergence: { detected: false, description: null },
+        assembledAt: new Date().toISOString(),
+      };
+    }
+
+    const series: BreadthInternalsPoint[] = rows.map((row) => {
+      const hi = typeof row.newHighCount === 'number' ? row.newHighCount : null;
+      const lo = typeof row.newLowCount === 'number' ? row.newLowCount : null;
+      return {
+        date: row.snapshotDate.toISOString().slice(0, 10),
+        percentAboveSma50: row.breadthPercentAboveSma50 !== null ? this.roundNumber(row.breadthPercentAboveSma50, 4) : null,
+        percentAboveSma200: row.breadthPercentAboveSma200 !== null ? this.roundNumber(row.breadthPercentAboveSma200, 4) : null,
+        advanceDeclineRatio: row.advanceDeclineRatio !== null ? this.roundNumber(row.advanceDeclineRatio, 4) : null,
+        newHighCount: hi,
+        newLowCount: lo,
+        newHighLowNet: hi !== null && lo !== null ? hi - lo : null,
+        regimeScore: this.roundNumber(row.regimeScore, 2),
+        regime: row.regime,
+      };
+    });
+
+    const limitedHistory = rows.length < days;
+    const limitedHistoryNote = limitedHistory
+      ? `Only ${rows.length} snapshot(s) are available (${days} requested). History will deepen as the daily pipeline runs.`
+      : null;
+
+    const deltas = this.buildDeltas(series);
+    const divergence = this.detectDivergence(series);
+
+    return {
+      status: limitedHistory ? 'limited' : 'ready',
+      scope: { region },
+      requestedDays: days,
+      limitedHistory,
+      limitedHistoryNote,
+      series,
+      deltas,
+      divergence,
+      assembledAt: new Date().toISOString(),
+    };
+  }
+
+  private buildDeltas(series: BreadthInternalsPoint[]): BreadthInternalsDelta[] {
+    if (series.length < 2) return [];
+    const first = series[0];
+    const last = series[series.length - 1];
+
+    const fields: Array<{ key: keyof BreadthInternalsPoint; label: string }> = [
+      { key: 'percentAboveSma50', label: '% Above SMA50' },
+      { key: 'percentAboveSma200', label: '% Above SMA200' },
+      { key: 'advanceDeclineRatio', label: 'Advance/Decline Ratio' },
+      { key: 'newHighLowNet', label: 'New High-Low Net' },
+      { key: 'regimeScore', label: 'Regime Score' },
+    ];
+
+    return fields.map(({ key, label }) => {
+      const current = last[key] as number | null;
+      const nDaysAgo = first[key] as number | null;
+      const delta = current !== null && nDaysAgo !== null ? this.roundNumber(current - nDaysAgo, 4) : null;
+      return { field: label, current, nDaysAgo, delta };
+    });
+  }
+
+  /**
+   * Breadth divergence: regime score is rising (or flat/high) while breadth
+   * metrics are declining — an early-warning pattern for Indian market tops.
+   * Descriptive only; never advice.
+   */
+  private detectDivergence(series: BreadthInternalsPoint[]): BreadthDivergenceNote {
+    if (series.length < 5) return { detected: false, description: null };
+
+    const half = Math.floor(series.length / 2);
+    const firstHalf = series.slice(0, half);
+    const secondHalf = series.slice(half);
+
+    const avgField = (pts: BreadthInternalsPoint[], key: keyof BreadthInternalsPoint): number | null => {
+      const vals = pts.map((p) => p[key] as number | null).filter((v): v is number => v !== null);
+      if (vals.length === 0) return null;
+      return vals.reduce((a, b) => a + b, 0) / vals.length;
+    };
+
+    const regimeEarly = avgField(firstHalf, 'regimeScore');
+    const regimeLate = avgField(secondHalf, 'regimeScore');
+    const sma50Early = avgField(firstHalf, 'percentAboveSma50');
+    const sma50Late = avgField(secondHalf, 'percentAboveSma50');
+    const sma200Early = avgField(firstHalf, 'percentAboveSma200');
+    const sma200Late = avgField(secondHalf, 'percentAboveSma200');
+
+    if (regimeEarly === null || regimeLate === null) return { detected: false, description: null };
+    if (sma50Early === null || sma50Late === null) return { detected: false, description: null };
+
+    const regimeRising = regimeLate > regimeEarly;
+    const sma50Weakening = sma50Late < sma50Early - 0.02; // 2pp threshold to avoid noise
+    const sma200Weakening = sma200Early !== null && sma200Late !== null && sma200Late < sma200Early - 0.02;
+
+    const divergenceDetected = regimeRising && (sma50Weakening || sma200Weakening);
+    if (!divergenceDetected) return { detected: false, description: null };
+
+    const components: string[] = [];
+    if (sma50Weakening) components.push(`% above SMA50 has declined (${(sma50Early * 100).toFixed(1)}% to ${(sma50Late * 100).toFixed(1)}%)`);
+    if (sma200Weakening) components.push(`% above SMA200 has declined (${(sma200Early! * 100).toFixed(1)}% to ${(sma200Late! * 100).toFixed(1)}%)`);
+
+    return {
+      detected: true,
+      description: `Breadth divergence observed over the selected window: the regime score has risen (${regimeEarly.toFixed(1)} to ${regimeLate.toFixed(1)}) while underlying breadth has weakened — ${components.join('; ')}. This pattern has historically preceded market tops in Indian large-cap indices. For research purposes only.`,
+    };
   }
 }

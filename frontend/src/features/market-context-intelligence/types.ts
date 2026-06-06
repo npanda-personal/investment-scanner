@@ -93,3 +93,41 @@ export interface MarketContextSummary {
   updatedAt: string;
   dataStatus: DataStatus;
 }
+
+// ─── NR-104: Breadth Internals time series ───────────────────────────────────
+
+export interface BreadthInternalsPoint {
+  date: string;
+  percentAboveSma50: number | null;
+  percentAboveSma200: number | null;
+  advanceDeclineRatio: number | null;
+  newHighCount: number | null;
+  newLowCount: number | null;
+  newHighLowNet: number | null;
+  regimeScore: number | null;
+  regime: string | null;
+}
+
+export interface BreadthInternalsDelta {
+  field: string;
+  current: number | null;
+  nDaysAgo: number | null;
+  delta: number | null;
+}
+
+export interface BreadthDivergenceNote {
+  detected: boolean;
+  description: string | null;
+}
+
+export interface BreadthInternalsEnvelope {
+  status: 'ready' | 'limited' | 'missing';
+  scope: { region: string };
+  requestedDays: number;
+  limitedHistory: boolean;
+  limitedHistoryNote: string | null;
+  series: BreadthInternalsPoint[];
+  deltas: BreadthInternalsDelta[];
+  divergence: BreadthDivergenceNote;
+  assembledAt: string;
+}
