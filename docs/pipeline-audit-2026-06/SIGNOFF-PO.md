@@ -100,3 +100,23 @@ These are the legitimately server-up / network-dependent steps; they are expecte
 The structural fixes are proven on the live DB now, not just asserted: dedup holds at zero duplicates, the reaper keeps RUNNING at zero, the napi fix restored latest-date DQ from 50 → 2,330, and the ledger filled 39 → 659. The day-over-day consistency story (incremental delta + persist-every-run + idempotency + dedup + reaper) is sound. The only thing standing between this and a clean APPROVE is committing two test files so the green suite is reproducible — and then the owner's operational catch-up to fill the price-derived coverage that genuinely needs a live, networked server.
 
 **Bottom line:** Build is right and the no-network populate is done. **Commit the two test files** (round-1 blocker, still open) → APPROVE. Everything else is operational follow-up.
+
+---
+
+## ROUND 3: APPROVED
+
+**Date:** 2026-06-06
+**Reviewer:** Product Owner (NSE/BSE domain)
+
+The single round-2 blocker is **resolved**. Verification this session:
+
+1. **`git status --porcelain`** — zero uncommitted *tracked* files (0 non-untracked entries). Only untracked scripts (`backend/scripts/*`, `backend/src/scripts/*`) and audit docs remain, which are acceptable.
+2. **Both portfolio test files are committed** in `d33d58e` ("test(pipeline): commit portfolio staleness-guard tests (PO sign-off blocker) + round-2 reports") — confirmed via `git log --oneline -1 --` on each of `portfolio-intelligence.service.test.ts` and `portfolio-intelligence-market-posture.test.ts`.
+3. **`npx jest tests/modules/portfolio-intelligence --silent`** — green: **3 suites / 31 tests passed**. A clean checkout now ships the production `findComputedAt` staleness guard *with* its test coverage; the green suite is reproducible.
+
+With the repo-hygiene blocker closed and the no-network populate already done, all gating criteria are met. **VERDICT: APPROVE.** The remaining items are server-up / network-dependent operational catch-up, not code work:
+
+1. **Start the backend/scheduler servers** and run one daily pipeline cycle for a trading day — bring `signal_results` latest-date coverage from ~2,044 up to ~universe (~2,937); confirm DQ/smart-money/earnings hold at ~2,330.
+2. **Run the NSE daily delivery + index sync** (market-data module) to close the `market_delivery` 4-day gap (06-02..06-05) and refresh stale NSE_INDEX prices (06-01) → clears MARKET_PULSE PARTIAL.
+3. **Re-kick the manual full-universe WORKBENCH_REFRESH** so `workbench_snapshots` climbs off its current ~205 to universe scale.
+4. After the live run, a quick browser pass on Signals / Workbench / Research-Hub / Portfolio to confirm full-coverage rendering.
