@@ -4713,6 +4713,7 @@ export class PipelineOrchestrationService {
       stageOrder: number;
       activeStage: PipelineStatusStageDto | null;
       lastStage: PipelineStatusStageDto | null;
+      lastStageRecord: PipelineStageRunRecord | null;
     }>();
     for (const stage of stages) {
       const current = groups.get(stage.stageKey) || {
@@ -4720,13 +4721,44 @@ export class PipelineOrchestrationService {
         stageOrder: stage.stageOrder,
         activeStage: null,
         lastStage: null,
+        lastStageRecord: null,
       };
       current.stageOrder = Math.min(current.stageOrder, stage.stageOrder);
       if (!current.activeStage && ACTIVE_STATUSES.has(stage.status) && !this.isStaleActiveStage(stage, now)) current.activeStage = this.toStageStatus(stage);
-      if (!current.lastStage && TERMINAL_STATUSES.has(stage.status)) current.lastStage = this.toStageStatus(stage);
+      // lastStage = the terminal run covering the FRESHEST data (latest dataThroughDate, then
+      // latest startedAt) — NOT simply the most-recently-started run. Otherwise an out-of-order
+      // or tiny/partial write (e.g. a 3-instrument integration-test seed for an old date, or a
+      // backfill of an older date) started after the real daily run would shadow it and make the
+      // pipeline-status card report a stale "data through" date.
+      if (TERMINAL_STATUSES.has(stage.status) && (!current.lastStageRecord || this.terminalStageIsFresher(stage, current.lastStageRecord))) {
+        current.lastStageRecord = stage;
+        current.lastStage = this.toStageStatus(stage);
+      }
       groups.set(stage.stageKey, current);
     }
-    return [...groups.values()].sort((a, b) => a.stageOrder - b.stageOrder || a.stageKey.localeCompare(b.stageKey));
+    return [...groups.values()]
+      .map(({ lastStageRecord, ...rest }) => rest)
+      .sort((a, b) => a.stageOrder - b.stageOrder || a.stageKey.localeCompare(b.stageKey));
+  }
+
+  /**
+   * A terminal stage is "fresher" than another if it covers a later data date
+   * (dataThroughDate), breaking ties by the later start time. This makes the
+   * pipeline-status "last run" reflect the run covering the most recent DATA, not
+   * merely the most-recently-written record (which could be a backfill of an old
+   * date or a tiny integration-test seed).
+   */
+  private terminalStageIsFresher(candidate: PipelineStageRunRecord, incumbent: PipelineStageRunRecord): boolean {
+    const cThrough = this.parseDateMs(candidate.dataThroughDate);
+    const iThrough = this.parseDateMs(incumbent.dataThroughDate);
+    if (cThrough !== iThrough) return cThrough > iThrough;
+    return this.parseDateMs(candidate.startedAt) > this.parseDateMs(incumbent.startedAt);
+  }
+
+  private parseDateMs(value: string | null | undefined): number {
+    if (!value) return 0;
+    const ms = Date.parse(String(value));
+    return Number.isFinite(ms) ? ms : 0;
   }
 
   private isStaleActiveRun(run: PipelineRunRecord, now: Date): boolean {

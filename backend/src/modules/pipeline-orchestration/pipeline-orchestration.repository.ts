@@ -255,8 +255,13 @@ export class PipelineOrchestrationRepository {
         pipelineRun: query.pipelineKey ? { pipelineKey: query.pipelineKey } : undefined,
         stageKey: query.stageKeys?.length ? { in: query.stageKeys } : undefined,
       },
-      orderBy: [{ startedAt: 'desc' }, { updatedAt: 'desc' }],
-      take: query.limit ?? 25,
+      // Order by updatedAt (always set) first so rows with a null startedAt (which sort
+      // NULLS-FIRST under `startedAt desc` in Postgres) cannot crowd out genuine recent runs.
+      orderBy: [{ updatedAt: 'desc' }, { startedAt: 'desc' }],
+      // Fetch a generous window so the freshest run for EACH stage is in scope even when there
+      // is recent churn (FAILED retries, integration-test seeds). groupStages() then selects,
+      // per stage, the terminal run covering the latest dataThroughDate.
+      take: query.limit ?? 300,
     });
     return rows.map((row: unknown) => this.toStageRecord(row));
   }
