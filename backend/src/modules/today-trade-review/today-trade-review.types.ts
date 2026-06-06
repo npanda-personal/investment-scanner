@@ -137,6 +137,20 @@ export interface TodayReviewCandidateDto {
    * is not present in the catalog (extremely rare).
    */
   catalogSector?: string | null;
+  /**
+   * 52-week range position computed at READ time from price_ticks (adjusted close,
+   * ~252 trading-day window). Populated for every candidate — legacy and new — as
+   * long as the stock has 52w price history in the DB.
+   * Formula: (currentClose - low52w) / (high52w - low52w) * 100 (0–100 scale).
+   * Null only when the stock genuinely lacks 52w price history.
+   */
+  range52wPositionPct?: number | null;
+  /** 52-week adjusted-close high (read-time, batch-loaded from price_ticks). */
+  range52wHigh?: number | null;
+  /** 52-week adjusted-close low (read-time, batch-loaded from price_ticks). */
+  range52wLow?: number | null;
+  /** Latest adjusted close used for the range position (read-time, from price_ticks). */
+  range52wCurrentClose?: number | null;
   createdAt?: string;
   updatedAt?: string;
 }

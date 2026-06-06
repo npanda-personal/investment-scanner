@@ -155,6 +155,18 @@ export interface TodayReviewCandidate {
    * Null only when the stock is absent from the catalog.
    */
   catalogSector?: string | null;
+  /**
+   * 52-week range position computed at READ time from price_ticks (backend).
+   * Populated for every candidate — legacy and new — as long as 52w price history exists.
+   * Range: 0–100. Null only when the stock genuinely lacks 52w price history.
+   */
+  range52wPositionPct?: number | null;
+  /** 52-week adjusted-close high (read-time). */
+  range52wHigh?: number | null;
+  /** 52-week adjusted-close low (read-time). */
+  range52wLow?: number | null;
+  /** Latest adjusted close used for the range position (read-time). */
+  range52wCurrentClose?: number | null;
   createdAt: string;
   updatedAt: string;
 }

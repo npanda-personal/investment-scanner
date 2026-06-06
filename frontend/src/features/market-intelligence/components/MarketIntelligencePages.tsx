@@ -523,7 +523,8 @@ function MarketPulseSnapshotView({
         <VixWidget vix={snapshot.vixSummary} />
         <AdvanceDeclineWidget ad={snapshot.advanceDecline} />
       </Stack>
-      <SectionPanel title="Top 5 Indices">
+      {/* NR-98: inline staleness badge on the index-trend section using snapshot.dataThroughDate */}
+      <SectionPanel title="Top 5 Indices" headerBadge={snapshot.dataThroughDate ? <StalenessBadge asOf={snapshot.dataThroughDate} label="Index trend" /> : undefined}>
         {displayIndices.length === 0 ? <EmptyState title="No index rows in snapshot." /> : (
           <TableContainer>
             <Table size="small">
@@ -940,8 +941,14 @@ function SectorIntelligencePanel({
   const { scope } = useMarketScope();
   const rows = envelope?.snapshot ?? [];
 
+  // NR-98: pick dataThroughDate from envelope level; fall back to first row if envelope field absent
+  const sectorAsOf = envelope?.dataThroughDate ?? rows[0]?.dataThroughDate ?? null;
+
   return (
-    <SectionPanel title="Sector Intelligence">
+    <SectionPanel
+      title="Sector Intelligence"
+      headerBadge={sectorAsOf ? <StalenessBadge asOf={sectorAsOf} label="Sector data" /> : undefined}
+    >
       <Stack spacing={1.25}>
         {loading && <LinearProgress />}
         {error && <Alert severity="error">{error}</Alert>}
@@ -1275,11 +1282,18 @@ function SectionHeader({ title, subtitle }: { title: string; subtitle?: string }
   );
 }
 
-function SectionPanel({ title, children }: { title: string; children: ReactNode }) {
+function SectionPanel({ title, headerBadge, children }: { title: string; headerBadge?: ReactNode; children: ReactNode }) {
   return (
     <Paper variant="outlined" sx={{ p: 2 }}>
       <Stack spacing={1.25}>
-        <SectionHeader title={title} />
+        {headerBadge ? (
+          <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+            <SectionHeader title={title} />
+            {headerBadge}
+          </Stack>
+        ) : (
+          <SectionHeader title={title} />
+        )}
         {children}
       </Stack>
     </Paper>

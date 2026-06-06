@@ -63,6 +63,17 @@ function SectorChip({ sector }: { sector: string | null }) {
   return <Chip label={sector} size="small" variant="outlined" sx={{ fontSize: '0.7rem' }} />;
 }
 
+function SignalChip({ direction, score }: { direction: 'BULLISH' | 'BEARISH' | 'NEUTRAL' | null; score: number | null }) {
+  if (!direction) return <Typography variant="body2" color="text.disabled">—</Typography>;
+  const color = direction === 'BULLISH' ? 'success' : direction === 'BEARISH' ? 'error' : 'default';
+  const label = score != null ? `${direction} ${Math.round(score)}` : direction;
+  return (
+    <Tooltip title={`Signal: ${direction}${score != null ? ` (score ${Math.round(score)})` : ''}`}>
+      <Chip label={label} size="small" color={color} sx={{ fontSize: '0.7rem', fontWeight: 600 }} />
+    </Tooltip>
+  );
+}
+
 function ScanWarning({ warnings }: { warnings: string[] }) {
   if (!warnings.length) return null;
   return (
@@ -118,6 +129,7 @@ function Table52w({ rows, scanType }: { rows: MarketScanRow52w[]; scanType: '52w
             <TableCell align="right">% from High</TableCell>
             <TableCell align="right">% from Low</TableCell>
             <TableCell>Basis</TableCell>
+            <TableCell>Signal</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
@@ -162,6 +174,9 @@ function Table52w({ rows, scanType }: { rows: MarketScanRow52w[]; scanType: '52w
                   {row.priceBasis === 'ADJUSTED_CLOSE' ? 'Adj' : 'Raw'}
                 </Typography>
               </TableCell>
+              <TableCell>
+                <SignalChip direction={row.signalDirection} score={row.signalScore} />
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>
@@ -188,6 +203,7 @@ function TableDeliverySpike({ rows }: { rows: MarketScanRowDeliverySpike[] }) {
             <TableCell align="right">Avg Delivery %</TableCell>
             <TableCell align="right">Spike Ratio</TableCell>
             <TableCell align="right">Lookback (bars)</TableCell>
+            <TableCell>Signal</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
@@ -222,6 +238,9 @@ function TableDeliverySpike({ rows }: { rows: MarketScanRowDeliverySpike[] }) {
               <TableCell align="right">
                 <Typography variant="body2" color="text.secondary">{row.lookbackBars}</Typography>
               </TableCell>
+              <TableCell>
+                <SignalChip direction={row.signalDirection} score={row.signalScore} />
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>
@@ -236,57 +255,70 @@ function TableVolumeSpike({ rows }: { rows: MarketScanRowVolumeSpike[] }) {
   if (!rows.length) {
     return <EmptyState message="No volume-spike candidates found. Check that recent price data has been ingested." />;
   }
+  // Derive lookback window from first row (all rows share the same lookback param)
+  const lookbackWindow = rows[0]?.lookbackBars ?? null;
   return (
-    <TableContainer>
-      <Table size="small">
-        <TableHead>
-          <TableRow>
-            <TableCell>Symbol</TableCell>
-            <TableCell>Company</TableCell>
-            <TableCell>Sector</TableCell>
-            <TableCell align="right">Latest Volume</TableCell>
-            <TableCell align="right">Avg Volume</TableCell>
-            <TableCell align="right">Spike Ratio</TableCell>
-            <TableCell align="right">Lookback (bars)</TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {rows.map((row) => (
-            <TableRow key={row.instrumentId} hover>
-              <TableCell>
-                <SymbolLink instrumentId={row.instrumentId} symbol={row.symbol} />
-              </TableCell>
-              <TableCell>
-                <Tooltip title={row.companyName}>
-                  <Typography variant="body2" noWrap sx={{ maxWidth: 180 }}>
-                    {row.companyName}
-                  </Typography>
-                </Tooltip>
-              </TableCell>
-              <TableCell><SectorChip sector={row.sector} /></TableCell>
-              <TableCell align="right">
-                <Typography variant="body2" fontWeight={600}>
-                  {formatVolume(row.latestVolume)}
-                </Typography>
-              </TableCell>
-              <TableCell align="right">
-                <Typography variant="body2" color="text.secondary">
-                  {formatVolume(row.avgVolume)}
-                </Typography>
-              </TableCell>
-              <TableCell align="right">
-                <Typography variant="body2" fontWeight={700} color="warning.main">
-                  {row.spikeRatio.toFixed(2)}x
-                </Typography>
-              </TableCell>
-              <TableCell align="right">
-                <Typography variant="body2" color="text.secondary">{row.lookbackBars}</Typography>
-              </TableCell>
+    <>
+      {lookbackWindow != null && (
+        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+          vs {lookbackWindow}-day average volume
+        </Typography>
+      )}
+      <TableContainer>
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+              <TableCell>Symbol</TableCell>
+              <TableCell>Company</TableCell>
+              <TableCell>Sector</TableCell>
+              <TableCell align="right">Latest Volume</TableCell>
+              <TableCell align="right">Avg Volume</TableCell>
+              <TableCell align="right">Spike Ratio</TableCell>
+              <TableCell align="right">Lookback (bars)</TableCell>
+              <TableCell>Signal</TableCell>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </TableContainer>
+          </TableHead>
+          <TableBody>
+            {rows.map((row) => (
+              <TableRow key={row.instrumentId} hover>
+                <TableCell>
+                  <SymbolLink instrumentId={row.instrumentId} symbol={row.symbol} />
+                </TableCell>
+                <TableCell>
+                  <Tooltip title={row.companyName}>
+                    <Typography variant="body2" noWrap sx={{ maxWidth: 180 }}>
+                      {row.companyName}
+                    </Typography>
+                  </Tooltip>
+                </TableCell>
+                <TableCell><SectorChip sector={row.sector} /></TableCell>
+                <TableCell align="right">
+                  <Typography variant="body2" fontWeight={600}>
+                    {formatVolume(row.latestVolume)}
+                  </Typography>
+                </TableCell>
+                <TableCell align="right">
+                  <Typography variant="body2" color="text.secondary">
+                    {formatVolume(row.avgVolume)}
+                  </Typography>
+                </TableCell>
+                <TableCell align="right">
+                  <Typography variant="body2" fontWeight={700} color="warning.main">
+                    {row.spikeRatio.toFixed(2)}x
+                  </Typography>
+                </TableCell>
+                <TableCell align="right">
+                  <Typography variant="body2" color="text.secondary">{row.lookbackBars}</Typography>
+                </TableCell>
+                <TableCell>
+                  <SignalChip direction={row.signalDirection} score={row.signalScore} />
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
+    </>
   );
 }
 

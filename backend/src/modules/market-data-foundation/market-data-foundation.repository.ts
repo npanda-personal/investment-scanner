@@ -3972,6 +3972,8 @@ export class MarketDataFoundationRepository {
     pctFromHigh: Prisma.Decimal | number;
     pctFromLow: Prisma.Decimal | number;
     priceBasis: string;
+    signalDirection: string | null;
+    signalScore: number | null;
   }>> {
     const rowLimit = Math.max(1, Math.min(options.limit ?? 30, 100));
     const proximityPct = Math.max(0.5, Math.min(options.proximityPct ?? 10, 50));
@@ -3990,6 +3992,8 @@ export class MarketDataFoundationRepository {
       pctFromHigh: Prisma.Decimal | number;
       pctFromLow: Prisma.Decimal | number;
       priceBasis: string;
+      signalDirection: string | null;
+      signalScore: number | null;
     }>>(Prisma.sql`
       WITH scoped_stocks AS (
         SELECT stocks.*
@@ -3998,6 +4002,15 @@ export class MarketDataFoundationRepository {
           AND stocks."isActive" = TRUE
           AND stocks."isDelisted" = FALSE
           AND UPPER(COALESCE(stocks."providerSupportStatus", 'UNSUPPORTED')) = 'SUPPORTED'
+      ),
+      latest_signal AS (
+        SELECT DISTINCT ON (sr."instrumentId")
+          sr."instrumentId",
+          sr.direction AS "signalDirection",
+          sr.score AS "signalScore"
+        FROM signal_results sr
+        WHERE sr."generatedDate" IS NOT NULL
+        ORDER BY sr."instrumentId", sr."generatedDate" DESC
       ),
       price_range AS (
         SELECT
@@ -4044,15 +4057,19 @@ export class MarketDataFoundationRepository {
         FROM price_range
         ORDER BY "instrumentId"
       )
-      SELECT *
-      FROM deduped
-      WHERE "high52w" IS NOT NULL AND "low52w" IS NOT NULL
+      SELECT
+        d.*,
+        ls."signalDirection",
+        ls."signalScore"
+      FROM deduped d
+      LEFT JOIN latest_signal ls ON ls."instrumentId" = d."instrumentId"
+      WHERE d."high52w" IS NOT NULL AND d."low52w" IS NOT NULL
         AND ${scanType === '52w-high'
-          ? Prisma.sql`"pctFromHigh" >= ${-(proximityPct)} AND "pctFromHigh" <= 0`
-          : Prisma.sql`"pctFromLow" >= 0 AND "pctFromLow" <= ${proximityPct}`}
+          ? Prisma.sql`d."pctFromHigh" >= ${-(proximityPct)} AND d."pctFromHigh" <= 0`
+          : Prisma.sql`d."pctFromLow" >= 0 AND d."pctFromLow" <= ${proximityPct}`}
       ORDER BY ${scanType === '52w-high'
-        ? Prisma.sql`"pctFromHigh" DESC`
-        : Prisma.sql`"pctFromLow" ASC`}
+        ? Prisma.sql`d."pctFromHigh" DESC`
+        : Prisma.sql`d."pctFromLow" ASC`}
       LIMIT ${rowLimit}
     `);
     return rows;
@@ -4079,6 +4096,8 @@ export class MarketDataFoundationRepository {
     avgDeliveryPct: Prisma.Decimal | number;
     spikeRatio: Prisma.Decimal | number;
     lookbackBars: number;
+    signalDirection: string | null;
+    signalScore: number | null;
   }>> {
     const rowLimit = Math.max(1, Math.min(options.limit ?? 30, 100));
     const lookbackBars = Math.max(5, Math.min(options.lookbackBars ?? 20, 60));
@@ -4094,6 +4113,8 @@ export class MarketDataFoundationRepository {
       avgDeliveryPct: Prisma.Decimal | number;
       spikeRatio: Prisma.Decimal | number;
       lookbackBars: number;
+      signalDirection: string | null;
+      signalScore: number | null;
     }>>(Prisma.sql`
       WITH scoped_stocks AS (
         SELECT stocks.id, stocks.symbol, stocks.name, stocks.sector
@@ -4102,6 +4123,15 @@ export class MarketDataFoundationRepository {
           AND stocks."isActive" = TRUE
           AND stocks."isDelisted" = FALSE
           AND UPPER(COALESCE(stocks."providerSupportStatus", 'UNSUPPORTED')) = 'SUPPORTED'
+      ),
+      latest_signal AS (
+        SELECT DISTINCT ON (sr."instrumentId")
+          sr."instrumentId",
+          sr.direction AS "signalDirection",
+          sr.score AS "signalScore"
+        FROM signal_results sr
+        WHERE sr."generatedDate" IS NOT NULL
+        ORDER BY sr."instrumentId", sr."generatedDate" DESC
       ),
       latest_delivery AS (
         SELECT DISTINCT ON (d.symbol)
@@ -4136,10 +4166,13 @@ export class MarketDataFoundationRepository {
         ld."deliveryPct",
         h."avgDeliveryPct",
         (ld."deliveryPct" / NULLIF(h."avgDeliveryPct", 0)) AS "spikeRatio",
-        h.bars AS "lookbackBars"
+        h.bars AS "lookbackBars",
+        ls."signalDirection",
+        ls."signalScore"
       FROM scoped_stocks s
       INNER JOIN latest_delivery ld ON ld.symbol = s.symbol
       INNER JOIN history h ON h.symbol = s.symbol
+      LEFT JOIN latest_signal ls ON ls."instrumentId" = s.id
       WHERE h."avgDeliveryPct" > 0
         AND (ld."deliveryPct" / NULLIF(h."avgDeliveryPct", 0)) >= ${minSpikeRatio}
         AND h.bars >= 3
@@ -4170,6 +4203,8 @@ export class MarketDataFoundationRepository {
     avgVolume: Prisma.Decimal | number;
     spikeRatio: Prisma.Decimal | number;
     lookbackBars: number;
+    signalDirection: string | null;
+    signalScore: number | null;
   }>> {
     const rowLimit = Math.max(1, Math.min(options.limit ?? 30, 100));
     const lookbackBars = Math.max(5, Math.min(options.lookbackBars ?? 20, 60));
@@ -4185,6 +4220,8 @@ export class MarketDataFoundationRepository {
       avgVolume: Prisma.Decimal | number;
       spikeRatio: Prisma.Decimal | number;
       lookbackBars: number;
+      signalDirection: string | null;
+      signalScore: number | null;
     }>>(Prisma.sql`
       WITH scoped_stocks AS (
         SELECT stocks.id, stocks.symbol, stocks.name, stocks.sector, stocks."sourceSymbol", stocks."providerSymbol"
@@ -4193,6 +4230,15 @@ export class MarketDataFoundationRepository {
           AND stocks."isActive" = TRUE
           AND stocks."isDelisted" = FALSE
           AND UPPER(COALESCE(stocks."providerSupportStatus", 'UNSUPPORTED')) = 'SUPPORTED'
+      ),
+      latest_signal AS (
+        SELECT DISTINCT ON (sr."instrumentId")
+          sr."instrumentId",
+          sr.direction AS "signalDirection",
+          sr.score AS "signalScore"
+        FROM signal_results sr
+        WHERE sr."generatedDate" IS NOT NULL
+        ORDER BY sr."instrumentId", sr."generatedDate" DESC
       ),
       latest_bar AS (
         SELECT DISTINCT ON (s.id)
@@ -4241,9 +4287,12 @@ export class MarketDataFoundationRepository {
         lb."latestVolume",
         av."avgVolume",
         (lb."latestVolume"::numeric / NULLIF(av."avgVolume", 0)) AS "spikeRatio",
-        av.bars AS "lookbackBars"
+        av.bars AS "lookbackBars",
+        ls."signalDirection",
+        ls."signalScore"
       FROM latest_bar lb
       INNER JOIN avg_vol av ON av."instrumentId" = lb."instrumentId"
+      LEFT JOIN latest_signal ls ON ls."instrumentId" = lb."instrumentId"
       WHERE av."avgVolume" > 0
         AND av.bars >= 3
         AND (lb."latestVolume"::numeric / NULLIF(av."avgVolume", 0)) >= ${minSpikeRatio}

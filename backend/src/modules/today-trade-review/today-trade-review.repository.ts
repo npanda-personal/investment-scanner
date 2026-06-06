@@ -167,8 +167,11 @@ export class TodayTradeReviewRepository implements TodayReviewRepositoryContract
   async getCandidate(id: string): Promise<TodayReviewCandidateDto | null> {
     const record = await this.db.todayReviewCandidate.findUnique({ where: { id } });
     if (!record) return null;
-    const catalogSectorMap = await this.loadCatalogSectors([record.instrumentId]);
-    return this.toCandidateDto(record, catalogSectorMap);
+    const [catalogSectorMap, range52wMap] = await Promise.all([
+      this.loadCatalogSectors([record.instrumentId]),
+      this.load52wRanges([record.symbol]),
+    ]);
+    return this.toCandidateDto(record, catalogSectorMap, range52wMap);
   }
 
   private optionalJson(value: unknown) {
@@ -192,13 +195,83 @@ export class TodayTradeReviewRepository implements TodayReviewRepositoryContract
     return map;
   }
 
+  /**
+   * Batch-load 52-week range (high, low, latest close) for a list of symbols from
+   * price_ticks (adjusted close preferred, ~252 trading-day look-back window).
+   * ONE query for all symbols — no N+1. Pool-safe: single read, no transactions.
+   *
+   * Returns a map of symbol → { high52w, low52w, currentClose, positionPct }.
+   * A symbol is absent from the map only when it has no price history in the DB.
+   */
+  private async load52wRanges(symbols: string[]): Promise<Map<string, { high52w: number; low52w: number; currentClose: number; positionPct: number }>> {
+    if (symbols.length === 0) return new Map();
+    // Use a single windowed query: for each symbol, select the latest 252 rows
+    // ordered by timestamp DESC and compute max/min adjusted-close + latest close.
+    // COALESCE(adjustedClose, close) ensures we fall back to raw close when
+    // adjustedClose is not populated (older ingested rows).
+    const rowsClean = await this.db.$queryRaw<Array<{
+      symbol: string;
+      high52w: number;
+      low52w: number;
+      current_close: number;
+    }>>(Prisma.sql`
+      WITH windowed AS (
+        SELECT
+          pt.symbol,
+          COALESCE(pt."adjustedClose", pt.close)::float8 AS adj_close,
+          ROW_NUMBER() OVER (PARTITION BY pt.symbol ORDER BY pt.timestamp DESC) AS rn
+        FROM price_ticks pt
+        WHERE pt.symbol = ANY(${symbols})
+          AND UPPER(COALESCE(pt."dataStatus", 'COMPLETE')) = 'COMPLETE'
+          AND UPPER(COALESCE(pt.source, '')) NOT LIKE 'TEST\\_%'
+      ),
+      range_agg AS (
+        SELECT
+          symbol,
+          MAX(adj_close) AS high52w,
+          MIN(adj_close) AS low52w
+        FROM windowed
+        WHERE rn <= 252
+        GROUP BY symbol
+      ),
+      latest_close AS (
+        SELECT symbol, adj_close AS current_close
+        FROM windowed
+        WHERE rn = 1
+      )
+      SELECT
+        r.symbol,
+        r.high52w::float8,
+        r.low52w::float8,
+        l.current_close::float8
+      FROM range_agg r
+      JOIN latest_close l ON l.symbol = r.symbol
+    `);
+
+    const map = new Map<string, { high52w: number; low52w: number; currentClose: number; positionPct: number }>();
+    for (const row of rowsClean) {
+      const high = Number(row.high52w);
+      const low = Number(row.low52w);
+      const current = Number(row.current_close);
+      if (!isFinite(high) || !isFinite(low) || !isFinite(current)) continue;
+      const range = high - low;
+      const positionPct = range > 0 ? Math.max(0, Math.min(100, ((current - low) / range) * 100)) : 0;
+      map.set(row.symbol, { high52w: high, low52w: low, currentClose: current, positionPct });
+    }
+    return map;
+  }
+
   private async toRunDto(record: any): Promise<TodayReviewRunDto> {
-    // Batch-load sectors for all candidates in one query (no N+1).
+    // Batch-load sectors + 52w ranges for all candidates in two queries (no N+1).
     const candidateRecords: any[] = record.candidates || [];
     const instrumentIds = [...new Set(candidateRecords.map((c: any) => c.instrumentId as string))];
-    const catalogSectorMap = await this.loadCatalogSectors(instrumentIds);
+    const symbols = [...new Set(candidateRecords.map((c: any) => c.symbol as string))];
+    const [catalogSectorMap, range52wMap] = await Promise.all([
+      this.loadCatalogSectors(instrumentIds),
+      this.load52wRanges(symbols),
+    ]);
 
-    const candidates = candidateRecords.map((candidate: any) => this.toCandidateDto(candidate, catalogSectorMap));
+    const candidates = candidateRecords.map((candidate: any) => this.toCandidateDto(candidate, catalogSectorMap, range52wMap));
     const sourceSnapshot = this.jsonObject(record.sourceSnapshot);
     const reviewUniverse = this.jsonObject(sourceSnapshot.reviewUniverse);
     const scanFunnel = this.nullableJson(sourceSnapshot.scanFunnel) as any;
@@ -229,7 +302,11 @@ export class TodayTradeReviewRepository implements TodayReviewRepositoryContract
     };
   }
 
-  private toCandidateDto(record: any, catalogSectorMap?: Map<string, string | null>): TodayReviewCandidateDto {
+  private toCandidateDto(
+    record: any,
+    catalogSectorMap?: Map<string, string | null>,
+    range52wMap?: Map<string, { high52w: number; low52w: number; currentClose: number; positionPct: number }>,
+  ): TodayReviewCandidateDto {
     const sourceSignalSnapshot = this.nullableJson(record.sourceSignalSnapshot);
     const boardMetadata = this.boardMetadataFromSnapshot(sourceSignalSnapshot);
     const earningsProximity = this.earningsProximityFromSnapshot(sourceSignalSnapshot);
@@ -237,6 +314,8 @@ export class TodayTradeReviewRepository implements TodayReviewRepositoryContract
     // This ensures every candidate — including those from legacy runs whose snapshot
     // did not capture sector — always shows the correct static catalog sector.
     const catalogSector = catalogSectorMap ? (catalogSectorMap.get(record.instrumentId) ?? null) : null;
+    // 52w range joined at READ time from price_ticks (batch-loaded, no N+1).
+    const range52w = range52wMap ? (range52wMap.get(record.symbol) ?? null) : null;
     const dto: TodayReviewCandidateDto = {
       id: record.id,
       runId: record.runId,
@@ -265,6 +344,11 @@ export class TodayTradeReviewRepository implements TodayReviewRepositoryContract
       boardContractVersion: boardMetadata?.contractVersion || null,
       earningsProximity,
       catalogSector,
+      // 52-week range position joined at READ time from price_ticks (no N+1).
+      range52wPositionPct: range52w ? range52w.positionPct : null,
+      range52wHigh: range52w ? range52w.high52w : null,
+      range52wLow: range52w ? range52w.low52w : null,
+      range52wCurrentClose: range52w ? range52w.currentClose : null,
       createdAt: record.createdAt?.toISOString(),
       updatedAt: record.updatedAt?.toISOString(),
     };

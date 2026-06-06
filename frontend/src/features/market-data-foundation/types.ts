@@ -1497,6 +1497,8 @@ export interface MarketScanRow52w {
   pctFromHigh: number;
   pctFromLow: number;
   priceBasis: 'ADJUSTED_CLOSE' | 'CLOSE_FALLBACK';
+  signalDirection: 'BULLISH' | 'BEARISH' | 'NEUTRAL' | null;
+  signalScore: number | null;
 }
 
 export interface MarketScanSummary52w {
@@ -1518,6 +1520,8 @@ export interface MarketScanRowDeliverySpike {
   avgDeliveryPct: number;
   spikeRatio: number;
   lookbackBars: number;
+  signalDirection: 'BULLISH' | 'BEARISH' | 'NEUTRAL' | null;
+  signalScore: number | null;
 }
 
 export interface MarketScanSummaryDeliverySpike {
@@ -1539,6 +1543,8 @@ export interface MarketScanRowVolumeSpike {
   avgVolume: number;
   spikeRatio: number;
   lookbackBars: number;
+  signalDirection: 'BULLISH' | 'BEARISH' | 'NEUTRAL' | null;
+  signalScore: number | null;
 }
 
 export interface MarketScanSummaryVolumeSpike {

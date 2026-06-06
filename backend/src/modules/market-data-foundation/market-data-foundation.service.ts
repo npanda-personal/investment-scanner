@@ -15038,6 +15038,8 @@ export class MarketDataFoundationService {
       pctFromHigh: Number(row.pctFromHigh),
       pctFromLow: Number(row.pctFromLow),
       priceBasis: (row.priceBasis === 'CLOSE_FALLBACK' ? 'CLOSE_FALLBACK' : 'ADJUSTED_CLOSE') as 'ADJUSTED_CLOSE' | 'CLOSE_FALLBACK',
+      signalDirection: (row.signalDirection as 'BULLISH' | 'BEARISH' | 'NEUTRAL' | null) ?? null,
+      signalScore: row.signalScore != null ? Number(row.signalScore) : null,
     }));
 
     const warnings = results.length === 0
@@ -15086,6 +15088,8 @@ export class MarketDataFoundationService {
       avgDeliveryPct: Number(row.avgDeliveryPct),
       spikeRatio: Number(row.spikeRatio),
       lookbackBars: Number(row.lookbackBars),
+      signalDirection: (row.signalDirection as 'BULLISH' | 'BEARISH' | 'NEUTRAL' | null) ?? null,
+      signalScore: row.signalScore != null ? Number(row.signalScore) : null,
     }));
 
     const warnings = results.length === 0
@@ -15134,6 +15138,8 @@ export class MarketDataFoundationService {
       avgVolume: Number(row.avgVolume),
       spikeRatio: Number(row.spikeRatio),
       lookbackBars: Number(row.lookbackBars),
+      signalDirection: (row.signalDirection as 'BULLISH' | 'BEARISH' | 'NEUTRAL' | null) ?? null,
+      signalScore: row.signalScore != null ? Number(row.signalScore) : null,
     }));
 
     const warnings = results.length === 0

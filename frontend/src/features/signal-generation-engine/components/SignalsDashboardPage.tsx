@@ -180,6 +180,8 @@ const SignalsDashboardPage: React.FC = () => {
   };
 
   const tabLabel = (tab: { value: SignalTab; label: string }) => {
+    // NR-97: suppress count while loading — show no number rather than a misleading "0"
+    if (loading) return tab.label;
     if (tab.value === 'bullish') return `${tab.label} (${directionCounts.BULLISH})`;
     if (tab.value === 'bearish') return `${tab.label} (${directionCounts.BEARISH})`;
     if (tab.value === 'neutral') return `${tab.label} (${directionCounts.NEUTRAL})`;

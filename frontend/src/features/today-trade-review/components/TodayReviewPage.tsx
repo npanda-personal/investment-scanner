@@ -1063,11 +1063,28 @@ function EarningsProximityChip({ earningsProximity }: { earningsProximity?: Toda
 }
 
 /**
- * NR-85: Reads 52-week range position from the persisted priceBehaviour snapshot
- * (lite path: price52wHigh/Low/PositionPct stored at run time from OHLCV history).
- * Returns null when data is absent (strategy-backed candidates or legacy runs).
+ * NR-85 / NR-95: Reads 52-week range position.
+ * Primary: read-time fields (range52wPositionPct etc.) computed at backend read time
+ * from price_ticks — available for every candidate including legacy runs.
+ * Fallback: persisted priceBehaviour snapshot (lite path only, new runs).
+ * Returns null only when the stock genuinely lacks 52w price history.
  */
 function range52wFromCandidate(candidate: TodayReviewCandidate): { positionPct: number; high: number; low: number; current: number } | null {
+  // Prefer read-time fields (NR-95 — covers legacy + new runs)
+  if (
+    typeof candidate.range52wPositionPct === 'number' &&
+    typeof candidate.range52wHigh === 'number' &&
+    typeof candidate.range52wLow === 'number' &&
+    typeof candidate.range52wCurrentClose === 'number'
+  ) {
+    return {
+      positionPct: candidate.range52wPositionPct,
+      high: candidate.range52wHigh,
+      low: candidate.range52wLow,
+      current: candidate.range52wCurrentClose,
+    };
+  }
+  // Fallback: lite snapshot priceBehaviour (NR-85 — new runs only)
   const signal = candidate.sourceSignalSnapshot as any;
   const pb = signal?.priceBehaviour;
   if (!pb) return null;
