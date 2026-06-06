@@ -69,6 +69,39 @@ const sectorStatusLabel = (status: SectorSmartMoneyStatus | string): string => {
 const fmtPercent = (value: number | null | undefined) => value === null || value === undefined ? 'N/A' : `${(value * 100).toFixed(1)}%`;
 const fmtVolume = (value: number | null | undefined) => value === null || value === undefined ? 'N/A' : Intl.NumberFormat('en-US', { notation: 'compact' }).format(value);
 
+/**
+ * Strip developer-internal phrases that should never reach the trader UI.
+ * These originate from backend service defaults for features not yet backed
+ * by real data (ownership filings, insider disclosures) and use "MVP" framing
+ * that is not meaningful to a trader.  The frontend already shows its own
+ * honest copy wherever ownershipDataStatus === 'MISSING'.
+ */
+const MVP_OWNERSHIP_SUFFIX =
+  ' Insider and institutional ownership data is unavailable in the free MVP provider.';
+const MVP_OWNERSHIP_STANDALONE = [
+  'Free insider and institutional ownership provider is not configured for the MVP.',
+  'Insider and institutional ownership are explicit MISSING placeholders until a free provider is configured.',
+];
+const HONEST_OWNERSHIP_NOTE =
+  'Institutional-ownership filings and insider-transaction data are not available from NSE/BSE feeds; analysis is price-volume based.';
+
+function sanitizeExplanation(text: string): string {
+  let out = text;
+  out = out.replace(MVP_OWNERSHIP_SUFFIX, '');
+  for (const phrase of MVP_OWNERSHIP_STANDALONE) {
+    if (out.trim() === phrase) return HONEST_OWNERSHIP_NOTE;
+    out = out.replace(phrase, HONEST_OWNERSHIP_NOTE);
+  }
+  return out.trim();
+}
+
+function sanitizeNote(note: string): string {
+  for (const phrase of MVP_OWNERSHIP_STANDALONE) {
+    if (note.trim() === phrase) return HONEST_OWNERSHIP_NOTE;
+  }
+  return note;
+}
+
 export default function SmartMoneyIntelligencePage() {
   const {
     range, setRange,
@@ -279,10 +312,10 @@ export default function SmartMoneyIntelligencePage() {
               <Chip size="small" label={health?.dataStatus || 'PARTIAL'} color="warning" />
             </Stack>
             <Typography color="text.secondary" sx={{ mb: 1 }}>
-              Analysis is based on persisted NSE/BSE price and volume data. Institutional-ownership filings and insider-transaction records are not available from free NSE/BSE data feeds, so this module reflects price-volume patterns only.
+              Analysis is based on persisted NSE/BSE price and volume data. Institutional-ownership filings and insider-transaction records are not available from NSE/BSE data feeds; this module reflects price-volume patterns only.
             </Typography>
             <Stack spacing={0.5}>
-              {(health?.notes || []).map((note) => <Typography key={note} variant="body2" color="text.secondary">{note}</Typography>)}
+              {(health?.notes || []).map((note) => <Typography key={note} variant="body2" color="text.secondary">{sanitizeNote(note)}</Typography>)}
             </Stack>
           </Paper>
         </Stack>
@@ -373,7 +406,7 @@ function StockDetail({ stock, loading }: { stock: SmartMoneyStockSummary | null;
           <Chip size="small" label={stock.status} color={statusColor(stock.status)} />
         </Stack>
       </Stack>
-      <Typography sx={{ mb: 2 }}>{stock.explanation}</Typography>
+      <Typography sx={{ mb: 2 }}>{sanitizeExplanation(stock.explanation)}</Typography>
       <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 1, mb: 2 }}>
         <Metric label="Latest volume" value={fmtVolume(stock.latestVolume)} />
         <Metric label="20D avg volume" value={fmtVolume(stock.averageVolume20)} />
@@ -401,8 +434,8 @@ function StockDetail({ stock, loading }: { stock: SmartMoneyStockSummary | null;
       </Stack>
       <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
         {stock.insiderOwnership.ownershipDataStatus === 'MISSING'
-          ? 'Institutional-ownership filings and insider-transaction data are not available from free NSE/BSE feeds. This analysis is based on price and volume patterns only.'
-          : stock.insiderOwnership.explanation}
+          ? 'Institutional-ownership filings and insider-transaction data are not available from NSE/BSE feeds. Analysis is price-volume based.'
+          : sanitizeExplanation(stock.insiderOwnership.explanation ?? '')}
       </Typography>
     </Paper>
   );

@@ -34,6 +34,7 @@ import TrendingDownIcon from '@mui/icons-material/TrendingDown';
 import RemoveIcon from '@mui/icons-material/Remove';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import { changeColor } from '@/shared/format/money';
+import { StalenessBadge } from '@/shared/components/StalenessBadge';
 import {
   fetchInstitutionalActivity,
   type InstitutionalActivityResponse,
@@ -221,9 +222,7 @@ export const InstitutionalActivityPanel: React.FC = () => {
         <Box>
           <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.75 }}>
             <Typography variant="subtitle2" fontWeight={700}>FII / DII Net</Typography>
-            {fiiDii.asOf && (
-              <Typography variant="caption" color="text.secondary">{formatDate(fiiDii.asOf)}</Typography>
-            )}
+            <StalenessBadge asOf={fiiDii.asOf} label="FII/DII" />
           </Stack>
           {fiiDii.status === 'ready' ? (
             <Stack spacing={0.5}>
@@ -248,9 +247,7 @@ export const InstitutionalActivityPanel: React.FC = () => {
         <Box>
           <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.75 }}>
             <Typography variant="subtitle2" fontWeight={700}>Bulk &amp; Block Deals</Typography>
-            {deals.asOf && (
-              <Typography variant="caption" color="text.secondary">{formatDate(deals.asOf)}</Typography>
-            )}
+            <StalenessBadge asOf={deals.asOf} label="Deals" />
           </Stack>
           {deals.status === 'ready' && deals.totalDeals > 0 ? (
             <Stack spacing={0.5}>
@@ -305,9 +302,7 @@ export const InstitutionalActivityPanel: React.FC = () => {
                 <WarningAmberIcon sx={{ fontSize: 16, color: 'warning.main' }} />
               )}
             </Stack>
-            {fnoBan.banDate && (
-              <Typography variant="caption" color="text.secondary">{formatDate(fnoBan.banDate)}</Typography>
-            )}
+            <StalenessBadge asOf={fnoBan.banDate} label="F&O Ban" />
           </Stack>
           {fnoBan.status === 'ready' ? (
             fnoBan.count === 0 ? (
@@ -355,11 +350,7 @@ export const InstitutionalActivityPanel: React.FC = () => {
         <Box>
           <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.75 }}>
             <Typography variant="subtitle2" fontWeight={700}>Sector Flows</Typography>
-            {sectors.asOf && (
-              <Tooltip title={`Smart-money snapshot: ${sectors.asOf}`} arrow>
-                <Typography variant="caption" color="text.secondary">{formatDate(sectors.asOf)}</Typography>
-              </Tooltip>
-            )}
+            <StalenessBadge asOf={sectors.asOf} label="Sector Flows" />
           </Stack>
           {sectors.status === 'ready' ? (
             <Stack spacing={1}>

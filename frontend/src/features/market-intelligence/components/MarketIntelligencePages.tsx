@@ -912,7 +912,7 @@ function SectorConstituentsTable({
                   <Button
                     size="small"
                     component={RouterLink}
-                    to={`/stocks/${encodeURIComponent(row.instrumentId)}`}
+                    to={`/instrument-workspace/${encodeURIComponent(row.symbol)}`}
                     variant="text"
                     sx={{ minWidth: 0, px: 0.75 }}
                   >
@@ -1000,7 +1000,7 @@ function StockInterestTable({ rows }: { rows: StockInterestSnapshot[] }) {
         <RiskTags key="risks" tags={row.riskTags} />,
         row.freshness || 'Unavailable',
         formatDate(row.dataThroughDate),
-        <Button key="workspace" size="small" component={RouterLink} to={`/stocks/${encodeURIComponent(row.symbol)}`}>Open</Button>,
+        <Button key="workspace" size="small" component={RouterLink} to={`/instrument-workspace/${encodeURIComponent(row.symbol)}`}>Open</Button>,
       ]}
     />
   );

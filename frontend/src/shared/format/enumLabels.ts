@@ -10,6 +10,29 @@
  * imperative ("Buy"/"Sell").
  */
 
+/**
+ * Known Indian-market and financial acronyms that must stay ALL-CAPS after
+ * title-casing. Add new tokens here — they are matched as whole words only
+ * (word-boundary \b on each side), case-insensitively, after the title-case
+ * pass so e.g. "Fmcg" → "FMCG", "Psu" → "PSU".
+ */
+const ACRONYMS = new Set([
+  'IT', 'FMCG', 'PSU', 'FII', 'DII', 'RS', 'VIX',
+  'NSE', 'BSE', 'FNO', 'F&O', 'AD', 'A/D', 'OI', 'PCR',
+  'SME', 'T2T', 'ISIN', 'EPS', 'PE', 'ROE', 'ROCE',
+  'CAGR', 'YTD', 'SMA', 'EMA', 'RSI', 'ADX', 'MACD',
+  'NIFTY', 'SENSEX', 'IPO', 'QIP', 'ETF', 'REIT',
+  'GST', 'RBI', 'USD', 'INR',
+  // keep previously-handled short tokens
+  'PR', 'TR', 'IQ', 'AI', 'US', 'UK',
+]);
+
+/** Regex that matches any token from the ACRONYMS set as a whole word (rebuilt once). */
+const ACRONYM_RE = new RegExp(
+  `\\b(${[...ACRONYMS].map((a) => a.replace(/[/&]/g, '\\$&')).join('|')})\\b`,
+  'gi',
+);
+
 /** Generic SCREAMING_SNAKE / kebab / dotted code -> Title Case words. */
 export function humanizeCode(code: unknown): string {
   if (code === null || code === undefined) return '';
@@ -17,17 +40,16 @@ export function humanizeCode(code: unknown): string {
   if (!raw) return '';
   // Already human (has a space and a lowercase letter) -> leave as-is.
   if (/\s/.test(raw) && /[a-z]/.test(raw)) return raw;
-  return raw
+  const titleCased = raw
     .replace(/^\^/, '') // strip ^ index prefix (e.g. ^CNXMETAL)
     .replace(/^(NSE_INDEX_|NSE_|BSE_)/i, '')
     .replace(/[_\-.]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
     .toLowerCase()
-    .replace(/\b([a-z])/g, (_m, c: string) => c.toUpperCase())
-    // keep common acronyms upper
-    .replace(/\b(It|Pe|Eps|Roe|Roce|Pr|Tr|Etf|Reit|Sme|Fno|F&o|Nifty|Sensex|Rsi|Sma|Adx|Iq|Ai|Us|Uk|Dii|Fii|Rbi)\b/gi,
-      (m: string) => m.toUpperCase());
+    .replace(/\b([a-z])/g, (_m, c: string) => c.toUpperCase());
+  // Restore known acronyms to ALL-CAPS (e.g. "Fmcg" → "FMCG", "Psu" → "PSU").
+  return titleCased.replace(ACRONYM_RE, (m: string) => m.toUpperCase());
 }
 
 /**

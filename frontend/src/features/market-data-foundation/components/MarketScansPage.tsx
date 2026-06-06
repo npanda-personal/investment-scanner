@@ -365,7 +365,16 @@ export default function MarketScansPage() {
   const error = errors[activeTab];
 
   function renderTabContent() {
-    if (isLoading) return <LinearProgress sx={{ mt: 1 }} />;
+    // Show loading indicator while fetching OR while data has not yet been
+    // requested (useEffect fires after first render, so there is a single
+    // frame where loading=false but data=null — treat that as "loading" too).
+    const tabDataReady = {
+      '52w-high': data52wHigh !== null,
+      '52w-low': data52wLow !== null,
+      'delivery-spike': dataDelivery !== null,
+      'volume-spike': dataVolume !== null,
+    }[activeTab];
+    if (isLoading || (!tabDataReady && !error)) return <LinearProgress sx={{ mt: 1 }} />;
     if (error) {
       return (
         <Alert severity="error" sx={{ mt: 2 }}>

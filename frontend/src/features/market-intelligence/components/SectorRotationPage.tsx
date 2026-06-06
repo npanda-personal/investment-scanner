@@ -17,8 +17,8 @@ import {
 } from '@mui/material';
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PageHeader } from '@/shared/components';
-import { humanizeCode, indexLabel } from '@/shared/format/enumLabels';
+import { PageHeader, StalenessBadge } from '@/shared/components';
+import { humanizeCode, humanizeEmbedded, indexLabel } from '@/shared/format/enumLabels';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
 import { fetchSectorRotation } from '../api/marketIntelligenceService';
 import type { RotationQuadrant, SectorRotationEnvelope, SectorRotationRow } from '../types';
@@ -317,11 +317,7 @@ export function SectorRotationPage() {
                 size="small"
               />
               {data.dataThroughDate && (
-                <Chip
-                  label={`Data through: ${new Date(data.dataThroughDate).toLocaleDateString()}`}
-                  variant="outlined"
-                  size="small"
-                />
+                <StalenessBadge asOf={data.dataThroughDate} label="Sector snapshot" />
               )}
             </Stack>
           ) : undefined
@@ -335,7 +331,7 @@ export function SectorRotationPage() {
         <Stack spacing={1} sx={{ mb: 2 }}>
           {data.warnings.slice(0, 3).map((w) => (
             <Alert key={w} severity="warning">
-              {humanizeCode(w)}
+              {humanizeEmbedded(w)}
             </Alert>
           ))}
         </Stack>

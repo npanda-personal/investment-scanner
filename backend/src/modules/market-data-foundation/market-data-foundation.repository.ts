@@ -4029,7 +4029,7 @@ export class MarketDataFoundationRepository {
         ) latest_p ON TRUE
         INNER JOIN price_ticks pt ON pt.symbol = pid.price_symbol
           AND pt.timestamp >= latest_p.timestamp - (${lookbackDays} * INTERVAL '1 day')
-          AND pt.timestamp <= latest_p.timestamp
+          AND pt.timestamp < latest_p.timestamp
           AND UPPER(COALESCE(pt."dataStatus", 'COMPLETE')) = 'COMPLETE'
           AND UPPER(COALESCE(pt.source, '')) NOT LIKE 'TEST\\_%'
           AND COALESCE(pt."adjustedClose", pt.close) >= ${MARKET_MOVER_MIN_PRICE}
