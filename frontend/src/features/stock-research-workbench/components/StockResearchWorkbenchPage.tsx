@@ -32,7 +32,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { fetchStockResearchWorkbench } from '../api/stockResearchWorkbenchService';
+import { fetchStockResearchWorkbench, isWorkbenchNotYetComputed } from '../api/stockResearchWorkbenchService';
 import type { ResearchRange, ResearchWorkbenchResponse, SignalEvidenceSection } from '../types';
 import { inr, inrCompact, changeColor, stripSuffix } from '@/shared/format/money';
 import { humanizeCode } from '@/shared/format/enumLabels';
@@ -154,6 +154,7 @@ const StockResearchWorkbenchPage: React.FC = () => {
   const [data, setData] = useState<ResearchWorkbenchResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [notYetComputed, setNotYetComputed] = useState<string | null>(null);
   const [watchlistDialogOpen, setWatchlistDialogOpen] = useState(false);
   const [successWatchlistId, setSuccessWatchlistId] = useState<string | null>(null);
   const [alertDialogOpen, setAlertDialogOpen] = useState(false);
@@ -162,8 +163,19 @@ const StockResearchWorkbenchPage: React.FC = () => {
     if (!id) return;
     setLoading(true);
     setError(null);
+    setNotYetComputed(null);
     fetchStockResearchWorkbench(id, range)
-      .then(setData)
+      .then((result) => {
+        // Backend returns HTTP 202 + { _status: 'NOT_YET_COMPUTED' } when the
+        // pipeline has not yet run for this instrument.  Treat this as a
+        // friendly "data being prepared" state — NOT an error.
+        if (isWorkbenchNotYetComputed(result)) {
+          setNotYetComputed(result.message);
+          setData(null);
+        } else {
+          setData(result);
+        }
+      })
       .catch((err: unknown) => {
         const anyErr = err as { response?: { data?: { error?: string } }; message?: string };
         setError(anyErr.response?.data?.error || anyErr.message || 'Failed to load research workbench');
@@ -215,6 +227,33 @@ const StockResearchWorkbenchPage: React.FC = () => {
 
   if (loading) {
     return <Box sx={{ p: 3, display: 'flex', justifyContent: 'center' }}><CircularProgress /></Box>;
+  }
+
+  // Not-yet-computed: pipeline hasn't run for this instrument yet.  Show a
+  // friendly informational state — never show an error or blank screen.
+  if (notYetComputed) {
+    return (
+      <Box sx={{ p: 3, maxWidth: 700 }}>
+        <Button startIcon={<ArrowBackIcon />} onClick={() => navigate('/research')} sx={{ mb: 2 }}>
+          Back to Research Command Center
+        </Button>
+        <Alert severity="info">
+          <Typography variant="body1" fontWeight={700} sx={{ mb: 0.5 }}>
+            Data is being prepared by the daily pipeline
+          </Typography>
+          <Typography variant="body2">
+            This stock's research workbench snapshot hasn't been computed yet. Check back after the
+            next pipeline run. If you need it now, ask an admin to trigger WORKBENCH_REFRESH from
+            the Pipeline Ops page.
+          </Typography>
+          {notYetComputed && (
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+              {notYetComputed}
+            </Typography>
+          )}
+        </Alert>
+      </Box>
+    );
   }
 
   if (error || !data) {

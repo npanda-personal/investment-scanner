@@ -76,9 +76,23 @@ function SignalChip({ direction, score }: { direction: 'BULLISH' | 'BEARISH' | '
 
 function ScanWarning({ warnings }: { warnings: string[] }) {
   if (!warnings.length) return null;
+  // Detect the "no snapshot yet" sentinel from the backend (contains MARKET_SCAN_REFRESH).
+  const isPipelineNotRun = warnings[0].includes('MARKET_SCAN_REFRESH');
   return (
-    <Alert severity="info" sx={{ mb: 2 }}>
-      {warnings[0]}
+    <Alert severity={isPipelineNotRun ? 'info' : 'info'} sx={{ mb: 2 }}>
+      {isPipelineNotRun ? (
+        <>
+          <Typography variant="body2" fontWeight={700} sx={{ mb: 0.25 }}>
+            Data is being prepared by the daily pipeline
+          </Typography>
+          <Typography variant="body2">
+            This scan snapshot hasn't been computed yet. Check back after the next pipeline run, or
+            ask an admin to trigger MARKET_SCAN_REFRESH from the Pipeline Ops page.
+          </Typography>
+        </>
+      ) : (
+        warnings[0]
+      )}
     </Alert>
   );
 }

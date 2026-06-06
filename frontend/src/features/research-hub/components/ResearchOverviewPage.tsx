@@ -64,6 +64,12 @@ const ResearchOverviewPage: React.FC = () => {
     );
   }
 
+  // When the backend snapshot is not yet materialized it returns a valid
+  // empty ResearchOverview whose dataGaps array contains the "not ready" sentinel.
+  const isNotYetComputed = (data.dataGaps || []).some((g) =>
+    g.toLowerCase().includes('not ready') || g.toLowerCase().includes('pipeline'),
+  );
+
   const {
     actionability = defaultActionability(),
     marketReadiness = {
@@ -114,6 +120,19 @@ const ResearchOverviewPage: React.FC = () => {
         subtitle={`Prioritized market intelligence for ${scope.region} / ${scope.assetType}.`}
         primaryAction={<Button variant="outlined" onClick={reload} startIcon={<UpdateOutlined />}>Reload Snapshot</Button>}
       />
+
+      {isNotYetComputed && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          <Typography variant="body2" fontWeight={700} sx={{ mb: 0.25 }}>
+            Data is being prepared by the daily pipeline
+          </Typography>
+          <Typography variant="body2">
+            The Research Command Center snapshot hasn't been computed yet. Check back after the next
+            pipeline run, or ask an admin to trigger the strategy evaluation pipeline from the
+            Pipeline Ops page. All sections below will populate once the snapshot is ready.
+          </Typography>
+        </Alert>
+      )}
 
       {data.generatedAt && (
         <Box
