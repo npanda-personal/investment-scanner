@@ -9,6 +9,7 @@ export const createPortfolioIntelligenceRouter = (
   router.use(requireAuth);
 
   router.get('/portfolios/:id/intelligence', controller.intelligence);
+  router.post('/portfolios/:id/intelligence/refresh', controller.refresh);
   router.get('/portfolios/:id/red-flags', controller.redFlags);
   router.get('/portfolios/:id/review', controller.review);
 

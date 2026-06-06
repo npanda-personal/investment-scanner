@@ -593,6 +593,7 @@ model Portfolio {
   transactions PortfolioTransaction[]
   alertRules   AlertRule[]
   alertEvents  AlertEvent[]
+  intelligenceSnapshot PortfolioIntelligenceSnapshot?
 
   @@index([userId])
   @@map("portfolios")
@@ -1502,6 +1503,31 @@ model PipelineStageRun {
   @@index([stageKey, scopeRegion, scopeAssetType, timeframe, dataThroughDate])
   @@index([stageKey, status, leaseExpiresAt])
   @@map("pipeline_stage_runs")
+}
+
+// ---------------------------------------------------------------------------
+// Portfolio Intelligence Snapshots — persisted per-portfolio intelligence payload (AUDIT-2)
+// GET /portfolios/:id/intelligence reads this table; no recomputation on read.
+// refreshPortfolioIntelligence() computes + upserts; triggered on holdings change + daily.
+// ---------------------------------------------------------------------------
+model PortfolioIntelligenceSnapshot {
+  id          String    @id @default(cuid())
+  portfolioId String    @unique
+  portfolio   Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  computedAt  DateTime
+
+  // Denormalised top-level scalars for cheap status queries (no JSONB parse)
+  healthScore Int
+  status      String   // HEALTHY | WATCH | AT_RISK
+
+  // Full payload stored as JSONB — shape matches PortfolioIntelligenceResponse
+  payloadJson Json
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([portfolioId, computedAt])
+  @@map("portfolio_intelligence_snapshots")
 }
 
 // ---------------------------------------------------------------------------

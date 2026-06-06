@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Instrument Context Snapshot Service — persisted-read only.
  *
  * Assembles the stock's CURRENT context from already-persisted read models.
@@ -51,7 +51,7 @@ export interface InstrumentContextSnapshotDto {
     return3M: number | null;
   } | null>;
 
-  /** Stock 63-bar return vs ^NSEI 63-bar return from persisted prices */
+  /** Stock return vs ^NSEI from persisted WorkbenchSnapshot.payloadJson.relative_strength */
   relativeStrength: InstrumentContextField<{
     stockReturn63d: number | null;
     benchmarkReturn63d: number | null;
@@ -171,82 +171,43 @@ async function loadSectorStrength(sector: string | null): Promise<InstrumentCont
 }
 
 // ---------------------------------------------------------------------------
-// Relative strength — from persisted price_ticks / latest_prices
+// Relative strength — from persisted WorkbenchSnapshot (payloadJson.relative_strength)
 // ---------------------------------------------------------------------------
 
-async function loadRelativeStrength(_instrumentId: string, symbol: string): Promise<InstrumentContextField<{
+async function loadRelativeStrength(instrumentId: string, _symbol: string): Promise<InstrumentContextField<{
   stockReturn63d: number | null;
   benchmarkReturn63d: number | null;
   relativeReturn63d: number | null;
   rsPercentile: number | null;
 } | null>> {
-  const LOOKBACK = 64; // 63-bar return needs 64 prices
-  const NSEI_SYMBOL = '^NSEI';
-
   try {
-    const [stockPrices, nseiPrices] = await Promise.all([
-      // Stock prices from price_ticks (adjustedClose preferred, else close)
-      prisma.priceTick.findMany({
-        where: { symbol },
-        orderBy: { timestamp: 'desc' },
-        take: LOOKBACK,
-        select: { adjustedClose: true, close: true, timestamp: true },
-      }),
-      // ^NSEI prices
-      prisma.priceTick.findMany({
-        where: { symbol: NSEI_SYMBOL },
-        orderBy: { timestamp: 'desc' },
-        take: LOOKBACK,
-        select: { adjustedClose: true, close: true, timestamp: true },
-      }),
-    ]);
+    const row = await prisma.workbenchSnapshot.findUnique({
+      where: { instrumentId },
+      select: { payloadJson: true, computedAt: true },
+    });
 
-    // Use adjustedClose consistently when at least half the rows have it,
-    // otherwise fall back to raw close. Never mix them across rows — mixing
-    // produces nonsensical returns when only recent bars have adjustedClose.
-    const toClose = (rows: Array<{ adjustedClose: any; close: any }>) => {
-      const adjCount = rows.filter((r) => r.adjustedClose !== null && r.adjustedClose !== undefined).length;
-      const useAdj = adjCount >= rows.length / 2 && adjCount > 0;
-      return rows
-        .map((r) => useAdj ? Number(r.adjustedClose) : Number(r.close))
-        .filter((v) => Number.isFinite(v) && v > 0);
-    };
-
-    const stockCloses = toClose(stockPrices);
-    const nseiCloses = toClose(nseiPrices);
-
-    const stockReturn63d =
-      stockCloses.length >= 64
-        ? (stockCloses[0] - stockCloses[63]) / stockCloses[63]
-        : stockCloses.length >= 2
-          ? (stockCloses[0] - stockCloses[stockCloses.length - 1]) / stockCloses[stockCloses.length - 1]
-          : null;
-
-    const benchmarkReturn63d =
-      nseiCloses.length >= 64
-        ? (nseiCloses[0] - nseiCloses[63]) / nseiCloses[63]
-        : nseiCloses.length >= 2
-          ? (nseiCloses[0] - nseiCloses[nseiCloses.length - 1]) / nseiCloses[nseiCloses.length - 1]
-          : null;
-
-    const relativeReturn63d =
-      stockReturn63d !== null && benchmarkReturn63d !== null
-        ? stockReturn63d - benchmarkReturn63d
-        : null;
-
-    if (stockReturn63d === null) {
-      return absent('PriceTick (insufficient price history for instrument)');
+    if (!row) {
+      return absent('WorkbenchSnapshot (no snapshot yet for this instrument — run workbench pipeline)');
     }
 
-    const asOf = stockPrices[0]?.timestamp ? toIsoDate(stockPrices[0].timestamp) : null;
+    const payload = row.payloadJson as Record<string, unknown>;
+    const rs = payload['relative_strength'] as Record<string, unknown> | null | undefined;
+
+    if (!rs || rs['data_status'] === 'MISSING') {
+      return absent('WorkbenchSnapshot (relative_strength unavailable — no price history in snapshot)');
+    }
+
+    const stockReturn63d = typeof rs['stock_return'] === 'number' ? rs['stock_return'] : null;
+    const benchmarkReturn63d = typeof rs['benchmark_return'] === 'number' ? rs['benchmark_return'] : null;
+    const relativeReturn63d = typeof rs['relative_to_benchmark'] === 'number' ? rs['relative_to_benchmark'] : null;
 
     return present(
       { stockReturn63d, benchmarkReturn63d, relativeReturn63d, rsPercentile: null },
-      'PriceTick (63-bar return vs ^NSEI)',
-      asOf,
+      'WorkbenchSnapshot (relative_strength vs ^NSEI)',
+      toIsoDate(row.computedAt),
     );
   } catch {
-    return absent('PriceTick (read error)');
+    return absent('WorkbenchSnapshot (read error)');
   }
 }
 

@@ -7,6 +7,7 @@ const currentUserId = (req: Request) => (req as any).user?.id || 'default-user';
 export class PortfolioIntelligenceController {
   constructor(private readonly service = new PortfolioIntelligenceService()) {}
 
+  /** Persisted-read GET: reads snapshot from DB, materialises lazily on first call. */
   intelligence = async (req: Request, res: Response) => {
     try {
       const result = await this.service.intelligence(getPortfolioId(req.params.id), currentUserId(req));
@@ -34,6 +35,22 @@ export class PortfolioIntelligenceController {
       return res.json({ review });
     } catch (error) {
       return this.error(res, error, 'Failed to load portfolio review');
+    }
+  };
+
+  /**
+   * POST /portfolios/:id/intelligence/refresh
+   *
+   * Forces a full recompute + upsert of the snapshot.
+   * Called (a) after holdings mutations and (b) from daily refresh jobs.
+   */
+  refresh = async (req: Request, res: Response) => {
+    try {
+      const result = await this.service.refreshPortfolioIntelligence(getPortfolioId(req.params.id), currentUserId(req));
+      if (!result) return res.status(404).json({ error: 'Portfolio not found' });
+      return res.status(200).json(result);
+    } catch (error) {
+      return this.error(res, error, 'Failed to refresh portfolio intelligence');
     }
   };
 

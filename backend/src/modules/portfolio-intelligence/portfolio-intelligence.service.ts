@@ -22,6 +22,7 @@ import {
   DEFAULT_PORTFOLIO_INTELLIGENCE_THRESHOLDS,
   statusForHealthScore,
 } from './portfolio-intelligence.validation';
+import { PortfolioIntelligenceRepository } from './portfolio-intelligence.repository';
 
 const SIGNAL_ORDER: Record<string, number> = { BEARISH: 0, NEUTRAL: 1, BULLISH: 2 };
 const DECISION_ORDER: Record<HoldingDecisionLabel, number> = { HIGH_RISK: 0, REVIEW: 1, WATCH: 2, GOOD: 3 };
@@ -46,15 +47,52 @@ export class PortfolioIntelligenceService {
   constructor(
     private readonly portfolioService = new PortfolioManagementService(),
     private readonly thresholds: PortfolioIntelligenceThresholds = DEFAULT_PORTFOLIO_INTELLIGENCE_THRESHOLDS,
-    private readonly capitalPostureService?: CapitalPostureLike
+    private readonly capitalPostureService?: CapitalPostureLike,
+    private readonly repository = new PortfolioIntelligenceRepository()
   ) {}
 
+  /**
+   * PERSISTED-READ GET path (AUDIT-2).
+   *
+   * Approach: pure persisted-read + refresh-on-holdings-change.
+   * - Returns the persisted snapshot immediately when available.
+   * - If no snapshot exists yet (first view), computes-and-persists once
+   *   (lazy materialisation), then returns the persisted result.
+   * - Never recomputes when a fresh snapshot already exists.
+   * - Callers that need a forced refresh invoke refreshPortfolioIntelligence().
+   */
   async intelligence(portfolioId: string, userId = 'default-user'): Promise<PortfolioIntelligenceResponse | null> {
+    // 1. Happy path: serve persisted snapshot directly (no recomputation).
+    const cached = await this.repository.findByPortfolioId(portfolioId);
+    if (cached) return cached;
+
+    // 2. Lazy materialisation: no snapshot yet — verify portfolio exists, then
+    //    compute-and-persist once so the next GET hits the fast path.
+    const exists = await this.portfolioService.summary(portfolioId, userId);
+    if (!exists) return null;
+
+    return this.refreshPortfolioIntelligence(portfolioId, userId);
+  }
+
+  /**
+   * Compute the full intelligence payload and UPSERT it into
+   * portfolio_intelligence_snapshots.  Returns the persisted result.
+   *
+   * Trigger points:
+   *  (a) On holdings add / edit / remove — called by the controller after
+   *      mutating holdings (see portfolio-intelligence.controller.ts).
+   *  (b) Daily refresh or manual admin request via
+   *      POST /portfolios/:id/intelligence/refresh.
+   *  (c) Lazy materialisation on first GET when no snapshot exists.
+   */
+  async refreshPortfolioIntelligence(portfolioId: string, userId = 'default-user'): Promise<PortfolioIntelligenceResponse | null> {
     const summary = await this.portfolioService.summary(portfolioId, userId);
     if (!summary) return null;
     const allocation = await this.portfolioService.allocation(portfolioId, userId);
     if (!allocation) return null;
-    return this.buildIntelligence(summary, allocation);
+    const payload = await this.buildIntelligence(summary, allocation);
+    await this.repository.upsertSnapshot(payload);
+    return payload;
   }
 
   async redFlags(portfolioId: string, userId = 'default-user'): Promise<RedFlag[] | null> {
