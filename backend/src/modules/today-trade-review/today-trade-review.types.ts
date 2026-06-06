@@ -130,6 +130,13 @@ export interface TodayReviewCandidateDto {
    * Frontend uses this to render the "Earnings in Nd" chip on list rows.
    */
   earningsProximity?: TodayReviewEarningsProximity | null;
+  /**
+   * Sector from instrument catalog (Stock.sector) joined at READ time.
+   * Always populated for every candidate — legacy and new runs — regardless
+   * of whether the run snapshot captured sector. Null only when the stock
+   * is not present in the catalog (extremely rare).
+   */
+  catalogSector?: string | null;
   createdAt?: string;
   updatedAt?: string;
 }

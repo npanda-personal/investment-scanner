@@ -160,20 +160,44 @@ export class TodayTradeReviewRepository implements TodayReviewRepositoryContract
       }),
       this.db.todayReviewRun.count({ where }),
     ]);
-    return { items: records.map((record) => this.toRunDto(record)), total };
+    return { items: await Promise.all(records.map((record) => this.toRunDto(record))), total };
   }
 
   async getCandidate(id: string): Promise<TodayReviewCandidateDto | null> {
     const record = await this.db.todayReviewCandidate.findUnique({ where: { id } });
-    return record ? this.toCandidateDto(record) : null;
+    if (!record) return null;
+    const catalogSectorMap = await this.loadCatalogSectors([record.instrumentId]);
+    return this.toCandidateDto(record, catalogSectorMap);
   }
 
   private optionalJson(value: unknown) {
     return value === null || value === undefined ? Prisma.DbNull : value as any;
   }
 
-  private toRunDto(record: any): TodayReviewRunDto {
-    const candidates = (record.candidates || []).map((candidate: any) => this.toCandidateDto(candidate));
+  /**
+   * Batch-load catalog sectors for a list of instrumentIds (Stock.id).
+   * One query for all IDs; returns a map of instrumentId → sector string.
+   */
+  private async loadCatalogSectors(instrumentIds: string[]): Promise<Map<string, string | null>> {
+    if (instrumentIds.length === 0) return new Map();
+    const stocks = await this.db.stock.findMany({
+      where: { id: { in: instrumentIds } },
+      select: { id: true, sector: true },
+    });
+    const map = new Map<string, string | null>();
+    for (const stock of stocks) {
+      map.set(stock.id, stock.sector ?? null);
+    }
+    return map;
+  }
+
+  private async toRunDto(record: any): Promise<TodayReviewRunDto> {
+    // Batch-load sectors for all candidates in one query (no N+1).
+    const candidateRecords: any[] = record.candidates || [];
+    const instrumentIds = [...new Set(candidateRecords.map((c: any) => c.instrumentId as string))];
+    const catalogSectorMap = await this.loadCatalogSectors(instrumentIds);
+
+    const candidates = candidateRecords.map((candidate: any) => this.toCandidateDto(candidate, catalogSectorMap));
     const sourceSnapshot = this.jsonObject(record.sourceSnapshot);
     const reviewUniverse = this.jsonObject(sourceSnapshot.reviewUniverse);
     const scanFunnel = this.nullableJson(sourceSnapshot.scanFunnel) as any;
@@ -204,10 +228,14 @@ export class TodayTradeReviewRepository implements TodayReviewRepositoryContract
     };
   }
 
-  private toCandidateDto(record: any): TodayReviewCandidateDto {
+  private toCandidateDto(record: any, catalogSectorMap?: Map<string, string | null>): TodayReviewCandidateDto {
     const sourceSignalSnapshot = this.nullableJson(record.sourceSignalSnapshot);
     const boardMetadata = this.boardMetadataFromSnapshot(sourceSignalSnapshot);
     const earningsProximity = this.earningsProximityFromSnapshot(sourceSignalSnapshot);
+    // Sector joined at READ time from instrument catalog (Stock.sector).
+    // This ensures every candidate — including those from legacy runs whose snapshot
+    // did not capture sector — always shows the correct static catalog sector.
+    const catalogSector = catalogSectorMap ? (catalogSectorMap.get(record.instrumentId) ?? null) : null;
     const dto: TodayReviewCandidateDto = {
       id: record.id,
       runId: record.runId,
@@ -235,6 +263,7 @@ export class TodayTradeReviewRepository implements TodayReviewRepositoryContract
       boardReason: boardMetadata?.reason || null,
       boardContractVersion: boardMetadata?.contractVersion || null,
       earningsProximity,
+      catalogSector,
       createdAt: record.createdAt?.toISOString(),
       updatedAt: record.updatedAt?.toISOString(),
     };
@@ -314,7 +343,7 @@ export class TodayTradeReviewRepository implements TodayReviewRepositoryContract
         strategyProof: candidate.strategyProofSnapshot ? 8 : 0,
         tradePlan: candidate.tradePlanSnapshot ? 8 : 0,
         marketRegime: candidate.marketContextSnapshot ? 5 : 0,
-        sectorAlignment: (candidate.dataQualitySnapshot as any)?.sector ? 5 : 0,
+        sectorAlignment: (candidate.dataQualitySnapshot as any)?.sector || candidate.catalogSector ? 5 : 0,
         signalCalibration: (candidate.sourceSignalSnapshot as any)?.calibration ? 5 : 0,
         dataQuality: candidate.dataQualitySnapshot ? 8 : 0,
         smartMoney: (candidate.sourceSignalSnapshot as any)?.smartMoney ? 5 : 0,

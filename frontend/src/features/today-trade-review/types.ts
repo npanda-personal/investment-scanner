@@ -149,6 +149,12 @@ export interface TodayReviewCandidate {
   explainability?: TodayReviewCandidateExplainability;
   /** Structured earnings-proximity snapshot. Present only when results are within the blackout window. */
   earningsProximity?: TodayReviewEarningsProximity | null;
+  /**
+   * Sector from instrument catalog (Stock.sector), joined at READ time on the backend.
+   * Always present for every candidate regardless of run age (legacy + new).
+   * Null only when the stock is absent from the catalog.
+   */
+  catalogSector?: string | null;
   createdAt: string;
   updatedAt: string;
 }

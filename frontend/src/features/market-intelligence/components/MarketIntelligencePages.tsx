@@ -754,13 +754,15 @@ function SectorScoreCell({ score }: { score: number | null }) {
   const color: 'success' | 'default' | 'error' =
     score >= 60 ? 'success' : score < 40 ? 'error' : 'default';
   return (
-    <Chip
-      label={new Intl.NumberFormat().format(score)}
-      color={color}
-      variant="outlined"
-      size="small"
-      sx={{ fontWeight: 600, minWidth: 44 }}
-    />
+    <Tooltip title="Sector strength score (0–100)" arrow>
+      <Chip
+        label={`${new Intl.NumberFormat().format(score)}/100`}
+        color={color}
+        variant="outlined"
+        size="small"
+        sx={{ fontWeight: 600, minWidth: 52 }}
+      />
+    </Tooltip>
   );
 }
 
@@ -1046,9 +1048,9 @@ function EarningsTable({ rows }: { rows: EarningsIntelligenceSnapshot[] }) {
         formatOptional(row.consistencyScore),
         formatOptional(row.accelerationScore),
         row.freshness || 'Unavailable',
-        <ReasonTags key="reasons" tags={row.reasonTags} />,
-        <RiskTags key="risks" tags={row.riskTags} />,
-        <RiskTags key="warnings" tags={row.warnings || []} />,
+        <ReasonTags key="reasons" tags={row.reasonTags.map(humanizeCode)} />,
+        <RiskTags key="risks" tags={row.riskTags.map(humanizeCode)} />,
+        <RiskTags key="warnings" tags={(row.warnings || []).map(humanizeCode)} />,
       ]}
     />
   );

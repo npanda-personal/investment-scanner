@@ -24,7 +24,7 @@ export const SignalWidget: React.FC<{ instrumentId?: string }> = ({ instrumentId
       ) : signal ? (
         <>
           <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, flexWrap: 'wrap' }}>
-            {signal.calibratedScore != null && signal.calibrationStatus === 'CALIBRATED' ? (
+            {signal.calibratedScore != null ? (
               <>
                 <Typography variant="h4">{signal.score}</Typography>
                 <Typography variant="body2" color="text.secondary">→ {signal.calibratedScore} (calibrated)</Typography>

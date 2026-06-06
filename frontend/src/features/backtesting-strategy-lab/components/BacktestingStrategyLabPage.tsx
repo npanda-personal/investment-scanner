@@ -76,6 +76,15 @@ const defaultConfig: BacktestStrategyConfig = {
   excludeMissingQuality: false,
 };
 
+/** NR-84: all regime buckets the backend may emit — used to pad missing rows in the by-regime table. */
+const ALL_REGIME_BUCKETS = ['RISK_ON', 'NEUTRAL', 'RISK_OFF', 'UNKNOWN'] as const;
+const REGIME_LABELS: Record<string, string> = {
+  RISK_ON: 'Risk On',
+  NEUTRAL: 'Neutral',
+  RISK_OFF: 'Risk Off',
+  UNKNOWN: 'Unknown',
+};
+
 const fmtMoney = (value: number | null | undefined, region = 'GLOBAL') => value === null || value === undefined
   ? 'N/A'
   : new Intl.NumberFormat(region === 'IN' ? 'en-IN' : 'en-US', { style: 'currency', currency: region === 'IN' ? 'INR' : 'USD', maximumFractionDigits: 0 }).format(value);
@@ -634,7 +643,7 @@ function ResultsPanel({ run, chartData }: { run: BacktestRun | null; chartData: 
         <MonthlyReturnGrid monthlyReturns={metrics.monthlyReturns} region={run.config.region} />
       )}
 
-      {/* NR-32: Regime-segmented performance table */}
+      {/* NR-32 / NR-84: Regime-segmented performance table — always renders all 4 buckets */}
       {metrics?.regimePerformance && metrics.regimePerformance.length > 0 && (
         <Paper sx={{ p: 2 }}>
           <Typography variant="h6" sx={{ mb: 1 }}>Performance by Regime</Typography>
@@ -650,15 +659,19 @@ function ResultsPanel({ run, chartData }: { run: BacktestRun | null; chartData: 
                 </TableRow>
               </TableHead>
               <TableBody>
-                {metrics.regimePerformance.map((row) => (
-                  <TableRow key={row.regime}>
-                    <TableCell>{row.regime}</TableCell>
-                    <TableCell align="right">{fmtPercent(row.cagr)}</TableCell>
-                    <TableCell align="right">{fmtPercent(row.winRate)}</TableCell>
-                    <TableCell align="right">{row.numberOfTrades}</TableCell>
-                    <TableCell align="right">{row.activeMonths}</TableCell>
-                  </TableRow>
-                ))}
+                {ALL_REGIME_BUCKETS.map((regime) => {
+                  const row = metrics.regimePerformance!.find((r) => r.regime === regime);
+                  const noData = !row || row.numberOfTrades === 0;
+                  return (
+                    <TableRow key={regime} sx={noData ? { opacity: 0.45 } : undefined}>
+                      <TableCell>{REGIME_LABELS[regime] ?? regime}</TableCell>
+                      <TableCell align="right">{noData ? '—' : fmtPercent(row.cagr)}</TableCell>
+                      <TableCell align="right">{noData ? '—' : fmtPercent(row.winRate)}</TableCell>
+                      <TableCell align="right">{noData ? '—' : row.numberOfTrades}</TableCell>
+                      <TableCell align="right">{noData ? '—' : (row.activeMonths ?? '—')}</TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </Box>

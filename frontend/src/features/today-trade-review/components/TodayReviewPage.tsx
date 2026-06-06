@@ -187,9 +187,12 @@ function RunStatusPanel({ run, marketPosture }: { run: TodayReviewRun | null; ma
   const postureBandText = marketPosture?.suggestedExposureBand
     ? ` (${marketPosture.suggestedExposureBand.minPct}–${marketPosture.suggestedExposureBand.maxPct}%)`
     : '';
-  // Run-level market regime from persisted market context snapshot.
+  // Run-level market regime from persisted market context snapshot (captured at run-generation time).
   const runRegime: string | null = (sourceSnapshot as any).marketContext?.regime?.regime ?? null;
   const regimeColor = runRegime === 'RISK_ON' ? 'success' : runRegime === 'RISK_OFF' ? 'error' : runRegime ? 'warning' : 'default';
+  // Timestamp for the regime annotation: when the run was generated (finishedAt, else startedAt).
+  const runGeneratedAt = run.finishedAt || run.startedAt;
+  const runGeneratedLabel = runGeneratedAt ? new Date(runGeneratedAt).toLocaleString() : null;
   return (
     <Card variant="outlined">
       <CardContent>
@@ -198,9 +201,12 @@ function RunStatusPanel({ run, marketPosture }: { run: TodayReviewRun | null; ma
           <Chip label={`Trust: ${run.trustStatus}`} color={run.trustStatus === 'OK' ? 'success' : run.trustStatus === 'FAILED' ? 'error' : 'warning'} variant="outlined" />
           <Chip label={`Market Data trust: ${reviewReadiness.trustStatus || 'UNKNOWN'}`} variant="outlined" />
           {runRegime ? (
-            <Tooltip title={`Market regime from persisted context snapshot: ${humanizeCode(runRegime)}. Applies to all candidates in this run.`} arrow>
+            <Tooltip
+              title={`Regime (as of ${runGeneratedLabel ?? 'run generation'}): ${humanizeCode(runRegime)}. This is the market regime captured when the run was generated — it may differ from the current live regime.`}
+              arrow
+            >
               <Chip
-                label={`Regime: ${humanizeCode(runRegime)}`}
+                label={`Regime (as of ${runGeneratedLabel ?? 'run'}): ${humanizeCode(runRegime)}`}
                 color={regimeColor as any}
                 variant="filled"
                 size="small"
@@ -1331,11 +1337,12 @@ function gradeColor(grade: string) {
 }
 
 function sectorAlignment(candidate: TodayReviewCandidate) {
+  // Primary: catalog sector joined at read time (always present for legacy + new runs).
+  // Fallbacks: snapshot paths retained for forward-compatibility.
   const dq = candidate.dataQualitySnapshot as TodayReviewCandidateDataQualitySnapshot | null;
   const signal = candidate.sourceSignalSnapshot as any;
-  // Strategy path: dataQualitySnapshot.sector or sourceSignalSnapshot.rawSignal.sector
-  // Lite path: dataQualitySnapshot.sector (populated from instrument catalog) or priceBehaviour.sector
-  const sector = dq?.sector
+  const sector = candidate.catalogSector
+    || dq?.sector
     || signal?.rawSignal?.sector
     || signal?.priceBehaviour?.sector
     || null;

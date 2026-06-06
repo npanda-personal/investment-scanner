@@ -28,7 +28,12 @@
  * - Uses the same setInterval pattern as MarketDataFoundationScheduler.
  * - Checks time-of-day in UTC on each tick; fires each job at most once per
  *   calendar day (UTC date guard).
- * - Never runs at startup — dev-server restarts must NOT hammer NSE.
+ * - Never runs at startup via the tick loop — dev-server restarts must NOT
+ *   hammer NSE on every restart.
+ * - seedIfEmpty() is called once at startup and fires each dataset's ingest
+ *   ONLY when the corresponding table has zero rows (fresh DB guard). On any
+ *   restart with populated tables the COUNT query short-circuits immediately
+ *   and no network call is made.
  * - Every job is wrapped in try/catch so a network failure only logs a warning
  *   and never crashes the scheduler or the process.
  * - Snapshot regen jobs are pool-aware: they run sequentially (staggered
@@ -36,6 +41,8 @@
  * - The ingest functions already enforce their own 7–8 s timeouts internally.
  */
 
+import { Prisma } from '@prisma/client';
+import prisma from '../../db/prisma';
 import { ingestFiiDii } from './fii-dii.service';
 import { ingestBulkBlockDeals } from './bulk-block-deals.service';
 import { ingestFnoBanList } from '../../modules/smart-money-intelligence/fno-ban.service';
@@ -126,13 +133,24 @@ export class EodIngestScheduler {
     this.tickIntervalMs = Math.max(1, tickIntervalMinutes) * 60_000;
   }
 
-  /** Start the scheduler. Never fires jobs immediately — schedule-only. */
+  /**
+   * Start the scheduler.
+   * - Registers the periodic tick for daily post-close ingests.
+   * - Fires seedIfEmpty() once (fire-and-forget) to populate tables on a
+   *   fresh DB. On restarts with data present the seed is a no-op.
+   */
   start(): void {
     if (this.timer) return;
     this.timer = setInterval(() => {
       this.tick(new Date());
     }, this.tickIntervalMs);
     console.log('[EodIngestScheduler] started, tick every', this.tickIntervalMs / 60_000, 'min');
+
+    // Guarded startup seed — runs once, skipped if tables already have rows.
+    this.seedIfEmpty().catch((err: unknown) => {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn('[EodIngestScheduler] seedIfEmpty error (non-fatal):', msg);
+    });
   }
 
   stop(): void {
@@ -167,6 +185,66 @@ export class EodIngestScheduler {
     }
   }
 
+  /**
+   * Startup seed: for each of the 3 NSE data tables, count rows and fire the
+   * corresponding ingest ONCE if the table is empty.  Calls are staggered 5 s
+   * apart so they don't hammer NSE concurrently.  Any network/parse error is
+   * caught and logged — never crashes boot.
+   *
+   * Guard: if the table already has rows this method returns immediately for
+   * that dataset (the COUNT query is the only DB call made on a normal restart).
+   */
+  private async seedIfEmpty(): Promise<void> {
+    const seeds: Array<{
+      name: string;
+      table: string;
+      delayMs: number;
+      ingest: () => Promise<unknown>;
+    }> = [
+      {
+        name: 'FII/DII Activity',
+        table: 'fii_dii_snapshots',
+        delayMs: 0,
+        ingest: ingestFiiDii,
+      },
+      {
+        name: 'Bulk & Block Deals',
+        table: 'bulk_block_deals',
+        delayMs: 5_000,
+        ingest: ingestBulkBlockDeals,
+      },
+      {
+        name: 'F&O Ban List',
+        table: 'fno_ban_list',
+        delayMs: 10_000,
+        ingest: ingestFnoBanList,
+      },
+    ];
+
+    for (const seed of seeds) {
+      // Capture for closure — avoid await inside setTimeout
+      const { name, table, delayMs, ingest } = seed;
+
+      const isEmpty = await countTableRows(table) === 0;
+      if (!isEmpty) {
+        console.log(`[EodIngestScheduler] seed skip — ${name} already has data`);
+        continue;
+      }
+
+      // Schedule the fetch with stagger; wrap in try/catch so NSE failures
+      // are warnings, never crashes.
+      setTimeout(() => {
+        console.log(`[EodIngestScheduler] seeding ${name} (table was empty)…`);
+        ingest().then((result) => {
+          console.log(`[EodIngestScheduler] seed ${name} done`, result);
+        }).catch((err: unknown) => {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.warn(`[EodIngestScheduler] seed ${name} failed (non-fatal):`, msg);
+        });
+      }, delayMs);
+    }
+  }
+
   private runSafe(job: JobSpec): void {
     job.run().then((result) => {
       console.log(`[EodIngestScheduler] ${job.name} completed`, result);
@@ -184,6 +262,23 @@ export class EodIngestScheduler {
 
 function utcDateString(d: Date): string {
   return d.toISOString().slice(0, 10); // "YYYY-MM-DD"
+}
+
+/**
+ * Return the row count for a raw (non-Prisma-model) table.
+ * Returns 0 if the table does not exist yet (handles fresh DB where
+ * ensureTable() hasn't been called yet).
+ */
+async function countTableRows(table: string): Promise<number> {
+  try {
+    const rows = await prisma.$queryRaw<Array<{ cnt: bigint }>>(
+      Prisma.sql`SELECT COUNT(*)::bigint AS cnt FROM ${Prisma.raw(table)}`,
+    );
+    return Number(rows[0]?.cnt ?? 0);
+  } catch {
+    // Table doesn't exist yet → treat as empty so seed fires
+    return 0;
+  }
 }
 
 // ---------------------------------------------------------------------------
