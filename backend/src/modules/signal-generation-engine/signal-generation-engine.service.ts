@@ -297,11 +297,10 @@ export class SignalGenerationEngineService {
   }
 
   async latestForInstrument(instrumentId: string): Promise<SignalResultDto | null> {
+    // Persisted-read only. No run() fallback — generation stays behind POST /signals/run.
     const latest = await this.repository.latestForInstrument(instrumentId);
     if (latest && this.isTrustedReadSignal(latest)) return this.enrichSignal(latest);
-    const run = await this.run({ instrumentId, missingQualityBehavior: 'SKIP' });
-    const generated = run.results[0] || null;
-    return generated ? this.enrichSignal(generated) : null;
+    return null;
   }
 
   async latestPersistedForInstruments(instrumentIds: string[]): Promise<SignalResultDto[]> {

@@ -110,13 +110,9 @@ export class SignalCalibrationEngineService {
   ) {}
 
   async latestForInstrument(instrumentId: string): Promise<SignalCalibrationResultDto | null> {
-    const existing = await this.repository.latestForInstrument(instrumentId, MODEL_VERSION);
-    if (existing) {
-      const summary = await this.qualityService.summary({ horizon: DEFAULT_HORIZON, limit: 1, minSampleSize: 0 }).catch(() => null);
-      return this.withEvidenceFromSummary(existing, DEFAULT_HORIZON, summary);
-    }
-    const raw = await this.signalService.latestForInstrument(instrumentId);
-    return raw ? this.calibrateAndPersist(raw) : null;
+    // Persisted-read only. No calibrateAndPersist() fallback on a GET.
+    // Calibration is generated via POST /signals/calibration/run + scheduled pipeline.
+    return this.latestPersistedForInstrument(instrumentId);
   }
 
   async latestPersistedForInstrument(instrumentId: string): Promise<SignalCalibrationResultDto | null> {
@@ -132,27 +128,14 @@ export class SignalCalibrationEngineService {
     return (existing as SignalCalibrationResultDto[]).map((item) => this.withEvidenceFromSummary(item, DEFAULT_HORIZON, null));
   }
 
-  async compare(instrumentId: string, region?: string, assetType?: string, horizonInput?: string): Promise<CalibrationComparison | null> {
-    const raw = await this.signalService.latestForInstrument(instrumentId);
-    if (!raw) return null;
-    const horizon = this.parseHorizon(horizonInput);
-    const summary = await this.qualityService.summary(this.signalQualitySummaryQuery({
-      horizon,
-      region,
-      assetType,
-    })).catch(() => null);
-    const stock = await this.repository.instrumentInScope(instrumentId, region, assetType);
-    if (!stock && region && region !== 'GLOBAL') {
-      return null;
-    }
-
-    const calibratedSignal = await this.calibrateAndPersist(raw, horizon, summary, { region, assetType });
-    if (stock) {
-      calibratedSignal.region = stock.region ?? null;
-      calibratedSignal.exchange = stock.exchange ?? null;
-      calibratedSignal.assetType = stock.assetType ?? null;
-    }
-
+  async compare(instrumentId: string, _region?: string, _assetType?: string, _horizonInput?: string): Promise<CalibrationComparison | null> {
+    // Persisted-read only. No calibrateAndPersist() on a GET.
+    // Returns persisted raw signal + persisted calibrated result; null when either is absent.
+    const [raw, calibratedSignal] = await Promise.all([
+      this.signalService.latestForInstrument(instrumentId),
+      this.latestPersistedForInstrument(instrumentId),
+    ]);
+    if (!raw || !calibratedSignal) return null;
     return { rawSignal: raw, calibratedSignal };
   }
 

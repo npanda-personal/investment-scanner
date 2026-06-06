@@ -158,7 +158,9 @@ const NSE_BSE_ONLY_PROVIDER_DISABLED_MESSAGE =
 const MANUAL_VERIFIED_FUNDAMENTALS_SOURCE = 'MANUAL_VERIFIED';
 const MANUAL_VERIFIED_FUNDAMENTALS_SEGMENT = 'FUNDAMENTALS';
 const MANUAL_VERIFIED_FUNDAMENTALS_PARSER_VERSION = 'manual-verified-fundamentals-csv-v1';
-const RECENT_PRICE_WINDOW_SYMBOL_CHUNK_SIZE = 100;
+// Reduced from 100 to 50 so each raw-SQL batch returns at most ~50 × 420 ≈ 21 000 rows,
+// keeping individual queries small and reducing connection-hold time (pool-safety).
+const RECENT_PRICE_WINDOW_SYMBOL_CHUNK_SIZE = 50;
 
 type ManualVerifiedFundamentalsPeriodType = 'ANNUAL' | 'QUARTERLY';
 type ParsedManualVerifiedFundamentalRow = {
@@ -3860,35 +3862,23 @@ export class MarketDataFoundationService {
     const safeLimit = Math.max(1, Math.min(Math.floor(Number(limit) || 500), 5000));
     const anchor = endDate ?? new Date();
     const cutoff = new Date(anchor);
-    cutoff.setDate(cutoff.getDate() - Math.max(365, safeLimit * 3));
+    // Use safeLimit * 1.5 calendar-day lookback (300 sessions × 1.5 ≈ 450 days, well above the
+    // ~420 calendar days needed for 300 trading sessions).  The old safeLimit * 3 = 900 days
+    // pulled roughly 2× the needed rows, doubling BigInt-exposure and result-set size.
+    cutoff.setDate(cutoff.getDate() - Math.max(365, Math.ceil(safeLimit * 1.5)));
     const instrumentIdBySymbol = new Map(stocks.map((stock) => [stock.symbol, stock.id]));
     const symbols = stocks.map((stock) => stock.symbol);
     const prices: any[] = [];
+    // listPriceWindowsForSymbolChunk uses raw SQL with CAST(volume AS float8) to avoid
+    // the Prisma 6 NAPI crash that occurs when BigInt volume values (e.g. IDEA: 8.4B,
+    // GTLINFRA: 6.1B) are returned through the Rust→Node NAPI bridge.
     for (let offset = 0; offset < symbols.length; offset += RECENT_PRICE_WINDOW_SYMBOL_CHUNK_SIZE) {
       const symbolChunk = symbols.slice(offset, offset + RECENT_PRICE_WINDOW_SYMBOL_CHUNK_SIZE);
-      const timestampFilter: Record<string, Date> = { gte: cutoff };
-      if (endDate) timestampFilter['lte'] = endDate;
-      const chunkPrices = await this.repository.prisma.priceTick.findMany({
-        where: {
-          symbol: { in: symbolChunk },
-          timestamp: timestampFilter,
-        },
-        orderBy: [{ symbol: 'asc' }, { timestamp: 'desc' }],
-        select: {
-          symbol: true,
-          timestamp: true,
-          open: true,
-          high: true,
-          low: true,
-          close: true,
-          adjustedClose: true,
-          volume: true,
-          source: true,
-          ingestionTimestamp: true,
-          lastUpdatedTimestamp: true,
-          dataStatus: true,
-        },
-      });
+      const chunkPrices = await this.repository.listPriceWindowsForSymbolChunk(
+        symbolChunk,
+        cutoff,
+        endDate ?? null,
+      );
       prices.push(...chunkPrices);
     }
 

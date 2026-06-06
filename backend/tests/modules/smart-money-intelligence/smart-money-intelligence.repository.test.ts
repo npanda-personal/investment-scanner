@@ -223,6 +223,57 @@ describe('SmartMoneyIntelligenceRepository', () => {
     expect(db.smartMoneyContextSnapshot.upsert).not.toHaveBeenCalled();
   });
 
+  it('upserts on the (snapshotDate, instrumentId, range) key — second write for the same key updates in-place, not duplicate', async () => {
+    const upsertedRows: unknown[] = [];
+    const db = {
+      smartMoneyContextSnapshot: {
+        findUnique: jest.fn()
+          // first call: no existing row → triggers create path
+          .mockResolvedValueOnce(null)
+          // second call: returns the first write so we can compare
+          .mockResolvedValueOnce(snapshotRow({ smartMoneyScore: 72 })),
+        upsert: jest.fn().mockImplementation((args: any) => {
+          upsertedRows.push(args);
+          return Promise.resolve({ id: 'snapshot-1' });
+        }),
+      },
+    };
+    const repository = new SmartMoneyIntelligenceRepository(db as any);
+
+    const base = {
+      ...snapshotRow(),
+      updatedAt: snapshotDate.toISOString(),
+      range: '3M' as const,
+      signals: [],
+      insiderOwnership: null as any,
+      researchUrl: '/research/stocks/stock-1',
+      snapshotDate: '2026-05-25',
+      dataThroughDate: '2026-05-25',
+    };
+
+    // First write — no existing row → 'created'
+    const firstResult = await repository.saveSnapshot({ ...base, smartMoneyScore: 72 } as any);
+    expect(firstResult).toBe('created');
+    expect(upsertedRows).toHaveLength(1);
+
+    // Second write — same (snapshotDate, instrumentId, range) but changed score → 'updated'
+    const secondResult = await repository.saveSnapshot({ ...base, smartMoneyScore: 85 } as any);
+    expect(secondResult).toBe('updated');
+    expect(upsertedRows).toHaveLength(2);
+
+    // Both upserts target the same composite key — proving update-in-place semantics
+    const firstKey = (upsertedRows[0] as any).where.snapshotDate_instrumentId_range;
+    const secondKey = (upsertedRows[1] as any).where.snapshotDate_instrumentId_range;
+    expect(firstKey).toEqual(secondKey);
+    expect(firstKey).toEqual({ snapshotDate, instrumentId: 'stock-1', range: '3M' });
+
+    // The second upsert carries the updated score in its update payload
+    expect((upsertedRows[1] as any).update.smartMoneyScore).toBe(85);
+
+    // Only 2 upsert calls total — no phantom inserts
+    expect(db.smartMoneyContextSnapshot.upsert).toHaveBeenCalledTimes(2);
+  });
+
   it('does not rewrite unchanged JSON evidence when persisted key order differs', async () => {
     const signal = {
       type: 'UNUSUAL_VOLUME',

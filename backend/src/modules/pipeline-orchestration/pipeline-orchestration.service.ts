@@ -240,6 +240,17 @@ export class PipelineOrchestrationService {
     return this.repository.latestStages(query);
   }
 
+  /**
+   * Reap stale RUNNING leases.  Marks RUNNING pipeline_stage_runs and pipeline_runs as FAILED
+   * when their lease has expired OR their startedAt/updatedAt is older than staleThresholdMs.
+   * Safe to call concurrently and idempotently; only touches clearly-stale rows.
+   */
+  async reapStaleLeases(opts?: { staleThresholdMs?: number; now?: Date }): Promise<{ stageRowsReaped: number; runRowsReaped: number }> {
+    const staleThresholdMs = opts?.staleThresholdMs ?? this.reaperThresholdMs();
+    const now = opts?.now ?? new Date();
+    return this.repository.reapStaleLeases({ staleThresholdMs, now });
+  }
+
   async status(query: PipelineStatusQuery, now = new Date()): Promise<PipelineStatusSnapshot> {
     const [activeRun, lastRun, stages] = await Promise.all([
       this.repository.findActiveRun(query),
@@ -4402,6 +4413,13 @@ export class PipelineOrchestrationService {
   private activeStaleMs(): number {
     const configured = Number(process.env.PIPELINE_ACTIVE_STALE_MS);
     if (Number.isFinite(configured) && configured >= 60_000) return Math.floor(configured);
+    return DEFAULT_ACTIVE_STALE_MS;
+  }
+
+  private reaperThresholdMs(): number {
+    const configured = Number(process.env.PIPELINE_REAPER_THRESHOLD_MS);
+    if (Number.isFinite(configured) && configured >= 60_000) return Math.floor(configured);
+    // Default: 2 × lease duration (7200 s).  Any RUNNING row untouched for this long is stale.
     return DEFAULT_ACTIVE_STALE_MS;
   }
 

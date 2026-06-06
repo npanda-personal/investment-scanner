@@ -140,12 +140,10 @@ export class MarketContextIntelligenceService {
     return { status: 'success' };
   }
 
-  async summary(query: { region?: string } = {}): Promise<MarketContextSummary> {
-    const persisted = await this.repository.latestSnapshot(query.region);
-    if (persisted) return persisted;
-
-    await this.run(query.region);
-    return (await this.repository.latestSnapshot(query.region))!;
+  async summary(query: { region?: string } = {}): Promise<MarketContextSummary | null> {
+    // Persisted-read only. Never triggers a live run() on a GET.
+    // Generation stays behind POST /market-context/run + scheduled pipeline.
+    return this.repository.latestPersistedSnapshot(query.region);
   }
 
   async latestPersistedSummary(region?: string): Promise<MarketContextSummary | null> {
@@ -330,22 +328,23 @@ export class MarketContextIntelligenceService {
 
   async regime(region?: string) {
     const s = await this.summary({ region });
-    return s.regime;
+    return s?.regime ?? null;
   }
 
   async sectors(region?: string) {
     const s = await this.summary({ region });
+    if (!s) return [];
     return s.topSectors.concat(s.weakSectors);
   }
 
   async breadth(region?: string) {
     const s = await this.summary({ region });
-    return s.breadth;
+    return s?.breadth ?? null;
   }
 
   async countries(region?: string) {
     const s = await this.summary({ region });
-    return s.countryStrength;
+    return s?.countryStrength ?? [];
   }
 
   macro(): MacroSnapshot {

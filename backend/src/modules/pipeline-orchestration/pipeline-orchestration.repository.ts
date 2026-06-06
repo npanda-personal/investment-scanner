@@ -261,6 +261,88 @@ export class PipelineOrchestrationRepository {
     return rows.map((row: unknown) => this.toStageRecord(row));
   }
 
+  /**
+   * Reaps RUNNING pipeline_stage_runs whose lease has expired OR whose startedAt is older than
+   * staleThresholdMs, then reaps any pipeline_runs that are still RUNNING but have no remaining
+   * RUNNING stage children.  Only touches clearly-stale rows; never touches a row updated within
+   * the last staleThresholdMs milliseconds.  Safe to call concurrently: uses updateMany with
+   * precise WHERE guards.  Returns counts of reaped rows.
+   */
+  async reapStaleLeases(opts: {
+    staleThresholdMs: number;
+    now?: Date;
+    errorMessage?: string;
+  }): Promise<{ stageRowsReaped: number; runRowsReaped: number }> {
+    const now = opts.now ?? new Date();
+    const cutoff = new Date(now.getTime() - opts.staleThresholdMs);
+    const reaperError = opts.errorMessage ?? 'reaped: stale lease / interrupted run';
+    const completedAt = now;
+
+    // 1. Reap stale stage runs: RUNNING rows where lease has expired (leaseExpiresAt < now)
+    //    OR leaseExpiresAt is null AND startedAt < cutoff
+    //    AND updatedAt < cutoff (safety: don't touch anything recently touched)
+    const stageResult = await this.db.pipelineStageRun.updateMany({
+      where: {
+        status: 'RUNNING',
+        updatedAt: { lt: cutoff },
+        OR: [
+          { leaseExpiresAt: { lt: now } },
+          { leaseExpiresAt: null, startedAt: { lt: cutoff } },
+        ],
+      },
+      data: {
+        status: 'FAILED',
+        completedAt,
+        leaseOwner: null,
+        leaseExpiresAt: null,
+        errors: [reaperError],
+      },
+    });
+
+    // 2. Reap stale pipeline runs: RUNNING rows where updatedAt < cutoff AND there are no
+    //    longer any child stage rows still RUNNING (those were just reaped or were already gone).
+    //    We do this as a raw query to avoid N+1; Prisma's updateMany doesn't support subquery
+    //    existence checks, so we fetch candidate IDs first then update by ID list.
+    const candidateRuns = await this.db.pipelineRun.findMany({
+      where: {
+        status: 'RUNNING',
+        updatedAt: { lt: cutoff },
+      },
+      select: { id: true },
+    });
+
+    let runRowsReaped = 0;
+    if (candidateRuns.length > 0) {
+      const candidateIds = candidateRuns.map((r: { id: string }) => r.id);
+      // Find runs that still have at least one RUNNING stage child (not yet reaped / still active)
+      const stillActiveStages = await this.db.pipelineStageRun.findMany({
+        where: {
+          pipelineRunId: { in: candidateIds },
+          status: 'RUNNING',
+        },
+        select: { pipelineRunId: true },
+      });
+      const activeRunIds = new Set(stillActiveStages.map((s: { pipelineRunId: string }) => s.pipelineRunId));
+      const idsToReap = candidateIds.filter((id: string) => !activeRunIds.has(id));
+      if (idsToReap.length > 0) {
+        const runResult = await this.db.pipelineRun.updateMany({
+          where: {
+            id: { in: idsToReap },
+            status: 'RUNNING',
+          },
+          data: {
+            status: 'FAILED',
+            completedAt,
+            errors: [reaperError],
+          },
+        });
+        runRowsReaped = runResult.count;
+      }
+    }
+
+    return { stageRowsReaped: stageResult.count, runRowsReaped };
+  }
+
   async findActiveRun(query: Required<Pick<PipelineLatestStageQuery, 'region' | 'assetType' | 'timeframe' | 'pipelineKey'>>): Promise<PipelineRunRecord | null> {
     const row = await this.db.pipelineRun.findFirst({
       where: {

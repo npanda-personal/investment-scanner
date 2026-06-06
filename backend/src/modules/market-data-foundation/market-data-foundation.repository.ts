@@ -4509,6 +4509,81 @@ export class MarketDataFoundationRepository {
     });
   }
 
+  /**
+   * Fetch a batch of price rows for the given symbols using raw SQL so that the
+   * `volume` column is returned as a float8 (JavaScript `number`) rather than
+   * a JavaScript `BigInt`.
+   *
+   * Background: the Prisma schema declares `volume BigInt?`.  Prisma 6 returns
+   * `BigInt` native JS values for that column.  When any row in the result set
+   * carries a volume value that exceeds the safe-integer range (e.g. IDEA at
+   * 8.4 B or GTLINFRA at 6.1 B) the Rust NAPI bridge throws
+   * "Failed to convert rust String into napi string" and the entire `findMany`
+   * call crashes — even for the other ~100 symbols in the same batch that have
+   * perfectly normal volumes.  Using `CAST(volume AS float8)` at the SQL layer
+   * means Prisma never sees a BigInt in the result, avoiding the crash.
+   *
+   * The caller is responsible for chunking `symbols` to a safe size (≤ 50) to
+   * keep per-query result sets manageable and avoid pool exhaustion.
+   */
+  async listPriceWindowsForSymbolChunk(
+    symbols: string[],
+    cutoff: Date,
+    endDate: Date | null
+  ): Promise<Array<{
+    symbol: string;
+    timestamp: Date;
+    open: number;
+    high: number;
+    low: number;
+    close: number;
+    adjustedClose: number | null;
+    volume: number | null;
+    source: string | null;
+    ingestionTimestamp: Date;
+    lastUpdatedTimestamp: Date;
+    dataStatus: string;
+  }>> {
+    if (symbols.length === 0) return [];
+    // Prisma.join builds a safe parameterised IN list
+    const endFilter = endDate
+      ? Prisma.sql`AND pt."timestamp" <= ${endDate}`
+      : Prisma.sql``;
+    return this.prisma.$queryRaw<Array<{
+      symbol: string;
+      timestamp: Date;
+      open: number;
+      high: number;
+      low: number;
+      close: number;
+      adjustedClose: number | null;
+      volume: number | null;
+      source: string | null;
+      ingestionTimestamp: Date;
+      lastUpdatedTimestamp: Date;
+      dataStatus: string;
+    }>>(Prisma.sql`
+      SELECT
+        pt.symbol,
+        pt."timestamp",
+        pt.open::float8                AS open,
+        pt.high::float8                AS high,
+        pt.low::float8                 AS low,
+        pt.close::float8               AS close,
+        pt."adjustedClose"::float8     AS "adjustedClose",
+        CAST(pt.volume AS float8)      AS volume,
+        pt.source,
+        pt."ingestionTimestamp"        AS "ingestionTimestamp",
+        pt."lastUpdatedTimestamp"      AS "lastUpdatedTimestamp",
+        COALESCE(pt."dataStatus", 'COMPLETE') AS "dataStatus"
+      FROM price_ticks pt
+      WHERE pt.symbol IN (${Prisma.join(symbols)})
+        AND pt."timestamp" >= ${cutoff}
+        ${endFilter}
+      ORDER BY pt.symbol ASC, pt."timestamp" DESC
+    `);
+  }
+
   private keepExistingIfBlank<T>(next: T | null | undefined, current: T | null): T | null {
     if (typeof next === 'string' && next.trim().length === 0) return current;
     return next === null || next === undefined ? current : next;

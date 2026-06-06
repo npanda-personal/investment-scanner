@@ -5,6 +5,7 @@ import {
   startMarketDataStartupLoads,
 } from './modules/market-data-foundation/market-data-foundation.scheduler';
 import { startEodIngestScheduler } from './modules/market-context-intelligence/eod-ingest.scheduler';
+import { startPipelineReaperScheduler } from './modules/pipeline-orchestration/pipeline-orchestration.scheduler';
 
 export const createHttpServer = (): http.Server => {
   const app = createApp();
@@ -20,6 +21,7 @@ export const startServer = (port = appConfig.port): http.Server => {
       console.error('[MarketDataStartup] failed to start market-data startup loads', error);
     });
     startEodIngestScheduler();
+    startPipelineReaperScheduler();
   });
 
   return server;
