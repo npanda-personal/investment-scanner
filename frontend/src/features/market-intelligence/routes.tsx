@@ -12,6 +12,7 @@ import {
 import { DailyReviewShortlistPage } from './components/DailyReviewShortlistPage';
 import { SectorRotationPage } from './components/SectorRotationPage';
 import { MarketEventsPage } from './components/MarketEventsPage';
+import { IndexConstituentsPage } from './components/IndexConstituentsPage';
 
 export const marketIntelligenceRoutes: RouteObject[] = [
   { path: 'market-pulse', element: <MarketPulsePage /> },
@@ -24,6 +25,7 @@ export const marketIntelligenceRoutes: RouteObject[] = [
   { path: 'trader-setup-radar', element: <TraderSetupRadarPage /> },
   { path: 'risk-radar', element: <RiskRadarPage /> },
   { path: 'instrument-workspace', element: <InstrumentWorkspaceLandingPage /> },
+  { path: 'index-constituents', element: <IndexConstituentsPage /> },
   { path: 'indices', element: <MarketIntelligenceCompatibilityPage title="Indices Workspace" /> },
   { path: 'breadth', element: <MarketIntelligenceCompatibilityPage title="Breadth" /> },
   { path: 'institutional-flow', element: <MarketIntelligenceCompatibilityPage title="Institutional Flow" /> },

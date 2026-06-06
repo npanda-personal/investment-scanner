@@ -6,6 +6,7 @@ import { assembleInstrumentContext } from './instrument-context.service';
 import { MarketContextIntelligenceService } from '../market-context-intelligence/market-context-intelligence.service';
 import type { SectorSnapshotDto } from '../market-context-intelligence/market-context-intelligence.types';
 import { getEventFeed } from './event-feed.service';
+import { IndexConstituentsService } from './index-constituents.service';
 
 export type RotationQuadrant = 'LEADING' | 'IMPROVING' | 'WEAKENING' | 'LAGGING';
 
@@ -61,6 +62,7 @@ export class MarketIntelligenceController {
     private readonly stockInterestService = new StockInterestSnapshotService(),
     private readonly sectorConstituentsService = new SectorConstituentsService(),
     private readonly marketContextService = new MarketContextIntelligenceService(),
+    private readonly indexConstituentsService = new IndexConstituentsService(),
   ) {}
 
   stockInterest = async (req: Request, res: Response) => {
@@ -203,6 +205,29 @@ export class MarketIntelligenceController {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to assemble instrument context';
       return res.status(500).json({ status: 'error', message, context: null });
+    }
+  };
+
+  indexConstituents = async (req: Request, res: Response) => {
+    try {
+      res.setHeader('Cache-Control', 'no-store');
+      const index = typeof req.query.index === 'string' ? req.query.index : null;
+      const result = await this.indexConstituentsService.constituentsForIndex(index);
+      return res.json(result);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to load index constituents';
+      return res.status(500).json({
+        availability: 'ERROR',
+        index: req.query.index ?? '',
+        indexLabel: '',
+        membershipSource: 'CURATED_STATIC',
+        membershipAsOf: '',
+        constituents: [],
+        count: 0,
+        breadth: { total: 0, bullishCount: 0, bearishCount: 0, neutralCount: 0, noSignalCount: 0, headline: '0 of 0 members bullish' },
+        message,
+        warnings: [message],
+      });
     }
   };
 }

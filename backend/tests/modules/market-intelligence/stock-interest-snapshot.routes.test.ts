@@ -7,13 +7,14 @@ const routePaths = (router: any) =>
     .map((layer: any) => `${Object.keys(layer.route.methods)[0].toUpperCase()} ${layer.route.path}`);
 
 describe('market intelligence routes', () => {
-  it('registers the persisted read endpoints (stock-interest + sector-constituents + instrument-context + event-feed)', () => {
+  it('registers the persisted read endpoints (stock-interest + sector-constituents + instrument-context + event-feed + index-constituents)', () => {
     const router = createMarketIntelligenceRouter({
       stockInterest: jest.fn(),
       sectorConstituents: jest.fn(),
       sectorRotation: jest.fn(),
       eventFeed: jest.fn(),
       instrumentContext: jest.fn(),
+      indexConstituents: jest.fn(),
     } as any);
 
     expect(router.stack.filter((layer: any) => !layer.route)).toHaveLength(0);
@@ -23,6 +24,7 @@ describe('market intelligence routes', () => {
       'GET /market-intelligence/sector-rotation',
       'GET /market-intelligence/event-feed',
       'GET /market-intelligence/instrument-context/:instrumentId',
+      'GET /market-intelligence/index-constituents',
     ]);
   });
 });

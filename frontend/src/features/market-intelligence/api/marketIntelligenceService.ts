@@ -3,6 +3,7 @@ import type { MarketScope } from '@/contexts/MarketScopeContext';
 import type {
   CompounderSnapshot,
   EarningsIntelligenceSnapshot,
+  IndexConstituentsEnvelope,
   InstrumentContextSnapshot,
   MarketPulseSnapshot,
   RiskRadarSnapshot,
@@ -479,4 +480,60 @@ export async function fetchEventFeed(days: number = 5): Promise<EventFeedEnvelop
     params: { days },
   });
   return response.data;
+}
+
+// ─── Index Constituents (NR-103) ────────────────────────────────────────────
+
+export async function fetchIndexConstituents(index: string): Promise<IndexConstituentsEnvelope> {
+  try {
+    const response = await axios.get<IndexConstituentsEnvelope>(
+      `${API_BASE}/index-constituents`,
+      { params: { index } },
+    );
+    const body = response.data;
+    return {
+      availability: body.availability ?? 'ERROR',
+      index: body.index ?? index,
+      indexLabel: body.indexLabel ?? index,
+      membershipSource: body.membershipSource ?? 'CURATED_STATIC',
+      membershipAsOf: body.membershipAsOf ?? '',
+      constituents: (body.constituents ?? []).map((row) => ({
+        instrumentId: row.instrumentId ?? null,
+        symbol: row.symbol,
+        companyName: row.companyName ?? null,
+        sector: row.sector ?? null,
+        marketCap: typeof row.marketCap === 'number' ? row.marketCap : null,
+        latestPrice: typeof row.latestPrice === 'number' ? row.latestPrice : null,
+        latestPriceTimestamp: row.latestPriceTimestamp ?? null,
+        change1D: typeof row.change1D === 'number' ? row.change1D : null,
+        signalDirection: row.signalDirection ?? null,
+        signalScore: typeof row.signalScore === 'number' ? row.signalScore : null,
+      })),
+      count: body.count ?? 0,
+      breadth: body.breadth ?? {
+        total: 0,
+        bullishCount: 0,
+        bearishCount: 0,
+        neutralCount: 0,
+        noSignalCount: 0,
+        headline: '',
+      },
+      message: body.message ?? '',
+      warnings: body.warnings ?? [],
+    };
+  } catch (caught) {
+    const msg = errorMessage(caught, `Failed to load index constituents for ${index}.`);
+    return {
+      availability: 'ERROR',
+      index,
+      indexLabel: index,
+      membershipSource: 'CURATED_STATIC',
+      membershipAsOf: '',
+      constituents: [],
+      count: 0,
+      breadth: { total: 0, bullishCount: 0, bearishCount: 0, neutralCount: 0, noSignalCount: 0, headline: '' },
+      message: msg,
+      warnings: [msg],
+    };
+  }
 }

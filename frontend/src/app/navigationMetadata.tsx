@@ -16,6 +16,7 @@ import SyncAltIcon from '@mui/icons-material/SyncAlt';
 import FilterAltIcon from '@mui/icons-material/FilterAlt';
 import WorkspacesIcon from '@mui/icons-material/Workspaces';
 import EventNoteIcon from '@mui/icons-material/EventNote';
+import TableChartIcon from '@mui/icons-material/TableChart';
 
 export type NavItem = {
   path: string;
@@ -38,6 +39,7 @@ export const navGroups: NavGroup[] = [
     items: [
       { path: '/', label: 'Market Pulse', icon: <DashboardIcon />, aliases: ['/market-pulse'] },
       { path: '/sector-rotation', label: 'Sector Rotation', icon: <SyncAltIcon /> },
+      { path: '/index-constituents', label: 'Index Constituents', icon: <TableChartIcon /> },
       { path: '/market-events', label: 'Market Events', icon: <EventNoteIcon /> },
       { path: '/today-review', label: 'Daily Review', icon: <TodayIcon />, matchPrefixes: ['/today-review/'] },
       { path: '/daily-overview', label: 'Daily Overview', icon: <SpaceDashboardIcon /> },

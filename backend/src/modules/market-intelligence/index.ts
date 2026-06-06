@@ -1,4 +1,8 @@
 export { MarketIntelligenceController } from './market-intelligence.controller';
+export { IndexConstituentsRepository } from './index-constituents.repository';
+export { IndexConstituentsService } from './index-constituents.service';
+export type { IndexConstituentRow, IndexConstituentsEnvelope, IndexBreadthSummary, SupportedIndex } from './index-constituents.types';
+export { INDEX_SYMBOL_LISTS, INDEX_DISPLAY_LABELS, NIFTY_50_SYMBOLS, NIFTY_BANK_SYMBOLS, MEMBERSHIP_AS_OF } from './index-constituents.symbols';
 export { SectorConstituentsRepository } from './sector-constituents.repository';
 export { SectorConstituentsService } from './sector-constituents.service';
 export type { SectorConstituentRow } from './sector-constituents.repository';

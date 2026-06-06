@@ -278,3 +278,44 @@ export type MarketReadModelKey =
   | 'traderSetupRadar'
   | 'riskRadar'
   | 'instrumentContext';
+
+// ─── Index Constituents (NR-103) ────────────────────────────────────────────
+
+export type SupportedIndex = 'NIFTY_50' | 'NIFTY_BANK';
+
+export interface IndexConstituentRow {
+  instrumentId: string | null;
+  symbol: string;
+  companyName: string | null;
+  sector: string | null;
+  marketCap: number | null;
+  latestPrice: number | null;
+  latestPriceTimestamp: string | null;
+  change1D: number | null;
+  signalDirection: string | null;
+  signalScore: number | null;
+}
+
+export interface IndexBreadthSummary {
+  total: number;
+  bullishCount: number;
+  bearishCount: number;
+  neutralCount: number;
+  noSignalCount: number;
+  headline: string;
+}
+
+export type IndexConstituentsAvailability = 'READY' | 'PARTIAL' | 'EMPTY' | 'INVALID_PARAMS' | 'ERROR';
+
+export interface IndexConstituentsEnvelope {
+  availability: IndexConstituentsAvailability;
+  index: string;
+  indexLabel: string;
+  membershipSource: 'CURATED_STATIC';
+  membershipAsOf: string;
+  constituents: IndexConstituentRow[];
+  count: number;
+  breadth: IndexBreadthSummary;
+  message: string;
+  warnings: string[];
+}

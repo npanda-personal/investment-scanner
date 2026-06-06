@@ -8,6 +8,7 @@ export function createMarketIntelligenceRouter(controller = new MarketIntelligen
   router.get('/market-intelligence/sector-rotation', controller.sectorRotation);
   router.get('/market-intelligence/event-feed', controller.eventFeed);
   router.get('/market-intelligence/instrument-context/:instrumentId', controller.instrumentContext);
+  router.get('/market-intelligence/index-constituents', controller.indexConstituents);
   return router;
 }
 

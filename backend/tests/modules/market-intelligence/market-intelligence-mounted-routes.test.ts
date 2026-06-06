@@ -10,6 +10,7 @@ const mockLatestEarnings = jest.fn();
 const mockRefreshEarnings = jest.fn();
 const mockLatestStockInterest = jest.fn();
 const mockRefreshStockInterest = jest.fn();
+const mockIndexConstituentsForIndex = jest.fn();
 
 jest.mock('../../../src/modules/market-context-intelligence/market-context-intelligence.service', () => ({
   MarketContextIntelligenceService: jest.fn().mockImplementation(() => ({
@@ -46,6 +47,12 @@ jest.mock('../../../src/modules/market-intelligence/stock-interest-snapshot.serv
   StockInterestSnapshotService: jest.fn().mockImplementation(() => ({
     latestSnapshot: mockLatestStockInterest,
     refreshSnapshots: mockRefreshStockInterest,
+  })),
+}));
+
+jest.mock('../../../src/modules/market-intelligence/index-constituents.service', () => ({
+  IndexConstituentsService: jest.fn().mockImplementation(() => ({
+    constituentsForIndex: mockIndexConstituentsForIndex,
   })),
 }));
 
@@ -118,6 +125,18 @@ describe('mounted Market Intelligence read routes', () => {
       message: 'Persisted Stock Interest snapshot rows loaded.',
       warnings: [],
     });
+    mockIndexConstituentsForIndex.mockResolvedValue({
+      availability: 'READY',
+      index: 'NIFTY_50',
+      indexLabel: 'Nifty 50',
+      membershipSource: 'CURATED_STATIC',
+      membershipAsOf: '2026-01',
+      constituents: [],
+      count: 0,
+      breadth: { total: 50, bullishCount: 0, bearishCount: 0, neutralCount: 0, noSignalCount: 50, headline: '0 of 50 members bullish' },
+      message: 'Loaded 0 members of Nifty 50.',
+      warnings: [],
+    });
   });
 
   it('exposes all read-only Market Intelligence snapshot routes through the real mounted app without authentication', async () => {
@@ -128,15 +147,18 @@ describe('mounted Market Intelligence read routes', () => {
         '/api/v1/market-intelligence/market-pulse/history?region=IN&assetType=STOCK&timeframe=1d',
         '/api/v1/market-intelligence/earnings?region=IN&assetType=STOCK',
         '/api/v1/market-intelligence/stock-interest?region=IN&assetType=STOCK',
+        '/api/v1/market-intelligence/index-constituents?index=NIFTY_50',
       ];
 
       const responses = await Promise.all(paths.map((path) => getJson(baseUrl, path)));
 
-      expect(responses.map((response) => response.status)).toEqual([200, 200, 200, 200, 200]);
+      expect(responses.map((response) => response.status)).toEqual([200, 200, 200, 200, 200, 200]);
       expect(responses[0].body.status).toBe('ready');
       expect(responses[1].body.availability).toBe('READY');
       expect(responses[2].body.availability).toBe('READY');
       expect(responses[4].body.availability).toBe('READY');
+      expect(responses[5].body.availability).toBe('READY');
+      expect(responses[5].body.index).toBe('NIFTY_50');
     });
   });
 
