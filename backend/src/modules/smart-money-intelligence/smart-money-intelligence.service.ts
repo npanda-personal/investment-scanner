@@ -116,7 +116,10 @@ export class SmartMoneyIntelligenceService {
       for (const range of SMART_MONEY_REFRESH_RANGES) byRange[range].skipped += missingInstrumentSkipped;
     }
 
-    await Promise.all(instruments.map(async (instrument: any) => {
+    // Bound concurrency to <=4 so smart-money refresh stays within connection_limit=10
+    // even when running concurrently with other pipeline stages.
+    const SMART_MONEY_CONCURRENCY = 4;
+    await this.eachWithConcurrency(instruments, SMART_MONEY_CONCURRENCY, async (instrument: any) => {
       try {
         const [fullRangeBars, dataQuality] = await Promise.all([
           this.loadBars(instrument.id, '6M').catch(() => []),
@@ -156,7 +159,7 @@ export class SmartMoneyIntelligenceService {
       } catch (err: any) {
         errors.push(`Failed for ${instrument.id}: ${err.message}`);
       }
-    }));
+    });
 
     const processedCount = requestedCount;
     const nextOffset = offset + requestedCount < totalCount ? offset + requestedCount : null;
@@ -727,5 +730,18 @@ export class SmartMoneyIntelligenceService {
       source: 'not-configured',
       explanation: 'Free insider and institutional ownership provider is not configured for the MVP.',
     };
+  }
+
+  /** Run `worker` over `items` with at most `concurrency` items in-flight at once. */
+  private async eachWithConcurrency<T>(items: T[], concurrency: number, worker: (item: T) => Promise<void>): Promise<void> {
+    let index = 0;
+    const workerCount = Math.max(1, Math.min(concurrency, items.length));
+    await Promise.all(Array.from({ length: workerCount }, async () => {
+      while (index < items.length) {
+        const current = items[index];
+        index += 1;
+        await worker(current);
+      }
+    }));
   }
 }

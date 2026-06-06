@@ -45,4 +45,17 @@ export class PortfolioIntelligenceRepository {
     if (!row) return null;
     return row.payloadJson as unknown as PortfolioIntelligenceResponse;
   }
+
+  /**
+   * Return only the computedAt timestamp for a portfolio's snapshot,
+   * without parsing the full payloadJson.  Used by staleness guards.
+   * Returns null when no snapshot exists.
+   */
+  async findComputedAt(portfolioId: string): Promise<Date | null> {
+    const row = await prisma.portfolioIntelligenceSnapshot.findUnique({
+      where: { portfolioId },
+      select: { computedAt: true },
+    });
+    return row?.computedAt ?? null;
+  }
 }

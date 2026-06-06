@@ -262,11 +262,17 @@ export class PipelineOrchestrationRepository {
   }
 
   /**
-   * Reaps RUNNING pipeline_stage_runs whose lease has expired OR whose startedAt is older than
-   * staleThresholdMs, then reaps any pipeline_runs that are still RUNNING but have no remaining
-   * RUNNING stage children.  Only touches clearly-stale rows; never touches a row updated within
-   * the last staleThresholdMs milliseconds.  Safe to call concurrently: uses updateMany with
-   * precise WHERE guards.  Returns counts of reaped rows.
+   * Reaps RUNNING and stale-PENDING pipeline_stage_runs/pipeline_runs.
+   *
+   * RUNNING: marks stage_runs as FAILED when their lease has expired OR
+   *   startedAt/updatedAt is older than staleThresholdMs.
+   * PENDING: marks stage_runs as FAILED when they are still PENDING
+   *   (never started) and updatedAt/createdAt is older than staleThresholdMs.
+   *   Also reaps the parent pipeline_run when all its stage children are gone.
+   *
+   * Only touches clearly-stale rows; never touches a row updated within the last
+   * staleThresholdMs milliseconds.  Safe to call concurrently: uses updateMany
+   * with precise WHERE guards.  Returns counts of reaped rows.
    */
   async reapStaleLeases(opts: {
     staleThresholdMs: number;
@@ -278,10 +284,10 @@ export class PipelineOrchestrationRepository {
     const reaperError = opts.errorMessage ?? 'reaped: stale lease / interrupted run';
     const completedAt = now;
 
-    // 1. Reap stale stage runs: RUNNING rows where lease has expired (leaseExpiresAt < now)
+    // 1. Reap stale RUNNING stage runs: lease has expired (leaseExpiresAt < now)
     //    OR leaseExpiresAt is null AND startedAt < cutoff
     //    AND updatedAt < cutoff (safety: don't touch anything recently touched)
-    const stageResult = await this.db.pipelineStageRun.updateMany({
+    const runningStageResult = await this.db.pipelineStageRun.updateMany({
       where: {
         status: 'RUNNING',
         updatedAt: { lt: cutoff },
@@ -299,13 +305,29 @@ export class PipelineOrchestrationRepository {
       },
     });
 
-    // 2. Reap stale pipeline runs: RUNNING rows where updatedAt < cutoff AND there are no
-    //    longer any child stage rows still RUNNING (those were just reaped or were already gone).
-    //    We do this as a raw query to avoid N+1; Prisma's updateMany doesn't support subquery
-    //    existence checks, so we fetch candidate IDs first then update by ID list.
+    // 2. Reap stale PENDING stage runs: never started, older than staleThresholdMs.
+    const pendingStageResult = await this.db.pipelineStageRun.updateMany({
+      where: {
+        status: 'PENDING',
+        updatedAt: { lt: cutoff },
+        createdAt: { lt: cutoff },
+      },
+      data: {
+        status: 'FAILED',
+        completedAt,
+        errors: [reaperError],
+      },
+    });
+
+    const stageRowsReaped = runningStageResult.count + pendingStageResult.count;
+
+    // 3. Reap stale pipeline runs: RUNNING or PENDING rows where updatedAt < cutoff AND there
+    //    are no longer any child stage rows still RUNNING or PENDING (those were just reaped or
+    //    were already gone).  We do this as a two-step query to avoid N+1; Prisma's updateMany
+    //    doesn't support subquery existence checks, so we fetch candidate IDs first then update.
     const candidateRuns = await this.db.pipelineRun.findMany({
       where: {
-        status: 'RUNNING',
+        status: { in: ['RUNNING', 'PENDING'] },
         updatedAt: { lt: cutoff },
       },
       select: { id: true },
@@ -314,11 +336,11 @@ export class PipelineOrchestrationRepository {
     let runRowsReaped = 0;
     if (candidateRuns.length > 0) {
       const candidateIds = candidateRuns.map((r: { id: string }) => r.id);
-      // Find runs that still have at least one RUNNING stage child (not yet reaped / still active)
+      // Find runs that still have at least one RUNNING or PENDING stage child (not yet reaped)
       const stillActiveStages = await this.db.pipelineStageRun.findMany({
         where: {
           pipelineRunId: { in: candidateIds },
-          status: 'RUNNING',
+          status: { in: ['RUNNING', 'PENDING'] },
         },
         select: { pipelineRunId: true },
       });
@@ -328,7 +350,7 @@ export class PipelineOrchestrationRepository {
         const runResult = await this.db.pipelineRun.updateMany({
           where: {
             id: { in: idsToReap },
-            status: 'RUNNING',
+            status: { in: ['RUNNING', 'PENDING'] },
           },
           data: {
             status: 'FAILED',
@@ -340,7 +362,7 @@ export class PipelineOrchestrationRepository {
       }
     }
 
-    return { stageRowsReaped: stageResult.count, runRowsReaped };
+    return { stageRowsReaped, runRowsReaped };
   }
 
   async findActiveRun(query: Required<Pick<PipelineLatestStageQuery, 'region' | 'assetType' | 'timeframe' | 'pipelineKey'>>): Promise<PipelineRunRecord | null> {

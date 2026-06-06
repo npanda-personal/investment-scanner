@@ -54,24 +54,43 @@ export class PortfolioIntelligenceService {
   /**
    * PERSISTED-READ GET path (AUDIT-2).
    *
-   * Approach: pure persisted-read + refresh-on-holdings-change.
-   * - Returns the persisted snapshot immediately when available.
+   * Approach: pure persisted-read + refresh-on-holdings-change + staleness guard.
+   * - Returns the persisted snapshot immediately when the snapshot is fresh
+   *   (computedAt >= portfolio.updatedAt).
+   * - Belt-and-suspenders staleness guard: if the snapshot's computedAt is
+   *   OLDER than the portfolio's updatedAt (a holdings mutation landed after the
+   *   last refresh), recompute-and-persist once then serve the fresh result.
+   *   This catches any gap where the fire-and-forget hook in the mutation path
+   *   failed silently or has not yet completed.
    * - If no snapshot exists yet (first view), computes-and-persists once
    *   (lazy materialisation), then returns the persisted result.
-   * - Never recomputes when a fresh snapshot already exists.
    * - Callers that need a forced refresh invoke refreshPortfolioIntelligence().
    */
   async intelligence(portfolioId: string, userId = 'default-user'): Promise<PortfolioIntelligenceResponse | null> {
-    // 1. Happy path: serve persisted snapshot directly (no recomputation).
-    const cached = await this.repository.findByPortfolioId(portfolioId);
-    if (cached) return cached;
+    // 1. Fetch the snapshot computedAt cheaply (no JSONB parse) alongside the
+    //    portfolio's updatedAt so we can detect staleness in one pass.
+    const [computedAt, portfolio] = await Promise.all([
+      this.repository.findComputedAt(portfolioId),
+      this.portfolioService.getPortfolioDetail(portfolioId, userId),
+    ]);
 
-    // 2. Lazy materialisation: no snapshot yet — verify portfolio exists, then
-    //    compute-and-persist once so the next GET hits the fast path.
-    const exists = await this.portfolioService.summary(portfolioId, userId);
-    if (!exists) return null;
+    // 2. Portfolio doesn't exist — nothing to serve.
+    if (!portfolio) return null;
 
-    return this.refreshPortfolioIntelligence(portfolioId, userId);
+    // 3. No snapshot yet — lazy materialise.
+    if (computedAt === null) {
+      return this.refreshPortfolioIntelligence(portfolioId, userId);
+    }
+
+    // 4. Staleness guard: if the snapshot was computed BEFORE the last
+    //    holdings change (portfolio.updatedAt > computedAt), recompute.
+    const portfolioUpdatedAt = new Date(portfolio.portfolio.updatedAt);
+    if (portfolioUpdatedAt > computedAt) {
+      return this.refreshPortfolioIntelligence(portfolioId, userId);
+    }
+
+    // 5. Happy path: snapshot is fresh — serve it without recomputation.
+    return this.repository.findByPortfolioId(portfolioId);
   }
 
   /**

@@ -1288,6 +1288,118 @@ describe('SignalPositionLedgerService', () => {
     expect(signalService.enrichSignals).toHaveBeenNthCalledWith(1, [signalA, signalB], { includeStrategyMatches: true });
     expect(signalService.enrichSignals).toHaveBeenNthCalledWith(2, [signalD], { includeStrategyMatches: true });
   });
+
+  it('PATH B persists lifecycle entries for signals PATH A enriched-but-discarded (no ENTRY_CANDIDATE match)', async () => {
+    // signal-a: passes isTrustedSourceSignal → PATH A enriches it, but strategy returns WATCH
+    //           (not ENTRY_CANDIDATE) → PATH A discards it → PATH B must pick it up
+    // signal-b: passes isTrustedSourceSignal → PATH A enriches it AND strategy returns
+    //           ENTRY_CANDIDATE → PATH A publishes it → PATH B must NOT double-publish
+    const signalA = {
+      ...trustedSignal,
+      id: 'signal-a',
+      instrument_id: 'stock-a',
+      symbol: 'AAA',
+      company_name: 'AAA Co',
+      lifecycleState: 'ENTRY' as const,
+    };
+    const signalB = {
+      ...trustedSignal,
+      id: 'signal-b',
+      instrument_id: 'stock-b',
+      symbol: 'BBB',
+      company_name: 'BBB Co',
+      lifecycleState: 'ENTRY' as const,
+    };
+    // PATH A enrichment: signal-a gets WATCH (discarded), signal-b gets ENTRY_CANDIDATE (published)
+    const enrichedA = {
+      ...signalA,
+      strategyMatches: [{
+        ...trustedSignal.strategyMatches![0],
+        decision: 'WATCH' as const,
+        direction: 'BULLISH' as const,
+      }],
+      triggerContract: { ...sourceProvenTrigger, signal_id: 'signal-a', instrument_id: 'stock-a', symbol: 'AAA', strategy_id: 'BREAKOUT_CONFIRMATION' },
+    };
+    const enrichedB = {
+      ...signalB,
+      strategyMatches: [{
+        ...trustedSignal.strategyMatches![0],
+        decision: 'ENTRY_CANDIDATE' as const,
+        direction: 'BULLISH' as const,
+      }],
+      triggerContract: { ...sourceProvenTrigger, signal_id: 'signal-b', instrument_id: 'stock-b', symbol: 'BBB', strategy_id: 'BREAKOUT_CONFIRMATION' },
+    };
+
+    const repository = {
+      listAllLedgerRows: jest.fn()
+        .mockResolvedValueOnce([])   // ACTIVE seed
+        .mockResolvedValueOnce([]),  // CLOSED seed
+      listLatestSignals: jest.fn().mockResolvedValue({
+        items: [signalA, signalB],
+        totalCount: 2,
+        limit: 100,
+        offset: 0,
+        nextOffset: null,
+        hasMore: false,
+      }),
+      latestSnapshotsByInstrumentIds: jest.fn().mockResolvedValue(new Map([
+        ['stock-a', {
+          latestPrice: { date: new Date().toISOString(), close: 98, adjustedClose: 98, dataStatus: 'COMPLETE', source: 'database' },
+          quality: { signalReadinessStatus: 'READY', coverageStatus: 'GOOD', liquidityStatus: 'LIQUID', lastEvaluatedAt: new Date().toISOString() },
+          exitDecision: null,
+        }],
+        ['stock-b', {
+          latestPrice: { date: new Date().toISOString(), close: 105, adjustedClose: 105, dataStatus: 'COMPLETE', source: 'database' },
+          quality: { signalReadinessStatus: 'READY', coverageStatus: 'GOOD', liquidityStatus: 'LIQUID', lastEvaluatedAt: new Date().toISOString() },
+          exitDecision: null,
+        }],
+      ])),
+      priceAtDateBatch: jest.fn().mockResolvedValue(
+        // Only stock-a needs a lifecycle price — stock-b went via PATH A
+        new Map([['stock-a', {
+          date: '2026-05-26T00:00:00.000Z',
+          close: 95,
+          adjustedClose: 95,
+          dataStatus: 'COMPLETE',
+          source: 'database',
+        }]]),
+      ),
+      upsertActiveLedgerRow: jest.fn(),
+      closeLedgerRow: jest.fn(),
+    };
+    const signalService = {
+      enrichSignals: jest.fn().mockResolvedValue([enrichedA, enrichedB]),
+    };
+    const service = new SignalPositionLedgerService(repository as any, signalService as any);
+    const query = { region: 'IN', assetType: 'STOCK', limit: 25, offset: 0 };
+
+    await service.refreshActiveRows(query, { force: true, wait: true });
+    const result = await service.listActiveRows(query);
+
+    // Both instruments must produce a ledger row
+    expect(result.totalCount).toBe(2);
+    const symbols = result.items.map((r) => r.symbol).sort();
+    expect(symbols).toEqual(['AAA', 'BBB']);
+
+    // PATH B row (AAA): the lifecycle trigger contract has strategy_id=null (no live strategy eval ran).
+    // The raw signal still carries its strategyMatches but the trigger itself is sourcePriceDate-derived.
+    const rowA = result.items.find((r) => r.symbol === 'AAA')!;
+    expect(rowA.strategyId).toBeNull();          // trigger_contract.strategy_id is null for PATH B
+    expect(rowA.strategyVersion).toBeNull();     // trigger_contract.strategy_version is null for PATH B
+    expect(rowA.entryRuleId).toBeNull();         // trigger_contract.entry_rule_id is null for PATH B
+    expect(rowA.entryTriggerPrice).toBe(95);
+    expect(rowA.triggerType).toBe('bullish_entry_trigger');
+
+    // PATH A row (BBB): strategy decision present
+    const rowB = result.items.find((r) => r.symbol === 'BBB')!;
+    expect(rowB.strategyDecision).toBe('ENTRY_CANDIDATE');
+    expect(rowB.strategyId).toBe('BREAKOUT_CONFIRMATION');
+
+    // Exactly 2 upsert calls — no double-persistence
+    expect(repository.upsertActiveLedgerRow).toHaveBeenCalledTimes(2);
+    const upsertedInstruments = repository.upsertActiveLedgerRow.mock.calls.map(([row]: [any]) => row.instrumentId);
+    expect(upsertedInstruments.sort()).toEqual(['stock-a', 'stock-b']);
+  });
 });
 
 // ---------------------------------------------------------------------------

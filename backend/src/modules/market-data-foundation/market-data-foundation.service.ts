@@ -1078,21 +1078,22 @@ export class MarketDataFoundationService {
 
     const db = this.repository.prisma;
 
-    // Delete all existing rows for this tradingDate + scope (replace semantics)
-    await (db as any).marketScanSnapshot.deleteMany({
-      where: {
-        region: scope.region,
-        assetType: scope.assetType,
-        tradingDate,
-      },
-    });
-
-    // Batch insert (sequential chunks to keep pool-safe)
+    // Atomic replace: delete + chunked insert run inside a single transaction so
+    // concurrent GETs never see an empty/torn snapshot between the two operations.
     const CHUNK = 200;
-    for (let i = 0; i < allRows.length; i += CHUNK) {
-      const chunk = allRows.slice(i, i + CHUNK);
-      await (db as any).marketScanSnapshot.createMany({ data: chunk });
-    }
+    await (db as any).$transaction(async (tx: any) => {
+      await tx.marketScanSnapshot.deleteMany({
+        where: {
+          region: scope.region,
+          assetType: scope.assetType,
+          tradingDate,
+        },
+      });
+      for (let i = 0; i < allRows.length; i += CHUNK) {
+        const chunk = allRows.slice(i, i + CHUNK);
+        await tx.marketScanSnapshot.createMany({ data: chunk });
+      }
+    });
 
     const scanTypes = [...new Set(allRows.map((r) => r.scanType))];
     return {

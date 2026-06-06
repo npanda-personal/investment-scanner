@@ -561,34 +561,10 @@ export class SignalPositionLedgerService {
           ? await this.signalService.enrichSignals(trusted, { includeStrategyMatches: true })
           : [];
 
-        // PATH B — lifecycle-entry path.
-        // For BULLISH signals with lifecycleState=ENTRY (fresh entry) or ACTIVE (ongoing
-        // tracked position not yet in the ledger) that did NOT produce a valid candidate
-        // via PATH A, build a trigger contract from the persisted price at the signal's
-        // sourcePriceDate.  This covers the full ACTIVE+ENTRY universe without live
-        // strategy re-evaluation.  Signals already represented in state.rows (either
-        // loaded from DB or added by PATH A) are excluded to avoid double-processing.
-        const enrichedIds = new Set(enriched.map((s) => s.instrument_id));
-        const alreadyInLedger = new Set([...state.rows.keys(), ...state.closedRows.keys()]);
-        // Use instrumentId for ledger membership check since ledgerKey is different.
-        const ledgerInstruments = new Set([
-          ...[...state.rows.values()].map((r) => r.instrumentId),
-          ...[...state.closedRows.values()].map((r) => r.instrumentId),
-        ]);
-        void alreadyInLedger; // suppress unused warning — using ledgerInstruments instead
-        const lifecycleEntryCandidates = page.items.filter(
-          (signal) => (signal.lifecycleState === 'ENTRY' || signal.lifecycleState === 'ACTIVE')
-            && signal.direction === 'BULLISH'
-            && signal.auditStatus === 'CURRENT'
-            && (signal.dataQualityEligibility?.eligible === true)
-            && !enrichedIds.has(signal.instrument_id)
-            && !ledgerInstruments.has(signal.instrument_id),
-        );
-        const lifecycleTriggerContracts = await this.buildLifecycleTriggerContracts(lifecycleEntryCandidates, query);
-
         const candidates: SignalPositionLedgerActiveCandidate[] = [];
 
-        // Collect PATH A candidates.
+        // Collect PATH A candidates first so we know which instruments PATH A published
+        // before deciding PATH B eligibility below.
         for (const signal of enriched) {
           if (!this.isTrustedEnrichedSignal(signal)) {
             state.skippedCount += 1;
@@ -605,6 +581,35 @@ export class SignalPositionLedgerService {
           }
           candidates.push({ signal, triggerContract: trigger });
         }
+
+        // PATH B — lifecycle-entry path.
+        // For BULLISH signals with lifecycleState=ENTRY (fresh entry) or ACTIVE (ongoing
+        // tracked position not yet in the ledger) that did NOT produce a valid candidate
+        // via PATH A, build a trigger contract from the persisted price at the signal's
+        // sourcePriceDate.  This covers the full ACTIVE+ENTRY universe without live
+        // strategy re-evaluation.  Signals already represented in state.rows (either
+        // loaded from DB or added by PATH A) are excluded to avoid double-processing.
+        //
+        // IMPORTANT: only exclude instruments PATH A actually PUBLISHED (pushed into
+        // `candidates`), not the full enriched set.  PATH A enriches all trusted signals
+        // but only publishes those with an ENTRY_CANDIDATE strategy match; signals that
+        // were enriched-but-discarded (no ENTRY_CANDIDATE) must still be eligible for
+        // PATH B so the full lifecycle-ENTRY/ACTIVE universe is covered.
+        const pathAPublishedIds = new Set(candidates.map((c) => c.signal.instrument_id));
+        // Use instrumentId for ledger membership check since ledgerKey is different.
+        const ledgerInstruments = new Set([
+          ...[...state.rows.values()].map((r) => r.instrumentId),
+          ...[...state.closedRows.values()].map((r) => r.instrumentId),
+        ]);
+        const lifecycleEntryCandidates = page.items.filter(
+          (signal) => (signal.lifecycleState === 'ENTRY' || signal.lifecycleState === 'ACTIVE')
+            && signal.direction === 'BULLISH'
+            && signal.auditStatus === 'CURRENT'
+            && (signal.dataQualityEligibility?.eligible === true)
+            && !pathAPublishedIds.has(signal.instrument_id)
+            && !ledgerInstruments.has(signal.instrument_id),
+        );
+        const lifecycleTriggerContracts = await this.buildLifecycleTriggerContracts(lifecycleEntryCandidates, query);
 
         // Collect PATH B candidates.
         for (const signal of lifecycleEntryCandidates) {

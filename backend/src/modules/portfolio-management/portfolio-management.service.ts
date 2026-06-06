@@ -64,18 +64,53 @@ export class PortfolioManagementService {
     this.throwIfErrors(validateHoldingInput(input));
     const instrument = await this.marketDataService.getInstrument(input.instrumentId);
     if (!instrument) throw new Error('Instrument not found');
-    return this.repository.addHolding(portfolioId, input, instrument);
+    const result = await this.repository.addHolding(portfolioId, input, instrument);
+    // Fire-and-forget: refresh the intelligence snapshot so it reflects the new holding.
+    // Errors are swallowed — this must never break the mutation.
+    this.triggerIntelligenceRefresh(portfolioId, userId);
+    return result;
   }
 
   async updateHolding(portfolioId: string, holdingId: string, input: UpdateHoldingRequest, userId = 'default-user') {
     await this.requirePortfolio(portfolioId, userId);
     this.throwIfErrors(validateHoldingInput(input, true));
-    return this.repository.updateHolding(portfolioId, holdingId, input);
+    const result = await this.repository.updateHolding(portfolioId, holdingId, input);
+    // Fire-and-forget: refresh the intelligence snapshot so it reflects the updated holding.
+    this.triggerIntelligenceRefresh(portfolioId, userId);
+    return result;
   }
 
   async removeHolding(portfolioId: string, holdingId: string, userId = 'default-user') {
     await this.requirePortfolio(portfolioId, userId);
-    return this.repository.removeHolding(portfolioId, holdingId);
+    const result = await this.repository.removeHolding(portfolioId, holdingId);
+    // Fire-and-forget: refresh the intelligence snapshot so it reflects the removed holding.
+    this.triggerIntelligenceRefresh(portfolioId, userId);
+    return result;
+  }
+
+  /**
+   * Fire-and-forget intelligence snapshot refresh after a holdings mutation.
+   *
+   * Cycle-safe: does NOT static-import the portfolio-intelligence module.
+   * Instead it lazy-requires the specific service file at call time so the
+   * module graph stays acyclic (same pattern as portfolio-intelligence.service.ts
+   * uses for capital-posture.service).
+   *
+   * Any error is caught and logged — this must never propagate to the caller.
+   */
+  private triggerIntelligenceRefresh(portfolioId: string, userId: string): void {
+    Promise.resolve().then(async () => {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const { PortfolioIntelligenceService } = require('../portfolio-intelligence/portfolio-intelligence.service') as {
+          PortfolioIntelligenceService: new () => { refreshPortfolioIntelligence(portfolioId: string, userId: string): Promise<unknown> };
+        };
+        await new PortfolioIntelligenceService().refreshPortfolioIntelligence(portfolioId, userId);
+      } catch (err) {
+        // Swallow — intelligence refresh failure must not break holding mutations.
+        console.error('[portfolio-management] intelligence refresh failed (non-fatal):', err);
+      }
+    });
   }
 
   async summary(portfolioId: string, userId = 'default-user'): Promise<PortfolioSummaryDto | null> {

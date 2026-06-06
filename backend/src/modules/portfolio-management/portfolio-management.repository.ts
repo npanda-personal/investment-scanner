@@ -76,6 +76,9 @@ export class PortfolioManagementRepository {
         notes: input.notes ?? null,
       },
     });
+    // Touch portfolio.updatedAt so staleness guards elsewhere can compare it
+    // against intelligence snapshot computedAt.
+    await this.db.portfolio.update({ where: { id: portfolioId }, data: { updatedAt: new Date() } });
     return this.toHoldingDto(holding);
   }
 
@@ -91,11 +94,21 @@ export class PortfolioManagementRepository {
         notes: input.notes,
       },
     });
+    // Touch portfolio.updatedAt so staleness guards elsewhere can compare it
+    // against intelligence snapshot computedAt.
+    await this.db.portfolio.update({ where: { id: portfolioId }, data: { updatedAt: new Date() } });
     return this.toHoldingDto(holding);
   }
 
   async removeHolding(portfolioId: string, holdingId: string): Promise<void> {
+    // Resolve portfolioId from the holding row before deletion so we can touch updatedAt.
+    const existing = await this.db.portfolioHolding.findFirst({ where: { id: holdingId, portfolioId }, select: { portfolioId: true } });
     await this.db.portfolioHolding.deleteMany({ where: { id: holdingId, portfolioId } });
+    if (existing) {
+      // Touch portfolio.updatedAt so staleness guards elsewhere can compare it
+      // against intelligence snapshot computedAt.
+      await this.db.portfolio.update({ where: { id: existing.portfolioId }, data: { updatedAt: new Date() } });
+    }
   }
 
   async listTransactions(portfolioId: string): Promise<PortfolioTransactionDto[]> {

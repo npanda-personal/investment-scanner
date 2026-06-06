@@ -75,6 +75,7 @@ const MARKET_CONTEXT_SNAPSHOT_SCHEDULED_STAGE_VERSION = 'scheduled-market-contex
 const MARKET_PULSE_SCHEDULED_STAGE_VERSION = 'scheduled-market-pulse-v1';
 const STOCK_INTEREST_SCHEDULED_STAGE_VERSION = 'scheduled-stock-interest-v1';
 const WORKBENCH_REFRESH_SCHEDULED_STAGE_VERSION = 'scheduled-workbench-refresh-v1';
+const MARKET_SCAN_REFRESH_SCHEDULED_STAGE_VERSION = 'scheduled-market-scan-refresh-v1';
 const SCHEDULED_DOWNSTREAM_STAGE_KEYS = [
   'DATA_QUALITY',
   'RAW_SIGNALS',
@@ -251,8 +252,10 @@ export class PipelineOrchestrationService {
   }
 
   /**
-   * Reap stale RUNNING leases.  Marks RUNNING pipeline_stage_runs and pipeline_runs as FAILED
-   * when their lease has expired OR their startedAt/updatedAt is older than staleThresholdMs.
+   * Reap stale RUNNING and PENDING rows.  Marks RUNNING pipeline_stage_runs/pipeline_runs as
+   * FAILED when their lease has expired or startedAt/updatedAt is older than staleThresholdMs.
+   * Also marks PENDING stage_runs/pipeline_runs that never started (older than staleThresholdMs)
+   * as FAILED so they don't accumulate indefinitely.
    * Safe to call concurrently and idempotently; only touches clearly-stale rows.
    */
   async reapStaleLeases(opts?: { staleThresholdMs?: number; now?: Date }): Promise<{ stageRowsReaped: number; runRowsReaped: number }> {
@@ -4326,6 +4329,47 @@ export class PipelineOrchestrationService {
       };
     }, now);
 
+    if (response.status === 'COMPLETED' || response.status === 'PARTIAL' || response.status === 'SKIPPED') {
+      response.downstream = await this.runScheduledMarketScanRefreshStage({
+        ...request,
+        sourceFingerprint: response.outputFingerprint || request.sourceFingerprint,
+        upstreamStageRunId: response.stageRunId,
+      }, now).catch((error) => this.logScheduledDownstreamFailure('Market Scan Refresh', response.stageKey, request, error));
+    }
+    return response;
+  }
+
+  async runScheduledMarketScanRefreshStage(request: ScheduledPipelineStageRequest, now = new Date()): Promise<ScheduledPipelineStageResponse> {
+    const response = await this.runScheduledPipelineStage(request, {
+      stageKey: 'MARKET_SCAN_REFRESH',
+      stageOrder: 18,
+      stageSlug: 'scheduled-market-scan-refresh',
+      stageVersion: MARKET_SCAN_REFRESH_SCHEDULED_STAGE_VERSION,
+      sourceStage: 'WORKBENCH_REFRESH',
+      adapter: 'MarketDataFoundationService.refreshMarketScanSnapshots',
+    }, async ({ normalizedScope }) => {
+      const result = await this.marketDataService.refreshMarketScanSnapshots({
+        region: normalizedScope.region,
+        assetType: normalizedScope.assetType,
+        now,
+      });
+      return {
+        totalCount: result.totalInserted,
+        processedCount: result.totalInserted,
+        succeededCount: result.totalInserted,
+        failedCount: result.errors.length,
+        skippedCount: 0,
+        unchangedCount: 0,
+        warnings: result.warnings,
+        errors: result.errors,
+        metadata: {
+          tradingDate: result.tradingDate,
+          totalInserted: result.totalInserted,
+          scanTypes: result.scanTypes,
+        },
+      };
+    }, now);
+
     return response;
   }
 
@@ -4724,7 +4768,7 @@ export class PipelineOrchestrationService {
   private reaperThresholdMs(): number {
     const configured = Number(process.env.PIPELINE_REAPER_THRESHOLD_MS);
     if (Number.isFinite(configured) && configured >= 60_000) return Math.floor(configured);
-    // Default: 2 × lease duration (7200 s).  Any RUNNING row untouched for this long is stale.
+    // Default: 2 × lease duration (1200 s / 20 min).  Any RUNNING row untouched for this long is stale.
     return DEFAULT_ACTIVE_STALE_MS;
   }
 

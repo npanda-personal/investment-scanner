@@ -3382,6 +3382,13 @@ describe('PipelineOrchestrationService', () => {
       errors: [],
       categories: {},
     });
+    const marketScanRefresh = jest.fn().mockResolvedValue({
+      tradingDate: '2026-05-25',
+      totalInserted: 6,
+      scanTypes: ['movers-1d', 'movers-5d', 'movers-1m', '52w-high', '52w-low', 'volume-spike'],
+      warnings: [],
+      errors: [],
+    });
     const service = new PipelineOrchestrationService(
       repository as any,
       { evaluateScheduledStage, evaluate: jest.fn() } as any,
@@ -3395,7 +3402,7 @@ describe('PipelineOrchestrationService', () => {
       { refreshOverview: researchRefresh } as any,
       { run: todayReviewRun } as any,
       { refreshActiveRows: ledgerRefresh } as any,
-      {} as any,
+      { refreshMarketScanSnapshots: marketScanRefresh } as any,
       { refreshSnapshot: marketPulseRefresh } as any,
       { refreshSnapshots: earningsRefresh } as any,
       { refreshSnapshots: stockInterestRefresh } as any,
@@ -3442,6 +3449,7 @@ describe('PipelineOrchestrationService', () => {
       'MARKET_PULSE_REFRESH',
       'STOCK_INTEREST_REFRESH',
       'WORKBENCH_REFRESH',
+      'MARKET_SCAN_REFRESH',
     ]);
     expect(evaluateScheduledStage).toHaveBeenCalledTimes(1);
     expect(signalRun).toHaveBeenCalledTimes(1);
