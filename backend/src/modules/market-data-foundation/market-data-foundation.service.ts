@@ -15156,6 +15156,74 @@ export class MarketDataFoundationService {
     };
   }
 
+  // ---------------------------------------------------------------------------
+  // Multi-Factor Screener
+  // ---------------------------------------------------------------------------
+
+  async screener(options: {
+    signalDirection?: string;
+    minScore?: number;
+    minRsPercentile?: number;
+    sector?: string;
+    capBand?: 'LARGE' | 'MID' | 'SMALL';
+    minDeliveryPct?: number;
+    min52wPositionPct?: number;
+    excludeFnoBan?: boolean;
+    limit?: number;
+  } = {}): Promise<{
+    generatedAt: string;
+    count: number;
+    results: Array<{
+      instrumentId: string;
+      symbol: string;
+      companyName: string;
+      price: number | null;
+      signalDirection: string | null;
+      signalScore: number | null;
+      rsPercentile: number | null;
+      sector: string | null;
+      capBand: string | null;
+      deliveryPct: number | null;
+      range52wPositionPct: number | null;
+      inFnoBan: boolean;
+    }>;
+    warnings: string[];
+  }> {
+    const rows = await this.repository.screener(options);
+
+    // Compute rs percentile in-memory from the score distribution in the result set
+    const scores = rows.map((r) => r.signalScore ?? 0);
+    const n = scores.length;
+    const withRs = rows.map((r) => {
+      if (n < 2) return { ...r, rsPercentile: null };
+      const score = r.signalScore ?? 0;
+      const sortedScores = [...scores].sort((a, b) => a - b);
+      let lo = 0, hi = sortedScores.length;
+      while (lo < hi) {
+        const mid = (lo + hi) >> 1;
+        if (sortedScores[mid] < score) lo = mid + 1; else hi = mid;
+      }
+      return { ...r, rsPercentile: Math.round((lo / (n - 1)) * 100) };
+    });
+
+    // Apply minRsPercentile post-query filter
+    const results = options.minRsPercentile != null
+      ? withRs.filter((r) => r.rsPercentile != null && r.rsPercentile >= options.minRsPercentile!)
+      : withRs;
+
+    const warnings: string[] = [];
+    if (results.length === 0) {
+      warnings.push('No stocks match the current filter combination. Try relaxing one or more criteria.');
+    }
+
+    return {
+      generatedAt: new Date().toISOString(),
+      count: results.length,
+      results,
+      warnings,
+    };
+  }
+
   private normalizePair(pair: string): string {
     const stripped = pair.replace('/', '').toUpperCase();
     return `${stripped.slice(0, 3)}/${stripped.slice(3, 6)}`;

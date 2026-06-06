@@ -1482,6 +1482,47 @@ export interface CorporateActionsResponse {
 }
 
 // ---------------------------------------------------------------------------
+// Multi-Factor Screener
+// ---------------------------------------------------------------------------
+
+export type ScreenerCapBand = 'LARGE' | 'MID' | 'SMALL';
+export type ScreenerSignalDirection = 'BULLISH' | 'BEARISH' | 'NEUTRAL';
+
+export interface ScreenerFilters {
+  signalDirection?: ScreenerSignalDirection;
+  minScore?: number;
+  minRsPercentile?: number;
+  sector?: string;
+  capBand?: ScreenerCapBand;
+  minDeliveryPct?: number;
+  min52wPositionPct?: number;
+  excludeFnoBan?: boolean;
+  limit?: number;
+}
+
+export interface ScreenerRow {
+  instrumentId: string;
+  symbol: string;
+  companyName: string;
+  price: number | null;
+  signalDirection: 'BULLISH' | 'BEARISH' | 'NEUTRAL' | null;
+  signalScore: number | null;
+  rsPercentile: number | null;
+  sector: string | null;
+  capBand: ScreenerCapBand | null;
+  deliveryPct: number | null;
+  range52wPositionPct: number | null;
+  inFnoBan: boolean;
+}
+
+export interface ScreenerResult {
+  generatedAt: string;
+  count: number;
+  results: ScreenerRow[];
+  warnings: string[];
+}
+
+// ---------------------------------------------------------------------------
 // Market Scans
 // ---------------------------------------------------------------------------
 

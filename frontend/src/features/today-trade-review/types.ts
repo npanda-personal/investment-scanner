@@ -167,6 +167,21 @@ export interface TodayReviewCandidate {
   range52wLow?: number | null;
   /** Latest adjusted close used for the range position (read-time). */
   range52wCurrentClose?: number | null;
+  /**
+   * NR-100: Whether the symbol is on the latest F&O ban list, joined at READ time.
+   * False/absent = not in ban (honest default).
+   */
+  inFnoBan?: boolean;
+  /**
+   * NR-101: Smart-money status from latest 3M snapshot, joined at READ time.
+   * Null when no snapshot exists for this instrument.
+   */
+  smartMoneyStatus?: 'ACCUMULATION' | 'DISTRIBUTION' | 'NEUTRAL' | null;
+  /**
+   * NR-101: Smart-money score (0–100) from the same snapshot.
+   * Null when no snapshot exists.
+   */
+  smartMoneyScore?: number | null;
   createdAt: string;
   updatedAt: string;
 }

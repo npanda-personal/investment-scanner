@@ -578,6 +578,8 @@ function CandidateTable({ candidates, run }: { candidates: TodayReviewCandidate[
             </Link>
           </Tooltip>
           <EarningsProximityChip earningsProximity={candidate.earningsProximity} />
+          <FnoBanChip inFnoBan={candidate.inFnoBan} />
+          <SmartMoneyChip status={candidate.smartMoneyStatus} score={candidate.smartMoneyScore} />
           <RangePositionIndicator candidate={candidate} />
         </Stack>
       ),
@@ -1052,6 +1054,62 @@ function EarningsProximityChip({ earningsProximity }: { earningsProximity?: Toda
         sx={{
           bgcolor: 'warning.light',
           color: 'warning.contrastText',
+          fontWeight: 700,
+          fontSize: 10,
+          height: 18,
+          '& .MuiChip-label': { px: 0.75 },
+        }}
+      />
+    </Tooltip>
+  );
+}
+
+/**
+ * NR-100: Small amber "F&O Ban" chip — shown only when inFnoBan is true.
+ * Derivatives trading is restricted for this symbol (OI > 95% MWPL).
+ */
+function FnoBanChip({ inFnoBan }: { inFnoBan?: boolean }) {
+  if (!inFnoBan) return null;
+  return (
+    <Tooltip
+      title="F&O ban: this symbol's derivatives open-interest has crossed 95% of the market-wide position limit. New F&O positions are restricted until OI drops below the threshold — elevated derivatives risk."
+      arrow
+      enterDelay={200}
+    >
+      <Chip
+        label="F&O Ban"
+        size="small"
+        sx={{
+          bgcolor: 'warning.main',
+          color: 'warning.contrastText',
+          fontWeight: 700,
+          fontSize: 10,
+          height: 18,
+          '& .MuiChip-label': { px: 0.75 },
+        }}
+      />
+    </Tooltip>
+  );
+}
+
+/**
+ * NR-101: Small chip showing the smart-money accumulation/distribution status.
+ * Green for ACCUMULATION, red for DISTRIBUTION. Renders "—" (absent) when no snapshot.
+ */
+function SmartMoneyChip({ status, score }: { status?: 'ACCUMULATION' | 'DISTRIBUTION' | 'NEUTRAL' | null; score?: number | null }) {
+  if (!status) return null;
+  const label = status === 'ACCUMULATION' ? 'Accumulation' : status === 'DISTRIBUTION' ? 'Distribution' : 'Neutral';
+  const scoreText = typeof score === 'number' ? ` (${score})` : '';
+  const tooltipText = `Smart-money: ${label}${scoreText} — derived from price-volume analysis of the latest 3-month snapshot. Research-support context only.`;
+  const bgColor = status === 'ACCUMULATION' ? 'success.main' : status === 'DISTRIBUTION' ? 'error.main' : 'text.secondary';
+  return (
+    <Tooltip title={tooltipText} arrow enterDelay={200}>
+      <Chip
+        label={`SM: ${label}${scoreText}`}
+        size="small"
+        sx={{
+          bgcolor: bgColor,
+          color: '#fff',
           fontWeight: 700,
           fontSize: 10,
           height: 18,

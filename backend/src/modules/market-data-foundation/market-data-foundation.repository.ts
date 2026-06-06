@@ -4302,6 +4302,213 @@ export class MarketDataFoundationRepository {
     return rows;
   }
 
+  // ---------------------------------------------------------------------------
+  // Multi-Factor Screener
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Multi-factor stock screener.
+   * All filters are combinable; every field is honest-null when its source is absent.
+   * Entirely persisted-read — no generation on GET.
+   *
+   * Cap-band thresholds (1 Cr = 1e7 INR, stocks.marketCap stored in INR):
+   *   LARGE  >= 20 000 Cr (2e11)
+   *   MID    5 000–20 000 Cr (5e10–2e11)
+   *   SMALL  <  5 000 Cr (<5e10)
+   */
+  async screener(options: {
+    signalDirection?: string;
+    minScore?: number;
+    minRsPercentile?: number;
+    sector?: string;
+    capBand?: 'LARGE' | 'MID' | 'SMALL';
+    minDeliveryPct?: number;
+    min52wPositionPct?: number;
+    excludeFnoBan?: boolean;
+    limit?: number;
+  }): Promise<Array<{
+    instrumentId: string;
+    symbol: string;
+    companyName: string;
+    price: number | null;
+    signalDirection: string | null;
+    signalScore: number | null;
+    rsPercentile: number | null;
+    sector: string | null;
+    capBand: string | null;
+    deliveryPct: number | null;
+    range52wPositionPct: number | null;
+    inFnoBan: boolean;
+  }>> {
+    const rowLimit = Math.max(1, Math.min(options.limit ?? 50, 500));
+    const LARGE_CAP_THRESHOLD = 2e11; // 20 000 Cr in INR
+    const MID_CAP_THRESHOLD = 5e10;   // 5 000 Cr in INR
+    const LOOKBACK_DAYS = 365;
+
+    const filters: Prisma.Sql[] = [
+      Prisma.sql`s."isActive" = TRUE`,
+      Prisma.sql`s."isDelisted" = FALSE`,
+      Prisma.sql`UPPER(COALESCE(s."providerSupportStatus", 'UNSUPPORTED')) = 'SUPPORTED'`,
+    ];
+
+    if (options.signalDirection) {
+      filters.push(Prisma.sql`ls."signalDirection" = UPPER(${options.signalDirection})`);
+    }
+    if (options.minScore != null) {
+      filters.push(Prisma.sql`ls."signalScore" >= ${options.minScore}`);
+    }
+    if (options.sector) {
+      filters.push(Prisma.sql`UPPER(COALESCE(s.sector, '')) = UPPER(${options.sector})`);
+    }
+    if (options.capBand) {
+      if (options.capBand === 'LARGE') {
+        filters.push(Prisma.sql`s."marketCap" >= ${LARGE_CAP_THRESHOLD}`);
+      } else if (options.capBand === 'MID') {
+        filters.push(Prisma.sql`s."marketCap" >= ${MID_CAP_THRESHOLD} AND s."marketCap" < ${LARGE_CAP_THRESHOLD}`);
+      } else if (options.capBand === 'SMALL') {
+        filters.push(Prisma.sql`(s."marketCap" IS NULL OR s."marketCap" < ${MID_CAP_THRESHOLD})`);
+      }
+    }
+    if (options.minDeliveryPct != null) {
+      filters.push(Prisma.sql`dd."deliveryPct" >= ${options.minDeliveryPct}`);
+    }
+    if (options.min52wPositionPct != null) {
+      filters.push(Prisma.sql`pr."range52wPositionPct" >= ${options.min52wPositionPct}`);
+    }
+    if (options.excludeFnoBan) {
+      filters.push(Prisma.sql`COALESCE(fno."inBan", FALSE) = FALSE`);
+    }
+
+    // rs percentile filter applied post-query in service layer (it's relative within the result set)
+
+    const whereClause = Prisma.join(filters, ' AND ');
+
+    const rows = await this.prisma.$queryRaw<Array<{
+      instrumentId: string;
+      symbol: string;
+      companyName: string;
+      price: Prisma.Decimal | null;
+      signalDirection: string | null;
+      signalScore: Prisma.Decimal | null;
+      sector: string | null;
+      marketCap: Prisma.Decimal | null;
+      deliveryPct: Prisma.Decimal | null;
+      range52wPositionPct: Prisma.Decimal | null;
+      inFnoBan: boolean;
+    }>>(Prisma.sql`
+      WITH latest_signal AS (
+        SELECT DISTINCT ON (sr."instrumentId")
+          sr."instrumentId",
+          sr.direction AS "signalDirection",
+          sr.score     AS "signalScore"
+        FROM signal_results sr
+        WHERE sr."generatedDate" IS NOT NULL
+        ORDER BY sr."instrumentId", sr."generatedDate" DESC
+      ),
+      latest_price AS (
+        SELECT DISTINCT ON (s.id)
+          s.id AS "instrumentId",
+          COALESCE(pt."adjustedClose", pt.close) AS price,
+          pt.timestamp AS price_ts,
+          pid.price_symbol
+        FROM stocks s
+        CROSS JOIN LATERAL (
+          SELECT regexp_replace(
+            COALESCE(NULLIF(s."sourceSymbol", ''), NULLIF(s.symbol, ''), NULLIF(s."providerSymbol", '')),
+            '\\.(NS|BO)$', '', 'i'
+          ) AS price_symbol
+        ) pid
+        INNER JOIN price_ticks pt ON pt.symbol = pid.price_symbol
+          AND UPPER(COALESCE(pt."dataStatus", 'COMPLETE')) = 'COMPLETE'
+          AND UPPER(COALESCE(pt.source, '')) NOT LIKE 'TEST\\_%'
+        WHERE s."isActive" = TRUE AND s."isDelisted" = FALSE
+        ORDER BY s.id, pt.timestamp DESC
+      ),
+      price_range AS (
+        SELECT
+          lp."instrumentId",
+          CASE
+            WHEN rng."high52w" > rng."low52w"
+            THEN ((lp.price - rng."low52w") / NULLIF(rng."high52w" - rng."low52w", 0) * 100)
+            ELSE NULL
+          END AS "range52wPositionPct"
+        FROM latest_price lp
+        CROSS JOIN LATERAL (
+          SELECT
+            MAX(COALESCE(pt."adjustedClose", pt.close)) AS "high52w",
+            MIN(COALESCE(pt."adjustedClose", pt.close)) AS "low52w"
+          FROM price_ticks pt
+          WHERE pt.symbol = lp.price_symbol
+            AND pt.timestamp >= lp.price_ts - (${LOOKBACK_DAYS} * INTERVAL '1 day')
+            AND pt.timestamp < lp.price_ts
+            AND UPPER(COALESCE(pt."dataStatus", 'COMPLETE')) = 'COMPLETE'
+            AND UPPER(COALESCE(pt.source, '')) NOT LIKE 'TEST\\_%'
+        ) rng
+      ),
+      latest_delivery AS (
+        SELECT DISTINCT ON (d.symbol)
+          d.symbol,
+          d."deliveryPercent" AS "deliveryPct"
+        FROM market_delivery_snapshots d
+        WHERE d."deliveryPercent" IS NOT NULL AND d."deliveryPercent" > 0
+        ORDER BY d.symbol, d."tradingDate" DESC
+      ),
+      fno_ban AS (
+        SELECT
+          fbl.symbol,
+          TRUE AS "inBan"
+        FROM fno_ban_list fbl
+        WHERE fbl.ban_date = (SELECT MAX(ban_date) FROM fno_ban_list)
+      )
+      SELECT
+        s.id            AS "instrumentId",
+        s.symbol,
+        COALESCE(s.name, s.symbol) AS "companyName",
+        lp.price        AS price,
+        ls."signalDirection",
+        ls."signalScore",
+        s.sector,
+        s."marketCap",
+        ld."deliveryPct",
+        pr."range52wPositionPct",
+        COALESCE(fno."inBan", FALSE) AS "inFnoBan"
+      FROM stocks s
+      LEFT JOIN latest_signal ls ON ls."instrumentId" = s.id
+      LEFT JOIN latest_price lp ON lp."instrumentId" = s.id
+      LEFT JOIN price_range pr ON pr."instrumentId" = s.id
+      LEFT JOIN latest_delivery ld ON ld.symbol = s.symbol
+      LEFT JOIN fno_ban fno ON fno.symbol = s.symbol
+      WHERE ${whereClause}
+      ORDER BY COALESCE(ls."signalScore", 0) DESC
+      LIMIT ${rowLimit}
+    `);
+
+    // Derive capBand from stored marketCap
+    return rows.map((row) => {
+      const mc = row.marketCap != null ? Number(row.marketCap) : null;
+      let capBand: string | null = null;
+      if (mc != null) {
+        if (mc >= LARGE_CAP_THRESHOLD) capBand = 'LARGE';
+        else if (mc >= MID_CAP_THRESHOLD) capBand = 'MID';
+        else capBand = 'SMALL';
+      }
+      return {
+        instrumentId: row.instrumentId,
+        symbol: row.symbol,
+        companyName: row.companyName,
+        price: row.price != null ? Number(row.price) : null,
+        signalDirection: row.signalDirection ?? null,
+        signalScore: row.signalScore != null ? Number(row.signalScore) : null,
+        rsPercentile: null, // computed in service layer
+        sector: row.sector ?? null,
+        capBand,
+        deliveryPct: row.deliveryPct != null ? Number(row.deliveryPct) : null,
+        range52wPositionPct: row.range52wPositionPct != null ? Number(row.range52wPositionPct) : null,
+        inFnoBan: Boolean(row.inFnoBan),
+      };
+    });
+  }
+
   private keepExistingIfBlank<T>(next: T | null | undefined, current: T | null): T | null {
     if (typeof next === 'string' && next.trim().length === 0) return current;
     return next === null || next === undefined ? current : next;

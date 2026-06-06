@@ -44,6 +44,7 @@ export const navGroups: NavGroup[] = [
       { path: '/stock-interest-radar', label: 'Stock Interest Radar', icon: <SavedSearchIcon /> },
       { path: '/earnings-intelligence', label: 'Earnings Intelligence', icon: <CalendarMonthIcon /> },
       { path: '/market-scans', label: 'Market Scans', icon: <FilterAltIcon /> },
+      { path: '/screener', label: 'Screener', icon: <FilterAltIcon /> },
       { path: '/watchlists', label: 'Watchlists', icon: <StarBorderIcon />, matchPrefixes: ['/watchlists/'] },
       { path: '/portfolios', label: 'Portfolios', icon: <AccountBalanceWalletIcon />, matchPrefixes: ['/portfolios/'] },
       { path: '/alerts', label: 'Alerts', icon: <NotificationsNoneIcon /> },

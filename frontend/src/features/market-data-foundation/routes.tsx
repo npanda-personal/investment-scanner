@@ -3,6 +3,7 @@ import MarketDataFoundationPage from './components/MarketDataFoundationPage';
 import AddInstrumentPage from './components/AddInstrumentPage';
 import UnifiedStockPage from './components/UnifiedStockPage';
 import MarketScansPage from './components/MarketScansPage';
+import ScreenerPage from './components/ScreenerPage';
 
 export const marketDataFoundationRoutes: RouteObject[] = [
   { path: 'market-data-foundation', element: <MarketDataFoundationPage /> },
@@ -16,4 +17,9 @@ export const marketDataFoundationRoutes: RouteObject[] = [
 /** User-facing route — lives in the main trader workflow nav. */
 export const marketScansRoutes: RouteObject[] = [
   { path: 'market-scans', element: <MarketScansPage /> },
+];
+
+/** Multi-factor screener — core trader tool. */
+export const screenerRoutes: RouteObject[] = [
+  { path: 'screener', element: <ScreenerPage /> },
 ];

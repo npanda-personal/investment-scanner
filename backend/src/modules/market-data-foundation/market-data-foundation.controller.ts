@@ -701,6 +701,39 @@ export class MarketDataFoundationController {
     }
   };
 
+  // ---------------------------------------------------------------------------
+  // Multi-Factor Screener
+  // ---------------------------------------------------------------------------
+
+  screener = async (req: Request, res: Response) => {
+    try {
+      const signalDirection = typeof req.query.signalDirection === 'string' ? req.query.signalDirection.toUpperCase() : undefined;
+      const validDirections = ['BULLISH', 'BEARISH', 'NEUTRAL'];
+      if (signalDirection && !validDirections.includes(signalDirection)) {
+        return res.status(400).json({ error: `signalDirection must be one of: ${validDirections.join(', ')}` });
+      }
+      const capBand = typeof req.query.capBand === 'string' ? req.query.capBand.toUpperCase() : undefined;
+      const validCapBands = ['LARGE', 'MID', 'SMALL'];
+      if (capBand && !validCapBands.includes(capBand)) {
+        return res.status(400).json({ error: `capBand must be one of: ${validCapBands.join(', ')}` });
+      }
+      return res.json(await this.service.screener({
+        signalDirection,
+        minScore: this.numberParam(req, 'minScore'),
+        minRsPercentile: this.numberParam(req, 'minRsPercentile'),
+        sector: typeof req.query.sector === 'string' ? req.query.sector : undefined,
+        capBand: capBand as 'LARGE' | 'MID' | 'SMALL' | undefined,
+        minDeliveryPct: this.numberParam(req, 'minDeliveryPct'),
+        min52wPositionPct: this.numberParam(req, 'min52wPositionPct'),
+        excludeFnoBan: this.parseOptionalBoolean(req.query.excludeFnoBan),
+        limit: this.numberParam(req, 'limit'),
+      }));
+    } catch (error) {
+      console.error('Screener error:', error);
+      return res.status(500).json({ error: 'Screener query failed' });
+    }
+  };
+
   marketMovers = async (req: Request, res: Response) => {
     try {
       const { region, assetType } = this.getMarketFilter(req);

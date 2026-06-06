@@ -167,11 +167,13 @@ export class TodayTradeReviewRepository implements TodayReviewRepositoryContract
   async getCandidate(id: string): Promise<TodayReviewCandidateDto | null> {
     const record = await this.db.todayReviewCandidate.findUnique({ where: { id } });
     if (!record) return null;
-    const [catalogSectorMap, range52wMap] = await Promise.all([
+    const [catalogSectorMap, range52wMap, fnoBanSet, smartMoneyMap] = await Promise.all([
       this.loadCatalogSectors([record.instrumentId]),
       this.load52wRanges([record.symbol]),
+      this.loadFnoBanSet([record.symbol]),
+      this.loadSmartMoneyStatuses([record.instrumentId]),
     ]);
-    return this.toCandidateDto(record, catalogSectorMap, range52wMap);
+    return this.toCandidateDto(record, catalogSectorMap, range52wMap, fnoBanSet, smartMoneyMap);
   }
 
   private optionalJson(value: unknown) {
@@ -261,17 +263,91 @@ export class TodayTradeReviewRepository implements TodayReviewRepositoryContract
     return map;
   }
 
+  /**
+   * NR-100: Batch-load the latest F&O ban symbol set.
+   * One raw query to determine the most-recent ban_date, then one query to
+   * fetch all symbols for that date. Returns a Set of upper-cased symbols
+   * that are currently in the F&O ban period. Pool-safe: read-only, no tx.
+   */
+  private async loadFnoBanSet(symbols: string[]): Promise<Set<string>> {
+    if (symbols.length === 0) return new Set();
+    try {
+      const dateRows = await this.db.$queryRaw<Array<{ ban_date: Date }>>(Prisma.sql`
+        SELECT ban_date FROM fno_ban_list ORDER BY ban_date DESC LIMIT 1
+      `);
+      if (dateRows.length === 0) return new Set();
+      const latestDate = dateRows[0].ban_date;
+      const upperSymbols = symbols.map((s) => s.toUpperCase());
+      const rows = await this.db.$queryRaw<Array<{ symbol: string }>>(Prisma.sql`
+        SELECT symbol FROM fno_ban_list
+        WHERE ban_date = ${latestDate}
+          AND symbol = ANY(${upperSymbols})
+      `);
+      return new Set(rows.map((r) => r.symbol.toUpperCase()));
+    } catch {
+      // fno_ban_list table may not exist yet — treat as no bans (honest false).
+      return new Set();
+    }
+  }
+
+  /**
+   * NR-101: Batch-load the latest smart-money snapshot status + score
+   * for a list of instrumentIds (one query via groupBy + findMany, no N+1).
+   * Returns a map of instrumentId → { status, score }.
+   * Pool-safe: read-only, no transaction.
+   */
+  private async loadSmartMoneyStatuses(
+    instrumentIds: string[],
+  ): Promise<Map<string, { status: 'ACCUMULATION' | 'DISTRIBUTION' | 'NEUTRAL'; score: number }>> {
+    const uniqueIds = [...new Set(instrumentIds.filter(Boolean))];
+    if (uniqueIds.length === 0) return new Map();
+    try {
+      const latestByInstrument = await this.db.smartMoneyContextSnapshot.groupBy({
+        by: ['instrumentId'],
+        where: {
+          instrumentId: { in: uniqueIds },
+          range: '3M',
+          status: { not: 'INSUFFICIENT_DATA' },
+        },
+        _max: { updatedAt: true },
+      });
+      if (latestByInstrument.length === 0) return new Map();
+      const latestPairs = latestByInstrument.flatMap((item: any) =>
+        item._max?.updatedAt ? [{ instrumentId: item.instrumentId, updatedAt: item._max.updatedAt }] : [],
+      );
+      const rows = await this.db.smartMoneyContextSnapshot.findMany({
+        where: { range: '3M', OR: latestPairs },
+        select: { instrumentId: true, status: true, smartMoneyScore: true, updatedAt: true },
+        orderBy: [{ updatedAt: 'desc' }],
+      });
+      const map = new Map<string, { status: 'ACCUMULATION' | 'DISTRIBUTION' | 'NEUTRAL'; score: number }>();
+      for (const row of rows) {
+        if (map.has(row.instrumentId)) continue; // keep only latest
+        const status = row.status as string;
+        if (status === 'ACCUMULATION' || status === 'DISTRIBUTION' || status === 'NEUTRAL') {
+          map.set(row.instrumentId, { status, score: Number(row.smartMoneyScore) });
+        }
+      }
+      return map;
+    } catch {
+      return new Map();
+    }
+  }
+
   private async toRunDto(record: any): Promise<TodayReviewRunDto> {
-    // Batch-load sectors + 52w ranges for all candidates in two queries (no N+1).
+    // Batch-load sectors, 52w ranges, F&O ban flags, and smart-money status
+    // for all candidates — four queries total, no N+1.
     const candidateRecords: any[] = record.candidates || [];
     const instrumentIds = [...new Set(candidateRecords.map((c: any) => c.instrumentId as string))];
     const symbols = [...new Set(candidateRecords.map((c: any) => c.symbol as string))];
-    const [catalogSectorMap, range52wMap] = await Promise.all([
+    const [catalogSectorMap, range52wMap, fnoBanSet, smartMoneyMap] = await Promise.all([
       this.loadCatalogSectors(instrumentIds),
       this.load52wRanges(symbols),
+      this.loadFnoBanSet(symbols),
+      this.loadSmartMoneyStatuses(instrumentIds),
     ]);
 
-    const candidates = candidateRecords.map((candidate: any) => this.toCandidateDto(candidate, catalogSectorMap, range52wMap));
+    const candidates = candidateRecords.map((candidate: any) => this.toCandidateDto(candidate, catalogSectorMap, range52wMap, fnoBanSet, smartMoneyMap));
     const sourceSnapshot = this.jsonObject(record.sourceSnapshot);
     const reviewUniverse = this.jsonObject(sourceSnapshot.reviewUniverse);
     const scanFunnel = this.nullableJson(sourceSnapshot.scanFunnel) as any;
@@ -306,6 +382,8 @@ export class TodayTradeReviewRepository implements TodayReviewRepositoryContract
     record: any,
     catalogSectorMap?: Map<string, string | null>,
     range52wMap?: Map<string, { high52w: number; low52w: number; currentClose: number; positionPct: number }>,
+    fnoBanSet?: Set<string>,
+    smartMoneyMap?: Map<string, { status: 'ACCUMULATION' | 'DISTRIBUTION' | 'NEUTRAL'; score: number }>,
   ): TodayReviewCandidateDto {
     const sourceSignalSnapshot = this.nullableJson(record.sourceSignalSnapshot);
     const boardMetadata = this.boardMetadataFromSnapshot(sourceSignalSnapshot);
@@ -316,6 +394,10 @@ export class TodayTradeReviewRepository implements TodayReviewRepositoryContract
     const catalogSector = catalogSectorMap ? (catalogSectorMap.get(record.instrumentId) ?? null) : null;
     // 52w range joined at READ time from price_ticks (batch-loaded, no N+1).
     const range52w = range52wMap ? (range52wMap.get(record.symbol) ?? null) : null;
+    // NR-100: F&O ban flag joined at READ time from fno_ban_list (batch-loaded, no N+1).
+    const inFnoBan = fnoBanSet ? fnoBanSet.has(record.symbol.toUpperCase()) : false;
+    // NR-101: Smart-money status + score joined at READ time from smart_money_context_snapshots.
+    const smEntry = smartMoneyMap ? (smartMoneyMap.get(record.instrumentId) ?? null) : null;
     const dto: TodayReviewCandidateDto = {
       id: record.id,
       runId: record.runId,
@@ -349,6 +431,11 @@ export class TodayTradeReviewRepository implements TodayReviewRepositoryContract
       range52wHigh: range52w ? range52w.high52w : null,
       range52wLow: range52w ? range52w.low52w : null,
       range52wCurrentClose: range52w ? range52w.currentClose : null,
+      // NR-100: F&O ban flag (batch join from fno_ban_list at read time).
+      inFnoBan,
+      // NR-101: Smart-money status + score (batch join from smart_money_context_snapshots at read time).
+      smartMoneyStatus: smEntry ? smEntry.status : null,
+      smartMoneyScore: smEntry ? smEntry.score : null,
       createdAt: record.createdAt?.toISOString(),
       updatedAt: record.updatedAt?.toISOString(),
     };

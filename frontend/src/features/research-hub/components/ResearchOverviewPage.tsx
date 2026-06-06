@@ -606,7 +606,7 @@ const DeltaChip: React.FC<{ delta: ResearchWhatChangedDelta }> = ({ delta }) => 
       color={color as any}
       variant="outlined"
       component={Link}
-      to={`/stocks/${delta.symbol}`}
+      to={`/instrument-workspace/${delta.symbol}`}
       sx={{ cursor: 'pointer', fontWeight: 700 }}
     />
   );
@@ -680,7 +680,7 @@ const WhatChangedPanel: React.FC<{
                 </Typography>
                 <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
                   {whatChanged.newTradeCandidates.map(symbol => (
-                    <Chip key={symbol} label={symbol} size="small" color="success" component={Link} to={`/stocks/${symbol}`} sx={{ cursor: 'pointer' }} />
+                    <Chip key={symbol} label={symbol} size="small" color="success" component={Link} to={`/instrument-workspace/${symbol}`} sx={{ cursor: 'pointer' }} />
                   ))}
                 </Stack>
               </Box>
@@ -694,7 +694,7 @@ const WhatChangedPanel: React.FC<{
                 </Typography>
                 <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
                   {droppedCandidates.map(symbol => (
-                    <Chip key={symbol} label={symbol} size="small" color="error" variant="outlined" component={Link} to={`/stocks/${symbol}`} sx={{ cursor: 'pointer' }} />
+                    <Chip key={symbol} label={symbol} size="small" color="error" variant="outlined" component={Link} to={`/instrument-workspace/${symbol}`} sx={{ cursor: 'pointer' }} />
                   ))}
                 </Stack>
               </Box>

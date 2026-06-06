@@ -151,6 +151,23 @@ export interface TodayReviewCandidateDto {
   range52wLow?: number | null;
   /** Latest adjusted close used for the range position (read-time, from price_ticks). */
   range52wCurrentClose?: number | null;
+  /**
+   * NR-100: Whether the symbol is on the latest F&O ban list (fno_ban_list table).
+   * Joined at READ time — one batch query for all candidates in the run.
+   * False/absent when the ban table is empty or the stock is not in ban.
+   */
+  inFnoBan?: boolean;
+  /**
+   * NR-101: Smart-money accumulation/distribution status joined at READ time
+   * from smart_money_context_snapshots (latest 3M snapshot per instrument).
+   * One batch query for all candidates. Null when no snapshot exists.
+   */
+  smartMoneyStatus?: 'ACCUMULATION' | 'DISTRIBUTION' | 'NEUTRAL' | null;
+  /**
+   * NR-101: Smart-money score (0–100) joined at READ time from the same snapshot.
+   * Null when no snapshot exists.
+   */
+  smartMoneyScore?: number | null;
   createdAt?: string;
   updatedAt?: string;
 }
