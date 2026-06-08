@@ -46,6 +46,12 @@ export class MarketDataFoundationScheduler {
     private readonly service = new MarketDataFoundationService(),
     private readonly config = readMarketDataSchedulerConfig(),
     private readonly pipelineOrchestration?: ScheduledDataQualityRunner,
+    /**
+     * Optional crypto 24/7 lane runner.  Injected (not hard-wired) so unit tests
+     * of the equity scheduler never trigger crypto ingest/signal side effects.
+     * Production wires `defaultCryptoLaneRunner` on the singleton below.
+     */
+    private readonly cryptoLaneRunner?: CryptoLaneRunner,
   ) {}
 
   start(options: { runStartup?: boolean } = {}) {
@@ -173,10 +179,36 @@ export class MarketDataFoundationScheduler {
         }
         results.push({ region, skipped: false, decision, summary, scheduledDataQuality, activePriceBackfillRunId: activePriceBackfill?.runId });
       }
+
+      // ── Crypto lane (GLOBAL:CRYPTO, 24/7) ─────────────────────────────────────
+      // Isolated from the equity region loop: crypto data lives in crypto_* tables
+      // and uses a dedicated lean path (incremental OHLCV ingest → crypto signals).
+      const cryptoResult = await this.runCryptoLane(now).catch((error) => {
+        console.error('[MarketDataScheduler] crypto lane failed', error);
+        return null;
+      });
+      if (cryptoResult) results.push(cryptoResult);
+
       return results;
     } finally {
       this.activeRun = false;
     }
+  }
+
+  private cryptoLaneEnabled(): boolean {
+    const explicit = process.env.MARKET_DATA_CRYPTO_LANE_ENABLED;
+    if (explicit !== undefined) return String(explicit).toLowerCase() !== 'false';
+    // Default ON when the crypto provider is enabled.
+    return String(process.env.MARKET_DATA_CRYPTO_PROVIDER_ENABLED ?? 'true').toLowerCase() !== 'false';
+  }
+
+  /**
+   * Crypto 24/7 lane — delegates to the injected runner (off unless wired, so the
+   * equity scheduler unit tests never trigger crypto side effects).  Best-effort.
+   */
+  private async runCryptoLane(now: Date): Promise<CryptoLaneResult | null> {
+    if (!this.cryptoLaneEnabled() || !this.cryptoLaneRunner) return null;
+    return this.cryptoLaneRunner(now);
   }
 
   async status(now = new Date()): Promise<MarketDataSchedulerStatus> {
@@ -343,7 +375,69 @@ export function readMarketDataSchedulerConfig(env = process.env): MarketDataSche
   };
 }
 
-const singletonScheduler = new MarketDataFoundationScheduler();
+export interface CryptoLaneResult {
+  lane: 'CRYPTO';
+  ingest: unknown;
+  signals: unknown;
+}
+
+export type CryptoLaneRunner = (now: Date) => Promise<CryptoLaneResult | null>;
+
+/**
+ * Tracks the last UTC day the crypto universe was refreshed so the 24/7 lane
+ * re-fetches the Binance-tradable catalog at most once per day (cheap: one
+ * CoinPaprika call) rather than on every 15-minute tick.  Resets on process
+ * restart (so a fresh boot also refreshes).
+ */
+let lastCryptoUniverseRefreshUtcDay: string | null = null;
+
+/**
+ * Production crypto lane runner: incremental OHLCV ingest for active crypto assets,
+ * then a crypto signal refresh.  The two services are lazy-required to avoid a
+ * STATIC upstream→downstream module cycle (market-data-foundation is upstream of
+ * signal-generation-engine) — the lazy-require cycle-avoidance pattern used
+ * elsewhere in the repo.
+ */
+export const defaultCryptoLaneRunner: CryptoLaneRunner = async (now: Date) => {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { cryptoIngestionService } = require('./market-data-foundation.crypto-ingestion.service');
+  // Refresh the Binance-tradable universe at most once per UTC day so coins newly
+  // listed on Binance are added to crypto_assets (incremental backfill then gives
+  // them a full history on the next tick). Cheap: a single CoinPaprika /tickers call.
+  const utcDay = now.toISOString().slice(0, 10);
+  if (lastCryptoUniverseRefreshUtcDay !== utcDay) {
+    try {
+      await cryptoIngestionService.ingestUniverse({ limit: 500 });
+      lastCryptoUniverseRefreshUtcDay = utcDay;
+    } catch (error) {
+      console.error('[CryptoLane] universe refresh failed', error);
+    }
+  }
+  // Incremental per-symbol ingest (resumes from the latest stored candle); a small
+  // lookback floor handles 24/7 boundary/overlap. Free-API friendly; provider throttles internally.
+  const ingest = await cryptoIngestionService.backfillPrices({ incremental: true, minLookbackDays: 2 });
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { cryptoSignalGenerationService } = require('../signal-generation-engine/signal-generation-engine.crypto-service');
+  const signals = await cryptoSignalGenerationService.generateAll({ asOf: now });
+  // Refresh crypto market scans (52w high/low, volume spike, movers, market-map) from fresh prices+signals.
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { marketDataFoundationCryptoRepository } = require('./market-data-foundation.crypto-repository');
+  await marketDataFoundationCryptoRepository.refreshMarketScans();
+  // Crypto-native market context (breadth + regime + BTC dominance), persisted under region='CRYPTO'.
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { MarketContextIntelligenceService } = require('../market-context-intelligence/market-context-intelligence.service');
+  await new MarketContextIntelligenceService().runCryptoContextAsOf(now).catch((error: unknown) => {
+    console.error('[CryptoLane] crypto market-context refresh failed', error);
+  });
+  return { lane: 'CRYPTO' as const, ingest, signals };
+};
+
+const singletonScheduler = new MarketDataFoundationScheduler(
+  undefined,
+  undefined,
+  undefined,
+  defaultCryptoLaneRunner,
+);
 
 export function startMarketDataFoundationScheduler(options: { runStartup?: boolean } = {}) {
   singletonScheduler.start(options);
@@ -362,8 +456,14 @@ export async function startMarketDataStartupLoads(env = process.env) {
 }
 
 export async function startMarketDataStartupPriceBackfill(env = process.env) {
-  void env;
-  console.warn('[MarketDataStartupBackfill] provider startup price backfill disabled for NSE/BSE-only market data.');
+  const regions = (env.MARKET_DATA_SCHEDULER_REGIONS || 'IN')
+    .split(',')
+    .map((r) => r.trim().toUpperCase())
+    .filter(Boolean);
+  console.log(
+    `[MarketDataStartupBackfill] startup price backfill is a no-op stub (regions configured: ${regions.join(', ')}).`,
+    'Run seed-us-indices.ts / seed-us-universe.ts manually for initial price history.',
+  );
   return null;
 }
 

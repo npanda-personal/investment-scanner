@@ -39,6 +39,7 @@ import { ExpandLess, ExpandMore, InfoOutlined } from '@mui/icons-material';
 import { fetchSignalScorecard } from '@/features/signal-quality-lab/api/signalQualityLabService';
 import type { ScorecardRow, ScorecardSummary, WinRateConfidence } from '@/features/signal-quality-lab/types';
 import { changeColor } from '@/shared/format/money';
+import { useMarketScope } from '@/contexts/MarketScopeContext';
 
 // ---------------------------------------------------------------------------
 // Constants matching backend thresholds (signal-quality-lab.types.ts)
@@ -216,6 +217,7 @@ interface SignalTrackRecordPanelProps {
 const HORIZONS_ORDER: string[] = ['1D', '5D', '10D', '20D', '60D'];
 
 export const SignalTrackRecordPanel: React.FC<SignalTrackRecordPanelProps> = ({ modelVersion }) => {
+  const { profile } = useMarketScope();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [summary, setSummary] = useState<ScorecardSummary[]>([]);
@@ -243,6 +245,9 @@ export const SignalTrackRecordPanel: React.FC<SignalTrackRecordPanelProps> = ({ 
   }, [modelVersion]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Crypto has no equity signal track record (samples are equity-derived) — hide.
+  if (profile.isCrypto) return null;
 
   const totalSamples = summary.reduce((acc, s) => Math.max(acc, s.directionalSampleSize), 0);
   const hasData = summary.length > 0 && totalSamples > 0;
@@ -309,7 +314,7 @@ export const SignalTrackRecordPanel: React.FC<SignalTrackRecordPanelProps> = ({ 
               )}
 
               <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-                Alpha = signal return − same-horizon Nifty 50 return. Green = outperformed index; red = underperformed.
+                {`Alpha = signal return − same-horizon ${profile.benchmarkLabel} return. Green = outperformed index; red = underperformed.`}
               </Typography>
 
               <Table size="small" sx={{ mb: 1 }}>
@@ -332,8 +337,8 @@ export const SignalTrackRecordPanel: React.FC<SignalTrackRecordPanelProps> = ({ 
                       </Tooltip>
                     </TableCell>
                     <TableCell align="right">
-                      <Tooltip title="Alpha vs Nifty 50: signal avg forward return minus Nifty 50 return over the same horizon. Green = signal beat the index; red = underperformed. '—' means benchmark data not yet available for this horizon." arrow>
-                        <span>Alpha vs Nifty</span>
+                      <Tooltip title={`Alpha vs ${profile.benchmarkLabel}: signal avg forward return minus ${profile.benchmarkLabel} return over the same horizon. Green = signal beat the index; red = underperformed. '—' means benchmark data not yet available for this horizon.`} arrow>
+                        <span>Alpha vs {profile.benchmarkLabel}</span>
                       </Tooltip>
                     </TableCell>
                     <TableCell align="right">
@@ -379,8 +384,8 @@ export const SignalTrackRecordPanel: React.FC<SignalTrackRecordPanelProps> = ({ 
                           <TableCell align="right"><Typography variant="caption">Win Rate</Typography></TableCell>
                           <TableCell align="right"><Typography variant="caption">Avg Return</Typography></TableCell>
                           <TableCell align="right">
-                            <Tooltip title="Alpha vs Nifty 50: signal return minus same-horizon Nifty 50 return" arrow>
-                              <Typography variant="caption" sx={{ cursor: 'help', borderBottom: '1px dotted', borderColor: 'text.disabled' }}>Alpha vs Nifty</Typography>
+                            <Tooltip title={`Alpha vs ${profile.benchmarkLabel}: signal return minus same-horizon ${profile.benchmarkLabel} return`} arrow>
+                              <Typography variant="caption" sx={{ cursor: 'help', borderBottom: '1px dotted', borderColor: 'text.disabled' }}>Alpha vs {profile.benchmarkLabel}</Typography>
                             </Tooltip>
                           </TableCell>
                           <TableCell align="right"><Typography variant="caption">Expectancy</Typography></TableCell>

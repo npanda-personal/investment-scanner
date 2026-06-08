@@ -27,7 +27,7 @@ import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { InstrumentSearchSelect, PageHeader, StalenessBadge } from '@/shared/components';
 import type { V1Instrument } from '@/features/market-data-foundation';
 import { humanizeCode, indexLabel, isHeadlineIndex } from '@/shared/format/enumLabels';
-import { inr, changeColor } from '@/shared/format/money';
+import { money, changeColor } from '@/shared/format/money';
 import {
   fetchCompounderRadarSnapshot,
   fetchEarningsIntelligenceSnapshot,
@@ -41,6 +41,7 @@ import {
 } from '../api/marketIntelligenceService';
 import { useReadModelSnapshot } from '../hooks/useMarketIntelligenceSnapshot';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
+import { NotApplicableForAssetClass } from '@/shared/components/NotApplicableForAssetClass';
 import type {
   CompounderSnapshot,
   EarningsIntelligenceSnapshot,
@@ -112,12 +113,22 @@ function countUpcomingEarnings(rows: EarningsIntelligenceSnapshot[]): number {
 }
 
 export function MarketPulsePage() {
+  const { profile } = useMarketScope();
   const view = useReadModelSnapshot(fetchMarketPulseSnapshot);
   const sectorView = useReadModelSnapshot(fetchSectorIntelligenceSnapshot);
   const earningsView = useReadModelSnapshot(fetchEarningsIntelligenceSnapshot);
   const snapshot = view.data?.snapshot ?? null;
   const earningsRows = earningsView.data?.snapshot ?? null;
   const upcomingEarningsCount = earningsRows !== null ? countUpcomingEarnings(earningsRows) : null;
+
+  if (!profile.capabilities.hasMarketBreadth) {
+    return (
+      <Box className="page-container page-container--hub">
+        <PageHeader title="Market Pulse" subtitle="Is the market healthy enough to take risk?" />
+        <NotApplicableForAssetClass feature="Market Pulse" />
+      </Box>
+    );
+  }
 
   return (
     <SnapshotPageShell
@@ -136,7 +147,19 @@ export function MarketPulsePage() {
 }
 
 export function StockInterestRadarPage() {
+  const { profile } = useMarketScope();
   const view = useReadModelSnapshot(fetchStockInterestRadarSnapshot);
+  if (profile.isCrypto) {
+    return (
+      <Box className="page-container page-container--hub">
+        <PageHeader title="Stock Interest Radar" subtitle="Which stocks deserve attention now?" />
+        <NotApplicableForAssetClass
+          feature="Stock Interest Radar"
+          detail="Crypto coverage in this release is available on Signals, Market Scans, and the Instrument workspace. This view will support crypto in a later update."
+        />
+      </Box>
+    );
+  }
   return (
     <RadarPage
       title="Stock Interest Radar"
@@ -156,7 +179,7 @@ export function StockInterestRadarPage() {
 const EARNINGS_EMPTY_MESSAGES: Record<string, string> = {
   UPCOMING_RESULTS:
     'No stocks have a result date within the next 90 days in the persisted snapshot. ' +
-    'This category populates when the NSE board-meeting calendar has been ingested or when ' +
+    'This category populates when an official earnings calendar has been ingested or when ' +
     'period-cadence estimates fall within 90 days. Run the earnings-intelligence refresh ' +
     'pipeline to re-materialise with today\'s date.',
   PRE_RESULT_INTEREST:
@@ -169,14 +192,23 @@ const EARNINGS_EMPTY_MESSAGES: Record<string, string> = {
     'No stocks showed a significant earnings miss or price drop in the last 60 days in the snapshot.',
   RESULT_REACTION_HISTORY:
     'No stocks have a price-reaction history calculated yet. ' +
-    'This category requires an official NSE board-meeting date (via the ingest pipeline) ' +
+    'This category requires an official earnings date (via the ingest pipeline) ' +
     'and at least one price bar 5 trading sessions after the result date.',
   EARNINGS_WATCHLIST:
     'No stocks qualified for the earnings watchlist. This is unusual — run the refresh pipeline to materialise.',
 };
 
 export function EarningsIntelligencePage() {
+  const { profile } = useMarketScope();
   const view = useReadModelSnapshot(fetchEarningsIntelligenceSnapshot);
+  if (!profile.capabilities.hasEarnings) {
+    return (
+      <Box className="page-container page-container--hub">
+        <PageHeader title="Earnings Intelligence" subtitle="Which result-related stocks deserve attention?" />
+        <NotApplicableForAssetClass feature="Earnings intelligence" />
+      </Box>
+    );
+  }
   return (
     <RadarPage
       title="Earnings Intelligence"
@@ -196,7 +228,16 @@ export function EarningsIntelligencePage() {
 const deadEndSuggestionLink = { to: '/stock-interest-radar', label: 'Open Stock Interest Radar (available now)' };
 
 export function CompounderRadarPage() {
+  const { profile } = useMarketScope();
   const view = useReadModelSnapshot(fetchCompounderRadarSnapshot);
+  if (!profile.capabilities.hasFundamentals) {
+    return (
+      <Box className="page-container page-container--hub">
+        <PageHeader title="Compounder Radar" subtitle="Which companies show durable long-term growth?" />
+        <NotApplicableForAssetClass feature="Compounder radar" />
+      </Box>
+    );
+  }
   return (
     <RadarPage
       title="Compounder Radar"
@@ -214,7 +255,19 @@ export function CompounderRadarPage() {
 }
 
 export function TraderSetupRadarPage() {
+  const { profile } = useMarketScope();
   const view = useReadModelSnapshot(fetchTraderSetupRadarSnapshot);
+  if (profile.isCrypto) {
+    return (
+      <Box className="page-container page-container--hub">
+        <PageHeader title="Trader Setup Radar" subtitle="Which setups are actionable for swing review?" />
+        <NotApplicableForAssetClass
+          feature="Trader Setup Radar"
+          detail="Crypto coverage in this release is available on Signals, Market Scans, and the Instrument workspace. This view will support crypto in a later update."
+        />
+      </Box>
+    );
+  }
   return (
     <RadarPage
       title="Trader Setup Radar"
@@ -232,7 +285,16 @@ export function TraderSetupRadarPage() {
 }
 
 export function RiskRadarPage() {
+  const { profile } = useMarketScope();
   const view = useReadModelSnapshot(fetchRiskRadarSnapshot);
+  if (!profile.capabilities.hasFundamentals) {
+    return (
+      <Box className="page-container page-container--hub">
+        <PageHeader title="Risk Radar" subtitle="What should be avoided?" />
+        <NotApplicableForAssetClass feature="Risk radar" />
+      </Box>
+    );
+  }
   return (
     <RadarPage
       title="Risk Radar"
@@ -576,6 +638,10 @@ function MarketPulseSnapshotView({
  * If VIX data is absent, renders "India VIX: —" honestly.
  */
 function VixWidget({ vix }: { vix: MarketPulseVixSummary | null | undefined }) {
+  const { scope } = useMarketScope();
+  // India VIX is an NSE-only construct in the Market Pulse model; it is not applicable
+  // to other markets (US/EU/crypto), so don't render an "India VIX" chip there.
+  if (scope.region !== 'IN') return null;
   const unavailable = !vix || vix.posture === 'UNAVAILABLE' || vix.latest === null;
 
   const postureColor = unavailable
@@ -852,6 +918,7 @@ function SectorConstituentsTable({
   loading: boolean;
   error: string | null;
 }) {
+  const { profile } = useMarketScope();
   if (loading) return <Stack spacing={1}><LinearProgress sx={{ mx: 1 }} /><Typography variant="caption" color="text.secondary" sx={{ px: 1 }}>Loading constituents for {indexLabel(sector)}…</Typography></Stack>;
   if (error) return <Alert severity="error" sx={{ mx: 0 }}>{error}</Alert>;
   if (!data) return null;
@@ -889,7 +956,7 @@ function SectorConstituentsTable({
                   <Typography variant="body2" noWrap sx={{ maxWidth: 180 }}>{row.companyName ?? '—'}</Typography>
                 </TableCell>
                 <TableCell align="right">
-                  <Typography variant="body2">{row.latestPrice !== null ? inr(row.latestPrice, { fractionDigits: 2 }) : '—'}</Typography>
+                  <Typography variant="body2">{row.latestPrice !== null ? money(row.latestPrice, profile.currency, { fractionDigits: 2 }) : '—'}</Typography>
                 </TableCell>
                 <TableCell align="right">
                   <Typography variant="body2" color={row.return1W !== null ? changeColor(row.return1W) : 'text.secondary'}>
@@ -1117,6 +1184,7 @@ function RiskTable({ rows }: { rows: RiskRadarSnapshot[] }) {
 }
 
 function InstrumentContextRail({ snapshot }: { snapshot: InstrumentContextSnapshot }) {
+  const { profile } = useMarketScope();
   const regimeLabel = snapshot.marketRegime.absent
     ? '—'
     : `${snapshot.marketRegime.value?.regime ?? '—'} (${snapshot.marketRegime.value?.score ?? '—'})`;
@@ -1130,7 +1198,7 @@ function InstrumentContextRail({ snapshot }: { snapshot: InstrumentContextSnapsh
         if (!rs) return '—';
         if (rs.relativeReturn63d !== null && rs.relativeReturn63d !== undefined) {
           const sign = rs.relativeReturn63d >= 0 ? '+' : '';
-          return `vs Nifty ${sign}${(rs.relativeReturn63d * 100).toFixed(1)}%`;
+          return `vs ${profile.benchmarkLabel} ${sign}${(rs.relativeReturn63d * 100).toFixed(1)}%`;
         }
         if (rs.stockReturn63d !== null && rs.stockReturn63d !== undefined) {
           const sign = rs.stockReturn63d >= 0 ? '+' : '';

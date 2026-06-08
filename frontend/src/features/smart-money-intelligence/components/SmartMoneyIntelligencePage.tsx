@@ -30,6 +30,8 @@ import type { FnoBanListResponse, SectorSmartMoneySummary, SectorSmartMoneyStatu
 import { fetchFnoBanList, ingestFnoBanList } from '../api/smartMoneyIntelligenceService';
 import { DataTable, FilterBar, PageHeader, StalenessBadge, type DataTableColumn } from '@/shared/components';
 import { humanizeCode } from '@/shared/format/enumLabels';
+import { useMarketScope } from '@/contexts/MarketScopeContext';
+import { NotApplicableForAssetClass } from '@/shared/components/NotApplicableForAssetClass';
 
 const statusColor = (status: SmartMoneyStatus | string) => {
   if (status === 'ACCUMULATION' || status === 'ACCUMULATING') return 'success';
@@ -103,6 +105,7 @@ function sanitizeNote(note: string): string {
 }
 
 export default function SmartMoneyIntelligencePage() {
+  const { profile } = useMarketScope();
   const {
     range, setRange,
     sector, setSector,
@@ -128,6 +131,18 @@ export default function SmartMoneyIntelligencePage() {
     loadStock,
     refreshSnapshots,
   } = useSmartMoneyIntelligence();
+
+  if (!profile.capabilities.hasInstitutionalFlow) {
+    return (
+      <Box sx={{ p: 3, maxWidth: 1600, mx: 'auto' }}>
+        <PageHeader
+          title="Smart Money Intelligence"
+          subtitle="Price-volume accumulation, distribution warnings, and sector flow context."
+        />
+        <NotApplicableForAssetClass feature="Smart Money intelligence" />
+      </Box>
+    );
+  }
 
   const handleRun = async () => {
     await refreshSnapshots();

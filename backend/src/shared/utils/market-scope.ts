@@ -45,7 +45,7 @@ export function resolveMarketRegionFilter(region?: string | null): Prisma.StockW
         OR: [
           { region: 'EU' },
           { country: { in: ['UK', 'United Kingdom', 'DE', 'Germany', 'FR', 'France', 'IT', 'Italy', 'ES', 'Spain', 'NL', 'Netherlands'], mode: 'insensitive' } },
-          { exchange: { in: ['LSE', 'XETRA', 'Euronext', 'BME'], mode: 'insensitive' } },
+          { exchange: { in: ['LSE', 'XETRA', 'Euronext', 'EURONEXT_AMS', 'BORSA_ITALIANA', 'BME'], mode: 'insensitive' } },
         ],
       };
     default:

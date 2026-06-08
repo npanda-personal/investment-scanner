@@ -105,11 +105,25 @@ export class AiInvestmentCopilotService {
     const tradePlanSvc = this.resolveTradePlanService();
     const todayReviewSvc = this.resolveTodayReviewService();
 
+    // -- Derive instrument region so context calls use the correct market --
+    // Fetch the instrument record first (lightweight, from persisted catalog).
+    // Falls back to IN when the instrument is not found or has no region.
+    let instrumentRegion = 'IN';
+    try {
+      const instrumentRecord = await this.dependencies.stockResearchService
+        .marketDataService?.getInstrument?.(instrumentId) ?? null;
+      if (instrumentRecord?.region) instrumentRegion = String(instrumentRecord.region).toUpperCase();
+    } catch {
+      // If the lookup fails, retain IN default — do not block the summary.
+    }
+
     const [research, signal, smartMoney, marketContext, strategyDecision, tradePlan, todayRun] = await Promise.all([
       this.safe(() => this.dependencies.stockResearchService.workbench(instrumentId, '1Y')),
       this.safe(() => this.dependencies.signalService.latestForInstrument(instrumentId)),
       this.safe(() => this.dependencies.smartMoneyService.stock(instrumentId)),
-      this.safe(() => this.dependencies.marketContextService.summary()),
+      // Pass the derived region so the market-context summary reflects the right market.
+      // IN is the default when region is absent/unknown.
+      this.safe(() => this.dependencies.marketContextService.summary({ region: instrumentRegion })),
       strategyDecisionSvc
         ? this.safe(() => strategyDecisionSvc.latestForInstrument(instrumentId))
         : Promise.resolve(null),
@@ -412,10 +426,13 @@ export class AiInvestmentCopilotService {
     });
   }
 
-  async marketBrief(userId = 'default-user'): Promise<CopilotSummaryResponse> {
+  async marketBrief(userId = 'default-user', region?: string): Promise<CopilotSummaryResponse> {
     await this.guardCopilotUsage(userId);
+    // Thread region from the request scope so a US market brief fetches the US regime/breadth.
+    // Falls back to IN when region is absent (preserves existing IN behaviour).
+    const effectiveRegion = region ? String(region).trim().toUpperCase() || 'IN' : 'IN';
     const [context, smartSectors] = await Promise.all([
-      this.safe(() => this.dependencies.marketContextService.summary()),
+      this.safe(() => this.dependencies.marketContextService.summary({ region: effectiveRegion })),
       this.safe(() => this.dependencies.smartMoneyService.sectors('3M')),
     ]);
     const leading = context?.topSectors ?? [];

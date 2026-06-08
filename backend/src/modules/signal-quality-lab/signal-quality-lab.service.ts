@@ -1,6 +1,7 @@
 import { MarketDataFoundationService } from '../market-data-foundation';
 import { SignalGenerationEngineService, type SignalItem, type SignalResultDto } from '../signal-generation-engine';
 import { HistoricalContextSnapshotsService } from '../historical-context-snapshots';
+import { resolveMarketProfile } from '../../shared/utils/market-profile';
 import { DataQualityEngineService } from '../data-quality-engine';
 import { SignalQualityLabRepository } from './signal-quality-lab.repository';
 import type {
@@ -555,9 +556,10 @@ export class SignalQualityLabService {
       const horizons = Object.keys({ '1D': 1, '5D': 5, '10D': 10, '20D': 20, '60D': 60 }) as QualityHorizon[];
       const rows: SignalOutcomeUpsert[] = [];
 
-      // CB-8: fetch ^NSEI prices once for the batch (covering the full date range).
+      // CB-8: fetch benchmark prices once for the batch (covering the full date range).
+      // Benchmark symbol is resolved per region (^NSEI for IN, ^GSPC for US, etc.).
       // Used to compute same-horizon benchmark return and alpha alongside signal return.
-      const benchmarkPrices = await this.fetchBenchmarkPrices(outcomes).catch(() => [] as PricePoint[]);
+      const benchmarkPrices = await this.fetchBenchmarkPrices(outcomes, input.region).catch(() => [] as PricePoint[]);
 
       for (const outcomeSet of outcomes) {
         if (!outcomeSet.signalResultId) continue;
@@ -1276,17 +1278,19 @@ export class SignalQualityLabService {
   }
 
   /**
-   * CB-8: Fetch and normalize the Nifty 50 (^NSEI) price series for a batch of outcomes.
+   * CB-8: Fetch and normalize the region benchmark price series for a batch of outcomes.
    *
    * Fetches a window wide enough to cover the earliest signal date through the
    * latest horizon end (60 trading days ≈ 90 calendar days after the latest signal).
    * Returns a normalized (deduplicated, ascending) PricePoint array identical to
    * the per-instrument series, so benchmark[N] = N trading days from entry.
    *
-   * Returns an empty array if ^NSEI data is unavailable — callers treat null benchmark
-   * as "data unavailable" and leave benchmarkReturnPercent/alphaPercent as null.
+   * Benchmark symbol is resolved per region via resolveMarketProfile (^NSEI for IN,
+   * ^GSPC for US, etc.). region defaults to IN for backward-compatibility.
+   * Returns an empty array when benchmark data is unavailable — callers treat null
+   * benchmark as "data unavailable" and leave benchmarkReturnPercent/alphaPercent as null.
    */
-  private async fetchBenchmarkPrices(outcomes: SignalOutcomeSet[]): Promise<PricePoint[]> {
+  private async fetchBenchmarkPrices(outcomes: SignalOutcomeSet[], region?: string): Promise<PricePoint[]> {
     if (outcomes.length === 0) return [];
     const signalDates = outcomes
       .map((o) => this.utcTradingDay(new Date(o.generatedAt)).getTime())
@@ -1295,8 +1299,9 @@ export class SignalQualityLabService {
     const earliest = new Date(Math.min(...signalDates));
     // Extend end by 90 calendar days to cover the 60D horizon
     const latest = new Date(Math.max(...signalDates) + 90 * 24 * 60 * 60 * 1000);
+    const benchmarkSymbol = resolveMarketProfile({ region }).benchmark.symbol;
     try {
-      const raw = await (this.marketDataService as any).listPrices('^NSEI', 5000, earliest, latest);
+      const raw = await (this.marketDataService as any).listPrices(benchmarkSymbol, 5000, earliest, latest);
       if (!raw || !Array.isArray(raw)) return [];
       return this.normalizePrices(
         raw.map((p: any) => ({

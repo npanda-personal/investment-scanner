@@ -1513,6 +1513,8 @@ export interface ScreenerRow {
   deliveryPct: number | null;
   range52wPositionPct: number | null;
   inFnoBan: boolean;
+  currency: string;
+  region?: string;
 }
 
 export interface ScreenerResult {
@@ -1540,6 +1542,8 @@ export interface MarketScanRow52w {
   priceBasis: 'ADJUSTED_CLOSE' | 'CLOSE_FALLBACK';
   signalDirection: 'BULLISH' | 'BEARISH' | 'NEUTRAL' | null;
   signalScore: number | null;
+  currency: string;
+  region?: string;
 }
 
 export interface MarketScanSummary52w {
@@ -1563,6 +1567,8 @@ export interface MarketScanRowDeliverySpike {
   lookbackBars: number;
   signalDirection: 'BULLISH' | 'BEARISH' | 'NEUTRAL' | null;
   signalScore: number | null;
+  currency: string;
+  region?: string;
 }
 
 export interface MarketScanSummaryDeliverySpike {
@@ -1586,6 +1592,8 @@ export interface MarketScanRowVolumeSpike {
   lookbackBars: number;
   signalDirection: 'BULLISH' | 'BEARISH' | 'NEUTRAL' | null;
   signalScore: number | null;
+  currency: string;
+  region?: string;
 }
 
 export interface MarketScanSummaryVolumeSpike {

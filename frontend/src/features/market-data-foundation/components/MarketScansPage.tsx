@@ -19,7 +19,8 @@ import {
 import { useCallback, useEffect, useState } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import { PageHeader } from '@/shared/components';
-import { inr } from '@/shared/format/money';
+import { useMarketScope } from '@/contexts/MarketScopeContext';
+import { money } from '@/shared/format/money';
 import type {
   MarketScanSummary52w,
   MarketScanSummaryDeliverySpike,
@@ -125,9 +126,9 @@ function formatVolume(vol: number): string {
 
 // ---- 52W High/Low Table ----
 
-function Table52w({ rows, scanType }: { rows: MarketScanRow52w[]; scanType: '52w-high' | '52w-low' }) {
+function Table52w({ rows, scanType, currency }: { rows: MarketScanRow52w[]; scanType: '52w-high' | '52w-low'; currency?: string }) {
   if (!rows.length) {
-    return <EmptyState message="No stocks found matching the scan criteria." />;
+    return <EmptyState message="No instruments found matching the scan criteria." />;
   }
   return (
     <TableContainer>
@@ -161,16 +162,16 @@ function Table52w({ rows, scanType }: { rows: MarketScanRow52w[]; scanType: '52w
               </TableCell>
               <TableCell><SectorChip sector={row.sector} /></TableCell>
               <TableCell align="right">
-                <Typography variant="body2" fontWeight={600}>{inr(row.currentPrice)}</Typography>
+                <Typography variant="body2" fontWeight={600}>{money(row.currentPrice, currency)}</Typography>
               </TableCell>
               <TableCell align="right">
                 <Typography variant="body2" color={scanType === '52w-high' ? 'success.main' : 'text.secondary'}>
-                  {inr(row.high52w)}
+                  {money(row.high52w, currency)}
                 </Typography>
               </TableCell>
               <TableCell align="right">
                 <Typography variant="body2" color={scanType === '52w-low' ? 'error.main' : 'text.secondary'}>
-                  {inr(row.low52w)}
+                  {money(row.low52w, currency)}
                 </Typography>
               </TableCell>
               <TableCell align="right">
@@ -339,6 +340,9 @@ function TableVolumeSpike({ rows }: { rows: MarketScanRowVolumeSpike[] }) {
 // ---- Main Page ----
 
 export default function MarketScansPage() {
+  const { scope, profile } = useMarketScope();
+  // Delivery-spike is NSE-delivery-based — not applicable to crypto.
+  const visibleTabs = TABS.filter((t) => t.id !== 'delivery-spike' || profile.capabilities.hasDelivery);
   const [activeTab, setActiveTab] = useState<TabId>('52w-high');
 
   const [data52wHigh, setData52wHigh] = useState<MarketScanSummary52w | null>(null);
@@ -365,22 +369,22 @@ export default function MarketScansPage() {
     try {
       switch (tab) {
         case '52w-high': {
-          const result = await fetchMarketScan52wHigh({ region: 'IN', limit: 30 });
+          const result = await fetchMarketScan52wHigh({ region: scope.region, assetType: scope.assetType, limit: 30 });
           setData52wHigh(result);
           break;
         }
         case '52w-low': {
-          const result = await fetchMarketScan52wLow({ region: 'IN', limit: 30 });
+          const result = await fetchMarketScan52wLow({ region: scope.region, assetType: scope.assetType, limit: 30 });
           setData52wLow(result);
           break;
         }
         case 'delivery-spike': {
-          const result = await fetchMarketScanDeliverySpike({ region: 'IN', limit: 30 });
+          const result = await fetchMarketScanDeliverySpike({ region: scope.region, assetType: scope.assetType, limit: 30 });
           setDataDelivery(result);
           break;
         }
         case 'volume-spike': {
-          const result = await fetchMarketScanVolumeSpike({ region: 'IN', limit: 30 });
+          const result = await fetchMarketScanVolumeSpike({ region: scope.region, assetType: scope.assetType, limit: 30 });
           setDataVolume(result);
           break;
         }
@@ -391,7 +395,18 @@ export default function MarketScansPage() {
     } finally {
       setLoading((prev) => ({ ...prev, [tab]: false }));
     }
-  }, []);
+  }, [scope.region, scope.assetType]);
+
+  // Reset cached scan data and active tab when the market scope changes so a
+  // crypto switch never shows stale equity rows (and vice-versa).
+  useEffect(() => {
+    setData52wHigh(null);
+    setData52wLow(null);
+    setDataDelivery(null);
+    setDataVolume(null);
+    setActiveTab((prev) => (visibleTabs.some((t) => t.id === prev) ? prev : '52w-high'));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scope.region, scope.assetType]);
 
   // Load active tab on first render and on tab switch if not yet loaded
   useEffect(() => {
@@ -434,7 +449,7 @@ export default function MarketScansPage() {
         return (
           <>
             <ScanWarning warnings={data52wHigh.warnings} />
-            <Table52w rows={data52wHigh.results} scanType="52w-high" />
+            <Table52w rows={data52wHigh.results} scanType="52w-high" currency={profile.currency} />
           </>
         );
       case '52w-low':
@@ -442,7 +457,7 @@ export default function MarketScansPage() {
         return (
           <>
             <ScanWarning warnings={data52wLow.warnings} />
-            <Table52w rows={data52wLow.results} scanType="52w-low" />
+            <Table52w rows={data52wLow.results} scanType="52w-low" currency={profile.currency} />
           </>
         );
       case 'delivery-spike':
@@ -477,7 +492,9 @@ export default function MarketScansPage() {
     <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 1400, mx: 'auto' }}>
       <PageHeader
         title="Market Scans"
-        subtitle="Daily screening scans for Indian NSE/BSE equities. Persisted-read — data reflects the latest ingested exchange files."
+        subtitle={profile.isCrypto
+          ? 'Daily screening scans for crypto assets (top market-cap universe). Persisted-read — data reflects the latest ingested OHLCV.'
+          : `Daily screening scans for ${scope.region === 'IN' ? 'Indian NSE/BSE' : scope.region} equities. Persisted-read — data reflects the latest ingested price data.`}
       />
 
       <Paper sx={{ p: 0 }}>
@@ -488,7 +505,7 @@ export default function MarketScansPage() {
             variant="scrollable"
             scrollButtons="auto"
           >
-            {TABS.map((tab) => (
+            {visibleTabs.map((tab) => (
               <Tab key={tab.id} value={tab.id} label={tab.label} />
             ))}
           </Tabs>
@@ -496,10 +513,10 @@ export default function MarketScansPage() {
 
         <Stack direction="row" alignItems="center" spacing={2} sx={{ px: 2, pt: 1.5, pb: 0.5 }}>
           <Typography variant="caption" color="text.secondary">
-            {activeTab === '52w-high' && 'Stocks within 5% of their 52-week adjusted-close high (breakout watch)'}
-            {activeTab === '52w-low' && 'Stocks within 5% of their 52-week adjusted-close low (breakdown watch)'}
+            {activeTab === '52w-high' && `${profile.isCrypto ? 'Coins' : 'Stocks'} within 5% of their 52-week high (breakout watch)`}
+            {activeTab === '52w-low' && `${profile.isCrypto ? 'Coins' : 'Stocks'} within 5% of their 52-week low (breakdown watch)`}
             {activeTab === 'delivery-spike' && 'Stocks with latest delivery% materially above recent rolling average (institutional-interest proxy)'}
-            {activeTab === 'volume-spike' && 'Stocks with latest volume materially above recent rolling average'}
+            {activeTab === 'volume-spike' && `${profile.isCrypto ? 'Coins' : 'Stocks'} with latest volume materially above recent rolling average`}
           </Typography>
           {currentResultCount !== null && !isLoading && (
             <Chip label={`${currentResultCount} results`} size="small" color="default" />

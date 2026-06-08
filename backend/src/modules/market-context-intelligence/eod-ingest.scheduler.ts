@@ -39,6 +39,28 @@ import prisma from '../../db/prisma';
 import { ingestFiiDii } from './fii-dii.service';
 import { ingestBulkBlockDeals } from './bulk-block-deals.service';
 import { ingestFnoBanList } from '../../modules/smart-money-intelligence/fno-ban.service';
+import { ingestFoBhavcopy } from '../../modules/derivatives-intelligence/derivatives-intelligence.fo-bhavcopy.service';
+import { computeOiBuildup } from '../../modules/derivatives-intelligence/derivatives-intelligence.oi-buildup.service';
+import { computeOptionMetrics } from '../../modules/derivatives-intelligence/derivatives-intelligence.option-metrics.service';
+import { ingestParticipantOi } from '../../modules/derivatives-intelligence/derivatives-intelligence.participant-oi.service';
+import { enrichDerivativeCatalogMetadata } from '../../modules/derivatives-intelligence/derivatives-intelligence.catalog-enrichment.service';
+
+/**
+ * Ingest the F&O bhavcopy, then compute the derived OI-buildup and option-metric
+ * (PCR / max-pain / support-resistance) rows on the freshly persisted contracts,
+ * and back-fill Stock derivative metadata (lot size / nearest expiry).
+ * Returns a combined result for logging.
+ */
+async function ingestFoBhavcopyAndBuildup(): Promise<unknown> {
+  const ingest = await ingestFoBhavcopy();
+  if (ingest.status === 'success' && ingest.tradingDate) {
+    const buildup = await computeOiBuildup(ingest.tradingDate);
+    const optionMetrics = await computeOptionMetrics(ingest.tradingDate);
+    const catalog = await enrichDerivativeCatalogMetadata(ingest.tradingDate);
+    return { ingest, buildup, optionMetrics, catalog };
+  }
+  return { ingest };
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -91,12 +113,118 @@ export class EodIngestScheduler {
       run: ingestFnoBanList,
       lastFiredDate: null,
     },
+    {
+      name: 'F&O Bhavcopy OI',
+      utcHour: 13,
+      utcMinute: 20,  // 18:50 IST = 13:20 UTC (margin past ~6pm IST publish)
+      run: ingestFoBhavcopyAndBuildup,
+      lastFiredDate: null,
+    },
+    {
+      name: 'F&O Participant OI',
+      utcHour: 13,
+      utcMinute: 25,  // 18:55 IST = 13:25 UTC
+      run: ingestParticipantOi,
+      lastFiredDate: null,
+    },
     // NOTE: Market Pulse snapshot and Research Hub snapshot are intentionally
-    // NOT listed here. Both are now ledger-tracked stages owned by the
-    // pipeline-orchestration chain (MARKET_PULSE_REFRESH fires as downstream
+    // NOT listed here for IN/India. Both are now ledger-tracked stages owned by
+    // the pipeline-orchestration chain (MARKET_PULSE_REFRESH fires as downstream
     // of SECTOR_INTELLIGENCE_REFRESH; RESEARCH_PROJECTION already ran earlier
     // in the chain before TODAY_REVIEW). Firing them here as well would cause
     // double execution and pool contention.
+
+    // -----------------------------------------------------------------------
+    // US PERSISTED-READ SURFACE REFRESH — post-US-close (NYSE closes 21:00 UTC;
+    // stagger starting 22:00 UTC so prices are already stored by MarketDataFoundationScheduler).
+    // These jobs regenerate snapshot tables from already-persisted prices/signals
+    // and do NOT fetch live data — safe to call any time after market close.
+    // -----------------------------------------------------------------------
+    {
+      name: 'US Market Scan Snapshots',
+      utcHour: 22,
+      utcMinute: 0,  // 22:00 UTC — ~1 h after NYSE close
+      run: async () => {
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const { MarketDataFoundationService } = require('../../modules/market-data-foundation/market-data-foundation.service') as typeof import('../../modules/market-data-foundation/market-data-foundation.service');
+          const svc = new MarketDataFoundationService();
+          return (svc as any).refreshMarketScanSnapshots({ region: 'US', assetType: 'STOCK' });
+        } catch (err) {
+          console.warn('[EodIngestScheduler] US Market Scan Snapshots error (non-fatal):', err instanceof Error ? err.message : String(err));
+          return null;
+        }
+      },
+      lastFiredDate: null,
+    },
+    {
+      name: 'US Stock Interest Snapshots',
+      utcHour: 22,
+      utcMinute: 10, // stagger 10 min
+      run: async () => {
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const { StockInterestSnapshotService } = require('../../modules/market-intelligence/stock-interest-snapshot.service') as typeof import('../../modules/market-intelligence/stock-interest-snapshot.service');
+          const svc = new StockInterestSnapshotService();
+          return (svc as any).refreshSnapshots({ region: 'US', assetType: 'STOCK' });
+        } catch (err) {
+          console.warn('[EodIngestScheduler] US Stock Interest Snapshots error (non-fatal):', err instanceof Error ? err.message : String(err));
+          return null;
+        }
+      },
+      lastFiredDate: null,
+    },
+    {
+      name: 'US Market Pulse Snapshot',
+      utcHour: 22,
+      utcMinute: 20, // stagger 20 min
+      run: async () => {
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const { MarketPulseSnapshotService } = require('../../modules/market-context-intelligence/market-pulse-snapshot.service') as typeof import('../../modules/market-context-intelligence/market-pulse-snapshot.service');
+          const svc = new MarketPulseSnapshotService();
+          return (svc as any).refreshSnapshot({ region: 'US', assetType: 'STOCK' });
+        } catch (err) {
+          console.warn('[EodIngestScheduler] US Market Pulse Snapshot error (non-fatal):', err instanceof Error ? err.message : String(err));
+          return null;
+        }
+      },
+      lastFiredDate: null,
+    },
+    {
+      name: 'US Research Hub Overview',
+      utcHour: 22,
+      utcMinute: 30, // stagger 30 min
+      run: async () => {
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const { ResearchHubService } = require('../../modules/research-hub/research-hub.service') as typeof import('../../modules/research-hub/research-hub.service');
+          const svc = new ResearchHubService();
+          return (svc as any).refreshOverview({ region: 'US', assetType: 'STOCK' });
+        } catch (err) {
+          console.warn('[EodIngestScheduler] US Research Hub Overview error (non-fatal):', err instanceof Error ? err.message : String(err));
+          return null;
+        }
+      },
+      lastFiredDate: null,
+    },
+    {
+      name: 'US Workbench Snapshots',
+      utcHour: 22,
+      utcMinute: 40, // stagger 40 min
+      run: async () => {
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const { WorkbenchRefreshService } = require('../../modules/stock-research-workbench') as typeof import('../../modules/stock-research-workbench');
+          const svc = new WorkbenchRefreshService();
+          return (svc as any).refreshWorkbenchSnapshots({ region: 'US', assetType: 'STOCK' });
+        } catch (err) {
+          console.warn('[EodIngestScheduler] US Workbench Snapshots error (non-fatal):', err instanceof Error ? err.message : String(err));
+          return null;
+        }
+      },
+      lastFiredDate: null,
+    },
   ];
 
   constructor(tickIntervalMinutes = 5) {
@@ -188,6 +316,18 @@ export class EodIngestScheduler {
         table: 'fno_ban_list',
         delayMs: 10_000,
         ingest: ingestFnoBanList,
+      },
+      {
+        name: 'F&O Bhavcopy OI',
+        table: 'fo_bhavcopy_contracts',
+        delayMs: 15_000,
+        ingest: ingestFoBhavcopyAndBuildup,
+      },
+      {
+        name: 'F&O Participant OI',
+        table: 'fo_participant_oi',
+        delayMs: 20_000,
+        ingest: ingestParticipantOi,
       },
     ];
 

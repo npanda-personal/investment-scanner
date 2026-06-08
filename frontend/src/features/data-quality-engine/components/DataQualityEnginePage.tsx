@@ -513,7 +513,7 @@ const DataQualityEnginePage: React.FC = () => {
             </Box>
             <Box>
               <Typography variant="subtitle2" gutterBottom>Data Gaps</Typography>
-              {selected.dataGaps.length ? selected.dataGaps.map((item) => <Typography key={item} variant="body2" color="text.secondary">- {item}</Typography>) : <Typography color="text.secondary" variant="body2">No major gaps detected.</Typography>}
+              {selected.dataGaps.length ? selected.dataGaps.map((item, i) => <Typography key={`${item}-${i}`} variant="body2" color="text.secondary">- {item}</Typography>) : <Typography color="text.secondary" variant="body2">No major gaps detected.</Typography>}
             </Box>
             <Box>
               <Typography variant="subtitle2" gutterBottom>Readiness Blockers</Typography>

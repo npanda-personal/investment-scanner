@@ -29,7 +29,7 @@ const tabs: Array<{ value: SignalTab; label: string }> = [
 ];
 
 const SignalsDashboardPage: React.FC = () => {
-  const { scope } = useMarketScope();
+  const { scope, profile } = useMarketScope();
   const [searchParams] = useSearchParams();
   const batchRunner = useBatchRunner<SignalRunResponse>();
   const [signals, setSignals] = useState<SignalResult[]>([]);
@@ -139,12 +139,13 @@ const SignalsDashboardPage: React.FC = () => {
       .catch(() => setLatestRun(null));
   }, [scope.region, scope.assetType]);
 
-  // Fetch F&O ban list once on mount. Silently swallows errors — no chips shown if unavailable.
+  // Fetch F&O ban list once on mount (NSE-only). Skipped for crypto — no F&O ban concept.
   useEffect(() => {
+    if (profile.isCrypto) { setFnoBanSymbols([]); return; }
     fetchFnoBanList()
       .then((res) => setFnoBanSymbols(res.symbols ?? []))
       .catch(() => setFnoBanSymbols([]));
-  }, []);
+  }, [profile.isCrypto]);
 
   // Build a Set for O(1) lookups — recomputed only when the raw symbols array changes.
   const bannedSymbolsSet = useMemo(() => new Set(fnoBanSymbols), [fnoBanSymbols]);
@@ -243,9 +244,13 @@ const SignalsDashboardPage: React.FC = () => {
             control={<Checkbox checked={showStrategyContext} onChange={(event) => setShowStrategyContext(event.target.checked)} />}
             label="Show strategy context"
           />
-          <Button variant="contained" onClick={runManualSignals} disabled={batchRunner.running} startIcon={batchRunner.running ? <CircularProgress size={16} color="inherit" /> : undefined}>
-            {batchRunner.running ? 'Running...' : 'Run Signals'}
-          </Button>
+          {profile.isCrypto ? (
+            <Chip variant="outlined" color="info" label="Crypto signals refresh automatically via the 24/7 pipeline" />
+          ) : (
+            <Button variant="contained" onClick={runManualSignals} disabled={batchRunner.running} startIcon={batchRunner.running ? <CircularProgress size={16} color="inherit" /> : undefined}>
+              {batchRunner.running ? 'Running...' : 'Run Signals'}
+            </Button>
+          )}
           <Button component={Link} to="/signals/quality" variant="outlined">View Signal Quality Lab</Button>
           <Button component={Link} to="/strategy" variant="outlined" startIcon={<FactCheckOutlined />}>View Strategy Decisions</Button>
         </Box>
@@ -327,19 +332,24 @@ const SignalsDashboardPage: React.FC = () => {
             </TextField>
             <TextField label="Min score" value={minScore} onChange={(event) => setMinScore(event.target.value)} />
             <TextField label="Signal type" value={signalType} onChange={(event) => setSignalType(event.target.value)} />
-            <TextField label="Sector" value={sector} onChange={(event) => setSector(event.target.value)} />
-            <TextField label="Country" value={country} onChange={(event) => setCountry(event.target.value)} />
-            <TextField select label="Strategy" value={strategyCode} onChange={(event) => setStrategyCode(event.target.value)}>
-              <MenuItem value="">Any</MenuItem>
-              <MenuItem value="TREND_MOMENTUM">Trend Momentum</MenuItem>
-              <MenuItem value="PULLBACK_IN_UPTREND">Pullback In Uptrend</MenuItem>
-              <MenuItem value="DEFENSIVE_EXIT">Defensive Exit</MenuItem>
-            </TextField>
-            <TextField select label="Reliability Tier" value={reliabilityTier} onChange={(event) => setReliabilityTier(event.target.value as ReliabilityTier | '')}>
-              <MenuItem value="">Any</MenuItem>
-              <MenuItem value="FULL">Full</MenuItem>
-              <MenuItem value="PARTIAL">Partial</MenuItem>
-            </TextField>
+            {/* Sector/Country/Strategy/Reliability are equity-only concepts — hidden for crypto. */}
+            {!profile.isCrypto && <TextField label="Sector" value={sector} onChange={(event) => setSector(event.target.value)} />}
+            {!profile.isCrypto && <TextField label="Country" value={country} onChange={(event) => setCountry(event.target.value)} />}
+            {!profile.isCrypto && (
+              <TextField select label="Strategy" value={strategyCode} onChange={(event) => setStrategyCode(event.target.value)}>
+                <MenuItem value="">Any</MenuItem>
+                <MenuItem value="TREND_MOMENTUM">Trend Momentum</MenuItem>
+                <MenuItem value="PULLBACK_IN_UPTREND">Pullback In Uptrend</MenuItem>
+                <MenuItem value="DEFENSIVE_EXIT">Defensive Exit</MenuItem>
+              </TextField>
+            )}
+            {!profile.isCrypto && (
+              <TextField select label="Reliability Tier" value={reliabilityTier} onChange={(event) => setReliabilityTier(event.target.value as ReliabilityTier | '')}>
+                <MenuItem value="">Any</MenuItem>
+                <MenuItem value="FULL">Full</MenuItem>
+                <MenuItem value="PARTIAL">Partial</MenuItem>
+              </TextField>
+            )}
             <FormControlLabel control={<Checkbox checked={onlyStrategyEligible} onChange={(event) => setOnlyStrategyEligible(event.target.checked)} />} label="Only strategy-eligible" />
             <FormControlLabel control={<Checkbox checked={excludeNoiseFiltered} onChange={(event) => setExcludeNoiseFiltered(event.target.checked)} />} label="Exclude noise-filtered" />
             <FormControlLabel control={<Checkbox checked={hasBlockedStrategies} onChange={(event) => setHasBlockedStrategies(event.target.checked)} />} label="Has blocked strategies" />

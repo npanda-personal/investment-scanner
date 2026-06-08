@@ -30,6 +30,8 @@ import TrendingDownIcon from '@mui/icons-material/TrendingDown';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import BarChartIcon from '@mui/icons-material/BarChart';
+import { useMarketScope } from '@/contexts/MarketScopeContext';
+import { NotApplicableForAssetClass } from '@/shared/components/NotApplicableForAssetClass';
 import { fetchEventFeed, type EventFeedEnvelope, type EventTone, type EventType, type MarketEvent } from '../api/marketIntelligenceService';
 
 // ---------------------------------------------------------------------------
@@ -229,6 +231,7 @@ const FILTER_OPTIONS: Array<{ value: FilterType; label: string }> = [
 // ---------------------------------------------------------------------------
 
 export function MarketEventsPage() {
+  const { profile } = useMarketScope();
   const [days, setDays] = useState(5);
   const [filterType, setFilterType] = useState<FilterType>('ALL');
   const [envelope, setEnvelope] = useState<EventFeedEnvelope | null>(null);
@@ -257,6 +260,25 @@ export function MarketEventsPage() {
   }, [envelope, filterType]);
 
   const groups = useMemo(() => groupByDate(filteredEvents), [filteredEvents]);
+
+  if (profile.isCrypto) {
+    return (
+      <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 900, mx: 'auto' }}>
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="h5" fontWeight={700}>
+            Market Events
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Morning briefing — chronological feed from persisted data. Research support only, not investment advice.
+          </Typography>
+        </Box>
+        <NotApplicableForAssetClass
+          feature="Market Events"
+          detail="Crypto coverage in this release is available on Signals, Market Scans, and the Instrument workspace. This view will support crypto in a later update."
+        />
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 900, mx: 'auto' }}>

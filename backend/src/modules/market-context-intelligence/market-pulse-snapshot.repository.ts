@@ -1,5 +1,6 @@
 import type { PrismaClient } from '@prisma/client';
 import prisma from '../../db/prisma';
+import { resolveMarketProfile } from '../../shared/utils/market-profile';
 import type {
   MarketPulseAdvanceDeclineSummary,
   MarketPulseCalculationData,
@@ -21,7 +22,9 @@ const EMPTY_AD: MarketPulseAdvanceDeclineSummary = { advances: 0, declines: 0, r
 const PRICE_LOOKBACK_DAYS = 420;
 const DELIVERY_LOOKBACK_DAYS = 90;
 const PRICE_SYMBOL_BATCH_SIZE = 500;
-const INDEX_PRICE_SOURCES = ['NSE_INDEX_EOD', 'NIFTY_SECTOR_INDEX'];
+// IN-specific NSE index sources. Non-IN regions filter by benchmark symbol instead
+// (Yahoo tags all equities YAHOO_EOD, so source can't identify an index).
+const INDEX_PRICE_SOURCES_IN = ['NSE_INDEX_EOD', 'NIFTY_SECTOR_INDEX'];
 const SOURCE_SEGMENTS = ['CM', 'INDEX', 'SECTOR_INDEX', 'DELIVERY'];
 
 export class MarketPulseSnapshotRepository {
@@ -98,21 +101,33 @@ export class MarketPulseSnapshotRepository {
     const priceSince = new Date(generatedAt.getTime() - PRICE_LOOKBACK_DAYS * 24 * 60 * 60 * 1000);
     const deliverySince = new Date(generatedAt.getTime() - DELIVERY_LOOKBACK_DAYS * 24 * 60 * 60 * 1000);
 
-    const [stockUniverse, indexPrices, deliverySnapshots, sourceImports] = await Promise.all([
+    const normalizedRegion = String(region || '').trim().toUpperCase();
+    const isIN = normalizedRegion === 'IN';
+
+    const [stockUniverse, indexPrices, deliverySnapshots, sourceImports, nonInSectorPrices] = await Promise.all([
       this.loadStockUniverse(region, assetType),
       this.loadIndexPricePoints(region, priceSince),
       this.loadDeliverySnapshots(deliverySince),
       this.loadSourceImports(region),
+      // Non-IN sector proxies: SPDR sector ETFs (US) supply the pulse's sector-strength score
+      // (Yahoo tags all equities YAHOO_EOD, so the index-price query can't pick them up).
+      isIN ? Promise.resolve([] as MarketPulsePricePoint[]) : this.loadSectorEtfPrices(region, priceSince),
     ]);
     const stockPrices = await this.loadStockPricePoints(region, stockUniverse.map((stock) => stock.symbol), priceSince);
-
     return {
       region,
       assetType,
       stockUniverse,
       stockPrices,
-      indexPrices: indexPrices.filter((price) => String(price.source || '').toUpperCase() === 'NSE_INDEX_EOD'),
-      sectorIndexPrices: indexPrices.filter((price) => String(price.source || '').toUpperCase() === 'NIFTY_SECTOR_INDEX'),
+      // IN: split NSE_INDEX_EOD (headline indices + VIX) vs NIFTY_SECTOR_INDEX (sector indices).
+      // non-IN: all YAHOO_EOD rows go to indexPrices; sectorIndexPrices is empty until a sector
+      // index seed is built for US/EU.
+      indexPrices: isIN
+        ? indexPrices.filter((price) => String(price.source || '').toUpperCase() === 'NSE_INDEX_EOD')
+        : indexPrices,
+      sectorIndexPrices: isIN
+        ? indexPrices.filter((price) => String(price.source || '').toUpperCase() === 'NIFTY_SECTOR_INDEX')
+        : nonInSectorPrices,
       deliverySnapshots,
       sourceImports,
     };
@@ -169,12 +184,20 @@ export class MarketPulseSnapshotRepository {
   }
 
   private async loadIndexPricePoints(region: string, since: Date): Promise<MarketPulsePricePoint[]> {
+    // Index price sources are region-specific:
+    //   IN  → NSE_INDEX_EOD + NIFTY_SECTOR_INDEX
+    //   US  → YAHOO_EOD  (Yahoo Finance writes ^GSPC price ticks with this source tag)
+    //   others → YAHOO_EOD (same provider used for non-IN equity seeds)
+    const normalizedRegion = String(region || '').trim().toUpperCase();
+    // IN uses index-specific source tags (NSE_INDEX_EOD/NIFTY_SECTOR_INDEX). Non-IN
+    // providers (Yahoo) tag EVERY equity with the same source (YAHOO_EOD), so source
+    // cannot distinguish an index from a stock — that would surface random stocks as
+    // "indices". Restrict non-IN to the region's benchmark symbol (e.g. US → ^GSPC).
+    const where: Record<string, unknown> = normalizedRegion === 'IN'
+      ? { region, source: { in: INDEX_PRICE_SOURCES_IN }, timestamp: { gte: since } }
+      : { region, symbol: resolveMarketProfile({ region }).benchmark.symbol, timestamp: { gte: since } };
     const rows = await (this.db as any).priceTick.findMany({
-      where: {
-        region,
-        source: { in: INDEX_PRICE_SOURCES },
-        timestamp: { gte: since },
-      },
+      where,
       select: {
         symbol: true,
         timestamp: true,
@@ -183,6 +206,25 @@ export class MarketPulseSnapshotRepository {
         volume: true,
         source: true,
       },
+      orderBy: [{ symbol: 'asc' }, { timestamp: 'desc' }],
+    });
+    return rows.map((row: unknown) => this.toPricePoint(row));
+  }
+
+  /**
+   * Non-IN sector proxies for the pulse sector-strength score. US uses the 11 SPDR
+   * sector ETFs (the same set the sector-rotation pipeline uses). Returns [] for
+   * regions without curated sector proxies.
+   */
+  private async loadSectorEtfPrices(region: string, since: Date): Promise<MarketPulsePricePoint[]> {
+    const SECTOR_ETF_SYMBOLS_BY_REGION: Record<string, string[]> = {
+      US: ['XLK', 'XLF', 'XLV', 'XLE', 'XLY', 'XLP', 'XLI', 'XLB', 'XLRE', 'XLU', 'XLC'],
+    };
+    const symbols = SECTOR_ETF_SYMBOLS_BY_REGION[String(region || '').trim().toUpperCase()] || [];
+    if (symbols.length === 0) return [];
+    const rows = await (this.db as any).priceTick.findMany({
+      where: { region, symbol: { in: symbols }, timestamp: { gte: since } },
+      select: { symbol: true, timestamp: true, close: true, adjustedClose: true, volume: true, source: true },
       orderBy: [{ symbol: 'asc' }, { timestamp: 'desc' }],
     });
     return rows.map((row: unknown) => this.toPricePoint(row));

@@ -157,6 +157,25 @@ export interface InstitutionalActivitySectorsSection {
   topDistributing: Array<{ sector: string; sectorStatus: string }>;
 }
 
+export interface OiBuildupHighlight {
+  underlying: string;
+  buildupLabel: string;
+  oiChangePct: number | null;
+  priceChangePct: number | null;
+}
+
+export interface InstitutionalActivityOiBuildupSection {
+  status: 'ready' | 'missing' | 'error';
+  asOf: string | null;
+  marketPcr: number | null;
+  longBuildupCount: number;
+  shortBuildupCount: number;
+  shortCoveringCount: number;
+  longUnwindingCount: number;
+  topLongBuildup: OiBuildupHighlight[];
+  topShortBuildup: OiBuildupHighlight[];
+}
+
 export interface InstitutionalActivityResponse {
   assembledAt: string;
   narrative: string;
@@ -164,6 +183,7 @@ export interface InstitutionalActivityResponse {
   deals: InstitutionalActivityDealsSection;
   fnoBan: InstitutionalActivityFnoBanSection;
   sectors: InstitutionalActivitySectorsSection;
+  oiBuildup: InstitutionalActivityOiBuildupSection;
 }
 
 export async function fetchInstitutionalActivity(): Promise<InstitutionalActivityResponse> {

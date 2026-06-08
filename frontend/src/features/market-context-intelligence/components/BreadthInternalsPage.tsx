@@ -32,6 +32,8 @@ import {
 } from 'recharts';
 import { fetchBreadthInternals } from '../api/marketContextIntelligenceService';
 import type { BreadthInternalsEnvelope, BreadthInternalsPoint } from '../types';
+import { useMarketScope } from '@/contexts/MarketScopeContext';
+import { NotApplicableForAssetClass } from '@/shared/components/NotApplicableForAssetClass';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -259,6 +261,7 @@ const DeltasTable: React.FC<{ envelope: BreadthInternalsEnvelope }> = ({ envelop
 const DAYS_OPTIONS = [14, 30, 60, 90];
 
 export const BreadthInternalsPage: React.FC = () => {
+  const { profile } = useMarketScope();
   const [days, setDays] = useState(60);
   const [envelope, setEnvelope] = useState<BreadthInternalsEnvelope | null>(null);
   const [loading, setLoading] = useState(true);
@@ -275,6 +278,20 @@ export const BreadthInternalsPage: React.FC = () => {
       })
       .finally(() => setLoading(false));
   }, [days]);
+
+  // Advance/decline breadth here is computed from NSE official A/D (India-only).
+  // Gate on institutional-flow capability so US/EU/crypto don't see Indian breadth.
+  if (!profile.capabilities.hasInstitutionalFlow) {
+    return (
+      <Box sx={{ p: 3, maxWidth: 1400, mx: 'auto' }}>
+        <Typography variant="h4" sx={{ mb: 2 }}>Breadth Internals</Typography>
+        <NotApplicableForAssetClass
+          feature="Breadth internals"
+          detail="Advance/decline breadth here is derived from NSE official data (India only). An equivalent free breadth feed for this market is not available in this release."
+        />
+      </Box>
+    );
+  }
 
   if (loading) {
     return (

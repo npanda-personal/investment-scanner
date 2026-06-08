@@ -27,6 +27,18 @@ model PriceTick {
   lastUpdatedTimestamp DateTime          @updatedAt
   dataStatus           String            @default("COMPLETE")
 
+  // DEFERRED P0 — cross-region symbol collision risk:
+  // The current unique key is ([symbol, timestamp]), which means a US ticker and an IN
+  // ticker that share the same symbol string (e.g. "IT") could collide on upsert.
+  // The correct key is @@unique([symbol, timestamp, region]).
+  // Guarded today at the app layer: upsertUsStock always passes region='US' and
+  // the IN ingest always passes region='IN', so a collision requires both to share
+  // both symbol AND timestamp — rare but not impossible.
+  // Migration path: hand-authored raw-SQL dedup + constraint swap (NOT `prisma migrate dev`
+  // on the shared DB — it would try to drop/recreate the hypertable).
+  // Owner must run: deduplicate rows where needed, then ALTER TABLE price_ticks
+  //   ADD CONSTRAINT price_ticks_symbol_timestamp_region_key UNIQUE (symbol, timestamp, region);
+  //   DROP CONSTRAINT price_ticks_symbol_timestamp_key;
   @@unique([symbol, timestamp])
   @@index([symbol, timestamp])
   @@index([region])
@@ -1577,4 +1589,398 @@ model MarketScanSnapshot {
   @@index([scanType, scanRange, region, assetType, tradingDate], map: "market_scan_snapshot_lookup_idx")
   @@index([tradingDate, region, assetType], map: "market_scan_snapshot_date_scope_idx")
   @@map("market_scan_snapshots")
+}
+
+// ===========================================================================
+// CRYPTO MARKET DATA — physically isolated storage (crypto_* tables)
+// ---------------------------------------------------------------------------
+// Crypto market data lives in its own table family so high-volume multi-market
+// data never co-mingles with the equity tables (stocks/price_ticks/...).  Domain
+// COMPUTE is shared (pure functions); only PERSISTENCE is routed by asset class.
+// These mirror their equity counterparts' fields so routed repositories can reuse
+// the same row-shaping logic; crypto rows FK into crypto_assets (never stocks).
+// Equity-only concepts (fundamentals, delivery, corporate actions, smart money,
+// earnings, sector/market-pulse) are intentionally NOT modelled here — those
+// features degrade for crypto via MarketProfile capability flags.
+// Low-volume orchestration metadata (pipeline_runs, pipeline_stage_runs,
+// market_data_sync_states) stays SHARED, discriminated by scopeAssetType=CRYPTO.
+// ===========================================================================
+
+model CryptoAsset {
+  id                              String                        @id @default(cuid())
+  symbol                          String                        @unique // Binance pair, e.g. BTCUSDT
+  name                            String
+  region                          String                        @default("GLOBAL")
+  exchange                        String?                       @default("CRYPTO")
+  currency                        String?                       @default("USD")
+  marketCap                       Decimal?
+  rank                            Int? // market-cap rank (1..N) from the universe source
+  assetType                       String?                       @default("CRYPTO")
+  instrumentSegment               String?                       @default("CRYPTO")
+  displaySymbol                   String? // BTC
+  providerSymbol                  String? // Binance pair symbol (BTCUSDT)
+  sourceSymbol                    String? // universe-source id (CoinPaprika "btc-bitcoin")
+  catalogSource                   String?
+  providerSupportStatus           String?
+  providerError                   String?
+  isDelisted                      Boolean                       @default(false)
+  source                          String                        @default("database")
+  dataStatus                      String                        @default("PARTIAL")
+  isActive                        Boolean                       @default(true)
+  lastSuccessfulDataLoadTimestamp DateTime?
+  // ── Descriptive metadata (CoinPaprika /coins/{id} + /tickers) ───────────────
+  description                     String?                       @db.Text
+  logoUrl                         String?
+  websiteUrl                      String?
+  categoryTags                    String[] // e.g. ["smart-contract-platform","defi"]
+  circulatingSupply               Decimal?
+  totalSupply                     Decimal?
+  maxSupply                       Decimal?
+  fullyDilutedValuation           Decimal?
+  athPrice                        Decimal?
+  athDate                         DateTime?
+  atlPrice                        Decimal?
+  atlDate                         DateTime?
+  genesisDate                     DateTime?
+  contractAddresses               Json? // { chain: address } across networks
+  metadataSource                  String?
+  metadataUpdatedAt               DateTime?
+  createdAt                       DateTime                      @default(now())
+  updatedAt                       DateTime                      @updatedAt
+  signalResults                   CryptoSignalResult[]
+  dataQualityEvaluations          CryptoDataQualityEvaluation[]
+  interestSnapshots               CryptoInterestSnapshot[]
+  fundamentalSnapshots            CryptoFundamentalSnapshot[]
+  events                          CryptoEvent[]
+
+  @@index([region, assetType, symbol], map: "crypto_assets_region_assetType_symbol_idx")
+  @@index([rank], map: "crypto_assets_rank_idx")
+  @@index([providerSupportStatus, isActive, isDelisted], map: "crypto_assets_support_active_delisted_idx")
+  @@map("crypto_assets")
+}
+
+// On-chain / protocol fundamentals (DefiLlama, free + commercial-OK). Coverage is
+// partial by nature — only DeFi protocols have TVL/fees/revenue; non-DeFi coins get
+// a row with coverageStatus=NONE so the gap is explicit rather than silently missing.
+model CryptoFundamentalSnapshot {
+  id                   String      @id @default(cuid())
+  instrumentId         String
+  asset                CryptoAsset @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+  symbol               String // BTCUSDT
+  snapshotDate         DateTime // UTC day of the snapshot
+  defillamaSlug        String?
+  category             String? // DeFi category (DEX, Lending, …)
+  chains               Json? // chains the protocol is deployed on
+  tvlUsd               Decimal?
+  tvlChange1dPct       Float?
+  tvlChange7dPct       Float?
+  fees24hUsd           Decimal?
+  fees7dUsd            Decimal?
+  revenue24hUsd        Decimal?
+  revenue30dUsd        Decimal?
+  annualizedRevenueUsd Decimal?
+  stakingApyPct        Float?
+  coverageStatus       String      @default("NONE") // FULL / PARTIAL / NONE
+  source               String      @default("DEFILLAMA")
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime    @updatedAt
+
+  @@unique([instrumentId, snapshotDate])
+  @@index([symbol, snapshotDate])
+  @@index([snapshotDate])
+  @@map("crypto_fundamental_snapshots")
+}
+
+// Upcoming/!past events (CoinMarketCal free tier): token unlocks, mainnet upgrades,
+// exchange listings, governance votes, airdrops. instrumentId nullable for events
+// that don't map to a tracked coin. Dormant until CRYPTO_COINMARKETCAL_API_KEY is set.
+model CryptoEvent {
+  id               String       @id @default(cuid())
+  instrumentId     String?
+  asset            CryptoAsset? @relation(fields: [instrumentId], references: [id], onDelete: SetNull)
+  symbol           String? // base ticker or pair
+  source           String       @default("COINMARKETCAL")
+  externalId       String // provider event id
+  title            String
+  description      String?      @db.Text
+  category         String? // UNLOCK / UPGRADE / LISTING / GOVERNANCE / AIRDROP / OTHER
+  eventDate        DateTime
+  dateConfidence   String? // CONFIRMED / ESTIMATED
+  isHot            Boolean      @default(false)
+  percentageChange Float?
+  votes            Int?
+  proofUrl         String?
+  sourceUrl        String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  @@unique([source, externalId])
+  @@index([eventDate])
+  @@index([instrumentId, eventDate])
+  @@index([category, eventDate])
+  @@map("crypto_events")
+}
+
+model CryptoPriceTick {
+  id                   String   @id @default(cuid())
+  symbol               String
+  region               String?  @default("GLOBAL")
+  exchange             String?
+  timestamp            DateTime
+  open                 Decimal
+  high                 Decimal
+  low                  Decimal
+  close                Decimal
+  adjustedClose        Decimal? // crypto has no splits/divs → equals close
+  volume               BigInt? // base-asset volume
+  quoteVolume          Decimal? // quote-asset (USD) volume from Binance klines
+  source               String? // e.g. BINANCE_KLINES
+  ingestionTimestamp   DateTime @default(now())
+  lastUpdatedTimestamp DateTime @updatedAt
+  dataStatus           String   @default("COMPLETE")
+
+  @@unique([symbol, timestamp])
+  @@index([symbol, timestamp])
+  @@map("crypto_price_ticks")
+}
+
+model CryptoLatestPrice {
+  symbol    String   @id
+  region    String?  @default("GLOBAL")
+  price     Decimal
+  timestamp DateTime
+  updatedAt DateTime @updatedAt
+
+  @@map("crypto_latest_prices")
+}
+
+model CryptoSignalGenerationRun {
+  id                            String               @id @default(cuid())
+  region                        String
+  assetType                     String
+  requestedByUserId             String
+  status                        String
+  modelVersion                  String
+  rulesetVersion                String
+  sourceDataDate                DateTime?
+  generatedDate                 DateTime
+  batchSize                     Int
+  offset                        Int
+  totalCount                    Int                  @default(0)
+  processedCount                Int                  @default(0)
+  generatedCount                Int                  @default(0)
+  updatedCount                  Int                  @default(0)
+  noOpCount                     Int                  @default(0)
+  duplicateOrIdempotentCount    Int                  @default(0)
+  skippedCount                  Int                  @default(0)
+  failedCount                   Int                  @default(0)
+  excludedByDataQuality         Int                  @default(0)
+  missingQualityEvaluationCount Int                  @default(0)
+  durationMs                    Int                  @default(0)
+  warnings                      Json
+  startedAt                     DateTime             @default(now())
+  completedAt                   DateTime?
+  createdAt                     DateTime             @default(now())
+  updatedAt                     DateTime             @updatedAt
+  signalResults                 CryptoSignalResult[]
+
+  @@index([region, assetType, modelVersion, generatedDate], map: "crypto_signal_gen_runs_scope_model_date_idx")
+  @@index([status, startedAt], map: "crypto_signal_gen_runs_status_started_idx")
+  @@map("crypto_signal_generation_runs")
+}
+
+model CryptoSignalResult {
+  id                             String                     @id @default(cuid())
+  instrumentId                   String
+  asset                          CryptoAsset                @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+  generationRunId                String?
+  generationRun                  CryptoSignalGenerationRun? @relation(fields: [generationRunId], references: [id], onDelete: SetNull)
+  symbol                         String
+  companyName                    String?
+  sector                         String?
+  country                        String?
+  score                          Float
+  direction                      String
+  confidence                     String
+  triggeredSignals               Json
+  negativeSignals                Json
+  explanation                    String
+  generatedAt                    DateTime                   @default(now())
+  generatedDate                  DateTime?
+  modelVersion                   String                     @default("signal-engine-v1")
+  rulesetVersion                 String?
+  sourceDataDate                 DateTime?
+  sourcePriceDate                DateTime?
+  scoringInputSummary            Json?
+  dataQualityEligibilitySnapshot Json?
+  source                         String                     @default("signal-generation-engine")
+  dataStatus                     String                     @default("PARTIAL")
+  reliabilityTier                String?
+  lifecycleState                 String?
+  priorScore                     Float?
+  createdAt                      DateTime                   @default(now())
+  updatedAt                      DateTime                   @updatedAt
+  signalOutcomes                 CryptoSignalOutcome[]
+
+  @@unique([instrumentId, modelVersion, generatedDate])
+  @@index([generationRunId], map: "crypto_signal_results_run_idx")
+  @@index([modelVersion, sourceDataDate], map: "crypto_signal_results_model_srcdate_idx")
+  @@index([instrumentId, generatedAt], map: "crypto_signal_results_instrument_genat_idx")
+  @@index([direction, score], map: "crypto_signal_results_direction_score_idx")
+  @@index([lifecycleState], map: "crypto_signal_results_lifecycle_idx")
+  @@map("crypto_signal_results")
+}
+
+// RESERVED — not yet wired. Schema exists for a future crypto signal-outcome/maturity
+// sweep; no application code writes to it today. Do NOT drop here (shared DB is drifted;
+// a removal needs a dedicated, controlled migration — see market-data-foundation.md).
+model CryptoSignalOutcome {
+  id                    String             @id @default(cuid())
+  signalResultId        String
+  signalResult          CryptoSignalResult @relation(fields: [signalResultId], references: [id], onDelete: Cascade)
+  instrumentId          String
+  symbol                String
+  direction             String
+  score                 Float
+  sector                String?
+  country               String?
+  modelVersion          String
+  signalGeneratedDate   DateTime
+  horizon               String
+  dataComplete          Boolean            @default(false)
+  priceAtSignal         Float?
+  futurePrice           Float?
+  windowEndDate         DateTime?
+  forwardReturnPercent  Float?
+  maxFavorableExcursion Float?
+  maxAdverseExcursion   Float?
+  maxDrawdownPercent    Float?
+  benchmarkReturnPercent Float?
+  alphaPercent          Float?
+  evaluatedAt           DateTime           @default(now())
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+
+  @@unique([signalResultId, horizon])
+  @@index([instrumentId, horizon, signalGeneratedDate], map: "crypto_signal_outcomes_instrument_idx")
+  @@index([modelVersion, horizon, signalGeneratedDate], map: "crypto_signal_outcomes_model_idx")
+  @@index([dataComplete, horizon, evaluatedAt], map: "crypto_signal_outcomes_complete_idx")
+  @@map("crypto_signal_outcomes")
+}
+
+// RESERVED — not yet wired (future crypto calibration). No writer today; do not drop here.
+model CryptoSignalCalibrationResult {
+  id                      String   @id @default(cuid())
+  signalResultId          String
+  instrumentId            String
+  symbol                  String
+  companyName             String?
+  sector                  String?
+  country                 String?
+  rawScore                Float
+  calibratedScore         Float
+  scoreDelta              Float
+  rawDirection            String
+  calibratedDirection     String
+  rawConfidence           String
+  calibratedConfidence    String
+  boosts                  Json
+  penalties               Json
+  calibrationReasons      Json
+  dataGaps                Json
+  calibrationModelVersion String
+  rawSignalModelVersion   String?
+  generatedAt             DateTime @default(now())
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  @@unique([signalResultId, calibrationModelVersion])
+  @@index([instrumentId, generatedAt], map: "crypto_calibration_instrument_idx")
+  @@index([calibratedDirection, calibratedScore], map: "crypto_calibration_direction_score_idx")
+  @@map("crypto_signal_calibration_results")
+}
+
+// RESERVED — not yet wired (future crypto data-quality evaluations). No writer today; do not drop here.
+model CryptoDataQualityEvaluation {
+  id                     String      @id @default(cuid())
+  instrumentId           String      @unique
+  asset                  CryptoAsset @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+  symbol                 String
+  companyName            String?
+  sector                 String?
+  industry               String?
+  country                String?
+  currency               String?
+  coverageScore          Float
+  coverageStatus         String
+  signalReadinessScore   Float
+  signalReadinessStatus  String
+  liquidityScore         Float
+  liquidityStatus        String
+  eligibleForSignals     Boolean
+  eligibleForBacktesting Boolean
+  eligibleForCalibration Boolean
+  dataGaps               Json
+  warnings               Json
+  readinessReasons       Json
+  readinessBlockers      Json
+  evaluatedAt            DateTime    @default(now())
+  createdAt              DateTime    @default(now())
+  updatedAt              DateTime    @updatedAt
+
+  @@index([coverageStatus], map: "crypto_dq_coverage_idx")
+  @@index([signalReadinessStatus], map: "crypto_dq_readiness_idx")
+  @@index([evaluatedAt], map: "crypto_dq_evaluatedat_idx")
+  @@map("crypto_quality_evaluations")
+}
+
+// RESERVED — not yet wired (future crypto interest/volume radar). No writer today; do not drop here.
+model CryptoInterestSnapshot {
+  id                 String      @id @default(cuid())
+  snapshotDate       DateTime
+  dataThroughDate    DateTime?
+  generatedAt        DateTime    @default(now())
+  instrumentId       String
+  asset              CryptoAsset @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+  symbol             String
+  company            String
+  scopeRegion        String      @default("GLOBAL")
+  scopeAssetType     String      @default("CRYPTO")
+  timeframe          String      @default("1d")
+  category           String
+  score              Float
+  direction          String
+  reasonTags         Json        @default("[]")
+  riskTags           Json        @default("[]")
+  freshness          String
+  warnings           Json        @default("[]")
+  calculationVersion String      @default("crypto-interest-v1")
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+
+  @@unique([snapshotDate, scopeRegion, scopeAssetType, timeframe, category, symbol], map: "crypto_interest_snapshot_scope_category_symbol_key")
+  @@index([scopeRegion, scopeAssetType, timeframe, snapshotDate], map: "crypto_interest_snapshot_scope_date_idx")
+  @@index([scopeRegion, scopeAssetType, category, score], map: "crypto_interest_snapshot_scope_category_score_idx")
+  @@index([instrumentId, snapshotDate], map: "crypto_interest_snapshot_instrument_date_idx")
+  @@map("crypto_interest_snapshots")
+}
+
+model CryptoMarketScanSnapshot {
+  id          String   @id @default(cuid())
+  /// One of: MOVERS_GAINERS | MOVERS_LOSERS | 52W_HIGH | 52W_LOW | VOLUME_SPIKE
+  scanType    String
+  scanRange   String?
+  region      String   @default("GLOBAL")
+  assetType   String   @default("CRYPTO")
+  tradingDate DateTime
+  rank        Int
+  payloadJson Json
+  computedAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([scanType, scanRange, region, assetType, tradingDate, rank], map: "crypto_market_scan_snapshot_type_range_scope_date_rank_key")
+  @@index([scanType, scanRange, region, assetType, tradingDate], map: "crypto_market_scan_snapshot_lookup_idx")
+  @@index([tradingDate, region, assetType], map: "crypto_market_scan_snapshot_date_scope_idx")
+  @@map("crypto_market_scan_snapshots")
 }

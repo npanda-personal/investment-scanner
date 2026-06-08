@@ -4317,6 +4317,7 @@ export class MarketDataFoundationRepository {
    *   SMALL  <  5 000 Cr (<5e10)
    */
   async screener(options: {
+    region?: string;
     signalDirection?: string;
     minScore?: number;
     minRsPercentile?: number;
@@ -4350,6 +4351,19 @@ export class MarketDataFoundationRepository {
       Prisma.sql`s."isDelisted" = FALSE`,
       Prisma.sql`UPPER(COALESCE(s."providerSupportStatus", 'UNSUPPORTED')) = 'SUPPORTED'`,
     ];
+
+    const normalizedRegion = normalizeMarketRegion(options.region);
+    if (normalizedRegion) {
+      // Region-scope the universe (IN/US/EU). Without this the screener mixes regions.
+      filters.push(Prisma.sql`UPPER(COALESCE(s."region", '')) = ${normalizedRegion}`);
+    }
+    // Push the same region scope INTO the latest_price CTE so the expensive
+    // per-stock price lateral joins only run for the selected region's stocks
+    // (otherwise the CTE scans every region's full price history before the
+    // outer region filter applies — the root of the screener's slowness).
+    const cteRegionFilter = normalizedRegion
+      ? Prisma.sql`AND UPPER(COALESCE(s."region", '')) = ${normalizedRegion}`
+      : Prisma.empty;
 
     if (options.signalDirection) {
       filters.push(Prisma.sql`ls."signalDirection" = UPPER(${options.signalDirection})`);
@@ -4396,7 +4410,12 @@ export class MarketDataFoundationRepository {
       range52wPositionPct: Prisma.Decimal | null;
       inFnoBan: boolean;
     }>>(Prisma.sql`
-      WITH latest_signal AS (
+      -- All heavy CTEs are MATERIALIZED so the planner computes each once and
+      -- HASH-joins them. Without this, the functional region/support predicates
+      -- make Postgres underestimate the stocks row count (rows=1) and pick a
+      -- nested loop that re-evaluates the full signal/delivery sorts PER stock
+      -- (the cause of the screener's multi-minute hang).
+      WITH latest_signal AS MATERIALIZED (
         SELECT DISTINCT ON (sr."instrumentId")
           sr."instrumentId",
           sr.direction AS "signalDirection",
@@ -4405,11 +4424,17 @@ export class MarketDataFoundationRepository {
         WHERE sr."generatedDate" IS NOT NULL
         ORDER BY sr."instrumentId", sr."generatedDate" DESC
       ),
-      latest_price AS (
-        SELECT DISTINCT ON (s.id)
+      -- MATERIALIZED: compute the region-scoped latest price ONCE (small result)
+      -- so the planner can't inline + re-evaluate it inside price_range and the
+      -- final join (the cause of the screener's multi-minute pathological plan).
+      latest_price AS MATERIALIZED (
+        -- Latest price per stock via an index-backed LATERAL LIMIT 1 (no global
+        -- DISTINCT-ON sort of millions of price rows — that sort was the second
+        -- screener bottleneck for large universes like IN).
+        SELECT
           s.id AS "instrumentId",
-          COALESCE(pt."adjustedClose", pt.close) AS price,
-          pt.timestamp AS price_ts,
+          lp.price,
+          lp.price_ts,
           pid.price_symbol
         FROM stocks s
         CROSS JOIN LATERAL (
@@ -4418,13 +4443,19 @@ export class MarketDataFoundationRepository {
             '\\.(NS|BO)$', '', 'i'
           ) AS price_symbol
         ) pid
-        INNER JOIN price_ticks pt ON pt.symbol = pid.price_symbol
-          AND UPPER(COALESCE(pt."dataStatus", 'COMPLETE')) = 'COMPLETE'
-          AND UPPER(COALESCE(pt.source, '')) NOT LIKE 'TEST\\_%'
+        CROSS JOIN LATERAL (
+          SELECT COALESCE(pt."adjustedClose", pt.close) AS price, pt.timestamp AS price_ts
+          FROM price_ticks pt
+          WHERE pt.symbol = pid.price_symbol
+            AND UPPER(COALESCE(pt."dataStatus", 'COMPLETE')) = 'COMPLETE'
+            AND UPPER(COALESCE(pt.source, '')) NOT LIKE 'TEST\\_%'
+          ORDER BY pt.timestamp DESC
+          LIMIT 1
+        ) lp
         WHERE s."isActive" = TRUE AND s."isDelisted" = FALSE
-        ORDER BY s.id, pt.timestamp DESC
+          ${cteRegionFilter}
       ),
-      price_range AS (
+      price_range AS MATERIALIZED (
         SELECT
           lp."instrumentId",
           CASE
@@ -4445,7 +4476,7 @@ export class MarketDataFoundationRepository {
             AND UPPER(COALESCE(pt.source, '')) NOT LIKE 'TEST\\_%'
         ) rng
       ),
-      latest_delivery AS (
+      latest_delivery AS MATERIALIZED (
         SELECT DISTINCT ON (d.symbol)
           d.symbol,
           d."deliveryPercent" AS "deliveryPct"

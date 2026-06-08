@@ -23,6 +23,8 @@ import {
 import { Link as RouterLink } from 'react-router-dom';
 import { humanizeCode } from '@/shared/format/enumLabels';
 import { PageHeader } from '@/shared/components';
+import { NotApplicableForAssetClass } from '@/shared/components/NotApplicableForAssetClass';
+import { useMarketScope } from '@/contexts/MarketScopeContext';
 import { useDailyReviewShortlist } from '../hooks/useDailyReviewShortlist';
 import type {
   DailyReviewShortlistResult,
@@ -31,7 +33,23 @@ import type {
 } from '../api/dailyReviewShortlistService';
 
 export function DailyReviewShortlistPage() {
+  const { profile } = useMarketScope();
   const { data, loading, error, scope } = useDailyReviewShortlist();
+
+  if (profile.isCrypto) {
+    return (
+      <Box className="page-container page-container--hub">
+        <PageHeader
+          title="Daily Review Shortlist"
+          subtitle="The first answer for the daily workflow: what are the 10 names to review today, using persisted source evidence only."
+        />
+        <NotApplicableForAssetClass
+          feature="Daily Review"
+          detail="Crypto coverage in this release is available on Signals, Market Scans, and the Instrument workspace. This view will support crypto in a later update."
+        />
+      </Box>
+    );
+  }
 
   return (
     <Box className="page-container page-container--hub">

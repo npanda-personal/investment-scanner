@@ -15,6 +15,14 @@ import type {
 
 const SECTOR_INDEX_PRICE_SOURCES = ['NIFTY_SECTOR_INDEX'];
 
+// Non-IN sector proxy symbols, keyed by region.
+// For US: the 11 SPDR Select Sector ETFs seeded with assetType='ETF', source='YAHOO_EOD'.
+// Keeping this list here (rather than in the service) so the discovery query is tight
+// and does not scan all 5000+ ETFs in the DB.
+const SECTOR_PROXY_SYMBOLS_BY_REGION: Record<string, string[]> = {
+  US: ['XLK', 'XLF', 'XLV', 'XLE', 'XLY', 'XLP', 'XLI', 'XLB', 'XLRE', 'XLU', 'XLC'],
+};
+
 export class MarketContextIntelligenceRepository {
   constructor(private readonly db: PrismaClient = prisma) {}
 
@@ -49,27 +57,87 @@ export class MarketContextIntelligenceRepository {
   }
 
   async loadSectorIndexInputs(query: { region: string; dataThroughDate?: Date | null }): Promise<SectorIndexInput[]> {
-    const symbolRows = await this.db.priceTick.findMany({
-      where: {
-        region: query.region,
-        source: { in: SECTOR_INDEX_PRICE_SOURCES },
-        ...(query.dataThroughDate ? { timestamp: { lte: this.endOfUtcDay(query.dataThroughDate) } } : {}),
-      },
-      distinct: ['symbol'],
-      select: { symbol: true },
-    });
-    const symbols = symbolRows.map((row: any) => row.symbol).filter(Boolean).sort((a: string, b: string) => a.localeCompare(b));
+    const normalizedRegion = String(query.region || '').trim().toUpperCase();
+    const isIN = normalizedRegion === 'IN';
+
+    let symbols: string[];
+
+    if (isIN) {
+      // IN path (unchanged): discover sector index symbols by NSE-specific source tag.
+      const symbolRows = await this.db.priceTick.findMany({
+        where: {
+          region: query.region,
+          source: { in: SECTOR_INDEX_PRICE_SOURCES },
+          ...(query.dataThroughDate ? { timestamp: { lte: this.endOfUtcDay(query.dataThroughDate) } } : {}),
+        },
+        distinct: ['symbol'],
+        select: { symbol: true },
+      });
+      symbols = symbolRows.map((row: any) => row.symbol).filter(Boolean).sort((a: string, b: string) => a.localeCompare(b));
+    } else {
+      // Non-IN path: discover sector-proxy instruments from the stocks table.
+      // We filter by both assetType='ETF' AND a curated symbol list (SECTOR_PROXY_SYMBOLS_BY_REGION)
+      // so that:
+      //   - benchmark indices like ^GSPC/^VIX (assetType='INDEX') are excluded, and
+      //   - the 5000+ other US ETFs that are NOT sector proxies are excluded.
+      // We must NOT filter by source because Yahoo tags all instruments with YAHOO_EOD —
+      // source alone cannot distinguish a sector ETF from a regular stock.
+      const knownSymbols = SECTOR_PROXY_SYMBOLS_BY_REGION[normalizedRegion] ?? [];
+      if (knownSymbols.length === 0) {
+        // No curated list for this region — fall back to assetType='ETF' only.
+        // The price-load step and the prices.length > 0 guard will naturally prune
+        // ETFs that have no persisted price history.
+        const sectorStocks = await this.db.stock.findMany({
+          where: {
+            region: query.region,
+            assetType: 'ETF',
+            isActive: true,
+            isDelisted: false,
+          },
+          select: { symbol: true },
+        });
+        symbols = sectorStocks.map((row: any) => row.symbol).filter(Boolean).sort((a: string, b: string) => a.localeCompare(b));
+      } else {
+        // Curated list available: discover only the known sector proxies that are
+        // active in the stocks table.
+        const sectorStocks = await this.db.stock.findMany({
+          where: {
+            region: query.region,
+            assetType: 'ETF',
+            symbol: { in: knownSymbols },
+            isActive: true,
+            isDelisted: false,
+          },
+          select: { symbol: true },
+        });
+        symbols = sectorStocks.map((row: any) => row.symbol).filter(Boolean).sort((a: string, b: string) => a.localeCompare(b));
+      }
+    }
+
     if (symbols.length === 0) return [];
+
+    const stockWhere = isIN
+      ? { region: query.region, assetType: 'INDEX', symbol: { in: symbols }, isActive: true, isDelisted: false }
+      : { region: query.region, assetType: 'ETF', symbol: { in: symbols }, isActive: true, isDelisted: false };
+
+    const priceTickWhere = isIN
+      ? {
+          symbol: { in: symbols },
+          region: query.region,
+          source: { in: SECTOR_INDEX_PRICE_SOURCES },
+          ...(query.dataThroughDate ? { timestamp: { lte: this.endOfUtcDay(query.dataThroughDate) } } : {}),
+        }
+      : {
+          // Non-IN: filter by symbol to select only the sector ETFs discovered above.
+          // Do NOT add a source filter — Yahoo tags everything YAHOO_EOD.
+          symbol: { in: symbols },
+          region: query.region,
+          ...(query.dataThroughDate ? { timestamp: { lte: this.endOfUtcDay(query.dataThroughDate) } } : {}),
+        };
 
     const [stocks, latestPrices, priceTicks] = await Promise.all([
       this.db.stock.findMany({
-        where: {
-          region: query.region,
-          assetType: 'INDEX',
-          symbol: { in: symbols },
-          isActive: true,
-          isDelisted: false,
-        },
+        where: stockWhere,
         select: {
           id: true,
           symbol: true,
@@ -90,12 +158,7 @@ export class MarketContextIntelligenceRepository {
         },
       }),
       this.db.priceTick.findMany({
-        where: {
-          symbol: { in: symbols },
-          region: query.region,
-          source: { in: SECTOR_INDEX_PRICE_SOURCES },
-          ...(query.dataThroughDate ? { timestamp: { lte: this.endOfUtcDay(query.dataThroughDate) } } : {}),
-        },
+        where: priceTickWhere,
         orderBy: [{ symbol: 'asc' }, { timestamp: 'desc' }],
         select: {
           symbol: true,
@@ -584,13 +647,16 @@ export class MarketContextIntelligenceRepository {
   }
 
   /**
-   * CB-41/CB-42: Load closing prices for a named index symbol (e.g. ^NSEI), most-recent first.
+   * CB-41/CB-42: Load closing prices for a named index symbol (e.g. ^NSEI, ^GSPC), most-recent first.
    * Used by the regime calculator to compute an index-trend term.
+   * region filter prevents Nifty rows contaminating a US regime calc and vice-versa.
+   * region defaults to undefined (no filter) for callers that do not pass a region.
    */
-  async loadIndexPrices(symbol: string, limit: number, endDate?: Date): Promise<number[]> {
+  async loadIndexPrices(symbol: string, limit: number, endDate?: Date, region?: string): Promise<number[]> {
     const rows = await this.db.priceTick.findMany({
       where: {
         symbol,
+        ...(region ? { region: String(region).trim().toUpperCase() } : {}),
         ...(endDate ? { timestamp: { lte: endDate } } : {}),
       },
       orderBy: { timestamp: 'desc' },

@@ -1,13 +1,96 @@
 import type { Request, Response } from 'express';
 import { SignalGenerationEngineService } from './signal-generation-engine.service';
 import { parseRunRequest, parseSignalQuery, validateInstrumentId } from './signal-generation-engine.validation';
+import { isCryptoScope } from '../../shared/data-access/market-repository-router';
+import {
+  CryptoSignalGenerationRepository,
+  cryptoSignalGenerationRepository,
+} from './signal-generation-engine.crypto-repository';
+
+type CryptoSignalRow = Awaited<ReturnType<CryptoSignalGenerationRepository['latestForInstrument']>>;
+
+/** Extract a single string value from an Express query param (handles arrays). */
+function first(value: unknown): string | undefined {
+  if (Array.isArray(value)) return value[0] != null ? String(value[0]) : undefined;
+  return value != null ? String(value) : undefined;
+}
+
+interface CryptoPriceEntry {
+  currentPrice: number | null;
+  previousClose: number | null;
+  priceTimestamp: string | null;
+}
+
+/** Map a crypto_signal_results row to the SignalResultDto shape the API/UI consume. */
+function mapCryptoSignalRow(row: NonNullable<CryptoSignalRow>, price?: CryptoPriceEntry) {
+  const currentPrice = price?.currentPrice ?? null;
+  const previousClose = price?.previousClose ?? null;
+  const dailyChange = currentPrice != null && previousClose != null ? currentPrice - previousClose : null;
+  const dailyChangePercent = dailyChange != null && previousClose ? (dailyChange / previousClose) * 100 : null;
+  return {
+    instrument_id: row.instrumentId,
+    symbol: row.symbol,
+    company_name: row.companyName ?? null,
+    sector: null,
+    country: null,
+    currentPrice,
+    previousClose,
+    dailyChange,
+    dailyChangePercent,
+    currency: 'USD',
+    priceTimestamp: price?.priceTimestamp ?? null,
+    score: row.score,
+    direction: row.direction,
+    confidence: row.confidence,
+    triggered_signals: row.triggeredSignals ?? [],
+    negative_signals: row.negativeSignals ?? [],
+    explanation: row.explanation,
+    generated_at: row.generatedAt.toISOString(),
+    generated_date: row.generatedDate ? row.generatedDate.toISOString() : null,
+    model_version: row.modelVersion,
+    reliabilityTier: row.reliabilityTier ?? null,
+    assetType: 'CRYPTO',
+  };
+}
 
 export class SignalGenerationEngineController {
-  constructor(private readonly service = new SignalGenerationEngineService()) {}
+  constructor(
+    private readonly service = new SignalGenerationEngineService(),
+    private readonly cryptoRepo: CryptoSignalGenerationRepository = cryptoSignalGenerationRepository,
+  ) {}
+
+  /** Build the crypto top/screener response (persisted-read from the crypto_* plane). */
+  private async cryptoTopResponse(query: ReturnType<typeof parseSignalQuery>) {
+    const result = await this.cryptoRepo.topSignals({
+      direction: query.direction,
+      minScore: query.minScore,
+      limit: query.limit,
+      offset: query.offset,
+    });
+    const priceBySymbol = await this.cryptoRepo.pricesForSymbols(result.items.map((r) => r.symbol));
+    const signals = result.items.map((r) => mapCryptoSignalRow(r, priceBySymbol.get(r.symbol)));
+    return {
+      signals,
+      items: signals,
+      total: result.total,
+      totalCount: result.total,
+      limit: query.limit,
+      offset: query.offset || 0,
+      hasMore: (query.offset || 0) + signals.length < result.total,
+      filtersApplied: { direction: query.direction ?? null, minScore: query.minScore ?? null },
+      scope: { region: 'GLOBAL', assetType: 'CRYPTO' },
+      directionCounts: result.directionCounts,
+    };
+  }
 
   top = async (req: Request, res: Response) => {
     try {
-      return res.json(await this.service.topSignals(parseSignalQuery(req.query)));
+      const query = parseSignalQuery(req.query);
+      // Route crypto scope to the isolated crypto_* signal plane (persisted-read).
+      if (isCryptoScope({ region: query.region, assetType: query.assetType })) {
+        return res.json(await this.cryptoTopResponse(query));
+      }
+      return res.json(await this.service.topSignals(query));
     } catch (error) {
       console.error('Signal top endpoint error:', error);
       return res.status(500).json({ error: 'Failed to load top signals' });
@@ -26,6 +109,10 @@ export class SignalGenerationEngineController {
   exitCandidates = async (req: Request, res: Response) => {
     try {
       const query = parseSignalQuery(req.query);
+      // Crypto signals don't carry a lifecycle state → not applicable on the crypto plane.
+      if (isCryptoScope({ region: query.region, assetType: query.assetType })) {
+        return res.json({ scope: { region: 'GLOBAL', assetType: 'CRYPTO' }, signals: [], items: [], notApplicable: true });
+      }
       return res.json(await this.service.exitCandidates(query));
     } catch (error) {
       console.error('Signal exit-candidates endpoint error:', error);
@@ -40,6 +127,10 @@ export class SignalGenerationEngineController {
   lifecycle = async (req: Request, res: Response) => {
     try {
       const query = parseSignalQuery(req.query);
+      // Crypto signals don't carry a lifecycle state → not applicable on the crypto plane.
+      if (isCryptoScope({ region: query.region, assetType: query.assetType })) {
+        return res.json({ scope: { region: 'GLOBAL', assetType: 'CRYPTO' }, signals: [], items: [], notApplicable: true });
+      }
       return res.json(await this.service.lifecycleSignals(query));
     } catch (error) {
       console.error('Signal lifecycle endpoint error:', error);
@@ -54,6 +145,13 @@ export class SignalGenerationEngineController {
 
     try {
       // Persisted-read only: never trigger live generation on a GET.
+      // Route crypto scope to the isolated crypto_* signal plane.
+      if (isCryptoScope({ region: first(req.query?.region), assetType: first(req.query?.assetType) })) {
+        const row = await this.cryptoRepo.latestForInstrument(instrumentId);
+        if (!row) return res.status(404).json({ error: 'No persisted crypto signal found for this instrument. Run crypto signal generation to populate.' });
+        const priceBySymbol = await this.cryptoRepo.pricesForSymbols([row.symbol]);
+        return res.json(mapCryptoSignalRow(row, priceBySymbol.get(row.symbol)));
+      }
       // latestPersistedForInstruments is a bulk reader that never calls run();
       // returns [] when nothing is persisted yet — no fallback to .run().
       const results = await this.service.latestPersistedForInstruments([instrumentId]);
@@ -68,7 +166,15 @@ export class SignalGenerationEngineController {
 
   run = async (req: Request, res: Response) => {
     try {
-      return res.json(await this.service.run(parseRunRequest(req.body)));
+      const request = parseRunRequest(req.body);
+      // Crypto generation is scheduler/script-driven (lean path), not this equity endpoint.
+      if (isCryptoScope({ region: request.region, assetType: request.assetType })) {
+        return res.status(409).json({
+          error: 'Crypto signal generation runs via the scheduler/crypto lane, not POST /signals/run.',
+          code: 'CRYPTO_RUN_NOT_SUPPORTED_HERE',
+        });
+      }
+      return res.json(await this.service.run(request));
     } catch (error) {
       console.error('Signal run endpoint error:', error);
       return res.status(500).json({ error: 'Failed to run signal generation' });
@@ -77,7 +183,12 @@ export class SignalGenerationEngineController {
 
   latestRun = async (req: Request, res: Response) => {
     try {
-      return res.json(await this.service.latestRunAudit(parseSignalQuery(req.query)));
+      const query = parseSignalQuery(req.query);
+      if (isCryptoScope({ region: query.region, assetType: query.assetType })) {
+        // Crypto runs are scheduler/script-driven; return an honest not-applicable audit.
+        return res.json({ scope: { region: 'GLOBAL', assetType: 'CRYPTO' }, latestRun: null, notApplicable: true });
+      }
+      return res.json(await this.service.latestRunAudit(query));
     } catch (error) {
       console.error('Signal latest run endpoint error:', error);
       return res.status(500).json({ error: 'Failed to load latest signal run audit' });
@@ -86,15 +197,31 @@ export class SignalGenerationEngineController {
 
   screener = async (req: Request, res: Response) => {
     try {
-      return res.json(await this.service.screener(parseSignalQuery(req.query)));
+      const query = parseSignalQuery(req.query);
+      if (isCryptoScope({ region: query.region, assetType: query.assetType })) {
+        return res.json(await this.cryptoTopResponse(query));
+      }
+      return res.json(await this.service.screener(query));
     } catch (error) {
       console.error('Signal screener endpoint error:', error);
       return res.status(500).json({ error: 'Failed to load signal screener' });
     }
   };
 
-  health = async (_req: Request, res: Response) => {
+  health = async (req: Request, res: Response) => {
     try {
+      // Crypto scope → health of the isolated crypto_* signal plane.
+      if (isCryptoScope({ region: first(req.query?.region), assetType: first(req.query?.assetType) })) {
+        const h = await this.cryptoRepo.health();
+        return res.json({
+          status: 'ok',
+          module: 'signal-generation-engine',
+          scope: { region: 'GLOBAL', assetType: 'CRYPTO' },
+          signalCount: h.count,
+          latest_generated_at: h.latestGeneratedAt?.toISOString() ?? null,
+          data_status: h.dataStatus,
+        });
+      }
       return res.json(await this.service.health());
     } catch (error) {
       console.error('Signal health endpoint error:', error);

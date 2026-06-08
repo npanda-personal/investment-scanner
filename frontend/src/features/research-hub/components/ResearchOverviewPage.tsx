@@ -38,13 +38,29 @@ import { Link } from 'react-router-dom';
 import { humanizeCode } from '@/shared/format/enumLabels';
 import { useResearchOverview } from '../hooks/useResearchOverview';
 import { PageHeader } from '@/shared/components';
+import { NotApplicableForAssetClass } from '@/shared/components/NotApplicableForAssetClass';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
 import type { ActionabilityDimension, ActionabilityStatus, ResearchOverview, NextAction, ResearchPriorityCandidate, ResearchWhatChangedDelta } from '../api/researchHubApi';
 import { ResearchDrilldownTabs } from './ResearchDrilldownTabs';
 
 const ResearchOverviewPage: React.FC = () => {
-  const { scope } = useMarketScope();
+  const { scope, profile } = useMarketScope();
   const { data, loading, error, reload } = useResearchOverview();
+
+  if (profile.isCrypto) {
+    return (
+      <Box className="page-container page-container--hub">
+        <PageHeader
+          title="Research Command Center"
+          subtitle={`Prioritized market intelligence for ${scope.region} / ${scope.assetType}.`}
+        />
+        <NotApplicableForAssetClass
+          feature="Research Hub"
+          detail="Crypto coverage in this release is available on Signals, Market Scans, and the Instrument workspace. This view will support crypto in a later update."
+        />
+      </Box>
+    );
+  }
 
   if (loading) {
     return (

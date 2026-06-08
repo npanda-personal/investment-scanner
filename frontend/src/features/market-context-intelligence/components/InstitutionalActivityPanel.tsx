@@ -18,12 +18,14 @@
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
+import { Link as RouterLink } from 'react-router-dom';
 import {
   Alert,
   Box,
   Chip,
   CircularProgress,
   Divider,
+  Link,
   Paper,
   Stack,
   Tooltip,
@@ -174,7 +176,7 @@ export const InstitutionalActivityPanel: React.FC = () => {
 
   if (!data) return null;
 
-  const { fiiDii, deals, fnoBan, sectors } = data;
+  const { fiiDii, deals, fnoBan, sectors, oiBuildup } = data;
 
   return (
     <Paper sx={{ p: 2, mb: 3 }}>
@@ -423,6 +425,75 @@ export const InstitutionalActivityPanel: React.FC = () => {
           )}
         </Box>
       </Box>
+
+      {/* --- F&O Futures OI Buildup strip --- */}
+      <Divider sx={{ my: 2 }} />
+      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.75 }}>
+        <Stack direction="row" alignItems="center" spacing={1}>
+          <Stack spacing={0}>
+            <Typography variant="subtitle2" fontWeight={700}>F&amp;O Futures OI Buildup</Typography>
+            <Typography variant="caption" color="text.secondary">
+              Across all F&amp;O underlyings · see the{' '}
+              <Link component={RouterLink} to="/derivatives" underline="hover">Derivatives page</Link>
+              {' '}for the F&amp;O-eligible-only view
+            </Typography>
+          </Stack>
+          {oiBuildup.marketPcr !== null && (
+            <Tooltip title="Market-wide put-call ratio (index options). >1 put-heavy, <1 call-heavy." arrow>
+              <Chip size="small" variant="outlined" label={`PCR ${oiBuildup.marketPcr.toFixed(2)}`} sx={{ fontSize: 11, cursor: 'default' }} />
+            </Tooltip>
+          )}
+        </Stack>
+        <StalenessBadge asOf={oiBuildup.asOf} label="F&O OI" />
+      </Stack>
+      {oiBuildup.status === 'ready' ? (
+        <Box>
+          <Stack direction="row" spacing={1} sx={{ mb: 1, flexWrap: 'wrap', gap: 0.5 }}>
+            <Chip size="small" color="success" variant="outlined" label={`${oiBuildup.longBuildupCount} Long Buildup`} sx={{ fontSize: 11 }} />
+            <Chip size="small" color="error" variant="outlined" label={`${oiBuildup.shortBuildupCount} Short Buildup`} sx={{ fontSize: 11 }} />
+            <Chip size="small" color="info" variant="outlined" label={`${oiBuildup.shortCoveringCount} Short Covering`} sx={{ fontSize: 11 }} />
+            <Chip size="small" color="warning" variant="outlined" label={`${oiBuildup.longUnwindingCount} Long Unwinding`} sx={{ fontSize: 11 }} />
+          </Stack>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)' }, gap: 2 }}>
+            <Box>
+              <Typography variant="caption" color="text.secondary" fontWeight={600}>Top fresh longs (price ↑ · OI ↑)</Typography>
+              <Stack spacing={0.25} sx={{ mt: 0.25 }}>
+                {oiBuildup.topLongBuildup.length === 0 && (
+                  <Typography variant="body2" color="text.secondary">None</Typography>
+                )}
+                {oiBuildup.topLongBuildup.map((h) => (
+                  <Stack key={h.underlying} direction="row" justifyContent="space-between">
+                    <Typography variant="body2" fontWeight={600}>{h.underlying}</Typography>
+                    <Typography variant="caption" sx={{ color: 'success.main' }}>
+                      OI {h.oiChangePct === null ? '—' : `+${h.oiChangePct.toFixed(1)}%`}
+                    </Typography>
+                  </Stack>
+                ))}
+              </Stack>
+            </Box>
+            <Box>
+              <Typography variant="caption" color="text.secondary" fontWeight={600}>Top fresh shorts (price ↓ · OI ↑)</Typography>
+              <Stack spacing={0.25} sx={{ mt: 0.25 }}>
+                {oiBuildup.topShortBuildup.length === 0 && (
+                  <Typography variant="body2" color="text.secondary">None</Typography>
+                )}
+                {oiBuildup.topShortBuildup.map((h) => (
+                  <Stack key={h.underlying} direction="row" justifyContent="space-between">
+                    <Typography variant="body2" fontWeight={600}>{h.underlying}</Typography>
+                    <Typography variant="caption" sx={{ color: 'error.main' }}>
+                      OI {h.oiChangePct === null ? '—' : `+${h.oiChangePct.toFixed(1)}%`}
+                    </Typography>
+                  </Stack>
+                ))}
+              </Stack>
+            </Box>
+          </Box>
+        </Box>
+      ) : (
+        <Typography variant="body2" color="text.secondary">
+          {oiBuildup.status === 'missing' ? 'F&O OI buildup not yet ingested' : 'Data unavailable'}
+        </Typography>
+      )}
     </Paper>
   );
 };

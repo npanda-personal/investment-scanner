@@ -16,6 +16,8 @@
 import { getLatestFiiDiiActivity, type FiiDiiRow } from './fii-dii.service';
 import { getLatestBulkBlockDeals, type BulkBlockDealRow } from './bulk-block-deals.service';
 import { getLatestFnoBanList } from '../smart-money-intelligence/fno-ban.service';
+import { getLatestOiBuildup, type OiBuildupRow } from '../derivatives-intelligence/derivatives-intelligence.oi-buildup.service';
+import { getLatestOptionMetrics } from '../derivatives-intelligence/derivatives-intelligence.option-metrics.service';
 import { SmartMoneyIntelligenceService } from '../smart-money-intelligence/smart-money-intelligence.service';
 import type { SectorSmartMoneySummary } from '../smart-money-intelligence/smart-money-intelligence.types';
 
@@ -66,6 +68,28 @@ export interface InstitutionalActivitySectorsSection {
   topDistributing: Array<{ sector: string; sectorStatus: string }>;
 }
 
+export interface OiBuildupHighlight {
+  underlying: string;
+  buildupLabel: string;
+  oiChangePct: number | null;
+  priceChangePct: number | null;
+}
+
+export interface InstitutionalActivityOiBuildupSection {
+  status: 'ready' | 'missing' | 'error';
+  asOf: string | null;
+  /** Market-wide put-call ratio (index options), null if unavailable */
+  marketPcr: number | null;
+  longBuildupCount: number;
+  shortBuildupCount: number;
+  shortCoveringCount: number;
+  longUnwindingCount: number;
+  /** Top fresh-long futures (LONG_BUILDUP) by OI change */
+  topLongBuildup: OiBuildupHighlight[];
+  /** Top fresh-short futures (SHORT_BUILDUP) by OI change */
+  topShortBuildup: OiBuildupHighlight[];
+}
+
 export interface InstitutionalActivityDto {
   assembledAt: string;
   /**
@@ -77,6 +101,7 @@ export interface InstitutionalActivityDto {
   deals: InstitutionalActivityDealsSection;
   fnoBan: InstitutionalActivityFnoBanSection;
   sectors: InstitutionalActivitySectorsSection;
+  oiBuildup: InstitutionalActivityOiBuildupSection;
 }
 
 // ---------------------------------------------------------------------------
@@ -150,12 +175,14 @@ function buildTopLevelNarrative(
 export async function getInstitutionalActivity(): Promise<InstitutionalActivityDto> {
   const assembledAt = new Date().toISOString();
 
-  // Run all 4 persisted reads in parallel
-  const [fiiDiiResp, dealsResp, fnoBanResp, sectorsRaw] = await Promise.allSettled([
+  // Run all persisted reads in parallel
+  const [fiiDiiResp, dealsResp, fnoBanResp, sectorsRaw, oiBuildupResp, optionMetricsResp] = await Promise.allSettled([
     getLatestFiiDiiActivity(1),
     getLatestBulkBlockDeals(1),
     getLatestFnoBanList(),
     smartMoneyService.sectors('3M', { region: 'IN', assetType: 'STOCK' }),
+    getLatestOiBuildup({ limit: 500 }),
+    getLatestOptionMetrics({ limit: 1 }),
   ]);
 
   // --- FII/DII section ---
@@ -307,6 +334,48 @@ export async function getInstitutionalActivity(): Promise<InstitutionalActivityD
     };
   }
 
+  // --- F&O OI buildup section (derivatives-intelligence, persisted read) ---
+  const marketPcr = optionMetricsResp.status === 'fulfilled' && optionMetricsResp.value.status === 'ready'
+    ? optionMetricsResp.value.marketPcr
+    : null;
+  let oiBuildupSection: InstitutionalActivityOiBuildupSection;
+  if (oiBuildupResp.status === 'fulfilled' && oiBuildupResp.value.status === 'ready') {
+    const resp = oiBuildupResp.value;
+    const futures = resp.rows.filter((r: OiBuildupRow) => r.instrumentType === 'FUTSTK');
+    const toHighlight = (r: OiBuildupRow): OiBuildupHighlight => ({
+      underlying: r.underlying,
+      buildupLabel: r.buildupLabel,
+      oiChangePct: r.oiChangePct,
+      priceChangePct: r.priceChangePct,
+    });
+    oiBuildupSection = {
+      status: 'ready',
+      asOf: resp.tradingDate,
+      marketPcr,
+      longBuildupCount: futures.filter((r) => r.buildupLabel === 'LONG_BUILDUP').length,
+      shortBuildupCount: futures.filter((r) => r.buildupLabel === 'SHORT_BUILDUP').length,
+      shortCoveringCount: futures.filter((r) => r.buildupLabel === 'SHORT_COVERING').length,
+      longUnwindingCount: futures.filter((r) => r.buildupLabel === 'LONG_UNWINDING').length,
+      topLongBuildup: futures.filter((r) => r.buildupLabel === 'LONG_BUILDUP').slice(0, 5).map(toHighlight),
+      topShortBuildup: futures.filter((r) => r.buildupLabel === 'SHORT_BUILDUP').slice(0, 5).map(toHighlight),
+    };
+  } else {
+    const status = oiBuildupResp.status === 'fulfilled'
+      ? (oiBuildupResp.value.status as 'missing' | 'error')
+      : 'error';
+    oiBuildupSection = {
+      status,
+      asOf: null,
+      marketPcr,
+      longBuildupCount: 0,
+      shortBuildupCount: 0,
+      shortCoveringCount: 0,
+      longUnwindingCount: 0,
+      topLongBuildup: [],
+      topShortBuildup: [],
+    };
+  }
+
   const narrative = buildTopLevelNarrative(fiiDiiSection, dealsSection, fnoBanSection, sectorsSection);
 
   return {
@@ -316,5 +385,6 @@ export async function getInstitutionalActivity(): Promise<InstitutionalActivityD
     deals: dealsSection,
     fnoBan: fnoBanSection,
     sectors: sectorsSection,
+    oiBuildup: oiBuildupSection,
   };
 }

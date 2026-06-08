@@ -4,38 +4,26 @@ import { WatchlistManagementService } from '../watchlist-management';
 import { DataQualityEngineService } from '../data-quality-engine';
 import { StrategyFrameworkEvaluator, StrategyFrameworkRegistry, StrategyFrameworkService } from '../strategy-framework';
 
-/**
- * Annualised risk-free rate used in Sharpe calculation.
- * Represents the approximate Indian 91-day T-bill / Repo rate baseline (2024).
- * Expressed as a decimal (0.065 = 6.5% p.a.).
- */
-const ANNUAL_RISK_FREE_RATE_IN = 0.065;
-/** Daily risk-free rate derived from the annual constant (continuous approximation). */
-const DAILY_RISK_FREE_RATE = ANNUAL_RISK_FREE_RATE_IN / 252;
+import { IN_STOCK_PROFILE, dailyRiskFreeRate, resolveMarketProfile } from '../../shared/utils/market-profile';
 
 /**
- * CB-12 — India delivery-equity transaction cost model.
+ * Risk-free + transaction-cost parameters now flow from the per-asset-class
+ * MarketProfile (backend/src/shared/utils/market-profile.ts), the single source
+ * of truth for multi-market behavior.  For India equities these resolve to the
+ * exact prior values (6.5% p.a. risk-free, 0.225%/leg cost), so IN backtests are
+ * byte-identical; crypto resolves to risk-free 0 and a 0.1%/leg flat cost.
  *
- * Realistic one-way components (NSE/BSE delivery trade, FY-2024 rates):
- *   STT (sell-side only)               0.1000 %
- *   Exchange transaction charge (NSE)  0.0035 %
- *   SEBI turnover fee                  0.0001 %
- *   Stamp duty (buy-side only)         0.0150 %
- *   GST on brokerage+exchange charges  0.0007 % (approx)
- *   Brokerage (discount broker, cap)   0.0300 % (typical per leg)
- *   DP (demat) charge per sell trade   ~₹15–20 flat → ~0.0050 % on ₹30 000 avg
- *   ─────────────────────────────────────────────────────────────
- *   Approximate one-way               ~0.15–0.22 %
- *   Round-trip (entry + exit)          0.30–0.44 %  → default 0.225 % per leg
- *
- * DEFAULT_INDIA_ONE_WAY_COST_PERCENT = 0.00225 (0.225 % per leg)
- * Round-trip total ≈ 0.45 % — consistent with CB-12 requirement (0.35–0.55 %).
- *
- * This constant is used as the default `transactionCostPercent` when the
- * caller does not specify a cost and the region is 'IN'.  Callers may override
- * it by setting `config.transactionCostPercent` explicitly.
+ * Fallback daily risk-free for metrics() when no config (and thus no scope) is
+ * available — preserves the previous global default (IN's 6.5% p.a. / 252).
  */
-export const DEFAULT_INDIA_ONE_WAY_COST_PERCENT = 0.00225; // 0.225 % per leg → 0.45 % round-trip
+const DAILY_RISK_FREE_RATE = dailyRiskFreeRate(IN_STOCK_PROFILE);
+
+/**
+ * CB-12 — India delivery-equity transaction cost model (0.225%/leg → 0.45%
+ * round-trip), preserved as a named export for callers/tests.  Sourced from the
+ * canonical IN_STOCK_PROFILE so it stays in lock-step with the profile layer.
+ */
+export const DEFAULT_INDIA_ONE_WAY_COST_PERCENT = IN_STOCK_PROFILE.oneWayTxnCostPercent; // 0.00225
 import {
   BREADTH_WEAK_THRESHOLD,
   BREADTH_VERY_WEAK_THRESHOLD,
@@ -248,14 +236,15 @@ export class BacktestingStrategyLabService {
   }
 
   /**
-   * Fetches the Nifty 50 (^NSEI) EOD price series for the given window.
+   * Fetches the benchmark index EOD price series for the given window.
+   * symbol is resolved from resolveMarketProfile({ region }).benchmark.symbol.
    * Returns bars sorted ascending by date. Returns an empty array when the
    * series is unavailable or insufficient (caller falls back to equal-weight).
    */
-  private async fetchNifty50Bars(startDate: string, endDate: string): Promise<HistoricalBar[]> {
+  private async fetchBenchmarkBars(symbol: string, startDate: string, endDate: string): Promise<HistoricalBar[]> {
     try {
       const raw = await this.marketDataService.listPrices(
-        '^NSEI',
+        symbol,
         5000,
         new Date(startDate),
         new Date(endDate),
@@ -283,7 +272,7 @@ export class BacktestingStrategyLabService {
     let insufficientHistoryCount = 0;
     const minBars = this.isRegisteredConfig(config) ? this.minimumBarsForTimeframe(config.timeframe) : 21;
     for (const instrument of instruments) {
-      const response = await this.marketDataService.listPricesByInstrumentId(instrument.instrumentId, 5000, new Date(config.startDate), new Date(config.endDate)).catch(() => null);
+      const response = await this.marketDataService.listPricesByInstrumentId(instrument.instrumentId, 5000, new Date(config.startDate), new Date(config.endDate), { region: config.region, assetType: config.assetType }).catch(() => null);
       // CB-13: include OHLC fields so stop checks can use bar low/high for intrabar gaps.
       // Prefer adjusted fields (adjusted_open, adjusted_high, adjusted_low, adjusted_close)
       // where available; fall back to raw OHLC; use close as fallback for open/high/low.
@@ -520,13 +509,11 @@ export class BacktestingStrategyLabService {
     const effectiveStartDate = strategyFirstEntryDate ?? config.startDate;
     const baseMetrics = this.metrics(config.initialCapital, curve, trades, config, effectiveStartDate);
 
-    // Nifty 50 real benchmark: fetch for IN-scoped backtests; fall back to
-    // equal-weight when the index series is absent/insufficient for the window.
-    const isIndiaRegion = !config.region || config.region === 'IN';
-    const nifty50Bars = isIndiaRegion
-      ? await this.fetchNifty50Bars(config.startDate, config.endDate)
-      : [];
-    const benchmarkComparison = this.benchmarkComparison(config, histories, dates, baseMetrics, strategyFirstEntryDate, nifty50Bars);
+    // Region benchmark: resolve per-region (^NSEI for IN, ^GSPC for US, etc.);
+    // fall back to equal-weight when the index series is absent/insufficient.
+    const benchmarkProfile = resolveMarketProfile({ region: config.region || 'IN' }).benchmark;
+    const benchmarkBars = await this.fetchBenchmarkBars(benchmarkProfile.symbol, config.startDate, config.endDate);
+    const benchmarkComparison = this.benchmarkComparison(config, histories, dates, baseMetrics, strategyFirstEntryDate, benchmarkBars, benchmarkProfile);
 
     // Fix 3: surface universe cap prominently at the top level.
     const universeSummary = config.universe.type === 'ALL' ? {
@@ -692,6 +679,12 @@ export class BacktestingStrategyLabService {
   }
 
   metrics(initialCapital: number, curve: EquityCurvePoint[], trades: BacktestTrade[], config?: BacktestStrategyConfig, effectiveStartDate?: string): BacktestMetrics {
+    // Daily risk-free rate sourced from the per-asset-class MarketProfile.
+    // IN/STOCK → 6.5% p.a. (unchanged); CRYPTO → 0.  Falls back to the IN default
+    // when no config (and thus no scope) is available.
+    const dailyRf = config
+      ? dailyRiskFreeRate(resolveMarketProfile({ assetType: config.assetType, region: config.region }))
+      : DAILY_RISK_FREE_RATE;
     const ending = curve[curve.length - 1]?.equity ?? initialCapital;
     const totalReturn = initialCapital > 0 ? (ending - initialCapital) / initialCapital : 0;
     // Fix #5: use effectiveStartDate (= firstEntryDate ?? configStart) so the
@@ -715,12 +708,12 @@ export class BacktestingStrategyLabService {
     const maxDrawdown = Math.min(0, ...curve.map((point) => point.drawdownPercent));
     const finiteVolatility = Number.isFinite(volatility) ? volatility : null;
     // NR-32 — Sortino: downside deviation uses only returns below the daily risk-free rate
-    const downsideReturns = returns.filter((r) => r < DAILY_RISK_FREE_RATE);
+    const downsideReturns = returns.filter((r) => r < dailyRf);
     const downsideDeviation = downsideReturns.length > 1
-      ? Math.sqrt(downsideReturns.reduce((sum, r) => sum + Math.pow(r - DAILY_RISK_FREE_RATE, 2), 0) / (downsideReturns.length - 1)) * Math.sqrt(252)
+      ? Math.sqrt(downsideReturns.reduce((sum, r) => sum + Math.pow(r - dailyRf, 2), 0) / (downsideReturns.length - 1)) * Math.sqrt(252)
       : null;
     const sortinoRatio = downsideDeviation !== null && downsideDeviation > 0
-      ? ((avgReturn - DAILY_RISK_FREE_RATE) * 252) / downsideDeviation
+      ? ((avgReturn - dailyRf) * 252) / downsideDeviation
       : null;
     // NR-32 — Calmar: CAGR / |maxDrawdown|
     const calmarRatio = cagr !== null && maxDrawdown < 0 ? cagr / Math.abs(maxDrawdown) : null;
@@ -730,9 +723,9 @@ export class BacktestingStrategyLabService {
       cagr,
       maxDrawdown,
       volatility: finiteVolatility,
-      // Fix #2: Sharpe ratio subtracts risk-free rate (6.5% p.a. for IN).
+      // Fix #2: Sharpe ratio subtracts risk-free rate (6.5% p.a. for IN; 0 for crypto).
       // annualisedExcess = (avgDailyReturn - dailyRf) * 252
-      sharpeRatio: volatility > 0 ? ((avgReturn - DAILY_RISK_FREE_RATE) * 252) / volatility : null,
+      sharpeRatio: volatility > 0 ? ((avgReturn - dailyRf) * 252) / volatility : null,
       calmarRatio: Number.isFinite(calmarRatio) ? calmarRatio : null,
       sortinoRatio: Number.isFinite(sortinoRatio) ? sortinoRatio : null,
       winRate,
@@ -1063,12 +1056,15 @@ export class BacktestingStrategyLabService {
       });
     }
     const effectiveRegion = config.region || config.universe.region || 'IN';
-    // CB-12: apply India delivery-equity cost default (0.225 % per leg = 0.45 % round-trip)
-    // when the caller has not set transactionCostPercent explicitly.
-    // The original flat 0.1 % (0.001) understated STT + exchange + SEBI + stamp + GST + DP.
+    const effectiveAssetType = config.assetType || config.universe.assetType || 'STOCK';
+    // Transaction-cost default is sourced from the per-asset-class MarketProfile
+    // when the caller has not set transactionCostPercent explicitly:
+    //   IN/STOCK   → 0.225%/leg (CB-12 India delivery-equity model, unchanged)
+    //   non-IN/etc → 0.1%/leg flat baseline
+    //   CRYPTO     → 0.1%/leg flat baseline
     const effectiveCostPercent = (config.transactionCostPercent !== undefined && config.transactionCostPercent !== null)
       ? config.transactionCostPercent
-      : (effectiveRegion.toUpperCase() === 'IN' ? DEFAULT_INDIA_ONE_WAY_COST_PERCENT : 0.001);
+      : resolveMarketProfile({ assetType: effectiveAssetType, region: effectiveRegion }).oneWayTxnCostPercent;
     const normalized = {
       ...config,
       mode: config.strategyCode ? 'REGISTERED_STRATEGY' : config.mode || 'CUSTOM_RULES',
@@ -1196,7 +1192,10 @@ export class BacktestingStrategyLabService {
     instruments: Array<{ instrumentId: string; symbol: string }>;
     metadata: NonNullable<BacktestMetrics['dataQualityMetadata']>;
   }> {
-    if (!config.useDataQualityFilter) {
+    // Crypto has no equity-style Data Quality Engine evaluations; bypass the filter
+    // so a crypto universe is never silently emptied by the equity readiness gate.
+    const isCrypto = resolveMarketProfile({ assetType: config.assetType, region: config.region }).assetClass === 'CRYPTO';
+    if (!config.useDataQualityFilter || isCrypto) {
       return {
         instruments,
         metadata: {
@@ -1616,7 +1615,8 @@ export class BacktestingStrategyLabService {
     dates: string[],
     metrics: BacktestMetrics,
     strategyFirstEntryDate?: string,
-    nifty50Bars: HistoricalBar[] = [],
+    benchmarkBars: HistoricalBar[] = [],
+    benchmarkProfile?: { symbol: string; label: string },
   ): NonNullable<BacktestMetrics['benchmarkComparison']> {
     if (histories.size === 0 || dates.length < 2) {
       return { benchmarkName: null, benchmarkTotalReturn: null, benchmarkCagr: null, excessReturn: null, excessCagr: null, benchmarkDataStatus: 'UNAVAILABLE', dataGap: 'Benchmark unavailable for selected region' };
@@ -1626,10 +1626,10 @@ export class BacktestingStrategyLabService {
     // Fall back to the first available date when no trade was opened.
     const alignedEntryDate = strategyFirstEntryDate ?? dates[0];
 
-    // --- Try Nifty 50 real benchmark first ---
-    if (nifty50Bars.length >= 2) {
-      const firstBar = nifty50Bars.find((bar) => bar.date >= alignedEntryDate) ?? nifty50Bars[0];
-      const lastBar = this.barAtOrBefore(nifty50Bars, lastDate) ?? nifty50Bars.at(-1);
+    // --- Try real benchmark index first (region-resolved; e.g. ^NSEI for IN, ^GSPC for US) ---
+    if (benchmarkBars.length >= 2 && benchmarkProfile) {
+      const firstBar = benchmarkBars.find((bar) => bar.date >= alignedEntryDate) ?? benchmarkBars[0];
+      const lastBar = this.barAtOrBefore(benchmarkBars, lastDate) ?? benchmarkBars.at(-1);
       if (firstBar && lastBar && firstBar.close > 0 && lastBar.date >= alignedEntryDate) {
         const benchmarkTotalReturn = (lastBar.close - firstBar.close) / firstBar.close;
         const benchmarkEntryMs = new Date(firstBar.date).getTime();
@@ -1639,7 +1639,7 @@ export class BacktestingStrategyLabService {
           : (new Date(config.endDate).getTime() - new Date(config.startDate).getTime()) / (365.25 * 24 * 60 * 60 * 1000);
         const benchmarkCagr = years > 0 ? Math.pow(1 + benchmarkTotalReturn, 1 / years) - 1 : null;
         return {
-          benchmarkName: 'NIFTY 50 (^NSEI)',
+          benchmarkName: `${benchmarkProfile.label} (${benchmarkProfile.symbol})`,
           benchmarkTotalReturn,
           benchmarkCagr,
           excessReturn: (metrics.totalReturn ?? 0) - benchmarkTotalReturn,

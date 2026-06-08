@@ -19,7 +19,9 @@ export class AiInvestmentCopilotController {
     this.service.watchlistSummary(requireString(req.body?.watchlistId, 'watchlistId'), currentUserId(req))
   );
 
-  marketBrief = async (req: Request, res: Response) => this.respond(res, () => this.service.marketBrief(currentUserId(req)));
+  marketBrief = async (req: Request, res: Response) => this.respond(res, () =>
+    this.service.marketBrief(currentUserId(req), (req.query.region as string | undefined) ?? undefined)
+  );
   alertDigest = async (req: Request, res: Response) => this.respond(res, () => this.service.alertDigest(currentUserId(req)));
 
   private async respond(res: Response, fn: () => Promise<unknown> | unknown) {

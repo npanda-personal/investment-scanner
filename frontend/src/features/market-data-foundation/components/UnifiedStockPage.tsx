@@ -249,7 +249,7 @@ function ContextRow({ label, value, color, sub }: {
 }
 
 function MarketContextRail({ instrumentId }: { instrumentId?: string }) {
-  const { scope } = useMarketScope();
+  const { scope, profile } = useMarketScope();
 
   const [snapshot, setSnapshot] = useState<import('@/features/market-intelligence/types').InstrumentContextSnapshot | null>(null);
   const [loading, setLoading] = useState(!!instrumentId);
@@ -296,7 +296,7 @@ function MarketContextRail({ instrumentId }: { instrumentId?: string }) {
         const rs = ctx?.relativeStrength.value;
         if (!rs) return '—';
         if (rs.relativeReturn63d !== null && rs.relativeReturn63d !== undefined) {
-          return `vs Nifty ${formatPercent(rs.relativeReturn63d)}`;
+          return `vs ${profile.benchmarkLabel} ${formatPercent(rs.relativeReturn63d)}`;
         }
         if (rs.stockReturn63d !== null && rs.stockReturn63d !== undefined) {
           return `63d: ${formatPercent(rs.stockReturn63d)}`;

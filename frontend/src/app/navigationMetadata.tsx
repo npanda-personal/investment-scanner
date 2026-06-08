@@ -38,6 +38,7 @@ export const navGroups: NavGroup[] = [
     group: 'Trader Workflow',
     items: [
       { path: '/', label: 'Market Pulse', icon: <DashboardIcon />, aliases: ['/market-pulse'] },
+      { path: '/crypto', label: 'Crypto Market', icon: <TrendingUpIcon /> },
       { path: '/sector-rotation', label: 'Sector Rotation', icon: <SyncAltIcon /> },
       { path: '/index-constituents', label: 'Index Constituents', icon: <TableChartIcon /> },
       { path: '/market-events', label: 'Market Events', icon: <EventNoteIcon /> },
@@ -49,6 +50,7 @@ export const navGroups: NavGroup[] = [
       { path: '/earnings-intelligence', label: 'Earnings Intelligence', icon: <CalendarMonthIcon /> },
       { path: '/market-scans', label: 'Market Scans', icon: <FilterAltIcon /> },
       { path: '/screener', label: 'Screener', icon: <FilterAltIcon /> },
+      { path: '/derivatives', label: 'Derivatives / F&O', icon: <ShowChartIcon /> },
       { path: '/watchlists', label: 'Watchlists', icon: <StarBorderIcon />, matchPrefixes: ['/watchlists/'] },
       { path: '/portfolios', label: 'Portfolios', icon: <AccountBalanceWalletIcon />, matchPrefixes: ['/portfolios/'] },
       { path: '/alerts', label: 'Alerts', icon: <NotificationsNoneIcon /> },

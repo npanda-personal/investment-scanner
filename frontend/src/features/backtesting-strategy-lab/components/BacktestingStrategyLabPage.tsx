@@ -92,7 +92,10 @@ const fmtPercent = (value: number | null | undefined) => value === null || value
   ? 'N/A'
   : `${(value * 100).toFixed(1)}%`;
 const fmtNumber = (value: number | null | undefined) => value === null || value === undefined ? 'N/A' : value.toFixed(2);
-const compactMoneyTick = (value: number, region = 'GLOBAL') => `${region === 'IN' ? '₹' : '$'}${Math.round(value / 1000)}k`;
+const compactMoneyTick = (value: number, region = 'GLOBAL') => {
+  const sym = region === 'IN' ? '₹' : region === 'EU' ? '€' : '$';
+  return `${sym}${Math.round(value / 1000)}k`;
+};
 
 export default function BacktestingStrategyLabPage() {
   const { scope } = useMarketScope();
@@ -479,8 +482,8 @@ export default function BacktestingStrategyLabPage() {
 }
 
 const BENCHMARK_STATUS_LABELS: Record<string, string> = {
-  AVAILABLE: 'Nifty 50 index data used',
-  FALLBACK_EQUAL_WEIGHT: 'Equal-weight proxy (Nifty 50 unavailable for this period)',
+  AVAILABLE: 'Benchmark index data used',
+  FALLBACK_EQUAL_WEIGHT: 'Equal-weight proxy (benchmark unavailable for this period)',
   UNAVAILABLE: 'Benchmark data unavailable',
 };
 
@@ -603,7 +606,7 @@ function ResultsPanel({ run, chartData }: { run: BacktestRun | null; chartData: 
             </Tooltip>
             <Chip size="small" label={metrics.benchmarkComparison.benchmarkName || 'Benchmark unavailable'} />
             <Chip size="small" label={`Strategy CAGR ${fmtPercent(metrics.cagr)}`} color={benchmarkIsReal ? 'primary' : 'default'} />
-            <Tooltip title={benchmarkIsReal ? 'Real Nifty 50 CAGR' : 'Equal-weight proxy — treat as approximate only'} arrow>
+            <Tooltip title={benchmarkIsReal ? 'Real benchmark CAGR' : 'Equal-weight proxy — treat as approximate only'} arrow>
               <Chip size="small" label={`Benchmark CAGR ${fmtPercent(metrics.benchmarkComparison.benchmarkCagr)}`} variant={benchmarkIsReal ? 'filled' : 'outlined'} />
             </Tooltip>
             <Chip size="small" label={`Excess CAGR ${fmtPercent(metrics.benchmarkComparison.excessCagr)}`} color={(metrics.benchmarkComparison.excessCagr ?? 0) < 0 ? 'warning' : 'success'} />

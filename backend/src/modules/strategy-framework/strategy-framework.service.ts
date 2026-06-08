@@ -339,7 +339,7 @@ export class StrategyFrameworkService {
     const instrument = await this.resolveInstrument(request);
     if (!instrument) return { symbol: request.symbol, region: request.region, assetType: request.assetType };
     const [pricesResponse, rawSignal, calibratedSignal, dataQuality, marketSummary, smartMoney] = await Promise.all([
-      this.marketDataService.listPricesByInstrumentId(instrument.id, 5000).catch(() => ({ prices: [] })),
+      this.marketDataService.listPricesByInstrumentId(instrument.id, 5000, undefined, undefined, { region: request.region, assetType: request.assetType }).catch(() => ({ prices: [] })),
       this.signalService.latestForInstrument(instrument.id).catch(() => null),
       this.calibrationService.latestForInstrument(instrument.id).catch(() => null),
       this.dataQualityService.diagnostics(instrument.id).catch(() => null),

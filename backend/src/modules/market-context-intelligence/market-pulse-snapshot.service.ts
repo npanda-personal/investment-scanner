@@ -1,5 +1,6 @@
 import { latestCompletedTradingDateForRegion } from '../market-data-foundation';
 import { MarketPulseSnapshotRepository } from './market-pulse-snapshot.repository';
+import { resolveMarketProfile } from '../../shared/utils/market-profile';
 import type {
   MarketPulseAdvanceDeclineSummary,
   MarketPulseBreadthSummary,
@@ -45,6 +46,12 @@ const HIGH_DELIVERY_THRESHOLD = 50;
 const VIX_SYMBOL = 'NSE_INDEX_INDIA_VIX';
 /** VIX above this threshold caps market posture at NEUTRAL (FRAGILE label). */
 const VIX_HIGH_THRESHOLD = 22;
+/** Friendly sector names for US SPDR sector ETF proxies (used in strong/weak sector labels). */
+const SPDR_SECTOR_NAMES: Record<string, string> = {
+  XLK: 'Technology', XLF: 'Financials', XLV: 'Healthcare', XLE: 'Energy',
+  XLY: 'Consumer Discretionary', XLP: 'Consumer Staples', XLI: 'Industrials',
+  XLB: 'Materials', XLRE: 'Real Estate', XLU: 'Utilities', XLC: 'Communication Services',
+};
 
 export class MarketPulseSnapshotService {
   // Leveraged / inverse / factor / thematic index slices that should NOT appear in the
@@ -125,14 +132,25 @@ export class MarketPulseSnapshotService {
   calculateSnapshot(data: MarketPulseCalculationData, options: MarketPulseCalculationOptions = {}): MarketPulseSnapshotInput {
     const generatedAt = options.generatedAt || new Date();
     const normalized = this.normalizeScope({ region: data.region, assetType: data.assetType, timeframe: options.timeframe });
+    const profile = resolveMarketProfile({ region: normalized.region });
     const snapshotDate = this.utcDay(generatedAt);
-    const freshness = this.calculateFreshness(data.sourceImports, normalized.region, generatedAt);
+    // For non-IN regions pass the latest price-tick date so freshness can be derived
+    // from price recency instead of SourceFileImport segments (which are NSE-only).
+    const latestPriceTickDate = this.latestEvidenceDate(data);
+    const freshness = this.calculateFreshness(data.sourceImports, normalized.region, generatedAt, latestPriceTickDate);
     const indexTrend = this.calculateIndexTrend(data.indexPrices);
     const sectorStrength = this.calculateSectorStrength(data.sectorIndexPrices);
     const breadth = this.calculateBreadth(data.stockUniverse, data.stockPrices);
-    const delivery = this.calculateDelivery(data.deliverySnapshots);
+    // delivery participation: only meaningful for IN (hasDelivery); for other regions
+    // exclude it from scoring (re-normalize the remaining weights) and emit UNAVAILABLE.
+    const delivery = profile.capabilities.hasDelivery
+      ? this.calculateDelivery(data.deliverySnapshots)
+      : { score: 0, summary: this.unavailableDeliverySummary(), warnings: [] as string[] };
     const candidateCount = this.calculateCandidateCount(data.stockUniverse, data.stockPrices, sectorStrength.rows || [], freshness.dataThroughDate);
-    const vixSummary = this.calculateVixSummary(data.indexPrices);
+    // VIX: only meaningful for regions with capabilities.hasVix (India only currently).
+    const vixSummary = profile.capabilities.hasVix
+      ? this.calculateVixSummary(data.indexPrices)
+      : this.unavailableVixSummary();
     const advanceDecline = this.calculateAdvanceDecline(data.stockUniverse, data.stockPrices);
     const warnings = this.uniqueStrings([
       ...freshness.warnings,
@@ -143,11 +161,17 @@ export class MarketPulseSnapshotService {
     ]);
     const hasAnyPriceEvidence = data.indexPrices.length > 0 || data.sectorIndexPrices.length > 0 || data.stockPrices.length > 0;
     const status = this.snapshotStatus(hasAnyPriceEvidence, freshness.status, warnings);
+    // Re-normalize weights when delivery is absent (non-IN regions): distribute its
+    // 15% weight proportionally to the other three scored components (25/25/25 → ~28.6/28.6/28.6,
+    // freshness stays at 10%) so the total remains 100%.
+    const deliveryWeight = profile.capabilities.hasDelivery ? 0.15 : 0;
+    const remainingWeight = 1 - deliveryWeight - 0.10; // 0.75 (IN) or 0.90 (non-IN)
+    const componentShare = remainingWeight / 3; // 0.25 (IN) or 0.30 (non-IN)
     const marketHealthScore = Math.round(
-      indexTrend.score * 0.25
-      + sectorStrength.score * 0.25
-      + breadth.score * 0.25
-      + delivery.score * 0.15
+      indexTrend.score * componentShare
+      + sectorStrength.score * componentShare
+      + breadth.score * componentShare
+      + delivery.score * deliveryWeight
       + freshness.score * 0.10
     );
 
@@ -184,8 +208,28 @@ export class MarketPulseSnapshotService {
     };
   }
 
-  calculateFreshness(sourceImports: MarketPulseSourceImport[], region: string, now = new Date()): FreshnessResult {
+  calculateFreshness(
+    sourceImports: MarketPulseSourceImport[],
+    region: string,
+    now = new Date(),
+    /**
+     * Latest price-tick timestamp for the region (used as freshness evidence for
+     * non-IN regions where SourceFileImport segments are NSE-file-only).
+     * Optional — leave undefined when calling from the IN path.
+     */
+    latestPriceTickDate?: Date | null,
+  ): FreshnessResult {
     const latestCompletedTradingDate = latestCompletedTradingDateForRegion(region, now);
+    const isIN = String(region || '').trim().toUpperCase() === 'IN';
+
+    // For non-IN regions the NSE SourceFileImport segments (CM/INDEX/SECTOR_INDEX)
+    // are never populated, so the segment-based required-count gate would always
+    // produce FAILED.  Instead, for non-IN we skip segment gating and derive
+    // freshness purely from price-tick recency.
+    if (!isIN) {
+      return this.calculateFreshnessFromPriceTicks(latestPriceTickDate ?? null, latestCompletedTradingDate, region);
+    }
+
     const latestBySegment = new Map<string, MarketPulseSourceImport>();
     for (const row of sourceImports) {
       if (String(row.status).toUpperCase() !== 'COMPLETED') continue;
@@ -252,6 +296,73 @@ export class MarketPulseSnapshotService {
         score,
         latestCompletedTradingDate,
         dataThroughDate: latestDataThroughDate ? this.dateKey(latestDataThroughDate) : null,
+        segments,
+      },
+    };
+  }
+
+  /**
+   * Non-IN freshness: no NSE SourceFileImport segments → derive status from
+   * the latest price-tick timestamp vs. the expected last completed trading date.
+   * Returns PARTIAL/STALE/FAILED based on data recency rather than segment presence.
+   */
+  private calculateFreshnessFromPriceTicks(
+    latestPriceTickDate: Date | null,
+    latestCompletedTradingDate: string | null,
+    region: string,
+  ): FreshnessResult {
+    const warnings: string[] = [];
+    const segments: MarketPulseSourceSummary['segments'] = {};
+
+    // Mark all NSE-file segments as N/A for non-IN regions (not an error, just absent).
+    for (const segment of ALL_SOURCE_SEGMENTS) {
+      segments[segment] = { status: 'MISSING', tradingDate: null, importedAt: null };
+    }
+
+    if (!latestPriceTickDate) {
+      warnings.push(`No persisted price-tick data found for region ${region}; freshness cannot be determined.`);
+      return {
+        status: 'FAILED',
+        score: 0,
+        dataThroughDate: null,
+        warnings,
+        sourceSummary: {
+          status: 'FAILED',
+          score: 0,
+          latestCompletedTradingDate,
+          dataThroughDate: null,
+          segments,
+        },
+      };
+    }
+
+    const tickDateKey = this.dateKey(latestPriceTickDate);
+    let status: MarketPulseSnapshotStatus = 'PARTIAL';
+    let score = 50; // mid-range default for non-IN with price evidence
+
+    if (latestCompletedTradingDate !== null) {
+      if (tickDateKey >= latestCompletedTradingDate) {
+        status = 'FRESH';
+        score = 85;
+      } else {
+        warnings.push(`Latest price-tick date ${tickDateKey} is before the expected trading date ${latestCompletedTradingDate} for ${region}.`);
+        status = 'STALE';
+        score = 30;
+      }
+    } else {
+      warnings.push(`Latest completed trading date is unavailable for ${region}; freshness is partial.`);
+    }
+
+    return {
+      status,
+      score,
+      dataThroughDate: latestPriceTickDate,
+      warnings,
+      sourceSummary: {
+        status,
+        score,
+        latestCompletedTradingDate,
+        dataThroughDate: tickDateKey,
         segments,
       },
     };
@@ -326,7 +437,7 @@ export class MarketPulseSnapshotService {
       const returns = this.seriesReturns(series);
       const score = this.seriesScore(series, returns);
       return {
-        sector: series[0]?.label || symbol,
+        sector: SPDR_SECTOR_NAMES[symbol.toUpperCase()] || series[0]?.label || symbol,
         return1W: returns.return1W,
         return1M: returns.return1M,
         return3M: returns.return3M,
@@ -666,6 +777,10 @@ export class MarketPulseSnapshotService {
       latestTradingDate: null,
       summaryText: 'Delivery participation is unavailable from persisted delivery snapshots.',
     };
+  }
+
+  private unavailableVixSummary(): MarketPulseVixSummary {
+    return { latest: null, low5d: null, high5d: null, asOf: null, posture: 'UNAVAILABLE' };
   }
 
   private toDto(row: MarketPulseSnapshotRecord, priorHealthScore: number | null = null, healthScoreHistory: number[] = []): MarketPulseSnapshotDto {

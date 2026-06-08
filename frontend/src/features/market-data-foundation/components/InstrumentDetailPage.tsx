@@ -37,7 +37,7 @@ import {
 } from '../api/marketDataFoundationService';
 import { PageHeader } from '@/shared/components';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
-import { inr, inrCompact, stripSuffix } from '@/shared/format/money';
+import { compactByProfile, currencySymbol, money, stripSuffix } from '@/shared/format/money';
 
 type ChipColor = 'default' | 'success' | 'warning' | 'error' | 'info';
 
@@ -77,12 +77,12 @@ const formatNumber = (value: number | string | null | undefined) => {
  * must never be shown to the trader. Prefer the real price-record source when
  * available, otherwise fall back to a generic exchange-feed label.
  */
-const safeSource = (instrumentSource: string | null | undefined, priceSource?: string | null): string => {
+const safeSource = (instrumentSource: string | null | undefined, priceSource?: string | null, isCrypto = false): string => {
   const src = instrumentSource ?? '';
   if (src.startsWith('TEST_') || src === '') {
     // Use the latest price-record source if it doesn't look like a test value
     if (priceSource && !priceSource.startsWith('TEST_') && priceSource !== '') return priceSource;
-    return 'NSE/BSE exchange feed';
+    return isCrypto ? 'Binance / CoinGecko' : 'NSE/BSE exchange feed';
   }
   return src;
 };
@@ -90,7 +90,7 @@ const safeSource = (instrumentSource: string | null | undefined, priceSource?: s
 const InstrumentDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { scope } = useMarketScope();
+  const { scope, profile } = useMarketScope();
   const [instrument, setInstrument] = useState<V1Instrument | null>(null);
   const [latest, setLatest] = useState<V1LatestPriceResponse | null>(null);
   const [prices, setPrices] = useState<V1PricesResponse | null>(null);
@@ -142,6 +142,8 @@ const InstrumentDetailPage: React.FC = () => {
   const latestUpdatedAt = latestPriceRecord?.last_updated_timestamp || prices?.last_updated_timestamp || instrument?.last_updated_timestamp || null;
   const persistedSource = safeSource(
     latestPriceRecord?.source || prices?.source || instrument?.source || null,
+    null,
+    profile.isCrypto,
   );
   const sourceStatus = latestPriceRecord?.data_status || latest?.data_status || prices?.data_status || instrument?.data_status || null;
   const freshnessStatus = instrument?.price_readiness || (dataThrough ? sourceStatus : 'MISSING_LATEST_PRICE');
@@ -184,9 +186,9 @@ const InstrumentDetailPage: React.FC = () => {
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(4, 1fr)' }, gap: 2, mb: 3 }}>
         <Paper sx={{ p: 2 }}>
           <Typography variant="overline" color="text.secondary">Latest Price</Typography>
-          <Typography variant="h5">{latest?.latest ? inr(latest.latest.close) : 'N/A'}</Typography>
+          <Typography variant="h5">{latest?.latest ? money(latest.latest.close, instrument.currency) : 'N/A'}</Typography>
           <Typography variant="caption" color="text.secondary">{latest?.latest ? formatDate(latest.latest.date) : 'No price data'}</Typography>
-          <PriceRangeBand prices={prices?.prices ?? []} />
+          <PriceRangeBand prices={prices?.prices ?? []} currency={instrument.currency} />
         </Paper>
         <Paper sx={{ p: 2 }}>
           <Typography variant="overline" color="text.secondary">Exchange</Typography>
@@ -195,18 +197,21 @@ const InstrumentDetailPage: React.FC = () => {
             <Chip size="small" label="SME" color="warning" sx={{ mt: 0.5 }} title="NSE SME platform — limited liquidity; verify tradability before acting" />
           )}
         </Paper>
-        <Paper sx={{ p: 2 }}>
-          <Typography variant="overline" color="text.secondary">ISIN</Typography>
-          <Typography variant="h6" sx={{ fontFamily: 'monospace', fontSize: 14, wordBreak: 'break-all' }}>
-            {instrument.isin || '—'}
-          </Typography>
-          <Typography variant="caption" color="text.secondary">
-            {instrument.isin ? 'NSE catalog' : 'Not available'}
-          </Typography>
-        </Paper>
+        {/* ISIN is an NSE/exchange-catalog identifier — not applicable to crypto. */}
+        {!profile.isCrypto && (
+          <Paper sx={{ p: 2 }}>
+            <Typography variant="overline" color="text.secondary">ISIN</Typography>
+            <Typography variant="h6" sx={{ fontFamily: 'monospace', fontSize: 14, wordBreak: 'break-all' }}>
+              {instrument.isin || '—'}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              {instrument.isin ? 'NSE catalog' : 'Not available'}
+            </Typography>
+          </Paper>
+        )}
         <Paper sx={{ p: 2 }}>
           <Typography variant="overline" color="text.secondary">Metadata</Typography>
-          <Typography variant="body2">Source: {safeSource(instrument.source, latestPriceRecord?.source)}</Typography>
+          <Typography variant="body2">Source: {safeSource(instrument.source, latestPriceRecord?.source, profile.isCrypto)}</Typography>
           <Typography variant="body2">Updated: {formatDateTime(instrument.last_updated_timestamp)}</Typography>
         </Paper>
       </Box>
@@ -230,7 +235,8 @@ const InstrumentDetailPage: React.FC = () => {
       <Paper sx={{ p: 2, mb: 3 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
           <Typography variant="h6">Historical Prices</Typography>
-          <Chip label="Prices shown are split/bonus-adjusted." size="small" variant="outlined" />
+          {/* Crypto has no splits/dividends → no adjustment caveat. */}
+          {!profile.isCrypto && <Chip label="Prices shown are split/bonus-adjusted." size="small" variant="outlined" />}
         </Box>
         {chartData.length > 0 ? (
           <Box sx={{ height: 320 }}>
@@ -248,41 +254,45 @@ const InstrumentDetailPage: React.FC = () => {
         )}
       </Paper>
 
-      <TableSection title="Price Table">
+      <TableSection title="Price Table" currencyLabel={currencySymbol(instrument.currency)}>
         {(prices?.prices || []).slice(0, 20).map((price) => (
           <TableRow key={price.date}>
             <TableCell>{formatDate(price.date)}</TableCell>
-            <TableCell align="right">{inr(price.open)}</TableCell>
-            <TableCell align="right">{inr(price.high)}</TableCell>
-            <TableCell align="right">{inr(price.low)}</TableCell>
-            <TableCell align="right">{inr(price.close)}</TableCell>
-            <TableCell align="right">{inr(price.adjusted_close)}</TableCell>
+            <TableCell align="right">{money(price.open, instrument.currency)}</TableCell>
+            <TableCell align="right">{money(price.high, instrument.currency)}</TableCell>
+            <TableCell align="right">{money(price.low, instrument.currency)}</TableCell>
+            <TableCell align="right">{money(price.close, instrument.currency)}</TableCell>
+            <TableCell align="right">{money(price.adjusted_close, instrument.currency)}</TableCell>
             <TableCell align="right">{formatNumber(price.volume)}</TableCell>
             <TableCell>{price.source}</TableCell>
           </TableRow>
         ))}
       </TableSection>
 
-      <TableSection title="Fundamentals">
+      {/* Fundamentals & corporate actions are equity-only — hidden for crypto. */}
+      {profile.capabilities.hasFundamentals && (
+      <TableSection title="Fundamentals" currencyLabel={currencySymbol(instrument.currency)}>
         {(fundamentals?.records || []).map((record) => (
           <TableRow key={`${record.period_type}-${record.period_end_date}`}>
             <TableCell>{record.period_type}</TableCell>
             <TableCell>{formatDate(record.period_end_date)}</TableCell>
-            <TableCell align="right">{inrCompact(record.revenue)}</TableCell>
-            <TableCell align="right">{inr(record.eps)}</TableCell>
-            <TableCell align="right">{inrCompact(record.net_income)}</TableCell>
+            <TableCell align="right">{compactByProfile(record.revenue, { currency: record.currency || instrument.currency || 'INR' })}</TableCell>
+            <TableCell align="right">{money(record.eps, record.currency || instrument.currency)}</TableCell>
+            <TableCell align="right">{compactByProfile(record.net_income, { currency: record.currency || instrument.currency || 'INR' })}</TableCell>
             <TableCell align="right">{formatNumber(record.pe_ratio)}</TableCell>
             <TableCell align="right">{formatNumber(record.dividend_yield)}</TableCell>
             <TableCell align="right">{formatNumber(record.shares_outstanding)}</TableCell>
-            <TableCell align="right">{inrCompact(record.market_cap)}</TableCell>
+            <TableCell align="right">{compactByProfile(record.market_cap, { currency: record.currency || instrument.currency || 'INR' })}</TableCell>
             <TableCell>{record.currency || 'N/A'}</TableCell>
             <TableCell>{record.source}</TableCell>
             <TableCell>{record.data_status}</TableCell>
           </TableRow>
         ))}
       </TableSection>
+      )}
 
-      <TableSection title="Corporate Actions">
+      {profile.capabilities.hasDividends && (
+      <TableSection title="Corporate Actions" currencyLabel={currencySymbol(instrument.currency)}>
         {(actions?.actions || []).map((action) => (
           <TableRow key={`${action.action_type}-${action.effective_date}-${action.value}`}>
             <TableCell>{action.action_type}</TableCell>
@@ -291,13 +301,14 @@ const InstrumentDetailPage: React.FC = () => {
             <TableCell>{action.payment_date ? formatDate(action.payment_date) : 'N/A'}</TableCell>
             <TableCell>{formatNumber(action.value)}</TableCell>
             <TableCell>{formatNumber(action.ratio)}</TableCell>
-            <TableCell>{inr(action.amount)}</TableCell>
+            <TableCell>{money(action.amount, action.currency || instrument.currency)}</TableCell>
             <TableCell>{action.currency || 'N/A'}</TableCell>
             <TableCell>{action.source}</TableCell>
             <TableCell>{action.data_status}</TableCell>
           </TableRow>
         ))}
       </TableSection>
+      )}
     </Box>
   );
 };
@@ -308,7 +319,7 @@ const tableSectionLayout = (title: string) => {
   return { columnCount: 8, minWidth: 900 };
 };
 
-const TableSection: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => {
+const TableSection: React.FC<{ title: string; children: React.ReactNode; currencyLabel?: string }> = ({ title, children, currencyLabel = '₹' }) => {
   const layout = tableSectionLayout(title);
   return (
     <Paper sx={{ mb: 3, overflow: 'hidden' }}>
@@ -339,11 +350,11 @@ const TableSection: React.FC<{ title: string; children: React.ReactNode }> = ({ 
               {title === 'Price Table' && (
                 <>
                   <TableCell sx={{ width: 128 }}>Date</TableCell>
-                  <TableCell sx={{ width: 110 }} align="right">Open (Rs.)</TableCell>
-                  <TableCell sx={{ width: 110 }} align="right">High (Rs.)</TableCell>
-                  <TableCell sx={{ width: 110 }} align="right">Low (Rs.)</TableCell>
-                  <TableCell sx={{ width: 110 }} align="right">Close (Rs.)</TableCell>
-                  <TableCell sx={{ width: 140 }} align="right">Adj. Close (Rs.)</TableCell>
+                  <TableCell sx={{ width: 110 }} align="right">Open ({currencyLabel})</TableCell>
+                  <TableCell sx={{ width: 110 }} align="right">High ({currencyLabel})</TableCell>
+                  <TableCell sx={{ width: 110 }} align="right">Low ({currencyLabel})</TableCell>
+                  <TableCell sx={{ width: 110 }} align="right">Close ({currencyLabel})</TableCell>
+                  <TableCell sx={{ width: 140 }} align="right">Adj. Close ({currencyLabel})</TableCell>
                   <TableCell sx={{ width: 130 }} align="right">Volume</TableCell>
                   <TableCell sx={{ width: 162 }}>Source</TableCell>
                 </>
@@ -353,7 +364,7 @@ const TableSection: React.FC<{ title: string; children: React.ReactNode }> = ({ 
                   <TableCell sx={{ width: 110 }}>Period</TableCell>
                   <TableCell sx={{ width: 130 }}>Period End</TableCell>
                   <TableCell sx={{ width: 120 }} align="right">Revenue</TableCell>
-                  <TableCell sx={{ width: 90 }} align="right">EPS (Rs.)</TableCell>
+                  <TableCell sx={{ width: 90 }} align="right">EPS ({currencyLabel})</TableCell>
                   <TableCell sx={{ width: 126 }} align="right">Net Income</TableCell>
                   <TableCell sx={{ width: 104 }} align="right">PE Ratio</TableCell>
                   <TableCell sx={{ width: 136 }} align="right">Dividend Yield</TableCell>
@@ -372,7 +383,7 @@ const TableSection: React.FC<{ title: string; children: React.ReactNode }> = ({ 
                   <TableCell sx={{ width: 130 }}>Payment Date</TableCell>
                   <TableCell sx={{ width: 110 }}>Value</TableCell>
                   <TableCell sx={{ width: 110 }}>Ratio</TableCell>
-                  <TableCell sx={{ width: 110 }}>Amount (Rs.)</TableCell>
+                  <TableCell sx={{ width: 110 }}>Amount ({currencyLabel})</TableCell>
                   <TableCell sx={{ width: 96 }}>Currency</TableCell>
                   <TableCell sx={{ width: 156 }}>Source</TableCell>
                   <TableCell sx={{ width: 152 }}>Status</TableCell>
@@ -399,7 +410,7 @@ const TableSection: React.FC<{ title: string; children: React.ReactNode }> = ({ 
  * Shows a derived high/low band from the loaded price array.
  * A true 52-week field requires a dedicated backend API field (not yet present).
  */
-const PriceRangeBand: React.FC<{ prices: { close: number }[] }> = ({ prices }) => {
+const PriceRangeBand: React.FC<{ prices: { close: number }[]; currency?: string | null }> = ({ prices, currency }) => {
   if (prices.length === 0) return null;
   const closes = prices.map((p) => p.close).filter(Number.isFinite);
   if (closes.length === 0) return null;
@@ -407,7 +418,7 @@ const PriceRangeBand: React.FC<{ prices: { close: number }[] }> = ({ prices }) =
   const lo = Math.min(...closes);
   return (
     <Typography variant="caption" color="text.secondary" display="block">
-      ~{prices.length}D range: {inr(lo)} - {inr(hi)}
+      ~{prices.length}D range: {money(lo, currency)} - {money(hi, currency)}
     </Typography>
   );
 };

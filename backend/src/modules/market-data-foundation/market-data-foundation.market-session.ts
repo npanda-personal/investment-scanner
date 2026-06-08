@@ -1,5 +1,7 @@
 import type { LatestStoredCandleInfo, MarketDataSchedulerDecision } from './market-data-foundation.types';
 import { normalizeMarketRegion } from '../../shared/utils/market-scope';
+import { US_NYSE_HOLIDAYS } from './market-data-foundation.us-holidays';
+import { EU_EUROZONE_HOLIDAYS } from './market-data-foundation.eu-holidays';
 
 export interface MarketSessionConfig {
   region: string;
@@ -181,7 +183,7 @@ export const DEFAULT_MARKET_SESSION_CONFIGS: Record<string, Omit<MarketSessionCo
     postCloseSyncWindowMinutes: 120,
     finalizationGraceMinutes: 15,
     weekdays: [1, 2, 3, 4, 5],
-    holidays: [],
+    holidays: US_NYSE_HOLIDAYS,
   },
   EU: {
     region: 'EU',
@@ -191,7 +193,7 @@ export const DEFAULT_MARKET_SESSION_CONFIGS: Record<string, Omit<MarketSessionCo
     postCloseSyncWindowMinutes: 120,
     finalizationGraceMinutes: 15,
     weekdays: [1, 2, 3, 4, 5],
-    holidays: [],
+    holidays: EU_EUROZONE_HOLIDAYS,
   },
 };
 

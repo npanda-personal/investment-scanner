@@ -3,6 +3,8 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import { Alert, Box, Button, Chip, CircularProgress, LinearProgress, Paper, Stack, Table, TableBody, TableCell, TableHead, TableRow, Tooltip, Typography } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { humanizeCode } from '@/shared/format/enumLabels';
+import { useMarketScope } from '@/contexts/MarketScopeContext';
+import { NotApplicableForAssetClass } from '@/shared/components/NotApplicableForAssetClass';
 import { useMarketContext } from '../hooks';
 import type { CapBandBreadth } from '../types';
 import { FiiDiiActivityWidget } from './FiiDiiActivityWidget';
@@ -85,8 +87,23 @@ const CapBandBreadthTable: React.FC<{ bands: CapBandBreadth[] }> = ({ bands }) =
 };
 
 export const MarketContextPage: React.FC = () => {
+  const { profile } = useMarketScope();
   const { summary, loading, error, reload } = useMarketContext();
   const navigate = useNavigate();
+  // FII/DII institutional flows + bulk/block deals here are India-only (NSE).
+  // Gate on institutional-flow capability so US/EU/crypto don't surface ₹/FII/DII.
+  if (!profile.capabilities.hasInstitutionalFlow) {
+    return (
+      <Box sx={{ p: 3, maxWidth: 1500, mx: 'auto' }}>
+        <Typography variant="h4" sx={{ mb: 1 }}>Market Context Intelligence</Typography>
+        <Typography color="text.secondary" sx={{ mb: 3 }}>Broader market regime, sector rotation, breadth, country strength, and macro context.</Typography>
+        <NotApplicableForAssetClass
+          feature="Market context"
+          detail="FII/DII institutional flows and bulk/block deals are sourced from NSE (India only). An equivalent free institutional-flow feed for this market is not available in this release."
+        />
+      </Box>
+    );
+  }
   if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress /></Box>;
   if (error || !summary) return <Alert severity="error">{error || 'Market context unavailable'}</Alert>;
 

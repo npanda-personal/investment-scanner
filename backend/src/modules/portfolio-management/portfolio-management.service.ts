@@ -289,6 +289,8 @@ export class PortfolioManagementService {
   }
 
   async valueHolding(holding: any): Promise<HoldingValuationDto> {
+    // NOTE: equity-plane only. Crypto holdings require assetType persisted on the
+    // holding row to route price reads to crypto_*; deferred (needs a migration).
     const [instrument, latest, prices, signal] = await Promise.all([
       this.marketDataService.getInstrument(holding.instrumentId),
       this.marketDataService.latestPriceByInstrumentId(holding.instrumentId),

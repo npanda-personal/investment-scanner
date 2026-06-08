@@ -22,17 +22,27 @@ import {
 } from '@mui/material';
 import TableSortLabel from '@mui/material/TableSortLabel';
 import { PageHeader } from '@/shared/components/PageHeader';
-import { inr, inrCompact, changeColor } from '@/shared/format/money';
+import { NotApplicableForAssetClass } from '@/shared/components/NotApplicableForAssetClass';
+import { useMarketScope } from '@/contexts/MarketScopeContext';
+import { money, compact, changeColor } from '@/shared/format/money';
 import { humanizeCode } from '@/shared/format/enumLabels';
 import { fetchIndexConstituents } from '../api/marketIntelligenceService';
 import type { IndexConstituentRow, IndexConstituentsEnvelope, SupportedIndex } from '../types';
 
 // ─── Index options ───────────────────────────────────────────────────────────
 
-const INDEX_OPTIONS: Array<{ value: SupportedIndex; label: string; size: number }> = [
-  { value: 'NIFTY_50', label: 'Nifty 50', size: 50 },
-  { value: 'NIFTY_BANK', label: 'Nifty Bank', size: 12 },
+const INDEX_OPTIONS: Array<{ value: SupportedIndex; label: string; size: number; region: string }> = [
+  { value: 'NIFTY_50', label: 'Nifty 50', size: 50, region: 'IN' },
+  { value: 'NIFTY_BANK', label: 'Nifty Bank', size: 12, region: 'IN' },
+  { value: 'SP500', label: 'S&P 500', size: 50, region: 'US' },
+  { value: 'NDX100', label: 'NASDAQ 100', size: 30, region: 'US' },
 ];
+
+// Index membership is curated per region: NSE for India, the exchange composite for US.
+const DEFAULT_INDEX_BY_REGION: Record<string, SupportedIndex> = {
+  IN: 'NIFTY_50',
+  US: 'SP500',
+};
 
 // ─── Signal chip ────────────────────────────────────────────────────────────
 
@@ -114,7 +124,16 @@ function sortedRows(
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export function IndexConstituentsPage() {
-  const [selectedIndex, setSelectedIndex] = useState<SupportedIndex>('NIFTY_50');
+  const { scope, profile } = useMarketScope();
+  const regionIndexOptions = INDEX_OPTIONS.filter((o) => o.region === scope.region);
+  const defaultIndex = DEFAULT_INDEX_BY_REGION[scope.region] ?? regionIndexOptions[0]?.value ?? 'NIFTY_50';
+  const [selectedIndex, setSelectedIndex] = useState<SupportedIndex>(defaultIndex);
+
+  // When the active market changes, snap the selected index back to that region's default
+  // so a US user never requests a Nifty index (and vice versa).
+  useEffect(() => {
+    setSelectedIndex(defaultIndex);
+  }, [defaultIndex]);
   const [envelope, setEnvelope] = useState<IndexConstituentsEnvelope | null>(null);
   const [loading, setLoading] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>('symbol');
@@ -155,6 +174,18 @@ export function IndexConstituentsPage() {
   const indexOption = INDEX_OPTIONS.find((o) => o.value === selectedIndex);
   const rows = envelope ? sortedRows(envelope.constituents, sortKey, sortOrder) : [];
 
+  if (!profile.capabilities.hasIndexConstituents) {
+    return (
+      <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 1400, mx: 'auto' }}>
+        <PageHeader
+          title="Index Constituents"
+          subtitle="Scan an index's internal members — latest signal, price, and 1D move in one view."
+        />
+        <NotApplicableForAssetClass feature="Index constituents" />
+      </Box>
+    );
+  }
+
   return (
     <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 1400, mx: 'auto' }}>
       <PageHeader
@@ -169,7 +200,7 @@ export function IndexConstituentsPage() {
               label="Index"
               onChange={(e) => setSelectedIndex(e.target.value as SupportedIndex)}
             >
-              {INDEX_OPTIONS.map((opt) => (
+              {regionIndexOptions.map((opt) => (
                 <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
               ))}
             </Select>
@@ -186,7 +217,7 @@ export function IndexConstituentsPage() {
           {envelope.membershipSource === 'CURATED_STATIC' && (
             <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
               Membership: curated static list as of {envelope.membershipAsOf}.
-              Update when NSE reconstitutes the index.
+              Update when the index is reconstituted.
             </Typography>
           )}
         </Paper>
@@ -204,7 +235,7 @@ export function IndexConstituentsPage() {
       {/* Empty / error state */}
       {!loading && envelope && (envelope.availability === 'EMPTY' || envelope.count === 0) && (
         <Alert severity="info">
-          No data found for {envelope.indexLabel}. Ensure NSE stock data has been ingested and signals have been generated.
+          No data found for {envelope.indexLabel}. Ensure stock data has been ingested and signals have been generated.
         </Alert>
       )}
       {!loading && envelope?.availability === 'ERROR' && (
@@ -313,7 +344,7 @@ export function IndexConstituentsPage() {
                   </TableCell>
                   <TableCell align="right">
                     <Typography variant="body2" fontFamily="monospace">
-                      {row.latestPrice !== null ? inr(row.latestPrice, { fractionDigits: 1 }) : '—'}
+                      {row.latestPrice !== null ? money(row.latestPrice, profile.currency, { fractionDigits: 1 }) : '—'}
                     </Typography>
                   </TableCell>
                   <TableCell align="right">
@@ -341,7 +372,7 @@ export function IndexConstituentsPage() {
                   </TableCell>
                   <TableCell align="right">
                     <Typography variant="body2" color="text.secondary">
-                      {row.marketCap !== null ? inrCompact(row.marketCap) : '—'}
+                      {row.marketCap !== null ? compact(row.marketCap, profile.currency) : '—'}
                     </Typography>
                   </TableCell>
                 </TableRow>

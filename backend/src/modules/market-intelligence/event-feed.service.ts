@@ -71,9 +71,19 @@ function fmtQty(qty: number): string {
   return qty.toLocaleString('en-IN');
 }
 
-/** Format price as ₹1,234.50 */
-function fmtPrice(price: number): string {
-  return `₹${price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+/** Region currency symbol for price formatting (breakout events are region-scoped). */
+function currencySymbolForRegion(region: string): string {
+  switch (String(region || '').trim().toUpperCase()) {
+    case 'US': return '$';
+    case 'EU': return '€';
+    case 'IN': default: return '₹';
+  }
+}
+
+/** Format price with the region currency symbol, e.g. $1,234.50 / ₹1,234.50 */
+function fmtPrice(price: number, symbol = '₹'): string {
+  const locale = symbol === '₹' ? 'en-IN' : 'en-US';
+  return `${symbol}${price.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 /** Format net flows in ₹ Cr with sign */
@@ -208,83 +218,98 @@ async function fetchFnoBanEvents(): Promise<MarketEvent[]> {
   return events;
 }
 
-async function fetchBreakoutEvents(): Promise<MarketEvent[]> {
+/**
+ * Snapshot row shape returned from market_scan_snapshots.payloadJson.
+ * All numeric fields are stored as JSON numbers; latestDate is an ISO string.
+ */
+interface SnapshotPayload {
+  symbol: string;
+  currentPrice: number;
+  high52w: number;
+  low52w: number;
+  pctFromHigh: number;
+  pctFromLow: number;
+  latestDate: string;
+  companyName?: string | null;
+}
+
+/**
+ * Reads the latest persisted 52W_HIGH / 52W_LOW snapshot rows for the given
+ * region from `market_scan_snapshots` instead of scanning ~15 M price_ticks
+ * rows.  The snapshots are computed nightly by MARKET_SCAN_REFRESH so this
+ * becomes a tiny index-seek (~100 rows) and completes in <50 ms.
+ */
+async function fetchBreakoutEvents(region: string): Promise<MarketEvent[]> {
+  // One query: grab both scan types for the region, each scoped to its own
+  // latest tradingDate, ordered by rank, capped to 25 rows per type.
   const rows = await prisma.$queryRawUnsafe<
     {
-      symbol: string;
-      session_high: string;
-      session_low: string;
-      yr_high: string;
-      yr_low: string;
-      breakout: string | null;
-      latest_date: string;
+      scan_type: string;
+      trading_date: string;
+      rank: number;
+      payload: SnapshotPayload;
     }[]
   >(
-    `WITH latest_date AS (
-       SELECT DATE(MAX(timestamp)) AS d FROM price_ticks WHERE symbol NOT LIKE '%^%'
-     ),
-     latest_session AS (
-       SELECT symbol,
-              MAX(high)  AS session_high,
-              MIN(low)   AS session_low,
-              MAX(close) AS session_close
-       FROM price_ticks
-       WHERE DATE(timestamp) = (SELECT d FROM latest_date)
-         AND symbol NOT LIKE '%^%'
-       GROUP BY symbol
-     ),
-     yearly_range AS (
-       SELECT symbol,
-              MAX(high) AS yr_high,
-              MIN(low)  AS yr_low
-       FROM price_ticks
-       WHERE timestamp >= NOW() - INTERVAL '365 days'
-         AND symbol NOT LIKE '%^%'
-       GROUP BY symbol
-     )
-     SELECT ls.symbol,
-            ls.session_high::text,
-            ls.session_low::text,
-            yr.yr_high::text,
-            yr.yr_low::text,
-            CASE
-              WHEN ls.session_high >= yr.yr_high THEN 'HIGH'
-              WHEN ls.session_low  <= yr.yr_low  THEN 'LOW'
-            END AS breakout,
-            (SELECT d::text FROM latest_date) AS latest_date
-     FROM latest_session  ls
-     JOIN yearly_range    yr ON ls.symbol = yr.symbol
-     WHERE ls.session_high >= yr.yr_high OR ls.session_low <= yr.yr_low
-     ORDER BY ls.symbol`,
+    `SELECT s."scanType"     AS scan_type,
+            s."tradingDate"::text AS trading_date,
+            s.rank,
+            s."payloadJson"  AS payload
+     FROM market_scan_snapshots s
+     INNER JOIN (
+       SELECT "scanType", MAX("tradingDate") AS max_date
+       FROM market_scan_snapshots
+       WHERE region = $1
+         AND "scanType" IN ('52W_HIGH', '52W_LOW')
+       GROUP BY "scanType"
+     ) latest ON s."scanType" = latest."scanType"
+               AND s."tradingDate" = latest.max_date
+     WHERE s.region = $1
+       AND s."scanType" IN ('52W_HIGH', '52W_LOW')
+     ORDER BY s."scanType", s.rank
+     LIMIT 50`,
+    region,
   );
 
   if (rows.length === 0) return [];
-  const latestDate = rows[0].latest_date;
 
+  const currencySymbol = currencySymbolForRegion(region);
   return rows
-    .filter((r) => r.breakout !== null)
+    // Exclude par-stuck shells (SPAC units, etc.) whose 52-week range is degenerate
+    // (high ≈ low): they sit "at their 52-week high" only because they never move.
+    // A real breakout has a meaningful yearly range.
+    .filter((r) => {
+      const hi = Number(r.payload?.high52w);
+      const lo = Number(r.payload?.low52w);
+      if (!Number.isFinite(hi) || !Number.isFinite(lo) || lo <= 0) return true;
+      return hi / lo >= 1.10; // require ≥10% yearly range
+    })
     .map((r) => {
-      const isHigh = r.breakout === 'HIGH';
-      const price = isHigh ? Number(r.session_high) : Number(r.session_low);
-      const desc = isHigh
-        ? `52W HIGH: ${r.symbol} broke out to ${fmtPrice(price)}`
-        : `52W LOW: ${r.symbol} hit 52-week low at ${fmtPrice(price)}`;
-      const tone: EventTone = isHigh ? 'positive' : 'negative';
-      return {
-        id: `breakout-${isHigh ? 'high' : 'low'}-${r.symbol}-${latestDate}`,
-        type: (isHigh ? 'BREAKOUT_52W_HIGH' : 'BREAKOUT_52W_LOW') as EventType,
-        date: isoDate(latestDate),
-        symbols: [r.symbol],
-        description: desc,
-        tone,
-        meta: {
-          sessionPrice: price,
-          yearlyHigh: Number(r.yr_high),
-          yearlyLow: Number(r.yr_low),
-          direction: r.breakout,
-        },
-      };
-    });
+    const p = r.payload;
+    const isHigh = r.scan_type === '52W_HIGH';
+    const price = p.currentPrice;
+    const snapshotDate = isoDate(r.trading_date);
+    const desc = isHigh
+      ? `52W HIGH: ${p.symbol} at ${fmtPrice(price, currencySymbol)} (near 52-week high)`
+      : `52W LOW: ${p.symbol} at ${fmtPrice(price, currencySymbol)} (near 52-week low)`;
+    const tone: EventTone = isHigh ? 'positive' : 'negative';
+    return {
+      id: `breakout-${isHigh ? 'high' : 'low'}-${p.symbol}-${snapshotDate}`,
+      type: (isHigh ? 'BREAKOUT_52W_HIGH' : 'BREAKOUT_52W_LOW') as EventType,
+      date: snapshotDate,
+      symbols: [p.symbol],
+      description: desc,
+      tone,
+      meta: {
+        sessionPrice: price,
+        yearlyHigh: p.high52w,
+        yearlyLow: p.low52w,
+        pctFromHigh: p.pctFromHigh,
+        pctFromLow: p.pctFromLow,
+        direction: isHigh ? 'HIGH' : 'LOW',
+        companyName: p.companyName ?? null,
+      },
+    };
+  });
 }
 
 async function fetchFiiDiiFlowEvents(): Promise<MarketEvent[]> {
@@ -341,33 +366,45 @@ async function fetchFiiDiiFlowEvents(): Promise<MarketEvent[]> {
 // Public service function
 // ---------------------------------------------------------------------------
 
-export async function getEventFeed(days: number = 5): Promise<EventFeedEnvelope> {
+export async function getEventFeed(days: number = 5, region: string = 'IN'): Promise<EventFeedEnvelope> {
   const clampedDays = Math.min(30, Math.max(1, Math.floor(days)));
   const cutoffDate = new Date();
   cutoffDate.setDate(cutoffDate.getDate() - clampedDays);
   const cutoffStr = cutoffDate.toISOString().slice(0, 10);
 
+  // Normalise to uppercase for DB comparison; default to IN (historical behaviour).
+  const normalizedRegion = (region || 'IN').toUpperCase();
+  const isIndia = normalizedRegion === 'IN';
+
   const warnings: string[] = [];
 
+  // India-only sub-queries (bulk/block deals, F&O ban, FII/DII flows) only run
+  // when the region is IN.  fetchBreakoutEvents always runs but is now scoped to
+  // the requested region via the price_ticks.region column so it only surfaces
+  // breakouts for the active region.
+  const breakoutsPromise = fetchBreakoutEvents(normalizedRegion);
+
   const [bulkBlock, fnoBan, breakouts, flows] = await Promise.allSettled([
-    fetchBulkBlockEvents(cutoffStr),
-    fetchFnoBanEvents(),
-    fetchBreakoutEvents(),
-    fetchFiiDiiFlowEvents(),
+    isIndia ? fetchBulkBlockEvents(cutoffStr) : Promise.resolve([] as MarketEvent[]),
+    isIndia ? fetchFnoBanEvents() : Promise.resolve([] as MarketEvent[]),
+    breakoutsPromise,
+    isIndia ? fetchFiiDiiFlowEvents() : Promise.resolve([] as MarketEvent[]),
   ]);
 
   const events: MarketEvent[] = [];
 
-  if (bulkBlock.status === 'fulfilled') {
-    events.push(...bulkBlock.value);
-  } else {
-    warnings.push(`Bulk/block deals unavailable: ${String(bulkBlock.reason)}`);
-  }
+  if (isIndia) {
+    if (bulkBlock.status === 'fulfilled') {
+      events.push(...bulkBlock.value);
+    } else {
+      warnings.push(`Bulk/block deals unavailable: ${String(bulkBlock.reason)}`);
+    }
 
-  if (fnoBan.status === 'fulfilled') {
-    events.push(...fnoBan.value);
-  } else {
-    warnings.push(`F&O ban data unavailable: ${String(fnoBan.reason)}`);
+    if (fnoBan.status === 'fulfilled') {
+      events.push(...fnoBan.value);
+    } else {
+      warnings.push(`F&O ban data unavailable: ${String(fnoBan.reason)}`);
+    }
   }
 
   if (breakouts.status === 'fulfilled') {
@@ -376,10 +413,12 @@ export async function getEventFeed(days: number = 5): Promise<EventFeedEnvelope>
     warnings.push(`52-week breakout data unavailable: ${String(breakouts.reason)}`);
   }
 
-  if (flows.status === 'fulfilled') {
-    events.push(...flows.value);
-  } else {
-    warnings.push(`FII/DII flow data unavailable: ${String(flows.reason)}`);
+  if (isIndia) {
+    if (flows.status === 'fulfilled') {
+      events.push(...flows.value);
+    } else {
+      warnings.push(`FII/DII flow data unavailable: ${String(flows.reason)}`);
+    }
   }
 
   // Sort newest-first, bounded to 50

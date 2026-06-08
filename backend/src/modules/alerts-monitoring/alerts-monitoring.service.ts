@@ -89,6 +89,8 @@ export class AlertsMonitoringService {
 
   private async evaluateStockRule(rule: AlertRuleDto): Promise<AlertEvaluationCandidate[]> {
     if (!rule.instrumentId) return [];
+    // NOTE: equity-plane only. Crypto alert rules require assetType persisted on the
+    // rule row to route price reads to crypto_*; deferred (needs a migration).
     const [instrument, latest, prices, signal] = await Promise.all([
       this.marketDataService.getInstrument(rule.instrumentId).catch(() => null),
       this.marketDataService.latestPriceByInstrumentId(rule.instrumentId).catch(() => null),

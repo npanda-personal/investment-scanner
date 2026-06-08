@@ -30,6 +30,7 @@ import { signalPositionLedgerRouter } from '../modules/signal-position-ledger';
 import { earningsIntelligenceRouter } from '../modules/earnings-intelligence';
 import { marketIntelligenceRouter } from '../modules/market-intelligence';
 import { tradeJournalRouter } from '../modules/trade-journal';
+import { derivativesIntelligenceRouter } from '../modules/derivatives-intelligence';
 
 export interface ApiModule {
   path: string;
@@ -66,6 +67,7 @@ export const apiModules: ApiModule[] = [
   { path: '/api/v1', router: signalPositionLedgerRouter },
   { path: tradePlanRiskModule.routePrefix, router: tradePlanRiskModule.router },
   { path: '/api/v1', router: tradeJournalRouter },
+  { path: '/api/v1', router: derivativesIntelligenceRouter },
   { path: '/api/market-data-foundation', router: marketDataFoundationRouter },
 ];
 

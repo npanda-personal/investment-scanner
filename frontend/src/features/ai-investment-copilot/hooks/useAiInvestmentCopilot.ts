@@ -51,12 +51,16 @@ export function useAiInvestmentCopilot() {
   }, [marketBrief, scope.region]);
 
   useEffect(() => {
-    // Clear brief on region change to ensure fresh generation
+    // Clear the cached market brief on region change to force fresh generation.
+    // NOTE: depend ONLY on scope.region. Previously activeSummary?.title was also a
+    // dependency, which made this effect re-fire right after a brief loaded (its title
+    // contains "market") and immediately null it out — so the Market Brief never rendered.
+    // Use a functional updater to clear a stale market brief without a stale-closure dep.
     setMarketBrief(null);
-    if (activeSummary?.title.toLowerCase().includes('market')) {
-      setActiveSummary(null);
-    }
-  }, [scope.region, activeSummary?.title]);
+    setActiveSummary((current) =>
+      current?.title?.toLowerCase().includes('market') ? null : current,
+    );
+  }, [scope.region]);
 
   const loadAlertDigest = async () => {
     setRunning(true);

@@ -5,6 +5,8 @@ import { CapitalPostureService } from './capital-posture.service';
 import { ingestFiiDii, getLatestFiiDiiActivity } from './fii-dii.service';
 import { ingestBulkBlockDeals, getLatestBulkBlockDeals } from './bulk-block-deals.service';
 import { getInstitutionalActivity } from './institutional-activity.service';
+import { resolveMarketProfile } from '../../shared/utils/market-profile';
+import { notApplicablePayload } from '../../shared/utils/not-applicable';
 
 export class MarketContextIntelligenceController {
   constructor(
@@ -17,7 +19,7 @@ export class MarketContextIntelligenceController {
     // Persisted-read only: never generate or write on a GET.
     // Repoints to the same persisted path used by persistedSummary so no
     // live .run() / saveSnapshot() is triggered.
-    const region = this.region(req) || 'GLOBAL';
+    const region = this.contextRegion(req);
     return this.respond(res, async () => {
       const persisted = await this.service.latestPersistedSummary(region);
       if (!persisted) {
@@ -41,7 +43,7 @@ export class MarketContextIntelligenceController {
   };
 
   persistedSummary = async (req: Request, res: Response) => {
-    const region = this.region(req) || 'GLOBAL';
+    const region = this.contextRegion(req);
     return this.respond(res, async () => {
       const summary = await this.service.latestPersistedSummary(region);
       if (!summary) {
@@ -65,7 +67,7 @@ export class MarketContextIntelligenceController {
   };
 
   persistedBreadth = async (req: Request, res: Response) => {
-    const region = this.region(req) || 'GLOBAL';
+    const region = this.contextRegion(req);
     return this.respond(res, () => this.service.latestPersistedBreadth(region));
   };
 
@@ -124,6 +126,14 @@ export class MarketContextIntelligenceController {
    */
   fiiDiiActivity = async (req: Request, res: Response) => {
     res.setHeader('Cache-Control', 'no-store');
+    const region = this.region(req) || 'IN';
+    const profile = resolveMarketProfile({ region, assetType: this.assetType(req) });
+    if (!profile.capabilities.hasInstitutionalFlow) {
+      return res.json(notApplicablePayload(
+        `FII/DII activity is not applicable to ${region} equities (NSE-sourced, India only).`,
+        { rows: [] },
+      ));
+    }
     const days = typeof req.query.days === 'string' ? Math.max(1, Math.min(30, Number(req.query.days) || 5)) : 5;
     return this.respond(res, () => getLatestFiiDiiActivity(days));
   };
@@ -138,6 +148,14 @@ export class MarketContextIntelligenceController {
    */
   bulkBlockDeals = async (req: Request, res: Response) => {
     res.setHeader('Cache-Control', 'no-store');
+    const region = this.region(req) || 'IN';
+    const profile = resolveMarketProfile({ region, assetType: this.assetType(req) });
+    if (!profile.capabilities.hasInstitutionalFlow) {
+      return res.json(notApplicablePayload(
+        `Bulk/block deals are not applicable to ${region} equities (NSE-sourced, India only).`,
+        { rows: [] },
+      ));
+    }
     const days = typeof req.query.days === 'string' ? Math.max(1, Math.min(30, Number(req.query.days) || 1)) : 1;
     return this.respond(res, () => getLatestBulkBlockDeals(days));
   };
@@ -151,20 +169,38 @@ export class MarketContextIntelligenceController {
    * Composes FII/DII + bulk/block deals + F&O ban + smart-money sectors
    * into a single persisted-read summary DTO.
    */
-  institutionalActivity = async (_req: Request, res: Response) => {
+  institutionalActivity = async (req: Request, res: Response) => {
     res.setHeader('Cache-Control', 'no-store');
+    const region = this.region(req) || 'IN';
+    const profile = resolveMarketProfile({ region, assetType: this.assetType(req) });
+    if (!profile.capabilities.hasInstitutionalFlow) {
+      return res.json(notApplicablePayload(
+        `Institutional activity is not applicable to ${region} equities (NSE-sourced, India only).`,
+      ));
+    }
     return this.respond(res, () => getInstitutionalActivity());
   };
 
-  regime = async (req: Request, res: Response) => this.respond(res, () => this.service.regime(this.region(req)));
-  sectors = async (req: Request, res: Response) => this.respond(res, () => this.service.sectors(this.region(req)));
-  breadth = async (req: Request, res: Response) => this.respond(res, () => this.service.breadth(this.region(req)));
-  countries = async (req: Request, res: Response) => this.respond(res, () => this.service.countries(this.region(req)));
+  regime = async (req: Request, res: Response) => this.respond(res, () => this.service.regime(this.contextRegion(req)));
+  sectors = async (req: Request, res: Response) => this.respond(res, () => this.service.sectors(this.contextRegion(req)));
+  breadth = async (req: Request, res: Response) => this.respond(res, () => this.service.breadth(this.contextRegion(req)));
+  countries = async (req: Request, res: Response) => this.respond(res, () => this.service.countries(this.contextRegion(req)));
   macro = async (_req: Request, res: Response) => this.respond(res, () => this.service.macro());
-  refresh = async (req: Request, res: Response) => this.respond(res, () => this.service.summary({ region: this.region(req) }));
+  refresh = async (req: Request, res: Response) => this.respond(res, () => this.service.summary({ region: this.contextRegion(req) }));
 
   private region(req: Request): string | undefined {
     return typeof req.query.region === 'string' ? req.query.region.trim() || undefined : undefined;
+  }
+
+  /**
+   * Region key for persisted market-context reads. Crypto scope maps to the dedicated
+   * 'CRYPTO' partition (the snapshot table has no assetType column), so crypto requests
+   * read the crypto-native regime/breadth instead of the equity GLOBAL/IN snapshot.
+   */
+  private contextRegion(req: Request): string {
+    const region = this.region(req);
+    const profile = resolveMarketProfile({ region, assetType: this.assetType(req) });
+    return profile.assetClass === 'CRYPTO' ? 'CRYPTO' : (region || 'GLOBAL');
   }
 
   private assetType(req: Request): string | undefined {

@@ -327,9 +327,10 @@ export class DataQualityEngineService {
   }
 
   async evaluateAndPersistInstrument(instrument: any): Promise<DataQualityEvaluationDto> {
+    const dqScope = { region: instrument.region, assetType: instrument.assetType ?? instrument.asset_type };
     const [pricesResponse, latestResponse, fundamentalsResponse, actionsResponse, latestSignal] = await Promise.all([
-      this.marketDataService.listPricesByInstrumentId(instrument.id, 300).catch(() => null),
-      this.marketDataService.latestPriceByInstrumentId(instrument.id).catch(() => null),
+      this.marketDataService.listPricesByInstrumentId(instrument.id, 300, undefined, undefined, dqScope).catch(() => null),
+      this.marketDataService.latestPriceByInstrumentId(instrument.id, dqScope).catch(() => null),
       this.marketDataService.storedFundamentalsByInstrumentId(instrument.id).catch(() => null),
       this.marketDataService.storedCorporateActionsByInstrumentId(instrument.id).catch(() => null),
       this.signalService?.signalHistory({ instrumentId: instrument.id, limit: 1 }).catch(() => []) ?? Promise.resolve([]),

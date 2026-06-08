@@ -32,6 +32,8 @@ import {
 import { useMemo, useState, type ReactNode } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import { StalenessBadge } from '@/shared/components';
+import { NotApplicableForAssetClass } from '@/shared/components/NotApplicableForAssetClass';
+import { useMarketScope } from '@/contexts/MarketScopeContext';
 import { useDailyOverviewDashboard } from '../hooks/useDailyOverviewDashboard';
 import type {
   CandidateGroupSummary,
@@ -44,6 +46,7 @@ const moverRanges: MarketMoverRange[] = ['1D', '1W', '1M', '3M', '6M', '1Y'];
 const unavailableLabel = 'Unavailable';
 
 export function DailyOverviewDashboardPage() {
+  const { profile } = useMarketScope();
   const dashboard = useDailyOverviewDashboard();
   const [moverRange, setMoverRange] = useState<MarketMoverRange>('1D');
   const [selectedCandidate, setSelectedCandidate] = useState<CandidateGroupSummary['rows'][number] | null>(null);
@@ -83,6 +86,26 @@ export function DailyOverviewDashboardPage() {
       .sort((left, right) => Math.abs(right.mover.returnPercent) - Math.abs(left.mover.returnPercent))
       .slice(0, 6);
   }, [moverSummary?.gainers, moverSummary?.losers, todayReviewGroups.bearishReview, todayReviewGroups.bullishReview]);
+
+  if (profile.isCrypto) {
+    return (
+      <Box className="page-container page-container--workspace">
+        <Stack spacing={2}>
+          <Paper variant="outlined" sx={{ p: 2 }}>
+            <Box>
+              <Typography variant="h4" sx={{ fontSize: { xs: 26, md: 32 }, fontWeight: 700 }}>
+                Daily Overview
+              </Typography>
+            </Box>
+          </Paper>
+          <NotApplicableForAssetClass
+            feature="Daily Overview"
+            detail="Crypto coverage in this release is available on Signals, Market Scans, and the Instrument workspace. This view will support crypto in a later update."
+          />
+        </Stack>
+      </Box>
+    );
+  }
 
   return (
     <Box className="page-container page-container--workspace">

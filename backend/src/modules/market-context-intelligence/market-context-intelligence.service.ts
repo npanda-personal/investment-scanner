@@ -1,6 +1,7 @@
 import { MarketDataFoundationService } from '../market-data-foundation';
 import { SignalGenerationEngineService } from '../signal-generation-engine';
 import { isKnownSector } from '../../shared/utils/sector-metadata';
+import { resolveMarketProfile } from '../../shared/utils/market-profile';
 import { MarketContextIntelligenceRepository } from './market-context-intelligence.repository';
 import type {
   BreadthDivergenceNote,
@@ -53,11 +54,8 @@ const LIQUID_UNIVERSE_FILTERS = {
   sortBy: 'marketCap' as const,
   sortOrder: 'desc' as const,
 };
-/**
- * NSE Nifty 50 broad-market index symbol present in price_ticks (source data
- * through 2026-06-04). Used as the index-trend input for the regime score.
- */
-const NSEI_SYMBOL = '^NSEI';
+// NSEI_SYMBOL module constant removed — benchmark symbol is now resolved per-region
+// via resolveMarketProfile({ region }).benchmark.symbol inside runAsOf().
 const SECTOR_LOOKBACK_DAYS = {
   return1W: 7,
   return1M: 30,
@@ -84,11 +82,12 @@ export class MarketContextIntelligenceService {
   async runAsOf(region?: string, asOf?: Date): Promise<{ status: string }> {
     const endDate = asOf ? this.startOfUtcDay(asOf) : undefined;
     const isIndianRegion = !region || region.trim().toUpperCase() === 'IN';
+    const benchmark = resolveMarketProfile({ region }).benchmark;
 
-    const [items, signals, nseiPrices, capBandItems] = await Promise.all([
+    const [items, signals, benchmarkPrices, capBandItems] = await Promise.all([
       this.loadContextInstruments(region, asOf),
       this.loadSignalMap(region),
-      this.repository.loadIndexPrices(NSEI_SYMBOL, 270, endDate),
+      this.repository.loadIndexPrices(benchmark.symbol, 270, endDate, region),
       // NR-5: load wider universe for cap-band breadth (IN-region only; 2 DB round-trips).
       // Non-IN regions fall back to the headline universe — cap-band divergence is
       // only meaningful for NSE/BSE where LARGE/MID/SMALL bands are well-defined.
@@ -98,7 +97,7 @@ export class MarketContextIntelligenceService {
     ]);
     const enriched = items.map((item) => ({ ...item, ...signals.get(item.instrumentId) }));
 
-    const regime = this.calculateRegime(enriched, nseiPrices);
+    const regime = this.calculateRegime(enriched, benchmarkPrices, benchmark.label);
     const sectors = this.rankSectors(enriched);
     const breadth = this.calculateBreadth(enriched);
 
@@ -117,7 +116,7 @@ export class MarketContextIntelligenceService {
       `[market-context] cap-band universe: ${capBandUniverse.length} instruments ` +
       `(headline universe: ${enriched.length}; limit: ${MarketContextIntelligenceRepository.CAP_BAND_UNIVERSE_LIMIT})`
     );
-    const breadthByCapBand = this.calculateBreadthByCapBand(capBandUniverse);
+    const breadthByCapBand = this.calculateBreadthByCapBand(capBandUniverse, region);
     const countries = this.rankCountries(enriched);
     const macro = this.macro();
 
@@ -137,6 +136,63 @@ export class MarketContextIntelligenceService {
     // When asOf is set, persist the snapshot under that historical date so downstream
     // consumers (backtests, quality-lab by-regime) can look it up by date.
     await this.repository.saveSnapshot(summary, region || 'GLOBAL', asOf);
+    return { status: 'success' };
+  }
+
+  /**
+   * Crypto-native market context: 24/7 breadth + regime computed from crypto_*
+   * price history (no sectors/cap-bands), benchmarked on BTC, with a BTC-dominance
+   * note. Persisted under the dedicated region key 'CRYPTO' so it never collides
+   * with equity GLOBAL/IN snapshots (the snapshot table has no assetType column).
+   * Crypto data is read only via MarketDataFoundationService public methods to keep
+   * module boundaries intact.
+   */
+  async runCryptoContextAsOf(asOf?: Date): Promise<{ status: string }> {
+    const profile = resolveMarketProfile({ assetType: 'CRYPTO' });
+    const assets = await this.marketDataService.listCryptoAssets({ activeOnly: true, limit: 200 });
+    const toNewestFirstCloses = (ascending: Array<{ close: unknown }>): number[] =>
+      [...ascending].reverse().map((tick) => Number(tick.close)).filter((value) => Number.isFinite(value));
+
+    const items: ContextInstrument[] = await Promise.all(assets.map(async (asset) => {
+      const ascending = await this.marketDataService.listCryptoPriceHistory(asset.symbol, 260).catch(() => []);
+      const prices = toNewestFirstCloses(ascending as Array<{ close: unknown }>);
+      return {
+        instrumentId: asset.id,
+        symbol: asset.symbol,
+        sector: null,
+        country: null,
+        latest: prices[0] ?? null,
+        previous: prices[1] ?? null,
+        prices,
+        marketCap: asset.marketCap != null ? Number(asset.marketCap) : null,
+      };
+    }));
+
+    const btcAscending = await this.marketDataService.listCryptoPriceHistory(profile.benchmark.symbol, 270).catch(() => []);
+    const benchmarkPrices = toNewestFirstCloses(btcAscending as Array<{ close: unknown }>);
+
+    const regime = this.calculateRegime(items, benchmarkPrices, profile.benchmark.label);
+    const breadth = this.calculateBreadth(items);
+
+    // BTC dominance = BTC market cap / total tracked crypto market cap.
+    const totalMarketCap = items.reduce((sum, item) => sum + (item.marketCap ?? 0), 0);
+    const btc = items.find((item) => item.symbol === profile.benchmark.symbol);
+    const dominance = btc?.marketCap && totalMarketCap > 0 ? (btc.marketCap / totalMarketCap) * 100 : null;
+    const dominanceNote = dominance != null ? ` BTC dominance is ${dominance.toFixed(1)}% of tracked crypto market cap.` : '';
+
+    const summary: MarketContextSummary = {
+      regime: { ...regime, explanation: `${regime.explanation}${dominanceNote}` },
+      topSectors: [],
+      weakSectors: [],
+      breadth,
+      breadthByCapBand: [],
+      countryStrength: [],
+      macro: this.macro(),
+      explanation: [`Crypto market regime from ${items.length} coins (benchmark ${profile.benchmark.label}).${dominanceNote}`.trim()],
+      updatedAt: (asOf ?? new Date()).toISOString(),
+      dataStatus: items.length > 0 ? 'PARTIAL' : 'MISSING',
+    };
+    await this.repository.saveSnapshot(summary, 'CRYPTO', asOf);
     return { status: 'success' };
   }
 
@@ -364,7 +420,7 @@ export class MarketContextIntelligenceService {
    *
    *   % above SMA-50    35%  — primary breadth gate; narrow rallies stay NEUTRAL/RISK_OFF
    *   % above SMA-200   25%  — structural breadth; confirms trend durability
-   *   ^NSEI index trend 25%  — objective single-index signal; null → 50 (no data, neutral)
+   *   benchmark index trend 25% — objective single-index signal; null → 50 (no data, neutral)
    *   broad mean return 10%  — corroborating evidence, demoted from 35%; null → 0 (conservative)
    *   leadership score   5%  — sector rotation tie-breaker
    *
@@ -373,12 +429,13 @@ export class MarketContextIntelligenceService {
    *   alone push to RISK_ON regardless of how high the mean return of those few stocks is.
    * - null broadReturn → 0 (not the old 50); absent mean-return evidence does not inflate
    *   the score toward RISK_ON.
-   * - ^NSEI 63-bar trend added as a 25% objective gate using persisted index prices.
-   * - null nseiReturn → 50 (genuinely neutral; index data may not be available point-in-time).
+   * - benchmark 63-bar trend added as a 25% objective gate using persisted index prices;
+   *   benchmark symbol is resolved per region (^NSEI for IN, ^GSPC for US, ^STOXX for EU).
+   * - null benchmarkReturn → 50 (genuinely neutral; index data may not be available point-in-time).
    *
    * Worked example (false-RISK_ON case that is now fixed):
    *   Scenario: 2-stock narrow rally, both stocks have strong +12% 63-bar return,
-   *   but broad market is below SMA50 and SMA200 (above50=0, above200=0), ^NSEI null.
+   *   but broad market is below SMA50 and SMA200 (above50=0, above200=0), benchmark null.
    *   Old score: 73×0.35 + 0×0.25 + 0×0.25 + 50×0.15 = 25.6 + 0 + 0 + 7.5 = 33 → RISK_OFF
    *     (old formula actually was already risk_off here; the real failure was when null
    *     return defaulted to 50 and inflated narrow-market signals to NEUTRAL/RISK_ON range)
@@ -386,7 +443,7 @@ export class MarketContextIntelligenceService {
    *   New score for null-return + modest breadth: 0×0.10 term removed entirely; breadth
    *   must carry the load.
    */
-  calculateRegime(items: ContextInstrument[], nseiPrices: number[] = []): MarketRegimeSummary {
+  calculateRegime(items: ContextInstrument[], benchmarkPrices: number[] = [], benchmarkLabel: string = 'Nifty 50'): MarketRegimeSummary {
     const breadth = this.calculateBreadth(items);
     const sectorItems = this.rankSectors(items);
     const broadReturn = this.average(items.map((item) => this.returnAt(item.prices, 63)).filter(this.isNumber));
@@ -397,9 +454,9 @@ export class MarketContextIntelligenceService {
     // null broadReturn → 0: no evidence of positive return should not push score up
     const returnScore = broadReturn === null ? 0 : Math.max(0, Math.min(100, 50 + broadReturn * 200));
 
-    // ^NSEI 63-bar trend: null → 50 (neutral; index data may lag on weekends/point-in-time)
-    const nseiReturn = this.returnAt(nseiPrices, 63);
-    const indexTrendScore = nseiReturn === null ? 50 : Math.max(0, Math.min(100, 50 + nseiReturn * 200));
+    // benchmark 63-bar trend: null → 50 (neutral; index data may lag on weekends/point-in-time)
+    const benchmarkReturn = this.returnAt(benchmarkPrices, 63);
+    const indexTrendScore = benchmarkReturn === null ? 50 : Math.max(0, Math.min(100, 50 + benchmarkReturn * 200));
 
     const score = Math.round(
       above50 * 100 * 0.35 +
@@ -412,7 +469,7 @@ export class MarketContextIntelligenceService {
     return {
       regime,
       score,
-      explanation: `${regime.replace('_', '-').toLowerCase()} because ${this.formatPercent(above50)} of liquid-universe instruments are above SMA50, ${this.formatPercent(above200)} above SMA200, and the Nifty 50 index 63-bar trend score is ${indexTrendScore}.`,
+      explanation: `${regime.replace('_', '-').toLowerCase()} because ${this.formatPercent(above50)} of liquid-universe instruments are above SMA50, ${this.formatPercent(above200)} above SMA200, and the ${benchmarkLabel} index 63-bar trend score is ${indexTrendScore}.`,
       updatedAt: new Date().toISOString(),
       dataStatus: items.length > 0 ? 'PARTIAL' : 'MISSING',
     };
@@ -487,10 +544,13 @@ export class MarketContextIntelligenceService {
    * DB unit note: the `marketCap` column stores absolute rupees (e.g. RELIANCE ≈ 1.95e13).
    * Thresholds are therefore expressed in rupees, not crores.
    */
-  calculateBreadthByCapBand(items: ContextInstrument[]): CapBandBreadth[] {
-    const CRORE = 10_000_000; // 1 Cr = 1e7 rupees (DB unit)
-    const LARGE_THRESHOLD = 20_000 * CRORE; // 20,000 Cr in rupees
-    const MID_THRESHOLD   =  5_000 * CRORE; //  5,000 Cr in rupees
+  calculateBreadthByCapBand(items: ContextInstrument[], region?: string): CapBandBreadth[] {
+    const isIN = !region || region.trim().toUpperCase() === 'IN';
+    // Cap-band thresholds are expressed in the marketCap DB unit (absolute local currency):
+    //   IN → rupees (₹20,000 Cr / ₹5,000 Cr); US/other → USD ($10B / $2B conventional bands).
+    const CRORE = 10_000_000; // 1 Cr = 1e7 rupees
+    const LARGE_THRESHOLD = isIN ? 20_000 * CRORE : 10_000_000_000; // ₹20,000 Cr or $10B
+    const MID_THRESHOLD   = isIN ?  5_000 * CRORE :  2_000_000_000; // ₹5,000 Cr or $2B
 
     const bandOf = (cap: number | null): CapBand => {
       if (cap === null || cap <= 0) return 'UNKNOWN';
@@ -499,11 +559,18 @@ export class MarketContextIntelligenceService {
       return 'SMALL';
     };
 
-    const META: { band: CapBand; label: string }[] = [
-      { band: 'LARGE', label: 'Large-cap (> ₹20,000 Cr)' },
-      { band: 'MID',   label: 'Mid-cap (₹5,000–20,000 Cr)' },
-      { band: 'SMALL', label: 'Small-cap (< ₹5,000 Cr)' },
-    ];
+    const sym = isIN ? '₹' : (region!.trim().toUpperCase() === 'EU' ? '€' : '$');
+    const META: { band: CapBand; label: string }[] = isIN
+      ? [
+          { band: 'LARGE', label: 'Large-cap (> ₹20,000 Cr)' },
+          { band: 'MID',   label: 'Mid-cap (₹5,000–20,000 Cr)' },
+          { band: 'SMALL', label: 'Small-cap (< ₹5,000 Cr)' },
+        ]
+      : [
+          { band: 'LARGE', label: `Large-cap (> ${sym}10B)` },
+          { band: 'MID',   label: `Mid-cap (${sym}2B–${sym}10B)` },
+          { band: 'SMALL', label: `Small-cap (< ${sym}2B)` },
+        ];
 
     const MIN_SAMPLE = 5;
 
@@ -765,6 +832,27 @@ export class MarketContextIntelligenceService {
   }
 
   private sectorNameFromIndex(input: SectorIndexInput): string | null {
+    // Non-IN: SPDR sector ETF symbol → sector label.
+    // Uses a direct symbol lookup (more robust than name regex).
+    // Labels are aligned with US stock 'sector' field values in the DB
+    // where overlap exists; others use GICS-standard names.
+    const SPDR_SECTOR_MAP: Record<string, string> = {
+      XLK:  'Technology',
+      XLF:  'Financials',
+      XLV:  'Healthcare',
+      XLE:  'Energy',
+      XLY:  'Consumer Discretionary',
+      XLP:  'Consumer Staples',
+      XLI:  'Industrials',
+      XLB:  'Materials',
+      XLRE: 'Real Estate',
+      XLU:  'Utilities',
+      XLC:  'Communication Services',
+    };
+    const sym = (input.symbol || '').trim().toUpperCase();
+    if (sym in SPDR_SECTOR_MAP) return SPDR_SECTOR_MAP[sym];
+
+    // IN path (and fallback): regex-based mapping from index name/sourceSymbol.
     const raw = `${input.sourceSymbol || ''} ${input.displayName || ''} ${input.symbol || ''}`.toUpperCase();
     const mappings: Array<[RegExp, string]> = [
       [/CONSUMER DURABLES/, 'Consumer Durables'],

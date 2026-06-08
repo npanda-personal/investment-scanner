@@ -221,7 +221,8 @@ describe('StockResearchWorkbenchService – Nifty 50 relative-strength', () => {
     expect(rs.benchmark_symbol).toBe('^NSEI');
     expect(rs.benchmark_return).not.toBeNull();
     expect(Number.isFinite(rs.benchmark_return)).toBe(true);
-    expect(rs.fallback_used).toBe('nse_nifty_50');
+    // fallback_used is now the region-resolved benchmark symbol (region-less instrument → IN default → ^NSEI).
+    expect(rs.fallback_used).toBe('^NSEI');
     expect(rs.data_status).toBe('COMPLETE');
   });
 

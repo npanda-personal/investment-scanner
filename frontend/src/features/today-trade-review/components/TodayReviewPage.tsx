@@ -36,6 +36,8 @@ import type { ReactNode } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { PageHeader } from '@/shared/components/PageHeader';
+import { NotApplicableForAssetClass } from '@/shared/components/NotApplicableForAssetClass';
+import { useMarketScope } from '@/contexts/MarketScopeContext';
 import { humanizeCode, humanizeEmbedded } from '@/shared/format/enumLabels';
 import { useTodayReview } from '../hooks/useTodayReview';
 import type {
@@ -58,6 +60,7 @@ const groupTabs: Array<{ key: keyof TodayReviewGroups; label: string }> = [
 ];
 
 export function TodayReviewPage() {
+  const { profile } = useMarketScope();
   const { data, loading, error, scope } = useTodayReview();
   const [tab, setTab] = useState<keyof TodayReviewGroups>('longReview');
   const run = data?.run || null;
@@ -87,6 +90,24 @@ export function TodayReviewPage() {
       ...groups.unproven,
     ].filter(hasMissingTierContext).length,
   }), [boardSelection, groups, run?.warnings.length]);
+
+  if (profile.isCrypto) {
+    return (
+      <Box className="page-container page-container--workspace">
+        <Stack spacing={3}>
+          <PageHeader
+            title="Daily Review"
+            subtitle="Persisted research support shortlist built from trusted OHLCV coverage, entry trigger context, exit/invalidation evidence, data quality, and supporting evidence. This page does not run review generation."
+            badges={<Chip label={`${scope.region} / ${scope.assetType}`} color="primary" variant="outlined" />}
+          />
+          <NotApplicableForAssetClass
+            feature="Today Review"
+            detail="Crypto coverage in this release is available on Signals, Market Scans, and the Instrument workspace. This view will support crypto in a later update."
+          />
+        </Stack>
+      </Box>
+    );
+  }
 
   return (
     <Box className="page-container page-container--workspace">

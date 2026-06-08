@@ -717,7 +717,10 @@ export class MarketDataFoundationController {
       if (capBand && !validCapBands.includes(capBand)) {
         return res.status(400).json({ error: `capBand must be one of: ${validCapBands.join(', ')}` });
       }
+      const { region, assetType } = this.getMarketFilter(req);
       return res.json(await this.service.screener({
+        region,
+        assetType,
         signalDirection,
         minScore: this.numberParam(req, 'minScore'),
         minRsPercentile: this.numberParam(req, 'minRsPercentile'),

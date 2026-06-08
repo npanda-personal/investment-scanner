@@ -502,7 +502,7 @@ describe('BacktestingStrategyLabService', () => {
     });
 
     expect(listInstruments).toHaveBeenCalledWith(expect.objectContaining({ search: 'RELIANCE', region: 'IN', assetType: 'STOCK' }));
-    expect(listPricesByInstrumentId).toHaveBeenCalledWith('stock-2', 5000, expect.any(Date), expect.any(Date));
+    expect(listPricesByInstrumentId).toHaveBeenCalledWith('stock-2', 5000, expect.any(Date), expect.any(Date), { region: 'IN', assetType: 'STOCK' });
     expect(run.trades.every((trade) => trade.instrumentId === 'stock-2')).toBe(true);
   });
 

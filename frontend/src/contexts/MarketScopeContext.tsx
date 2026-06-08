@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import { resolveUiMarketProfile, type UiMarketProfile } from '../shared/marketProfile';
 
 export type MarketRegion = 'IN' | 'US' | 'EU' | 'GLOBAL';
 
@@ -11,6 +12,8 @@ export interface MarketScope {
 
 interface MarketScopeContextType {
   scope: MarketScope;
+  /** Derived per-asset-class capability profile for graceful degradation. */
+  profile: UiMarketProfile;
   setRegion: (region: MarketRegion) => void;
   setAssetType: (assetType: AssetType) => void;
   resetMarketScope: () => void;
@@ -38,24 +41,44 @@ export const MarketScopeProvider: React.FC<{ children: React.ReactNode }> = ({ c
     return DEFAULT_SCOPE;
   });
 
+  // Persist SYNCHRONOUSLY inside the state updater (not a useEffect) so that
+  // localStorage is current BEFORE any child component's data-fetch effect fires.
+  // The global axios interceptor reads localStorage at request time; without this,
+  // the first refetch after a market switch would race the effect and query the
+  // previous region (causing wrong-context / empty data on the first load).
+  const persist = (next: MarketScope): MarketScope => {
+    try { localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+    return next;
+  };
+
+  // Keep localStorage in sync on mount (init reads it; this is a harmless no-op resync).
   useEffect(() => {
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(scope));
-  }, [scope]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const setRegion = useCallback((region: MarketRegion) => {
-    setScope(prev => ({ ...prev, region }));
+    setScope(prev => persist({ ...prev, region }));
   }, []);
 
   const setAssetType = useCallback((assetType: AssetType) => {
-    setScope(prev => ({ ...prev, assetType }));
+    setScope(prev => {
+      // Crypto is a single GLOBAL plane — force region to GLOBAL when switching to crypto,
+      // and restore IN when switching back to a regional asset class from crypto.
+      if (assetType === 'CRYPTO') return persist({ region: 'GLOBAL', assetType });
+      if (prev.assetType === 'CRYPTO' && prev.region === 'GLOBAL') return persist({ region: 'IN', assetType });
+      return persist({ ...prev, assetType });
+    });
   }, []);
 
   const resetMarketScope = useCallback(() => {
-    setScope(DEFAULT_SCOPE);
+    setScope(persist(DEFAULT_SCOPE));
   }, []);
 
+  const profile = useMemo(() => resolveUiMarketProfile(scope), [scope]);
+
   return (
-    <MarketScopeContext.Provider value={{ scope, setRegion, setAssetType, resetMarketScope }}>
+    <MarketScopeContext.Provider value={{ scope, profile, setRegion, setAssetType, resetMarketScope }}>
       {children}
     </MarketScopeContext.Provider>
   );

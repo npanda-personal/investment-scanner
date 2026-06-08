@@ -686,6 +686,8 @@ export class SmartMoneyIntelligenceService {
   }
 
   private async loadBars(instrumentId: string, range: SmartMoneyRange): Promise<SmartMoneyPriceBar[]> {
+    // Equity-plane only: smart-money/institutional-flow is not applicable to crypto
+    // (capability hasInstitutionalFlow=false) and is gated off in the frontend.
     const result = await this.marketDataService.listPricesByInstrumentId(instrumentId, RANGE_LIMITS[range]);
     return (result?.prices || [])
       .map((price: any) => ({

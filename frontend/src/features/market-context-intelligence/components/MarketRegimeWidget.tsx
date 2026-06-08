@@ -1,6 +1,7 @@
 import React from 'react';
 import { Alert, Chip, CircularProgress, Paper, Stack, Typography } from '@mui/material';
 import { useMarketContext } from '../hooks';
+import { useMarketScope } from '@/contexts/MarketScopeContext';
 
 const colorFor = (regime?: string) => regime === 'RISK_ON' ? 'success' : regime === 'RISK_OFF' ? 'error' : 'warning';
 
@@ -9,7 +10,10 @@ const roundFloatsInText = (text: string): string =>
   text.replace(/\b(\d+\.\d{2,})\b/g, (_, n) => parseFloat(n).toFixed(1));
 
 export const MarketRegimeWidget: React.FC = () => {
+  const { profile } = useMarketScope();
   const { summary, loading, error } = useMarketContext();
+  // Regime is computed for equity (breadth-based) and crypto (BTC-benchmarked); gate on hasRegime.
+  if (!profile.capabilities.hasRegime) return null;
   if (loading) return <Paper sx={{ p: 2 }}><CircularProgress size={20} /></Paper>;
   if (error) return <Alert severity="warning">{error}</Alert>;
   if (!summary) return null;

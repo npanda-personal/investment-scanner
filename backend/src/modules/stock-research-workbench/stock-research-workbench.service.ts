@@ -1,6 +1,7 @@
 import { MarketDataFoundationService } from '../market-data-foundation';
 import { WorkbenchSnapshotRepository } from './workbench-snapshot.repository';
 import type { ResearchPerformanceMetrics, ResearchPricePoint, ResearchRange, SignalEvidenceSection } from './stock-research-workbench.types';
+import { resolveMarketProfile } from '../../shared/utils/market-profile';
 
 const TRADING_DAYS_PER_YEAR = 252;
 
@@ -148,6 +149,8 @@ export class StockResearchWorkbenchService {
   }
 
   async workbench(instrumentId: string, range: ResearchRange = '1Y') {
+    // Equity-plane only: the research workbench (and peer comparison) is fundamentals-
+    // driven and gated off for crypto in the frontend; price reads stay equity-scoped.
     const [instrument, latest, prices, fundamentals, corporateActions] = await Promise.all([
       this.marketDataService.getInstrument(instrumentId),
       this.marketDataService.latestPriceByInstrumentId(instrumentId),
@@ -157,6 +160,11 @@ export class StockResearchWorkbenchService {
     ]);
 
     if (!instrument) return null;
+
+    // Resolve benchmark per instrument region (^NSEI for IN, ^GSPC for US, etc.).
+    // V1Instrument carries `region` (preferred) or `country` as a fallback.
+    const instrumentRegion = instrument.region ?? instrument.country ?? 'IN';
+    const benchmarkProfile = resolveMarketProfile({ region: instrumentRegion }).benchmark;
 
     const pricePoints = this.toPricePoints(prices?.prices || []);
     const selectedPrices = this.filterByRange(pricePoints, range);
@@ -168,12 +176,12 @@ export class StockResearchWorkbenchService {
       latestClose,
       corporateActions?.actions || [],
     );
-    const peers = await this.peerComparison(instrument, instrumentId, range);
+    const peers = await this.peerComparison(instrument, instrumentId, range, instrumentRegion);
     const valuation = this.valuationSnapshot(enrichedFundamentals, peers, instrument.market_cap);
     const performance = this.performanceMetrics(pricePoints, selectedPrices);
-    // Fetch Nifty 50 for relative-strength; uses same time window as the selected range.
-    const nifty50PricePoints = await this.fetchNifty50PricePoints(selectedPrices);
-    const relativeStrength = this.relativeStrengthSnapshot(selectedPrices, peers, nifty50PricePoints);
+    // Fetch region benchmark for relative-strength; uses same time window as the selected range.
+    const benchmarkPricePoints = await this.fetchBenchmarkPricePoints(benchmarkProfile.symbol, selectedPrices);
+    const relativeStrength = this.relativeStrengthSnapshot(selectedPrices, peers, benchmarkPricePoints, benchmarkProfile);
     const dailyChange = this.returnBetween(pricePoints[1]?.adjusted_close, pricePoints[0]?.adjusted_close);
     const dailyChangeValue = pricePoints.length > 1 ? pricePoints[0].adjusted_close - pricePoints[1].adjusted_close : null;
 
@@ -351,21 +359,25 @@ export class StockResearchWorkbenchService {
     return Math.pow(latest / old, 1 / years) - 1;
   }
 
-  private async peerComparison(instrument: any, instrumentId: string, range: ResearchRange) {
+  private async peerComparison(instrument: any, instrumentId: string, range: ResearchRange, region?: string | null) {
     // Fetch peers directly by sector/industry without loading the full universe or
     // running the expensive universeReadinessAndStatsForStocks + trustedBaselineByStockId
     // enrichment that caused ~10 s latency and HTTP 500 on the research workbench endpoint.
     //
     // Strategy: prefer industry match first; if that returns fewer than 3 results
     // (sparse industry), fall back to sector match.  Hard limit of 20 rows from DB.
+    // region filter: scope peers to the same region as the instrument so a US stock
+    // does not receive Indian peers (TCS/HCLTECH) and vice-versa.
     const PEER_LIMIT = 20;
     const PEER_RETURN_CAP = 10;
+    const normalizedRegion = region ? String(region).trim().toUpperCase() : undefined;
 
     const buildFilter = (sector?: string | null, industry?: string | null) => ({
       page: 1 as const,
       pageSize: PEER_LIMIT,
       sortBy: 'marketCap' as const,
       sortOrder: 'desc' as const,
+      ...(normalizedRegion ? { region: normalizedRegion } : {}),
       ...(industry ? { industry } : sector ? { sector } : {}),
     });
 
@@ -430,11 +442,12 @@ export class StockResearchWorkbenchService {
   }
 
   /**
-   * Fetches the Nifty 50 (^NSEI) EOD price series covering the same date
-   * window as `selectedPrices` (oldest to newest).  Returns an empty array
-   * when the series is unavailable or the range cannot be determined.
+   * Fetches the region benchmark EOD price series covering the same date
+   * window as `selectedPrices` (oldest to newest).  symbol is resolved from
+   * resolveMarketProfile({ region }).benchmark.symbol by the caller.
+   * Returns an empty array when the series is unavailable or the range cannot be determined.
    */
-  private async fetchNifty50PricePoints(selectedPrices: ResearchPricePoint[]): Promise<ResearchPricePoint[]> {
+  private async fetchBenchmarkPricePoints(symbol: string, selectedPrices: ResearchPricePoint[]): Promise<ResearchPricePoint[]> {
     if (selectedPrices.length === 0) return [];
     // selectedPrices is sorted newest-first (see toPricePoints); dates[0] is
     // the most recent and dates[last] is the oldest.
@@ -444,7 +457,7 @@ export class StockResearchWorkbenchService {
     oldestDate.setDate(oldestDate.getDate() - 5);
     newestDate.setDate(newestDate.getDate() + 5);
     try {
-      const raw = await this.marketDataService.listPrices('^NSEI', 5000, oldestDate, newestDate);
+      const raw = await this.marketDataService.listPrices(symbol, 5000, oldestDate, newestDate);
       return this.toPricePoints((raw || []).map((price: any) => ({
         date: price.timestamp ?? price.date,
         close: Number(price.close),
@@ -461,25 +474,27 @@ export class StockResearchWorkbenchService {
   private relativeStrengthSnapshot(
     selectedPrices: ResearchPricePoint[],
     peers: Array<Record<string, any>>,
-    nifty50Prices: ResearchPricePoint[] = [],
+    benchmarkPrices: ResearchPricePoint[] = [],
+    benchmarkProfile?: { symbol: string; label: string },
   ) {
     const stockReturn = this.periodReturn(selectedPrices);
     const peerReturns = peers.map((peer) => peer.return_selected).filter((value) => typeof value === 'number') as number[];
     const peerAverage = this.average(peerReturns);
 
-    // Use the Nifty 50 index when the series spans the selected range
+    // Use the region benchmark index when the series spans the selected range
     // (at least 2 bars present after filtering to the same window).
-    const indexReturn = nifty50Prices.length >= 2 ? this.periodReturn(nifty50Prices) : null;
+    const indexReturn = benchmarkPrices.length >= 2 ? this.periodReturn(benchmarkPrices) : null;
     const useIndex = indexReturn !== null;
+    const benchmarkSymbol = benchmarkProfile?.symbol ?? null;
 
     return {
-      benchmark_symbol: useIndex ? '^NSEI' : null,
+      benchmark_symbol: useIndex ? benchmarkSymbol : null,
       benchmark_return: useIndex ? indexReturn : null,
       peer_average_return: peerAverage,
       stock_return: stockReturn,
       relative_to_benchmark: useIndex && stockReturn !== null ? stockReturn - indexReturn! : null,
       relative_to_peer_average: stockReturn !== null && peerAverage !== null ? stockReturn - peerAverage : null,
-      fallback_used: useIndex ? 'nse_nifty_50' : 'peer_average',
+      fallback_used: useIndex ? (benchmarkSymbol ?? 'benchmark_index') : 'peer_average',
       data_status: stockReturn !== null ? (useIndex ? 'COMPLETE' : 'PARTIAL') : 'MISSING',
     };
   }

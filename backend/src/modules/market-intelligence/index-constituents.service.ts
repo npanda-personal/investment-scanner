@@ -10,16 +10,43 @@ import type {
   SupportedIndex,
 } from './index-constituents.types';
 
-export const SUPPORTED_INDICES: SupportedIndex[] = ['NIFTY_50', 'NIFTY_BANK'];
+export const SUPPORTED_INDICES: SupportedIndex[] = ['NIFTY_50', 'NIFTY_BANK', 'SP500', 'NDX100'];
+
+/** US indices keyed by SupportedIndex value. */
+const US_INDICES: ReadonlySet<SupportedIndex> = new Set(['SP500', 'NDX100'] as const);
+
+/**
+ * Return the default SupportedIndex for a given region string.
+ * US → SP500, everything else → NIFTY_50.
+ */
+export function defaultIndexForRegion(region: string | null | undefined): SupportedIndex {
+  const normalized = String(region || '').trim().toUpperCase();
+  if (normalized === 'US') return 'SP500';
+  return 'NIFTY_50';
+}
+
+/**
+ * Return the region that owns a given index.
+ * SP500/NDX100 → 'US'; NIFTY_* → 'IN'.
+ */
+export function regionForIndex(index: SupportedIndex | string): string {
+  if (US_INDICES.has(index as SupportedIndex)) return 'US';
+  return 'IN';
+}
 
 export class IndexConstituentsService {
   constructor(private readonly repository = new IndexConstituentsRepository()) {}
 
-  async constituentsForIndex(rawIndex: string | null | undefined): Promise<IndexConstituentsEnvelope> {
-    const index = typeof rawIndex === 'string' ? rawIndex.trim().toUpperCase() : '';
+  async constituentsForIndex(rawIndex: string | null | undefined, options?: { region?: string | null }): Promise<IndexConstituentsEnvelope> {
+    // If no index supplied but a region is provided, default to that region's headline index.
+    let index = typeof rawIndex === 'string' ? rawIndex.trim().toUpperCase() : '';
+
+    if (!index && options?.region) {
+      index = defaultIndexForRegion(options.region);
+    }
 
     if (!index) {
-      return this.invalidParams('', 'index query parameter is required (NIFTY_50 or NIFTY_BANK).');
+      return this.invalidParams('', `index query parameter is required. Supported values: ${SUPPORTED_INDICES.join(', ')}.`);
     }
 
     const symbolList = INDEX_SYMBOL_LISTS[index];
@@ -34,7 +61,7 @@ export class IndexConstituentsService {
 
     let constituents;
     try {
-      constituents = await this.repository.loadConstituents(symbolList);
+      constituents = await this.repository.loadConstituents(symbolList, regionForIndex(index));
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to load index constituents from database.';
       return {

@@ -196,7 +196,13 @@ export class SignalPositionLedgerService {
 
     return {
       ledgerKey: this.lifecycleKey({
-        region: triggerContract.region || 'IN',
+        // Prefer the region explicitly written on the trigger contract.
+        // Fall back to the signal instrument's region when available (e.g. a
+        // US signal whose triggerContract.region was not populated at write time).
+        // 'IN' is kept only as the last resort to preserve existing behaviour for
+        // legacy IN rows.  The real fix is to ensure signal generation writes
+        // triggerContract.region='US' for US signals (data-op, handled separately).
+        region: triggerContract.region || (signal as any).region || 'IN',
         assetType: triggerContract.asset_class || 'STOCK',
         instrumentId: signal.instrument_id,
         entryTriggerTimestamp: triggerContract.trigger_timestamp as string,

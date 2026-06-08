@@ -34,7 +34,7 @@ import {
 } from 'recharts';
 import { fetchStockResearchWorkbench, isWorkbenchNotYetComputed } from '../api/stockResearchWorkbenchService';
 import type { ResearchRange, ResearchWorkbenchResponse, SignalEvidenceSection } from '../types';
-import { inr, inrCompact, changeColor, stripSuffix } from '@/shared/format/money';
+import { money, compactByProfile, changeColor, stripSuffix } from '@/shared/format/money';
 import { humanizeCode } from '@/shared/format/enumLabels';
 import { SignalWidget } from '@/features/signal-generation-engine';
 import { StrategyDecisionWidget } from '@/features/strategy-decision-engine';
@@ -300,7 +300,7 @@ const StockResearchWorkbenchPage: React.FC = () => {
                 <Chip label="Cap tier: —" size="small" variant="outlined" color="default" />
               )}
               <Typography variant="caption" color="text.secondary">
-                {inrCompact(overview.market_cap)} mkt cap
+                {compactByProfile(overview.market_cap, { currency: overview.currency || 'INR' })} mkt cap
               </Typography>
             </Stack>
 
@@ -309,7 +309,7 @@ const StockResearchWorkbenchPage: React.FC = () => {
               <Box sx={{ mt: 1 }}>
                 <Typography variant="caption" color="text.secondary">
                   {rangeInfo.isFullYear ? '52w' : `~${rangeInfo.windowWeeks}w`} range:{' '}
-                  <strong>{inr(rangeInfo.low)}</strong> – <strong>{inr(rangeInfo.high)}</strong>
+                  <strong>{money(rangeInfo.low, overview.currency)}</strong> – <strong>{money(rangeInfo.high, overview.currency)}</strong>
                   {' · '}
                   <strong>{rangeInfo.positionPct.toFixed(1)}%</strong> above{' '}
                   {rangeInfo.isFullYear ? '52w' : `${rangeInfo.windowWeeks}w`} low
@@ -319,9 +319,9 @@ const StockResearchWorkbenchPage: React.FC = () => {
           </Box>
 
           <Box sx={{ textAlign: { xs: 'left', md: 'right' } }}>
-            <Typography variant="h4">{inr(overview.latest_price)}</Typography>
+            <Typography variant="h4">{money(overview.latest_price, overview.currency)}</Typography>
             <Typography color={changeColor(overview.daily_change_percent)}>
-              {inr(overview.daily_change)} ({formatPercent(overview.daily_change_percent)})
+              {money(overview.daily_change, overview.currency)} ({formatPercent(overview.daily_change_percent)})
             </Typography>
             <Typography variant="caption" color="text.secondary">
               {overview.source} | {formatDateTime(overview.last_updated_timestamp)}
@@ -360,7 +360,7 @@ const StockResearchWorkbenchPage: React.FC = () => {
         open={alertDialogOpen}
         onClose={() => setAlertDialogOpen(false)}
         defaults={{
-          name: `${stripSuffix(String(overview.symbol))} price above ${inr(overview.latest_price)}`,
+          name: `${stripSuffix(String(overview.symbol))} price above ${money(overview.latest_price, overview.currency)}`,
           type: 'PRICE_ABOVE',
           scope: 'STOCK',
           instrumentId: String(overview.instrument_id),
@@ -518,13 +518,13 @@ const StockResearchWorkbenchPage: React.FC = () => {
         >
           {fundamentals ? (
             <MetricGrid items={{
-              Revenue: inrCompact(fundamentals.revenue),
-              EPS: inr(fundamentals.eps),
-              'Net Income': inrCompact(fundamentals.net_income),
+              Revenue: compactByProfile(fundamentals.revenue, { currency: fundamentals.currency || overview.currency || 'INR' }),
+              EPS: money(fundamentals.eps, fundamentals.currency || overview.currency),
+              'Net Income': compactByProfile(fundamentals.net_income, { currency: fundamentals.currency || overview.currency || 'INR' }),
               'P/E': <DerivedValue value={formatNumber(fundamentals.pe_ratio)} derived={!!fundamentals._pe_ratio_derived} />,
               'Dividend Yield': <DerivedValue value={formatPercent(fundamentals.dividend_yield)} derived={!!fundamentals._dividend_yield_derived} />,
               Shares: formatNumber(fundamentals.shares_outstanding),
-              'Market Cap': <DerivedValue value={inrCompact(fundamentals.market_cap)} derived={!!fundamentals._market_cap_derived} />,
+              'Market Cap': <DerivedValue value={compactByProfile(fundamentals.market_cap, { currency: fundamentals.currency || overview.currency || 'INR' })} derived={!!fundamentals._market_cap_derived} />,
               Period: String(fundamentals.period_type || 'N/A'),
             }} />
           ) : <Typography color="text.secondary">No fundamentals available.</Typography>}
@@ -583,7 +583,7 @@ const StockResearchWorkbenchPage: React.FC = () => {
               >
                 <Typography fontWeight={700}>{stripSuffix(String(peer.symbol))} | {String(peer.company_name)}</Typography>
                 <Typography variant="body2" color="text.secondary">{String(peer.exchange || 'UNKNOWN')}</Typography>
-                <Typography variant="body2">Price: {inr(peer.latest_price)} | {range}: {formatPercent(peer.return_selected)}</Typography>
+                <Typography variant="body2">Price: {money(peer.latest_price, overview.currency)} | {range}: {formatPercent(peer.return_selected)}</Typography>
                 <Typography variant="body2">P/E: {formatNumber(peer.pe_ratio)} | Yield: {formatPercent(peer.dividend_yield)}</Typography>
               </Paper>
             ))}
@@ -604,7 +604,7 @@ const StockResearchWorkbenchPage: React.FC = () => {
             {data.corporate_actions.map((action) => (
               <Paper key={`${action.action_type}-${action.effective_date}-${action.value}`} variant="outlined" sx={{ p: 1.5 }}>
                 <Typography fontWeight={700}>{String(action.action_type)} | {new Date(String(action.effective_date)).toLocaleDateString()}</Typography>
-                <Typography variant="body2">Amount: {inr(action.amount)} | Ratio: {formatNumber(action.ratio)} | {String(action.currency || overview.currency)}</Typography>
+                <Typography variant="body2">Amount: {money(action.amount, action.currency || overview.currency)} | Ratio: {formatNumber(action.ratio)} | {String(action.currency || overview.currency)}</Typography>
                 <Typography variant="caption" color="text.secondary">{String(action.source)} | {String(action.data_status)}</Typography>
               </Paper>
             ))}

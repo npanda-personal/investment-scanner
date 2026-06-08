@@ -677,3 +677,16 @@ Verification commands:
 
 - All data integration remains free/open-source.
 - Application-wide market context is controlled by the header selector.
+
+## Crypto plane — schema notes (deferred work)
+
+- **Reserved tables (no writer yet):** `crypto_signal_outcomes`, `crypto_signal_calibration_results`,
+  `crypto_quality_evaluations`, `crypto_interest_snapshots`. They are defined for future crypto
+  outcome/calibration/data-quality/interest features. They are intentionally **not dropped**: the shared
+  DB is drifted, so removal requires a dedicated, controlled migration window (never `prisma migrate dev`).
+- **FK constraints deferred:** `crypto_price_ticks` / `crypto_latest_prices` reference `crypto_assets` by
+  `symbol` string without a DB-level FK. Storage isolation is enforced in code (every crypto write hard-codes
+  `region='GLOBAL', assetType='CRYPTO'` and only touches `crypto_*` tables). Adding `ON DELETE CASCADE` FKs is
+  a future controlled-migration task.
+- **Crypto market-context** is persisted under the dedicated `region='CRYPTO'` partition of
+  `market_context_snapshots` (the table has no `assetType` column), keeping it isolated from equity GLOBAL/IN.

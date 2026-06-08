@@ -20,6 +20,7 @@ import { useNavigate } from 'react-router-dom';
 import { PageHeader, StalenessBadge } from '@/shared/components';
 import { humanizeCode, humanizeEmbedded, indexLabel } from '@/shared/format/enumLabels';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
+import { NotApplicableForAssetClass } from '@/shared/components/NotApplicableForAssetClass';
 import { fetchSectorRotation } from '../api/marketIntelligenceService';
 import type { RotationQuadrant, SectorRotationEnvelope, SectorRotationRow } from '../types';
 
@@ -270,7 +271,7 @@ function SectorRotationTable({ sectors }: { sectors: SectorRotationRow[] }) {
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export function SectorRotationPage() {
-  const { scope } = useMarketScope();
+  const { scope, profile } = useMarketScope();
   const [data, setData] = useState<SectorRotationEnvelope | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -295,6 +296,18 @@ export function SectorRotationPage() {
 
   const sectors = data?.sectors ?? [];
   const quadrants: RotationQuadrant[] = ['LEADING', 'IMPROVING', 'WEAKENING', 'LAGGING'];
+
+  if (!profile.capabilities.hasSectors) {
+    return (
+      <Box className="page-container page-container--hub">
+        <PageHeader
+          title="Sector Rotation"
+          subtitle="Which sectors are money rotating into vs out of?"
+        />
+        <NotApplicableForAssetClass feature="Sector rotation" />
+      </Box>
+    );
+  }
 
   return (
     <Box className="page-container page-container--hub">

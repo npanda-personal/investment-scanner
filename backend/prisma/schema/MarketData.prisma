@@ -19,8 +19,18 @@ model PriceTick {
 
 // For faster lookups of latest price per symbol
 model LatestPrice {
+  // DEFERRED P0 — cross-region symbol collision risk:
+  // The current primary key is symbol alone (@id), meaning if a US ticker and an IN
+  // ticker share the same symbol string the latest-price row for one will silently
+  // overwrite the other.
+  // The correct key is @@id([symbol, region]) (with region made non-nullable).
+  // Guarded today at the app layer: upsertUsStock always passes region='US' and IN
+  // ingest passes region='IN', but the @id constraint enforces symbol uniqueness only.
+  // Migration path: hand-authored raw-SQL — NOT `prisma migrate dev` on the shared DB.
+  // Owner must run: ALTER TABLE latest_prices ADD COLUMN IF NOT EXISTS region_nn VARCHAR
+  //   DEFAULT 'IN', then backfill, then swap the PK to (symbol, region).
   symbol    String   @id
-  region    String?  // region for filtering
+  region    String?  // region for filtering; deferred: should be non-nullable part of PK
   price     Decimal
   timestamp DateTime
   updatedAt DateTime @updatedAt

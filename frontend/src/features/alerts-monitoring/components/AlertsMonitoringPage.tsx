@@ -32,7 +32,7 @@ const severityColor = (severity: string) => severity === 'CRITICAL' ? 'error' : 
 const contextLink = (event: AlertEvent) => event.instrumentId ? `/research/stocks/${event.instrumentId}` : event.portfolioId ? `/portfolios/${event.portfolioId}` : event.watchlistId ? `/watchlists/${event.watchlistId}` : '/alerts';
 
 export const AlertsMonitoringPage: React.FC = () => {
-  const { scope } = useMarketScope();
+  const { scope, profile } = useMarketScope();
   const { rules, events, loading, error, reload } = useAlertsMonitoring();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [evaluating, setEvaluating] = useState(false);
@@ -97,7 +97,16 @@ export const AlertsMonitoringPage: React.FC = () => {
           These states appear after persisted alert read models exist. This trader page does not evaluate shared alert conditions.
         </Typography>
         <Stack direction="row" gap={1} flexWrap="wrap" useFlexGap>
-          {['Entered Radar', 'Upcoming Result', 'Risk Radar Entry', 'Sector Weakness', '52W High', 'Delivery Accumulation'].map((item) => (
+          {[
+            'Entered Radar',
+            'Upcoming Result',
+            'Risk Radar Entry',
+            'Sector Weakness',
+            '52W High',
+            // Delivery Accumulation is an India-specific concept (NSE delivery%); hide for
+            // non-IN regions where delivery data is not available.
+            ...(profile.capabilities.hasDelivery ? ['Delivery Accumulation'] : []),
+          ].map((item) => (
             <Chip key={item} label={item} variant="outlined" />
           ))}
         </Stack>

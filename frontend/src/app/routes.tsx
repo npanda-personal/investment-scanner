@@ -14,6 +14,7 @@ import { alertsMonitoringRoutes } from '@/features/alerts-monitoring';
 import { marketContextIntelligenceRoutes } from '@/features/market-context-intelligence';
 import { backtestingStrategyLabRoutes } from '@/features/backtesting-strategy-lab';
 import { smartMoneyIntelligenceRoutes } from '@/features/smart-money-intelligence';
+import { derivativesIntelligenceRoutes } from '@/features/derivatives-intelligence';
 import { aiInvestmentCopilotRoutes } from '@/features/ai-investment-copilot';
 import { subscriptionBillingRoutes } from '@/features/subscription-billing';
 import { protectedAuthIdentityRoutes, ProtectedRoute, publicAuthIdentityRoutes } from '@/features/auth-identity';
@@ -30,6 +31,7 @@ import { todayTradeReviewRoutes } from '@/features/today-trade-review';
 import { pipelineOpsRoutes } from '@/features/pipeline-ops';
 import { signalPositionLedgerRoutes } from '@/features/signal-position-ledger';
 import { DailyOverviewDashboardPage } from '@/features/daily-overview-dashboard';
+import CryptoMarketOverviewPage from '@/features/market-data-foundation/components/CryptoMarketOverviewPage';
 
 const userInstrumentRoutes: RouteObject[] = [
   { path: 'stocks', element: <Navigate to="/instrument-workspace" replace /> },
@@ -88,6 +90,7 @@ export const appRoutes: RouteObject[] = [
           ...todayTradeReviewRoutes,
           ...marketScansRoutes,
           ...screenerRoutes,
+          ...derivativesIntelligenceRoutes,
           ...researchHubRoutes,
           ...userInstrumentRoutes,
           ...stockResearchWorkbenchRoutes,
@@ -97,6 +100,7 @@ export const appRoutes: RouteObject[] = [
           ...aiInvestmentCopilotRoutes,
           ...notificationsDeliveryRoutes,
           { path: 'daily-overview', element: <DailyOverviewDashboardPage /> },
+          { path: 'crypto', element: <CryptoMarketOverviewPage /> },
           ...protectedAuthIdentityRoutes,
           { path: 'admin', element: <AdminHomePage /> },
           ...prefixedAdminRoutes(operatorRoutes),

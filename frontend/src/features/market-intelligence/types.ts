@@ -281,7 +281,7 @@ export type MarketReadModelKey =
 
 // ─── Index Constituents (NR-103) ────────────────────────────────────────────
 
-export type SupportedIndex = 'NIFTY_50' | 'NIFTY_BANK';
+export type SupportedIndex = 'NIFTY_50' | 'NIFTY_BANK' | 'SP500' | 'NDX100';
 
 export interface IndexConstituentRow {
   instrumentId: string | null;

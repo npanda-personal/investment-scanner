@@ -173,7 +173,8 @@ export class MarketIntelligenceController {
       res.setHeader('Cache-Control', 'no-store');
       const rawDays = req.query.days;
       const days = typeof rawDays === 'string' && /^\d+$/.test(rawDays) ? parseInt(rawDays, 10) : 5;
-      const result = await getEventFeed(days);
+      const region = typeof req.query.region === 'string' ? req.query.region.trim() || 'IN' : 'IN';
+      const result = await getEventFeed(days, region);
       return res.json(result);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to load market event feed';

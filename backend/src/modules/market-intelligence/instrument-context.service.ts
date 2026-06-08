@@ -203,7 +203,7 @@ async function loadRelativeStrength(instrumentId: string, _symbol: string): Prom
 
     return present(
       { stockReturn63d, benchmarkReturn63d, relativeReturn63d, rsPercentile: null },
-      'WorkbenchSnapshot (relative_strength vs ^NSEI)',
+      'WorkbenchSnapshot (relative_strength vs region benchmark)',
       toIsoDate(row.computedAt),
     );
   } catch {

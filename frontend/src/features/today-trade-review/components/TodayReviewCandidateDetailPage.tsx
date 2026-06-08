@@ -288,11 +288,11 @@ function ReasonList({ reasons }: { reasons: Array<{ code: string; label: string;
   if (reasons.length === 0) return <Typography color="text.secondary">No candidate reasons were stored for this panel.</Typography>;
   return (
     <List dense disablePadding>
-      {reasons.map((reason) => {
+      {reasons.map((reason, i) => {
         const category = reasonCategoryLabel(reason.category);
         const source = reasonSourceLabel(reason.sourceModule);
         return (
-          <ListItem key={`${reason.severity}:${reason.code}`} disableGutters>
+          <ListItem key={`${reason.severity}:${reason.code}:${i}`} disableGutters>
             <ListItemText
               primary={`${category} / ${reason.severity}`}
               secondary={`${safeReviewText(reason.label)} Source: ${source}${reason.evidenceDate ? `; Evidence: ${formatDateTime(reason.evidenceDate)}` : ''}`}

@@ -7,6 +7,7 @@ import type { TrustedReviewUniverseHealth, TrustedReviewUniverseInstrument } fro
 import { SignalCalibrationEngineService } from '../signal-calibration-engine';
 import { SignalGenerationEngineService } from '../signal-generation-engine';
 import { SmartMoneyIntelligenceService } from '../smart-money-intelligence';
+import { getLatestOiBuildup, type OiBuildupRow } from '../derivatives-intelligence/derivatives-intelligence.oi-buildup.service';
 import { StrategyDecisionEngineService, type StrategyDecisionDto } from '../strategy-decision-engine';
 import { TradePlanRiskEngineService, type TradePlanResultDto } from '../trade-plan-risk-engine';
 import { TodayTradeReviewRepository } from './today-trade-review.repository';
@@ -135,9 +136,10 @@ export class TodayTradeReviewService {
     });
 
     try {
-      const [sources, marketPosture] = await Promise.all([
+      const [sources, marketPosture, oiBuildupBySymbol] = await Promise.all([
         this.loadRunSources(scope, warnings),
         this.loadMarketPosture(scope.region),
+        this.loadOiBuildupBySymbol(),
       ]);
       sourceSnapshot.marketData = sources.marketData;
       sourceSnapshot.reviewReadiness = sources.reviewReadiness;
@@ -146,7 +148,7 @@ export class TodayTradeReviewService {
       sourceSnapshot.marketContext = sources.marketContext;
       sourceSnapshot.rawSignalUniverse = sources.rawSignalUniverse;
 
-      const liteResult = this.buildLiteCandidates(sources.trustedInstruments, sources.reviewUniverse, sources.scanEvidence, sources.strategyFunnel, sources.earningsProximity, sources.marketContext);
+      const liteResult = this.buildLiteCandidates(sources.trustedInstruments, sources.reviewUniverse, sources.scanEvidence, sources.strategyFunnel, sources.earningsProximity, sources.marketContext, oiBuildupBySymbol);
       sourceSnapshot.scanFunnel = liteResult.scanFunnel;
       const candidateSources = sources.reviewUniverse?.mode === 'NO_REVIEW'
         ? []
@@ -644,7 +646,8 @@ export class TodayTradeReviewService {
     },
     strategyFunnel: StrategyFunnelStats,
     earningsProximity: Map<string, TodayReviewEarningsProximity> = new Map(),
-    marketContext?: MarketContextSummary | null
+    marketContext?: MarketContextSummary | null,
+    oiBuildupBySymbol: Map<string, OiBuildupRow> = new Map()
   ): { candidates: TodayReviewCandidateDto[]; scanFunnel: TodayReviewScanFunnel } {
     const scanFunnel: TodayReviewScanFunnel = {
       trustedUniverseCount: scanEvidence.trustedUniverseCount,
@@ -718,11 +721,18 @@ export class TodayTradeReviewService {
       const rawScore = state === 'BLOCKED' || state === 'AVOID' ? 0 : this.liteScore(setup, evidence, tradePlan.rewardRiskRatio, instrument, contextGapPenalty);
       // Down-rank long entries by 10 points when results are imminent; short/blocked paths unaffected.
       const score = (earningsCaveat && state === 'LONG_REVIEW') ? Math.max(0, rawScore - 10) : rawScore;
+      // F&O OI corroboration for short candidates (#FNO-4): if the futures OI
+      // buildup confirms (SHORT_BUILDUP) or contradicts (SHORT_COVERING) the
+      // bearish setup, surface it as descriptive evidence (research-support only).
+      const oiEvidence = setup.direction === 'SHORT'
+        ? this.oiBuildupEvidence(instrument.symbol, oiBuildupBySymbol)
+        : null;
       const watchReasons = [
         ...(state === 'WATCH_ONLY' && evidence.label === 'UNPROVEN' ? ['Historical evidence is UNPROVEN; keep as watch only until more occurrences are available.'] : []),
         ...(tradePlan.rewardRiskRatio < 1.2 ? ['Exit/invalidation evidence is incomplete for research review.'] : []),
         ...(instrument.contextGaps.length > 0 ? [`Context gaps: ${instrument.contextGaps.join(', ')}.`] : []),
         ...(earningsCaveat ? [earningsCaveat] : []),
+        ...(oiEvidence ? [oiEvidence] : []),
         ...instrument.warnings.slice(0, 2),
       ];
       // Resolve sector leadership from the run's persisted market context (if available).
@@ -798,6 +808,44 @@ export class TodayTradeReviewService {
     }
 
     return { candidates, scanFunnel };
+  }
+
+  /**
+   * Load the latest persisted futures OI-buildup keyed by underlying symbol.
+   * Persisted-read only; never ingests. Returns an empty map on any error so
+   * the review run never fails because derivatives data is missing.
+   */
+  private async loadOiBuildupBySymbol(): Promise<Map<string, OiBuildupRow>> {
+    try {
+      const resp = await getLatestOiBuildup({ limit: 500 });
+      if (resp.status !== 'ready') return new Map();
+      return new Map(resp.rows.map((row) => [row.underlying.toUpperCase(), row]));
+    } catch {
+      return new Map();
+    }
+  }
+
+  /**
+   * Build a one-line OI-buildup corroboration note for a short candidate.
+   * SHORT_BUILDUP confirms the bearish thesis; SHORT_COVERING contradicts it.
+   * Descriptive only — never an instruction to trade.
+   */
+  private oiBuildupEvidence(symbol: string, oiBuildupBySymbol: Map<string, OiBuildupRow>): string | null {
+    const row = oiBuildupBySymbol.get((symbol || '').toUpperCase());
+    if (!row) return null;
+    const oiPct = row.oiChangePct === null ? null : `${row.oiChangePct >= 0 ? '+' : ''}${row.oiChangePct.toFixed(1)}%`;
+    switch (row.buildupLabel) {
+      case 'SHORT_BUILDUP':
+        return `Derivatives corroboration: futures show SHORT BUILDUP (price down with rising open interest${oiPct ? `, OI ${oiPct}` : ''}) — consistent with the bearish setup.`;
+      case 'SHORT_COVERING':
+        return `Derivatives caution: futures show SHORT COVERING (price up with falling open interest${oiPct ? `, OI ${oiPct}` : ''}) — contradicts the bearish setup.`;
+      case 'LONG_BUILDUP':
+        return `Derivatives caution: futures show LONG BUILDUP (price up with rising open interest${oiPct ? `, OI ${oiPct}` : ''}) — contradicts the bearish setup.`;
+      case 'LONG_UNWINDING':
+        return `Derivatives context: futures show LONG UNWINDING (price down with falling open interest${oiPct ? `, OI ${oiPct}` : ''}).`;
+      default:
+        return null;
+    }
   }
 
   private detectLiteSetup(history: TrustedReviewUniverseInstrument['priceHistory']) {

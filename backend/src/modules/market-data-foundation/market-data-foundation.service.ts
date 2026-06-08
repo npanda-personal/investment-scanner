@@ -5,6 +5,11 @@ import os from 'os';
 import path from 'path';
 import { inflateRawSync } from 'zlib';
 import { MarketDataFoundationRepository } from './market-data-foundation.repository';
+import {
+  MarketDataFoundationCryptoRepository,
+  marketDataFoundationCryptoRepository,
+} from './market-data-foundation.crypto-repository';
+import { isCryptoScope } from '../../shared/data-access/market-repository-router';
 import { enqueueIngestionJob } from './market-data-foundation.queue';
 import { getCatalogDownloadConfig, getCatalogSourceConfig, getCatalogSourceConfigs } from './market-data-foundation.catalog-sources';
 import type {
@@ -99,6 +104,9 @@ import type {
 } from './market-data-foundation.types';
 import { validateInstrumentInput } from './market-data-foundation.validation';
 import { getMarketSessionConfig, latestCompletedTradingDateForRegion, shouldRunMarketDataSync, tradingDateForRegion } from './market-data-foundation.market-session';
+import { resolveMarketProfile } from '../../shared/utils/market-profile';
+import { regionUsesRegionProviderPath } from './market-data-foundation.provider-registry';
+import { usEquityIngestionService } from './market-data-foundation.us-equity-ingestion.service';
 import { isKnownNseFnoStockUnderlying } from './market-data-foundation.fno-underlyings';
 import {
   classifyInstrumentUniverseReadiness,
@@ -883,6 +891,63 @@ export class MarketDataFoundationService {
     return this.repository.listStocks(options);
   }
 
+  // ── Crypto reads (isolated crypto_* plane) ──────────────────────────────────
+  // Public surface so downstream modules consume crypto market data through this
+  // service (never the crypto repository directly), preserving module boundaries.
+  private readonly cryptoRepository: MarketDataFoundationCryptoRepository = marketDataFoundationCryptoRepository;
+
+  /** List crypto assets from crypto_assets (ranked by market cap). */
+  listCryptoAssets(options: { activeOnly?: boolean; limit?: number; offset?: number } = {}) {
+    return this.cryptoRepository.listAssets(options);
+  }
+
+  /** Fetch a single crypto asset (crypto_assets) by id. */
+  getCryptoAssetById(id: string) {
+    return this.cryptoRepository.getAssetById(id);
+  }
+
+  /** Fetch a single crypto asset (crypto_assets) by canonical symbol (e.g. BTCUSDT). */
+  getCryptoAssetBySymbol(symbol: string) {
+    return this.cryptoRepository.getAssetBySymbol(symbol);
+  }
+
+  /** Ascending crypto price history (crypto_price_ticks) for a symbol. */
+  listCryptoPriceHistory(symbol: string, limit?: number) {
+    return this.cryptoRepository.getPriceHistory(symbol, limit);
+  }
+
+  /** Crypto prices response (same shape as listPricesByInstrumentId; newest-first; delivery N/A). */
+  private async listCryptoPricesByInstrumentId(instrumentId: string, limit = 250) {
+    const asset = await this.cryptoRepository.getAssetById(instrumentId);
+    if (!asset) return null;
+    const ascending = await this.cryptoRepository.getPriceHistory(asset.symbol, limit);
+    const prices = [...ascending].reverse(); // newest-first to match equity response
+    return {
+      instrument_id: asset.id,
+      symbol: asset.symbol,
+      adjustment_strategy: 'crypto: no splits/dividends; adjusted_close equals close.',
+      source: prices[0]?.source || 'BINANCE_KLINES',
+      ingestion_timestamp: prices[0]?.ingestionTimestamp instanceof Date ? prices[0].ingestionTimestamp.toISOString() : null,
+      last_updated_timestamp: prices[0]?.lastUpdatedTimestamp instanceof Date ? prices[0].lastUpdatedTimestamp.toISOString() : null,
+      data_status: prices.length > 0 ? 'COMPLETE' : 'MISSING',
+      delivery_percent: null, // not applicable for crypto
+      prices: prices.map((price) => ({
+        date: price.timestamp,
+        open: Number(price.open),
+        high: Number(price.high),
+        low: Number(price.low),
+        close: Number(price.close),
+        adjusted_close: price.adjustedClose !== null ? Number(price.adjustedClose) : Number(price.close),
+        volume: price.volume !== null && price.volume !== undefined ? Number(price.volume) : null,
+        delivery_percent: null,
+        source: price.source || 'BINANCE_KLINES',
+        ingestion_timestamp: price.ingestionTimestamp instanceof Date ? price.ingestionTimestamp.toISOString() : new Date().toISOString(),
+        last_updated_timestamp: price.lastUpdatedTimestamp instanceof Date ? price.lastUpdatedTimestamp.toISOString() : new Date().toISOString(),
+        data_status: price.dataStatus || 'COMPLETE',
+      })),
+    };
+  }
+
   providerDataCleanupReport() {
     return this.repository.providerDataCleanupReport();
   }
@@ -938,6 +1003,10 @@ export class MarketDataFoundationService {
   }
 
   async health(options: Pick<PaginationOptions, 'region' | 'assetType'> = {}) {
+    // Crypto scope → isolated crypto_* plane (counts + freshness from crypto tables).
+    if (isCryptoScope(options)) {
+      return this.cryptoHealth();
+    }
     const [instrumentCount, latestDataTimestamp] = await Promise.all([
       this.repository.instrumentCount(options),
       this.repository.latestDataTimestamp(options),
@@ -1139,6 +1208,25 @@ export class MarketDataFoundationService {
       ? [requestedRange]
       : (Object.keys(MARKET_MOVER_LOOKBACK_DAYS) as MarketMoverRange[]);
 
+    // Crypto scope → isolated crypto_market_scan_snapshots (movers persisted by the crypto lane).
+    if (isCryptoScope(options)) {
+      const cryptoRanges: MarketMoverRangeSummary[] = [];
+      for (const range of requestedRanges) {
+        const [g, l] = await Promise.all([
+          this.cryptoRepository.readLatestScan('MOVERS_GAINERS', range),
+          this.cryptoRepository.readLatestScan('MOVERS_LOSERS', range),
+        ]);
+        if (!g && !l) {
+          cryptoRanges.push({ range, gainers: [], losers: [], warnings: [`No crypto movers snapshot for ${range} yet. Awaiting the next crypto scan refresh.`] });
+          continue;
+        }
+        const gainers = (g?.rows ?? []).slice(0, limit) as unknown as MarketMoverRow[];
+        const losers = (l?.rows ?? []).slice(0, limit) as unknown as MarketMoverRow[];
+        cryptoRanges.push({ range, gainers, losers, warnings: ['Crypto price movers served from persisted Binance OHLCV snapshot.'] });
+      }
+      return { scope: { region: 'GLOBAL', assetType: 'CRYPTO' }, generatedAt: new Date().toISOString(), ranges: cryptoRanges };
+    }
+
     const ranges: MarketMoverRangeSummary[] = [];
     for (const range of requestedRanges) {
       const [gainersSnap, losersSnap] = await Promise.all([
@@ -1149,8 +1237,11 @@ export class MarketDataFoundationService {
         ranges.push({ range, gainers: [], losers: [], warnings: [`No market-scan snapshot found for movers ${range} in ${scope.region}/${scope.assetType}. Run MARKET_SCAN_REFRESH to populate.`] });
         continue;
       }
-      const gainers = (gainersSnap?.rows ?? []).slice(0, limit) as unknown as MarketMoverRow[];
-      const losers = (losersSnap?.rows ?? []).slice(0, limit) as unknown as MarketMoverRow[];
+      const scopeCurrency = resolveMarketProfile(scope).currency;
+      const gainers = ((gainersSnap?.rows ?? []).slice(0, limit) as unknown as MarketMoverRow[])
+        .map((r) => ({ ...r, currency: (r as any).currency || scopeCurrency, region: (r as any).region || scope.region }));
+      const losers = ((losersSnap?.rows ?? []).slice(0, limit) as unknown as MarketMoverRow[])
+        .map((r) => ({ ...r, currency: (r as any).currency || scopeCurrency, region: (r as any).region || scope.region }));
       const warnings = ['Price movers served from persisted daily snapshot. Excludes unsupported instruments, stale candles, insufficient liquidity/history, mixed sources, and mixed adjusted/close basis.'];
       ranges.push({ range, gainers, losers, warnings });
     }
@@ -1170,7 +1261,9 @@ export class MarketDataFoundationService {
     const range = this.marketMoverRange(options.range) ?? '1D';
     const limit = Math.max(1, Math.min(Number(options.limit) || 60, 100));
 
-    const snap = await this.readLatestScanSnapshot('MARKET_MAP', range, scope.region, scope.assetType);
+    const snap = isCryptoScope(options)
+      ? await this.cryptoRepository.readLatestScan('MARKET_MAP', range)
+      : await this.readLatestScanSnapshot('MARKET_MAP', range, scope.region, scope.assetType);
     if (!snap) {
       return {
         status: 'missing',
@@ -1186,6 +1279,7 @@ export class MarketDataFoundationService {
       };
     }
     const rawRows = snap.rows.slice(0, limit) as unknown as MarketMoverRow[];
+    const mapScopeCurrency = resolveMarketProfile(scope).currency;
     const tiles: MarketMapTile[] = rawRows.map((row) => ({
       instrumentId: row.instrumentId,
       symbol: row.symbol,
@@ -1197,6 +1291,8 @@ export class MarketDataFoundationService {
       returnPercent: row.returnPercent,
       latestDate: row.latestDate,
       priceBasis: row.priceBasis,
+      currency: (row as any).currency || mapScopeCurrency,
+      region: (row as any).region || scope.region,
     }));
     const groups = this.marketMapGroups(tiles);
     const hasMissingSector = tiles.some((tile) => !tile.sector?.trim());
@@ -1431,6 +1527,11 @@ export class MarketDataFoundationService {
     options: Pick<PaginationOptions, 'region' | 'assetType'> = {},
     snapshot?: UniverseComputationSnapshot
   ): Promise<MarketDataUniverseHealth> {
+    // Crypto scope → reduced, honest universe-health (price coverage only; the equity
+    // readiness/blocker model — ISIN, sector, delivery — is not applicable to crypto).
+    if (isCryptoScope(options)) {
+      return this.cryptoUniverseHealth();
+    }
     const scope = {
       region: options.region?.trim().toUpperCase() || 'IN',
       assetType: options.assetType?.trim().toUpperCase() || 'STOCK',
@@ -1577,6 +1678,70 @@ export class MarketDataFoundationService {
       warnings,
       trustStatus: this.universeTrustStatus(counts, coverage),
       trustReasons,
+    } as Omit<MarketDataUniverseHealth, 'universeSignoff'>;
+    return {
+      ...healthWithoutSignoff,
+      universeSignoff: this.universeSignoffFromHealth(healthWithoutSignoff),
+    };
+  }
+
+  /** Crypto plane health: counts + freshness from crypto_* tables (no equity readiness model). */
+  private async cryptoHealth() {
+    const [instrumentCount, latestDataTimestamp] = await Promise.all([
+      this.cryptoRepository.countAssets({ activeOnly: true }),
+      this.cryptoRepository.latestPriceTimestamp(),
+    ]);
+    return {
+      status: 'ok',
+      module: 'market-data-foundation',
+      instrumentCount,
+      latestDataTimestamp: latestDataTimestamp?.toISOString() ?? null,
+      source: 'database',
+      ingestion_timestamp: new Date().toISOString(),
+      last_updated_timestamp: latestDataTimestamp?.toISOString() ?? null,
+      data_status: latestDataTimestamp ? 'COMPLETE' : 'MISSING',
+      timestamp: new Date().toISOString(),
+      region: 'GLOBAL',
+      assetType: 'CRYPTO',
+    };
+  }
+
+  /** Reduced crypto universe-health: active count + price coverage; reuses trust/signoff helpers. */
+  private async cryptoUniverseHealth(): Promise<MarketDataUniverseHealth> {
+    const scope = { region: 'GLOBAL', assetType: 'CRYPTO' };
+    const [total, priceReady, latest] = await Promise.all([
+      this.cryptoRepository.countAssets({ activeOnly: true }),
+      this.cryptoRepository.countLatestPrices(),
+      this.cryptoRepository.latestPriceTimestamp(),
+    ]);
+    const counts = this.emptyUniverseCounts();
+    counts.totalCatalogInstruments = total;
+    counts.activeInstruments = total;
+    counts.providerSupported = total;
+    counts.priceReady = priceReady;
+    counts.readiness.priceReady = priceReady;
+    counts.contextReady = priceReady;
+    counts.readiness.contextReady = priceReady;
+    counts.reviewReady = priceReady;
+    counts.readiness.reviewReady = priceReady;
+    const denom = total || 1;
+    const coverage = {
+      priceCoveragePercentage: this.percent(priceReady, denom),
+      metadataCoveragePercentage: this.percent(total, denom),
+      reviewReadyPercentage: this.percent(priceReady, denom),
+    };
+    const latestStoredEodDate = latest ? latest.toISOString().slice(0, 10) : null;
+    const healthWithoutSignoff = {
+      scope,
+      generatedAt: new Date().toISOString(),
+      latestStoredEodDate,
+      expectedLatestTradingDate: latestStoredEodDate,
+      counts,
+      coverage,
+      topBlockers: [],
+      warnings: ['Crypto universe health reports price coverage only; equity-style readiness blockers (ISIN, sector, delivery) are not applicable.'],
+      trustStatus: this.universeTrustStatus(counts, coverage),
+      trustReasons: this.universeTrustReasons(counts, coverage),
     } as Omit<MarketDataUniverseHealth, 'universeSignoff'>;
     return {
       ...healthWithoutSignoff,
@@ -1855,7 +2020,9 @@ export class MarketDataFoundationService {
       listingDate: baselineByStockId.get(stock.id)?.listingDate ?? null,
       listingDateStatus: baselineByStockId.get(stock.id)?.listingDateStatus ?? 'MISSING_USED_15_YEAR_TARGET',
       providerFallbackState: baselineByStockId.get(stock.id)?.providerFallbackState ?? 'PROVIDER_SUPPORTED',
-      primarySourceAttempted: baselineByStockId.get(stock.id)?.primarySourceAttempted ?? 'NSE_BSE_EXCHANGE_EOD',
+      // Report a region-correct source label for the default case (non-IN = Yahoo, not NSE/BSE).
+      primarySourceAttempted: baselineByStockId.get(stock.id)?.primarySourceAttempted
+        ?? ((stock.region && stock.region !== 'IN') ? 'YAHOO_EOD' : 'NSE_BSE_EXCHANGE_EOD'),
       fallbackSourcesAttempted: baselineByStockId.get(stock.id)?.fallbackSourcesAttempted ?? [],
       sourceFallbackReason: baselineByStockId.get(stock.id)?.sourceFallbackReason ?? null,
       contextGaps,
@@ -3714,6 +3881,20 @@ export class MarketDataFoundationService {
       derivativesEligible: options.derivativesEligible,
       search: options.search,
     };
+    // Crypto scope → isolated crypto_assets plane (mapped to the same V1Instrument shape).
+    if (isCryptoScope(requestOptions)) {
+      const pageSize = requestOptions.pageSize;
+      const page = requestOptions.page;
+      const search = requestOptions.search;
+      const [assets, total] = await Promise.all([
+        this.cryptoRepository.listAssets({ activeOnly: true, search, limit: pageSize, offset: (page - 1) * pageSize }),
+        this.cryptoRepository.countAssets({ activeOnly: true, search }),
+      ]);
+      return {
+        instruments: assets.map((asset) => this.toV1Instrument(asset)),
+        pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) },
+      };
+    }
     const result = await this.list(requestOptions);
     const { readinessBySymbol, statsBySymbol } = await this.universeReadinessAndStatsForStocks(result.stocks, requestOptions);
     const baselineByStockId = await this.trustedBaselineByStockId(result.stocks, readinessBySymbol, statsBySymbol, requestOptions);
@@ -3729,6 +3910,12 @@ export class MarketDataFoundationService {
   }
 
   async getInstrument(id: string, options: Pick<PaginationOptions, 'region' | 'assetType'> = {}) {
+    // Crypto scope → isolated crypto_assets plane (mapped to the same V1Instrument shape).
+    if (isCryptoScope(options)) {
+      const asset = await this.cryptoRepository.getAssetById(id);
+      if (!asset) return null;
+      return this.toV1Instrument(asset);
+    }
     const stock = await this.repository.findStockByIdInScope(id, options);
     if (!stock) return null;
     const { readinessBySymbol, statsBySymbol } = await this.universeReadinessAndStatsForStocks([stock], options);
@@ -4169,6 +4356,10 @@ export class MarketDataFoundationService {
   }
 
   async listPricesByInstrumentId(instrumentId: string, limit = 250, startDate?: Date, endDate?: Date, options: Pick<PaginationOptions, 'region' | 'assetType'> = {}) {
+    // Crypto scope → crypto_price_ticks (same prices response shape; no delivery%).
+    if (isCryptoScope(options)) {
+      return this.listCryptoPricesByInstrumentId(instrumentId, limit);
+    }
     const stock = await this.repository.findStockByIdInScope(instrumentId, options);
     if (!stock) {
       return null;
@@ -4240,6 +4431,27 @@ export class MarketDataFoundationService {
   }
 
   async latestPriceByInstrumentId(instrumentId: string, options: Pick<PaginationOptions, 'region' | 'assetType'> = {}) {
+    if (isCryptoScope(options)) {
+      const asset = await this.cryptoRepository.getAssetById(instrumentId);
+      if (!asset) return null;
+      const latest = await this.cryptoRepository.prisma.cryptoLatestPrice.findUnique({ where: { symbol: asset.symbol } });
+      if (!latest) {
+        return { instrument_id: asset.id, symbol: asset.symbol, latest: null, data_status: 'PARTIAL' };
+      }
+      return {
+        instrument_id: asset.id,
+        symbol: asset.symbol,
+        latest: {
+          date: latest.timestamp,
+          close: Number(latest.price),
+          adjusted_close: Number(latest.price),
+          source: 'BINANCE_KLINES',
+          data_status: 'COMPLETE',
+        },
+        source: 'BINANCE_KLINES',
+        data_status: 'COMPLETE',
+      };
+    }
     const stock = await this.repository.findStockByIdInScope(instrumentId, options);
     if (!stock) {
       return null;
@@ -4279,6 +4491,19 @@ export class MarketDataFoundationService {
   }
 
   async fundamentalsByInstrumentId(instrumentId: string, options: Pick<PaginationOptions, 'region' | 'assetType'> = {}) {
+    // Crypto has no fundamentals — return an honest empty, not-applicable payload
+    // (the UI hides the fundamentals tab for crypto via capability flags).
+    if (isCryptoScope(options)) {
+      const asset = await this.cryptoRepository.getAssetById(instrumentId);
+      if (!asset) return null;
+      return {
+        instrument_id: asset.id,
+        symbol: asset.symbol,
+        records: [],
+        not_applicable: true,
+        not_applicable_reason: 'Fundamentals are not applicable to crypto assets.',
+      };
+    }
     const stock = await this.repository.findStockByIdInScope(instrumentId, options);
     if (!stock) {
       return null;
@@ -4710,6 +4935,18 @@ export class MarketDataFoundationService {
   }
 
   async corporateActionsByInstrumentId(instrumentId: string, options: Pick<PaginationOptions, 'region' | 'assetType'> = {}) {
+    // Crypto has no dividends/splits — honest empty, not-applicable payload.
+    if (isCryptoScope(options)) {
+      const asset = await this.cryptoRepository.getAssetById(instrumentId);
+      if (!asset) return null;
+      return {
+        instrument_id: asset.id,
+        symbol: asset.symbol,
+        actions: [],
+        not_applicable: true,
+        not_applicable_reason: 'Dividends and splits are not applicable to crypto assets.',
+      };
+    }
     const stock = await this.repository.findStockByIdInScope(instrumentId, options);
     if (!stock) {
       return null;
@@ -7877,6 +8114,78 @@ export class MarketDataFoundationService {
       };
     }
 
+    // US/EU FREE region provider path (Yahoo EOD via the provider-registry).
+    // Mirrors the NSE exchange-file branch shape so downstream DQ/pipeline
+    // catch-up consumes a byte-compatible ScheduledRegionSyncSummary.
+    if (this.shouldUseRegionProviderImportPath(region, assetType)) {
+      const summary: ScheduledRegionSyncSummary = {
+        region,
+        assetType,
+        tradingDate,
+        dataThroughDate: targetTradingDate,
+        instrumentsProcessed: 0,
+        rowsReceived: 0,
+        rowsInserted: 0,
+        rowsUpdated: 0,
+        rowsSkipped: 0,
+        rowsNoOp: 0,
+        changedInstrumentIds: [],
+        downstreamInstrumentIds: [],
+        changedInstrumentCount: 0,
+        dqStageEligible: false,
+        warningCount: 0,
+        warnings: [],
+        errors: [],
+      };
+      await this.repository.upsertSyncState({ region, assetType, tradingDate, status: 'PENDING', summary, lastCheckedAt: now });
+
+      const tasks = await this.repository.listActiveStockSyncTasks({ region, assetType }, batchSize);
+      const symbols = tasks.map((task) => task.symbol).filter(Boolean);
+      // Small forward lookback so a single tick captures the latest completed candle
+      // plus a few prior days (covers weekends/holidays); full history is seeded offline.
+      const lookbackDays = Math.max(5, (options.lookbackTradingDays ?? 2) + 5);
+      const backfill = await usEquityIngestionService.backfillPrices({ symbols, lookbackDays });
+
+      const changedInstrumentIds = this.instrumentIdsForImportedSymbols(tasks, backfill.changedSymbols);
+      const downstreamInstrumentIds = changedInstrumentIds.length > 0
+        ? changedInstrumentIds
+        : this.instrumentIdsForImportedSymbols(tasks, symbols);
+
+      summary.instrumentsProcessed = backfill.symbolsProcessed;
+      summary.rowsReceived = backfill.barsReceived;
+      summary.rowsInserted = backfill.barsInserted;
+      summary.rowsUpdated = backfill.barsUpdated;
+      summary.rowsSkipped = backfill.barsSkipped;
+      summary.rowsNoOp = 0;
+      summary.warningCount = backfill.warnings.length;
+      summary.warnings = backfill.warnings.slice(0, 10);
+      summary.changedInstrumentIds = changedInstrumentIds;
+      summary.downstreamInstrumentIds = downstreamInstrumentIds;
+      summary.downstreamEligibilitySource = changedInstrumentIds.length > 0 ? 'region_provider_backfill' : null;
+      summary.changedInstrumentCount = changedInstrumentIds.length;
+      summary.dqStageEligible = changedInstrumentIds.length > 0;
+      summary.sourceFingerprint = this.scheduledRegionSourceFingerprint({
+        region,
+        assetType,
+        dataThroughDate: targetTradingDate,
+        rowsInserted: backfill.barsInserted,
+        rowsUpdated: backfill.barsUpdated,
+        changedInstrumentIds,
+        downstreamInstrumentIds,
+      });
+
+      if (backfill.changedSymbols.length > 0) {
+        await this.updateStockLoadTimestampsForSymbols(backfill.changedSymbols);
+      }
+
+      await this.repository.upsertSyncState({ region, assetType, tradingDate, status: 'SYNCED', summary, lastCheckedAt: now, lastProviderFetchAt: now });
+      return {
+        ...summary,
+        warnings: summary.warnings.slice(0, 10),
+        errors: summary.errors.slice(0, 10),
+      };
+    }
+
     const repositoryAny = this.repository as any;
     const canListStaleTasks = typeof repositoryAny.listStaleActiveStockSyncTasks === 'function';
     const officialBulkEnabled = this.officialNseEodBulkEnabled();
@@ -8210,6 +8519,18 @@ export class MarketDataFoundationService {
     return region === 'IN'
       && ['STOCK', 'INDEX'].includes(assetType)
       && typeof repository.upsertSourceFileImport === 'function'
+      && typeof repository.storeHistoricalBulk === 'function';
+  }
+
+  /**
+   * US/EU equities flow through the FREE region provider (Yahoo EOD) when that
+   * region's provider is enabled.  IN stays on the exchange-file path above and
+   * GLOBAL (crypto) is served by its own isolated lane, so neither is affected.
+   */
+  private shouldUseRegionProviderImportPath(region: string, assetType: string): boolean {
+    const repository = this.repository as any;
+    return assetType === 'STOCK'
+      && regionUsesRegionProviderPath(region)
       && typeof repository.storeHistoricalBulk === 'function';
   }
 
@@ -13955,7 +14276,10 @@ export class MarketDataFoundationService {
       required_history_status: trustedBaseline?.requiredHistoryStatus,
       listing_date_status: trustedBaseline?.listingDateStatus,
       provider_fallback_state: trustedBaseline?.providerFallbackState,
-      primary_source_attempted: trustedBaseline?.primarySourceAttempted,
+      // Report a region-correct source label: non-IN instruments are fetched via Yahoo,
+      // not the NSE/BSE exchange file path; the fallback label avoids misleading operators.
+      primary_source_attempted: trustedBaseline?.primarySourceAttempted
+        ?? ((stock.region && stock.region !== 'IN') ? 'YAHOO_EOD' : 'NSE_BSE_EXCHANGE_EOD'),
       fallback_sources_attempted: trustedBaseline?.fallbackSourcesAttempted,
       source_fallback_reason: trustedBaseline?.sourceFallbackReason ?? null,
       is_active: stock.isActive ?? true,
@@ -15144,7 +15468,9 @@ export class MarketDataFoundationService {
     const limit = Math.max(1, Math.min(options.limit ?? 30, 100));
     const snapKey = scanType === '52w-high' ? '52W_HIGH' : '52W_LOW';
 
-    const snap = await this.readLatestScanSnapshot(snapKey, null, scope.region, scope.assetType);
+    const snap = isCryptoScope(options)
+      ? await this.cryptoRepository.readLatestScan(snapKey)
+      : await this.readLatestScanSnapshot(snapKey, null, scope.region, scope.assetType);
     if (!snap) {
       return {
         scanType,
@@ -15155,7 +15481,21 @@ export class MarketDataFoundationService {
         warnings: [`No 52w-${scanType === '52w-high' ? 'high' : 'low'} snapshot found for ${scope.region}/${scope.assetType}. Run MARKET_SCAN_REFRESH to populate.`],
       };
     }
-    const results = snap.rows.slice(0, limit) as unknown as MarketScanRow52w[];
+    const scan52wCurrency = resolveMarketProfile(scope).currency;
+    // SPAC/shell filter: for non-IN regions, exclude obvious non-common-stock shells that
+    // get stuck near $10 par (SPAC units, acquisition shells, warrants, rights).
+    // Conservative name-based heuristic — does not affect IN.
+    // Patterns: "Acquisition Corp", "- Unit(s)", "Warrants", "Rights", "Class A Ordinary Shares"
+    const SPAC_NAME_RE = /Acquisition\s+Corp|\bUnit(s)?\b|Warrant(s)?\b|Right(s)?\b|Class\s+[AB]\s+Ordinary\s+Shares/i;
+    const rawRows52w = snap.rows as unknown as MarketScanRow52w[];
+    const filteredRows = scope.region !== 'IN'
+      ? rawRows52w.filter((r) => !SPAC_NAME_RE.test(r.companyName ?? ''))
+      : rawRows52w;
+    const results = filteredRows.slice(0, limit).map((r) => ({
+      ...r,
+      currency: (r as any).currency || scan52wCurrency,
+      region: (r as any).region || scope.region,
+    }));
     return {
       scanType,
       scope,
@@ -15180,6 +15520,17 @@ export class MarketDataFoundationService {
     const minSpikeRatio = Math.max(1.1, Math.min(options.minSpikeRatio ?? 1.5, 10));
     const limit = Math.max(1, Math.min(options.limit ?? 30, 100));
 
+    // Delivery data is NSE-only — not applicable to crypto.
+    if (isCryptoScope(options)) {
+      return {
+        scanType: 'delivery-spike',
+        scope,
+        generatedAt: new Date().toISOString(),
+        minSpikeRatio,
+        results: [],
+        warnings: ['Delivery% is not applicable to crypto assets.'],
+      };
+    }
     const snap = await this.readLatestScanSnapshot('DELIVERY_SPIKE', null, scope.region, scope.assetType);
     if (!snap) {
       return {
@@ -15191,7 +15542,13 @@ export class MarketDataFoundationService {
         warnings: [`No delivery-spike snapshot found for ${scope.region}/${scope.assetType}. Run MARKET_SCAN_REFRESH to populate.`],
       };
     }
-    const results = snap.rows.slice(0, limit) as unknown as MarketScanRowDeliverySpike[];
+    const deliveryScopeCurrency = resolveMarketProfile(scope).currency;
+    const results = (snap.rows.slice(0, limit) as unknown as MarketScanRowDeliverySpike[])
+      .map((r) => ({
+        ...r,
+        currency: (r as any).currency || deliveryScopeCurrency,
+        region: (r as any).region || scope.region,
+      }));
     return {
       scanType: 'delivery-spike',
       scope,
@@ -15216,7 +15573,9 @@ export class MarketDataFoundationService {
     const minSpikeRatio = Math.max(1.1, Math.min(options.minSpikeRatio ?? 2.0, 20));
     const limit = Math.max(1, Math.min(options.limit ?? 30, 100));
 
-    const snap = await this.readLatestScanSnapshot('VOLUME_SPIKE', null, scope.region, scope.assetType);
+    const snap = isCryptoScope(options)
+      ? await this.cryptoRepository.readLatestScan('VOLUME_SPIKE')
+      : await this.readLatestScanSnapshot('VOLUME_SPIKE', null, scope.region, scope.assetType);
     if (!snap) {
       return {
         scanType: 'volume-spike',
@@ -15227,7 +15586,13 @@ export class MarketDataFoundationService {
         warnings: [`No volume-spike snapshot found for ${scope.region}/${scope.assetType}. Run MARKET_SCAN_REFRESH to populate.`],
       };
     }
-    const results = snap.rows.slice(0, limit) as unknown as MarketScanRowVolumeSpike[];
+    const volumeScopeCurrency = resolveMarketProfile(scope).currency;
+    const results = (snap.rows.slice(0, limit) as unknown as MarketScanRowVolumeSpike[])
+      .map((r) => ({
+        ...r,
+        currency: (r as any).currency || volumeScopeCurrency,
+        region: (r as any).region || scope.region,
+      }));
     return {
       scanType: 'volume-spike',
       scope,
@@ -15243,6 +15608,8 @@ export class MarketDataFoundationService {
   // ---------------------------------------------------------------------------
 
   async screener(options: {
+    region?: string;
+    assetType?: string;
     signalDirection?: string;
     minScore?: number;
     minRsPercentile?: number;
@@ -15268,16 +15635,33 @@ export class MarketDataFoundationService {
       deliveryPct: number | null;
       range52wPositionPct: number | null;
       inFnoBan: boolean;
+      currency: string;
+      region?: string;
     }>;
     warnings: string[];
   }> {
+    // The equity screener (delivery%, cap band, F&O ban) is not applicable to crypto.
+    // Crypto discovery lives on the Signals screener; return empty rather than leak equity rows.
+    if (isCryptoScope(options)) {
+      return {
+        generatedAt: new Date().toISOString(),
+        count: 0,
+        results: [],
+        warnings: ['Screener is equity-only. Use the Signals screener for crypto.'],
+      };
+    }
+    const screenerScope = {
+      region: options.region?.trim().toUpperCase() || 'IN',
+      assetType: options.assetType?.trim().toUpperCase() || 'STOCK',
+    };
+    const screenerCurrency = resolveMarketProfile(screenerScope).currency;
     const rows = await this.repository.screener(options);
 
     // Compute rs percentile in-memory from the score distribution in the result set
     const scores = rows.map((r) => r.signalScore ?? 0);
     const n = scores.length;
     const withRs = rows.map((r) => {
-      if (n < 2) return { ...r, rsPercentile: null };
+      if (n < 2) return { ...r, rsPercentile: null, currency: screenerCurrency, region: screenerScope.region };
       const score = r.signalScore ?? 0;
       const sortedScores = [...scores].sort((a, b) => a - b);
       let lo = 0, hi = sortedScores.length;
@@ -15285,7 +15669,7 @@ export class MarketDataFoundationService {
         const mid = (lo + hi) >> 1;
         if (sortedScores[mid] < score) lo = mid + 1; else hi = mid;
       }
-      return { ...r, rsPercentile: Math.round((lo / (n - 1)) * 100) };
+      return { ...r, rsPercentile: Math.round((lo / (n - 1)) * 100), currency: screenerCurrency, region: screenerScope.region };
     });
 
     // Apply minRsPercentile post-query filter

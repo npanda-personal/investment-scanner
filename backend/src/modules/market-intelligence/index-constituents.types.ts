@@ -6,7 +6,7 @@
  * No weight data — omitted (not reliably free/persisted).
  */
 
-export type SupportedIndex = 'NIFTY_50' | 'NIFTY_BANK';
+export type SupportedIndex = 'NIFTY_50' | 'NIFTY_BANK' | 'SP500' | 'NDX100';
 
 export interface IndexConstituentRow {
   instrumentId: string | null; // null when symbol not found in catalog

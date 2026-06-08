@@ -3,7 +3,7 @@ import type { StrategyDefinition, StrategyTimeframe } from './strategy-framework
 export const STRATEGY_TIMEFRAMES: StrategyTimeframe[] = ['1Y', '3Y', '5Y', '10Y', '15Y'];
 
 const commonAssetTypes = ['STOCK'];
-const commonRegions = ['IN'];
+const commonRegions = ['IN', 'US'];
 /** Instruments eligible for F&O/derivatives — short-entry strategies are restricted to this set. */
 const derivativesEligibleOnly = ['STOCK'];  // gated at runtime by derivativesEligible flag on the decision
 

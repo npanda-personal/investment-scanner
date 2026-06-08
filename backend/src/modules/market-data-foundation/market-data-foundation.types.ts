@@ -233,6 +233,9 @@ export interface MarketMoverRow {
   actualLookbackDays?: number;
   historyBarsInWindow?: number;
   averageRecentTurnover?: number | null;
+  /** Populated by the service layer when building the response DTO (not stored in scan snapshot). */
+  currency?: string;
+  region?: string;
 }
 
 export interface MarketMoverRangeSummary {
@@ -262,6 +265,8 @@ export interface MarketMapTile {
   returnPercent: number | null;
   latestDate: string | null;
   priceBasis?: 'ADJUSTED_CLOSE' | 'CLOSE_FALLBACK';
+  currency: string;
+  region?: string;
 }
 
 export interface MarketMapGroup {
@@ -308,6 +313,8 @@ export interface MarketScanRow52w {
   priceBasis: 'ADJUSTED_CLOSE' | 'CLOSE_FALLBACK';
   signalDirection: 'BULLISH' | 'BEARISH' | 'NEUTRAL' | null;
   signalScore: number | null;
+  currency: string;
+  region?: string;
 }
 
 export interface MarketScanSummary52w {
@@ -331,6 +338,8 @@ export interface MarketScanRowDeliverySpike {
   lookbackBars: number;
   signalDirection: 'BULLISH' | 'BEARISH' | 'NEUTRAL' | null;
   signalScore: number | null;
+  currency: string;
+  region?: string;
 }
 
 export interface MarketScanSummaryDeliverySpike {
@@ -354,6 +363,8 @@ export interface MarketScanRowVolumeSpike {
   lookbackBars: number;
   signalDirection: 'BULLISH' | 'BEARISH' | 'NEUTRAL' | null;
   signalScore: number | null;
+  currency: string;
+  region?: string;
 }
 
 export interface MarketScanSummaryVolumeSpike {
@@ -563,7 +574,7 @@ export interface V1Instrument {
   required_history_status?: TrustedBaselineRequiredHistoryStatus;
   listing_date_status?: TrustedBaselineListingDateStatus;
   provider_fallback_state?: TrustedBaselineProviderFallbackState;
-  primary_source_attempted?: 'NSE_BSE_EXCHANGE_EOD' | 'YAHOO' | null;
+  primary_source_attempted?: 'NSE_BSE_EXCHANGE_EOD' | 'YAHOO' | 'YAHOO_EOD' | null;
   fallback_sources_attempted?: string[];
   source_fallback_reason?: string | null;
   is_active: boolean;
@@ -1036,7 +1047,7 @@ export interface TrustedReviewUniverseInstrument {
   listingDate: string | null;
   listingDateStatus: TrustedBaselineListingDateStatus;
   providerFallbackState: TrustedBaselineProviderFallbackState;
-  primarySourceAttempted: 'NSE_BSE_EXCHANGE_EOD' | 'YAHOO' | null;
+  primarySourceAttempted: 'NSE_BSE_EXCHANGE_EOD' | 'YAHOO' | 'YAHOO_EOD' | null;
   fallbackSourcesAttempted: string[];
   sourceFallbackReason: string | null;
   contextGaps: string[];

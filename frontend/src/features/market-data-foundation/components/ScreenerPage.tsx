@@ -26,7 +26,9 @@ import {
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import { PageHeader } from '@/shared/components';
-import { inr } from '@/shared/format/money';
+import { NotApplicableForAssetClass } from '@/shared/components/NotApplicableForAssetClass';
+import { useMarketScope } from '@/contexts/MarketScopeContext';
+import { compactByProfile, money } from '@/shared/format/money';
 import type { ScreenerFilters, ScreenerRow, ScreenerCapBand, ScreenerSignalDirection } from '../types';
 import { fetchScreener } from '../api/screenerService';
 
@@ -116,6 +118,11 @@ const DEFAULT_FILTERS: ScreenerFilters = {
 // ---------------------------------------------------------------------------
 
 export default function ScreenerPage() {
+  const { profile, scope } = useMarketScope();
+  // India-only NSE/BSE features (delivery %, F&O ban) — gate by capability.
+  const hasDelivery = profile.capabilities.hasDelivery;
+  const universeLabel = scope.region === 'IN' ? 'NSE/BSE' : scope.region === 'US' ? 'US' : scope.region === 'EU' ? 'EU' : 'global';
+  const screenerSubtitle = `Filter the ${universeLabel} universe by signal, sector, cap-band,${hasDelivery ? ' delivery,' : ''} and 52-week position.`;
   const [filters, setFilters] = useState<ScreenerFilters>(DEFAULT_FILTERS);
   const [rows, setRows] = useState<ScreenerRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -166,11 +173,26 @@ export default function ScreenerPage() {
     });
   };
 
+  if (profile.isCrypto) {
+    return (
+      <Box sx={{ p: 3 }}>
+        <PageHeader
+          title="Stock Screener"
+          subtitle={screenerSubtitle}
+        />
+        <NotApplicableForAssetClass
+          feature="Screener"
+          detail="Crypto coverage in this release is available on Signals, Market Scans, and the Instrument workspace. This view will support crypto in a later update."
+        />
+      </Box>
+    );
+  }
+
   return (
     <Box sx={{ p: 3 }}>
       <PageHeader
         title="Stock Screener"
-        subtitle="Filter the NSE/BSE universe by signal, sector, cap-band, delivery, and 52-week position."
+        subtitle={screenerSubtitle}
       />
 
       {/* Filter Bar */}
@@ -229,9 +251,9 @@ export default function ScreenerPage() {
                 }}
               >
                 <MenuItem value="">Any</MenuItem>
-                <MenuItem value="LARGE">Large Cap (&gt; ₹20,000 Cr)</MenuItem>
-                <MenuItem value="MID">Mid Cap (₹5,000–20,000 Cr)</MenuItem>
-                <MenuItem value="SMALL">Small Cap (&lt; ₹5,000 Cr)</MenuItem>
+                <MenuItem value="LARGE">{`Large Cap (> ${compactByProfile(2e11, profile)})`}</MenuItem>
+                <MenuItem value="MID">{`Mid Cap (${compactByProfile(5e10, profile)}–${compactByProfile(2e11, profile)})`}</MenuItem>
+                <MenuItem value="SMALL">{`Small Cap (< ${compactByProfile(5e10, profile)})`}</MenuItem>
               </Select>
             </FormControl>
           </Grid>
@@ -270,7 +292,8 @@ export default function ScreenerPage() {
             />
           </Grid>
 
-          {/* Min Delivery % */}
+          {/* Min Delivery % (India-only NSE/BSE delivery data) */}
+          {hasDelivery && (
           <Grid item xs={12} sm={6} md={3}>
             <Box>
               <Typography variant="caption" color="text.secondary" gutterBottom>
@@ -291,6 +314,7 @@ export default function ScreenerPage() {
               />
             </Box>
           </Grid>
+          )}
 
           {/* Min 52w Position % */}
           <Grid item xs={12} sm={6} md={3}>
@@ -317,6 +341,7 @@ export default function ScreenerPage() {
           {/* Exclude F&O Ban + Limit */}
           <Grid item xs={12} sm={6} md={3}>
             <Stack spacing={1}>
+              {hasDelivery && (
               <FormControlLabel
                 control={
                   <Checkbox
@@ -330,6 +355,7 @@ export default function ScreenerPage() {
                 }
                 label={<Typography variant="body2">Exclude F&amp;O Ban</Typography>}
               />
+              )}
               <TextField
                 size="small"
                 label="Limit"
@@ -383,9 +409,9 @@ export default function ScreenerPage() {
                 <TableCell align="right">RS %ile</TableCell>
                 <TableCell>Sector</TableCell>
                 <TableCell>Cap Band</TableCell>
-                <TableCell align="right">Delivery %</TableCell>
+                {hasDelivery && <TableCell align="right">Delivery %</TableCell>}
                 <TableCell align="right">52W Pos %</TableCell>
-                <TableCell>F&O Ban</TableCell>
+                {hasDelivery && <TableCell>F&O Ban</TableCell>}
               </TableRow>
             </TableHead>
             <TableBody>
@@ -403,7 +429,7 @@ export default function ScreenerPage() {
                   </TableCell>
                   <TableCell align="right">
                     <Typography variant="body2" fontWeight={600}>
-                      {row.price != null ? inr(row.price) : '—'}
+                      {row.price != null ? money(row.price, profile.currency) : '—'}
                     </Typography>
                   </TableCell>
                   <TableCell>
@@ -424,18 +450,22 @@ export default function ScreenerPage() {
                   <TableCell>
                     <CapBandChip capBand={row.capBand} />
                   </TableCell>
+                  {hasDelivery && (
                   <TableCell align="right">
                     <NullableNum value={row.deliveryPct} suffix="%" />
                   </TableCell>
+                  )}
                   <TableCell align="right">
                     <NullableNum value={row.range52wPositionPct} suffix="%" />
                   </TableCell>
+                  {hasDelivery && (
                   <TableCell>
                     {row.inFnoBan
                       ? <Chip label="Banned" size="small" color="warning" sx={{ fontSize: '0.65rem' }} />
                       : <Typography variant="body2" color="text.disabled">—</Typography>
                     }
                   </TableCell>
+                  )}
                 </TableRow>
               ))}
             </TableBody>

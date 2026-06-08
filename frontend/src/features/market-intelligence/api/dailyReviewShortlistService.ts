@@ -238,8 +238,13 @@ async function loadSources(scope: MarketScope): Promise<SourceBundle> {
 }
 
 async function fetchReviewReadiness(scope: MarketScope): Promise<DailyReviewShortlistReviewReadiness> {
+  // review-readiness-summary runs a heavy live universe-health computation that can take
+  // many seconds (or effectively hang) on large catalogs. Cap it with a timeout so a slow
+  // readiness source degrades gracefully (allSettled → null) instead of freezing the whole
+  // shortlist — the core review rows come from Today Review / Stock Interest / Active Ledger.
   const response = await axios.get<ReviewReadinessResponse>('/api/v1/market-data/review-readiness-summary', {
     params: { region: scope.region, assetType: scope.assetType },
+    timeout: 6000,
   });
   const body = response.data;
 

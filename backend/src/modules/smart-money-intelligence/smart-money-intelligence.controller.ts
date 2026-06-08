@@ -2,6 +2,8 @@ import type { Request, Response } from 'express';
 import { SmartMoneyIntelligenceService } from './smart-money-intelligence.service';
 import { getParam, parseLimit, parseOffset, parseOptionalText, parseRange } from './smart-money-intelligence.validation';
 import { getLatestFnoBanList, ingestFnoBanList } from './fno-ban.service';
+import { resolveMarketProfile } from '../../shared/utils/market-profile';
+import { notApplicablePayload } from '../../shared/utils/not-applicable';
 
 export class SmartMoneyIntelligenceController {
   constructor(private readonly service = new SmartMoneyIntelligenceService()) {}
@@ -49,7 +51,17 @@ export class SmartMoneyIntelligenceController {
 
   health = async (_req: Request, res: Response) => this.respond(res, () => this.service.health());
 
-  fnoBanList = async (_req: Request, res: Response) => this.respond(res, () => getLatestFnoBanList());
+  fnoBanList = async (req: Request, res: Response) => {
+    const region = parseOptionalText(req.query.region) || 'IN';
+    const profile = resolveMarketProfile({ region, assetType: parseOptionalText(req.query.assetType) });
+    if (!profile.capabilities.hasInstitutionalFlow) {
+      return this.respond(res, () => notApplicablePayload(
+        `F&O ban list is not applicable to ${region} equities (NSE-sourced, India only).`,
+        { symbols: [], count: 0 },
+      ));
+    }
+    return this.respond(res, () => getLatestFnoBanList());
+  };
 
   fnoBanIngest = async (_req: Request, res: Response) => this.respond(res, () => ingestFnoBanList());
 

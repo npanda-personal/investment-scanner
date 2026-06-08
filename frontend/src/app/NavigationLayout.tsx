@@ -33,6 +33,7 @@ import { MarketScopeSelector } from '@/shared/components/MarketScopeSelector';
 import { getNavGroupsForPathname, isNavItemActive, resolveNavItem } from './navigationMetadata';
 import { fetchAlertEvents } from '@/features/alerts-monitoring';
 import { fetchCapitalPosture } from '@/features/market-context-intelligence';
+import { useMarketScope } from '@/contexts/MarketScopeContext';
 
 const drawerWidth = 260;
 const collapsedWidth = 72;
@@ -87,6 +88,7 @@ export default function NavigationLayout() {
   const location = useLocation();
   const unreadAlerts = useUnreadAlertCount();
   const capitalPosture = useCapitalPosture();
+  const { profile, scope } = useMarketScope();
 
   const handleDrawerToggle = () => setOpen(!open);
   const activeLabel = resolveNavItem(location.pathname)?.label || 'Investment Scanner';
@@ -163,7 +165,7 @@ export default function NavigationLayout() {
             <Typography variant="h6" noWrap sx={{ fontWeight: 700 }}>{activeLabel}</Typography>
           </Stack>
           <Stack direction="row" alignItems="center" spacing={1.5}>
-            {capitalPosture && (
+            {!profile.isCrypto && capitalPosture && (
               <Tooltip title={capitalPosture.band ? `Suggested exposure: ${capitalPosture.band}` : 'Capital posture is based on persisted market context snapshots.'} arrow>
                 <Chip
                   label={capitalPosture.label}
@@ -194,7 +196,11 @@ export default function NavigationLayout() {
       </Drawer>
       <Box component="main" sx={{ flexGrow: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
         <Toolbar />
-        <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+        {/* Key on market scope so switching region/asset-class REMOUNTS the active
+            page — re-firing its data fetches with the new scope. Without this,
+            pages that fetch on mount/filters (not on scope) keep showing the
+            previous market's data, just re-formatted with the new currency. */}
+        <Box key={`${scope.region}-${scope.assetType}`} sx={{ flexGrow: 1, minWidth: 0 }}>
           <Outlet />
         </Box>
       </Box>

@@ -550,7 +550,8 @@ describe('Nifty 50 real benchmark (Fix 4)', () => {
 
     const { benchmarkComparison } = result.metrics;
     expect(benchmarkComparison?.benchmarkDataStatus).toBe('NSE_NIFTY_50');
-    expect(benchmarkComparison?.benchmarkName).toBe('NIFTY 50 (^NSEI)');
+    // Region-aware benchmark label now sourced from the market profile (region absent → IN default).
+    expect(benchmarkComparison?.benchmarkName).toBe('Nifty 50 (^NSEI)');
     expect(benchmarkComparison?.benchmarkTotalReturn).not.toBeNull();
     expect(Number.isFinite(benchmarkComparison?.benchmarkTotalReturn)).toBe(true);
   });
@@ -638,13 +639,15 @@ describe('Nifty 50 real benchmark (Fix 4)', () => {
     expect(Number.isFinite(benchmarkComparison?.benchmarkTotalReturn)).toBe(true);
   });
 
-  it('does not use index for non-IN regions (returns equal-weight fallback)', async () => {
+  it('uses the region benchmark (^GSPC / S&P 500) for US when the index series is present', async () => {
     const indexTicks = makeIndexTicks('2020-01-01', 520, 1);
     const service = createServiceWithIndex(indexTicks);
 
     const result = await service.simulate({ ...baseConfig, region: 'US' });
 
-    // For non-IN region, nifty50Bars is [] → falls through to equal-weight
-    expect(result.metrics.benchmarkComparison?.benchmarkDataStatus).toBe('FALLBACK_EQUAL_WEIGHT');
+    // Region-aware benchmark: US resolves to ^GSPC (S&P 500) and uses it when bars are present
+    // (in production, falls back to equal-weight only when ^GSPC history is unavailable).
+    expect(result.metrics.benchmarkComparison?.benchmarkName).toBe('S&P 500 (^GSPC)');
+    expect(result.metrics.benchmarkComparison?.benchmarkDataStatus).not.toBe('FALLBACK_EQUAL_WEIGHT');
   });
 });

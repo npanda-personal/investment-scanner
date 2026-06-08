@@ -375,6 +375,7 @@ export class StrategyDecisionEngineService {
     options: {
       portfolioId?: string;
       region?: string;
+      assetType?: string;
       marketSummary?: any;
       rawSignal?: SignalResultDto;
       instrument?: any;
@@ -427,6 +428,7 @@ export class StrategyDecisionEngineService {
     options: {
       portfolioId?: string;
       region?: string;
+      assetType?: string;
       marketSummary?: any;
       rawSignal?: SignalResultDto;
       instrument?: any;
@@ -438,8 +440,8 @@ export class StrategyDecisionEngineService {
     } = {}
   ): Promise<any | null> {
     const [instrument, pricesRes, rawSignal, calibrated, quality, smartMoney, marketSummary, portfolio] = await Promise.all([
-      options.instrument ? Promise.resolve(options.instrument) : this.marketDataService.getInstrument(instrumentId, { region: options.region }).catch(() => null),
-      options.prices !== undefined ? Promise.resolve({ prices: options.prices }) : this.marketDataService.listPricesByInstrumentId(instrumentId, 500, undefined, undefined, { region: options.region }).catch(() => ({ prices: [] })),
+      options.instrument ? Promise.resolve(options.instrument) : this.marketDataService.getInstrument(instrumentId, { region: options.region, assetType: options.assetType }).catch(() => null),
+      options.prices !== undefined ? Promise.resolve({ prices: options.prices }) : this.marketDataService.listPricesByInstrumentId(instrumentId, 500, undefined, undefined, { region: options.region, assetType: options.assetType }).catch(() => ({ prices: [] })),
       options.rawSignal ? Promise.resolve(options.rawSignal) : this.signalService.latestForInstrument(instrumentId).catch(() => null),
       options.calibrated !== undefined ? Promise.resolve(options.calibrated) : this.latestPersistedCalibration(instrumentId),
       options.quality !== undefined ? Promise.resolve(options.quality) : this.latestPersistedDataQuality(instrumentId),

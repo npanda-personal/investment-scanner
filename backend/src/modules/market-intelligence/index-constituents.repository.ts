@@ -14,6 +14,7 @@ const EXCHANGE_PRICE_SOURCES = [
   'BSE_CM_BHAVCOPY',
   'BSE_CM_BACKUP_BHAVCOPY',
   'BSE_UDIFF_CM_BHAVCOPY',
+  'YAHOO_EOD', // US/EU exchange EOD (Yahoo provider) — needed for non-IN index constituents
 ];
 
 /**
@@ -23,16 +24,18 @@ const EXCHANGE_PRICE_SOURCES = [
 export class IndexConstituentsRepository {
   constructor(private readonly db: PrismaClient = defaultPrisma) {}
 
-  async loadConstituents(symbols: readonly string[]): Promise<IndexConstituentRow[]> {
+  async loadConstituents(symbols: readonly string[], region: string = 'IN'): Promise<IndexConstituentRow[]> {
     if (symbols.length === 0) return [];
 
     const symbolList = [...symbols];
+    const normalizedRegion = String(region || 'IN').trim().toUpperCase() || 'IN';
 
-    // 1. Catalog: resolve symbol → id, name, sector, marketCap
+    // 1. Catalog: resolve symbol → id, name, sector, marketCap (region-scoped — the
+    // index belongs to a region, e.g. S&P 500 → US, Nifty 50 → IN).
     const stocks = await this.db.stock.findMany({
       where: {
         symbol: { in: symbolList },
-        region: 'IN',
+        region: normalizedRegion,
         isDelisted: false,
       },
       select: {
