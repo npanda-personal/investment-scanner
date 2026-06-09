@@ -23,10 +23,9 @@ function fmtDate(isoDate: string): string {
 }
 
 function dealLine(row: BulkBlockDealRow): string {
-  const icon = row.buySell === 'BUY' ? '🟢' : '🔴';
   const notional = row.qty * row.avgPrice;
   return (
-    `${icon} <b>${row.buySell}</b> | <b>${esc(row.symbol)}</b> | ${esc(row.clientName)}\n` +
+    `<b>${esc(row.symbol)}</b> | ${esc(row.clientName)}\n` +
     `    ${fmtQty(row.qty)} @ ₹${row.avgPrice.toFixed(2)} → <b>${fmtCrore(notional)}</b>`
   );
 }
