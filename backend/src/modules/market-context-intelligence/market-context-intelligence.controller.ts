@@ -4,6 +4,7 @@ import { MarketPulseSnapshotService } from './market-pulse-snapshot.service';
 import { CapitalPostureService } from './capital-posture.service';
 import { ingestFiiDii, getLatestFiiDiiActivity } from './fii-dii.service';
 import { ingestBulkBlockDeals, getLatestBulkBlockDeals } from './bulk-block-deals.service';
+import { sendBlockDealsAlert } from './block-deals-telegram';
 import { getInstitutionalActivity } from './institutional-activity.service';
 import { resolveMarketProfile } from '../../shared/utils/market-profile';
 import { notApplicablePayload } from '../../shared/utils/not-applicable';
@@ -160,8 +161,20 @@ export class MarketContextIntelligenceController {
     return this.respond(res, () => getLatestBulkBlockDeals(days));
   };
 
-  bulkBlockDealsIngest = async (_req: Request, res: Response) =>
-    this.respond(res, () => ingestBulkBlockDeals());
+  bulkBlockDealsIngest = async (_req: Request, res: Response) => {
+    try {
+      const result = await ingestBulkBlockDeals();
+      if (result.status === 'success' && result.rowsUpserted > 0) {
+        getLatestBulkBlockDeals(1)
+          .then((data) => sendBlockDealsAlert(data.rows))
+          .catch(() => {});
+      }
+      return res.json(result);
+    } catch (error) {
+      console.error('Market context endpoint error:', error);
+      return res.status(500).json({ error: 'Failed to load market context' });
+    }
+  };
 
   /**
    * CB-25: Institutional Activity Aggregate
