@@ -2,6 +2,7 @@ import { AlertsMonitoringService, type AlertEventDto } from '../alerts-monitorin
 import { AiInvestmentCopilotService, type CopilotSummaryResponse } from '../ai-investment-copilot';
 import { NotificationsDeliveryRepository } from './notifications-delivery.repository';
 import { createNotificationProvider } from './notifications-delivery.provider';
+import { TelegramProvider, type TelegramStatus } from './telegram.provider';
 import type {
   DeliveryRequest,
   NotificationEventDto,
@@ -17,7 +18,8 @@ export class NotificationsDeliveryService {
     private readonly repository = new NotificationsDeliveryRepository(),
     private readonly provider: NotificationProvider = createNotificationProvider(),
     private readonly alertsService = new AlertsMonitoringService(),
-    private readonly copilotService = new AiInvestmentCopilotService()
+    private readonly copilotService = new AiInvestmentCopilotService(),
+    private readonly telegram = new TelegramProvider()
   ) {}
 
   async preferences(userId: string): Promise<NotificationPreferenceDto> {
@@ -36,6 +38,28 @@ export class NotificationsDeliveryService {
 
   providerStatus(): NotificationProviderStatus {
     return this.provider.status();
+  }
+
+  telegramStatus(): TelegramStatus {
+    return this.telegram.status();
+  }
+
+  async sendTestTelegram(): Promise<{ status: 'SENT' | 'FAILED'; messageId?: number; error?: string }> {
+    if (!this.telegram.isConfigured()) {
+      return { status: 'FAILED', error: this.telegram.status().message };
+    }
+    try {
+      const result = await this.telegram.sendMessage(
+        '<b>📊 Investment Scanner</b>\n\nTest notification — your Telegram alerts are working!'
+      );
+      return { status: 'SENT', messageId: result.messageId };
+    } catch (error: any) {
+      return { status: 'FAILED', error: error?.message };
+    }
+  }
+
+  async discoverTelegramChatId(): Promise<{ chatId: string; username: string | null; firstName: string | null } | null> {
+    return this.telegram.discoverChatId();
   }
 
   async sendTestEmail(userId: string): Promise<NotificationEventDto> {
@@ -177,6 +201,38 @@ export class NotificationsDeliveryService {
         payload: input.payload,
         status: 'FAILED',
         error: error?.message || 'Notification delivery failed',
+      });
+    } finally {
+      this.fireTelegramSideChannel(input).catch(() => {});
+    }
+  }
+
+  private async fireTelegramSideChannel(input: DeliveryRequest): Promise<void> {
+    if (!this.telegram.isConfigured()) return;
+    try {
+      const result = await this.telegram.sendMessage(this.telegram.formatMessage(input.title, input.message));
+      await this.repository.createEvent({
+        userId: input.userId,
+        type: input.type,
+        channel: 'TELEGRAM',
+        title: input.title,
+        message: input.message,
+        payload: { ...input.payload, messageId: result.messageId, chatId: String(result.chatId) },
+        status: 'SENT',
+        error: null,
+        sentAt: new Date(),
+      });
+    } catch (error: any) {
+      await this.repository.createEvent({
+        userId: input.userId,
+        type: input.type,
+        channel: 'TELEGRAM',
+        title: input.title,
+        message: input.message,
+        payload: input.payload,
+        status: 'FAILED',
+        error: error?.message || 'Telegram delivery failed',
+        sentAt: null,
       });
     }
   }

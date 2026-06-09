@@ -1,4 +1,4 @@
-export type NotificationChannel = 'IN_APP' | 'EMAIL_LOG' | 'SMTP_EMAIL';
+export type NotificationChannel = 'IN_APP' | 'EMAIL_LOG' | 'SMTP_EMAIL' | 'TELEGRAM';
 export type NotificationStatus = 'PENDING' | 'SENT' | 'FAILED' | 'SKIPPED';
 export type NotificationType = 'TEST_EMAIL' | 'ALERT_DIGEST' | 'DAILY_DIGEST' | 'WEEKLY_DIGEST';
 

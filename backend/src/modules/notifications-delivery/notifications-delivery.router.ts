@@ -16,6 +16,9 @@ export const createNotificationsDeliveryRouter = (
   router.post('/notifications/send-alert-digest', controller.sendAlertDigest);
   router.post('/notifications/send-daily-digest', controller.sendDailyDigest);
   router.post('/notifications/send-weekly-digest', controller.sendWeeklyDigest);
+  router.get('/notifications/telegram/status', controller.telegramStatus);
+  router.get('/notifications/telegram/setup', controller.telegramSetup);
+  router.post('/notifications/telegram/test', controller.testTelegram);
 
   return router;
 };
