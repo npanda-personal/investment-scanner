@@ -31,7 +31,6 @@ import { money, changeColor } from '@/shared/format/money';
 import {
   fetchCompounderRadarSnapshot,
   fetchEarningsIntelligenceSnapshot,
-  fetchInstrumentContextSnapshot,
   fetchMarketPulseSnapshot,
   fetchRiskRadarSnapshot,
   fetchSectorConstituents,
@@ -45,7 +44,6 @@ import { NotApplicableForAssetClass } from '@/shared/components/NotApplicableFor
 import type {
   CompounderSnapshot,
   EarningsIntelligenceSnapshot,
-  InstrumentContextSnapshot,
   MarketPulseSnapshot,
   RiskRadarSnapshot,
   SectorConstituentRow,
@@ -313,33 +311,36 @@ export function RiskRadarPage() {
 
 export function InstrumentWorkspaceLandingPage() {
   const navigate = useNavigate();
-  const view = useReadModelSnapshot(fetchInstrumentContextSnapshot);
 
   return (
-    <SnapshotPageShell
-      title="Instrument Workspace"
-      subtitle="Open a stock workspace and review backend-provided instrument context. Shared market-data production actions stay out of this trader workflow."
-      loading={view.loading}
-      error={view.error}
-      envelope={view.data}
-      missingTitle="Instrument Context backend not available yet."
-    >
-      <Paper variant="outlined" sx={{ p: 2 }}>
+    <Box className="page-container page-container--hub">
+      <PageHeader
+        title="Instrument Workspace"
+        subtitle="Open any NSE/BSE stock to study it in one place — price action, market regime, sector strength, smart-money context, and the latest research-support signal. Everything is read from persisted data; no data jobs run from here."
+      />
+      <Paper variant="outlined" sx={{ p: 2.5, maxWidth: 680 }}>
         <Stack spacing={1.5}>
-          <Typography variant="h6">Open Instrument</Typography>
+          <Typography variant="h6">Open a stock</Typography>
+          <Typography variant="body2" color="text.secondary">
+            Search the local catalog and pick a stock to open its workspace.
+          </Typography>
           <InstrumentSearchSelect
             value={null}
             onChange={(instrument: V1Instrument | null) => {
               if (instrument?.id) navigate(`/stocks/${instrument.id}`);
             }}
           />
-          <Typography variant="body2" color="text.secondary">
-            Search only opens existing local catalog entries. Shared data jobs stay outside this trader workflow.
-          </Typography>
+          <Typography variant="subtitle2" sx={{ pt: 1 }}>What the workspace shows once a stock is open</Typography>
+          <Stack component="ul" spacing={0.5} sx={{ m: 0, pl: 2.5 }}>
+            <Typography component="li" variant="body2" color="text.secondary">Market regime and breadth context for the current session.</Typography>
+            <Typography component="li" variant="body2" color="text.secondary">The stock&apos;s sector strength and rotation standing.</Typography>
+            <Typography component="li" variant="body2" color="text.secondary">Relative strength versus the benchmark.</Typography>
+            <Typography component="li" variant="body2" color="text.secondary">Smart-money accumulation / distribution read and F&amp;O ban status.</Typography>
+            <Typography component="li" variant="body2" color="text.secondary">The latest signal, shown as supporting evidence only — never an instruction.</Typography>
+          </Stack>
         </Stack>
       </Paper>
-      {view.data?.snapshot && <InstrumentContextRail snapshot={view.data.snapshot} />}
-    </SnapshotPageShell>
+    </Box>
   );
 }
 
@@ -1180,55 +1181,6 @@ function RiskTable({ rows }: { rows: RiskRadarSnapshot[] }) {
         row.freshness || 'Unavailable',
       ]}
     />
-  );
-}
-
-function InstrumentContextRail({ snapshot }: { snapshot: InstrumentContextSnapshot }) {
-  const { profile } = useMarketScope();
-  const regimeLabel = snapshot.marketRegime.absent
-    ? '—'
-    : `${snapshot.marketRegime.value?.regime ?? '—'} (${snapshot.marketRegime.value?.score ?? '—'})`;
-  const sectorLabel = snapshot.sectorStrength.absent
-    ? '—'
-    : `${snapshot.sectorStrength.value?.sector ?? '—'}: ${snapshot.sectorStrength.value?.classification ?? '—'}`;
-  const rsLabel = snapshot.relativeStrength.absent
-    ? '—'
-    : (() => {
-        const rs = snapshot.relativeStrength.value;
-        if (!rs) return '—';
-        if (rs.relativeReturn63d !== null && rs.relativeReturn63d !== undefined) {
-          const sign = rs.relativeReturn63d >= 0 ? '+' : '';
-          return `vs ${profile.benchmarkLabel} ${sign}${(rs.relativeReturn63d * 100).toFixed(1)}%`;
-        }
-        if (rs.stockReturn63d !== null && rs.stockReturn63d !== undefined) {
-          const sign = rs.stockReturn63d >= 0 ? '+' : '';
-          return `63d: ${sign}${(rs.stockReturn63d * 100).toFixed(1)}%`;
-        }
-        return '—';
-      })();
-  const smLabel = snapshot.smartMoney.absent
-    ? '—'
-    : `${snapshot.smartMoney.value?.status ?? '—'} (${snapshot.smartMoney.value?.score ?? '—'})`;
-  const fnoLabel = snapshot.fnoBan.absent
-    ? '—'
-    : snapshot.fnoBan.value?.banned
-      ? `Banned (${snapshot.fnoBan.value?.banDate ?? ''})`
-      : 'Not banned';
-  const signalLabel = snapshot.latestSignal.absent
-    ? '—'
-    : `${snapshot.latestSignal.value?.direction ?? '—'} (${snapshot.latestSignal.value?.score !== undefined ? Math.round(snapshot.latestSignal.value.score) : '—'})`;
-
-  return (
-    <SectionPanel title="Instrument Context Snapshot">
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' }, gap: 1.5 }}>
-        <ScoreCard label="Market Regime" value={regimeLabel} />
-        <ScoreCard label="Sector Strength" value={sectorLabel} />
-        <ScoreCard label="Relative Strength (63d)" value={rsLabel} />
-        <ScoreCard label="Smart Money" value={smLabel} />
-        <ScoreCard label="F&O Ban" value={fnoLabel} />
-        <ScoreCard label="Latest Signal" value={signalLabel} />
-      </Box>
-    </SectionPanel>
   );
 }
 

@@ -2918,6 +2918,59 @@ export class MarketDataFoundationRepository {
     return this.toSyncStateDto(row);
   }
 
+  /**
+   * Persist the latest computed review-readiness summary as a namespaced row in
+   * market_data_sync_states (scopeType `REVIEW_READINESS_SUMMARY`, scopeKey `DEFAULT`). This
+   * reuses the existing sync-state table's JSON `lastSummary` column rather than adding a
+   * migration on the shared/drifted DB. The distinct scopeType isolates these rows from CATALOG
+   * sync bookkeeping — getSyncState/upsertSyncState always query by the full composite key (incl.
+   * scopeType), so they never read or overwrite these rows. Read back via latestReviewReadinessSnapshot.
+   */
+  async upsertReviewReadinessSnapshot(region: string, assetType: string, tradingDate: string, summary: unknown): Promise<void> {
+    const dateText = String(tradingDate).slice(0, 10);
+    const tradingDateValue = new Date(`${dateText}T00:00:00.000Z`);
+    const now = new Date();
+    await (this.prisma as any).marketDataSyncState.upsert({
+      where: {
+        region_assetType_scopeType_scopeKey_timeframe_tradingDate: {
+          region,
+          assetType,
+          scopeType: 'REVIEW_READINESS_SUMMARY',
+          scopeKey: 'DEFAULT',
+          timeframe: '1D',
+          tradingDate: tradingDateValue,
+        },
+      },
+      create: {
+        region,
+        assetType,
+        scopeType: 'REVIEW_READINESS_SUMMARY',
+        scopeKey: 'DEFAULT',
+        timeframe: '1D',
+        tradingDate: tradingDateValue,
+        status: 'SYNCED',
+        lastCheckedAt: now,
+        lastRunAt: now,
+        lastSummary: summary as any,
+      },
+      update: {
+        status: 'SYNCED',
+        lastCheckedAt: now,
+        lastRunAt: now,
+        lastSummary: summary as any,
+      },
+    });
+  }
+
+  /** Read the most-recent persisted review-readiness summary JSON for the scope, or null. */
+  async latestReviewReadinessSnapshot(region: string, assetType: string): Promise<unknown | null> {
+    const row = await (this.prisma as any).marketDataSyncState.findFirst({
+      where: { region, assetType, scopeType: 'REVIEW_READINESS_SUMMARY' },
+      orderBy: [{ tradingDate: 'desc' }, { updatedAt: 'desc' }],
+    });
+    return row?.lastSummary ?? null;
+  }
+
   async updateCompanyMasterData(stockId: string, data: Partial<CreateStockRequest>) {
     const current = await this.prisma.stock.findUnique({ where: { id: stockId } });
     if (!current) {

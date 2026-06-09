@@ -123,7 +123,7 @@ export class TodayTradeReviewRepository implements TodayReviewRepositoryContract
     return this.toRunDto(record);
   }
 
-  async latest(region: string, assetType: string): Promise<TodayReviewRunDto | null> {
+  async latest(region: string, assetType: string, options: { enrich?: boolean } = {}): Promise<TodayReviewRunDto | null> {
     let scanned = 0;
     while (scanned < LATEST_VISIBLE_RUN_MAX_SCAN_ROWS) {
       const records = await this.db.todayReviewRun.findMany({
@@ -134,7 +134,7 @@ export class TodayTradeReviewRepository implements TodayReviewRepositoryContract
         include: { candidates: { orderBy: { rank: 'asc' } } },
       });
       const record = records.find((item: any) => this.isTraderVisibleRun(item));
-      if (record) return this.toRunDto(record);
+      if (record) return this.toRunDto(record, options);
       if (records.length < LATEST_VISIBLE_RUN_PAGE_SIZE) return null;
       scanned += records.length;
     }
@@ -334,18 +334,26 @@ export class TodayTradeReviewRepository implements TodayReviewRepositoryContract
     }
   }
 
-  private async toRunDto(record: any): Promise<TodayReviewRunDto> {
-    // Batch-load sectors, 52w ranges, F&O ban flags, and smart-money status
-    // for all candidates — four queries total, no N+1.
+  private async toRunDto(record: any, options: { enrich?: boolean } = {}): Promise<TodayReviewRunDto> {
+    // Batch-load sectors, 52w ranges, F&O ban flags, and smart-money status for all candidates
+    // — four queries total, no N+1. The 52-week range window query over price_ticks dominates
+    // read latency, so callers that don't render these fields (enrich:false) skip all four and
+    // get a fast read; toCandidateDto leaves the corresponding fields null/false when maps are absent.
     const candidateRecords: any[] = record.candidates || [];
-    const instrumentIds = [...new Set(candidateRecords.map((c: any) => c.instrumentId as string))];
-    const symbols = [...new Set(candidateRecords.map((c: any) => c.symbol as string))];
-    const [catalogSectorMap, range52wMap, fnoBanSet, smartMoneyMap] = await Promise.all([
-      this.loadCatalogSectors(instrumentIds),
-      this.load52wRanges(symbols),
-      this.loadFnoBanSet(symbols),
-      this.loadSmartMoneyStatuses(instrumentIds),
-    ]);
+    let catalogSectorMap: Map<string, string | null> | undefined;
+    let range52wMap: Map<string, { high52w: number; low52w: number; currentClose: number; positionPct: number }> | undefined;
+    let fnoBanSet: Set<string> | undefined;
+    let smartMoneyMap: Map<string, { status: 'ACCUMULATION' | 'DISTRIBUTION' | 'NEUTRAL'; score: number }> | undefined;
+    if (options.enrich !== false) {
+      const instrumentIds = [...new Set(candidateRecords.map((c: any) => c.instrumentId as string))];
+      const symbols = [...new Set(candidateRecords.map((c: any) => c.symbol as string))];
+      [catalogSectorMap, range52wMap, fnoBanSet, smartMoneyMap] = await Promise.all([
+        this.loadCatalogSectors(instrumentIds),
+        this.load52wRanges(symbols),
+        this.loadFnoBanSet(symbols),
+        this.loadSmartMoneyStatuses(instrumentIds),
+      ]);
+    }
 
     const candidates = candidateRecords.map((candidate: any) => this.toCandidateDto(candidate, catalogSectorMap, range52wMap, fnoBanSet, smartMoneyMap));
     const sourceSnapshot = this.jsonObject(record.sourceSnapshot);

@@ -626,7 +626,10 @@ export class MarketDataFoundationController {
   reviewReadinessSummary = async (req: Request, res: Response) => {
     try {
       const { region, assetType } = this.getMarketFilter(req);
-      return res.json(await this.service.reviewReadinessSummary({ region, assetType }));
+      // Default GET is a fast persisted read. `?recompute=true` is an explicit operator opt-in
+      // that runs the heavy live universe-health computation and refreshes the persisted snapshot.
+      const recompute = this.parseOptionalBoolean(req.query.recompute ?? (req.body as any)?.recompute);
+      return res.json(await this.service.reviewReadinessSummary({ region, assetType, recompute }));
     } catch (error) {
       console.error('Review readiness summary error:', error);
       return res.status(500).json({ error: 'Review readiness summary failed' });

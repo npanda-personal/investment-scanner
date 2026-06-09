@@ -1,4 +1,3 @@
-import axios from 'axios';
 import type { MarketScope } from '@/contexts/MarketScopeContext';
 import { fetchDataQualitySummary } from '@/features/data-quality-engine';
 import type { DataQualitySummary } from '@/features/data-quality-engine';
@@ -189,10 +188,12 @@ export async function fetchDailyReviewShortlist(scope: MarketScope): Promise<Dai
 async function loadSources(scope: MarketScope): Promise<SourceBundle> {
   const settled = await Promise.allSettled([
     fetchMarketPulseSnapshot(scope),
-    todayTradeReviewApi.latest({ region: scope.region, assetType: scope.assetType }),
+    // enrich:false — the shortlist reads only persisted candidate fields (symbol, rank, reasons,
+    // dataQuality, explainability) + sourceSnapshot.reviewReadiness; it renders none of the
+    // expensive read-time enrichment (52w range, smart-money), so we skip it for a fast read.
+    todayTradeReviewApi.latest({ region: scope.region, assetType: scope.assetType, enrich: false }),
     fetchStockInterestRadarSnapshot(scope),
     fetchEarningsIntelligenceSnapshot(scope),
-    fetchReviewReadiness(scope),
     fetchDataQualitySummary({ region: scope.region, assetType: scope.assetType }),
     fetchSignalPositionLedgerActiveRows({
       region: scope.region,
@@ -210,10 +211,19 @@ async function loadSources(scope: MarketScope): Promise<SourceBundle> {
   const todayReview = settledValue(settled[1], 'Today Review', sourceErrors);
   const stockInterest = settledValue(settled[2], 'Stock Interest', sourceErrors);
   const earnings = settledValue(settled[3], 'Fundamentals / Earnings', sourceErrors);
-  const reviewReadiness = settledValue(settled[4], 'Review Ready Universe', sourceErrors);
-  const dataQualitySummary = settledValue(settled[5], 'Data Quality', sourceErrors);
-  const activeLedger = settledValue(settled[6], 'Active Ledger', sourceErrors);
-  const overlays = settledValue(settled[7], 'Portfolio / Watchlist overlays', sourceErrors) ?? emptyOverlays();
+  const dataQualitySummary = settledValue(settled[4], 'Data Quality', sourceErrors);
+  const activeLedger = settledValue(settled[5], 'Active Ledger', sourceErrors);
+  const overlays = settledValue(settled[6], 'Portfolio / Watchlist overlays', sourceErrors) ?? emptyOverlays();
+
+  // Review-readiness is read from the PERSISTED today-review run snapshot (the daily-review
+  // pipeline already computed and stored it). We deliberately do NOT call the live
+  // /market-data/review-readiness-summary endpoint from this trader page: that endpoint runs a
+  // heavy operator-only universe-health recomputation (tens of seconds, blocks the Node event
+  // loop and starves every sibling request), and trader pages must be persisted reads only.
+  // Same data, correct source, no app-wide starvation, no more permanent loading skeleton.
+  const reviewReadiness = mapReviewReadiness(
+    (todayReview?.run?.sourceSnapshot as { reviewReadiness?: ReviewReadinessResponse } | undefined)?.reviewReadiness ?? null,
+  );
 
   const sourceWarnings = [
     ...envelopeWarnings('Market Pulse', marketPulse),
@@ -237,17 +247,10 @@ async function loadSources(scope: MarketScope): Promise<SourceBundle> {
   };
 }
 
-async function fetchReviewReadiness(scope: MarketScope): Promise<DailyReviewShortlistReviewReadiness> {
-  // review-readiness-summary runs a heavy live universe-health computation that can take
-  // many seconds (or effectively hang) on large catalogs. Cap it with a timeout so a slow
-  // readiness source degrades gracefully (allSettled → null) instead of freezing the whole
-  // shortlist — the core review rows come from Today Review / Stock Interest / Active Ledger.
-  const response = await axios.get<ReviewReadinessResponse>('/api/v1/market-data/review-readiness-summary', {
-    params: { region: scope.region, assetType: scope.assetType },
-    timeout: 6000,
-  });
-  const body = response.data;
-
+function mapReviewReadiness(body: ReviewReadinessResponse | null): DailyReviewShortlistReviewReadiness | null {
+  // Pure mapper over the persisted today-review review-readiness snapshot (same shape the
+  // live operator endpoint returns). No network call — see loadSources() for why.
+  if (!body) return null;
   return {
     reviewMode: body.reviewMode ?? null,
     trustStatus: body.trustStatus ?? null,

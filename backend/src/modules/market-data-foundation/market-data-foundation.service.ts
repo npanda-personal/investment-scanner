@@ -245,7 +245,7 @@ const disabledAngelProvider: LegacyAngelProviderPort = {
   fetchHistorical: async () => { throw providerDisabledError('Angel One historical candle fetch'); },
 };
 
-type TrustedReviewUniverseOptions = Pick<PaginationOptions, 'region' | 'assetType'> & { now?: Date };
+type TrustedReviewUniverseOptions = Pick<PaginationOptions, 'region' | 'assetType'> & { now?: Date; recompute?: boolean };
 type UniverseComputationSnapshot = {
   scope: { region: string; assetType: string };
   stocks: any[];
@@ -1758,7 +1758,100 @@ export class MarketDataFoundationService {
     return (await this.trustedReviewUniverseEvaluation(options, snapshot ?? undefined)).health;
   }
 
+  /**
+   * Trader/operator-facing review-readiness read. **PERSISTED-READ by default**: it serves the
+   * last computed snapshot from the persisted store and NEVER triggers the heavy live
+   * universe-health computation (which scans the full catalog for tens of seconds AND issues a
+   * provider-support DB write) on a plain GET. The live compute runs only when `recompute` is
+   * set — an explicit operator opt-in (`?recompute=true`) or the data pipeline — and that path
+   * also refreshes the persisted snapshot. If nothing has been computed yet for the scope, an
+   * honest "pending" summary is returned rather than computing on the read path. This keeps the
+   * GET fast and honours the trader-pages-are-persisted-reads-only constraint.
+   */
   async reviewReadinessSummary(options: TrustedReviewUniverseOptions = {}): Promise<ReviewReadinessSummary> {
+    const scope = {
+      region: options.region?.trim().toUpperCase() || 'IN',
+      assetType: options.assetType?.trim().toUpperCase() || 'STOCK',
+    };
+    if (options.recompute) {
+      const summary = await this.computeReviewReadinessSummary(options);
+      await this.persistReviewReadinessSnapshot(scope, summary);
+      return summary;
+    }
+    const persisted = await this.loadPersistedReviewReadiness(scope);
+    return persisted ?? this.pendingReviewReadinessSummary(scope);
+  }
+
+  /**
+   * Persist the latest computed review-readiness summary (best-effort). Reuses the namespaced
+   * market_data_sync_states row written by the repository; failures here never break the compute.
+   */
+  private async persistReviewReadinessSnapshot(scope: { region: string; assetType: string }, summary: ReviewReadinessSummary): Promise<void> {
+    try {
+      const repo = this.repository as any;
+      if (typeof repo.upsertReviewReadinessSnapshot !== 'function') return;
+      const tradingDate = summary.reviewUniverse.targetTradingDate
+        || summary.reviewUniverse.requiredDataThroughDate
+        || new Date().toISOString().slice(0, 10);
+      await repo.upsertReviewReadinessSnapshot(scope.region, scope.assetType, tradingDate, summary);
+    } catch (error) {
+      console.warn('[MarketDataFoundation] failed to persist review-readiness snapshot', error);
+    }
+  }
+
+  /** Read the latest persisted review-readiness summary for the scope, or null if none/unsupported. */
+  private async loadPersistedReviewReadiness(scope: { region: string; assetType: string }): Promise<ReviewReadinessSummary | null> {
+    try {
+      const repo = this.repository as any;
+      if (typeof repo.latestReviewReadinessSnapshot !== 'function') return null;
+      const stored = await repo.latestReviewReadinessSnapshot(scope.region, scope.assetType);
+      return stored ? (stored as ReviewReadinessSummary) : null;
+    } catch (error) {
+      console.warn('[MarketDataFoundation] failed to read persisted review-readiness snapshot', error);
+      return null;
+    }
+  }
+
+  /** Honest "not yet computed" summary returned when no persisted snapshot exists for the scope. */
+  private pendingReviewReadinessSummary(scope: { region: string; assetType: string }): ReviewReadinessSummary {
+    return {
+      scope,
+      generatedAt: new Date().toISOString(),
+      reviewMode: 'NO_REVIEW',
+      trustStatus: 'NOT_TRUSTWORTHY',
+      userDecision: 'WAIT',
+      reviewUniverse: {
+        catalogCount: 0,
+        providerSupportedCount: 0,
+        trustedCount: 0,
+        targetTradingDate: null,
+        requiredDataThroughDate: null,
+        storedDataThroughDate: null,
+      },
+      readinessCounts: {
+        priceReady: 0,
+        contextReady: 0,
+        reviewReady: 0,
+        missingLatestPrice: 0,
+        staleLatestPrice: 0,
+        inadequateHistory: 0,
+        missingRecentVolume: 0,
+        providerUnknown: 0,
+        providerValidationFailedRetryable: 0,
+        unsupportedExcluded: 0,
+      },
+      blockers: [],
+      nextAction: null,
+      warnings: ['Review readiness has not been computed yet for this scope. It is refreshed by the data pipeline; pass ?recompute=true to compute it on demand.'],
+    };
+  }
+
+  /**
+   * Live universe-health computation behind review readiness. Expensive (full-catalog price
+   * readiness scan + a provider-support repair write) and event-loop-heavy — only invoked from
+   * the pipeline or an explicit recompute, NEVER from a plain GET. See reviewReadinessSummary.
+   */
+  private async computeReviewReadinessSummary(options: TrustedReviewUniverseOptions = {}): Promise<ReviewReadinessSummary> {
     const scope = {
       region: options.region?.trim().toUpperCase() || 'IN',
       assetType: options.assetType?.trim().toUpperCase() || 'STOCK',

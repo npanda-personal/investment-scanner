@@ -54,12 +54,42 @@ const ROUTES: { slug: string; path: string; label: string }[] = [
   { slug: '21-account', path: '/account', label: 'Account' },
 ];
 
-function classify(text: string, ok: boolean): string {
+interface ScreenProbe {
+  text: string;
+  /** A real page title/header rendered (working pages always render their PageHeader). */
+  hasHeading: boolean;
+  /** A spinner / skeleton / progress bar is STILL present after the settle wait. */
+  stillSpinning: boolean;
+}
+
+/**
+ * Content-aware health classification.
+ *
+ * The previous heuristic flagged any page under 900 chars as EMPTY, which false-flagged
+ * genuinely-working concise pages (Account profile, empty Portfolios/Watchlists with their
+ * empty-state copy, Copilot's pre-brief state, the Crypto not-applicable placeholder, the
+ * Screener pre-render). We instead look at WHAT the page rendered:
+ *   - ERROR                — navigation/JS failure (ok === false).
+ *   - BACKEND_UNAVAILABLE  — a dead operator backend stub surfaced to a trader.
+ *   - LOADING_STUCK        — a spinner/skeleton never resolved into content.
+ *   - EMPTY                — truly blank: no heading and essentially no text (not an
+ *                            intentional empty-state).
+ *   - OK                   — anything that rendered a header and is not mid-spin.
+ * This still flags every genuinely-broken screen (dead backend → jargon; infinite spinner →
+ * stillSpinning) without penalising concise-but-working pages.
+ */
+function classify(probe: ScreenProbe, ok: boolean): string {
   if (!ok) return 'ERROR';
-  const t = text.toLowerCase();
-  if (t.includes('backend unavailable') || t.includes('backend not available')) return 'BACKEND_UNAVAILABLE';
-  if (t.includes('loading ') && text.length < 1500) return 'LOADING_STUCK';
-  if (text.length < 900) return 'EMPTY';
+  const t = probe.text.toLowerCase();
+  if (
+    t.includes('backend unavailable') ||
+    t.includes('backend not available') ||
+    t.includes('capability is not implemented for this snapshot')
+  ) return 'BACKEND_UNAVAILABLE';
+  // Still showing a loading indicator after the settle wait, with no substantial resolved content.
+  if (probe.stillSpinning && probe.text.length < 1500) return 'LOADING_STUCK';
+  // Truly blank — no header and almost no text. Intentional empty-states render a header + copy.
+  if (!probe.hasHeading && probe.text.trim().length < 200) return 'EMPTY';
   return 'OK';
 }
 
@@ -81,13 +111,37 @@ test('user-facing screen audit crawl', async ({ page }) => {
   for (const r of ROUTES) {
     const before = { c: consoleErrors.length, n: netErrors.length };
     let text = '';
+    let probe: ScreenProbe = { text: '', hasHeading: false, stillSpinning: false };
     let ok = true;
     let err = '';
     try {
       await page.goto(r.path, { waitUntil: 'domcontentloaded' });
-      await page.waitForTimeout(2500);
-      try { await page.waitForLoadState('networkidle', { timeout: 8000 }); } catch {}
-      text = await page.evaluate(() => document.body.innerText || '');
+      // Let the SPA mount and fire its initial data requests.
+      await page.waitForTimeout(1500);
+      // Wait for the page to RESOLVE its loading state. A working page — even a slow one under
+      // concurrent backend load — clears its spinners/skeletons within a bounded window. A
+      // genuinely-broken page spins forever; that is the G1 "infinite loading" bug this audit
+      // targets, and it stays flagged LOADING_STUCK below. The 22s cap exceeds the frontend's own
+      // request timeouts, so a hung backend surfaces as a resolved error state, not a false stuck.
+      try {
+        await page.waitForFunction(
+          () => !document.querySelector('[role="progressbar"], .MuiCircularProgress-root, .MuiSkeleton-root, .MuiLinearProgress-root'),
+          { timeout: 22000 },
+        );
+      } catch {}
+      try { await page.waitForLoadState('networkidle', { timeout: 5000 }); } catch {}
+      probe = await page.evaluate(() => {
+        const bodyText = document.body.innerText || '';
+        const headingEls = Array.from(
+          document.querySelectorAll('h1, h2, h3, h4, [class*="PageHeader"], [class*="page-header"]'),
+        );
+        const hasHeading = headingEls.some((el) => ((el.textContent || '').trim().length > 0));
+        const stillSpinning = Boolean(
+          document.querySelector('[role="progressbar"], .MuiCircularProgress-root, .MuiSkeleton-root, .MuiLinearProgress-root'),
+        );
+        return { text: bodyText, hasHeading, stillSpinning };
+      });
+      text = probe.text;
       await page.screenshot({ path: path.join(OUT, `${r.slug}.png`), fullPage: true });
     } catch (e: any) {
       ok = false;
@@ -95,7 +149,7 @@ test('user-facing screen audit crawl', async ({ page }) => {
       try { await page.screenshot({ path: path.join(OUT, `${r.slug}-ERR.png`) }); } catch {}
     }
     fs.writeFileSync(path.join(OUT, `${r.slug}.txt`), text);
-    const health = classify(text, ok);
+    const health = classify(probe, ok);
     const newConsole = consoleErrors.length - before.c;
     const routeNet = netErrors.slice(before.n);
     if (health !== 'OK' || newConsole > 0 || routeNet.length > 0) {
@@ -105,6 +159,7 @@ test('user-facing screen audit crawl', async ({ page }) => {
     }
     summary.push({
       slug: r.slug, label: r.label, path: r.path, ok, err, health,
+      hasHeading: probe.hasHeading, stillSpinning: probe.stillSpinning,
       finalUrl: page.url(), textLen: text.length,
       textHead: text.replace(/\s+/g, ' ').slice(0, 600),
       newConsoleErrors: newConsole, netErrors: routeNet.slice(0, 12),

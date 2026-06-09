@@ -4,8 +4,13 @@ import type { TodayReviewCandidate, TodayReviewResponse, TodayReviewRunsResponse
 const API_BASE = '/api/v1/today-review';
 
 export const todayTradeReviewApi = {
-  latest: async (params: { region: string; assetType: string }) => {
-    const response = await axios.get<TodayReviewResponse>(`${API_BASE}/latest`, { params });
+  latest: async (params: { region: string; assetType: string; enrich?: boolean }) => {
+    // enrich:false skips the backend's per-candidate 52w/smart-money read-time enrichment for
+    // consumers that don't render those fields (e.g. the Daily Review Shortlist) — a fast read.
+    const query = params.enrich === false
+      ? { region: params.region, assetType: params.assetType, enrich: false }
+      : { region: params.region, assetType: params.assetType };
+    const response = await axios.get<TodayReviewResponse>(`${API_BASE}/latest`, { params: query });
     return response.data;
   },
 

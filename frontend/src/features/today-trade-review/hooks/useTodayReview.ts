@@ -19,6 +19,7 @@ export function useTodayReview() {
       const response = await axios.get<TodayReviewResponse>('/api/v1/today-review/latest', {
         params: { region: scope.region, assetType: scope.assetType },
         signal: controller.signal,
+        timeout: 20000,
       });
       setData(response.data);
     } catch (err: any) {
@@ -50,6 +51,7 @@ export function useTodayReview() {
     setError(null);
     axios.get<TodayReviewResponse>('/api/v1/today-review/latest', {
       params: { region: scope.region, assetType: scope.assetType },
+      timeout: 20000,
     })
       .then((response) => {
         if (!canceled) setData(response.data);

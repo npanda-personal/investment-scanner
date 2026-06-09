@@ -8,6 +8,8 @@ export function parseTodayReviewQuery(query: Record<string, unknown>): TodayRevi
     assetType: first(query.assetType),
     limit: parsePositiveInt(first(query.limit)),
     offset: parseNonNegativeInt(first(query.offset)),
+    // Only an explicit ?enrich=false|0|no opts out; otherwise leave undefined (defaults to enriched).
+    enrich: ['false', '0', 'no'].includes((first(query.enrich) || '').trim().toLowerCase()) ? false : undefined,
   };
 }
 

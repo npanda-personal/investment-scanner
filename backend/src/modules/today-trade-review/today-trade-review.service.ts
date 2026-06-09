@@ -189,7 +189,7 @@ export class TodayTradeReviewService {
 
   async latest(query: TodayReviewQuery = {}): Promise<TodayReviewRunResponse> {
     const scope = this.normalizeScope(query);
-    const run = await this.repository.latest(scope.region, scope.assetType);
+    const run = await this.repository.latest(scope.region, scope.assetType, { enrich: query.enrich });
     return this.toRunResponse(run, scope);
   }
 
@@ -241,7 +241,7 @@ export class TodayTradeReviewService {
     const [marketData, reviewReadiness, reviewUniverseResult, marketContext, marketGate, rawSignalUniverse, entryCandidates, exitCandidates, earningsProximity] = await Promise.all([
       this.safe(() => this.services.marketDataService.latestStoredCandleInfo(scope.region, scope.assetType, this.clock()), 'Market data freshness is unavailable.', warnings),
       this.services.marketDataService.reviewReadinessSummary
-        ? this.safe(() => this.services.marketDataService.reviewReadinessSummary!({ region: scope.region, assetType: scope.assetType }), TRUSTED_REVIEW_UNAVAILABLE_WARNING, warnings)
+        ? this.safe(() => this.services.marketDataService.reviewReadinessSummary!({ region: scope.region, assetType: scope.assetType, recompute: true }), TRUSTED_REVIEW_UNAVAILABLE_WARNING, warnings)
         : Promise.resolve(null),
       this.services.marketDataService.trustedReviewUniverseHealth
         ? this.safe(() => this.services.marketDataService.trustedReviewUniverseHealth!({ region: scope.region, assetType: scope.assetType }), TRUSTED_REVIEW_UNAVAILABLE_WARNING, warnings)

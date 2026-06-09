@@ -48,6 +48,13 @@ export interface TodayReviewQuery {
   assetType?: string;
   limit?: number;
   offset?: number;
+  /**
+   * When false, skip the per-candidate read-time enrichment (52-week range window queries,
+   * smart-money lookups, catalog sector, F&O ban). Consumers that don't render those fields
+   * (e.g. the Daily Review Shortlist) can opt out to turn a multi-second read into a fast one.
+   * Defaults to enriched (true) so the full Daily Review page is unaffected.
+   */
+  enrich?: boolean;
 }
 
 export interface TodayReviewSourceSnapshot {
@@ -332,7 +339,7 @@ export interface TodayReviewRepository {
     sourceSnapshot: TodayReviewSourceSnapshot | Record<string, unknown>;
     candidates: TodayReviewCandidateDto[];
   }): Promise<TodayReviewRunDto>;
-  latest(region: string, assetType: string): Promise<TodayReviewRunDto | null>;
+  latest(region: string, assetType: string, options?: { enrich?: boolean }): Promise<TodayReviewRunDto | null>;
   getRun(id: string): Promise<TodayReviewRunDto | null>;
   listRuns(query: Required<Pick<TodayReviewQuery, 'region' | 'assetType' | 'limit' | 'offset'>>): Promise<{ items: TodayReviewRunDto[]; total: number }>;
   getCandidate(id: string): Promise<TodayReviewCandidateDto | null>;
@@ -363,7 +370,7 @@ export interface TodayReviewUpstreamServices {
   };
   marketDataService: {
     latestStoredCandleInfo(region: string, assetType?: string, now?: Date): Promise<Record<string, unknown>>;
-    reviewReadinessSummary?(options: { region?: string; assetType?: string }): Promise<ReviewReadinessSummary>;
+    reviewReadinessSummary?(options: { region?: string; assetType?: string; recompute?: boolean }): Promise<ReviewReadinessSummary>;
     trustedReviewUniverseHealth?(options: { region?: string; assetType?: string }): Promise<TrustedReviewUniverseHealth>;
     listTrustedReviewUniverseInstruments?(options: { region?: string; assetType?: string; limit?: number; offset?: number }): Promise<TrustedReviewUniverseInstrument[]>;
   };
