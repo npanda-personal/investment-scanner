@@ -35,8 +35,8 @@ export function formatBlockDealsHtml(rows: BulkBlockDealRow[]): string {
   if (rows.length === 0) return '';
 
   const tradeDate = rows[0].tradeDate;
-  const blockRows = rows.filter((r) => r.dealType === 'BLOCK');
-  const allBulkRows = rows.filter((r) => r.dealType === 'BULK')
+  const blockRows = rows.filter((r) => r.dealType === 'BLOCK' && r.buySell === 'BUY');
+  const allBulkRows = rows.filter((r) => r.dealType === 'BULK' && r.buySell === 'BUY')
     .sort((a, b) => (b.qty * b.avgPrice) - (a.qty * a.avgPrice));
   const bulkRows = allBulkRows.slice(0, 5);
 
