@@ -1,6 +1,5 @@
 import { MarketDataFoundationService, expectedLatestTradingDate, tradingSessionsBetween } from '../market-data-foundation';
 import { DataQualityEngineRepository } from './data-quality-engine.repository';
-import prisma from '../../db/prisma';
 import {
   ELIGIBILITY_POLICY,
   ELIGIBILITY_POLICY_VERSION,
@@ -1062,64 +1061,31 @@ export class DataQualityEngineService {
     const tradingDateStr = expectedDate ?? new Date().toISOString().slice(0, 10);
     const tradingDate = new Date(tradingDateStr + 'T00:00:00.000Z');
 
-    await prisma.instrumentEligibility.upsert({
-      where: {
-        instrumentId_tradingDate: {
-          instrumentId,
-          tradingDate,
-        },
-      },
-      create: {
-        instrumentId,
-        tradingDate,
-        priceBars: facts.priceBars,
-        lastPriceDate: facts.lastPriceDate ? new Date(facts.lastPriceDate + 'T00:00:00.000Z') : null,
-        staleSessions: facts.staleSessions > 98 ? 99 : facts.staleSessions,
-        volumeCoveragePct: facts.volumeCoveragePct,
-        maxGapDays: facts.maxGapDays,
-        liquidityScore: facts.liquidityScore,
-        hasFundamentals: facts.hasFundamentals,
-        hasSector: facts.hasSector,
-        hasIndustry: facts.hasIndustry,
-        hasCountry: facts.hasCountry,
-        signalEligible: verdicts.signalEligible,
-        reviewEligible: verdicts.reviewEligible,
-        backtestEligible: verdicts.backtestEligible,
-        calibrationEligible: verdicts.calibrationEligible,
-        signalReasons: verdicts.signalReasons,
-        reviewReasons: verdicts.reviewReasons,
-        backtestReasons: verdicts.backtestReasons,
-        calibrationReasons: verdicts.calibrationReasons,
-        readinessScore,
-        readinessStatus,
-        policyVersion: ELIGIBILITY_POLICY_VERSION,
-        computedAt: new Date(),
-      },
-      update: {
-        priceBars: facts.priceBars,
-        lastPriceDate: facts.lastPriceDate ? new Date(facts.lastPriceDate + 'T00:00:00.000Z') : null,
-        staleSessions: facts.staleSessions > 98 ? 99 : facts.staleSessions,
-        volumeCoveragePct: facts.volumeCoveragePct,
-        maxGapDays: facts.maxGapDays,
-        liquidityScore: facts.liquidityScore,
-        hasFundamentals: facts.hasFundamentals,
-        hasSector: facts.hasSector,
-        hasIndustry: facts.hasIndustry,
-        hasCountry: facts.hasCountry,
-        signalEligible: verdicts.signalEligible,
-        reviewEligible: verdicts.reviewEligible,
-        backtestEligible: verdicts.backtestEligible,
-        calibrationEligible: verdicts.calibrationEligible,
-        signalReasons: verdicts.signalReasons,
-        reviewReasons: verdicts.reviewReasons,
-        backtestReasons: verdicts.backtestReasons,
-        calibrationReasons: verdicts.calibrationReasons,
-        readinessScore,
-        readinessStatus,
-        policyVersion: ELIGIBILITY_POLICY_VERSION,
-        computedAt: new Date(),
-      },
-    });
+    const values = {
+      priceBars: facts.priceBars,
+      lastPriceDate: facts.lastPriceDate ? new Date(facts.lastPriceDate + 'T00:00:00.000Z') : null,
+      staleSessions: facts.staleSessions > 98 ? 99 : facts.staleSessions,
+      volumeCoveragePct: facts.volumeCoveragePct,
+      maxGapDays: facts.maxGapDays,
+      liquidityScore: facts.liquidityScore,
+      hasFundamentals: facts.hasFundamentals,
+      hasSector: facts.hasSector,
+      hasIndustry: facts.hasIndustry,
+      hasCountry: facts.hasCountry,
+      signalEligible: verdicts.signalEligible,
+      reviewEligible: verdicts.reviewEligible,
+      backtestEligible: verdicts.backtestEligible,
+      calibrationEligible: verdicts.calibrationEligible,
+      signalReasons: verdicts.signalReasons,
+      reviewReasons: verdicts.reviewReasons,
+      backtestReasons: verdicts.backtestReasons,
+      calibrationReasons: verdicts.calibrationReasons,
+      readinessScore,
+      readinessStatus,
+      policyVersion: ELIGIBILITY_POLICY_VERSION,
+      computedAt: new Date(),
+    };
+    await this.repository.upsertEligibility({ instrumentId, tradingDate, values });
   }
 
   // ── Eligibility read API ──────────────────────────────────────────────────
@@ -1137,21 +1103,16 @@ export class DataQualityEngineService {
     const unique = [...new Set(instrumentIds)];
 
     if (tradingDate) {
-      const rows = await prisma.instrumentEligibility.findMany({
-        where: {
-          instrumentId: { in: unique },
-          tradingDate,
-        },
-      });
+      const rows = (await this.repository.findEligibilityRows({
+        instrumentIds: unique,
+        tradingDate,
+      })) as any[];
       return rows.map((row) => this.toEligibilityRow(row));
     }
 
-    // Latest row per instrument: fetch all rows for the ids, group by
-    // instrumentId, pick the one with the highest tradingDate.
-    const rows = await prisma.instrumentEligibility.findMany({
-      where: { instrumentId: { in: unique } },
-      orderBy: { tradingDate: 'desc' },
-    });
+    // Latest row per instrument: fetch all rows for the ids (ordered by
+    // tradingDate desc by the repository), pick the first per instrumentId.
+    const rows = (await this.repository.findEligibilityRows({ instrumentIds: unique })) as any[];
     const seen = new Set<string>();
     const latest: typeof rows = [];
     for (const row of rows) {

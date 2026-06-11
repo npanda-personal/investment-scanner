@@ -18,6 +18,46 @@ const TIER_REASON_LISTING_DATE_CONFIDENCE_MISSING = 'LISTING_DATE_CONFIDENCE_MIS
 export class DataQualityEngineRepository {
   constructor(private readonly db = prisma) {}
 
+  async upsertEligibility(params: {
+    instrumentId: string;
+    tradingDate: Date;
+    values: Record<string, unknown>;
+  }): Promise<void> {
+    await this.db.instrumentEligibility.upsert({
+      where: {
+        instrumentId_tradingDate: {
+          instrumentId: params.instrumentId,
+          tradingDate: params.tradingDate,
+        },
+      },
+      create: {
+        instrumentId: params.instrumentId,
+        tradingDate: params.tradingDate,
+        ...(params.values as object),
+      } as Prisma.InstrumentEligibilityUncheckedCreateInput,
+      update: params.values as Prisma.InstrumentEligibilityUncheckedUpdateInput,
+    });
+  }
+
+  async findEligibilityRows(params: {
+    instrumentIds: string[];
+    tradingDate?: Date;
+  }): Promise<unknown[]> {
+    if (params.instrumentIds.length === 0) return [];
+    if (params.tradingDate) {
+      return this.db.instrumentEligibility.findMany({
+        where: {
+          instrumentId: { in: params.instrumentIds },
+          tradingDate: params.tradingDate,
+        },
+      });
+    }
+    return this.db.instrumentEligibility.findMany({
+      where: { instrumentId: { in: params.instrumentIds } },
+      orderBy: { tradingDate: 'desc' },
+    });
+  }
+
   async upsertEvaluation(evaluation: DataQualityEvaluationDto): Promise<DataQualityEvaluationDto> {
     const saved = await this.db.dataQualityEvaluation.upsert({
       where: { instrumentId: evaluation.instrumentId },

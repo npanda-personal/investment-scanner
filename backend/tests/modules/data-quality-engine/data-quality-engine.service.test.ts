@@ -25,6 +25,8 @@ function service(overrides: Record<string, any> = {}) {
     summary: jest.fn(),
     list: jest.fn(),
     latestForInstrument: jest.fn().mockResolvedValue(null),
+    upsertEligibility: jest.fn().mockResolvedValue(undefined),
+    findEligibilityRows: jest.fn().mockResolvedValue([]),
     ...overrides.repository,
   };
   const marketDataService = {

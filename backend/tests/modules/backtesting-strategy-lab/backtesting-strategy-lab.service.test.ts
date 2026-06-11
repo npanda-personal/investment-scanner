@@ -97,22 +97,18 @@ const createService = (overrides: any = {}) => {
     strategyToBacktestConfig: jest.fn(),
     ...overrides.strategyFrameworkService,
   };
-  // Default snapshotsRepository: returns a RISK_ON snapshot from far in the past
+  // Default snapshotsService: returns a RISK_ON snapshot from far in the past
   // so all bars in tests have regime context (OPEN market gate).
   // Fix #1: tests that rely on entries happening MUST provide regime context.
-  const snapshotsRepository = overrides.snapshotsRepository ?? {
-    db: {
-      marketContextSnapshot: {
-        findMany: jest.fn().mockResolvedValue([{
-          snapshotDate: new Date('2010-01-01T00:00:00.000Z'),
-          regime: 'RISK_ON',
-          breadthPercentAboveSma50: 0.72,
-        }]),
-      },
-    },
+  const snapshotsService = overrides.snapshotsService ?? {
+    marketContextSnapshotsInRange: jest.fn().mockResolvedValue([{
+      snapshotDate: new Date('2010-01-01T00:00:00.000Z'),
+      regime: 'RISK_ON',
+      breadthPercentAboveSma50: 0.72,
+    }]),
   };
   return {
-    service: new BacktestingStrategyLabService(repository as any, marketDataService as any, watchlistService as any, { assertAllowed: jest.fn(), recordUsage: jest.fn() } as any, dataQualityService as any, overrides.strategyRegistry || new StrategyFrameworkRegistry(), strategyFrameworkService as any, snapshotsRepository as any),
+    service: new BacktestingStrategyLabService(repository as any, marketDataService as any, watchlistService as any, { assertAllowed: jest.fn(), recordUsage: jest.fn() } as any, dataQualityService as any, overrides.strategyRegistry || new StrategyFrameworkRegistry(), strategyFrameworkService as any, snapshotsService as any),
     repository,
     dataQualityService,
     strategyFrameworkService,

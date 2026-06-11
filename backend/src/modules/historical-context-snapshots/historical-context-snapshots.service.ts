@@ -180,6 +180,19 @@ export class HistoricalContextSnapshotsService {
   countries(query: SnapshotQuery) { return this.repository.countries(query); }
   smartMoney(query: SnapshotQuery) { return this.repository.smartMoney(query); }
 
+  /**
+   * Bulk range-query for MarketContextSnapshot rows ordered ascending by
+   * snapshotDate.  One DB query for the whole range — intended for
+   * point-in-time regime lookup in the backtesting path (no N+1).
+   */
+  marketContextSnapshotsInRange(params: {
+    region: string;
+    from: Date;
+    to: Date;
+  }): Promise<Array<{ snapshotDate: Date; regime: string; breadthPercentAboveSma50: number | null }>> {
+    return this.repository.marketContextSnapshotsInRange(params);
+  }
+
   async coverage(query: Pick<SnapshotQuery, 'region' | 'assetType'> = {}) {
     const coverage = await this.repository.coverage(query);
     return {

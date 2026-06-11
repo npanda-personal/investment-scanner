@@ -29,9 +29,7 @@ import {
   BREADTH_WEAK_THRESHOLD,
   BREADTH_VERY_WEAK_THRESHOLD,
 } from '../market-context-intelligence/capital-posture.types';
-// Lazy import to keep the dependency one-directional (historical-context-snapshots
-// does NOT import backtesting-strategy-lab, so no cycle risk here).
-import { HistoricalContextSnapshotsRepository } from '../historical-context-snapshots/historical-context-snapshots.repository';
+import { HistoricalContextSnapshotsService } from '../historical-context-snapshots/historical-context-snapshots.service';
 import { BacktestingStrategyLabRepository } from './backtesting-strategy-lab.repository';
 import type {
   BacktestMetrics,
@@ -131,11 +129,11 @@ export class BacktestingStrategyLabService {
     private readonly dataQualityService = new DataQualityEngineService(),
     private readonly strategyRegistry = new StrategyFrameworkRegistry(),
     private readonly strategyFrameworkService = new StrategyFrameworkService(),
-    // Optional injection for testing — defaults to the real repository.
+    // Optional injection for testing — defaults to the real service.
     // Using optional injection so that existing tests that don't supply it
     // still compile without changes (they mock snapshot lookup via the
     // regimeIndex argument threaded into strategyContextFromBars).
-    private readonly snapshotsRepository: HistoricalContextSnapshotsRepository = new HistoricalContextSnapshotsRepository()
+    private readonly snapshotsService: HistoricalContextSnapshotsService = new HistoricalContextSnapshotsService()
   ) {}
 
   listStrategies(userId = 'default-user') { return this.repository.listStrategies(userId); }
@@ -1337,30 +1335,17 @@ export class BacktestingStrategyLabService {
     region: string,
   ): Promise<RegimeSnapshotRow[]> {
     try {
-      // We intentionally reach into the Prisma client via the repository's
-      // underlying db accessor to avoid a per-row async call.  The repository
-      // itself only exposes paginated queries; we add a simple bulk read here
-      // by calling the inherited Prisma model directly via the exposed db field.
-      const repoAsAny = this.snapshotsRepository as any;
-      const db = repoAsAny.db;
-      if (!db || typeof db.marketContextSnapshot?.findMany !== 'function') {
-        return [];
-      }
       // Fetch snapshotDate <= endDate AND snapshotDate >= (startDate - 90 days)
       // to ensure we also cover bar dates that precede the first snapshot after
       // the backtest's start date (e.g. a snapshot on 2018-12-28 is valid for
       // a bar on 2019-01-02).
       const from = new Date(new Date(startDate).getTime() - 90 * 24 * 60 * 60 * 1000);
       const to = new Date(endDate);
-      const rows: Array<{ snapshotDate: Date; regime: string; breadthPercentAboveSma50: number | null }> =
-        await db.marketContextSnapshot.findMany({
-          where: {
-            region: region.toUpperCase(),
-            snapshotDate: { gte: from, lte: to },
-          },
-          select: { snapshotDate: true, regime: true, breadthPercentAboveSma50: true },
-          orderBy: { snapshotDate: 'asc' },
-        });
+      const rows = await this.snapshotsService.marketContextSnapshotsInRange({
+        region: region.toUpperCase(),
+        from,
+        to,
+      });
       return rows.map((row) => ({
         dateKey: row.snapshotDate.toISOString().slice(0, 10),
         regime: row.regime,

@@ -196,4 +196,29 @@ describe('historical context snapshots service', () => {
     await expect(service.coverage({ region: 'IN', assetType: 'STOCK' })).resolves.toMatchObject({ warnings: ['No market context snapshots have been generated yet.'] });
     expect(repository.coverage).toHaveBeenCalledWith({ region: 'IN', assetType: 'STOCK' });
   });
+
+  it('marketContextSnapshotsInRange delegates to repository with correct params and returns rows ordered asc', async () => {
+    const from = new Date('2024-01-01T00:00:00.000Z');
+    const to = new Date('2024-06-30T00:00:00.000Z');
+    const mockRows = [
+      { snapshotDate: new Date('2024-01-15T00:00:00.000Z'), regime: 'RISK_ON', breadthPercentAboveSma50: 0.72 },
+      { snapshotDate: new Date('2024-03-20T00:00:00.000Z'), regime: 'NEUTRAL', breadthPercentAboveSma50: 0.48 },
+      { snapshotDate: new Date('2024-06-10T00:00:00.000Z'), regime: 'RISK_OFF', breadthPercentAboveSma50: 0.21 },
+    ];
+    const rangeFn = jest.fn().mockResolvedValue(mockRows);
+    const mockRepo = repo() as any;
+    mockRepo.marketContextSnapshotsInRange = rangeFn;
+    const service = new HistoricalContextSnapshotsService(mockRepo as any, marketContext as any, smartMoney as any, marketData as any);
+
+    const result = await service.marketContextSnapshotsInRange({ region: 'IN', from, to });
+
+    expect(rangeFn).toHaveBeenCalledWith({ region: 'IN', from, to });
+    expect(result).toHaveLength(3);
+    expect(result[0].regime).toBe('RISK_ON');
+    expect(result[1].regime).toBe('NEUTRAL');
+    expect(result[2].regime).toBe('RISK_OFF');
+    // Confirm the row shape the backtester expects
+    expect(result[0]).toHaveProperty('snapshotDate');
+    expect(result[0]).toHaveProperty('breadthPercentAboveSma50');
+  });
 });

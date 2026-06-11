@@ -122,6 +122,26 @@ export class HistoricalContextSnapshotsRepository {
     return { market, sector, country, smartMoney, dataQuality };
   }
 
+  /**
+   * Bulk range-query for MarketContextSnapshot rows used by per-bar regime
+   * lookup in the backtesting path.  Returns rows ordered ascending by
+   * snapshotDate — one findMany for the whole range, never per-bar.
+   */
+  marketContextSnapshotsInRange(params: {
+    region: string;
+    from: Date;
+    to: Date;
+  }): Promise<Array<{ snapshotDate: Date; regime: string; breadthPercentAboveSma50: number | null }>> {
+    return this.db.marketContextSnapshot.findMany({
+      where: {
+        region: params.region,
+        snapshotDate: { gte: params.from, lte: params.to },
+      },
+      select: { snapshotDate: true, regime: true, breadthPercentAboveSma50: true },
+      orderBy: { snapshotDate: 'asc' },
+    });
+  }
+
   emptyCount(): SnapshotCount {
     return { inserted: 0, updated: 0, skipped: 0 };
   }

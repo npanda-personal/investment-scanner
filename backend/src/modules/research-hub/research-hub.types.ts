@@ -1,6 +1,7 @@
 import type { StrategyDecisionDto, MarketGate, MarketCondition, AllowedAction } from '../strategy-decision-engine/strategy-decision-engine.types';
+import type { SignalConfidence } from '../../shared/types/signal.types';
 
-export type PriorityLevel = 'HIGH' | 'MEDIUM' | 'LOW';
+export type PriorityLevel = SignalConfidence;
 
 export interface NextAction {
   label: string;

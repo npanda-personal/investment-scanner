@@ -38,8 +38,8 @@ const makePrices = (start = '2021-01-01', days = 260, slope = 1) => {
 
 /**
  * Minimal service factory.  Accepts an optional mock for the 8th constructor
- * argument (snapshotsRepository).  The mock should expose a `db` property
- * with a `marketContextSnapshot.findMany` function to supply snapshot rows.
+ * argument (snapshotsService).  The mock should expose a
+ * `marketContextSnapshotsInRange` function to supply snapshot rows.
  */
 const makeService = (snapshotRows: Array<{ snapshotDate: Date; regime: string; breadthPercentAboveSma50: number | null }> = []) => {
   const prices = makePrices('2021-01-01', 260);
@@ -84,14 +84,10 @@ const makeService = (snapshotRows: Array<{ snapshotDate: Date; regime: string; b
     strategyToBacktestConfig: jest.fn(),
   };
 
-  // Mock the snapshots repository: expose a `db` with the correct Prisma-like
-  // interface so preloadRegimeSnapshots() can use it.
-  const mockSnapshotsRepository = {
-    db: {
-      marketContextSnapshot: {
-        findMany: jest.fn().mockResolvedValue(snapshotRows),
-      },
-    },
+  // Mock the snapshots service: expose marketContextSnapshotsInRange so that
+  // preloadRegimeSnapshots() gets the test rows via the public service API.
+  const mockSnapshotsService = {
+    marketContextSnapshotsInRange: jest.fn().mockResolvedValue(snapshotRows),
   };
 
   return {
@@ -103,10 +99,10 @@ const makeService = (snapshotRows: Array<{ snapshotDate: Date; regime: string; b
       dataQualityService as any,
       new StrategyFrameworkRegistry(),
       strategyFrameworkService as any,
-      mockSnapshotsRepository as any,
+      mockSnapshotsService as any,
     ),
     repository,
-    mockSnapshotsRepository,
+    mockSnapshotsService,
     prices,
   };
 };
@@ -352,14 +348,14 @@ describe('strategyContextFromBars: regime from persisted snapshot', () => {
 // ─── 3. Integration: preloadRegimeSnapshots is called once per simulate() ────
 
 describe('preloadRegimeSnapshots: called once per simulate, not per-bar', () => {
-  it('calls findMany exactly once during a full simulation', async () => {
+  it('calls marketContextSnapshotsInRange exactly once during a full simulation', async () => {
     const snapshotRows = [{
       snapshotDate: new Date('2021-01-01T00:00:00.000Z'),
       regime: 'NEUTRAL',
       breadthPercentAboveSma50: 0.5,
     }];
 
-    const { service, mockSnapshotsRepository } = makeService(snapshotRows);
+    const { service, mockSnapshotsService } = makeService(snapshotRows);
 
     const config: BacktestStrategyConfig = {
       universe: { type: 'SYMBOLS', symbols: ['TST'] },
@@ -375,8 +371,8 @@ describe('preloadRegimeSnapshots: called once per simulate, not per-bar', () => 
 
     await service.run({ config });
 
-    // findMany must have been called exactly once — not once per bar
-    expect(mockSnapshotsRepository.db.marketContextSnapshot.findMany).toHaveBeenCalledTimes(1);
+    // marketContextSnapshotsInRange must have been called exactly once — not once per bar
+    expect(mockSnapshotsService.marketContextSnapshotsInRange).toHaveBeenCalledTimes(1);
   });
 });
 

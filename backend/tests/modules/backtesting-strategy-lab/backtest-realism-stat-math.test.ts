@@ -46,7 +46,7 @@ const baseConfig: BacktestStrategyConfig = {
 const createService = (overrides: Partial<{
   marketDataService: any;
   strategyRegistry: any;
-  snapshotsRepository: any;
+  snapshotsService: any;
 }> = {}) => {
   const repository = {
     listStrategies: jest.fn(),
@@ -78,12 +78,8 @@ const createService = (overrides: Partial<{
     persistBacktestPerformance: jest.fn().mockResolvedValue({ id: 'summary-1', ratingScore: 20, ratingGrade: 'UNPROVEN', readinessLabel: 'RESEARCH_ONLY', ratingReasons: [] }),
     strategyToBacktestConfig: jest.fn(),
   };
-  const snapshotsRepository = overrides.snapshotsRepository ?? {
-    db: {
-      marketContextSnapshot: {
-        findMany: jest.fn().mockResolvedValue([]),
-      },
-    },
+  const snapshotsService = overrides.snapshotsService ?? {
+    marketContextSnapshotsInRange: jest.fn().mockResolvedValue([]),
   };
   return new BacktestingStrategyLabService(
     repository as any,
@@ -93,7 +89,7 @@ const createService = (overrides: Partial<{
     dataQualityService as any,
     overrides.strategyRegistry ?? { get: jest.fn().mockReturnValue(null) } as any,
     strategyFrameworkService as any,
-    snapshotsRepository as any,
+    snapshotsService as any,
   );
 };
 
@@ -140,18 +136,14 @@ describe('Fix #1 — regime-absent bars produce UNKNOWN gate and realismWarning'
 
   it('REGIME_UNAVAILABLE warning is absent when all bars have regime data', async () => {
     // Provide a snapshot that covers the entire test window
-    const snapshotsRepository = {
-      db: {
-        marketContextSnapshot: {
-          findMany: jest.fn().mockResolvedValue([{
-            snapshotDate: new Date('2020-01-01T00:00:00.000Z'),
-            regime: 'RISK_ON',
-            breadthPercentAboveSma50: 0.65,
-          }]),
-        },
-      },
+    const snapshotsService = {
+      marketContextSnapshotsInRange: jest.fn().mockResolvedValue([{
+        snapshotDate: new Date('2020-01-01T00:00:00.000Z'),
+        regime: 'RISK_ON',
+        breadthPercentAboveSma50: 0.65,
+      }]),
     };
-    const service = createService({ snapshotsRepository });
+    const service = createService({ snapshotsService });
     const result = await service.simulate({ ...baseConfig });
     const warnings = result.metrics.realismWarnings ?? [];
     expect(warnings.some((w) => w.includes('REGIME_UNAVAILABLE'))).toBe(false);

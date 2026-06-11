@@ -1,6 +1,7 @@
 import type { MarketDataStatus } from '../market-data-foundation';
 import type { StrategyDefinitionDrift, StrategyDefinitionSource } from '../strategy-framework';
 import type { StrategyDecision } from '../../shared/types/strategy.types';
+import type { SignalConfidence } from '../../shared/types/signal.types';
 
 export type { StrategyDecision };
 
@@ -35,10 +36,10 @@ export type DecisionAction =
   | 'HOLD_POSITION'
   | 'NO_ACTION';
 
-export type DecisionConfidence = 'LOW' | 'MEDIUM' | 'HIGH';
+export type DecisionConfidence = SignalConfidence;
 
 export type EntryZoneType = 'BREAKOUT' | 'PULLBACK' | 'REVERSAL' | 'UNKNOWN';
-export type RiskReviewLevel = 'LOW' | 'MEDIUM' | 'HIGH';
+export type RiskReviewLevel = SignalConfidence;
 
 export interface EntryZonePreview {
   type: EntryZoneType;

@@ -5,6 +5,8 @@ import os from 'os';
 import path from 'path';
 import { inflateRawSync } from 'zlib';
 import { MarketDataFoundationRepository } from './market-data-foundation.repository';
+import type { MarketDataReadApi } from './market-data-read.api';
+import { isWatermarkGateEnabled, getWatermarkDate } from './market-data-read.api';
 import {
   MarketDataFoundationCryptoRepository,
   marketDataFoundationCryptoRepository,
@@ -823,7 +825,7 @@ export interface SignalOutcomeStalenessInvalidator {
   markStaleByInstrumentsFromDate?(instrumentIds: string[], fromDate: Date): Promise<number>;
 }
 
-export class MarketDataFoundationService {
+export class MarketDataFoundationService implements MarketDataReadApi {
   private static lastIngestionAt = 0;
   private static ingestionThrottleChain: Promise<void> = Promise.resolve();
   private static catalogSyncRuns = new Map<string, CatalogSyncRunRecord>();
@@ -4255,18 +4257,30 @@ export class MarketDataFoundationService {
   }
 
   async getLatestPricesBySymbols(symbols: string[]) {
+    // Watermark gate (DEFAULT OFF): when enabled, filter out prices beyond the
+    // FINAL_CONFIRMED watermark date.  A single lookup covers all symbols
+    // (they are all IN/STOCK for the equity use case that calls this method).
+    let watermarkEndDate: Date | null = null;
+    if (isWatermarkGateEnabled()) {
+      // Default region/assetType — getLatestPricesBySymbols has no scope arg.
+      const wmDate = await getWatermarkDate(this.repository, 'IN', 'STOCK');
+      watermarkEndDate = wmDate ? new Date(`${wmDate}T23:59:59.999Z`) : null;
+    }
+
     const prices = await this.repository.prisma.priceTick.findMany({
       where: { symbol: { in: symbols } },
       orderBy: { timestamp: 'desc' },
       distinct: ['symbol'],
     });
-    return prices.map((price) => ({
-      symbol: price.symbol,
-      date: price.timestamp,
-      close: Number(price.close),
-      adjusted_close: price.adjustedClose !== null ? Number(price.adjustedClose) : Number(price.close),
-      timestamp: price.timestamp,
-    }));
+    return prices
+      .filter((price) => !watermarkEndDate || price.timestamp <= watermarkEndDate)
+      .map((price) => ({
+        symbol: price.symbol,
+        date: price.timestamp,
+        close: Number(price.close),
+        adjusted_close: price.adjustedClose !== null ? Number(price.adjustedClose) : Number(price.close),
+        timestamp: price.timestamp,
+      }));
   }
 
   async listRecentPriceWindowsByInstrumentIds(
@@ -4277,6 +4291,20 @@ export class MarketDataFoundationService {
   ) {
     const uniqueIds = [...new Set(instrumentIds.filter(Boolean))];
     if (uniqueIds.length === 0) return new Map<string, any[]>();
+
+    // Watermark gate (DEFAULT OFF): clamp endDate to the FINAL_CONFIRMED watermark
+    // so mid-ingest rows are never returned.
+    if (isWatermarkGateEnabled()) {
+      const region = _options.region || 'IN';
+      const assetType = _options.assetType || 'STOCK';
+      const wmDate = await getWatermarkDate(this.repository, region, assetType);
+      if (wmDate) {
+        const wmEndDate = new Date(`${wmDate}T23:59:59.999Z`);
+        if (!endDate || endDate > wmEndDate) {
+          endDate = wmEndDate;
+        }
+      }
+    }
 
     const stocks = await this.repository.prisma.stock.findMany({
       where: { id: { in: uniqueIds } },
@@ -4469,6 +4497,21 @@ export class MarketDataFoundationService {
       return null;
     }
 
+    // Watermark gate (DEFAULT OFF): when MARKET_DATA_READ_WATERMARK_GATE=1|true,
+    // clamp the effective endDate to the latest FINAL_CONFIRMED watermark so
+    // mid-ingest rows are never visible to consumers.
+    if (isWatermarkGateEnabled()) {
+      const region = options.region || stock.region || 'IN';
+      const assetType = options.assetType || stock.assetType || 'STOCK';
+      const wmDate = await getWatermarkDate(this.repository, region, assetType);
+      if (wmDate) {
+        const wmEndDate = new Date(`${wmDate}T23:59:59.999Z`);
+        if (!endDate || endDate > wmEndDate) {
+          endDate = wmEndDate;
+        }
+      }
+    }
+
     // Fetch prices and recent delivery% concurrently (persisted-read, null-safe)
     const [prices, recentDelivery] = await Promise.all([
       this.repository.listPrices(stock.symbol, limit, startDate, endDate),
@@ -4561,8 +4604,28 @@ export class MarketDataFoundationService {
       return null;
     }
 
+    // Watermark gate (DEFAULT OFF): when enabled, if the latest price date
+    // exceeds the FINAL_CONFIRMED watermark treat it as PARTIAL (mid-ingest).
+    let watermarkEndDate: Date | null = null;
+    if (isWatermarkGateEnabled()) {
+      const region = options.region || stock.region || 'IN';
+      const assetType = options.assetType || stock.assetType || 'STOCK';
+      const wmDate = await getWatermarkDate(this.repository, region, assetType);
+      watermarkEndDate = wmDate ? new Date(`${wmDate}T23:59:59.999Z`) : null;
+    }
+
     const price = await this.repository.latestPrice(stock.symbol);
     if (!price) {
+      return {
+        instrument_id: stock.id,
+        symbol: stock.symbol,
+        latest: null,
+        data_status: 'PARTIAL',
+      };
+    }
+
+    // If the price is newer than the watermark, report as PARTIAL (not yet confirmed).
+    if (watermarkEndDate && price.timestamp > watermarkEndDate) {
       return {
         instrument_id: stock.id,
         symbol: stock.symbol,
