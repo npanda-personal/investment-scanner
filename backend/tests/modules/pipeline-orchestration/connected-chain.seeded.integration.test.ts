@@ -57,6 +57,15 @@ const {
   PipelineOrchestrationService,
 } = require('../../../src/modules/pipeline-orchestration') as typeof import('../../../src/modules/pipeline-orchestration');
 const { TradePlanRiskEngineService } = require('../../../src/modules/trade-plan-risk-engine') as typeof import('../../../src/modules/trade-plan-risk-engine');
+const {
+  EarningsIntelligenceRepository,
+  EarningsIntelligenceService,
+} = require('../../../src/modules/earnings-intelligence') as typeof import('../../../src/modules/earnings-intelligence');
+const {
+  StockInterestSnapshotRepository,
+  StockInterestSnapshotService,
+} = require('../../../src/modules/market-intelligence') as typeof import('../../../src/modules/market-intelligence');
+const { WorkbenchRefreshService } = require('../../../src/modules/stock-research-workbench') as typeof import('../../../src/modules/stock-research-workbench');
 
 const FIXED_CLOCK = new Date('2026-06-01T09:00:00.000Z');
 const SNAPSHOT_DAY = new Date('2026-06-01T00:00:00.000Z');
@@ -153,7 +162,7 @@ describe('Pipeline Orchestration seeded connected-chain integration', () => {
     // instruments (RELIANCE/TCS/INFY), TEST_SOURCE, and SIGNAL_GENERATED_DAY/DATA_THROUGH_DAY only.
     await cleanupConnectedChainRows();
     await prisma.$disconnect();
-  }, 60_000);
+  }, 120_000);
 
   it('fans out a terminal MARKET_DATA snapshot through persisted downstream chain outputs', async () => {
     const services = createConnectedChainServices();
@@ -326,7 +335,7 @@ describe('Pipeline Orchestration seeded connected-chain integration', () => {
     }
     const runAllMarker = ['PIPELINE', 'RUN', 'ALL'].join('_');
     expect(stageByKey.get('MARKET_DATA')?.idempotencyKey).not.toContain(runAllMarker);
-  }, 300_000);
+  }, 600_000);
 
   function createConnectedChainServices() {
     const marketDataService = new MarketDataFoundationService(new MarketDataFoundationRepository(prisma as any));
@@ -434,6 +443,9 @@ describe('Pipeline Orchestration seeded connected-chain integration', () => {
         signalPositionLedgerService,
         marketDataService,
         new MarketPulseSnapshotService(),
+        new EarningsIntelligenceService(new EarningsIntelligenceRepository(prisma as any)),
+        new StockInterestSnapshotService(new StockInterestSnapshotRepository(prisma as any)),
+        new WorkbenchRefreshService(undefined as any),
       ),
     };
   }

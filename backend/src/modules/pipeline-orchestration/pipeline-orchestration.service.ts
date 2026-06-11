@@ -17,6 +17,11 @@ import { TodayTradeReviewService } from '../today-trade-review';
 import { StockInterestSnapshotService } from '../market-intelligence';
 import { WorkbenchRefreshService } from '../stock-research-workbench';
 import { PipelineOrchestrationRepository } from './pipeline-orchestration.repository';
+import { buildPipelineDagAdapters } from './pipeline-dag-registry';
+import { PipelineDagRunner } from './pipeline-dag-runner';
+import { RepositoryDagPersistence } from './pipeline-dag-persistence';
+import type { DagAlertSummary } from './pipeline-dag-runner';
+import type { DagRunResult } from './pipeline-dag.types';
 import type {
   PipelineCommandAvailability,
   PipelineCommandCatalogItem,
@@ -175,6 +180,7 @@ const PIPELINE_COMMAND_POLICIES: PipelineCommandPolicy[] = [
   commandPolicy('MARKET_DATA_HISTORICAL_EXCHANGE_BACKFILL', 'MARKET_DATA', 1, 'Market Data', 'Historical exchange candle backfill', 'ENABLED', null),
   commandPolicy('MARKET_DATA_MANUAL_VERIFIED_FUNDAMENTALS_IMPORT', 'MARKET_DATA', 1, 'Market Data', 'Manual verified fundamentals import', 'ENABLED', null),
   commandPolicy('PIPELINE_RETRY_FAILED_STAGE', 'PIPELINE', 16, 'Pipeline', 'Retry failed stage or run', 'ENABLED', null),
+  commandPolicy('PIPELINE_DAG_RETRY', 'PIPELINE', 16, 'Pipeline', 'DAG retry — re-run failed stages via DAG runner', 'ENABLED', null, ['full_latest_trading_date', 'incremental_changed_only'], 100),
   commandPolicy('PIPELINE_DRAIN_ALL_BATCHES', 'PIPELINE', 16, 'Pipeline', 'Drain all batches', 'FORBIDDEN', 'First slice allows one batch per request only.'),
   commandPolicy('PIPELINE_CANCEL_ACTIVE', 'PIPELINE', 16, 'Pipeline', 'Cancel active run', 'FORBIDDEN', 'No background worker cancellation contract exists for this slice.'),
 ];
@@ -211,6 +217,111 @@ export class PipelineOrchestrationService {
     private readonly stockInterestService = new StockInterestSnapshotService(),
     private readonly workbenchRefreshService = new WorkbenchRefreshService()
   ) {}
+
+  // ---------------------------------------------------------------------------
+  // DAG runner — lazily built once per service instance so constructor
+  // injection and test mocking both work without changes to callers.
+  // ---------------------------------------------------------------------------
+  private _dagRunner: PipelineDagRunner | null = null;
+
+  private getDagRunner(): PipelineDagRunner {
+    if (!this._dagRunner) {
+      const persistence = new RepositoryDagPersistence(this.repository);
+      const adapters = buildPipelineDagAdapters({
+        dataQualityService: this.dataQualityService,
+        signalGenerationService: this.signalGenerationService,
+        signalCalibrationService: this.signalCalibrationService,
+        earningsIntelligenceService: this.earningsIntelligenceService,
+        marketContextService: this.marketContextService,
+        smartMoneyService: this.smartMoneyService,
+        historicalContextSnapshotsService: this.historicalContextService,
+        signalQualityService: this.signalQualityService,
+        strategyDecisionService: this.strategyDecisionService,
+        researchHubService: this.researchHubService,
+        todayReviewService: this.todayReviewService,
+        signalPositionLedgerService: this.signalPositionLedgerService,
+        marketDataService: this.marketDataService,
+        marketPulseService: this.marketPulseService,
+        stockInterestService: this.stockInterestService,
+        workbenchRefreshService: this.workbenchRefreshService,
+      });
+      const alertFn = (summary: DagAlertSummary): void => {
+        this.firePipelineRunAlert(
+          summary.runStatus,
+          summary.region,
+          summary.assetType,
+          summary.dataThroughDate,
+          summary.durationMs,
+          summary.stagesSummary,
+          summary.firstError ?? null
+        );
+      };
+      this._dagRunner = new PipelineDagRunner(adapters, { persistence, alert: alertFn }, { maxConcurrency: 3 });
+    }
+    return this._dagRunner;
+  }
+
+  /**
+   * Execute the daily pipeline via the DAG runner.
+   *
+   * Instrument scope:
+   *  - When changedInstrumentIds is non-empty, it is used as the instrument scope.
+   *  - Otherwise the full daily-refresh eligible set is resolved via
+   *    marketDataService.listDailyRefreshEligibleInstrumentIds (same path as the
+   *    legacy full_latest_trading_date mode).
+   *
+   * Alert: fired by the runner itself via the alert hook above — callers MUST NOT
+   * also fire a legacy chain alert for the DAG path.
+   */
+  async executeDagPipeline(params: {
+    tradingDate: string;
+    region: string;
+    assetType: string;
+    timeframe: string;
+    trigger: 'scheduled' | 'manual' | 'retry';
+    changedInstrumentIds?: string[] | null;
+    fromStage?: string;
+    sourceFingerprint?: string;
+  }): Promise<DagRunResult> {
+    const runner = this.getDagRunner();
+
+    // Resolve instrument scope.
+    let instrumentScope: string[] | null = null;
+    const provided = this.normalizeInstrumentIds(params.changedInstrumentIds);
+    if (provided.length > 0) {
+      instrumentScope = provided;
+    } else {
+      // Full daily refresh: resolve eligible set from market data service.
+      const resolver = (this.marketDataService as any).listDailyRefreshEligibleInstrumentIds;
+      if (typeof resolver === 'function') {
+        try {
+          const eligibility = await resolver.call(this.marketDataService, {
+            region: params.region,
+            assetType: params.assetType,
+            dataThroughDate: params.tradingDate,
+            limit: 10_000,
+          });
+          const resolved = this.normalizeInstrumentIds(eligibility?.instrumentIds);
+          if (resolved.length > 0) {
+            instrumentScope = resolved;
+          }
+        } catch (err) {
+          console.warn('[executeDagPipeline] listDailyRefreshEligibleInstrumentIds failed, proceeding with null scope:', err instanceof Error ? err.message : String(err));
+        }
+      }
+    }
+
+    return runner.execute({
+      tradingDate: params.tradingDate,
+      region: params.region,
+      assetType: params.assetType,
+      timeframe: params.timeframe,
+      trigger: params.trigger,
+      instrumentScope,
+      fromStage: params.fromStage,
+      sourceFingerprint: params.sourceFingerprint,
+    });
+  }
 
   createRun(input: PipelineRunCreateInput): Promise<PipelineRunRecord> {
     const normalized = this.normalizeScope(input);
@@ -336,7 +447,11 @@ export class PipelineOrchestrationService {
     }
 
     if (request.commandKey === 'PIPELINE_RUN_ALL') {
-      return this.executeDailyPipelineCommand(request, context, policy, now);
+      return this.executeDailyPipelineViaDag(request, context, policy, now);
+    }
+
+    if (request.commandKey === 'PIPELINE_DAG_RETRY') {
+      return this.executeDagRetryCommand(request, context, policy, now);
     }
 
     if (request.commandKey === 'MARKET_DATA_HISTORICAL_EXCHANGE_BACKFILL') {
@@ -1604,7 +1719,422 @@ export class PipelineOrchestrationService {
     }
   }
 
-  private async executeDailyPipelineCommand(
+  /**
+   * PIPELINE_RUN_ALL — DAG execution path (Phase 2 live).
+   *
+   * Market-data sync runs first (same as legacy), then hands the downstream
+   * pipeline over to executeDagPipeline instead of the legacy chain.
+   * The DAG runner fires the alert internally; no second alert is fired here.
+   */
+  private async executeDailyPipelineViaDag(
+    request: PipelineCommandRequest,
+    context: PipelineCommandExecutionContext,
+    policy: PipelineCommandPolicy,
+    now: Date
+  ): Promise<PipelineCommandResponse> {
+    if (request.timeframe !== '1d' || request.pipelineKey !== 'market-intelligence') {
+      throw new PipelineCommandError(400, 'PIPELINE_RUN_ALL supports only the market-intelligence 1d pipeline');
+    }
+
+    const commandIdempotencyKey = this.commandIdempotencyKey(request);
+    if (typeof (this.repository as any).findActiveRun === 'function') {
+      const activeRun = await this.repository.findActiveRun({
+        region: request.region,
+        assetType: request.assetType,
+        timeframe: request.timeframe,
+        pipelineKey: request.pipelineKey,
+      });
+      if (activeRun && !this.isStaleActiveRun(activeRun, now)) {
+        const blockingStage = await this.findBlockingActiveStageForScope({
+          region: request.region,
+          assetType: request.assetType,
+          timeframe: request.timeframe,
+          pipelineKey: request.pipelineKey,
+        }, now);
+        if (blockingStage !== null) {
+          throw new PipelineCommandError(
+            409,
+            'Pipeline run is already active for this scope',
+            this.activeRunHeldResponse(request, policy, commandIdempotencyKey, activeRun, blockingStage)
+          );
+        }
+      }
+    }
+
+    const commandRunId = `manual-daily-pipeline-${createHash('sha256').update(commandIdempotencyKey).digest('hex').slice(0, 16)}`;
+    const batchSize = Math.max(1, Math.min(request.batchSize || 100, 250));
+    const startedAt = now.toISOString();
+    const marketDataLeaseOwner = `manual-command:${request.commandKey}:${PROCESS_LOCAL_ID}`;
+
+    await this.recordMarketDataStageSnapshot({
+      region: request.region,
+      assetType: request.assetType,
+      timeframe: '1d',
+      pipelineKey: 'market-intelligence',
+      triggerType: 'manual',
+      operation: 'INCREMENTAL_EOD_LOAD',
+      runId: commandRunId,
+      status: 'RUNNING',
+      dataThroughDate: null,
+      totalCount: 0,
+      processedCount: 0,
+      succeededCount: 0,
+      failedCount: 0,
+      skippedCount: 0,
+      unchangedCount: 0,
+      changedInstrumentIds: [],
+      downstreamInstrumentIds: [],
+      batchSize,
+      nextOffset: 0,
+      hasMore: false,
+      startedAt,
+      completedAt: null,
+      leaseOwner: marketDataLeaseOwner,
+      leaseMs: DEFAULT_LEASE_MS,
+      warnings: [],
+      errors: [],
+      metadata: {
+        commandKey: request.commandKey,
+        commandIdempotencyKey,
+        requestedByUserId: context.requestedByUserId,
+        runMode: request.runMode,
+        reason: request.reason || null,
+        downstreamSnapshotBridgeSuppressed: true,
+      },
+    });
+
+    try {
+      const initialSummary = await this.marketDataService.syncScheduledRegion(request.region, {
+        assetType: request.assetType,
+        batchSize,
+        now,
+        syncDuringMarketHours: false,
+        skipWeekends: true,
+      });
+
+      const fullDailyMode = this.isFullDailyPipelineRun(request);
+      const summary = fullDailyMode
+        ? await this.withFullDailyDownstreamEligibility(initialSummary)
+        : this.incrementalChangedOnlyDownstreamSummary(initialSummary);
+
+      const downstreamInstrumentIds = this.normalizeInstrumentIds(
+        summary.downstreamInstrumentIds?.length ? summary.downstreamInstrumentIds : summary.changedInstrumentIds
+      );
+      const tradingDate = (summary.dataThroughDate || summary.tradingDate || '').slice(0, 10);
+      const stageStatus = this.marketDataPipelineStageStatus(summary);
+      const totalCount = this.marketDataPipelineTotalCount(summary);
+      const providerSkippedCount = Math.max(0, Number(summary.providerFetchSkippedCount || summary.skippedBeforeFetchCount || 0));
+      const processedCount = stageStatus === 'SKIPPED'
+        ? Math.max(totalCount, providerSkippedCount)
+        : Math.max(0, Number(summary.instrumentsProcessed || 0));
+      const failedCount = Math.max(0, summary.errors?.length || 0);
+      const skippedCount = stageStatus === 'SKIPPED' ? Math.max(totalCount, providerSkippedCount) : 0;
+      const succeededCount = stageStatus === 'SKIPPED'
+        ? 0
+        : Math.max(0, processedCount - failedCount - skippedCount);
+
+      // Run downstream via DAG runner when there is a valid tradingDate.
+      let dagResult: DagRunResult | null = null;
+      const dagWarnings: string[] = [];
+      const dagErrors: string[] = [];
+      if (tradingDate && downstreamInstrumentIds.length > 0) {
+        try {
+          dagResult = await this.executeDagPipeline({
+            tradingDate,
+            region: request.region,
+            assetType: request.assetType,
+            timeframe: '1d',
+            trigger: 'manual',
+            changedInstrumentIds: downstreamInstrumentIds,
+            sourceFingerprint: summary.sourceFingerprint ?? undefined,
+          });
+        } catch (dagErr) {
+          const msg = dagErr instanceof Error ? dagErr.message : 'DAG pipeline failed';
+          dagErrors.push(msg);
+          console.error('[PIPELINE_RUN_ALL/DAG] downstream DAG pipeline failed:', msg);
+        }
+      } else if (fullDailyMode && !tradingDate) {
+        dagWarnings.push('Full daily pipeline could not run downstream stages: no tradingDate from market-data sync.');
+      } else if (fullDailyMode && downstreamInstrumentIds.length === 0) {
+        dagWarnings.push('Full daily pipeline did not start downstream stages: no eligible instruments.');
+      }
+
+      const dagRunStatus = dagResult?.runStatus ?? null;
+      const terminalStageStatus = this.dagTerminalStatus(stageStatus, dagRunStatus, dagErrors);
+      const completedAt = new Date();
+
+      const completedStage = await this.recordMarketDataStageSnapshot({
+        region: request.region,
+        assetType: request.assetType,
+        timeframe: '1d',
+        pipelineKey: 'market-intelligence',
+        triggerType: 'manual',
+        operation: 'INCREMENTAL_EOD_LOAD',
+        runId: commandRunId,
+        status: terminalStageStatus,
+        dataThroughDate: summary.dataThroughDate || summary.tradingDate || null,
+        totalCount,
+        processedCount,
+        succeededCount,
+        failedCount,
+        skippedCount,
+        unchangedCount: Math.max(0, Number(summary.rowsNoOp || 0)),
+        changedInstrumentIds: summary.changedInstrumentIds || [],
+        downstreamInstrumentIds: downstreamInstrumentIds.length
+          ? downstreamInstrumentIds
+          : summary.changedInstrumentIds || [],
+        batchSize,
+        nextOffset: null,
+        hasMore: false,
+        startedAt,
+        completedAt: completedAt.toISOString(),
+        warnings: [...(summary.warnings || []), ...dagWarnings],
+        errors: [...(summary.errors || []), ...dagErrors],
+        metadata: {
+          commandKey: request.commandKey,
+          commandIdempotencyKey,
+          requestedByUserId: context.requestedByUserId,
+          runMode: request.runMode,
+          reason: request.reason || null,
+          adapter: 'MarketDataFoundationService.syncScheduledRegion',
+          sourceFingerprint: summary.sourceFingerprint || null,
+          tradingDate: summary.tradingDate,
+          dataThroughDate: summary.dataThroughDate || null,
+          rowsReceived: summary.rowsReceived,
+          rowsInserted: summary.rowsInserted,
+          rowsUpdated: summary.rowsUpdated,
+          rowsSkipped: summary.rowsSkipped,
+          rowsNoOp: summary.rowsNoOp,
+          officialEodBulk: summary.officialEodBulk ?? null,
+          downstreamInstrumentCount: downstreamInstrumentIds.length,
+          changedInstrumentCount: summary.changedInstrumentIds?.length || 0,
+          dagRunStatus,
+          dagErrors,
+          downstreamSnapshotBridgeSuppressed: true,
+        },
+      });
+
+      // Map DagRunResult → PipelineCommandResponse contract.
+      // The stage record returned by recordMarketDataStageSnapshot covers the
+      // MARKET_DATA stage; counts are populated from there.
+      return this.dagRunResultToCommandResponse(request, policy, commandIdempotencyKey, completedStage, dagResult, terminalStageStatus);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Daily pipeline command failed';
+      const failedAt = new Date();
+      const failedStage = await this.recordMarketDataStageSnapshot({
+        region: request.region,
+        assetType: request.assetType,
+        timeframe: '1d',
+        pipelineKey: 'market-intelligence',
+        triggerType: 'manual',
+        operation: 'INCREMENTAL_EOD_LOAD',
+        runId: commandRunId,
+        status: 'FAILED',
+        dataThroughDate: null,
+        totalCount: 1,
+        processedCount: 0,
+        succeededCount: 0,
+        failedCount: 1,
+        skippedCount: 0,
+        unchangedCount: 0,
+        changedInstrumentIds: [],
+        downstreamInstrumentIds: [],
+        batchSize,
+        nextOffset: null,
+        hasMore: false,
+        startedAt,
+        completedAt: failedAt.toISOString(),
+        warnings: [],
+        errors: [errorMessage],
+        metadata: {
+          commandKey: request.commandKey,
+          commandIdempotencyKey,
+          requestedByUserId: context.requestedByUserId,
+          adapter: 'MarketDataFoundationService.syncScheduledRegion',
+          error: errorMessage,
+          downstreamSnapshotBridgeSuppressed: true,
+        },
+      });
+      this.firePipelineRunAlert('FAILED', request.region, request.assetType, null, failedAt.getTime() - now.getTime(), [], errorMessage);
+      return this.responseFromStage(
+        request,
+        policy,
+        commandIdempotencyKey,
+        failedStage,
+        { acquired: true, reason: 'ACQUIRED', stage: failedStage },
+        'FAILED'
+      );
+    }
+  }
+
+  /**
+   * PIPELINE_DAG_RETRY — re-run failed/blocked stages via the DAG runner.
+   * Resolves the failed instrument scope from the latest failed stage records
+   * (failedInstrumentIds metadata written by Phase 0).
+   */
+  private async executeDagRetryCommand(
+    request: PipelineCommandRequest,
+    _context: PipelineCommandExecutionContext,
+    _policy: PipelineCommandPolicy,
+    _now: Date
+  ): Promise<PipelineCommandResponse> {
+    if (request.timeframe !== '1d' || request.pipelineKey !== 'market-intelligence') {
+      throw new PipelineCommandError(400, 'PIPELINE_DAG_RETRY supports only the market-intelligence 1d pipeline');
+    }
+
+    // Find the most-recent failed stage to extract tradingDate and failedInstrumentIds.
+    const failedStages = await this.latestStages({
+      region: request.region,
+      assetType: request.assetType,
+      timeframe: request.timeframe,
+      pipelineKey: request.pipelineKey,
+      stageKeys: SCHEDULED_DOWNSTREAM_STAGE_KEYS,
+      limit: 50,
+    });
+
+    const failedOrBlocked = failedStages.filter((s) => s.status === 'FAILED' || s.status === 'BLOCKED' || s.status === 'PARTIAL');
+    const tradingDate = failedOrBlocked[0]?.dataThroughDate?.slice(0, 10)
+      ?? failedStages[0]?.dataThroughDate?.slice(0, 10)
+      ?? new Date().toISOString().slice(0, 10);
+
+    // Collect failed instrument ids across all failed stages.
+    const failedIds: string[] = [];
+    for (const stage of failedOrBlocked) {
+      const meta = stage.metadata as Record<string, unknown> | null;
+      const ids = meta?.failedInstrumentIds;
+      if (Array.isArray(ids)) {
+        for (const id of ids) {
+          if (typeof id === 'string' && id.trim()) failedIds.push(id.trim());
+        }
+      }
+    }
+    const instrumentScope = failedIds.length > 0 ? this.normalizeInstrumentIds(failedIds) : null;
+
+    // Determine a fromStage (the earliest failed stage in topo order).
+    const fromStage = failedOrBlocked.length > 0
+      ? failedOrBlocked.reduce((earliest, s) => (s.stageOrder < earliest.stageOrder ? s : earliest), failedOrBlocked[0]).stageKey
+      : undefined;
+
+    const dagResult = await this.executeDagPipeline({
+      tradingDate,
+      region: request.region,
+      assetType: request.assetType,
+      timeframe: request.timeframe,
+      trigger: 'retry',
+      changedInstrumentIds: instrumentScope,
+      fromStage,
+    });
+
+    // Build a minimal synthetic PipelineCommandResponse from the DagRunResult.
+    const status = this.commandStatusFromStageStatus(dagResult.runStatus as any);
+    const totalSucceeded = Object.values(dagResult.stages).reduce((s, o) => s + o.succeededCount, 0);
+    const totalFailed = Object.values(dagResult.stages).reduce((s, o) => s + o.failedCount, 0);
+    const allErrors = Object.values(dagResult.stages).flatMap((o) => o.errors ?? []);
+
+    return {
+      commandId: this.commandIdempotencyKey(request),
+      commandKey: request.commandKey,
+      stageKey: 'PIPELINE',
+      status,
+      scope: {
+        region: request.region,
+        assetType: request.assetType,
+        timeframe: request.timeframe,
+        pipelineKey: request.pipelineKey,
+      },
+      runMode: request.runMode,
+      pipelineRunId: null,
+      stageRunId: null,
+      idempotencyKey: this.commandIdempotencyKey(request),
+      lease: { acquired: true, reason: 'ACQUIRED', leaseOwner: null, leaseExpiresAt: null },
+      batch: { batchSize: request.batchSize, offset: request.offset, nextOffset: null, hasMore: false },
+      counts: {
+        totalCount: totalSucceeded + totalFailed,
+        processedCount: totalSucceeded + totalFailed,
+        succeededCount: totalSucceeded,
+        partialCount: 0,
+        failedCount: totalFailed,
+        skippedCount: 0,
+        unchangedCount: 0,
+      },
+      warnings: [],
+      errors: allErrors,
+      statusUrl: this.statusUrl(request),
+      startedAt: null,
+      completedAt: new Date().toISOString(),
+    };
+  }
+
+  /** Map a DagRunResult to the PipelineCommandResponse shape the controller expects. */
+  private dagRunResultToCommandResponse(
+    request: PipelineCommandRequest,
+    policy: PipelineCommandPolicy,
+    commandIdempotencyKey: string,
+    marketDataStage: PipelineStageRunRecord,
+    dagResult: DagRunResult | null,
+    terminalStageStatus: PipelineStageStatus
+  ): PipelineCommandResponse {
+    const dagSucceeded = dagResult ? Object.values(dagResult.stages).reduce((s, o) => s + o.succeededCount, 0) : 0;
+    const dagFailed = dagResult ? Object.values(dagResult.stages).reduce((s, o) => s + o.failedCount, 0) : 0;
+    const dagErrors = dagResult ? Object.values(dagResult.stages).flatMap((o) => o.errors ?? []) : [];
+    const stagesSummary: Array<{ stageKey: string; status: string; succeededCount: number; failedCount: number }> = dagResult
+      ? Object.entries(dagResult.stages).map(([key, o]) => ({ stageKey: key, status: o.status, succeededCount: o.succeededCount, failedCount: o.failedCount }))
+      : [];
+    return {
+      commandId: commandIdempotencyKey,
+      commandKey: request.commandKey,
+      stageKey: policy.stageKey,
+      status: this.commandStatusFromStageStatus(terminalStageStatus),
+      scope: {
+        region: request.region,
+        assetType: request.assetType,
+        timeframe: request.timeframe,
+        pipelineKey: request.pipelineKey,
+      },
+      runMode: request.runMode,
+      pipelineRunId: marketDataStage.pipelineRunId,
+      stageRunId: marketDataStage.id,
+      idempotencyKey: commandIdempotencyKey,
+      lease: { acquired: true, reason: 'ACQUIRED', leaseOwner: marketDataStage.leaseOwner, leaseExpiresAt: marketDataStage.leaseExpiresAt },
+      batch: {
+        batchSize: marketDataStage.batchSize ?? request.batchSize,
+        offset: marketDataStage.offset ?? request.offset,
+        nextOffset: marketDataStage.nextOffset,
+        hasMore: marketDataStage.hasMore,
+      },
+      counts: {
+        totalCount: marketDataStage.totalCount + dagSucceeded + dagFailed,
+        processedCount: marketDataStage.processedCount + dagSucceeded + dagFailed,
+        succeededCount: marketDataStage.succeededCount + dagSucceeded,
+        partialCount: marketDataStage.partialCount,
+        failedCount: marketDataStage.failedCount + dagFailed,
+        skippedCount: marketDataStage.skippedCount,
+        unchangedCount: marketDataStage.unchangedCount,
+      },
+      warnings: [...marketDataStage.warnings, ...(stagesSummary.filter((s) => s.status === 'PARTIAL').map((s) => `${s.stageKey}: partial`))],
+      errors: [...marketDataStage.errors, ...dagErrors],
+      statusUrl: this.statusUrl(request),
+      startedAt: marketDataStage.startedAt,
+      completedAt: new Date().toISOString(),
+    };
+  }
+
+  /** Compute the overall terminal status for PIPELINE_RUN_ALL/DAG combining market-data and DAG run. */
+  private dagTerminalStatus(
+    marketDataStatus: PipelineStageStatus,
+    dagRunStatus: 'COMPLETED' | 'PARTIAL' | 'FAILED' | null,
+    dagErrors: string[]
+  ): PipelineStageStatus {
+    if (marketDataStatus === 'FAILED') return 'FAILED';
+    if (dagErrors.length > 0 && !dagRunStatus) return 'PARTIAL';
+    if (!dagRunStatus) return marketDataStatus;
+    if (dagRunStatus === 'FAILED') return 'PARTIAL';
+    if (dagRunStatus === 'PARTIAL') return 'PARTIAL';
+    return marketDataStatus === 'SKIPPED' ? 'SKIPPED' : 'COMPLETED';
+  }
+
+  /** @deprecated Superseded by executeDailyPipelineViaDag. Retained for legacy test coverage; scheduled for deletion in Phase 4. */
+  async executeDailyPipelineCommand(
     request: PipelineCommandRequest,
     context: PipelineCommandExecutionContext,
     policy: PipelineCommandPolicy,
@@ -2368,6 +2898,16 @@ export class PipelineOrchestrationService {
       params: retryParams || undefined,
     }, context, now);
   }
+
+  // ---------------------------------------------------------------------------
+  // LEGACY CHAIN — superseded by executeDagPipeline (Phase 2).
+  // Scheduled handover: runDownstreamDataQualityForMarketDataSnapshot now calls
+  // executeDagPipeline directly instead of this chain.
+  // Manual handover: executeDailyPipelineViaDag handles PIPELINE_RUN_ALL.
+  // These methods are retained for backward-compatibility with existing tests
+  // and the public runScheduledPipelineCatchUpFromMarketDataSummary API.
+  // Scheduled for deletion in Phase 4.
+  // ---------------------------------------------------------------------------
 
   async runScheduledDataQualityStage(
     request: ScheduledDataQualityStageRequest,
@@ -5555,6 +6095,18 @@ export class PipelineOrchestrationService {
       .sort((a, b) => a.localeCompare(b));
   }
 
+  /**
+   * Scheduled handover — Phase 2 live path.
+   *
+   * Market-data foundation calls recordMarketDataStageSnapshot on every sync
+   * completion; this method picks up the payload and hands it to executeDagPipeline.
+   *
+   * The guards hasActiveScheduledDownstream / hasCompletedScheduledTerminal still
+   * run via the shouldRun check above and the dataThroughDate guard below.
+   * hasCompletedScheduledTerminal checks for SIGNAL_POSITION_LEDGER — the DAG runner
+   * writes stageKey='SIGNAL_POSITION_LEDGER' verbatim (stageVersion='dag-v1'), so
+   * `latestStages` finds it with the same key; the guard remains effective.
+   */
   private async runDownstreamDataQualityForMarketDataSnapshot(input: {
     request: MarketDataStageSnapshotRequest;
     normalizedScope: { region: string; assetType: string; timeframe: string; dataThroughDate?: Date | null };
@@ -5563,12 +6115,12 @@ export class PipelineOrchestrationService {
     changedInstrumentIds: string[];
     normalizedBatchSize: number;
   }): Promise<unknown | null> {
-    const { request, normalizedScope, completedStage, outputFingerprint, changedInstrumentIds, normalizedBatchSize } = input;
+    const { request, normalizedScope, completedStage, outputFingerprint, changedInstrumentIds } = input;
     if (!this.shouldRunDownstreamDataQualityForMarketDataSnapshot(request, changedInstrumentIds)) return null;
 
     const dataThroughDate = this.snapshotDataThroughDateKey(request.dataThroughDate, normalizedScope.dataThroughDate);
     if (!dataThroughDate) {
-      console.warn('[PipelineOrchestration] Market Data snapshot skipped downstream Data Quality: missing dataThroughDate', {
+      console.warn('[PipelineOrchestration] Market Data snapshot skipped downstream DAG pipeline: missing dataThroughDate', {
         operation: request.operation,
         runId: request.runId,
         stageRunId: completedStage.id,
@@ -5576,20 +6128,19 @@ export class PipelineOrchestrationService {
       return null;
     }
 
-    return this.runScheduledDataQualityStage({
+    const sourceFingerprint = `${outputFingerprint || completedStage.outputFingerprint || `market-data:${request.operation}:${request.runId}`}:catchup:${dataThroughDate}`;
+
+    return this.executeDagPipeline({
+      tradingDate: dataThroughDate,
       region: normalizedScope.region,
       assetType: normalizedScope.assetType,
       timeframe: '1d',
-      pipelineKey: request.pipelineKey,
-      triggerType: 'scheduled',
-      dataThroughDate,
-      sourceFingerprint: outputFingerprint || completedStage.outputFingerprint || `market-data:${request.operation}:${request.runId}`,
+      trigger: 'scheduled',
       changedInstrumentIds,
-      batchSize: normalizedBatchSize,
-      schedulerRunStartedAt: (this.parseOptionalDate(request.startedAt) || new Date()).toISOString(),
+      sourceFingerprint,
     }).catch((error) => {
       const message = error instanceof Error ? error.message : 'unknown error';
-      console.error('[PipelineOrchestration] downstream Data Quality stage failed after Market Data snapshot', {
+      console.error('[PipelineOrchestration] downstream DAG pipeline failed after Market Data snapshot', {
         operation: request.operation,
         runId: request.runId,
         stageRunId: completedStage.id,
@@ -5598,8 +6149,9 @@ export class PipelineOrchestrationService {
         error: message,
       });
       return {
-        status: 'FAILED',
-        stageKey: 'DATA_QUALITY',
+        runStatus: 'FAILED',
+        stages: {},
+        durationMs: 0,
         errors: [message],
       };
     });

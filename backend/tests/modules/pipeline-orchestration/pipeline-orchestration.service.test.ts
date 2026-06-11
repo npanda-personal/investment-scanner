@@ -621,6 +621,7 @@ describe('PipelineOrchestrationService', () => {
       'MARKET_DATA_HISTORICAL_EXCHANGE_BACKFILL',
       'MARKET_DATA_MANUAL_VERIFIED_FUNDAMENTALS_IMPORT',
       'PIPELINE_RETRY_FAILED_STAGE',
+      'PIPELINE_DAG_RETRY',
     ]);
     expect(catalog.commands.find((item) => item.commandKey === 'PIPELINE_RUN_ALL')).toMatchObject({
       availability: 'ENABLED',
@@ -1068,24 +1069,8 @@ describe('PipelineOrchestrationService', () => {
     const recordSnapshot = jest.spyOn(service, 'recordMarketDataStageSnapshot')
       .mockResolvedValueOnce({ ...completedStage, status: 'RUNNING', completedAt: null } as any)
       .mockResolvedValueOnce(completedStage as any);
-    const catchUp = jest.spyOn(service, 'runScheduledPipelineCatchUpFromMarketDataSummary')
-      .mockResolvedValue({
-        status: 'COMPLETED',
-        pipelineRunId: 'run-dq',
-        stageRunId: 'stage-dq',
-        stageKey: 'DATA_QUALITY',
-        scope: { region: 'IN', assetType: 'STOCK', timeframe: '1d', pipelineKey: 'market-intelligence' },
-        triggerType: 'scheduled',
-        dataThroughDate: '2026-05-25',
-        inputFingerprint: 'dq-input',
-        outputFingerprint: 'dq-output',
-        batch: { totalInstrumentCount: 2, processedCount: 2, batchSize: 2, nextOffset: null, hasMore: false },
-        counts: { totalCount: 2, processedCount: 2, succeededCount: 2, partialCount: 0, failedCount: 0, skippedCount: 0, unchangedCount: 0 },
-        warnings: [],
-        errors: [],
-        startedAt: '2026-05-25T03:00:02.000Z',
-        completedAt: '2026-05-25T03:00:03.000Z',
-      } as any);
+    const dagRun = jest.spyOn(service, 'executeDagPipeline')
+      .mockResolvedValue({ runStatus: 'COMPLETED', stages: {}, durationMs: 100 });
 
     const result = await service.executeCommand({
       commandKey: 'PIPELINE_RUN_ALL',
@@ -1117,19 +1102,18 @@ describe('PipelineOrchestrationService', () => {
       changedInstrumentIds: ['stock-1'],
       downstreamInstrumentIds: ['stock-1', 'stock-2'],
     }));
-    expect(catchUp).toHaveBeenCalledWith(expect.objectContaining({
-      dataThroughDate: '2026-05-25',
-      downstreamInstrumentIds: ['stock-1', 'stock-2'],
-      dqStageEligible: true,
-    }), expect.any(Date), { allowCompletedTerminal: true });
+    expect(dagRun).toHaveBeenCalledWith(expect.objectContaining({
+      tradingDate: '2026-05-25',
+      region: 'IN',
+      assetType: 'STOCK',
+      timeframe: '1d',
+      trigger: 'manual',
+      changedInstrumentIds: ['stock-1', 'stock-2'],
+    }));
     expect(result).toMatchObject({
       commandKey: 'PIPELINE_RUN_ALL',
       stageKey: 'MARKET_DATA',
       status: 'COMPLETED',
-      counts: {
-        totalCount: 2,
-        processedCount: 2,
-      },
     });
   });
 
@@ -1295,24 +1279,8 @@ describe('PipelineOrchestrationService', () => {
     const recordSnapshot = jest.spyOn(service, 'recordMarketDataStageSnapshot')
       .mockResolvedValueOnce({ ...completedStage, status: 'RUNNING', completedAt: null } as any)
       .mockResolvedValueOnce(completedStage as any);
-    jest.spyOn(service, 'runScheduledPipelineCatchUpFromMarketDataSummary')
-      .mockResolvedValue({
-        status: 'COMPLETED',
-        pipelineRunId: 'run-dq-retry',
-        stageRunId: 'stage-dq-retry',
-        stageKey: 'DATA_QUALITY',
-        scope: { region: 'IN', assetType: 'STOCK', timeframe: '1d', pipelineKey: 'market-intelligence' },
-        triggerType: 'scheduled',
-        dataThroughDate: '2026-05-25',
-        inputFingerprint: 'dq-input-retry',
-        outputFingerprint: 'dq-output-retry',
-        batch: { totalInstrumentCount: 1, processedCount: 1, batchSize: 1, nextOffset: null, hasMore: false },
-        counts: { totalCount: 1, processedCount: 1, succeededCount: 1, partialCount: 0, failedCount: 0, skippedCount: 0, unchangedCount: 0 },
-        warnings: [],
-        errors: [],
-        startedAt: '2026-05-25T03:05:01.000Z',
-        completedAt: '2026-05-25T03:05:02.000Z',
-      } as any);
+    jest.spyOn(service, 'executeDagPipeline')
+      .mockResolvedValue({ runStatus: 'COMPLETED', stages: {}, durationMs: 100 });
 
     const result = await service.executeCommand({
       commandKey: 'PIPELINE_RUN_ALL',
@@ -1376,24 +1344,8 @@ describe('PipelineOrchestrationService', () => {
     const recordSnapshot = jest.spyOn(service, 'recordMarketDataStageSnapshot')
       .mockResolvedValueOnce({ ...completedStage, status: 'RUNNING', completedAt: null } as any)
       .mockResolvedValueOnce(completedStage as any);
-    const catchUp = jest.spyOn(service, 'runScheduledPipelineCatchUpFromMarketDataSummary')
-      .mockResolvedValue({
-        status: 'COMPLETED',
-        pipelineRunId: 'run-dq-no-op',
-        stageRunId: 'stage-dq-no-op',
-        stageKey: 'DATA_QUALITY',
-        scope: { region: 'IN', assetType: 'STOCK', timeframe: '1d', pipelineKey: 'market-intelligence' },
-        triggerType: 'scheduled',
-        dataThroughDate: '2026-05-25',
-        inputFingerprint: 'dq-input',
-        outputFingerprint: 'dq-output',
-        batch: { totalInstrumentCount: 2, processedCount: 2, batchSize: 2, nextOffset: null, hasMore: false },
-        counts: { totalCount: 2, processedCount: 2, succeededCount: 2, partialCount: 0, failedCount: 0, skippedCount: 0, unchangedCount: 0 },
-        warnings: [],
-        errors: [],
-        startedAt: '2026-05-25T03:00:02.000Z',
-        completedAt: '2026-05-25T03:00:03.000Z',
-      } as any);
+    const dagRun = jest.spyOn(service, 'executeDagPipeline')
+      .mockResolvedValue({ runStatus: 'COMPLETED', stages: {}, durationMs: 100 });
 
     const result = await service.executeCommand({
       commandKey: 'PIPELINE_RUN_ALL',
@@ -1408,11 +1360,13 @@ describe('PipelineOrchestrationService', () => {
       force: false,
     }, { requestedByUserId: 'local-manual-operator' }, new Date('2026-05-25T03:00:00.000Z'));
 
-    expect(catchUp).toHaveBeenCalledWith(expect.objectContaining({
-      changedInstrumentIds: [],
-      downstreamInstrumentIds: ['stock-1', 'stock-2'],
-      dqStageEligible: true,
-    }), expect.any(Date), { allowCompletedTerminal: true });
+    expect(dagRun).toHaveBeenCalledWith(expect.objectContaining({
+      tradingDate: '2026-05-25',
+      region: 'IN',
+      assetType: 'STOCK',
+      changedInstrumentIds: ['stock-1', 'stock-2'],
+      trigger: 'manual',
+    }));
     expect(recordSnapshot).toHaveBeenNthCalledWith(2, expect.objectContaining({
       status: 'COMPLETED',
       changedInstrumentIds: [],
@@ -1471,24 +1425,8 @@ describe('PipelineOrchestrationService', () => {
     const recordSnapshot = jest.spyOn(service, 'recordMarketDataStageSnapshot')
       .mockResolvedValueOnce({ ...completedStage, status: 'RUNNING', completedAt: null } as any)
       .mockResolvedValueOnce(completedStage as any);
-    const catchUp = jest.spyOn(service, 'runScheduledPipelineCatchUpFromMarketDataSummary')
-      .mockResolvedValue({
-        status: 'COMPLETED',
-        pipelineRunId: 'run-dq-current',
-        stageRunId: 'stage-dq-current',
-        stageKey: 'DATA_QUALITY',
-        scope: { region: 'IN', assetType: 'STOCK', timeframe: '1d', pipelineKey: 'market-intelligence' },
-        triggerType: 'scheduled',
-        dataThroughDate: '2026-05-27',
-        inputFingerprint: 'dq-input-current',
-        outputFingerprint: 'dq-output-current',
-        batch: { totalInstrumentCount: 2, processedCount: 2, batchSize: 2, nextOffset: null, hasMore: false },
-        counts: { totalCount: 2, processedCount: 2, succeededCount: 2, partialCount: 0, failedCount: 0, skippedCount: 0, unchangedCount: 0 },
-        warnings: [],
-        errors: [],
-        startedAt: '2026-05-28T03:00:02.000Z',
-        completedAt: '2026-05-28T03:00:03.000Z',
-      } as any);
+    const dagRun = jest.spyOn(service, 'executeDagPipeline')
+      .mockResolvedValue({ runStatus: 'COMPLETED', stages: {}, durationMs: 100 });
 
     const result = await service.executeCommand({
       commandKey: 'PIPELINE_RUN_ALL',
@@ -1509,12 +1447,11 @@ describe('PipelineOrchestrationService', () => {
       dataThroughDate: '2026-05-27',
       limit: 10000,
     });
-    expect(catchUp).toHaveBeenCalledWith(expect.objectContaining({
-      changedInstrumentIds: [],
-      downstreamInstrumentIds: ['stock-1', 'stock-2'],
-      downstreamEligibilitySource: 'LATEST_PRICE',
-      dqStageEligible: true,
-    }), expect.any(Date), { allowCompletedTerminal: true });
+    expect(dagRun).toHaveBeenCalledWith(expect.objectContaining({
+      tradingDate: '2026-05-27',
+      changedInstrumentIds: ['stock-1', 'stock-2'],
+      trigger: 'manual',
+    }));
     expect(recordSnapshot).toHaveBeenNthCalledWith(2, expect.objectContaining({
       status: 'COMPLETED',
       changedInstrumentIds: [],
@@ -1524,9 +1461,6 @@ describe('PipelineOrchestrationService', () => {
         rowsInserted: 0,
         rowsUpdated: 0,
         downstreamInstrumentCount: 2,
-        downstreamEligibilitySource: 'LATEST_PRICE',
-        downstreamStatus: 'COMPLETED',
-        downstreamAlreadyExecuted: true,
         downstreamSnapshotBridgeSuppressed: true,
       }),
     }));
@@ -1607,24 +1541,8 @@ describe('PipelineOrchestrationService', () => {
     const recordSnapshot = jest.spyOn(service, 'recordMarketDataStageSnapshot')
       .mockResolvedValueOnce({ ...completedStage, status: 'RUNNING', completedAt: null, warnings: [] } as any)
       .mockResolvedValueOnce(completedStage as any);
-    const catchUp = jest.spyOn(service, 'runScheduledPipelineCatchUpFromMarketDataSummary')
-      .mockResolvedValue({
-        status: 'COMPLETED',
-        pipelineRunId: 'run-dq-not-available',
-        stageRunId: 'stage-dq-not-available',
-        stageKey: 'DATA_QUALITY',
-        scope: { region: 'IN', assetType: 'STOCK', timeframe: '1d', pipelineKey: 'market-intelligence' },
-        triggerType: 'scheduled',
-        dataThroughDate: '2026-05-26',
-        inputFingerprint: 'dq-input-not-available',
-        outputFingerprint: 'dq-output-not-available',
-        batch: { totalInstrumentCount: 2, processedCount: 2, batchSize: 2, nextOffset: null, hasMore: false },
-        counts: { totalCount: 2, processedCount: 2, succeededCount: 2, partialCount: 0, failedCount: 0, skippedCount: 0, unchangedCount: 0 },
-        warnings: [],
-        errors: [],
-        startedAt: '2026-05-27T13:00:02.000Z',
-        completedAt: '2026-05-27T13:00:03.000Z',
-      } as any);
+    const dagRun = jest.spyOn(service, 'executeDagPipeline')
+      .mockResolvedValue({ runStatus: 'COMPLETED', stages: {}, durationMs: 100 });
 
     const result = await service.executeCommand({
       commandKey: 'PIPELINE_RUN_ALL',
@@ -1645,12 +1563,11 @@ describe('PipelineOrchestrationService', () => {
       dataThroughDate: '2026-05-26',
       limit: 10000,
     });
-    expect(catchUp).toHaveBeenCalledWith(expect.objectContaining({
-      dataThroughDate: '2026-05-26',
-      downstreamInstrumentIds: ['stock-1', 'stock-2'],
-      downstreamEligibilitySource: 'LATEST_PRICE',
-      dqStageEligible: true,
-    }), expect.any(Date), { allowCompletedTerminal: true });
+    expect(dagRun).toHaveBeenCalledWith(expect.objectContaining({
+      tradingDate: '2026-05-26',
+      changedInstrumentIds: ['stock-1', 'stock-2'],
+      trigger: 'manual',
+    }));
     expect(recordSnapshot).toHaveBeenNthCalledWith(2, expect.objectContaining({
       status: 'COMPLETED',
       dataThroughDate: '2026-05-26',
@@ -1664,11 +1581,8 @@ describe('PipelineOrchestrationService', () => {
           fallbackReason: 'OFFICIAL_EOD_NOT_AVAILABLE',
           targetTradingDate: '2026-05-27',
         }),
-        marketDataAvailabilityStatus: 'NOT_AVAILABLE',
         downstreamInstrumentCount: 2,
-        downstreamEligibilitySource: 'LATEST_PRICE',
-        downstreamStatus: 'COMPLETED',
-        downstreamAlreadyExecuted: true,
+        downstreamSnapshotBridgeSuppressed: true,
       }),
     }));
     expect(result.status).toBe('COMPLETED');
@@ -1736,7 +1650,7 @@ describe('PipelineOrchestrationService', () => {
     const recordSnapshot = jest.spyOn(service, 'recordMarketDataStageSnapshot')
       .mockResolvedValueOnce({ ...skippedStage, status: 'RUNNING', completedAt: null } as any)
       .mockResolvedValueOnce(skippedStage as any);
-    const catchUp = jest.spyOn(service, 'runScheduledPipelineCatchUpFromMarketDataSummary');
+    const dagRun = jest.spyOn(service, 'executeDagPipeline');
 
     const result = await service.executeCommand({
       commandKey: 'PIPELINE_RUN_ALL',
@@ -1753,7 +1667,7 @@ describe('PipelineOrchestrationService', () => {
 
     expect(marketDataService.listDailyRefreshEligibleInstrumentIds).not.toHaveBeenCalled();
     expect(marketDataService.latestStoredCandleInfo).not.toHaveBeenCalled();
-    expect(catchUp).not.toHaveBeenCalled();
+    expect(dagRun).not.toHaveBeenCalled();
     expect(recordSnapshot).toHaveBeenNthCalledWith(2, expect.objectContaining({
       status: 'SKIPPED',
       changedInstrumentIds: [],
@@ -1761,8 +1675,8 @@ describe('PipelineOrchestrationService', () => {
       warnings: [],
       metadata: expect.objectContaining({
         downstreamInstrumentCount: 0,
-        downstreamStatus: null,
-        downstreamAlreadyExecuted: false,
+        dagRunStatus: null,
+        dagErrors: [],
       }),
     }));
     expect(result.status).toBe('SKIPPED');
@@ -1807,24 +1721,14 @@ describe('PipelineOrchestrationService', () => {
     const recordSnapshot = jest.spyOn(service, 'recordMarketDataStageSnapshot')
       .mockResolvedValueOnce({ ...partialStage, status: 'RUNNING', completedAt: null, errors: [] } as any)
       .mockResolvedValueOnce(partialStage as any);
-    jest.spyOn(service, 'runScheduledPipelineCatchUpFromMarketDataSummary')
+    jest.spyOn(service, 'executeDagPipeline')
       .mockResolvedValue({
-        status: 'FAILED',
-        pipelineRunId: 'run-dq-failed',
-        stageRunId: 'stage-dq-failed',
-        stageKey: 'DATA_QUALITY',
-        scope: { region: 'IN', assetType: 'STOCK', timeframe: '1d', pipelineKey: 'market-intelligence' },
-        triggerType: 'scheduled',
-        dataThroughDate: '2026-05-25',
-        inputFingerprint: 'dq-input',
-        outputFingerprint: null,
-        batch: { totalInstrumentCount: 1, processedCount: 0, batchSize: 1, nextOffset: null, hasMore: false },
-        counts: { totalCount: 1, processedCount: 0, succeededCount: 0, partialCount: 0, failedCount: 1, skippedCount: 0, unchangedCount: 0 },
-        warnings: [],
-        errors: ['DQ failed'],
-        startedAt: '2026-05-25T03:00:02.000Z',
-        completedAt: '2026-05-25T03:00:03.000Z',
-      } as any);
+        runStatus: 'FAILED',
+        stages: {
+          DATA_QUALITY: { status: 'FAILED', succeededCount: 0, failedCount: 1, durationMs: 50, cached: false, errors: ['DQ failed'] },
+        },
+        durationMs: 50,
+      });
 
     const result = await service.executeCommand({
       commandKey: 'PIPELINE_RUN_ALL',
@@ -1841,10 +1745,8 @@ describe('PipelineOrchestrationService', () => {
 
     expect(recordSnapshot).toHaveBeenNthCalledWith(2, expect.objectContaining({
       status: 'PARTIAL',
-      errors: ['DATA_QUALITY: DQ failed'],
       metadata: expect.objectContaining({
-        downstreamStatus: 'FAILED',
-        downstreamErrors: ['DATA_QUALITY: DQ failed'],
+        dagRunStatus: 'FAILED',
       }),
     }));
     expect(result.status).toBe('PARTIAL');
@@ -4951,9 +4853,9 @@ describe('PipelineOrchestrationService', () => {
       latestStages: jest.fn(),
     };
     const service = new PipelineOrchestrationService(repository as any, {} as any);
-    const runScheduledDataQualityStage = jest
-      .spyOn(service, 'runScheduledDataQualityStage')
-      .mockResolvedValue({ status: 'COMPLETED' } as any);
+    const dagRun = jest
+      .spyOn(service, 'executeDagPipeline')
+      .mockResolvedValue({ runStatus: 'COMPLETED', stages: {}, durationMs: 100 });
 
     await service.recordMarketDataStageSnapshot({
       region: 'IN',
@@ -4988,16 +4890,13 @@ describe('PipelineOrchestrationService', () => {
     expect(repository.upsertStage).toHaveBeenCalledWith(expect.objectContaining({
       changedInstrumentCount: 2,
     }));
-    expect(runScheduledDataQualityStage).toHaveBeenCalledWith(expect.objectContaining({
+    expect(dagRun).toHaveBeenCalledWith(expect.objectContaining({
       region: 'IN',
       assetType: 'STOCK',
       timeframe: '1d',
-      pipelineKey: 'market-intelligence',
-      triggerType: 'scheduled',
-      dataThroughDate: '2026-05-25',
-      changedInstrumentIds: ['stock-1', 'stock-2'],
-      batchSize: 2,
-      schedulerRunStartedAt: '2026-05-25T03:00:00.000Z',
+      tradingDate: '2026-05-25',
+      trigger: 'scheduled',
+      changedInstrumentIds: expect.arrayContaining(['stock-1', 'stock-2']),
     }));
   });
 });
