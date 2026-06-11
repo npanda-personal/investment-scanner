@@ -1,5 +1,5 @@
 import { MarketDataFoundationService } from '../market-data-foundation';
-import { DataQualityEngineService, type DataQualityEvaluationDto } from '../data-quality-engine';
+import { DataQualityEngineService, type DataQualityEvaluationDto, type InstrumentEligibilityRow } from '../data-quality-engine';
 import { SmartMoneyIntelligenceProvider } from './smart-money-intelligence.provider';
 import { SmartMoneyIntelligenceRepository } from './smart-money-intelligence.repository';
 import type {
@@ -61,7 +61,7 @@ export class SmartMoneyIntelligenceService {
     private readonly repository = new SmartMoneyIntelligenceRepository(),
     private readonly marketDataService = new MarketDataFoundationService(),
     private readonly provider = new SmartMoneyIntelligenceProvider(),
-    private readonly dataQualityService: Pick<DataQualityEngineService, 'diagnostics'> | null = new DataQualityEngineService()
+    private readonly dataQualityService: Pick<DataQualityEngineService, 'diagnostics' | 'getEligibility'> | null = new DataQualityEngineService()
   ) {}
 
   async health(): Promise<SmartMoneyHealth> {
@@ -121,11 +121,12 @@ export class SmartMoneyIntelligenceService {
     const SMART_MONEY_CONCURRENCY = 4;
     await this.eachWithConcurrency(instruments, SMART_MONEY_CONCURRENCY, async (instrument: any) => {
       try {
-        const [fullRangeBars, dataQuality] = await Promise.all([
+        const [fullRangeBars, dataQuality, eligibilityRow] = await Promise.all([
           this.loadBars(instrument.id, '6M').catch(() => []),
           this.loadDataQuality(instrument.id),
+          this.loadEligibility(instrument.id),
         ]);
-        const dataQualityGate = this.evaluateDataQuality(dataQuality);
+        const dataQualityGate = this.evaluateDataQualityFromEligibility(eligibilityRow) ?? this.evaluateDataQuality(dataQuality);
         if (dataQualityGate.status === 'BLOCKED') {
           const warning = `${instrument.symbol || instrument.id} smart-money snapshot skipped: ${dataQualityGate.reason}`;
           warnings.push(warning);
@@ -196,11 +197,12 @@ export class SmartMoneyIntelligenceService {
     // Fallback to on-the-fly calculation if missing
     const instrument = await this.marketDataService.getInstrument(instrumentId) as InstrumentLike | null;
     if (!instrument) return null;
-    const [bars, dataQuality] = await Promise.all([
+    const [bars, dataQuality, eligibilityRow] = await Promise.all([
       this.loadBars(instrumentId, range),
       this.loadDataQuality(instrumentId),
+      this.loadEligibility(instrumentId),
     ]);
-    const dataQualityGate = this.evaluateDataQuality(dataQuality);
+    const dataQualityGate = this.evaluateDataQualityFromEligibility(eligibilityRow) ?? this.evaluateDataQuality(dataQuality);
     if (dataQualityGate.status === 'BLOCKED') {
       return this.unavailableSummary(instrument, range, dataQualityGate.reason, dataQualityGate);
     }
@@ -471,6 +473,53 @@ export class SmartMoneyIntelligenceService {
   private async loadDataQuality(instrumentId: string): Promise<DataQualityEvaluationDto | null> {
     if (!this.dataQualityService) return null;
     return this.dataQualityService.diagnostics(instrumentId).catch(() => null);
+  }
+
+  private async loadEligibility(instrumentId: string): Promise<InstrumentEligibilityRow | null> {
+    if (!this.dataQualityService || typeof this.dataQualityService.getEligibility !== 'function') return null;
+    const rows = await this.dataQualityService.getEligibility([instrumentId]).catch(() => [] as InstrumentEligibilityRow[]);
+    return rows[0] ?? null;
+  }
+
+  /**
+   * Derive the SmartMoneyDataQualityGate from an instrument_eligibility row.
+   * Returns null when no row is available (caller falls back to legacy evaluateDataQuality).
+   *
+   * Mapping (per Phase-1 spec):
+   *   BLOCKED  — signalEligible=false with COVERAGE_UNUSABLE-class reasons
+   *              OR readinessStatus NOT_READY
+   *   LIMITED  — readinessStatus LIMITED
+   *              OR liquidity-class reasons (ILLIQUID)
+   *   READY    — otherwise
+   */
+  private evaluateDataQualityFromEligibility(row: InstrumentEligibilityRow | null): SmartMoneyDataQualityGate | null {
+    if (!row) return null;
+
+    const COVERAGE_UNUSABLE_CODES: string[] = ['COVERAGE_UNUSABLE'];
+    const LIQUIDITY_CODES: string[] = ['ILLIQUID', 'LOW_VOLUME_COVERAGE'];
+
+    const hasCoverageUnusable = row.verdicts.signalReasons.some((code) => COVERAGE_UNUSABLE_CODES.includes(code));
+    const hasLiquidityIssue = row.verdicts.signalReasons.some((code) => LIQUIDITY_CODES.includes(code));
+    const isNotReady = row.readinessStatus === 'NOT_READY';
+    const isLimited = row.readinessStatus === 'LIMITED';
+
+    if (!row.verdicts.signalEligible && (hasCoverageUnusable || isNotReady)) {
+      const reason = hasCoverageUnusable
+        ? 'Coverage is UNUSABLE; smart-money scoring blocked.'
+        : 'Signal readiness is NOT_READY; smart-money scoring blocked.';
+      const warnings = row.verdicts.signalReasons.map((code) => code as string);
+      return { status: 'BLOCKED', dataStatus: 'ERROR', reason, warnings };
+    }
+
+    if (isLimited || (hasLiquidityIssue && !row.verdicts.signalEligible)) {
+      const reason = isLimited
+        ? 'Signal readiness is LIMITED; smart-money evidence is limited.'
+        : 'Liquidity issue; smart-money evidence is limited.';
+      const warnings = row.verdicts.signalReasons.map((code) => code as string);
+      return { status: 'LIMITED', dataStatus: 'PARTIAL', reason, warnings };
+    }
+
+    return { status: 'READY', dataStatus: 'COMPLETE', reason: 'Eligibility row is ready for smart-money scoring.', warnings: [] };
   }
 
   private async loadOwnership(symbol: string): Promise<InsiderOwnershipSummary> {

@@ -1,6 +1,7 @@
 import { MarketDataFoundationService } from '../market-data-foundation';
 import { StockResearchWorkbenchService } from '../stock-research-workbench';
 import { DataQualityEngineService } from '../data-quality-engine';
+import type { FilterByVerdictResult } from '../data-quality-engine';
 import {
   BREADTH_WEAK_THRESHOLD,
   BREADTH_VERY_WEAK_THRESHOLD,
@@ -377,7 +378,7 @@ export class SignalGenerationEngineService {
     const resolvedInstrumentIds = resolved.instrumentIds;
     let instrumentIds = resolvedInstrumentIds;
     const useDataQualityFilter = request.useDataQualityFilter !== false;
-    let filteredDataQualityResult: Awaited<ReturnType<DataQualityEngineService['filterEligibleInstruments']>> | null = null;
+    let filteredDataQualityResult: FilterByVerdictResult | null = null;
     let dataQuality: SignalRunResponse['dataQuality'] = {
       filterApplied: useDataQualityFilter,
       beforeFilter: resolvedInstrumentIds.length,
@@ -389,77 +390,40 @@ export class SignalGenerationEngineService {
     };
 
     if (useDataQualityFilter) {
-      const dqFilterOptions = {
-        minSignalReadinessScore: request.minSignalReadinessScore ?? 70,
-        allowedReadinessStatuses: request.allowedReadinessStatuses,
-        includeLimited: request.includeLimited,
-        skipUnusable: request.skipUnusable ?? true,
-        missingQualityBehavior: request.missingQualityBehavior ?? 'SKIP',
-      };
       const filtered = await (asOfDate
-        ? this.dataQualityService.filterEligibleInstruments(resolvedInstrumentIds, dqFilterOptions, asOfDate)
-        : this.dataQualityService.filterEligibleInstruments(resolvedInstrumentIds, dqFilterOptions)
+        ? this.dataQualityService.filterByVerdict(resolvedInstrumentIds, 'signal', asOfDate)
+        : this.dataQualityService.filterByVerdict(resolvedInstrumentIds, 'signal')
       ).catch((error: any) => {
         if (asOfDate) {
           // Fix #7 (DQ asOf no-snapshot): For historical/backfill runs there may be no
-          // DQ snapshot for the requested date.  Falling back to "exclude all" would
+          // eligibility row for the requested date.  Falling back to "exclude all" would
           // silently zero-out the entire backfill run.  Instead fall back to INCLUDE so
           // that generation proceeds (with a warning); operators can re-filter later.
-          warnings.push(`Data quality filter unavailable for as-of date ${asOfDate.toISOString().split('T')[0]}; falling back to INCLUDE all instruments for this backfill run: ${error?.message || 'unknown error'}`);
+          warnings.push(`Signal verdict filter unavailable for as-of date ${asOfDate.toISOString().split('T')[0]}; falling back to INCLUDE all instruments for this backfill run: ${error?.message || 'unknown error'}`);
           return {
             eligibleInstrumentIds: resolvedInstrumentIds,
             excludedInstrumentIds: [] as string[],
-            missingQualityEvaluationCount: resolvedInstrumentIds.length,
-            warnings: [] as string[],
-            evaluationsByInstrumentId: {} as Record<string, any>,
+            reasonsByInstrumentId: {} as Record<string, any>,
           };
         }
-        warnings.push(`Data quality filter unavailable; trusted signal generation failed closed: ${error?.message || 'unknown error'}`);
+        warnings.push(`Signal verdict filter unavailable; trusted signal generation failed closed: ${error?.message || 'unknown error'}`);
         return {
           eligibleInstrumentIds: [] as string[],
           excludedInstrumentIds: resolvedInstrumentIds,
-          missingQualityEvaluationCount: resolvedInstrumentIds.length,
-          warnings: [] as string[],
-          evaluationsByInstrumentId: {} as Record<string, any>,
+          reasonsByInstrumentId: {} as Record<string, any>,
         };
       });
       if (filtered) {
         filteredDataQualityResult = filtered;
         instrumentIds = filtered.eligibleInstrumentIds;
-        warnings.push(...filtered.warnings);
         dataQuality = {
           filterApplied: true,
           beforeFilter: resolvedInstrumentIds.length,
           afterFilter: instrumentIds.length,
           excludedByDataQuality: filtered.excludedInstrumentIds.length,
-          missingQualityEvaluationCount: filtered.missingQualityEvaluationCount,
+          missingQualityEvaluationCount: 0,
           eligibleInstrumentCount: instrumentIds.length,
           attemptedGenerationCount: instrumentIds.length,
-        };
-      }
-    }
-
-    // Fundamentals eligibility gate (non-as-of only):
-    // Mainboard instruments (catalogSource='NSE_EQUITY_SECURITIES') with NO fundamentals record
-    // are excluded from generation — they'll be picked up once fundamentals are ingested.
-    // SME instruments (catalogSource='NSE_SME_EQUITY_SECURITIES') are always included.
-    // For as-of/historical runs the gate is skipped since historical fundamentals don't exist.
-    let excludedByFundamentalsGate = 0;
-    if (!asOfDate && instrumentIds.length > 0) {
-      const gateResult = await this.applyFundamentalsEligibilityGate(instrumentIds);
-      if (gateResult.excluded.length > 0) {
-        excludedByFundamentalsGate = gateResult.excluded.length;
-        instrumentIds = instrumentIds.filter((id) => !gateResult.excluded.includes(id));
-        if (gateResult.excluded.length > 0) {
-          warnings.push(`Fundamentals gate excluded ${gateResult.excluded.length} mainboard instrument(s) with no fundamentals record.`);
-        }
-        // Update dataQuality totals
-        dataQuality = {
-          ...dataQuality,
-          afterFilter: instrumentIds.length,
-          eligibleInstrumentCount: instrumentIds.length,
-          attemptedGenerationCount: instrumentIds.length,
-          excludedByFundamentalsGate,
         };
       }
     }
@@ -542,7 +506,7 @@ export class SignalGenerationEngineService {
       skipped: skippedCount,
       errors,
       warnings,
-      dataQuality: { ...dataQuality, excludedByFundamentalsGate },
+      dataQuality,
       results,
       runAudit: completedRunAudit,
       generated_at: generatedAt,
@@ -2346,14 +2310,13 @@ export class SignalGenerationEngineService {
 
   private getDataQualityEligibilityMap(
     instrumentIds: string[],
-    filtered: Awaited<ReturnType<DataQualityEngineService['filterEligibleInstruments']>>
+    filtered: FilterByVerdictResult
   ): Record<string, SignalDataQualityEligibility> {
-    const evaluations = filtered.evaluationsByInstrumentId || {};
     const excluded = new Set(filtered.excludedInstrumentIds);
     const eligible = new Set(filtered.eligibleInstrumentIds);
     return Object.fromEntries(instrumentIds.map((instrumentId) => {
-      const evaluation = evaluations[instrumentId];
-      return [instrumentId, this.toEligibilitySnapshot(true, eligible.has(instrumentId), excluded.has(instrumentId), evaluation)];
+      const reasons = filtered.reasonsByInstrumentId[instrumentId];
+      return [instrumentId, this.toEligibilitySnapshot(true, eligible.has(instrumentId), excluded.has(instrumentId), reasons)];
     }));
   }
 
@@ -2366,30 +2329,24 @@ export class SignalGenerationEngineService {
     };
   }
 
-  private toEligibilitySnapshot(filterApplied: boolean, eligible: boolean, excluded: boolean, evaluation: any): SignalDataQualityEligibility {
-    if (!evaluation) {
-      return {
-        filterApplied,
-        eligible: excluded ? false : (eligible ? true : null),
-        excludedReason: excluded ? 'Missing data quality evaluation.' : 'Missing data quality evaluation; configured behavior allowed processing.',
-      };
-    }
+  private toEligibilitySnapshot(filterApplied: boolean, eligible: boolean, excluded: boolean, reasons: string[] | undefined): SignalDataQualityEligibility {
     return {
       filterApplied,
-      eligible,
-      coverageStatus: evaluation.coverageStatus,
-      signalReadinessStatus: evaluation.signalReadinessStatus,
-      liquidityStatus: evaluation.liquidityStatus,
-      excludedReason: excluded ? this.dataQualityExcludedReason(evaluation) : undefined,
+      eligible: excluded ? false : (eligible ? true : null),
+      excludedReason: excluded ? this.dataQualityExcludedReason(reasons) : undefined,
     };
   }
 
-  private dataQualityExcludedReason(evaluation: any): string {
-    if (!evaluation.eligibleForSignals) return 'Not eligible for signals.';
-    if (evaluation.signalReadinessStatus && evaluation.signalReadinessStatus !== 'READY') return `Signal readiness is ${evaluation.signalReadinessStatus}.`;
-    if (evaluation.coverageStatus === 'UNUSABLE') return 'Coverage is unusable.';
-    if (evaluation.liquidityStatus === 'ILLIQUID') return 'Liquidity is illiquid.';
-    return 'Data quality filter excluded this instrument.';
+  private dataQualityExcludedReason(reasons: string[] | undefined): string {
+    if (!reasons || reasons.length === 0) return 'Signal verdict excluded this instrument.';
+    if (reasons.includes('MISSING_FUNDAMENTALS')) return 'Missing fundamentals record.';
+    if (reasons.includes('SCORE_BELOW_THRESHOLD')) return 'Signal readiness score below threshold.';
+    if (reasons.includes('STALE_PRICE')) return 'Stale price data.';
+    if (reasons.includes('COVERAGE_UNUSABLE')) return 'Coverage is unusable.';
+    if (reasons.includes('ILLIQUID')) return 'Liquidity is illiquid.';
+    if (reasons.includes('INSUFFICIENT_BARS')) return 'Insufficient price bars.';
+    if (reasons.includes('NO_LATEST_PRICE')) return 'No persisted eligibility record.';
+    return `Signal verdict excluded this instrument (${reasons.join(', ')}).`;
   }
 
   private scoringInputSummary(prices: SignalPricePoint[], latestFundamental: any, strategyContextLoaded: boolean): SignalScoringInputSummary {
@@ -2481,44 +2438,6 @@ export class SignalGenerationEngineService {
     const hasSector = Boolean(instrument?.sector?.trim?.());
     if (hasFundamentals && hasSector) return 'FULL';
     return 'PARTIAL';
-  }
-
-  /**
-   * Applies the fundamentals eligibility gate for non-as-of batch runs.
-   * Mainboard instruments with NO fundamentals record are excluded.
-   * SME instruments are always included.
-   * Returns { excluded: string[] } — instrument IDs to skip.
-   */
-  private async applyFundamentalsEligibilityGate(instrumentIds: string[]): Promise<{ excluded: string[] }> {
-    if (instrumentIds.length === 0) return { excluded: [] };
-    try {
-      const serviceAny = this.marketDataService as any;
-      const instruments: any[] = typeof serviceAny.getInstrumentsByIds === 'function'
-        ? await serviceAny.getInstrumentsByIds(instrumentIds).catch(() => [])
-        : [];
-      const fundamentalsMap: Map<string, any> = typeof serviceAny.storedFundamentalsByInstrumentIds === 'function'
-        ? await serviceAny.storedFundamentalsByInstrumentIds(instrumentIds).catch(() => new Map())
-        : new Map();
-      const excluded: string[] = [];
-      for (const instrument of instruments) {
-        const isSme = this.isSmeInstrument(instrument);
-        if (isSme) continue; // SME always included
-        const isMainboard = instrument.catalogSource === 'NSE_EQUITY_SECURITIES';
-        if (!isMainboard) continue; // non-SME non-mainboard: don't apply gate
-        const fundamentals = fundamentalsMap.get(instrument.id);
-        const hasFundamentals = fundamentals && (
-          (typeof fundamentals === 'object' && 'records' in fundamentals)
-            ? Array.isArray(fundamentals.records) && fundamentals.records.length > 0
-            : (fundamentals instanceof Map ? false : Boolean(fundamentals))
-        );
-        if (!hasFundamentals) {
-          excluded.push(instrument.id);
-        }
-      }
-      return { excluded };
-    } catch {
-      return { excluded: [] };
-    }
   }
 
   private clampInt(value: unknown, fallback: number, min: number, max: number) {

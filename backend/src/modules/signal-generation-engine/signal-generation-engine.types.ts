@@ -381,7 +381,6 @@ export interface SignalRunResponse {
     missingQualityEvaluationCount: number;
     eligibleInstrumentCount?: number;
     attemptedGenerationCount?: number;
-    excludedByFundamentalsGate?: number;
   };
   results: SignalResultDto[];
   runAudit?: SignalGenerationRunAudit;

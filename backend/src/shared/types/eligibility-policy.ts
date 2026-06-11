@@ -1,5 +1,11 @@
 export const ELIGIBILITY_POLICY_VERSION = 'elig-v1';
 
+// Minimum bars required to compute a meaningful signal (SMA-200 baseline).
+export const SIGNAL_HISTORY_MIN_BARS = 200;
+
+// Minimum bars for a partial / limited-quality history tier.
+export const PARTIAL_HISTORY_MIN_BARS = 50;
+
 // v1 preserves legacy semantics:
 //   signal  — legacy DQE eligibleForSignals (signalReadinessScore >= 70 && !stale)
 //             + legacy SGE mainboard-fundamentals gate folded in (requiresFundamentalsForBoards)

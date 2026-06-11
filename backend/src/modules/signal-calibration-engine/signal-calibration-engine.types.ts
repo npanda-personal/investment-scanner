@@ -1,5 +1,6 @@
 import type { SignalConfidence, SignalDirection, SignalItem, SignalResultDto } from '../signal-generation-engine';
 import type { DataQualityEvaluationDto } from '../data-quality-engine';
+import type { EligibilityFacts } from '../../shared/types/eligibility-policy';
 
 export type CalibrationDataStatus = 'COMPLETE' | 'PARTIAL' | 'MISSING' | 'ERROR';
 export type CalibrationAdjustmentType = 'SIGNAL_TYPE' | 'SCORE_BUCKET' | 'REGIME' | 'SECTOR' | 'SMART_MONEY' | 'DATA_QUALITY' | 'NOISE';
@@ -245,6 +246,8 @@ export interface CalibrationContext {
   smartMoneyStatus: string | null;
   dataQuality: any | null;
   dataQualityEvaluation?: DataQualityEvaluationDto | null;
+  /** Canonical per-instrument facts from instrument_eligibility — used for priceBars threshold check. */
+  eligibilityFacts?: EligibilityFacts | null;
   noisyIssueTypes: string[];
   dataGaps: string[];
   horizonAvailability?: Record<string, { eligible: number; evaluated: number; insufficientFuturePrice: number }> | null;

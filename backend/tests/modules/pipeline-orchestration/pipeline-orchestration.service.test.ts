@@ -2853,6 +2853,24 @@ describe('PipelineOrchestrationService', () => {
       completedAt: '2026-05-25T03:00:04.000Z',
       downstream: null,
     });
+    jest.spyOn(service, 'runScheduledEarningsIntelligenceStage').mockResolvedValue({
+      status: 'COMPLETED',
+      pipelineRunId: 'run-earnings-after-calibration',
+      stageRunId: 'stage-earnings-after-calibration',
+      stageKey: 'EARNINGS_INTELLIGENCE_REFRESH',
+      scope: { region: 'IN', assetType: 'STOCK', timeframe: '1d', pipelineKey: 'market-intelligence' },
+      triggerType: 'scheduled',
+      dataThroughDate: '2026-05-25',
+      inputFingerprint: 'earnings-input',
+      outputFingerprint: 'earnings-output',
+      batch: { totalInstrumentCount: 2, processedCount: 2, batchSize: 2, nextOffset: null, hasMore: false },
+      counts: { totalCount: 2, processedCount: 2, succeededCount: 2, partialCount: 0, failedCount: 0, skippedCount: 0, unchangedCount: 0 },
+      warnings: [],
+      errors: [],
+      startedAt: '2026-05-25T03:00:05.000Z',
+      completedAt: '2026-05-25T03:00:06.000Z',
+      downstream: null,
+    });
 
     const response = await service.runScheduledDataQualityStage({
       region: 'IN',
@@ -3793,6 +3811,24 @@ describe('PipelineOrchestrationService', () => {
       calibrationReadiness: { status: 'USABLE' },
     });
     const service = new PipelineOrchestrationService(repository as any, {} as any, { run: signalRun } as any, { run: calibrationAdapterRun } as any);
+    jest.spyOn(service, 'runScheduledEarningsIntelligenceStage').mockResolvedValue({
+      status: 'PARTIAL',
+      pipelineRunId: 'run-earnings-after-calibration-partial',
+      stageRunId: 'stage-earnings-after-calibration-partial',
+      stageKey: 'EARNINGS_INTELLIGENCE_REFRESH',
+      scope: { region: 'IN', assetType: 'STOCK', timeframe: '1d', pipelineKey: 'market-intelligence' },
+      triggerType: 'scheduled',
+      dataThroughDate: '2026-05-25',
+      inputFingerprint: 'earnings-partial-input',
+      outputFingerprint: 'earnings-partial-output',
+      batch: { totalInstrumentCount: 2, processedCount: 1, batchSize: 2, nextOffset: null, hasMore: false },
+      counts: { totalCount: 2, processedCount: 1, succeededCount: 1, partialCount: 1, failedCount: 0, skippedCount: 1, unchangedCount: 0 },
+      warnings: [],
+      errors: [],
+      startedAt: '2026-05-25T03:00:03.000Z',
+      completedAt: '2026-05-25T03:00:04.000Z',
+      downstream: null,
+    });
     jest.spyOn(service, 'runScheduledMarketContextStage').mockResolvedValue({
       status: 'COMPLETED',
       pipelineRunId: 'run-market-context-after-calibration',

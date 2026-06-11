@@ -817,15 +817,13 @@ describe('SignalGenerationEngineService', () => {
       listInstruments: jest.fn().mockResolvedValue({ instruments: [{ id: 'ready', symbol: 'RDY' }, { id: 'blocked', symbol: 'BLK' }, { id: 'missing', symbol: 'MSG' }] }),
     };
     const dataQualityService = {
-      filterEligibleInstruments: jest.fn().mockResolvedValue({
+      filterByVerdict: jest.fn().mockResolvedValue({
         eligibleInstrumentIds: ['ready'],
         excludedInstrumentIds: ['blocked', 'missing'],
-        missingQualityEvaluationCount: 1,
-        warnings: ['missing: missing data quality evaluation'],
-        evaluationsByInstrumentId: {
-          ready: { instrumentId: 'ready', eligibleForSignals: true, coverageStatus: 'GOOD', signalReadinessStatus: 'READY', liquidityStatus: 'LIQUID', signalReadinessScore: 90 },
-          blocked: { instrumentId: 'blocked', eligibleForSignals: false, coverageStatus: 'UNUSABLE', signalReadinessStatus: 'NOT_READY', liquidityStatus: 'UNKNOWN', signalReadinessScore: 10 },
-        },
+        reasonsByInstrumentId: {
+          blocked: ['COVERAGE_UNUSABLE'],
+          missing: ['NO_LATEST_PRICE'],
+        } as Record<string, string[]>,
       }),
     };
     const service = new SignalGenerationEngineService(repository as any, marketDataService as any, {} as any, dataQualityService as any);
@@ -859,32 +857,30 @@ describe('SignalGenerationEngineService', () => {
       beforeFilter: 3,
       afterFilter: 1,
       excludedByDataQuality: 2,
-      missingQualityEvaluationCount: 1,
+      // missingQualityEvaluationCount is always 0 with filterByVerdict — the verdict result
+      // carries exclusion reasons in reasonsByInstrumentId, not a separate missing-count field.
+      missingQualityEvaluationCount: 0,
       eligibleInstrumentCount: 1,
       attemptedGenerationCount: 1,
     });
     expect(result).toMatchObject({ eligibleInstrumentCount: 1, attemptedGenerationCount: 1, skippedCount: 2 });
-    expect(result.warnings[0]).toContain('missing data quality');
-    expect(dataQualityService.filterEligibleInstruments).toHaveBeenCalledTimes(1);
-    expect(dataQualityService.filterEligibleInstruments).toHaveBeenCalledWith(['ready', 'blocked', 'missing'], expect.objectContaining({
-      missingQualityBehavior: 'SKIP',
-    }));
+    // filterByVerdict is called with (ids, 'signal') — no options object
+    expect(dataQualityService.filterByVerdict).toHaveBeenCalledTimes(1);
+    expect(dataQualityService.filterByVerdict).toHaveBeenCalledWith(['ready', 'blocked', 'missing'], 'signal');
     const generationOptions = generateForInstrument.mock.calls[0][1] as any;
     expect(generationOptions.dataQualityEvaluationsByInstrumentId.ready).toMatchObject({
       filterApplied: true,
       eligible: true,
-      coverageStatus: 'GOOD',
-      signalReadinessStatus: 'READY',
-      liquidityStatus: 'LIQUID',
     });
     expect(generationOptions.dataQualityEvaluationsByInstrumentId.blocked).toMatchObject({
       filterApplied: true,
       eligible: false,
     });
+    // 'missing' has reason NO_LATEST_PRICE → 'No persisted eligibility record.'
     expect(generationOptions.dataQualityEvaluationsByInstrumentId.missing).toMatchObject({
       filterApplied: true,
       eligible: false,
-      excludedReason: 'Missing data quality evaluation.',
+      excludedReason: 'No persisted eligibility record.',
     });
   });
 
@@ -894,16 +890,14 @@ describe('SignalGenerationEngineService', () => {
       listInstruments: jest.fn().mockResolvedValue({ instruments: [{ id: 'one' }, { id: 'two' }], pagination: { total: 2 } }),
     };
     const dataQualityService = {
-      filterEligibleInstruments: jest.fn().mockRejectedValue(new Error('dq unavailable')),
+      filterByVerdict: jest.fn().mockRejectedValue(new Error('dq unavailable')),
     };
     const service = new SignalGenerationEngineService(repository as any, marketDataService as any, {} as any, dataQualityService as any);
     const generateForInstrument = jest.spyOn(service, 'generateForInstrument');
 
     const result = await service.run({ batchSize: 2, region: 'IN', assetType: 'STOCK' });
 
-    expect(dataQualityService.filterEligibleInstruments).toHaveBeenCalledWith(['one', 'two'], expect.objectContaining({
-      missingQualityBehavior: 'SKIP',
-    }));
+    expect(dataQualityService.filterByVerdict).toHaveBeenCalledWith(['one', 'two'], 'signal');
     expect(generateForInstrument).not.toHaveBeenCalled();
     expect(result).toMatchObject({
       generatedCount: 0,
@@ -914,7 +908,8 @@ describe('SignalGenerationEngineService', () => {
         beforeFilter: 2,
         afterFilter: 0,
         excludedByDataQuality: 2,
-        missingQualityEvaluationCount: 2,
+        // missingQualityEvaluationCount is always 0 with the verdict-based filter
+        missingQualityEvaluationCount: 0,
         eligibleInstrumentCount: 0,
         attemptedGenerationCount: 0,
       },

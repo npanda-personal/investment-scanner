@@ -125,17 +125,10 @@ const baseMarketDataService = (instrumentOverrides: Record<string, any> = {}, fu
 
 // DQ service that passes everything through
 const passThroughDqService = () => ({
-  filterEligibleInstruments: jest.fn(async (ids: string[]) => ({
+  filterByVerdict: jest.fn(async (ids: string[]) => ({
     eligibleInstrumentIds: ids,
-    excludedInstrumentIds: [],
-    missingQualityEvaluationCount: 0,
-    warnings: [],
-    evaluationsByInstrumentId: Object.fromEntries(ids.map((id) => [id, {
-      eligibleForSignals: true,
-      coverageStatus: 'GOOD',
-      signalReadinessStatus: 'READY',
-      liquidityStatus: 'LIQUID',
-    }])),
+    excludedInstrumentIds: [] as string[],
+    reasonsByInstrumentId: {} as Record<string, string[]>,
   })),
 });
 
@@ -208,17 +201,18 @@ describe('Signal eligibility gate + reliability tier', () => {
     expect(result!.reliabilityTier).toBe('PARTIAL');
   });
 
-  // ── 4. Mainboard without fundamentals, non-as-of → excluded by gate ─────
-  it('mainboard instrument with no fundamentals is excluded from non-as-of batch run', async () => {
+  // ── 4. Mainboard without fundamentals, non-as-of → excluded by DQ verdict ─
+  // The fundamentals-gate rule was removed as an in-flight check and folded into
+  // the persisted signal verdict (instrument_eligibility).  Live runs enforce it
+  // via filterByVerdict (useDataQualityFilter=true).  Tests with
+  // useDataQualityFilter=false bypass the gate entirely (no in-flight gate exists).
+  it('mainboard instrument with no fundamentals is excluded from non-as-of batch run via DQ verdict', async () => {
     const repo = mockRepository();
-    // Override storedFundamentalsByInstrumentIds to return empty (no fundamentals)
     const mds = baseMarketDataService({
       catalogSource: 'NSE_EQUITY_SECURITIES',
       sector: 'Technology',
     }, []); // empty fundamentals
-    // The gate calls storedFundamentalsByInstrumentIds
     mds.storedFundamentalsByInstrumentIds = jest.fn(async (_ids: string[]) => new Map()); // empty map → no fundamentals
-    // listInstruments returns one instrument for the batch
     mds.listInstruments = jest.fn().mockResolvedValue({
       instruments: [{ id: 'mb-nofund', catalogSource: 'NSE_EQUITY_SECURITIES', sector: 'Technology' }],
       pagination: { total: 1 },
@@ -230,23 +224,31 @@ describe('Signal eligibility gate + reliability tier', () => {
       sector: 'Technology',
     })));
 
+    // The DQ verdict carries the MISSING_FUNDAMENTALS reason — this is the new
+    // enforcement boundary (filterByVerdict replaces applyFundamentalsEligibilityGate).
+    const dqService = {
+      filterByVerdict: jest.fn(async (_ids: string[]) => ({
+        eligibleInstrumentIds: [] as string[],
+        excludedInstrumentIds: ['mb-nofund'],
+        reasonsByInstrumentId: { 'mb-nofund': ['MISSING_FUNDAMENTALS'] as string[] },
+      })),
+    };
+
     const service = new SignalGenerationEngineService(
       repo as any,
       mds as any,
       { workbench: jest.fn().mockResolvedValue(null) } as any,
-      passThroughDqService() as any,
+      dqService as any,
     );
 
     const runResult = await service.run({
       instrumentIds: ['mb-nofund'],
-      useDataQualityFilter: false, // bypass DQ filter to isolate the fundamentals gate
+      useDataQualityFilter: true, // DQ verdict enforces the fundamentals rule
     });
 
     // The instrument should be excluded — no results generated
     expect(runResult.results).toHaveLength(0);
-    expect(runResult.dataQuality?.excludedByFundamentalsGate).toBe(1);
-    // The warning should be present
-    expect(runResult.warnings.some((w) => w.includes('Fundamentals gate excluded'))).toBe(true);
+    expect(runResult.dataQuality?.excludedByDataQuality).toBe(1);
   });
 
   // ── 5. Mainboard without fundamentals, as-of run → NOT excluded ─────────
@@ -280,14 +282,14 @@ describe('Signal eligibility gate + reliability tier', () => {
     const runResult = await service.run({
       instrumentIds: ['mb-nofund-asof'],
       useDataQualityFilter: false,
-      asOfDate: '2025-01-15', // historical run → gate is bypassed
+      asOfDate: '2025-01-15', // historical run → DQ gate bypassed (useDataQualityFilter=false)
     });
 
-    // Gate was skipped: instrument was attempted
-    expect(runResult.dataQuality?.excludedByFundamentalsGate).toBe(0);
+    // Gate bypassed: no DQ-based exclusion
+    expect(runResult.dataQuality?.excludedByDataQuality).toBe(0);
     // Signal was generated (tier = PARTIAL since no fundamentals)
-    expect(runResult.results.length).toBeGreaterThanOrEqual(0); // may be 0 if DQ excluded, but gate should not fire
-    // Crucially: no gate-exclusion warning
+    expect(runResult.results.length).toBeGreaterThanOrEqual(0); // may be 0 if generation fails, but not excluded by gate
+    // No fundamentals-gate warning (gate no longer runs in-flight)
     expect(runResult.warnings.some((w) => w.includes('Fundamentals gate excluded'))).toBe(false);
   });
 });

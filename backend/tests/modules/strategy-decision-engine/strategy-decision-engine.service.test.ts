@@ -969,14 +969,35 @@ describe('StrategyDecisionEngineService', () => {
           liquidityStatus: 'LIQUID',
           signalReadinessScore: 90,
         }),
-        getEvaluationsForInstruments: jest.fn().mockResolvedValue(signalRows.map((signal) => ({
+        getEligibility: jest.fn().mockResolvedValue(signalRows.map((signal) => ({
           instrumentId: signal.instrument_id,
-          eligibleForSignals: true,
-          eligibleForBacktesting: true,
-          signalReadinessStatus: 'READY',
-          coverageStatus: 'GOOD',
-          liquidityStatus: 'LIQUID',
-          signalReadinessScore: 90,
+          tradingDate: new Date(),
+          facts: {
+            priceBars: 260,
+            lastPriceDate: new Date().toISOString(),
+            staleSessions: 0,
+            volumeCoveragePct: 0.98,
+            maxGapDays: 1,
+            liquidityScore: 75,
+            hasFundamentals: true,
+            hasSector: true,
+            hasIndustry: true,
+            hasCountry: true,
+          },
+          verdicts: {
+            signalEligible: true,
+            reviewEligible: true,
+            backtestEligible: true,
+            calibrationEligible: true,
+            signalReasons: [],
+            reviewReasons: [],
+            backtestReasons: [],
+            calibrationReasons: [],
+          },
+          readinessScore: 90,
+          readinessStatus: 'READY',
+          policyVersion: 'v1',
+          computedAt: new Date(),
         }))),
       };
       const smartMoney = {
@@ -1017,7 +1038,7 @@ describe('StrategyDecisionEngineService', () => {
       expect(marketData.getInstrument).not.toHaveBeenCalled();
       expect(marketData.listPricesByInstrumentId).not.toHaveBeenCalled();
       expect(calibration.latestPersistedForInstruments).toHaveBeenCalledWith(['stock-1', 'stock-2']);
-      expect(quality.getEvaluationsForInstruments).toHaveBeenCalledWith(['stock-1', 'stock-2']);
+      expect(quality.getEligibility).toHaveBeenCalledWith(['stock-1', 'stock-2']);
       expect(quality.diagnostics).not.toHaveBeenCalled();
       expect(smartMoney.latestPersistedStocks).toHaveBeenCalledWith(['stock-1', 'stock-2'], '3M');
       expect(smartMoney.stock).not.toHaveBeenCalled();
@@ -1100,14 +1121,35 @@ describe('StrategyDecisionEngineService', () => {
           liquidityStatus: 'LIQUID',
           signalReadinessScore: 90,
         }),
-        getEvaluationsForInstruments: jest.fn().mockResolvedValue(signalRows.map((signal) => ({
+        getEligibility: jest.fn().mockResolvedValue(signalRows.map((signal) => ({
           instrumentId: signal.instrument_id,
-          eligibleForSignals: true,
-          eligibleForBacktesting: true,
-          signalReadinessStatus: 'READY',
-          coverageStatus: 'GOOD',
-          liquidityStatus: 'LIQUID',
-          signalReadinessScore: 90,
+          tradingDate: new Date(),
+          facts: {
+            priceBars: 260,
+            lastPriceDate: new Date().toISOString(),
+            staleSessions: 0,
+            volumeCoveragePct: 0.98,
+            maxGapDays: 1,
+            liquidityScore: 75,
+            hasFundamentals: true,
+            hasSector: true,
+            hasIndustry: true,
+            hasCountry: true,
+          },
+          verdicts: {
+            signalEligible: true,
+            reviewEligible: true,
+            backtestEligible: true,
+            calibrationEligible: true,
+            signalReasons: [],
+            reviewReasons: [],
+            backtestReasons: [],
+            calibrationReasons: [],
+          },
+          readinessScore: 90,
+          readinessStatus: 'READY',
+          policyVersion: 'v1',
+          computedAt: new Date(),
         }))),
       };
       const smartMoney = {
@@ -1159,7 +1201,7 @@ describe('StrategyDecisionEngineService', () => {
       expect(signal.latestForInstrument).not.toHaveBeenCalled();
       expect(calibration.latestPersistedForInstruments).toHaveBeenCalledWith(['stock-1', 'stock-2', 'stock-3', 'stock-4']);
       expect(calibration.latestPersistedForInstrument).not.toHaveBeenCalled();
-      expect(quality.getEvaluationsForInstruments).toHaveBeenCalledWith(['stock-1', 'stock-2', 'stock-3', 'stock-4']);
+      expect(quality.getEligibility).toHaveBeenCalledWith(['stock-1', 'stock-2', 'stock-3', 'stock-4']);
       expect(quality.getLatestEvaluationForInstrument).not.toHaveBeenCalled();
       expect(smartMoney.latestPersistedStocks).toHaveBeenCalledWith(['stock-1', 'stock-2', 'stock-3', 'stock-4'], '3M');
       expect(smartMoney.latestPersistedStock).not.toHaveBeenCalled();

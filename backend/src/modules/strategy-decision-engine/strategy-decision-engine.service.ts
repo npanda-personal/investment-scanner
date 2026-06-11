@@ -8,6 +8,7 @@ import {
 import { SignalGenerationEngineService } from '../signal-generation-engine';
 import { SignalCalibrationEngineService } from '../signal-calibration-engine';
 import { DataQualityEngineService } from '../data-quality-engine';
+import type { InstrumentEligibilityRow } from '../data-quality-engine';
 import { SmartMoneyIntelligenceService } from '../smart-money-intelligence';
 import { PortfolioManagementService } from '../portfolio-management';
 import { WatchlistManagementService } from '../watchlist-management';
@@ -522,6 +523,60 @@ export class StrategyDecisionEngineService {
     return evaluation ?? null;
   }
 
+  /**
+   * Map either an InstrumentEligibilityRow (batch path, Phase 1) or a legacy
+   * DataQualityEvaluation object (single-instrument path) to the evaluator's
+   * StrategyContext.dataQuality shape.
+   *
+   * Mapping table (evaluator field ← source):
+   *   signalReadinessStatus  ← eligibilityRow.readinessStatus   (legacy: .signalReadinessStatus)
+   *   eligibleForSignals     ← eligibilityRow.verdicts.signalEligible (legacy: .eligibleForSignals)
+   *   signalReadinessScore   ← eligibilityRow.readinessScore    (legacy: .signalReadinessScore)
+   *   eligibleForBacktesting ← eligibilityRow.verdicts.backtestEligible (legacy: .eligibleForBacktesting)
+   *   liquidityStatus        ← derived from eligibilityRow.facts.liquidityScore via banding
+   *                            (>=70 LIQUID, >=40 THIN, else ILLIQUID — mirrors DQE readinessScore banding,
+   *                             see data-quality-engine.service.ts line ~638)
+   *                            (legacy: .liquidityStatus — direct field)
+   *   coverageStatus         ← FALLBACK: not stored in instrument_eligibility; defaults to 'PARTIAL'
+   *                            (conservative — won't trigger the UNUSABLE block in applyCommonNoise)
+   *                            (legacy: .coverageStatus — direct field, kept as fallback below)
+   */
+  private toEvaluatorDataQuality(quality: InstrumentEligibilityRow | Record<string, any>) {
+    // Discriminate: InstrumentEligibilityRow has a `verdicts` object with `signalEligible`.
+    const isEligibilityRow = quality != null &&
+      typeof (quality as InstrumentEligibilityRow).verdicts === 'object' &&
+      (quality as InstrumentEligibilityRow).verdicts != null;
+
+    if (isEligibilityRow) {
+      const row = quality as InstrumentEligibilityRow;
+      const ls = row.facts.liquidityScore;
+      // Liquidity banding mirrors DQE (data-quality-engine.service.ts ~638):
+      const liquidityStatus: 'LIQUID' | 'THIN' | 'ILLIQUID' =
+        ls >= 70 ? 'LIQUID' : ls >= 40 ? 'THIN' : 'ILLIQUID';
+      return {
+        // coverageStatus: FALLBACK — not stored in instrument_eligibility.
+        // Conservative default: 'PARTIAL' avoids false COVERAGE_UNUSABLE blocks.
+        coverageStatus: 'PARTIAL' as const,
+        signalReadinessStatus: row.readinessStatus,
+        liquidityStatus,
+        signalReadinessScore: row.readinessScore,
+        eligibleForSignals: row.verdicts.signalEligible,
+        eligibleForBacktesting: row.verdicts.backtestEligible,
+      };
+    }
+
+    // Legacy DataQualityEvaluation path (single-instrument buildDecisionContext).
+    const q = quality as Record<string, any>;
+    return {
+      coverageStatus: q['coverageStatus'],
+      signalReadinessStatus: q['signalReadinessStatus'],
+      liquidityStatus: q['liquidityStatus'],
+      signalReadinessScore: q['signalReadinessScore'],
+      eligibleForSignals: q['eligibleForSignals'],
+      eligibleForBacktesting: q['eligibleForBacktesting'],
+    };
+  }
+
   private toStrategyFrameworkContext(ctx: any): StrategyContext {
     const closes = ctx.prices as number[];
     // Resolve F&O / derivatives eligibility from the instrument record.
@@ -559,14 +614,7 @@ export class StrategyDecisionEngineService {
         calibratedDirection: ctx.calibrated.calibratedDirection ?? ctx.rawSignal?.direction ?? 'NEUTRAL',
         calibratedConfidence: ctx.calibrated.calibratedConfidence ?? 'MEDIUM',
       } : null,
-      dataQuality: ctx.quality ? {
-        coverageStatus: ctx.quality.coverageStatus,
-        signalReadinessStatus: ctx.quality.signalReadinessStatus,
-        liquidityStatus: ctx.quality.liquidityStatus,
-        signalReadinessScore: ctx.quality.signalReadinessScore,
-        eligibleForSignals: ctx.quality.eligibleForSignals,
-        eligibleForBacktesting: ctx.quality.eligibleForBacktesting,
-      } : null,
+      dataQuality: ctx.quality ? this.toEvaluatorDataQuality(ctx.quality) : null,
       marketGate: ctx.gate.marketGate,
       marketRegime: ctx.marketSummary?.regime?.regime ?? null,
       sectorLeadership: ctx.sectorContext?.leadershipStatus ?? null,
@@ -741,16 +789,16 @@ export class StrategyDecisionEngineService {
     const marketDataAny = this.marketDataService as any;
     const calibrationAny = this.calibrationService as any;
     const smartMoneyAny = this.smartMoneyService as any;
-    const [prices, calibrations, dataQuality, smartMoney] = await Promise.all([
+    const [prices, calibrations, eligibilityRows, smartMoney] = await Promise.all([
       typeof marketDataAny.listRecentPriceWindowsByInstrumentIds === 'function'
         ? marketDataAny.listRecentPriceWindowsByInstrumentIds(instrumentIds, 500, marketScope).catch(() => new Map())
         : Promise.resolve(new Map()),
       typeof calibrationAny.latestPersistedForInstruments === 'function'
         ? calibrationAny.latestPersistedForInstruments(instrumentIds).catch(() => [])
         : Promise.resolve([]),
-      typeof (this.dataQualityService as any).getEvaluationsForInstruments === 'function'
-        ? (this.dataQualityService as any).getEvaluationsForInstruments(instrumentIds).catch(() => [])
-        : Promise.resolve([]),
+      // Phase 1 consumer flip: source data-quality context from instrument_eligibility
+      // (one bulk query, no N+1). Legacy getEvaluationsForInstruments replaced.
+      this.dataQualityService.getEligibility(instrumentIds).catch(() => [] as InstrumentEligibilityRow[]),
       typeof smartMoneyAny.latestPersistedStocks === 'function'
         ? smartMoneyAny.latestPersistedStocks(instrumentIds, '3M').catch(() => [])
         : Promise.resolve([]),
@@ -758,7 +806,7 @@ export class StrategyDecisionEngineService {
     return {
       pricesByInstrumentId: prices instanceof Map ? prices : new Map(),
       calibrationByInstrumentId: new Map((calibrations as any[]).map((item) => [item.instrumentId, item])),
-      dataQualityByInstrumentId: new Map((dataQuality as any[]).map((item) => [item.instrumentId, item])),
+      dataQualityByInstrumentId: new Map((eligibilityRows as InstrumentEligibilityRow[]).map((row) => [row.instrumentId, row])),
       smartMoneyByInstrumentId: new Map((smartMoney as any[]).map((item) => [item.instrumentId, item])),
     };
   }

@@ -193,6 +193,17 @@ const dataQuality = (overrides: Partial<DataQualityEvaluationDto> = {}): DataQua
   ...overrides,
 });
 
+const eligibilityRow = (instrumentId = 'stock-1'): import('../../../src/modules/data-quality-engine').InstrumentEligibilityRow => ({
+  instrumentId,
+  tradingDate: fixedNow,
+  facts: { priceBars: 252, lastPriceDate: '2026-05-10', staleSessions: 0, volumeCoveragePct: 95, maxGapDays: 1, liquidityScore: 80, hasFundamentals: true, hasSector: true, hasIndustry: true, hasCountry: true },
+  verdicts: { reviewEligible: true, signalEligible: true, backtestEligible: true, calibrationEligible: true, reviewReasons: [], signalReasons: [], backtestReasons: [], calibrationReasons: [] },
+  readinessScore: 85,
+  readinessStatus: 'GOOD',
+  policyVersion: 'v1',
+  computedAt: fixedNow,
+});
+
 const tradePlan = (overrides: Partial<TradePlanResultDto> = {}): TradePlanResultDto => ({
   id: 'plan-1',
   instrumentId: 'stock-1',
@@ -337,6 +348,7 @@ const services = (overrides: Partial<TodayReviewUpstreamServices> = {}): TodayRe
   dataQualityService: {
     getLatestEvaluationForInstrument: jest.fn().mockResolvedValue(dataQuality()),
     getEvaluationsForInstruments: jest.fn().mockResolvedValue([dataQuality()]),
+    getEligibility: jest.fn().mockResolvedValue([eligibilityRow('stock-1')]),
   },
   marketContextService: {
     latestPersistedSummary: jest.fn().mockResolvedValue({
@@ -440,6 +452,7 @@ function boardFixtureServices(input: {
     dataQualityService: {
       getLatestEvaluationForInstrument: jest.fn().mockImplementation(async (instrumentId: string) => dataQualityByInstrument.get(instrumentId) || null),
       getEvaluationsForInstruments: jest.fn().mockImplementation(async (instrumentIds: string[]) => instrumentIds.map((instrumentId) => dataQualityByInstrument.get(instrumentId)).filter(Boolean)),
+      getEligibility: jest.fn().mockImplementation(async (instrumentIds: string[]) => instrumentIds.filter((id) => dataQualityByInstrument.has(id)).map(eligibilityRow)),
     },
     signalService: {
       latestForInstrument: jest.fn().mockImplementation(async (instrumentId: string) => signalEvidence ? {
@@ -902,6 +915,12 @@ describe('TodayTradeReviewService', () => {
       dataQualityService: {
         getLatestEvaluationForInstrument: jest.fn().mockResolvedValue(dataQuality({ signalReadinessStatus: 'LIMITED' })),
         getEvaluationsForInstruments: jest.fn().mockResolvedValue([dataQuality({ signalReadinessStatus: 'LIMITED' })]),
+        // reviewEligible:true keeps the candidate in LONG_REVIEW; signalEligible:false surfaces 'Signal readiness is LIMITED.' as a watch-reason (preserved user-facing wording).
+        getEligibility: jest.fn().mockResolvedValue([{
+          ...eligibilityRow('stock-1'),
+          verdicts: { reviewEligible: true, signalEligible: false, backtestEligible: true, calibrationEligible: false, reviewReasons: [], signalReasons: ['SCORE_BELOW_THRESHOLD'], backtestReasons: [], calibrationReasons: ['SCORE_BELOW_THRESHOLD'] },
+          readinessStatus: 'LIMITED',
+        }]),
       },
     }), () => fixedNow);
 
@@ -1230,6 +1249,7 @@ describe('TodayTradeReviewService', () => {
       dataQualityService: {
         getLatestEvaluationForInstrument: jest.fn().mockResolvedValue(null),
         getEvaluationsForInstruments: jest.fn().mockResolvedValue([]),
+        getEligibility: jest.fn().mockResolvedValue([]),
       },
     }), () => fixedNow);
 

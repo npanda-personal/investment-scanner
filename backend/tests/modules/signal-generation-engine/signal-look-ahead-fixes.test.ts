@@ -374,7 +374,7 @@ describe('#7 DQ asOf no-snapshot falls back to INCLUDE', () => {
       }),
     };
     const dataQualityService = {
-      filterEligibleInstruments: jest.fn().mockRejectedValue(new Error('no snapshot for 2023-01-01')),
+      filterByVerdict: jest.fn().mockRejectedValue(new Error('no snapshot for 2023-01-01')),
     };
 
     const service = new SignalGenerationEngineService(
@@ -403,7 +403,7 @@ describe('#7 DQ asOf no-snapshot falls back to INCLUDE', () => {
       }),
     };
     const dataQualityService = {
-      filterEligibleInstruments: jest.fn().mockRejectedValue(new Error('dq unavailable')),
+      filterByVerdict: jest.fn().mockRejectedValue(new Error('dq unavailable')),
     };
 
     const service = new SignalGenerationEngineService(

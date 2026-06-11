@@ -4,7 +4,7 @@ import { StrategyDecisionEngineService } from '../strategy-decision-engine';
 import { SignalGenerationEngineService } from '../signal-generation-engine';
 import { MarketDataFoundationService } from '../market-data-foundation/market-data-foundation.service';
 import { PortfolioManagementService } from '../portfolio-management';
-import { DataQualityEngineService } from '../data-quality-engine';
+import { DataQualityEngineService, type InstrumentEligibilityRow } from '../data-quality-engine';
 import { StrategyFrameworkService } from '../strategy-framework';
 import { applyLongPlanGeometryGuards, applyShortPlanGeometryGuards, canonicalizeTradePlanReadiness } from './trade-plan-risk-engine.geometry';
 
@@ -211,7 +211,7 @@ export class TradePlanRiskEngineService {
         result.planStatus = 'INSUFFICIENT_DATA';
         result.blockers.push('No Strategy Decision found for instrument.');
         result.dataGaps.push('strategy_decision');
-        return this.finalizeAndPersist(result, { request, decision: null, latestPriceResult: null, pricesDto: null, prices: [], dataQuality: null, backtestSummary: null, cache: executionContext.cache });
+        return this.finalizeAndPersist(result, { request, decision: null, latestPriceResult: null, pricesDto: null, prices: [], dataQuality: null, eligibilityRow: null, backtestSummary: null, cache: executionContext.cache });
       }
 
       result.strategy = decision.strategy;
@@ -279,7 +279,7 @@ export class TradePlanRiskEngineService {
         result.planStatus = 'INSUFFICIENT_DATA';
         result.blockers.push('Missing latest price.');
         result.dataGaps.push('latest_price');
-        return this.finalizeAndPersist(result, { request, decision, latestPriceResult, pricesDto: null, prices: [], dataQuality: null, backtestSummary: null, cache: executionContext.cache });
+        return this.finalizeAndPersist(result, { request, decision, latestPriceResult, pricesDto: null, prices: [], dataQuality: null, eligibilityRow: null, backtestSummary: null, cache: executionContext.cache });
       }
 
       const currentPrice = Number(latestPriceResult.latest.close);
@@ -291,9 +291,9 @@ export class TradePlanRiskEngineService {
         result.planStatus = 'INSUFFICIENT_DATA';
         result.blockers.push('Insufficient historical price data (< 10 bars).');
         result.dataGaps.push('price_history');
-        return this.finalizeAndPersist(result, { request, decision, latestPriceResult, pricesDto, prices, dataQuality: null, backtestSummary: null, cache: executionContext.cache });
+        return this.finalizeAndPersist(result, { request, decision, latestPriceResult, pricesDto, prices, dataQuality: null, eligibilityRow: null, backtestSummary: null, cache: executionContext.cache });
       }
-      
+
       let sma50 = null;
       let sma200 = null;
       let volatility = 0; // simple ATR approx
@@ -315,9 +315,34 @@ export class TradePlanRiskEngineService {
         volatility = ranges.reduce((a,b)=>a+b, 0) / 14;
       }
 
-      // Data Quality Evaluation
-      const dataQuality = await this.dataQualityService.diagnostics(instrumentId).catch(() => null);
-      if (dataQuality) {
+      // Data Quality Evaluation — load eligibility row (Phase-1 verdict source) in parallel with legacy diagnostics.
+      const [dataQuality, eligibilityRows] = await Promise.all([
+        this.dataQualityService.diagnostics(instrumentId).catch(() => null),
+        typeof (this.dataQualityService as any).getEligibility === 'function'
+          ? (this.dataQualityService as any).getEligibility([instrumentId]).catch(() => [] as InstrumentEligibilityRow[])
+          : Promise.resolve([] as InstrumentEligibilityRow[]),
+      ]);
+      const eligibilityRow: InstrumentEligibilityRow | null = (eligibilityRows as InstrumentEligibilityRow[])[0] ?? null;
+
+      // Phase-1 gate: source UNUSABLE/ILLIQUID blockers from eligibility row when available;
+      // fall back to legacy dataQuality fields when no row exists.
+      if (eligibilityRow) {
+        const signalReasons = eligibilityRow.verdicts.signalReasons;
+        if (!eligibilityRow.verdicts.signalEligible) {
+          if (signalReasons.includes('COVERAGE_UNUSABLE')) {
+            result.planStatus = 'BLOCKED';
+            result.blockers.push('Data Quality Engine reports UNUSABLE coverage.');
+          }
+          if (signalReasons.includes('ILLIQUID')) {
+            result.planStatus = 'BLOCKED';
+            result.blockers.push('Data Quality Engine reports ILLIQUID status.');
+          }
+          if (eligibilityRow.readinessStatus === 'NOT_READY') {
+            forceStatusWatch = true;
+            result.warnings.push('Data Quality Engine reports NOT_READY for signals.');
+          }
+        }
+      } else if (dataQuality) {
         if (dataQuality.coverageStatus === 'UNUSABLE') {
           result.planStatus = 'BLOCKED';
           result.blockers.push('Data Quality Engine reports UNUSABLE coverage.');
@@ -723,11 +748,11 @@ export class TradePlanRiskEngineService {
       }
 
       const backtestSummary = await this.latestBacktestSummary(result.strategy, region, assetType, request.backtestTimeframe, executionContext.cache);
-      return this.finalizeAndPersist(canonicalizeTradePlanReadiness(result), { request, decision, latestPriceResult, pricesDto, prices, dataQuality, backtestSummary, cache: executionContext.cache });
+      return this.finalizeAndPersist(canonicalizeTradePlanReadiness(result), { request, decision, latestPriceResult, pricesDto, prices, dataQuality, eligibilityRow, backtestSummary, cache: executionContext.cache });
     } catch (e: any) {
       result.planStatus = 'BLOCKED';
       result.blockers.push(`Error generating plan: ${e.message}`);
-      return this.finalizeAndPersist(canonicalizeTradePlanReadiness(result), { request, decision: null, latestPriceResult: null, pricesDto: null, prices: [], dataQuality: null, backtestSummary: null, cache: executionContext.cache });
+      return this.finalizeAndPersist(canonicalizeTradePlanReadiness(result), { request, decision: null, latestPriceResult: null, pricesDto: null, prices: [], dataQuality: null, eligibilityRow: null, backtestSummary: null, cache: executionContext.cache });
     }
   }
 
@@ -1441,6 +1466,8 @@ export class TradePlanRiskEngineService {
       pricesDto: any | null;
       prices: any[];
       dataQuality: any | null;
+      /** Phase-1: eligibility row from instrument_eligibility. Null when unavailable. */
+      eligibilityRow?: InstrumentEligibilityRow | null;
       backtestSummary: any | null;
       cache?: TradePlanGenerationCache;
     }
@@ -1462,7 +1489,7 @@ export class TradePlanRiskEngineService {
     const proofSnapshot = this.toStrategyProofSnapshot(result, context.decision, backtestSnapshot, context.request.backtestTimeframe || null);
     const decisionSnapshot = this.toStrategyDecisionSnapshot(result, context.decision);
     const marketSnapshot = this.toMarketDataSnapshot(result, context.latestPriceResult, context.pricesDto, context.prices, instrument, latestStoredInfo, region, assetType);
-    const dataQualitySnapshot = this.toDataQualitySnapshot(context.dataQuality);
+    const dataQualitySnapshot = this.toDataQualitySnapshot(context.dataQuality, context.eligibilityRow ?? null);
 
     result.region = region;
     result.assetType = assetType;
@@ -1584,8 +1611,22 @@ export class TradePlanRiskEngineService {
     };
   }
 
-  private toDataQualitySnapshot(dataQuality: any | null): DataQualitySnapshot {
-    if (!dataQuality) {
+  /**
+   * Build the DataQualitySnapshot embedded in persisted trade plans.
+   *
+   * Phase-1 flip: when an instrument_eligibility row is available, populate
+   * coverageStatus/liquidityStatus/signalReadinessStatus from its facts+verdicts
+   * so the snapshot is sourced from the shared eligibility table.
+   * Legacy dataQuality fields are used as fallback for fields not representable
+   * from the eligibility row (coverageScore, signalReadinessScore, liquidityScore,
+   * eligibleForSignals — kept from legacy when row is absent).
+   *
+   * Fallback fields that cannot be faithfully derived from the eligibility row:
+   *   - coverageScore, signalReadinessScore, liquidityScore — legacy source kept.
+   *   - eligibleForSignals — derived from signalEligible verdict.
+   */
+  private toDataQualitySnapshot(dataQuality: any | null, eligibilityRow: InstrumentEligibilityRow | null): DataQualitySnapshot {
+    if (!dataQuality && !eligibilityRow) {
       return {
         status: 'MISSING',
         warnings: ['No data quality evaluation found.'],
@@ -1593,6 +1634,53 @@ export class TradePlanRiskEngineService {
         generatedAt: null,
       };
     }
+
+    if (eligibilityRow) {
+      const v = eligibilityRow.verdicts;
+      const f = eligibilityRow.facts;
+
+      // Derive coverage status from eligibility facts/verdicts
+      const coverageStatus = v.signalReasons.includes('COVERAGE_UNUSABLE') ? 'UNUSABLE'
+        : (f.priceBars < 120 || f.staleSessions > 0) ? 'PARTIAL'
+        : 'GOOD';
+
+      // Derive signal readiness status from readinessStatus
+      const signalReadinessStatus = eligibilityRow.readinessStatus;
+
+      // Derive liquidity status from eligibility facts
+      const liquidityStatus = v.signalReasons.includes('ILLIQUID') || f.liquidityScore < 40 ? 'ILLIQUID'
+        : f.liquidityScore < 70 ? 'THIN'
+        : 'LIQUID';
+
+      const blockers: string[] = [];
+      if (!v.signalEligible) {
+        for (const code of v.signalReasons) {
+          if (code === 'COVERAGE_UNUSABLE') blockers.push('Data quality coverage is UNUSABLE.');
+          else if (code === 'ILLIQUID') blockers.push('Liquidity status is ILLIQUID.');
+          else if (code === 'STALE_PRICE') blockers.push('Latest price is stale.');
+          else if (code === 'INSUFFICIENT_BARS') blockers.push('Insufficient price history bars.');
+          else if (code === 'MISSING_FUNDAMENTALS') blockers.push('Fundamentals are missing.');
+          else blockers.push(code);
+        }
+      }
+
+      return {
+        status: 'AVAILABLE',
+        coverageStatus,
+        signalReadinessStatus,
+        liquidityStatus,
+        // Score fields not derivable from eligibility row — use legacy fallback when available
+        coverageScore: dataQuality?.coverageScore ?? null,
+        signalReadinessScore: eligibilityRow.readinessScore,
+        liquidityScore: f.liquidityScore,
+        eligibleForSignals: v.signalEligible,
+        warnings: dataQuality?.warnings || [],
+        blockers,
+        generatedAt: eligibilityRow.computedAt?.toISOString() ?? dataQuality?.lastEvaluatedAt ?? null,
+      };
+    }
+
+    // Legacy path: no eligibility row, use dataQuality only
     return {
       status: 'AVAILABLE',
       coverageStatus: dataQuality.coverageStatus ?? null,

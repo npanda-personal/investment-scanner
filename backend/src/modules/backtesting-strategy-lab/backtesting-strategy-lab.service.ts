@@ -5,6 +5,7 @@ import { DataQualityEngineService } from '../data-quality-engine';
 import { StrategyFrameworkEvaluator, StrategyFrameworkRegistry, StrategyFrameworkService } from '../strategy-framework';
 
 import { IN_STOCK_PROFILE, dailyRiskFreeRate, resolveMarketProfile } from '../../shared/utils/market-profile';
+import { ELIGIBILITY_POLICY, SIGNAL_HISTORY_MIN_BARS, PARTIAL_HISTORY_MIN_BARS } from '../../shared/types/eligibility-policy';
 
 /**
  * Risk-free + transaction-cost parameters now flow from the per-asset-class
@@ -978,20 +979,25 @@ export class BacktestingStrategyLabService {
         priceTimestamp: latest?.date ?? null,
         score: signal.score,
         direction: signal.direction as any,
-        confidence: closes.length >= 200 ? 'HIGH' : closes.length >= 50 ? 'MEDIUM' : 'LOW',
+        confidence: closes.length >= SIGNAL_HISTORY_MIN_BARS ? 'HIGH' : closes.length >= PARTIAL_HISTORY_MIN_BARS ? 'MEDIUM' : 'LOW',
         triggered_signals: [],
         negative_signals: [],
         explanation: 'Backtest proxy signal derived from registered strategy context.',
         generated_at: latest?.date ?? new Date().toISOString(),
         source: 'backtesting-strategy-lab',
-        data_status: closes.length >= 200 ? 'COMPLETE' : closes.length >= 50 ? 'PARTIAL' : 'MISSING',
+        data_status: closes.length >= SIGNAL_HISTORY_MIN_BARS ? 'COMPLETE' : closes.length >= PARTIAL_HISTORY_MIN_BARS ? 'PARTIAL' : 'MISSING',
       } as any,
+      // Intentionally point-in-time: thresholds are evaluated against the number of
+      // closes available at this bar, not the current-day instrument_eligibility verdict.
+      // instrument_eligibility only carries today's row; using it here would corrupt
+      // historical semantics.  Switch to historical snapshot verdicts in Phase 4 once
+      // snapshot history has accumulated.
       dataQuality: {
-        signalReadinessStatus: closes.length >= 200 ? 'READY' : closes.length >= 50 ? 'LIMITED' : 'NOT_READY',
-        coverageStatus: closes.length >= 252 ? 'GOOD' : closes.length >= 50 ? 'PARTIAL' : 'UNUSABLE',
+        signalReadinessStatus: closes.length >= SIGNAL_HISTORY_MIN_BARS ? 'READY' : closes.length >= PARTIAL_HISTORY_MIN_BARS ? 'LIMITED' : 'NOT_READY',
+        coverageStatus: closes.length >= ELIGIBILITY_POLICY.backtest.minPriceBars ? 'GOOD' : closes.length >= PARTIAL_HISTORY_MIN_BARS ? 'PARTIAL' : 'UNUSABLE',
         liquidityStatus: averageVolume20 === null ? 'UNKNOWN' : averageVolume20 > 0 ? 'LIQUID' : 'ILLIQUID',
-        eligibleForSignals: closes.length >= 200,
-        eligibleForBacktesting: closes.length >= 252,
+        eligibleForSignals: closes.length >= SIGNAL_HISTORY_MIN_BARS,
+        eligibleForBacktesting: closes.length >= ELIGIBILITY_POLICY.backtest.minPriceBars,
       },
       // Use the persisted regime for this bar date when available.
       // regimeRow is the nearest MarketContextSnapshot on-or-before the bar

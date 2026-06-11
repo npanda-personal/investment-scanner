@@ -558,8 +558,12 @@ export class TodayTradeReviewService {
     const hasBulkRawSignals = typeof this.services.signalService.latestPersistedForInstruments === 'function';
     const hasBulkCalibration = typeof this.services.calibrationService.latestPersistedForInstruments === 'function';
     const hasBulkSmartMoney = typeof this.services.smartMoneyService.latestPersistedStocks === 'function';
-    const [dataQualityRows, rawSignalRows, calibrationRows, smartMoneyRows] = await Promise.all([
+    const hasGetEligibility = typeof this.services.dataQualityService.getEligibility === 'function';
+    const [dataQualityRows, eligibilityRows, rawSignalRows, calibrationRows, smartMoneyRows] = await Promise.all([
       this.safe(() => this.services.dataQualityService.getEvaluationsForInstruments(instrumentIds), 'Data quality snapshots are unavailable.', warnings),
+      hasGetEligibility
+        ? this.safe(() => this.services.dataQualityService.getEligibility!(instrumentIds), 'Instrument eligibility rows are unavailable.', warnings)
+        : Promise.resolve(null),
       hasBulkRawSignals
         ? this.safe(() => this.services.signalService.latestPersistedForInstruments!(instrumentIds), 'Raw signal snapshots are unavailable.', warnings)
         : Promise.resolve(null),
@@ -571,6 +575,7 @@ export class TodayTradeReviewService {
         : Promise.resolve(null),
     ]);
     const dataQualityByInstrument = new Map((dataQualityRows || []).map((evaluation) => [evaluation.instrumentId, evaluation]));
+    const eligibilityByInstrument = new Map((eligibilityRows || []).map((row) => [row.instrumentId, row]));
     const rawSignalByInstrument = new Map((rawSignalRows || []).map((signal) => [signal.instrument_id, signal]));
     const calibrationByInstrument = new Map((calibrationRows || []).map((calibration) => [calibration.instrumentId, calibration]));
     const smartMoneyByInstrument = new Map((smartMoneyRows || []).map((summary) => [summary.instrumentId, summary]));
@@ -598,6 +603,7 @@ export class TodayTradeReviewService {
       result.push({
         decision: item.decision,
         dataQuality: dataQualityByInstrument.get(instrumentId) || null,
+        eligibilityRow: eligibilityByInstrument.get(instrumentId) || null,
         marketContext: sources.marketContext || null,
         marketGate: sources.marketGate,
         tradePlan,
@@ -1189,7 +1195,10 @@ export class TodayTradeReviewService {
 
   private stateFor(source: TodayReviewCandidateSource, hardBlocked: boolean, hasProof: boolean, dataQualityMissing: boolean): TodayReviewCandidateState {
     if (hardBlocked) return 'BLOCKED';
-    if (dataQualityMissing || source.decision.decision === 'INSUFFICIENT_DATA' || source.tradePlan?.planStatus === 'INSUFFICIENT_DATA') return 'INSUFFICIENT_DATA';
+    // Phase-1 gate: no eligibility row means we cannot certify the instrument — INSUFFICIENT_DATA.
+    // Legacy fallback: when eligibility row is unavailable but dataQuality is also missing, also INSUFFICIENT_DATA.
+    const noEligibilityRow = source.eligibilityRow === null;
+    if (noEligibilityRow || dataQualityMissing || source.decision.decision === 'INSUFFICIENT_DATA' || source.tradePlan?.planStatus === 'INSUFFICIENT_DATA') return 'INSUFFICIENT_DATA';
     if (!hasProof) return 'UNPROVEN';
     if (source.sourceKind === 'EXIT') return 'EXIT_RISK_REVIEW';
     if (source.decision.decision === 'WATCH' || source.tradePlan?.planStatus === 'WATCH' || source.tradePlan?.paperReadinessStatus === 'WATCH_ONLY') return 'WATCH_ONLY';
@@ -1216,8 +1225,26 @@ export class TodayTradeReviewService {
       }
       if (source.tradePlan?.paperReadinessStatus === 'BLOCKED') add('Exit/invalidation evidence is BLOCKED by the risk snapshot.');
     }
-    if (source.dataQuality?.coverageStatus === 'UNUSABLE') add('Data quality coverage is UNUSABLE.');
-    if (source.dataQuality?.liquidityStatus === 'ILLIQUID') add('Liquidity status is ILLIQUID.');
+    // Phase-1 gate: source blockers from reviewEligible verdict + reason codes.
+    // Reason codes ARE the new blocker strings — map to human-readable form so DTO shapes are unchanged.
+    // Fall back to legacy dataQuality fields when no eligibility row is available (keeps backward compat).
+    if (source.eligibilityRow) {
+      if (!source.eligibilityRow.verdicts.reviewEligible) {
+        for (const code of source.eligibilityRow.verdicts.reviewReasons) {
+          if (code === 'INSUFFICIENT_BARS') add('Instrument has insufficient price history bars.');
+          else if (code === 'STALE_PRICE') add('Latest price is stale.');
+          else if (code === 'NO_RECENT_VOLUME') add('No recent volume — liquidity check failed.');
+          else if (code === 'ILLIQUID') add('Liquidity status is ILLIQUID.');
+          else if (code === 'COVERAGE_UNUSABLE') add('Data quality coverage is UNUSABLE.');
+          else if (code === 'LOW_VOLUME_COVERAGE') add('Volume coverage is too low.');
+          else add(code);
+        }
+      }
+    } else {
+      // Legacy fallback when no eligibility row exists
+      if (source.dataQuality?.coverageStatus === 'UNUSABLE') add('Data quality coverage is UNUSABLE.');
+      if (source.dataQuality?.liquidityStatus === 'ILLIQUID') add('Liquidity status is ILLIQUID.');
+    }
     if (source.decision.decision === 'AVOID') add('Strategy Decision classified the setup as avoid.');
     return [...blockers];
   }
@@ -1228,9 +1255,25 @@ export class TodayTradeReviewService {
       if (message) reasons.add(message);
     };
     if (!source.dataQuality) add('Data quality snapshot is missing.');
-    if (source.dataQuality?.signalReadinessStatus === 'LIMITED') add('Signal readiness is LIMITED.');
-    if (source.dataQuality?.coverageStatus === 'PARTIAL') add('Data coverage is PARTIAL.');
-    if (source.dataQuality?.liquidityStatus === 'THIN') add('Liquidity is THIN.');
+    // Phase-1 watch-reason gate: prefer eligibility row signal reasons over legacy fields.
+    if (source.eligibilityRow) {
+      if (!source.eligibilityRow.verdicts.signalEligible) {
+        for (const code of source.eligibilityRow.verdicts.signalReasons) {
+          if (code === 'SCORE_BELOW_THRESHOLD') add('Signal readiness is LIMITED.');
+          else if (code === 'STALE_PRICE') add('Latest price is stale.');
+          else if (code === 'MISSING_FUNDAMENTALS') add('Fundamentals are missing.');
+          else if (code === 'ILLIQUID') add('Liquidity is THIN.');
+          else if (code === 'LOW_VOLUME_COVERAGE') add('Volume coverage is too low.');
+        }
+      }
+      // Surface readiness tiers as watch reasons
+      if (source.eligibilityRow.readinessStatus === 'LIMITED') add('Signal readiness is LIMITED.');
+    } else {
+      // Legacy fallback
+      if (source.dataQuality?.signalReadinessStatus === 'LIMITED') add('Signal readiness is LIMITED.');
+      if (source.dataQuality?.coverageStatus === 'PARTIAL') add('Data coverage is PARTIAL.');
+      if (source.dataQuality?.liquidityStatus === 'THIN') add('Liquidity is THIN.');
+    }
     if (!this.hasUsableProof(source)) add('Strategy Framework proof is missing or weak.');
     if (!source.marketContext) add('Market context snapshot is missing.');
     if (source.decision.confidence === 'LOW') add('Strategy Decision confidence is LOW.');

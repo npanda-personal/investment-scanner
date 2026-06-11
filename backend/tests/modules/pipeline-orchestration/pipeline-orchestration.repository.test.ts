@@ -363,7 +363,7 @@ describe('PipelineOrchestrationRepository', () => {
     }));
     expect(db.pipelineRun.findFirst).toHaveBeenNthCalledWith(2, expect.objectContaining({
       where: expect.objectContaining({
-        status: { in: ['COMPLETED', 'PARTIAL', 'FAILED'] },
+        status: { in: ['COMPLETED', 'PARTIAL', 'FAILED', 'ABANDONED'] },
       }),
     }));
     expect(db.pipelineStageRun.findMany).toHaveBeenCalledWith(expect.objectContaining({

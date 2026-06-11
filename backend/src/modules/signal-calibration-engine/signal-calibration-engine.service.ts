@@ -7,7 +7,8 @@ import {
 } from '../signal-generation-engine';
 import { SignalQualityLabService, SCORE_BUCKETS, type NoisySignalItem, type QualityHorizon, type QualityMetricGroup, type SignalTypePerformance } from '../signal-quality-lab';
 import type { PersistedQualityMetrics } from '../signal-quality-lab';
-import { DataQualityEngineService, type DataQualityEvaluationDto } from '../data-quality-engine';
+import { DataQualityEngineService, type DataQualityEvaluationDto, type InstrumentEligibilityRow } from '../data-quality-engine';
+import { SIGNAL_HISTORY_MIN_BARS, type EligibilityFacts } from '../../shared/types/eligibility-policy';
 import { SignalCalibrationEngineRepository } from './signal-calibration-engine.repository';
 import type {
   CalibrationAdjustment,
@@ -91,6 +92,7 @@ type BatchQualityMetrics = {
 type BatchLookupCache = {
   qualityMetrics: BatchQualityMetrics;
   dataQualityEvaluationsByInstrumentId?: Map<string, DataQualityEvaluationDto>;
+  eligibilityRowsByInstrumentId?: Map<string, InstrumentEligibilityRow>;
   historicalContextLookups: Map<string, Promise<any | null>>;
   skipHistoricalContext?: boolean;
 };
@@ -187,9 +189,14 @@ export class SignalCalibrationEngineService {
       && resolvedBatchMetrics.bySector.length === 0
       && skipOnDemandEvidenceWork;
     const batchQualityMetrics = resolvedBatchMetrics;
+    const [batchDqeEvaluations, batchEligibilityRows] = await Promise.all([
+      this.batchDataQualityEvaluations(signals),
+      this.batchEligibilityRows(signals),
+    ]);
     const batchLookupCache: BatchLookupCache = {
       qualityMetrics: batchQualityMetrics,
-      dataQualityEvaluationsByInstrumentId: await this.batchDataQualityEvaluations(signals),
+      dataQualityEvaluationsByInstrumentId: batchDqeEvaluations,
+      eligibilityRowsByInstrumentId: batchEligibilityRows,
       historicalContextLookups: new Map(),
       skipHistoricalContext: skipCalibrationEvidenceWork,
     };
@@ -436,7 +443,7 @@ export class SignalCalibrationEngineService {
     if (context.dataQualityEvaluation) {
       this.persistedDataQualityAdjustment(context.dataQualityEvaluation, add, context.dataGaps);
     } else {
-      this.dataQualityAdjustment(signal, context.dataQuality, add, context.dataGaps);
+      this.dataQualityAdjustment(signal, context.dataQuality, add, context.dataGaps, context.eligibilityFacts ?? null);
     }
     
     for (const issue of context.noisyIssueTypes) add({ type: 'NOISE', label: `Noise flag detected: ${issue}.`, delta: issue.includes('FAILED') ? -6 : -3, evidence: { issue } });
@@ -562,6 +569,9 @@ export class SignalCalibrationEngineService {
       this.dataQualityEvaluation(signal.instrument_id, batchLookupCache).catch(() => null),
     ]);
     const bucket = this.scoreBucket(signal.score);
+    const eligibilityFacts = batchLookupCache?.eligibilityRowsByInstrumentId
+      ? (batchLookupCache.eligibilityRowsByInstrumentId.get(signal.instrument_id)?.facts ?? null)
+      : null;
     return {
       signalTypeMetrics: qualityMetrics.signalTypeMetrics,
       scoreBucketMetric: qualityMetrics.scoreBucketMetrics.get(bucket) || null,
@@ -571,6 +581,7 @@ export class SignalCalibrationEngineService {
       smartMoneyStatus: lookup?.smartMoney?.status ?? null,
       dataQuality: lookup?.dataQuality ?? null,
       dataQualityEvaluation,
+      eligibilityFacts,
       noisyIssueTypes: qualityMetrics.noisyIssueTypesByInstrumentId.get(signal.instrument_id) || [],
       dataGaps: lookup?.gaps?.length ? [...lookup.gaps] : lookup ? [] : ['Historical context lookup unavailable.'],
       horizonAvailability: globalSummary?.horizonAvailability || null,
@@ -729,6 +740,13 @@ export class SignalCalibrationEngineService {
     if (instrumentIds.length === 0 || typeof serviceAny.getEvaluationsForInstruments !== 'function') return undefined;
     const evaluations = await serviceAny.getEvaluationsForInstruments(instrumentIds).catch(() => []);
     return new Map((evaluations as DataQualityEvaluationDto[]).map((evaluation) => [evaluation.instrumentId, evaluation]));
+  }
+
+  private async batchEligibilityRows(signals: SignalResultDto[]): Promise<Map<string, InstrumentEligibilityRow> | undefined> {
+    const instrumentIds = [...new Set(signals.map((signal) => signal.instrument_id).filter(Boolean))];
+    if (instrumentIds.length === 0) return undefined;
+    const rows = await this.dataQualityService.getEligibility(instrumentIds).catch(() => []);
+    return new Map(rows.map((row) => [row.instrumentId, row]));
   }
 
   private async dataQualityEvaluation(instrumentId: string, batchLookupCache?: BatchLookupCache): Promise<DataQualityEvaluationDto | null> {
@@ -1274,13 +1292,15 @@ export class SignalCalibrationEngineService {
     if (signal.direction === 'BEARISH' && status === 'ACCUMULATION') add({ type: 'SMART_MONEY', label: 'Smart-money accumulation conflicts with bearish signal.', delta: -5 });
   }
 
-  private dataQualityAdjustment(signal: SignalLikeForCalibration, dataQuality: any, add: (adjustment: CalibrationAdjustment) => void, gaps: string[]): void {
+  private dataQualityAdjustment(signal: SignalLikeForCalibration, dataQuality: any, add: (adjustment: CalibrationAdjustment) => void, gaps: string[], eligibilityFacts?: EligibilityFacts | null): void {
     if (!dataQuality) {
       gaps.push('Missing data-quality snapshot.');
       return;
     }
     if (!dataQuality.hasLatestPrice) add({ type: 'DATA_QUALITY', label: 'Missing latest price lowers calibration confidence.', delta: -5 });
-    if ((dataQuality.priceHistoryDays ?? 0) < 200) add({ type: 'DATA_QUALITY', label: 'Insufficient price history for robust calibration.', delta: -4 });
+    // Use canonical priceBars from instrument_eligibility when available; fall back to snapshot field.
+    const priceBars = eligibilityFacts != null ? eligibilityFacts.priceBars : (dataQuality.priceHistoryDays ?? 0);
+    if (priceBars < SIGNAL_HISTORY_MIN_BARS) add({ type: 'DATA_QUALITY', label: 'Insufficient price history for robust calibration.', delta: -4 });
     const usesFundamentals = [...signal.triggered_signals, ...signal.negative_signals].some((item) => item.category === 'FUNDAMENTAL');
     if (usesFundamentals && !dataQuality.hasFundamentals) add({ type: 'DATA_QUALITY', label: 'Fundamental signal exists but fundamentals are missing.', delta: -4 });
   }

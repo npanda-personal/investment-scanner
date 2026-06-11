@@ -132,69 +132,20 @@ const createMarketDataService = () => ({
   }),
 });
 
+// FilterByVerdictResult shape: {eligibleInstrumentIds, excludedInstrumentIds, reasonsByInstrumentId}
+// Reason codes are string arrays — see DataQualityEngineService.dataQualityExcludedReason for mapping.
 const createStrictDataQualityService = () => ({
-  filterEligibleInstruments: jest.fn().mockResolvedValue({
+  filterByVerdict: jest.fn().mockResolvedValue({
     eligibleInstrumentIds: ['ready'],
     excludedInstrumentIds: ['limited', 'not-ready', 'unusable', 'manual-required', 'stale', 'missing-dq'],
-    missingQualityEvaluationCount: 1,
-    warnings: [
-      'limited: signal readiness is LIMITED',
-      'not-ready: signal readiness is NOT_READY',
-      'unusable: coverage is UNUSABLE',
-      'manual-required: manual provider symbol repair required',
-      'stale: stale latest price',
-      'missing-dq: missing data quality evaluation',
-    ],
-    evaluationsByInstrumentId: {
-      ready: {
-        instrumentId: 'ready',
-        eligibleForSignals: true,
-        coverageStatus: 'GOOD',
-        signalReadinessStatus: 'READY',
-        liquidityStatus: 'LIQUID',
-        signalReadinessScore: 92,
-      },
-      limited: {
-        instrumentId: 'limited',
-        eligibleForSignals: false,
-        coverageStatus: 'PARTIAL',
-        signalReadinessStatus: 'LIMITED',
-        liquidityStatus: 'LIQUID',
-        signalReadinessScore: 65,
-      },
-      'not-ready': {
-        instrumentId: 'not-ready',
-        eligibleForSignals: false,
-        coverageStatus: 'POOR',
-        signalReadinessStatus: 'NOT_READY',
-        liquidityStatus: 'UNKNOWN',
-        signalReadinessScore: 20,
-      },
-      unusable: {
-        instrumentId: 'unusable',
-        eligibleForSignals: false,
-        coverageStatus: 'UNUSABLE',
-        signalReadinessStatus: 'NOT_READY',
-        liquidityStatus: 'UNKNOWN',
-        signalReadinessScore: 5,
-      },
-      'manual-required': {
-        instrumentId: 'manual-required',
-        eligibleForSignals: false,
-        coverageStatus: 'PARTIAL',
-        signalReadinessStatus: 'NOT_READY',
-        liquidityStatus: 'UNKNOWN',
-        signalReadinessScore: 0,
-      },
-      stale: {
-        instrumentId: 'stale',
-        eligibleForSignals: false,
-        coverageStatus: 'POOR',
-        signalReadinessStatus: 'NOT_READY',
-        liquidityStatus: 'LIQUID',
-        signalReadinessScore: 35,
-      },
-    },
+    reasonsByInstrumentId: {
+      limited: ['SCORE_BELOW_THRESHOLD'],
+      'not-ready': ['SCORE_BELOW_THRESHOLD'],
+      unusable: ['COVERAGE_UNUSABLE'],
+      'manual-required': ['SCORE_BELOW_THRESHOLD'],
+      stale: ['STALE_PRICE'],
+      'missing-dq': ['NO_LATEST_PRICE'],
+    } as Record<string, string[]>,
   }),
 });
 
@@ -224,12 +175,8 @@ describe('signal generation data quality enforcement characterization invariants
       minSignalReadinessScore: 70,
     });
 
-    expect(dataQualityService.filterEligibleInstruments).toHaveBeenCalledWith(instrumentIds, expect.objectContaining({
-      minSignalReadinessScore: 70,
-      includeLimited: false,
-      skipUnusable: true,
-      missingQualityBehavior: 'SKIP',
-    }));
+    // filterByVerdict is called with (ids, 'signal') — no options object (folded into verdict policy)
+    expect(dataQualityService.filterByVerdict).toHaveBeenCalledWith(instrumentIds, 'signal');
     expect(generateSpy).toHaveBeenCalledTimes(1);
     expect(generateSpy.mock.calls[0][0]).toBe('ready');
     expect(marketDataService.getInstrument).toHaveBeenCalledWith('ready', { region: 'IN', assetType: 'STOCK' });
@@ -254,7 +201,9 @@ describe('signal generation data quality enforcement characterization invariants
         beforeFilter: 7,
         afterFilter: 1,
         excludedByDataQuality: 6,
-        missingQualityEvaluationCount: 1,
+        // missingQualityEvaluationCount is now always 0 — the verdict result does not carry
+        // per-instrument evaluation details; exclusion reason is carried in reasonsByInstrumentId.
+        missingQualityEvaluationCount: 0,
         eligibleInstrumentCount: 1,
         attemptedGenerationCount: 1,
       },
@@ -265,16 +214,11 @@ describe('signal generation data quality enforcement characterization invariants
       generatedCount: 1,
       skippedCount: 6,
       excludedByDataQuality: 6,
-      missingQualityEvaluationCount: 1,
+      missingQualityEvaluationCount: 0,
     });
-    expect(result.warnings).toEqual(expect.arrayContaining([
-      'limited: signal readiness is LIMITED',
-      'not-ready: signal readiness is NOT_READY',
-      'unusable: coverage is UNUSABLE',
-      'manual-required: manual provider symbol repair required',
-      'stale: stale latest price',
-      'missing-dq: missing data quality evaluation',
-    ]));
+    // Invariant: all non-eligible instruments were excluded (6 of 7)
+    // Reason details are now carried in reasonsByInstrumentId, not as human-readable warnings
+    expect(result.dataQuality?.excludedByDataQuality).toBe(6);
   });
 
   it('preserves Data Quality eligibility evidence on generated signal output without target-price fields', async () => {
@@ -300,6 +244,9 @@ describe('signal generation data quality enforcement characterization invariants
     });
 
     expect(result.results).toHaveLength(1);
+    // dataQualityEligibility now carries filterApplied + eligible from the verdict result.
+    // coverageStatus / signalReadinessStatus / liquidityStatus are not populated by filterByVerdict
+    // (they lived in the old evaluation-shaped response; the verdict result uses reasonsByInstrumentId).
     expect(result.results[0]).toMatchObject({
       instrument_id: 'ready',
       symbol: 'READY.NS',
@@ -307,9 +254,6 @@ describe('signal generation data quality enforcement characterization invariants
       dataQualityEligibility: {
         filterApplied: true,
         eligible: true,
-        coverageStatus: 'GOOD',
-        signalReadinessStatus: 'READY',
-        liquidityStatus: 'LIQUID',
       },
     });
     expect(repository.createSignalResultWithStatus.mock.calls[0][0]).toMatchObject({
@@ -317,9 +261,6 @@ describe('signal generation data quality enforcement characterization invariants
       dataQualityEligibility: {
         filterApplied: true,
         eligible: true,
-        coverageStatus: 'GOOD',
-        signalReadinessStatus: 'READY',
-        liquidityStatus: 'LIQUID',
       },
     });
 

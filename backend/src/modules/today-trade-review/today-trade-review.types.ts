@@ -1,4 +1,4 @@
-import type { DataQualityEvaluationDto } from '../data-quality-engine';
+import type { DataQualityEvaluationDto, InstrumentEligibilityRow } from '../data-quality-engine';
 import type { MarketContextSummary } from '../market-context-intelligence';
 import type { ReviewReadinessSummary, TrustedReviewUniverseHealth, TrustedReviewUniverseInstrument } from '../market-data-foundation';
 import type { SignalCalibrationResultDto } from '../signal-calibration-engine';
@@ -377,6 +377,7 @@ export interface TodayReviewUpstreamServices {
   dataQualityService: {
     getLatestEvaluationForInstrument(instrumentId: string): Promise<DataQualityEvaluationDto | null>;
     getEvaluationsForInstruments(instrumentIds: string[]): Promise<DataQualityEvaluationDto[]>;
+    getEligibility(instrumentIds: string[]): Promise<InstrumentEligibilityRow[]>;
   };
   marketContextService: {
     latestPersistedSummary(region?: string): Promise<MarketContextSummary | null>;
@@ -408,6 +409,9 @@ export interface TodayReviewUpstreamServices {
 export interface TodayReviewCandidateSource {
   decision: StrategyDecisionDto;
   dataQuality: DataQualityEvaluationDto | null;
+  /** Eligibility row from instrument_eligibility — the Phase-1 verdict source.
+   *  Null when no row exists (treated as INSUFFICIENT_DATA). */
+  eligibilityRow: InstrumentEligibilityRow | null;
   marketContext: MarketContextSummary | null;
   marketGate: Record<string, unknown> | null;
   tradePlan: TradePlanResultDto | null;

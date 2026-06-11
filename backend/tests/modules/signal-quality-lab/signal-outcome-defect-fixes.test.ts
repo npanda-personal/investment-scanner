@@ -176,7 +176,7 @@ describe('Fix 2: syntheticSummaryFromPersistedMetrics uses real matureCount, emp
       } as any,
       qualityService as any,
       { lookup: jest.fn().mockResolvedValue(null) } as any,
-      { getEvaluationsForInstruments: jest.fn().mockResolvedValue([]), getLatestEvaluationForInstrument: jest.fn().mockResolvedValue(null) } as any,
+      { getEvaluationsForInstruments: jest.fn().mockResolvedValue([]), getLatestEvaluationForInstrument: jest.fn().mockResolvedValue(null), getEligibility: jest.fn().mockResolvedValue([]) } as any,
     );
     return svc;
   }

@@ -169,6 +169,7 @@ function makeService(qualityServiceOverrides: Partial<Record<string, jest.Mock>>
   const dataQualityService = {
     getLatestEvaluationForInstrument: jest.fn().mockResolvedValue(null),
     getEvaluationsForInstruments: jest.fn().mockResolvedValue([]),
+    getEligibility: jest.fn().mockResolvedValue([]),
   };
   const instance = new SignalCalibrationEngineService(
     repository as any,

@@ -228,6 +228,7 @@ function minimalServices(instruments: any[]): TodayReviewUpstreamServices {
     dataQualityService: {
       getLatestEvaluationForInstrument: jest.fn().mockResolvedValue(null),
       getEvaluationsForInstruments: jest.fn().mockResolvedValue([]),
+      getEligibility: jest.fn().mockResolvedValue([]),
     },
     marketContextService: {
       latestPersistedSummary: jest.fn().mockResolvedValue({

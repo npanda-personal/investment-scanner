@@ -1,6 +1,7 @@
 import { MarketContextIntelligenceService } from '../market-context-intelligence';
 import { MarketDataFoundationService } from '../market-data-foundation';
 import { SmartMoneyIntelligenceService } from '../smart-money-intelligence';
+import { DataQualityEngineService } from '../data-quality-engine';
 import { HistoricalContextSnapshotsRepository } from './historical-context-snapshots.repository';
 import type { SnapshotCount, SnapshotGenerateSummary, SnapshotLookupResult, SnapshotQuery } from './historical-context-snapshots.types';
 import { normalizeSnapshotDate } from './historical-context-snapshots.validation';
@@ -11,7 +12,8 @@ export class HistoricalContextSnapshotsService {
     private readonly repository = new HistoricalContextSnapshotsRepository(),
     private readonly marketContextService = new MarketContextIntelligenceService(),
     private readonly smartMoneyService = new SmartMoneyIntelligenceService(),
-    private readonly marketDataService = new MarketDataFoundationService()
+    private readonly marketDataService = new MarketDataFoundationService(),
+    private readonly dataQualityService = new DataQualityEngineService()
   ) {}
 
   async generate(snapshotDate = normalizeSnapshotDate(), limit = 50, scope: { region?: string; assetType?: string; instrumentIds?: string[] } = {}): Promise<SnapshotGenerateSummary> {
@@ -93,6 +95,20 @@ export class HistoricalContextSnapshotsService {
     const instruments = explicitInstrumentIds.length > 0
       ? await this.safe<any[]>(() => this.marketDataService.getInstrumentsByIds(explicitInstrumentIds.slice(0, Math.max(1, limit))), 'instrument list failed', warnings)
       : (await this.safe(() => this.marketDataService.listInstruments({ page: 1, pageSize: limit, region, assetType }), 'instrument list failed', warnings))?.instruments || [];
+
+    // Bulk-fetch instrument_eligibility rows for the whole batch (eliminates N+1).
+    const batchInstrumentIds = (instruments || []).map((inst: any) => String(inst.id)).filter(Boolean);
+    const eligibilityRows = batchInstrumentIds.length > 0
+      ? await this.safe(
+          () => this.dataQualityService.getEligibility(batchInstrumentIds),
+          'bulk eligibility fetch failed',
+          warnings
+        ) ?? []
+      : [];
+    const eligibilityByInstrumentId = new Map(
+      (eligibilityRows as Awaited<ReturnType<DataQualityEngineService['getEligibility']>>).map((row) => [row.instrumentId, row])
+    );
+
     const smartMoneyAny = this.smartMoneyService as any;
     for (const instrument of instruments || []) {
       const [smart, prices, latest, fundamentals] = await Promise.all([
@@ -127,23 +143,26 @@ export class HistoricalContextSnapshotsService {
         smartMoney.skipped += 1;
         if (smart) warnings.push(`${instrument.symbol} smart-money snapshot skipped: on-demand evidence is not downstream safe.`);
       }
-      const priceHistoryDays = prices?.prices?.length || 0;
-      const readiness = this.readinessScore({
-        priceHistoryDays,
-        hasLatestPrice: Boolean(latest?.latest),
-        hasFundamentals: Boolean(fundamentals?.records?.length),
-        hasSector: Boolean(instrument.sector),
-        hasIndustry: Boolean(instrument.industry),
-      });
+
+      // Source readiness score + facts from the canonical instrument_eligibility row.
+      // Fall back to locally-derived values only when no eligibility row exists yet.
+      const eligibilityRow = eligibilityByInstrumentId.get(String(instrument.id));
+      const priceHistoryDays = eligibilityRow ? eligibilityRow.facts.priceBars : (prices?.prices?.length || 0);
+      const hasLatestPrice = eligibilityRow ? eligibilityRow.facts.staleSessions === 0 : Boolean(latest?.latest);
+      const hasFundamentals = eligibilityRow ? eligibilityRow.facts.hasFundamentals : Boolean(fundamentals?.records?.length);
+      const hasSector = eligibilityRow ? eligibilityRow.facts.hasSector : Boolean(instrument.sector);
+      const hasIndustry = eligibilityRow ? eligibilityRow.facts.hasIndustry : Boolean(instrument.industry);
+      const readiness = eligibilityRow ? eligibilityRow.readinessScore : this.legacyReadinessScore({ priceHistoryDays, hasLatestPrice, hasFundamentals, hasSector, hasIndustry });
+
       this.bump(dataQuality, await this.repository.upsertDataQuality({
         snapshotDate,
         instrumentId: instrument.id,
         symbol: instrument.symbol,
         priceHistoryDays,
-        hasLatestPrice: Boolean(latest?.latest),
-        hasFundamentals: Boolean(fundamentals?.records?.length),
-        hasSector: Boolean(instrument.sector),
-        hasIndustry: Boolean(instrument.industry),
+        hasLatestPrice,
+        hasFundamentals,
+        hasSector,
+        hasIndustry,
         dataStatus: readiness >= 80 ? 'COMPLETE' : readiness >= 40 ? 'PARTIAL' : 'MISSING',
         signalReadinessScore: readiness,
       }));
@@ -196,7 +215,12 @@ export class HistoricalContextSnapshotsService {
     return lookup.market?.regime ?? null;
   }
 
-  private readinessScore(input: { priceHistoryDays: number; hasLatestPrice: boolean; hasFundamentals: boolean; hasSector: boolean; hasIndustry: boolean }) {
+  /**
+   * Legacy readiness formula — used only as a fallback when no instrument_eligibility
+   * row exists for an instrument yet. The canonical score is now sourced from
+   * instrument_eligibility.readinessScore (DataQualityEngineService.getEligibility).
+   */
+  private legacyReadinessScore(input: { priceHistoryDays: number; hasLatestPrice: boolean; hasFundamentals: boolean; hasSector: boolean; hasIndustry: boolean }) {
     return Math.round(
       Math.min(input.priceHistoryDays, 252) / 252 * 45 +
       (input.hasLatestPrice ? 20 : 0) +

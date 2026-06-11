@@ -5991,7 +5991,7 @@ export class PipelineOrchestrationService {
     ]);
     const stageIdemKey = `${runIdemKey}:stage`;
     const normalizedScope = this.normalizeScope({ region: request.region, assetType: request.assetType, timeframe: request.timeframe });
-    this.createRun({
+    Promise.resolve(this.createRun({
       pipelineKey: request.pipelineKey,
       triggerType: request.triggerType,
       status: 'FAILED',
@@ -6004,7 +6004,7 @@ export class PipelineOrchestrationService {
       failedCount: 1,
       idempotencyKey: runIdemKey,
       errors: [message],
-    }).then((run) => this.createStage({
+    })).then((run) => run && this.createStage({
       pipelineRunId: run.id,
       stageKey,
       stageOrder: 99,

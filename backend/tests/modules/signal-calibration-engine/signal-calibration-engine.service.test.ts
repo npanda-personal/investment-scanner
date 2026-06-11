@@ -93,6 +93,7 @@ function service(overrides: Record<string, any> = {}) {
   const dataQualityService = {
     getLatestEvaluationForInstrument: jest.fn().mockResolvedValue(null),
     getEvaluationsForInstruments: jest.fn().mockResolvedValue([]),
+    getEligibility: jest.fn().mockResolvedValue([]),
     ...overrides.dataQualityService,
   };
   return {
