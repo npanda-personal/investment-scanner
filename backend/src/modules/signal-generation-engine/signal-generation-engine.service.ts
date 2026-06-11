@@ -13,6 +13,11 @@ import type {
   StrategySignalOutput,
 } from '../strategy-framework';
 import { normalizeMarketRegion } from '../../shared/utils/market-scope';
+import {
+  DIRECTION_BULLISH_THRESHOLD,
+  DIRECTION_BEARISH_THRESHOLD,
+} from '../../shared/types/signal.types';
+export { DIRECTION_BULLISH_THRESHOLD, DIRECTION_BEARISH_THRESHOLD };
 import { SignalGenerationEngineRepository } from './signal-generation-engine.repository';
 import type {
   PaginatedSignalResponse,
@@ -119,17 +124,7 @@ const FUNDAMENTAL_PUBLIC_LAG_DAYS = 45;
 // (not just >= 0) to reduce false positives when the stock barely keeps up.
 const OUTPERFORMING_PEERS_MIN_RELATIVE = 0.02;
 
-// Direction cut-points (v3):
-//   With the new spread, empirical synthetic distribution shows:
-//   - Scores for genuinely bullish (2+ categories aligned bullish): 60-95
-//   - Neutral / mixed / thin setups cluster near 45-59
-//   - Genuinely bearish (2+ categories aligned bearish): 5-40
-//   Deadband of [41-59] keeps "NEUTRAL" from disappearing; 60/40 cuts are chosen
-//   so a single-category lean that doesn't cross to ~60 stays NEUTRAL.
-// CB-4: exported so signal-calibration-engine can import and reuse these values
-// rather than re-encoding its own cut-points (which caused a 60/70 mismatch).
-export const DIRECTION_BULLISH_THRESHOLD = 60;
-export const DIRECTION_BEARISH_THRESHOLD = 40;
+// Direction cut-points (v3): sourced from shared/types/signal.types.ts
 
 // ── v3 Overextension / Mean-Reversion Guards ─────────────────────────────────
 //

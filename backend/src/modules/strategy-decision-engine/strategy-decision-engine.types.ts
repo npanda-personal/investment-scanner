@@ -1,5 +1,8 @@
 import type { MarketDataStatus } from '../market-data-foundation';
 import type { StrategyDefinitionDrift, StrategyDefinitionSource } from '../strategy-framework';
+import type { StrategyDecision } from '../../shared/types/strategy.types';
+
+export type { StrategyDecision };
 
 export type MarketCondition = 'HEALTHY' | 'MIXED' | 'BAD' | 'UNKNOWN';
 export type MarketGate = 'OPEN' | 'SELECTIVE' | 'CLOSED' | 'UNKNOWN';
@@ -21,16 +24,6 @@ export interface MarketGateResponse {
 }
 
 export type StrategyName = string;
-
-export type StrategyDecision =
-  | 'TRADE_CANDIDATE'
-  | 'WATCH'
-  | 'WAIT'
-  | 'AVOID'
-  | 'EXIT_CANDIDATE'
-  | 'REDUCE_RISK'
-  | 'HOLD'
-  | 'INSUFFICIENT_DATA';
 
 export type DecisionAction =
   | 'CONSIDER_ENTRY'

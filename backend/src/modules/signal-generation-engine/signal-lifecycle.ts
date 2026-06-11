@@ -28,7 +28,8 @@
  * This module never references "buy" or "sell".
  */
 
-export type SignalLifecycleState = 'ENTRY' | 'ACTIVE' | 'EXIT' | 'EXPIRED';
+import type { SignalLifecycleState } from '../../shared/types/signal.types';
+export type { SignalLifecycleState };
 
 export interface LifecycleThresholds {
   /**

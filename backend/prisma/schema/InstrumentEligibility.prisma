@@ -1,0 +1,49 @@
+// Per-instrument, per-day eligibility record.
+// One row per (instrumentId, tradingDate), written by the data-quality-engine stage.
+// FACTS are measured once from real data; VERDICTS are derived by eligibility-policy.ts.
+model InstrumentEligibility {
+  id           String   @id @default(cuid())
+  instrumentId String
+  stock        Stock    @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+  tradingDate  DateTime
+
+  // ── FACTS (measured once per day) ────────────────────────────────────────
+  priceBars          Int
+  lastPriceDate      DateTime? // nullable — null when no price data at all
+  staleSessions      Int
+  volumeCoveragePct  Decimal
+  maxGapDays         Int
+  liquidityScore     Int
+  hasFundamentals    Boolean
+  hasSector          Boolean
+  hasIndustry        Boolean
+  hasCountry         Boolean
+
+  // ── VERDICTS (derived from facts by eligibility-policy.ts) ───────────────
+  signalEligible      Boolean
+  reviewEligible      Boolean
+  backtestEligible    Boolean
+  calibrationEligible Boolean
+
+  signalReasons      String[]
+  reviewReasons      String[]
+  backtestReasons    String[]
+  calibrationReasons String[]
+
+  // ── READINESS SUMMARY ────────────────────────────────────────────────────
+  readinessScore  Int
+  readinessStatus String // READY | LIMITED | NOT_READY
+
+  // ── PROVENANCE ───────────────────────────────────────────────────────────
+  policyVersion String
+  computedAt    DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([instrumentId, tradingDate], map: "instrument_eligibility_instrument_date_key")
+  @@index([tradingDate], map: "instrument_eligibility_trading_date_idx")
+  @@index([tradingDate, signalEligible], map: "instrument_eligibility_date_signal_idx")
+  @@index([tradingDate, reviewEligible], map: "instrument_eligibility_date_review_idx")
+  @@map("instrument_eligibility")
+}

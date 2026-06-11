@@ -1,19 +1,12 @@
 import type { MarketDataStatus } from '../market-data-foundation';
 import type { StrategyDecision, StrategyDefinitionDrift, StrategyDefinitionSource, StrategyDirection, StrategyRatingGrade, StrategyReadinessLabel } from '../strategy-framework';
+import type { SignalDirection, SignalConfidence, SignalLifecycleState } from '../../shared/types/signal.types';
 
-export type SignalDirection = 'BULLISH' | 'NEUTRAL' | 'BEARISH';
-export type SignalConfidence = 'LOW' | 'MEDIUM' | 'HIGH';
+export type { SignalDirection, SignalConfidence };
 export type SignalCategory = 'TECHNICAL' | 'MOMENTUM' | 'FUNDAMENTAL';
 export type ReliabilityTier = 'FULL' | 'PARTIAL';
 
-/**
- * Lifecycle state of a signal candidate:
- *  ENTRY   — new in the current run (no prior signal for this instrument+modelVersion)
- *  ACTIVE  — was active before and still passes thresholds
- *  EXIT    — was active, now weakened (score dropped, direction flipped, or below exit floor)
- *  EXPIRED — was active in a prior run but generated no signal at all in the current run
- */
-export type SignalLifecycleState = 'ENTRY' | 'ACTIVE' | 'EXIT' | 'EXPIRED';
+export type { SignalLifecycleState };
 
 export interface SignalItem {
   code: string;

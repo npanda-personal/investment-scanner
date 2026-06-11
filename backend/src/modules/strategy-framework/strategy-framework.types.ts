@@ -1,11 +1,12 @@
 import type { BacktestStrategyConfig } from '../backtesting-strategy-lab';
 import type { SignalConfidence, SignalDirection, SignalItem, SignalPricePoint, SignalResultDto } from '../signal-generation-engine';
+import type { FrameworkEvaluationDecision } from '../../shared/types/strategy.types';
 
 export type StrategyStatus = 'DRAFT' | 'ACTIVE' | 'DISABLED' | 'DEPRECATED';
 export type StrategyAutomationStatus = 'NOT_ELIGIBLE' | 'WATCHLIST_ONLY' | 'PAPER_TEST_CANDIDATE';
 export type StrategyReadinessLabel = 'RESEARCH_ONLY' | 'WATCHLIST_CANDIDATE' | 'PAPER_TEST_CANDIDATE' | 'NOT_AUTOMATION_READY';
 export type StrategyRatingGrade = 'EXCELLENT' | 'GOOD' | 'AVERAGE' | 'WEAK' | 'UNPROVEN';
-export type StrategyDecision = 'SIGNAL' | 'ENTRY_CANDIDATE' | 'WAIT' | 'WATCH' | 'AVOID' | 'EXIT_CANDIDATE' | 'REDUCE_RISK' | 'HOLD' | 'INSUFFICIENT_DATA';
+export type StrategyDecision = FrameworkEvaluationDecision;
 export type StrategyDirection = 'BULLISH' | 'BEARISH' | 'NEUTRAL';
 export type StrategyTimeframe = '1Y' | '3Y' | '5Y' | '10Y' | '15Y';
 export type StrategyCategory = 'ENTRY' | 'EXIT' | 'FILTER' | 'GATE' | 'RISK' | 'CALIBRATION' | 'DIAGNOSTIC';

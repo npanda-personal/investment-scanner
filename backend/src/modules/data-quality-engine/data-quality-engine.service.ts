@@ -1,5 +1,13 @@
 import { MarketDataFoundationService, expectedLatestTradingDate, tradingSessionsBetween } from '../market-data-foundation';
 import { DataQualityEngineRepository } from './data-quality-engine.repository';
+import prisma from '../../db/prisma';
+import {
+  ELIGIBILITY_POLICY,
+  ELIGIBILITY_POLICY_VERSION,
+  type EligibilityFacts,
+  type EligibilityReasonCode,
+  type EligibilityVerdicts,
+} from '../../shared/types/eligibility-policy';
 import type {
   CoverageStatus,
   DataQualityEvaluateRequest,
@@ -18,6 +26,26 @@ import type {
   PriceForQuality,
   SignalReadinessStatus,
 } from './data-quality-engine.types';
+
+// ── Eligibility read-API types ────────────────────────────────────────────────
+export interface InstrumentEligibilityRow {
+  instrumentId: string;
+  tradingDate: Date;
+  facts: EligibilityFacts;
+  verdicts: EligibilityVerdicts;
+  readinessScore: number;
+  readinessStatus: string;
+  policyVersion: string;
+  computedAt: Date;
+}
+
+export interface FilterByVerdictResult {
+  eligibleInstrumentIds: string[];
+  excludedInstrumentIds: string[];
+  reasonsByInstrumentId: Record<string, EligibilityReasonCode[]>;
+}
+
+type VerdictKey = 'signal' | 'review' | 'backtest' | 'calibration';
 
 const DAY_MS = 86_400_000;
 /**
@@ -294,7 +322,10 @@ export class DataQualityEngineService {
           const fundamentals = fundamentalsResponse.records || [];
           const actions = actionsResponse?.actions || [];
           const evaluated = this.evaluateInstrument(instrument, prices, latestPrice, fundamentals, actions, latestSignal.length > 0);
-          await this.repository.upsertEvaluation(evaluated);
+          await Promise.all([
+            this.repository.upsertEvaluation(evaluated),
+            this.persistEligibility(instrument, prices, latestPrice, fundamentals, evaluated.signalReadinessScore, evaluated.signalReadinessStatus),
+          ]);
           evaluatedCount += 1;
         } catch (error: any) {
           failedCount += 1;
@@ -340,7 +371,44 @@ export class DataQualityEngineService {
     const fundamentals = fundamentalsResponse?.records || [];
     const actions = actionsResponse?.actions || [];
     const evaluated = this.evaluateInstrument(instrument, prices, latest, fundamentals, actions, latestSignal.length > 0);
-    return this.repository.upsertEvaluation(evaluated);
+    const [saved] = await Promise.all([
+      this.repository.upsertEvaluation(evaluated),
+      this.persistEligibility(instrument, prices, latest, fundamentals, evaluated.signalReadinessScore, evaluated.signalReadinessStatus),
+    ]);
+    return saved;
+  }
+
+  /**
+   * Shared helper: compute facts + verdicts and upsert into instrument_eligibility.
+   * Called from both the single-instrument path and the scheduled-stage batch path.
+   * Failures are swallowed so they never block the legacy DataQualityEvaluation write.
+   */
+  private async persistEligibility(
+    instrument: any,
+    prices: PriceForQuality[],
+    latestPrice: PriceForQuality | null,
+    fundamentals: any[],
+    readinessScore: number,
+    readinessStatus: string,
+  ): Promise<void> {
+    try {
+      const latestDate = latestPrice?.date
+        ? new Date(latestPrice.date as unknown as string)
+        : prices[0]?.date
+          ? new Date(prices[0].date as unknown as string)
+          : null;
+      const staleSessionCount = this.staleSessions(latestDate, instrument);
+      const liquidity = this.calculateLiquidity(prices);
+      const facts = this.computeEligibilityFacts(instrument, prices, latestPrice, fundamentals, staleSessionCount, liquidity.score);
+      const verdicts = this.computeEligibilityVerdicts(facts, instrument, readinessScore);
+      await this.upsertInstrumentEligibility(instrument.id, instrument, facts, verdicts, readinessScore, readinessStatus);
+    } catch (_err: unknown) {
+      // Eligibility write failure must not surface to callers — the legacy
+      // DataQualityEvaluation row is already written; log only in debug builds.
+      if (process.env.NODE_ENV === 'development') {
+        console.warn(`[DQE] eligibility upsert failed for ${instrument?.id}: ${(_err as Error)?.message}`);
+      }
+    }
   }
 
   private async evaluateInstrumentBatch(instruments: any[], concurrency: number): Promise<Array<{ ok: true } | { ok: false; warning: string }>> {
@@ -613,6 +681,29 @@ export class DataQualityEngineService {
     return (sessionsBehind - 1) > STALE_PRICE_TRADING_SESSIONS;
   }
 
+  /**
+   * Returns the number of trading sessions the latest price is behind the
+   * expected latest trading date (weekend-only calendar, same degrade path as
+   * isPriceStale).  Returns 0 when the price is fresh.  Returns 99 when
+   * latestDate is null (no price at all) so downstream verdict logic can treat
+   * it as maximally stale.
+   */
+  private staleSessions(latestDate: Date | null, instrument: any): number {
+    if (!latestDate) return 99;
+    const region =
+      this.optionalText(instrument?.region ?? instrument?.country) ?? 'IN';
+    const { date: expectedDate } = expectedLatestTradingDate(region);
+    if (!expectedDate) {
+      // Calendar lookup failed — use 0 (we cannot measure so we don't punish)
+      return 0;
+    }
+    const latestDateStr = latestDate.toISOString().slice(0, 10);
+    if (latestDateStr >= expectedDate) return 0;
+    const { count } = tradingSessionsBetween(region, latestDateStr, expectedDate);
+    // count includes both endpoints → subtract 1 (same as isPriceStale)
+    return Math.max(0, count - 1);
+  }
+
   private coverageStatus(score: number): CoverageStatus {
     if (score >= 80) return 'GOOD';
     if (score >= 60) return 'PARTIAL';
@@ -833,5 +924,316 @@ export class DataQualityEngineService {
     if (!instrumentAssetType) return assetType === 'STOCK';
     if (assetType === 'STOCK') return instrumentAssetType === 'STOCK' || instrumentAssetType === 'EQUITY';
     return instrumentAssetType === assetType;
+  }
+
+  // ── Eligibility authority ─────────────────────────────────────────────────
+
+  /**
+   * Derives whether an instrument is a mainboard instrument.
+   * Replicates the exact check from signal-generation-engine.service.ts
+   * applyFundamentalsEligibilityGate (~line 2506):
+   *   mainboard = catalogSource === 'NSE_EQUITY_SECURITIES'
+   */
+  private isMainboardInstrument(instrument: any): boolean {
+    return instrument?.catalogSource === 'NSE_EQUITY_SECURITIES' ||
+      instrument?.catalog_source === 'NSE_EQUITY_SECURITIES';
+  }
+
+  /**
+   * Compute EligibilityFacts from data that the DQE evaluation ALREADY loads.
+   *
+   * Gaps (facts that cannot be derived from already-loaded data without adding
+   * new heavy DB queries):
+   *   - volumeCoveragePct: requires counting non-zero-volume bars over a
+   *     defined window and dividing by expected trading sessions — the DQE
+   *     loads volumes but does not compute this ratio; persisted as 0.
+   *   - maxGapDays: requires sorting price dates and finding the maximum
+   *     consecutive gap — prices ARE in memory but the DQE evaluation does not
+   *     sort and iterate them for gap analysis; persisted as 0 to avoid adding
+   *     an O(n log n) pass to the hot evaluation path.
+   *   Both gaps will be filled when the DQE pipeline moves to the dedicated
+   *   DAG stage that has more processing budget.
+   */
+  computeEligibilityFacts(
+    instrument: any,
+    prices: PriceForQuality[],
+    latestPrice: PriceForQuality | null,
+    fundamentals: any[],
+    staleSessionCount: number,
+    liquidityScore: number,
+  ): EligibilityFacts {
+    const lastPriceDate = latestPrice?.date
+      ? (latestPrice.date instanceof Date ? latestPrice.date : new Date(latestPrice.date)).toISOString().slice(0, 10)
+      : prices[0]?.date
+        ? (prices[0].date instanceof Date ? prices[0].date : new Date(prices[0].date as unknown as string)).toISOString().slice(0, 10)
+        : null;
+
+    return {
+      priceBars: prices.length,
+      lastPriceDate,
+      staleSessions: staleSessionCount,
+      // volumeCoveragePct: not derivable without counting sessions — see note above
+      volumeCoveragePct: 0,
+      // maxGapDays: not derivable without a sorted gap-scan pass — see note above
+      maxGapDays: 0,
+      liquidityScore,
+      hasFundamentals: fundamentals.length > 0,
+      hasSector: Boolean(this.optionalText(instrument?.sector)),
+      hasIndustry: Boolean(this.optionalText(instrument?.industry)),
+      hasCountry: Boolean(this.optionalText(instrument?.country)),
+    };
+  }
+
+  /**
+   * Derive EligibilityVerdicts from facts + ELIGIBILITY_POLICY only.
+   * No DB access; no external inputs beyond facts and instrument metadata
+   * needed for the mainboard check.
+   *
+   * tradingDate is the expected latest completed trading date (used by the
+   * review verdict's freshness check: staleSessions === 0).
+   */
+  computeEligibilityVerdicts(
+    facts: EligibilityFacts,
+    instrument: any,
+    readinessScore: number,
+  ): EligibilityVerdicts {
+    const policy = ELIGIBILITY_POLICY;
+    const isMainboard = this.isMainboardInstrument(instrument);
+
+    // ── signal ──────────────────────────────────────────────────────────────
+    const signalReasons: EligibilityReasonCode[] = [];
+    if (readinessScore < policy.signal.minReadinessScore) signalReasons.push('SCORE_BELOW_THRESHOLD');
+    if (facts.staleSessions > policy.signal.maxStaleSessions) signalReasons.push('STALE_PRICE');
+    if (isMainboard && !facts.hasFundamentals) signalReasons.push('MISSING_FUNDAMENTALS');
+    if (facts.liquidityScore < 40) signalReasons.push('ILLIQUID');
+    const signalEligible = signalReasons.length === 0;
+
+    // ── review ───────────────────────────────────────────────────────────────
+    // Mirrors MDF trusted-universe semantics: minPriceBars + fresh price
+    // (staleSessions === 0) + recent volume present (liquidityScore > 0).
+    const reviewReasons: EligibilityReasonCode[] = [];
+    if (facts.priceBars < policy.review.minPriceBars) reviewReasons.push('INSUFFICIENT_BARS');
+    if (facts.staleSessions > 0) reviewReasons.push('STALE_PRICE');
+    if (facts.liquidityScore === 0) reviewReasons.push('NO_RECENT_VOLUME');
+    const reviewEligible = reviewReasons.length === 0;
+
+    // ── backtest ─────────────────────────────────────────────────────────────
+    const backtestReasons: EligibilityReasonCode[] = [];
+    if (facts.priceBars < policy.backtest.minPriceBars) backtestReasons.push('INSUFFICIENT_BARS');
+    if (facts.staleSessions > 0) backtestReasons.push('STALE_PRICE');
+    const backtestEligible = backtestReasons.length === 0;
+
+    // ── calibration ──────────────────────────────────────────────────────────
+    const calibrationReasons: EligibilityReasonCode[] = [];
+    if (facts.priceBars < policy.calibration.minPriceBars) calibrationReasons.push('INSUFFICIENT_BARS');
+    const calibrationEligible = calibrationReasons.length === 0;
+
+    return {
+      signalEligible,
+      reviewEligible,
+      backtestEligible,
+      calibrationEligible,
+      signalReasons,
+      reviewReasons,
+      backtestReasons,
+      calibrationReasons,
+    };
+  }
+
+  /**
+   * Upsert a row into instrument_eligibility keyed (instrumentId, tradingDate).
+   * tradingDate = the expected latest completed trading date for the instrument's
+   * region — the same reference date DQE uses for staleness checks.
+   */
+  async upsertInstrumentEligibility(
+    instrumentId: string,
+    instrument: any,
+    facts: EligibilityFacts,
+    verdicts: EligibilityVerdicts,
+    readinessScore: number,
+    readinessStatus: string,
+  ): Promise<void> {
+    const region =
+      this.optionalText(instrument?.region ?? instrument?.country) ?? 'IN';
+    const { date: expectedDate } = expectedLatestTradingDate(region);
+    // When the calendar cannot determine a date (unknown region / startup), use
+    // today as a best-effort key so the row lands somewhere rather than being
+    // silently dropped.
+    const tradingDateStr = expectedDate ?? new Date().toISOString().slice(0, 10);
+    const tradingDate = new Date(tradingDateStr + 'T00:00:00.000Z');
+
+    await prisma.instrumentEligibility.upsert({
+      where: {
+        instrumentId_tradingDate: {
+          instrumentId,
+          tradingDate,
+        },
+      },
+      create: {
+        instrumentId,
+        tradingDate,
+        priceBars: facts.priceBars,
+        lastPriceDate: facts.lastPriceDate ? new Date(facts.lastPriceDate + 'T00:00:00.000Z') : null,
+        staleSessions: facts.staleSessions > 98 ? 99 : facts.staleSessions,
+        volumeCoveragePct: facts.volumeCoveragePct,
+        maxGapDays: facts.maxGapDays,
+        liquidityScore: facts.liquidityScore,
+        hasFundamentals: facts.hasFundamentals,
+        hasSector: facts.hasSector,
+        hasIndustry: facts.hasIndustry,
+        hasCountry: facts.hasCountry,
+        signalEligible: verdicts.signalEligible,
+        reviewEligible: verdicts.reviewEligible,
+        backtestEligible: verdicts.backtestEligible,
+        calibrationEligible: verdicts.calibrationEligible,
+        signalReasons: verdicts.signalReasons,
+        reviewReasons: verdicts.reviewReasons,
+        backtestReasons: verdicts.backtestReasons,
+        calibrationReasons: verdicts.calibrationReasons,
+        readinessScore,
+        readinessStatus,
+        policyVersion: ELIGIBILITY_POLICY_VERSION,
+        computedAt: new Date(),
+      },
+      update: {
+        priceBars: facts.priceBars,
+        lastPriceDate: facts.lastPriceDate ? new Date(facts.lastPriceDate + 'T00:00:00.000Z') : null,
+        staleSessions: facts.staleSessions > 98 ? 99 : facts.staleSessions,
+        volumeCoveragePct: facts.volumeCoveragePct,
+        maxGapDays: facts.maxGapDays,
+        liquidityScore: facts.liquidityScore,
+        hasFundamentals: facts.hasFundamentals,
+        hasSector: facts.hasSector,
+        hasIndustry: facts.hasIndustry,
+        hasCountry: facts.hasCountry,
+        signalEligible: verdicts.signalEligible,
+        reviewEligible: verdicts.reviewEligible,
+        backtestEligible: verdicts.backtestEligible,
+        calibrationEligible: verdicts.calibrationEligible,
+        signalReasons: verdicts.signalReasons,
+        reviewReasons: verdicts.reviewReasons,
+        backtestReasons: verdicts.backtestReasons,
+        calibrationReasons: verdicts.calibrationReasons,
+        readinessScore,
+        readinessStatus,
+        policyVersion: ELIGIBILITY_POLICY_VERSION,
+        computedAt: new Date(),
+      },
+    });
+  }
+
+  // ── Eligibility read API ──────────────────────────────────────────────────
+
+  /**
+   * Returns the latest persisted eligibility row per instrument (or the exact
+   * row for the given tradingDate when provided).
+   * Reads only from instrument_eligibility — never recomputes.
+   */
+  async getEligibility(
+    instrumentIds: string[],
+    tradingDate?: Date,
+  ): Promise<InstrumentEligibilityRow[]> {
+    if (instrumentIds.length === 0) return [];
+    const unique = [...new Set(instrumentIds)];
+
+    if (tradingDate) {
+      const rows = await prisma.instrumentEligibility.findMany({
+        where: {
+          instrumentId: { in: unique },
+          tradingDate,
+        },
+      });
+      return rows.map((row) => this.toEligibilityRow(row));
+    }
+
+    // Latest row per instrument: fetch all rows for the ids, group by
+    // instrumentId, pick the one with the highest tradingDate.
+    const rows = await prisma.instrumentEligibility.findMany({
+      where: { instrumentId: { in: unique } },
+      orderBy: { tradingDate: 'desc' },
+    });
+    const seen = new Set<string>();
+    const latest: typeof rows = [];
+    for (const row of rows) {
+      if (!seen.has(row.instrumentId)) {
+        seen.add(row.instrumentId);
+        latest.push(row);
+      }
+    }
+    return latest.map((row) => this.toEligibilityRow(row));
+  }
+
+  /**
+   * Filter instruments by a named verdict, reading only persisted rows.
+   * Never recomputes eligibility.
+   * Returns { eligibleInstrumentIds, excludedInstrumentIds, reasonsByInstrumentId }.
+   */
+  async filterByVerdict(
+    instrumentIds: string[],
+    verdict: VerdictKey,
+    tradingDate?: Date,
+  ): Promise<FilterByVerdictResult> {
+    if (instrumentIds.length === 0) {
+      return { eligibleInstrumentIds: [], excludedInstrumentIds: [], reasonsByInstrumentId: {} };
+    }
+    const rows = await this.getEligibility(instrumentIds, tradingDate);
+    const byId = new Map(rows.map((row) => [row.instrumentId, row]));
+
+    const eligibleInstrumentIds: string[] = [];
+    const excludedInstrumentIds: string[] = [];
+    const reasonsByInstrumentId: Record<string, EligibilityReasonCode[]> = {};
+
+    for (const instrumentId of instrumentIds) {
+      const row = byId.get(instrumentId);
+      if (!row) {
+        // No persisted row — exclude conservatively
+        excludedInstrumentIds.push(instrumentId);
+        reasonsByInstrumentId[instrumentId] = ['NO_LATEST_PRICE'];
+        continue;
+      }
+      const eligible = row.verdicts[`${verdict}Eligible` as keyof EligibilityVerdicts] as boolean;
+      if (eligible) {
+        eligibleInstrumentIds.push(instrumentId);
+      } else {
+        excludedInstrumentIds.push(instrumentId);
+        const reasons = row.verdicts[`${verdict}Reasons` as keyof EligibilityVerdicts] as EligibilityReasonCode[];
+        reasonsByInstrumentId[instrumentId] = reasons;
+      }
+    }
+
+    return { eligibleInstrumentIds, excludedInstrumentIds, reasonsByInstrumentId };
+  }
+
+  private toEligibilityRow(row: any): InstrumentEligibilityRow {
+    return {
+      instrumentId: row.instrumentId,
+      tradingDate: row.tradingDate,
+      facts: {
+        priceBars: row.priceBars,
+        lastPriceDate: row.lastPriceDate ? (row.lastPriceDate as Date).toISOString().slice(0, 10) : null,
+        staleSessions: row.staleSessions,
+        volumeCoveragePct: Number(row.volumeCoveragePct),
+        maxGapDays: row.maxGapDays,
+        liquidityScore: row.liquidityScore,
+        hasFundamentals: row.hasFundamentals,
+        hasSector: row.hasSector,
+        hasIndustry: row.hasIndustry,
+        hasCountry: row.hasCountry,
+      },
+      verdicts: {
+        signalEligible: row.signalEligible,
+        reviewEligible: row.reviewEligible,
+        backtestEligible: row.backtestEligible,
+        calibrationEligible: row.calibrationEligible,
+        signalReasons: (row.signalReasons ?? []) as EligibilityReasonCode[],
+        reviewReasons: (row.reviewReasons ?? []) as EligibilityReasonCode[],
+        backtestReasons: (row.backtestReasons ?? []) as EligibilityReasonCode[],
+        calibrationReasons: (row.calibrationReasons ?? []) as EligibilityReasonCode[],
+      },
+      readinessScore: row.readinessScore,
+      readinessStatus: row.readinessStatus,
+      policyVersion: row.policyVersion,
+      computedAt: row.computedAt,
+    };
   }
 }

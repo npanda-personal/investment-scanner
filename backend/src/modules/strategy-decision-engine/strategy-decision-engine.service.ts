@@ -1,5 +1,6 @@
 import { MarketDataFoundationService } from '../market-data-foundation';
 import { MarketContextIntelligenceService } from '../market-context-intelligence';
+import { mapFrameworkDecisionToStrategyDecision } from '../../shared/types/strategy.types';
 import {
   BREADTH_WEAK_THRESHOLD,
   BREADTH_VERY_WEAK_THRESHOLD,
@@ -655,13 +656,14 @@ export class StrategyDecisionEngineService {
   }
 
   private mapFrameworkDecision(result: StrategySignalOutput): { decision: StrategyDecision; action: DecisionAction; frameworkAction: string } {
-    if (result.decision === 'ENTRY_CANDIDATE' || result.decision === 'SIGNAL') return { decision: 'TRADE_CANDIDATE', action: 'CONSIDER_ENTRY', frameworkAction: 'CONSIDER_ENTRY' };
-    if (result.decision === 'WATCH') return { decision: 'WATCH', action: 'WAIT_FOR_CONFIRMATION', frameworkAction: 'WAIT_FOR_CONFIRMATION' };
-    if (result.decision === 'WAIT') return { decision: 'WAIT', action: 'WAIT_FOR_PULLBACK', frameworkAction: 'WAIT_FOR_PULLBACK' };
-    if (result.decision === 'AVOID') return { decision: 'AVOID', action: 'AVOID_NEW_ENTRY', frameworkAction: 'AVOID_NEW_ENTRY' };
-    if (result.decision === 'INSUFFICIENT_DATA') return { decision: 'INSUFFICIENT_DATA', action: 'NO_ACTION', frameworkAction: 'NO_ACTION' };
-    if (result.decision === 'EXIT_CANDIDATE') return { decision: 'EXIT_CANDIDATE', action: 'REVIEW_EXIT', frameworkAction: 'REVIEW_EXIT' };
-    if (result.decision === 'REDUCE_RISK') return { decision: 'REDUCE_RISK', action: 'REDUCE_EXPOSURE', frameworkAction: 'REDUCE_EXPOSURE' };
+    const decision = mapFrameworkDecisionToStrategyDecision(result.decision);
+    if (decision === 'TRADE_CANDIDATE') return { decision, action: 'CONSIDER_ENTRY', frameworkAction: 'CONSIDER_ENTRY' };
+    if (decision === 'WATCH') return { decision, action: 'WAIT_FOR_CONFIRMATION', frameworkAction: 'WAIT_FOR_CONFIRMATION' };
+    if (decision === 'WAIT') return { decision, action: 'WAIT_FOR_PULLBACK', frameworkAction: 'WAIT_FOR_PULLBACK' };
+    if (decision === 'AVOID') return { decision, action: 'AVOID_NEW_ENTRY', frameworkAction: 'AVOID_NEW_ENTRY' };
+    if (decision === 'INSUFFICIENT_DATA') return { decision, action: 'NO_ACTION', frameworkAction: 'NO_ACTION' };
+    if (decision === 'EXIT_CANDIDATE') return { decision, action: 'REVIEW_EXIT', frameworkAction: 'REVIEW_EXIT' };
+    if (decision === 'REDUCE_RISK') return { decision, action: 'REDUCE_EXPOSURE', frameworkAction: 'REDUCE_EXPOSURE' };
     return { decision: 'HOLD', action: 'HOLD_POSITION', frameworkAction: 'HOLD_POSITION' };
   }
 
