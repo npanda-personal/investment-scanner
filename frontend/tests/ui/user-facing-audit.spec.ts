@@ -94,8 +94,9 @@ const ROUTES: AuditRoute[] = [
   { slug: '08-portfolios', path: '/portfolios', label: 'Portfolios' },
   { slug: '09-alerts', path: '/alerts', label: 'Alerts' },
   { slug: '10-instrument', path: '/instrument-workspace', label: 'Instrument Workspace' },
+  { slug: '11-copilot', path: '/copilot', label: 'Copilot' },
   // Account (accessible from nav chrome)
-  { slug: '11-account', path: '/account', label: 'Account' },
+  { slug: '12-account', path: '/account', label: 'Account' },
 ];
 
 // ---------------------------------------------------------------------------
