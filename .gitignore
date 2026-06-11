@@ -141,3 +141,5 @@ frontend/test-results-*/
 frontend/playwright-report/
 frontend/playwright-results*/
 frontend/tmp-*
+test-results/
+frontend/tests/ui/support/.auth-state.json

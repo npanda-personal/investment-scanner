@@ -17,8 +17,18 @@ const moduleDir = path.dirname(fileURLToPath(import.meta.url));
 const AUTH_TOKEN_KEY = 'investment_scanner_auth_token';
 export const STORAGE_STATE_PATH = path.join(moduleDir, '.auth-state.json');
 
+const STATE_REUSE_MS = 60 * 60 * 1000;
+
 export default async function globalSetup(config: FullConfig) {
   const baseURL = (config.projects[0]?.use?.baseURL as string) || 'http://localhost:5173';
+
+  // Reuse a fresh auth state across invocations: the chunked QA runner calls
+  // this setup once PER SPEC FILE, and per-chunk logins trip the same
+  // 10-per-15-min limiter this setup exists to avoid.
+  if (fs.existsSync(STORAGE_STATE_PATH)) {
+    const ageMs = Date.now() - fs.statSync(STORAGE_STATE_PATH).mtimeMs;
+    if (ageMs < STATE_REUSE_MS) return;
+  }
   const backendURL = process.env.E2E_BACKEND_URL || 'http://localhost:3000';
   const email = process.env.E2E_EMAIL || 'test@example.com';
   const password = process.env.E2E_PASSWORD || 'TestUser123!';
