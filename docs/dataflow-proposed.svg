@@ -1,0 +1,199 @@
+<svg viewBox="0 0 1060 880" xmlns="http://www.w3.org/2000/svg" font-family="system-ui, sans-serif" font-size="11">
+  <title>Investment Scanner — Proposed Architecture: Measure → Decide → Assemble (2026-06-11)</title>
+
+  <defs>
+    <marker id="a" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill="#94a3b8"/></marker>
+    <marker id="ab" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill="#3b82f6"/></marker>
+    <marker id="ag" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill="#4ade80"/></marker>
+    <marker id="ao" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill="#f97316"/></marker>
+    <marker id="ap" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill="#c084fc"/></marker>
+    <marker id="ay" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill="#facc15"/></marker>
+    <marker id="as" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill="#38bdf8"/></marker>
+  </defs>
+
+  <rect width="1060" height="880" fill="#0f172a"/>
+
+  <!-- Column headers -->
+  <text x="200" y="22" text-anchor="middle" fill="#64748b" font-size="9.5" font-weight="700" letter-spacing="1">DECIDE — NIGHTLY DAG  (write path)</text>
+  <text x="565" y="22" text-anchor="middle" fill="#64748b" font-size="9.5" font-weight="700" letter-spacing="1">SHARED STATE  (facts · verdicts · snapshot)</text>
+  <text x="905" y="22" text-anchor="middle" fill="#64748b" font-size="9.5" font-weight="700" letter-spacing="1">ASSEMBLED READ  (query path)</text>
+  <text x="1045" y="10" text-anchor="end" fill="#475569" font-size="8">PROPOSED · 2026-06-11</text>
+
+  <!-- Column dividers -->
+  <line x1="385" y1="10" x2="385" y2="650" stroke="#1e293b" stroke-width="1.5"/>
+  <line x1="745" y1="10" x2="745" y2="650" stroke="#1e293b" stroke-width="1.5"/>
+
+  <!-- DAG runner -->
+  <rect x="60" y="35" width="280" height="46" rx="5" fill="#1e293b" stroke="#4ade80" stroke-width="1.5"/>
+  <text x="200" y="53" text-anchor="middle" fill="#4ade80" font-size="11" font-weight="700">pipeline DAG runner  (in-process)</text>
+  <text x="200" y="68" text-anchor="middle" fill="#86efac" font-size="8.5">stage registry · heartbeat leases · PARTIAL receipts · one execution path</text>
+  <line x1="200" y1="81" x2="200" y2="98" stroke="#4ade80" marker-end="url(#ag)"/>
+
+  <!-- ingest -->
+  <rect x="100" y="100" width="200" height="38" rx="4" fill="#1e3a5f" stroke="#3b82f6" stroke-width="1.5"/>
+  <text x="200" y="116" text-anchor="middle" fill="#60a5fa" font-size="10" font-weight="700">ingest</text>
+  <text x="200" y="130" text-anchor="middle" fill="#93c5fd" font-size="8.5">market-data-foundation (write side)</text>
+  <line x1="200" y1="138" x2="200" y2="154" stroke="#94a3b8" marker-end="url(#a)"/>
+
+  <!-- eligibility -->
+  <rect x="80" y="156" width="240" height="44" rx="4" fill="#2a2208" stroke="#facc15" stroke-width="1.5"/>
+  <text x="200" y="173" text-anchor="middle" fill="#facc15" font-size="10" font-weight="700">eligibility — data-quality-engine</text>
+  <text x="200" y="188" text-anchor="middle" fill="#fde68a" font-size="8.5">facts → 4 named verdicts · ONE policy file</text>
+
+  <!-- branch arrows -->
+  <line x1="140" y1="200" x2="105" y2="226" stroke="#4ade80" marker-end="url(#ag)"/>
+  <line x1="262" y1="200" x2="278" y2="226" stroke="#f97316" marker-end="url(#ao)"/>
+
+  <!-- intelligence group (parallel) -->
+  <text x="105" y="222" text-anchor="middle" fill="#64748b" font-size="8.5">parallel ∥</text>
+  <rect x="40" y="228" width="130" height="30" rx="4" fill="#1a2a1a" stroke="#4ade80" stroke-width="1"/>
+  <text x="105" y="247" text-anchor="middle" fill="#4ade80" font-size="9.5">earnings-intel</text>
+  <rect x="40" y="266" width="130" height="30" rx="4" fill="#1a2a1a" stroke="#4ade80" stroke-width="1"/>
+  <text x="105" y="285" text-anchor="middle" fill="#4ade80" font-size="9.5">derivatives-intel</text>
+  <rect x="40" y="304" width="130" height="30" rx="4" fill="#1a2a1a" stroke="#4ade80" stroke-width="1"/>
+  <text x="105" y="323" text-anchor="middle" fill="#4ade80" font-size="9.5">smart-money-intel</text>
+  <line x1="105" y1="334" x2="105" y2="438" stroke="#4ade80" marker-end="url(#ag)"/>
+
+  <!-- signal chain -->
+  <rect x="195" y="228" width="170" height="30" rx="4" fill="#2a1a0a" stroke="#fb923c" stroke-width="1.5"/>
+  <text x="280" y="247" text-anchor="middle" fill="#fb923c" font-size="9.5" font-weight="700">signal-generation</text>
+  <line x1="280" y1="258" x2="280" y2="264" stroke="#f97316" marker-end="url(#ao)"/>
+  <rect x="195" y="266" width="170" height="30" rx="4" fill="#2a1a0a" stroke="#fb923c" stroke-width="1.5"/>
+  <text x="280" y="285" text-anchor="middle" fill="#fb923c" font-size="9.5" font-weight="700">signal-calibration</text>
+  <line x1="280" y1="296" x2="280" y2="302" stroke="#f97316" marker-end="url(#ao)"/>
+  <rect x="195" y="304" width="170" height="30" rx="4" fill="#2a1a0a" stroke="#fb923c" stroke-width="1.5"/>
+  <text x="280" y="323" text-anchor="middle" fill="#fb923c" font-size="9.5" font-weight="700">market-context †</text>
+  <line x1="280" y1="334" x2="280" y2="340" stroke="#f97316" marker-end="url(#ao)"/>
+  <rect x="195" y="342" width="170" height="38" rx="4" fill="#2a0f0f" stroke="#f87171" stroke-width="1.5"/>
+  <text x="280" y="357" text-anchor="middle" fill="#f87171" font-size="9.5" font-weight="700">strategy-decision</text>
+  <text x="280" y="371" text-anchor="middle" fill="#fca5a5" font-size="8">uses strategy-framework (rule library)</text>
+  <line x1="280" y1="380" x2="280" y2="386" stroke="#f97316" marker-end="url(#ao)"/>
+  <rect x="195" y="388" width="170" height="30" rx="4" fill="#2a0f0f" stroke="#f87171" stroke-width="1.5"/>
+  <text x="280" y="407" text-anchor="middle" fill="#f87171" font-size="9.5" font-weight="700">trade-plan</text>
+  <line x1="280" y1="418" x2="280" y2="438" stroke="#f97316" marker-end="url(#ao)"/>
+  <text x="32" y="356" fill="#64748b" font-size="7.5">† post-calibration:</text>
+  <text x="32" y="366" fill="#64748b" font-size="7.5">aggregates signal</text>
+  <text x="32" y="376" fill="#64748b" font-size="7.5">breadth (status quo)</text>
+
+  <!-- snapshot assembler -->
+  <rect x="60" y="440" width="280" height="44" rx="5" fill="#231a30" stroke="#c084fc" stroke-width="2"/>
+  <text x="200" y="457" text-anchor="middle" fill="#c084fc" font-size="11" font-weight="700">snapshot-assembler   ← NEW</text>
+  <text x="200" y="471" text-anchor="middle" fill="#d8b4fe" font-size="8.5">composes all module outputs · versioned write · never blocks on partial</text>
+  <line x1="200" y1="484" x2="200" y2="504" stroke="#c084fc" marker-end="url(#ap)"/>
+
+  <!-- post-assembly hooks -->
+  <rect x="40" y="506" width="320" height="56" rx="4" fill="#1a2a1a" stroke="#4ade80" stroke-width="1"/>
+  <text x="200" y="522" text-anchor="middle" fill="#4ade80" font-size="9" font-weight="700">on assembly complete</text>
+  <text x="200" y="536" text-anchor="middle" fill="#86efac" font-size="8.5">mark date READY → evaluate alerts → refresh signal-position-ledger</text>
+  <text x="200" y="550" text-anchor="middle" fill="#86efac" font-size="8.5">→ Telegram run summary (✅ / ⚠️ / ❌ on EVERY terminal state)</text>
+
+  <!-- offline -->
+  <text x="200" y="588" text-anchor="middle" fill="#64748b" font-size="8.5">offline / analytical — off the critical path</text>
+  <rect x="40" y="596" width="150" height="32" rx="4" fill="#16202e" stroke="#64748b" stroke-width="1" stroke-dasharray="4 3"/>
+  <text x="115" y="616" text-anchor="middle" fill="#94a3b8" font-size="9">backtesting-lab</text>
+  <rect x="210" y="596" width="150" height="32" rx="4" fill="#16202e" stroke="#64748b" stroke-width="1" stroke-dasharray="4 3"/>
+  <text x="285" y="616" text-anchor="middle" fill="#94a3b8" font-size="9">signal-quality-lab</text>
+  <line x1="360" y1="608" x2="408" y2="592" stroke="#64748b" stroke-dasharray="4 3" marker-end="url(#a)"/>
+
+  <!-- CENTER: market data tables -->
+  <rect x="430" y="100" width="270" height="36" rx="4" fill="#16202e" stroke="#3b82f6" stroke-width="1" stroke-dasharray="4 3"/>
+  <text x="565" y="115" text-anchor="middle" fill="#60a5fa" font-size="9">price · fundamentals · corp-action tables</text>
+  <text x="565" y="128" text-anchor="middle" fill="#475569" font-size="8">written by ingest · read by compute stages</text>
+  <line x1="300" y1="119" x2="428" y2="118" stroke="#3b82f6" marker-end="url(#ab)"/>
+
+  <!-- CENTER: instrument_eligibility -->
+  <rect x="420" y="166" width="290" height="112" rx="5" fill="#2a2208" stroke="#facc15" stroke-width="1.5"/>
+  <text x="565" y="184" text-anchor="middle" fill="#facc15" font-size="10" font-weight="700">instrument_eligibility  (per instrument · day)</text>
+  <text x="432" y="202" fill="#fde68a" font-size="8.5">FACTS — bars · staleness (sessions) · volume coverage ·</text>
+  <text x="432" y="214" fill="#fde68a" font-size="8.5">liquidity · fundamentals · sector / industry / country</text>
+  <text x="432" y="232" fill="#fde68a" font-size="8.5">VERDICTS — signal / review / backtest / calibration</text>
+  <text x="432" y="244" fill="#fde68a" font-size="8.5">each boolean + reason_codes[]  (one vocabulary)</text>
+  <text x="432" y="264" fill="#ca8a04" font-size="8.5">policy: shared/types/eligibility-policy.ts · policy_version</text>
+  <line x1="322" y1="178" x2="418" y2="196" stroke="#facc15" marker-end="url(#ay)"/>
+  <line x1="565" y1="278" x2="565" y2="324" stroke="#94a3b8" stroke-dasharray="4 3" marker-end="url(#a)"/>
+  <text x="578" y="306" fill="#475569" font-size="7.5">verdicts copied in</text>
+
+  <!-- CENTER: daily_instrument_snapshot -->
+  <rect x="410" y="328" width="310" height="196" rx="5" fill="#231a30" stroke="#c084fc" stroke-width="2"/>
+  <text x="565" y="346" text-anchor="middle" fill="#c084fc" font-size="10" font-weight="700">daily_instrument_snapshot  (one row · instrument · day)</text>
+  <text x="424" y="364" fill="#d8b4fe" font-size="8.5">eligibility verdicts + reason codes</text>
+  <text x="424" y="377" fill="#d8b4fe" font-size="8.5">signal_score · direction              ← signal-generation</text>
+  <text x="424" y="390" fill="#d8b4fe" font-size="8.5">calibrated_score · authority         ← signal-calibration</text>
+  <text x="424" y="403" fill="#d8b4fe" font-size="8.5">strategy_decision · rules_fired     ← strategy-decision</text>
+  <text x="424" y="416" fill="#d8b4fe" font-size="8.5">stop_loss · target · rr_ratio          ← trade-plan</text>
+  <text x="424" y="429" fill="#d8b4fe" font-size="8.5">market_regime · breadth_pct        ← market-context</text>
+  <text x="424" y="442" fill="#d8b4fe" font-size="8.5">oi_buildup · positioning               ← derivatives-intel</text>
+  <text x="424" y="455" fill="#d8b4fe" font-size="8.5">earnings_proximity_days · smart_money_code</text>
+  <text x="424" y="472" fill="#a78bfa" font-size="8.5">per-section provenance  (OK / STALE / FAILED / N-A)</text>
+  <text x="424" y="485" fill="#a78bfa" font-size="8.5">snapshot_version — supersede, never silent overwrite</text>
+  <text x="424" y="498" fill="#a78bfa" font-size="8.5">assembled_at — THE staleness clock for all readers</text>
+  <line x1="342" y1="462" x2="408" y2="440" stroke="#c084fc" marker-end="url(#ap)"/>
+
+  <!-- READY watermark -->
+  <rect x="410" y="534" width="310" height="22" rx="3" fill="#0d2818" stroke="#4ade80" stroke-width="1" stroke-dasharray="4 3"/>
+  <text x="565" y="549" text-anchor="middle" fill="#4ade80" font-size="8.5">READY watermark — date visible to readers only after assembly</text>
+
+  <!-- history chip -->
+  <rect x="410" y="566" width="310" height="34" rx="4" fill="#16202e" stroke="#64748b" stroke-width="1" stroke-dasharray="4 3"/>
+  <text x="565" y="580" text-anchor="middle" fill="#94a3b8" font-size="8.5">historical rows = backtesting + signal-quality source</text>
+  <text x="565" y="593" text-anchor="middle" fill="#64748b" font-size="8">(replaces historical-context-snapshots after backfill)</text>
+
+  <!-- user data chip -->
+  <rect x="410" y="610" width="310" height="30" rx="4" fill="#16202e" stroke="#64748b" stroke-width="1"/>
+  <text x="565" y="623" text-anchor="middle" fill="#94a3b8" font-size="8.5">user data joined at read time:</text>
+  <text x="565" y="635" text-anchor="middle" fill="#94a3b8" font-size="8.5">portfolio · watchlist · trade-journal · alert rules</text>
+
+  <!-- RIGHT: readers -->
+  <rect x="770" y="150" width="250" height="40" rx="4" fill="#102a3a" stroke="#38bdf8" stroke-width="1.5"/>
+  <text x="895" y="166" text-anchor="middle" fill="#38bdf8" font-size="10" font-weight="700">today-trade-review</text>
+  <text x="895" y="181" text-anchor="middle" fill="#7dd3fc" font-size="8.5">1 dependency (was 11) · filter + rank only</text>
+
+  <rect x="770" y="200" width="250" height="38" rx="4" fill="#102a3a" stroke="#38bdf8" stroke-width="1.5"/>
+  <text x="895" y="215" text-anchor="middle" fill="#38bdf8" font-size="10" font-weight="700">portfolio-intelligence</text>
+  <text x="895" y="229" text-anchor="middle" fill="#7dd3fc" font-size="8.5">snapshot + holdings · staleness = assembled_at</text>
+
+  <rect x="770" y="248" width="250" height="38" rx="4" fill="#102a3a" stroke="#38bdf8" stroke-width="1.5"/>
+  <text x="895" y="263" text-anchor="middle" fill="#38bdf8" font-size="10" font-weight="700">ai-investment-copilot</text>
+  <text x="895" y="277" text-anchor="middle" fill="#7dd3fc" font-size="8.5">snapshot + user data · zero lazy-requires</text>
+
+  <rect x="770" y="296" width="250" height="38" rx="4" fill="#102a3a" stroke="#38bdf8" stroke-width="1.5"/>
+  <text x="895" y="311" text-anchor="middle" fill="#38bdf8" font-size="10" font-weight="700">stock-research-workbench</text>
+  <text x="895" y="325" text-anchor="middle" fill="#7dd3fc" font-size="8.5">instrument workspace reader</text>
+
+  <rect x="770" y="344" width="250" height="30" rx="4" fill="#102a3a" stroke="#38bdf8" stroke-width="1.5"/>
+  <text x="895" y="363" text-anchor="middle" fill="#38bdf8" font-size="10" font-weight="700">research-hub</text>
+
+  <rect x="770" y="384" width="250" height="38" rx="4" fill="#1a2a1a" stroke="#4ade80" stroke-width="1.5"/>
+  <text x="895" y="399" text-anchor="middle" fill="#4ade80" font-size="10" font-weight="700">alerts-monitoring</text>
+  <text x="895" y="413" text-anchor="middle" fill="#86efac" font-size="8.5">evaluated at assembly · no polling</text>
+  <line x1="895" y1="422" x2="895" y2="432" stroke="#4ade80" marker-end="url(#ag)"/>
+
+  <rect x="770" y="434" width="250" height="38" rx="4" fill="#1a2a1a" stroke="#4ade80" stroke-width="1.5"/>
+  <text x="895" y="449" text-anchor="middle" fill="#4ade80" font-size="10" font-weight="700">notifications-delivery</text>
+  <text x="895" y="463" text-anchor="middle" fill="#86efac" font-size="8.5">Telegram — alerts + pipeline run summaries</text>
+
+  <rect x="790" y="496" width="210" height="44" rx="5" fill="#1e293b" stroke="#e2e8f0" stroke-width="1.5"/>
+  <text x="895" y="514" text-anchor="middle" fill="#e2e8f0" font-size="10" font-weight="700">Frontend</text>
+  <text x="895" y="528" text-anchor="middle" fill="#94a3b8" font-size="8.5">all trader pages = persisted snapshot reads</text>
+  <line x1="895" y1="474" x2="895" y2="494" stroke="#94a3b8" stroke-dasharray="4 3" marker-end="url(#a)"/>
+
+  <!-- snapshot -> readers arrows -->
+  <line x1="722" y1="356" x2="768" y2="174" stroke="#38bdf8" marker-end="url(#as)"/>
+  <line x1="722" y1="388" x2="768" y2="221" stroke="#38bdf8" marker-end="url(#as)"/>
+  <line x1="722" y1="420" x2="768" y2="268" stroke="#38bdf8" marker-end="url(#as)"/>
+  <line x1="722" y1="452" x2="768" y2="316" stroke="#38bdf8" marker-end="url(#as)"/>
+  <line x1="722" y1="484" x2="768" y2="360" stroke="#38bdf8" marker-end="url(#as)"/>
+  <line x1="722" y1="510" x2="768" y2="402" stroke="#4ade80" marker-end="url(#ag)"/>
+
+  <!-- KEY CHANGES callout -->
+  <rect x="40" y="660" width="980" height="200" rx="6" fill="#111c2e" stroke="#334155" stroke-width="1"/>
+  <text x="60" y="682" fill="#e2e8f0" font-size="10.5" font-weight="700">KEY CHANGES vs current  (full design: dataflow-proposed.md · plan: dataflow-implementation-plan.md)</text>
+  <text x="60" y="704" fill="#facc15" font-size="9">• ONE eligibility authority — 3 readiness formulas / 15 gate sites / 3 staleness definitions collapse into 1 facts table + 1 policy file + 4 named verdicts with reason codes</text>
+  <text x="60" y="722" fill="#4ade80" font-size="9">• in-process DAG runner — declared dependencies, heartbeat leases, PARTIAL with failed-instrument receipts, any stage re-runnable for any date; DEFERRED/FORBIDDEN command maze deleted</text>
+  <text x="60" y="740" fill="#4ade80" font-size="9">• NO Redis / BullMQ — adapter interface keeps the queue option open if the app ever goes multi-process; existing PipelineRun/StageRun persistence is reused</text>
+  <text x="60" y="758" fill="#c084fc" font-size="9">• snapshot is the only trader-facing read surface — 11-service query fan-in, 12 lazy-require hacks and N+1 loops deleted; supersede-by-version handles NSE restatements</text>
+  <text x="60" y="776" fill="#38bdf8" font-size="9">• pipeline reports to the owner — Telegram on every terminal state; NSE holiday calendar wired in; restart-safe idempotency (no timestamps in fingerprints)</text>
+  <text x="60" y="794" fill="#94a3b8" font-size="9">• retired: historical-context-snapshots (post-backfill) · backtest readiness proxy · signal-gen fundamentals re-gate · per-consumer hand-rolled gate logic</text>
+  <text x="60" y="812" fill="#94a3b8" font-size="9">• market-data-foundation split read/write (interface-first); reads gated by READY watermark; no cache layer until profiling demands one</text>
+  <text x="60" y="838" fill="#475569" font-size="8.5">† open question Q1: market-context currently aggregates signal breadth, so it stays post-calibration (status-quo semantics, prior-day regime for calibration) until signal-quality data justifies splitting it.</text>
+</svg>

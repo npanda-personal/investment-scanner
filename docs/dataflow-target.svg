@@ -1,0 +1,236 @@
+<svg viewBox="0 0 1060 820" xmlns="http://www.w3.org/2000/svg" font-family="system-ui, sans-serif" font-size="11">
+  <title>Investment Scanner — Target Architecture Dataflow</title>
+
+  <defs>
+    <marker id="a" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill="#94a3b8"/></marker>
+    <marker id="ao" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill="#f97316"/></marker>
+    <marker id="ab" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill="#3b82f6"/></marker>
+    <marker id="ag" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill="#4ade80"/></marker>
+    <marker id="ap" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill="#c084fc"/></marker>
+    <marker id="ay" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill="#facc15"/></marker>
+  </defs>
+
+  <rect width="1060" height="820" fill="#0f172a"/>
+
+  <!-- Column headers -->
+  <text x="185" y="22" text-anchor="middle" fill="#64748b" font-size="9.5" font-weight="700" letter-spacing="1">NIGHTLY COMPUTE  (write path)</text>
+  <text x="560" y="22" text-anchor="middle" fill="#64748b" font-size="9.5" font-weight="700" letter-spacing="1">DAILY SNAPSHOT STORE  (shared state)</text>
+  <text x="875" y="22" text-anchor="middle" fill="#64748b" font-size="9.5" font-weight="700" letter-spacing="1">ON-DEMAND READ  (query path)</text>
+
+  <!-- Column dividers -->
+  <line x1="380" y1="10" x2="380" y2="810" stroke="#1e293b" stroke-width="1.5"/>
+  <line x1="740" y1="10" x2="740" y2="810" stroke="#1e293b" stroke-width="1.5"/>
+
+  <!-- pipeline-orchestration -->
+  <rect x="80" y="35" width="210" height="36" rx="5" fill="#1e293b" stroke="#4ade80" stroke-width="1.5"/>
+  <text x="185" y="53" text-anchor="middle" fill="#4ade80" font-size="11" font-weight="700">pipeline-orchestration</text>
+  <text x="185" y="65" text-anchor="middle" fill="#86efac" font-size="9">Schedules nightly stages via queue</text>
+
+  <!-- Stage 1: Ingest -->
+  <rect x="30" y="105" width="130" height="40" rx="4" fill="#1e3a5f" stroke="#3b82f6" stroke-width="1.5"/>
+  <text x="95" y="121" text-anchor="middle" fill="#60a5fa" font-size="10" font-weight="700">Stage 1</text>
+  <text x="95" y="135" text-anchor="middle" fill="#93c5fd" font-size="9">market-data-foundation</text>
+
+  <!-- Queue bar -->
+  <rect x="170" y="115" width="110" height="20" rx="3" fill="#1a2a1a" stroke="#4ade80" stroke-width="1"/>
+  <text x="225" y="129" text-anchor="middle" fill="#4ade80" font-size="9">BullMQ queue →</text>
+
+  <!-- Stage 2: Intelligence (parallel) -->
+  <text x="185" y="165" text-anchor="middle" fill="#64748b" font-size="9">Stage 2 — parallel</text>
+  <rect x="20" y="175" width="108" height="32" rx="4" fill="#1a2a1a" stroke="#4ade80" stroke-width="1"/>
+  <text x="74" y="195" text-anchor="middle" fill="#4ade80" font-size="9.5">market-context</text>
+  <rect x="138" y="175" width="100" height="32" rx="4" fill="#1a2a1a" stroke="#4ade80" stroke-width="1"/>
+  <text x="188" y="195" text-anchor="middle" fill="#4ade80" font-size="9.5">derivatives-intel</text>
+  <rect x="248" y="175" width="100" height="32" rx="4" fill="#1a2a1a" stroke="#4ade80" stroke-width="1"/>
+  <text x="298" y="195" text-anchor="middle" fill="#4ade80" font-size="9.5">earnings-intel</text>
+  <rect x="20" y="215" width="108" height="32" rx="4" fill="#1a2a1a" stroke="#4ade80" stroke-width="1"/>
+  <text x="74" y="235" text-anchor="middle" fill="#4ade80" font-size="9.5">smart-money-intel</text>
+  <rect x="138" y="215" width="100" height="32" rx="4" fill="#1a2a1a" stroke="#4ade80" stroke-width="1"/>
+  <text x="188" y="235" text-anchor="middle" fill="#4ade80" font-size="9.5">data-quality</text>
+  <rect x="248" y="215" width="100" height="32" rx="4" fill="#1a2a1a" stroke="#4ade80" stroke-width="1"/>
+  <text x="298" y="235" text-anchor="middle" fill="#4ade80" font-size="9.5">market-intelligence</text>
+
+  <!-- Stage 3: Signal gen -->
+  <text x="185" y="275" text-anchor="middle" fill="#64748b" font-size="9">Stage 3</text>
+  <rect x="60" y="283" width="250" height="36" rx="4" fill="#2a1a0a" stroke="#fb923c" stroke-width="1.5"/>
+  <text x="185" y="297" text-anchor="middle" fill="#fb923c" font-size="10" font-weight="700">signal-generation-engine</text>
+  <text x="185" y="311" text-anchor="middle" fill="#fdba74" font-size="9">reads market-data + intelligence snapshots</text>
+
+  <!-- Stage 4: Calibration -->
+  <text x="185" y="340" text-anchor="middle" fill="#64748b" font-size="9">Stage 4</text>
+  <rect x="60" y="348" width="250" height="36" rx="4" fill="#2a1a0a" stroke="#fb923c" stroke-width="1"/>
+  <text x="185" y="362" text-anchor="middle" fill="#fb923c" font-size="10" font-weight="700">signal-calibration-engine</text>
+  <text x="185" y="376" text-anchor="middle" fill="#fdba74" font-size="9">refines raw scores → authority scores</text>
+
+  <!-- Stage 5: Strategy -->
+  <text x="185" y="405" text-anchor="middle" fill="#64748b" font-size="9">Stage 5</text>
+  <rect x="60" y="413" width="250" height="36" rx="4" fill="#2a1a1a" stroke="#f87171" stroke-width="1"/>
+  <text x="185" y="427" text-anchor="middle" fill="#f87171" font-size="10" font-weight="700">strategy-decision-engine</text>
+  <text x="185" y="441" text-anchor="middle" fill="#fca5a5" font-size="9">ENTER · WAIT · AVOID · EXIT</text>
+
+  <!-- Stage 6: Trade plan -->
+  <text x="185" y="470" text-anchor="middle" fill="#64748b" font-size="9">Stage 6</text>
+  <rect x="60" y="478" width="250" height="36" rx="4" fill="#2a1a1a" stroke="#f87171" stroke-width="1"/>
+  <text x="185" y="492" text-anchor="middle" fill="#f87171" font-size="10" font-weight="700">trade-plan-risk-engine</text>
+  <text x="185" y="506" text-anchor="middle" fill="#fca5a5" font-size="9">stop · target · position size</text>
+
+  <!-- Stage 7: Assemble snapshot -->
+  <text x="185" y="535" text-anchor="middle" fill="#64748b" font-size="9">Stage 7  ← NEW</text>
+  <rect x="40" y="543" width="290" height="42" rx="5" fill="#172040" stroke="#60a5fa" stroke-width="2"/>
+  <text x="185" y="559" text-anchor="middle" fill="#60a5fa" font-size="11" font-weight="700">SnapshotAssembler</text>
+  <text x="185" y="573" text-anchor="middle" fill="#93c5fd" font-size="9">merges all stage outputs → 1 row / instrument / day</text>
+
+  <!-- Left pipeline arrows -->
+  <line x1="185" y1="71" x2="185" y2="104" stroke="#4ade80" stroke-width="1.2" marker-end="url(#ag)"/>
+  <line x1="185" y1="135" x2="185" y2="164" stroke="#94a3b8" stroke-width="1.2" marker-end="url(#a)"/>
+  <line x1="185" y1="247" x2="185" y2="282" stroke="#f97316" stroke-width="1.2" marker-end="url(#ao)"/>
+  <line x1="185" y1="319" x2="185" y2="347" stroke="#f97316" stroke-width="1.2" marker-end="url(#ao)"/>
+  <line x1="185" y1="384" x2="185" y2="412" stroke="#f87171" stroke-width="1.2" marker-end="url(#a)"/>
+  <line x1="185" y1="449" x2="185" y2="477" stroke="#f87171" stroke-width="1.2" marker-end="url(#a)"/>
+  <line x1="185" y1="514" x2="185" y2="542" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#ab)"/>
+
+  <!-- auth/billing note -->
+  <rect x="40" y="620" width="290" height="36" rx="4" fill="#1e293b" stroke="#475569" stroke-width="1"/>
+  <text x="185" y="634" text-anchor="middle" fill="#94a3b8" font-size="10" font-weight="600">auth-identity  ·  subscription-billing</text>
+  <text x="185" y="648" text-anchor="middle" fill="#64748b" font-size="9">user context threaded through all query calls</text>
+
+  <!-- Offline modules -->
+  <text x="185" y="670" fill="#475569" font-size="8.5" text-anchor="middle">Offline / analytical (don't block pipeline)</text>
+  <rect x="40" y="680" width="140" height="36" rx="4" fill="#1e293b" stroke="#475569" stroke-width="1" stroke-dasharray="4,2"/>
+  <text x="110" y="694" text-anchor="middle" fill="#64748b" font-size="9.5">signal-quality-lab</text>
+  <text x="110" y="708" text-anchor="middle" fill="#475569" font-size="8">offline — no write to snapshot</text>
+  <rect x="200" y="680" width="140" height="36" rx="4" fill="#1e293b" stroke="#475569" stroke-width="1" stroke-dasharray="4,2"/>
+  <text x="270" y="694" text-anchor="middle" fill="#64748b" font-size="9.5">backtesting-lab</text>
+  <text x="270" y="708" text-anchor="middle" fill="#475569" font-size="8">offline — reads history only</text>
+
+  <!-- CENTRE: DAILY SNAPSHOT STORE -->
+  <rect x="400" y="90" width="310" height="420" rx="8" fill="#0c1829" stroke="#3b82f6" stroke-width="2"/>
+  <rect x="400" y="90" width="310" height="36" rx="8" fill="#1e3a5f"/>
+  <rect x="400" y="116" width="310" height="10" fill="#1e3a5f"/>
+  <text x="555" y="113" text-anchor="middle" fill="#60a5fa" font-size="12" font-weight="700">daily_instrument_snapshot</text>
+  <text x="555" y="132" text-anchor="middle" fill="#7dd3fc" font-size="9">one row per instrument per day</text>
+
+  <text x="420" y="158" fill="#64748b" font-size="9" font-weight="600">WRITTEN BY PIPELINE</text>
+  <text x="420" y="173" fill="#94a3b8" font-size="9">instrumentId, tradingDate</text>
+  <text x="420" y="188" fill="#4ade80" font-size="9">— signal_score, signal_direction  (stage 3)</text>
+  <text x="420" y="203" fill="#4ade80" font-size="9">— calibrated_score, authority  (stage 4)</text>
+  <text x="420" y="218" fill="#f87171" font-size="9">— strategy_decision, rules_fired  (stage 5)</text>
+  <text x="420" y="233" fill="#f87171" font-size="9">— stop_loss, target, rr_ratio  (stage 6)</text>
+  <text x="420" y="248" fill="#4ade80" font-size="9">— market_regime, breadth_pct  (stage 2)</text>
+  <text x="420" y="263" fill="#4ade80" font-size="9">— oi_buildup, participant_pos  (stage 2)</text>
+  <text x="420" y="278" fill="#4ade80" font-size="9">— earnings_proximity_days  (stage 2)</text>
+  <text x="420" y="293" fill="#4ade80" font-size="9">— smart_money_code  (stage 2)</text>
+  <text x="420" y="308" fill="#4ade80" font-size="9">— data_quality_eligible  (stage 2)</text>
+  <text x="420" y="325" fill="#64748b" font-size="9">snapshot_version, assembled_at</text>
+
+  <line x1="410" y1="335" x2="700" y2="335" stroke="#1e293b" stroke-width="1"/>
+  <text x="420" y="352" fill="#64748b" font-size="9" font-weight="600">READ BY QUERY PATH</text>
+  <text x="420" y="367" fill="#94a3b8" font-size="9">today-trade-review  →  filter + rank only</text>
+  <text x="420" y="382" fill="#94a3b8" font-size="9">portfolio-intelligence  →  overlay holdings</text>
+  <text x="420" y="397" fill="#94a3b8" font-size="9">alerts-monitoring  →  threshold checks</text>
+  <text x="420" y="412" fill="#94a3b8" font-size="9">ai-investment-copilot  →  Q&amp;A context</text>
+  <text x="420" y="427" fill="#94a3b8" font-size="9">frontend screener  →  sort / filter UI</text>
+  <text x="420" y="442" fill="#94a3b8" font-size="9">backtesting  →  historical snapshot reads</text>
+  <text x="420" y="462" fill="#60a5fa" font-size="8.5" font-style="italic">immutable once assembled_at is set</text>
+  <text x="420" y="476" fill="#60a5fa" font-size="8.5" font-style="italic">versioned — old snapshots never overwritten</text>
+  <text x="420" y="492" fill="#60a5fa" font-size="8.5" font-style="italic">read-cache (Redis) sits in front for hot queries</text>
+
+  <!-- User snapshots -->
+  <rect x="400" y="535" width="140" height="60" rx="5" fill="#0c1829" stroke="#facc15" stroke-width="1.5"/>
+  <text x="470" y="553" text-anchor="middle" fill="#facc15" font-size="10" font-weight="700">user snapshots</text>
+  <text x="470" y="567" text-anchor="middle" fill="#fef08a" font-size="8.5">portfolio · watchlist</text>
+  <text x="470" y="580" text-anchor="middle" fill="#fef08a" font-size="8.5">trade journal</text>
+
+  <!-- Alert rules store -->
+  <rect x="570" y="535" width="140" height="60" rx="5" fill="#0c1829" stroke="#818cf8" stroke-width="1.5"/>
+  <text x="640" y="553" text-anchor="middle" fill="#a5b4fc" font-size="10" font-weight="700">alert rules</text>
+  <text x="640" y="567" text-anchor="middle" fill="#c7d2fe" font-size="8.5">user-defined thresholds</text>
+  <text x="640" y="580" text-anchor="middle" fill="#c7d2fe" font-size="8.5">evaluated against snapshot</text>
+
+  <!-- Historical snapshots -->
+  <rect x="400" y="620" width="310" height="36" rx="4" fill="#0c1829" stroke="#334155" stroke-width="1"/>
+  <text x="555" y="634" text-anchor="middle" fill="#475569" font-size="9.5">historical_instrument_snapshots</text>
+  <text x="555" y="648" text-anchor="middle" fill="#334155" font-size="8.5">immutable past rows — point-in-time replay, backtesting</text>
+
+  <!-- SnapshotAssembler → daily_instrument_snapshot arrow -->
+  <line x1="330" y1="564" x2="398" y2="300" stroke="#3b82f6" stroke-width="2" marker-end="url(#ab)"/>
+
+  <!-- RIGHT: QUERY PATH -->
+  <rect x="760" y="90" width="270" height="55" rx="5" fill="#1e2a1e" stroke="#4ade80" stroke-width="1.5"/>
+  <text x="895" y="109" text-anchor="middle" fill="#4ade80" font-size="11" font-weight="700">today-trade-review</text>
+  <text x="895" y="123" text-anchor="middle" fill="#86efac" font-size="9">reads snapshot → filter → rank → serve</text>
+  <text x="895" y="136" text-anchor="middle" fill="#4ade80" font-size="8.5" font-style="italic">1 dependency (snapshot) not 11</text>
+
+  <rect x="760" y="168" width="270" height="55" rx="5" fill="#2a2a0a" stroke="#facc15" stroke-width="1.5"/>
+  <text x="895" y="187" text-anchor="middle" fill="#facc15" font-size="11" font-weight="700">portfolio-intelligence</text>
+  <text x="895" y="201" text-anchor="middle" fill="#fef08a" font-size="9">snapshot + holdings → health overlay</text>
+  <text x="895" y="214" text-anchor="middle" fill="#facc15" font-size="8.5" font-style="italic">staleness = snapshot.assembled_at</text>
+
+  <rect x="760" y="246" width="270" height="55" rx="5" fill="#1a1a2a" stroke="#818cf8" stroke-width="1.5"/>
+  <text x="895" y="265" text-anchor="middle" fill="#a5b4fc" font-size="11" font-weight="700">alerts-monitoring</text>
+  <text x="895" y="279" text-anchor="middle" fill="#c7d2fe" font-size="9">diff snapshot vs alert rules on assemble</text>
+  <text x="895" y="292" text-anchor="middle" fill="#818cf8" font-size="8.5" font-style="italic">event-driven — no polling</text>
+
+  <rect x="760" y="324" width="270" height="40" rx="5" fill="#1a1a2a" stroke="#475569" stroke-width="1"/>
+  <text x="895" y="339" text-anchor="middle" fill="#94a3b8" font-size="10" font-weight="600">notifications-delivery</text>
+  <text x="895" y="353" text-anchor="middle" fill="#64748b" font-size="9">Telegram · Email · Push</text>
+
+  <rect x="760" y="387" width="270" height="55" rx="5" fill="#2a1a2e" stroke="#c084fc" stroke-width="1.5"/>
+  <text x="895" y="406" text-anchor="middle" fill="#c084fc" font-size="11" font-weight="700">ai-investment-copilot</text>
+  <text x="895" y="420" text-anchor="middle" fill="#e9d5ff" font-size="9">snapshot + user data → LLM context</text>
+  <text x="895" y="433" text-anchor="middle" fill="#c084fc" font-size="8.5" font-style="italic">no lazy-require hacks needed</text>
+
+  <rect x="760" y="465" width="270" height="55" rx="5" fill="#1a1f2e" stroke="#334155" stroke-width="1.5"/>
+  <text x="895" y="484" text-anchor="middle" fill="#94a3b8" font-size="11" font-weight="700">Frontend</text>
+  <text x="895" y="498" text-anchor="middle" fill="#64748b" font-size="9">screener · review board · alerts · copilot</text>
+  <text x="895" y="511" text-anchor="middle" fill="#475569" font-size="8.5" font-style="italic">all pages read from same snapshot layer</text>
+
+  <rect x="760" y="543" width="130" height="40" rx="4" fill="#1e293b" stroke="#475569" stroke-width="1" stroke-dasharray="4,2"/>
+  <text x="825" y="558" text-anchor="middle" fill="#64748b" font-size="9.5">research-hub</text>
+  <text x="825" y="570" text-anchor="middle" fill="#475569" font-size="8.5">standalone content</text>
+
+  <rect x="900" y="543" width="130" height="40" rx="4" fill="#1e293b" stroke="#475569" stroke-width="1" stroke-dasharray="4,2"/>
+  <text x="965" y="558" text-anchor="middle" fill="#64748b" font-size="9.5">trade-journal</text>
+  <text x="965" y="570" text-anchor="middle" fill="#475569" font-size="8.5">user-input only</text>
+
+  <!-- Read path arrows FROM snapshot -->
+  <line x1="710" y1="210" x2="759" y2="118" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#ab)"/>
+  <line x1="710" y1="240" x2="759" y2="196" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#ab)"/>
+  <line x1="710" y1="270" x2="759" y2="274" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#ab)"/>
+  <line x1="710" y1="280" x2="759" y2="415" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#ab)"/>
+
+  <!-- portfolio-intelligence also reads user snapshots -->
+  <line x1="470" y1="535" x2="810" y2="223" stroke="#facc15" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#ay)"/>
+
+  <!-- alerts reads alert-rules -->
+  <line x1="640" y1="535" x2="830" y2="301" stroke="#818cf8" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#ap)"/>
+  <!-- alerts → notifications -->
+  <line x1="895" y1="301" x2="895" y2="323" stroke="#818cf8" stroke-width="1.5" marker-end="url(#ap)"/>
+
+  <!-- read path vertical arrows -->
+  <line x1="895" y1="442" x2="895" y2="464" stroke="#c084fc" stroke-width="1.2" marker-end="url(#ap)"/>
+  <line x1="895" y1="520" x2="895" y2="542" stroke="#475569" stroke-width="1" marker-end="url(#a)"/>
+
+  <!-- Key changes callout -->
+  <rect x="760" y="612" width="275" height="120" rx="5" fill="#0c1829" stroke="#334155" stroke-width="1"/>
+  <text x="772" y="629" fill="#64748b" font-size="9" font-weight="700">KEY STRUCTURAL CHANGES</text>
+  <text x="772" y="645" fill="#4ade80" font-size="9">▸ SnapshotAssembler  —  new Stage 7</text>
+  <text x="772" y="659" fill="#4ade80" font-size="9">▸ today-trade-review: 11 deps → 1</text>
+  <text x="772" y="673" fill="#4ade80" font-size="9">▸ Staleness = snapshot.assembled_at</text>
+  <text x="772" y="687" fill="#4ade80" font-size="9">▸ BullMQ queue between every stage</text>
+  <text x="772" y="701" fill="#4ade80" font-size="9">▸ ai-copilot: no lazy-require needed</text>
+  <text x="772" y="715" fill="#4ade80" font-size="9">▸ Alerts are event-driven not polled</text>
+  <text x="772" y="729" fill="#f97316" font-size="9">▸ market-data-foundation: write-only ingestor</text>
+
+  <!-- Legend -->
+  <rect x="390" y="705" width="330" height="90" rx="5" fill="#0c1829" stroke="#334155" stroke-width="1"/>
+  <text x="402" y="721" fill="#64748b" font-size="9" font-weight="700">LEGEND</text>
+  <line x1="402" y1="735" x2="435" y2="735" stroke="#3b82f6" stroke-width="2"/>
+  <text x="441" y="739" fill="#94a3b8" font-size="9">pipeline writes / snapshot reads</text>
+  <line x1="402" y1="750" x2="435" y2="750" stroke="#f97316" stroke-width="2"/>
+  <text x="441" y="754" fill="#94a3b8" font-size="9">signal compute chain</text>
+  <line x1="402" y1="765" x2="435" y2="765" stroke="#4ade80" stroke-width="2"/>
+  <text x="441" y="769" fill="#94a3b8" font-size="9">intelligence / context stages</text>
+  <line x1="402" y1="780" x2="435" y2="780" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <text x="441" y="784" fill="#94a3b8" font-size="9">offline / standalone — not on critical path</text>
+</svg>
