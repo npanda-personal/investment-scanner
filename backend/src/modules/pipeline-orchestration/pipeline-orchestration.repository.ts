@@ -18,7 +18,7 @@ const ACTIVE_STATUSES = ['PENDING', 'RUNNING'];
 // Only genuine runs (real work completed) — excludes ABANDONED (reaped/interrupted), SKIPPED, and
 // BLOCKED so that a stale-lease reaped run never becomes the headline "last run" on the Pipeline
 // Ops header.
-const MEANINGFUL_RUN_STATUSES = ['COMPLETED', 'PARTIAL', 'FAILED'];
+const MEANINGFUL_RUN_STATUSES = ['COMPLETED', 'PARTIAL', 'FAILED', 'ABANDONED'];
 
 export class PipelineOrchestrationRepository {
   constructor(private readonly db = prisma) {}
@@ -282,11 +282,19 @@ export class PipelineOrchestrationRepository {
    * staleThresholdMs milliseconds.  Safe to call concurrently: uses updateMany
    * with precise WHERE guards.  Returns counts of reaped rows.
    */
+  async extendStageLease(idempotencyKey: string, leaseMs: number, now = new Date()): Promise<void> {
+    const leaseExpiresAt = new Date(now.getTime() + leaseMs);
+    await this.db.pipelineStageRun.updateMany({
+      where: { idempotencyKey, status: 'RUNNING' },
+      data: { leaseExpiresAt, updatedAt: now },
+    });
+  }
+
   async reapStaleLeases(opts: {
     staleThresholdMs: number;
     now?: Date;
     errorMessage?: string;
-  }): Promise<{ stageRowsReaped: number; runRowsReaped: number }> {
+  }): Promise<{ stageRowsReaped: number; runRowsReaped: number; reaped: Array<{ region: string; assetType: string; dataThroughDate: string | null; pipelineRunId: string }> }> {
     const now = opts.now ?? new Date();
     const cutoff = new Date(now.getTime() - opts.staleThresholdMs);
     const reaperError = opts.errorMessage ?? 'reaped: stale lease / interrupted run';
@@ -338,10 +346,11 @@ export class PipelineOrchestrationRepository {
         status: { in: ['RUNNING', 'PENDING'] },
         updatedAt: { lt: cutoff },
       },
-      select: { id: true },
+      select: { id: true, scopeRegion: true, scopeAssetType: true, dataThroughDate: true },
     });
 
     let runRowsReaped = 0;
+    const reaped: Array<{ region: string; assetType: string; dataThroughDate: string | null; pipelineRunId: string }> = [];
     if (candidateRuns.length > 0) {
       const candidateIds = candidateRuns.map((r: { id: string }) => r.id);
       // Find runs that still have at least one RUNNING or PENDING stage child (not yet reaped)
@@ -367,10 +376,22 @@ export class PipelineOrchestrationRepository {
           },
         });
         runRowsReaped = runResult.count;
+        const reaperCandidateMap = new Map(candidateRuns.map((r: { id: string; scopeRegion: string; scopeAssetType: string; dataThroughDate: Date | null }) => [r.id, r]));
+        for (const id of idsToReap) {
+          const r = reaperCandidateMap.get(id);
+          if (r) {
+            reaped.push({
+              region: r.scopeRegion,
+              assetType: r.scopeAssetType,
+              dataThroughDate: r.dataThroughDate ? (r.dataThroughDate as Date).toISOString().slice(0, 10) : null,
+              pipelineRunId: id,
+            });
+          }
+        }
       }
     }
 
-    return { stageRowsReaped, runRowsReaped };
+    return { stageRowsReaped, runRowsReaped, reaped };
   }
 
   async findActiveRun(query: Required<Pick<PipelineLatestStageQuery, 'region' | 'assetType' | 'timeframe' | 'pipelineKey'>>): Promise<PipelineRunRecord | null> {

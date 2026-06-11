@@ -103,7 +103,7 @@ import type {
   V1SyncResult,
 } from './market-data-foundation.types';
 import { validateInstrumentInput } from './market-data-foundation.validation';
-import { getMarketSessionConfig, latestCompletedTradingDateForRegion, shouldRunMarketDataSync, tradingDateForRegion } from './market-data-foundation.market-session';
+import { getMarketSessionConfig, latestCompletedTradingDateForRegion, registerNseHolidayProvider, shouldRunMarketDataSync, tradingDateForRegion } from './market-data-foundation.market-session';
 import { resolveMarketProfile } from '../../shared/utils/market-profile';
 import { regionUsesRegionProviderPath } from './market-data-foundation.provider-registry';
 import { usEquityIngestionService } from './market-data-foundation.us-equity-ingestion.service';
@@ -854,7 +854,18 @@ export class MarketDataFoundationService {
     // to SignalQualityLabRepository — the repository file is imported directly to
     // avoid a circular module dependency (signal-quality-lab depends on this module).
     private signalOutcomeInvalidator?: SignalOutcomeStalenessInvalidator
-  ) {}
+  ) {
+    // Register a synchronous reader backed by the in-process NSE holiday cache
+    // so that shouldRunMarketDataSync / latestCompletedTradingDateForRegion can
+    // resolve NSE holidays without an async call.  Before the cache is warm
+    // (first scheduler tick on a cold start), the static fallback list in
+    // market-data-foundation.nse-holidays.ts is used automatically.
+    registerNseHolidayProvider((year: number) => {
+      const entry = this.nseTradingHolidayCache.get(year);
+      if (!entry || entry.expiresAt <= Date.now()) return null;
+      return [...entry.holidays.keys()];
+    });
+  }
 
   /**
    * Best-effort invalidation of persisted signal_outcomes for instruments whose

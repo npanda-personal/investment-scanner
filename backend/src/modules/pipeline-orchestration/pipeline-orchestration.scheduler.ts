@@ -12,6 +12,7 @@
  */
 
 import { pipelineOrchestrationModule } from './pipeline-orchestration.module';
+import { sendPipelineRunAlert } from '../notifications-delivery/pipeline-alert';
 
 const REAPER_INTERVAL_MS = (() => {
   const configured = Number(process.env.PIPELINE_REAPER_INTERVAL_MS);
@@ -21,15 +22,30 @@ const REAPER_INTERVAL_MS = (() => {
 })();
 
 export function startPipelineReaperScheduler(): void {
+  function fireReaperAlerts(reaped: Array<{ region: string; assetType: string; dataThroughDate: string | null; pipelineRunId: string }>): void {
+    for (const r of reaped) {
+      sendPipelineRunAlert({
+        status: 'ABANDONED',
+        region: r.region,
+        assetType: r.assetType,
+        dataThroughDate: r.dataThroughDate,
+        durationMs: null,
+        stagesSummary: [],
+        firstError: 'Reaped by stale-lease reaper — process may have crashed',
+      }).catch(() => {});
+    }
+  }
+
   // 1. Run immediately at startup to clear any rows leaked by prior process crashes.
   setImmediate(() => {
     pipelineOrchestrationModule.service
       .reapStaleLeases()
-      .then(({ stageRowsReaped, runRowsReaped }) => {
+      .then(({ stageRowsReaped, runRowsReaped, reaped }) => {
         if (stageRowsReaped > 0 || runRowsReaped > 0) {
           console.log(
-            `[PipelineReaper] startup reap: ${stageRowsReaped} stage rows + ${runRowsReaped} run rows marked FAILED`
+            `[PipelineReaper] startup reap: ${stageRowsReaped} stage rows + ${runRowsReaped} run rows marked ABANDONED`
           );
+          fireReaperAlerts(reaped);
         }
       })
       .catch((err: unknown) => {
@@ -41,11 +57,12 @@ export function startPipelineReaperScheduler(): void {
   setInterval(() => {
     pipelineOrchestrationModule.service
       .reapStaleLeases()
-      .then(({ stageRowsReaped, runRowsReaped }) => {
+      .then(({ stageRowsReaped, runRowsReaped, reaped }) => {
         if (stageRowsReaped > 0 || runRowsReaped > 0) {
           console.log(
-            `[PipelineReaper] periodic reap: ${stageRowsReaped} stage rows + ${runRowsReaped} run rows marked FAILED`
+            `[PipelineReaper] periodic reap: ${stageRowsReaped} stage rows + ${runRowsReaped} run rows marked ABANDONED`
           );
+          fireReaperAlerts(reaped);
         }
       })
       .catch((err: unknown) => {

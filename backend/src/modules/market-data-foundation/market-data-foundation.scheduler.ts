@@ -356,7 +356,12 @@ export class MarketDataFoundationScheduler {
       pipelineKey: 'market-intelligence',
       triggerType: 'scheduled',
       dataThroughDate: summary.dataThroughDate || summary.tradingDate,
-      sourceFingerprint: `${summary.sourceFingerprint}:catchup:${now.toISOString()}`,
+      // Use the deterministic trading date as the catchup suffix instead of a
+      // timestamp so that restarts cannot mint fresh idempotency keys for an
+      // already-processed trading date.  The pipeline layer deduplicates on
+      // (sourceFingerprint, tradingDate); a `:catchup:<date>` suffix produces
+      // DUPLICATE_TERMINAL on re-run — safe and intentional.
+      sourceFingerprint: `${summary.sourceFingerprint}:catchup:${summary.dataThroughDate || summary.tradingDate}`,
       changedInstrumentIds: summary.downstreamInstrumentIds?.length ? summary.downstreamInstrumentIds : summary.changedInstrumentIds || [],
       batchSize: Math.max(1, Math.min(this.config.batchSize, 100)),
       schedulerRunStartedAt: now.toISOString(),

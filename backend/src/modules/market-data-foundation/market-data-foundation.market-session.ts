@@ -2,6 +2,7 @@ import type { LatestStoredCandleInfo, MarketDataSchedulerDecision } from './mark
 import { normalizeMarketRegion } from '../../shared/utils/market-scope';
 import { US_NYSE_HOLIDAYS } from './market-data-foundation.us-holidays';
 import { EU_EUROZONE_HOLIDAYS } from './market-data-foundation.eu-holidays';
+import { getStaticNseHolidaysForYear } from './market-data-foundation.nse-holidays';
 
 export interface MarketSessionConfig {
   region: string;
@@ -156,6 +157,73 @@ export function addTradingSessions(
   return { date: null, calendarUncertain };
 }
 
+// ─── NSE holiday provider ──────────────────────────────────────────────────
+//
+// The live holiday fetcher lives in MarketDataFoundationService (async, hits
+// the NSE API).  To make holiday data available synchronously here — without
+// creating a circular dependency — we use a simple in-process registry:
+//
+//   1. `getKnownNseHolidaysForYear(year)` returns the best-available list for
+//      that year: live cache if already warm, otherwise the static fallback.
+//   2. `registerNseHolidayProvider(provider)` lets the service inject a
+//      synchronous reader backed by its own in-process cache once it is warm.
+//   3. `getKnownNseHolidaysForSessionDate(date)` is a convenience that covers
+//      the current and surrounding years (handles year-boundary proximity).
+
+type NseHolidayProvider = (year: number) => string[] | null;
+let _nseHolidayProvider: NseHolidayProvider | null = null;
+
+/**
+ * Register a synchronous NSE holiday provider backed by the live in-process
+ * cache.  Call this once from MarketDataFoundationService after the cache is
+ * first populated.  Before registration (cold start), the static fallback list
+ * is used automatically — holiday detection is always active.
+ */
+export function registerNseHolidayProvider(provider: NseHolidayProvider): void {
+  _nseHolidayProvider = provider;
+}
+
+/**
+ * Returns the best-available list of NSE trading holiday date strings
+ * (YYYY-MM-DD) for the given calendar year.
+ *
+ * Priority:
+ *   1. Live provider (in-process cache from the service's fetcher), if registered.
+ *   2. Static fallback list from `market-data-foundation.nse-holidays.ts`.
+ *
+ * The result is always non-null — the static fallback ensures holiday detection
+ * works even on the very first scheduler tick before the live fetch runs.
+ */
+export function getKnownNseHolidaysForYear(year: number): string[] {
+  if (_nseHolidayProvider) {
+    const live = _nseHolidayProvider(year);
+    if (live && live.length > 0) return live;
+  }
+  return getStaticNseHolidaysForYear(year);
+}
+
+/**
+ * Returns the combined NSE holiday list for the year(s) touched by a session
+ * that starts on `tradingDate` (YYYY-MM-DD).  In practice this covers the
+ * current year; the previous/next year entries are harmless extras that make
+ * the helper safe to call near year-boundaries.
+ */
+export function getKnownNseHolidaysForSessionDate(tradingDate: string): string[] {
+  const year = Number(tradingDate.slice(0, 4));
+  const years = [year - 1, year, year + 1].filter((y) => y > 2020 && y < 2100);
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const y of years) {
+    for (const d of getKnownNseHolidaysForYear(y)) {
+      if (!seen.has(d)) {
+        seen.add(d);
+        result.push(d);
+      }
+    }
+  }
+  return result;
+}
+
 // ─── internal helpers ──────────────────────────────────────────────────────
 
 function toHolidaySet(holidays?: string[] | Set<string>): Set<string> | null {
@@ -173,6 +241,9 @@ export const DEFAULT_MARKET_SESSION_CONFIGS: Record<string, Omit<MarketSessionCo
     postCloseSyncWindowMinutes: 120,
     finalizationGraceMinutes: 15,
     weekdays: [1, 2, 3, 4, 5],
+    // Populated dynamically via getKnownNseHolidaysForSessionDate() at call
+    // sites.  Left empty here so static object construction never needs an
+    // async context; see getMarketSessionConfig() for the live injection.
     holidays: [],
   },
   US: {
@@ -209,8 +280,19 @@ export function getMarketSessionConfig(region: string, options: MarketSessionOpt
   if (!normalizedRegion || normalizedRegion === 'GLOBAL') return null;
   const base = DEFAULT_MARKET_SESSION_CONFIGS[normalizedRegion];
   if (!base) return null;
+
+  // For the IN region, inject the best-available NSE holiday list so that
+  // shouldRunMarketDataSync and latestCompletedTradingDateForRegion treat NSE
+  // holidays as non-trading days.  We resolve relative to today so the list
+  // always covers the current year.  US/EU configs carry their own static arrays.
+  const holidays =
+    normalizedRegion === 'IN'
+      ? getKnownNseHolidaysForSessionDate(new Date().toISOString().slice(0, 10))
+      : base.holidays;
+
   return {
     ...base,
+    holidays,
     postCloseSyncWindowMinutes: options.postCloseSyncWindowMinutes ?? base.postCloseSyncWindowMinutes,
     finalizationGraceMinutes: options.finalizationGraceMinutes ?? base.finalizationGraceMinutes,
     syncDuringMarketHours: options.syncDuringMarketHours ?? false,
@@ -251,7 +333,9 @@ export function shouldRunMarketDataSync(
       shouldRun: false,
       reasonCode: 'WEEKEND_OR_HOLIDAY',
       sessionState: 'WEEKEND_OR_HOLIDAY',
-      reason: isHoliday ? `${config.region} market holiday.` : `${config.region} market weekend.`,
+      reason: isHoliday
+        ? `${config.region} market holiday on ${tradingDate} — NSE/exchange closed, sync skipped.`
+        : `${config.region} market weekend.`,
       todayTradingDate: tradingDate,
       nextSuggestedRunAt: nextOpenAt.toISOString(),
     };
