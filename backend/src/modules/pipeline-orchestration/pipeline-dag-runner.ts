@@ -21,8 +21,14 @@
  *
  *  DagPersistence.extendLease     → PipelineOrchestrationRepository.extendStageLease(key, leaseMs)
  *
+ *  DagPersistence.recordProgress  → PipelineOrchestrationRepository.recordStageProgress
+ *    field map: idempotencyKey=stageKey, processedCount, totalCount, succeededCount?,
+ *               failedCount?, leaseMs (extends lease — progress writes SUBSUME heartbeat
+ *               lease extension; keep ctx.heartbeat for single-shot stages without counts)
+ *
  *  DagPersistence.completeStage   → PipelineOrchestrationRepository.completeStage
  *    field map: idempotencyKey=stageKey, status, succeededCount, failedCount,
+ *               totalCount?, processedCount?, skippedCount?, unchangedCount?,
  *               durationMs, errors, metadata={failedInstrumentIds (capped 500), ...}
  *
  *  DagPersistence.findTerminalStage → PipelineOrchestrationRepository.latestStages
@@ -108,11 +114,24 @@ export interface DagPersistence {
 
   extendLease(idempotencyKey: string, leaseMs: number): Promise<void>;
 
+  recordProgress(params: {
+    idempotencyKey: string;
+    processedCount: number;
+    totalCount: number;
+    succeededCount?: number;
+    failedCount?: number;
+    leaseMs: number;
+  }): Promise<void>;
+
   completeStage(params: {
     idempotencyKey: string;
     status: string;
     succeededCount: number;
     failedCount: number;
+    totalCount?: number;
+    processedCount?: number;
+    skippedCount?: number;
+    unchangedCount?: number;
     durationMs: number;
     errors?: string[];
     warnings?: string[];
@@ -603,6 +622,21 @@ export class PipelineDagRunner {
               console.error(`[DagRunner] heartbeat extendLease failed for ${adapter.key}:`, err instanceof Error ? err.message : String(err));
             });
           },
+          // progress: fire-and-forget live count update + lease extension.
+          // Calling ctx.progress() subsumes a heartbeat — no need to also call
+          // ctx.heartbeat() in the same batch iteration when counts are available.
+          progress: (update) => {
+            this.persistence.recordProgress({
+              idempotencyKey: stKey,
+              processedCount: update.processed,
+              totalCount: update.total,
+              succeededCount: update.succeeded,
+              failedCount: update.failed,
+              leaseMs: this.config.leaseMs,
+            }).catch((err) => {
+              console.error(`[DagRunner] recordProgress failed for ${adapter.key}:`, err instanceof Error ? err.message : String(err));
+            });
+          },
           log: (msg: string) => {
             console.log(`[DagRunner:${adapter.key}] ${msg}`);
           },
@@ -646,12 +680,25 @@ export class PipelineDagRunner {
       const failedCount = stageResult.failedCount ?? 0;
       const failedIds = stageResult.failedInstrumentIds?.slice(0, 500) ?? undefined;
 
+      // Derive totalCount / processedCount with sane fallbacks so terminal rows
+      // always render a meaningful Progress column in the UI.
+      // Priority: explicit field > sum of succeeded+failed > undefined (column stays blank).
+      const resultTotalCount = stageResult.totalCount
+        ?? stageResult.processedCount
+        ?? (succeededCount + failedCount > 0 ? succeededCount + failedCount : undefined);
+      const resultProcessedCount = stageResult.processedCount
+        ?? (succeededCount + failedCount > 0 ? succeededCount + failedCount : undefined);
+
       try {
         await this.persistence.completeStage({
           idempotencyKey: stKey,
           status: stageResult.status,
           succeededCount,
           failedCount,
+          totalCount: resultTotalCount,
+          processedCount: resultProcessedCount,
+          skippedCount: stageResult.skippedCount,
+          unchangedCount: stageResult.unchangedCount,
           durationMs,
           errors: stageResult.errors,
           warnings: stageResult.warnings,

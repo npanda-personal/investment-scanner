@@ -164,13 +164,20 @@ export function createCoreStageAdapters(services: CoreStageServices): PipelineSt
 
       // dataQualityService.evaluateScheduledStage handles batching internally via onProgress.
       // Call once with the full list + batchSize — identical to legacy call at line 2588.
+      let progressProcessed = 0;
       const adapterResult = await dataQualityService.evaluateScheduledStage({
         instrumentIds,
         region: ctx.region,
         assetType: ctx.assetType,
         batchSize,
-        onProgress: async () => {
-          ctx.heartbeat();
+        onProgress: async (batchResult?: { processedCount?: number; succeededCount?: number; failedCount?: number }) => {
+          progressProcessed += batchResult?.processedCount ?? batchSize;
+          ctx.progress({
+            processed: Math.min(progressProcessed, instrumentIds.length),
+            total: instrumentIds.length,
+            succeeded: batchResult?.succeededCount,
+            failed: batchResult?.failedCount,
+          });
         },
       });
 
@@ -178,6 +185,7 @@ export function createCoreStageAdapters(services: CoreStageServices): PipelineSt
       const evaluatedCount = adapterResult.evaluatedCount;
       const failedCount = adapterResult.failedCount;
       const skippedCount = adapterResult.skippedCount;
+      const processedCount = adapterResult.processedCount ?? (evaluatedCount + failedCount + skippedCount);
 
       const status = mapDataQualityStatus({ totalCount, evaluatedCount, failedCount, skippedCount });
 
@@ -185,6 +193,9 @@ export function createCoreStageAdapters(services: CoreStageServices): PipelineSt
         status,
         succeededCount: evaluatedCount,
         failedCount,
+        processedCount,
+        totalCount,
+        skippedCount,
         errors: adapterResult.errors || [],
         warnings: adapterResult.warnings || [],
         metadata: {
@@ -262,7 +273,12 @@ export function createCoreStageAdapters(services: CoreStageServices): PipelineSt
         if (chunkFailedCount > 0 && failedInstrumentIds.length < 500) {
           failedInstrumentIds.push(...chunk.slice(0, chunkFailedCount));
         }
-        ctx.heartbeat();
+        ctx.progress({
+          processed: Math.min(adapterProcessedCount, instrumentIds.length),
+          total: instrumentIds.length,
+          succeeded: generatedCount + updatedCount + noOpCount,
+          failed: failedCount,
+        });
       }
 
       const succeededCount = generatedCount + updatedCount + noOpCount;
@@ -274,6 +290,9 @@ export function createCoreStageAdapters(services: CoreStageServices): PipelineSt
         status,
         succeededCount,
         failedCount,
+        processedCount: adapterProcessedCount,
+        totalCount,
+        skippedCount,
         failedInstrumentIds: cappedFailedIds,
         errors,
         warnings,
@@ -360,7 +379,12 @@ export function createCoreStageAdapters(services: CoreStageServices): PipelineSt
         if (chunkCalibFailedCount > 0 && failedInstrumentIds.length < 500) {
           failedInstrumentIds.push(...chunk.slice(0, chunkCalibFailedCount));
         }
-        ctx.heartbeat();
+        ctx.progress({
+          processed: Math.min(adapterProcessedCount, instrumentIds.length),
+          total: instrumentIds.length,
+          succeeded: succeededCount,
+          failed: failedCount,
+        });
       }
 
       const totalCount = instrumentIds.length;
@@ -383,6 +407,10 @@ export function createCoreStageAdapters(services: CoreStageServices): PipelineSt
         status,
         succeededCount,
         failedCount,
+        processedCount: completedCount,
+        totalCount,
+        skippedCount,
+        unchangedCount: unchangedCount,
         failedInstrumentIds: cappedCalibFailedIds,
         errors,
         warnings,
@@ -469,13 +497,19 @@ export function createCoreStageAdapters(services: CoreStageServices): PipelineSt
         if (result.failedCount > 0 && failedInstrumentIds.length < 500) {
           failedInstrumentIds.push(...chunk.slice(0, result.failedCount));
         }
-        ctx.heartbeat();
+        ctx.progress({
+          processed: Math.min(processedCount, instrumentIds.length),
+          total: instrumentIds.length,
+          succeeded: succeededCount,
+          failed: failedCount,
+        });
       }
 
       const totalCount = instrumentIds.length;
+      const clampedProcessedCount = Math.min(totalCount, processedCount);
       const status = mapPipelineStatus({
         totalCount,
-        processedCount: Math.min(totalCount, processedCount),
+        processedCount: clampedProcessedCount,
         succeededCount,
         failedCount,
         skippedCount,
@@ -486,6 +520,10 @@ export function createCoreStageAdapters(services: CoreStageServices): PipelineSt
         status,
         succeededCount,
         failedCount,
+        processedCount: clampedProcessedCount,
+        totalCount,
+        skippedCount,
+        unchangedCount,
         failedInstrumentIds: cappedEarningsFailedIds,
         errors,
         warnings,
@@ -536,6 +574,8 @@ export function createCoreStageAdapters(services: CoreStageServices): PipelineSt
         status,
         succeededCount: succeeded ? 1 : 0,
         failedCount: succeeded ? 0 : 1,
+        processedCount: 1,
+        totalCount: 1,
         errors: succeeded ? [] : ['Market Context refresh did not report success.'],
         metadata: {
           adapter: 'MarketContextIntelligenceService.run',
@@ -573,6 +613,8 @@ export function createCoreStageAdapters(services: CoreStageServices): PipelineSt
         status,
         succeededCount: succeeded ? 1 : 0,
         failedCount: succeeded ? 0 : 1,
+        processedCount: 1,
+        totalCount: 1,
         errors: succeeded ? [] : ['Market Context Snapshot persist did not report success.'],
         metadata: {
           adapter: 'MarketContextIntelligenceService.runAsOf',
@@ -639,7 +681,12 @@ export function createCoreStageAdapters(services: CoreStageServices): PipelineSt
           };
         }
         aggregate.pages += 1;
-        ctx.heartbeat();
+        ctx.progress({
+          processed: Math.min(aggregate.processedCount, aggregate.totalCount),
+          total: aggregate.totalCount,
+          succeeded: aggregate.generatedCount,
+          failed: aggregate.failedCount,
+        });
         if (
           !result.hasMore ||
           result.processedCount <= 0 ||
@@ -665,6 +712,8 @@ export function createCoreStageAdapters(services: CoreStageServices): PipelineSt
         status,
         succeededCount,
         failedCount: aggregate.failedCount,
+        processedCount,
+        totalCount,
         errors: aggregate.errors,
         warnings: aggregate.warnings,
         metadata: {
@@ -733,7 +782,12 @@ export function createCoreStageAdapters(services: CoreStageServices): PipelineSt
         aggregate.snapshotDate = result.snapshotDate;
         aggregate.pages += 1;
         aggregate.processedCount += chunkIds.length;
-        ctx.heartbeat();
+        ctx.progress({
+          processed: Math.min(aggregate.processedCount, instrumentIds.length),
+          total: instrumentIds.length,
+          succeeded: aggregate.processedCount,
+          failed: 0,
+        });
       }
 
       const inserted =
@@ -770,6 +824,8 @@ export function createCoreStageAdapters(services: CoreStageServices): PipelineSt
         status,
         succeededCount,
         failedCount: 0,
+        processedCount,
+        totalCount,
         warnings: aggregate.warnings,
         metadata: {
           adapter: 'HistoricalContextSnapshotsService.generate',

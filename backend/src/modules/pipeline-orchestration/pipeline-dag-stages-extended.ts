@@ -118,7 +118,12 @@ function makeSignalQualityAdapter(svc: SignalQualityLabService): PipelineStageAd
         aggregate.outcomesPersisted = aggregate.outcomesPersisted || result.outcomesPersisted;
         aggregate.message = result.message;
         aggregate.pages += 1;
-        ctx.heartbeat();
+        ctx.progress({
+          processed: Math.min(aggregate.processedCount, aggregate.totalCount),
+          total: aggregate.totalCount,
+          succeeded: Math.max(0, aggregate.processedCount - aggregate.failedCount - aggregate.skippedCount),
+          failed: aggregate.failedCount,
+        });
         if (!result.hasMore || result.processedCount <= 0 || result.nextOffset == null) break;
         offset = result.nextOffset;
       }
@@ -133,6 +138,9 @@ function makeSignalQualityAdapter(svc: SignalQualityLabService): PipelineStageAd
         status,
         succeededCount,
         failedCount: aggregate.failedCount,
+        processedCount: processed,
+        totalCount: aggregate.totalCount,
+        skippedCount: aggregate.skippedCount,
         warnings: aggregate.warnings.length > 0 ? aggregate.warnings : undefined,
         metadata: {
           adapterPages: aggregate.pages,
@@ -202,7 +210,12 @@ function makeStrategyDecisionAdapter(svc: StrategyDecisionEngineService): Pipeli
         aggregate.resultsLength += result.results.length;
         aggregate.hasMore = result.hasMore;
         aggregate.pages += 1;
-        ctx.heartbeat();
+        ctx.progress({
+          processed: Math.min(aggregate.processedCount, aggregate.totalCount),
+          total: aggregate.totalCount,
+          succeeded: Math.max(0, aggregate.processedCount - aggregate.failedCount - aggregate.skippedCount),
+          failed: aggregate.failedCount,
+        });
         if (!result.hasMore || result.processedCount <= 0 || result.nextOffset == null) break;
         offset = result.nextOffset;
       }
@@ -217,6 +230,9 @@ function makeStrategyDecisionAdapter(svc: StrategyDecisionEngineService): Pipeli
         status,
         succeededCount,
         failedCount: aggregate.failedCount,
+        processedCount: processed,
+        totalCount: aggregate.totalCount,
+        skippedCount: aggregate.skippedCount,
         warnings: aggregate.warnings.length > 0 ? aggregate.warnings : undefined,
         metadata: {
           adapterPages: aggregate.pages,
@@ -249,6 +265,8 @@ function makeResearchProjectionAdapter(svc: ResearchHubService): PipelineStageAd
         status: 'COMPLETED',
         succeededCount: 1,
         failedCount: 0,
+        processedCount: 1,
+        totalCount: 1,
         warnings: result.dataGaps.length > 0 ? result.dataGaps : undefined,
         metadata: {
           generatedAt: result.generatedAt,
@@ -289,6 +307,8 @@ function makeTodayReviewAdapter(svc: TodayTradeReviewService): PipelineStageAdap
         status: failed ? 'FAILED' : 'COMPLETED',
         succeededCount: failed ? 0 : 1,
         failedCount: failed ? 1 : 0,
+        processedCount: 1,
+        totalCount: 1,
         warnings: result.run?.warnings?.length ? result.run.warnings : undefined,
         errors: failed ? (result.run?.warnings?.length ? result.run.warnings : ['Today Review publication failed.']) : undefined,
         metadata: {
@@ -332,6 +352,8 @@ function makeSignalPositionLedgerAdapter(svc: SignalPositionLedgerService): Pipe
         status,
         succeededCount: progress.succeededCount,
         failedCount: progress.failedCount,
+        processedCount: progress.succeededCount + progress.failedCount,
+        totalCount: progress.succeededCount + progress.failedCount,
         warnings: progress.warnings?.length ? progress.warnings : undefined,
         errors: progress.errors?.length ? progress.errors : undefined,
         metadata: {
@@ -376,6 +398,9 @@ function makeSectorIntelligenceAdapter(
         status,
         succeededCount,
         failedCount,
+        processedCount: succeededCount + failedCount,
+        totalCount: succeededCount + failedCount + result.skippedCount,
+        skippedCount: result.skippedCount,
         warnings: result.warnings?.length ? result.warnings : undefined,
         errors: result.errors?.length ? result.errors : undefined,
         metadata: {
@@ -422,6 +447,8 @@ function makeMarketPulseAdapter(svc: MarketPulseSnapshotService): PipelineStageA
         status: 'COMPLETED',
         succeededCount: 1,
         failedCount: 0,
+        processedCount: 1,
+        totalCount: 1,
         warnings: warnings.length > 0 ? warnings : undefined,
         metadata: {
           snapshotId: snapshot.id,
@@ -466,6 +493,8 @@ function makeStockInterestAdapter(svc: StockInterestSnapshotService): PipelineSt
         status,
         succeededCount,
         failedCount,
+        processedCount: result.processedCount,
+        totalCount: result.processedCount,
         warnings: result.warnings?.length ? result.warnings : undefined,
         errors: result.errors?.length ? result.errors : undefined,
         metadata: {
@@ -527,6 +556,8 @@ function makeWorkbenchRefreshAdapter(svc: WorkbenchRefreshService): PipelineStag
         status,
         succeededCount,
         failedCount,
+        processedCount: result.processedCount,
+        totalCount: result.processedCount,
         warnings: result.warnings?.length ? result.warnings : undefined,
         errors: result.errors?.length ? result.errors : undefined,
         metadata: {
@@ -587,6 +618,8 @@ function makeMarketScanRefreshAdapter(svc: MarketDataFoundationService): Pipelin
         status,
         succeededCount,
         failedCount,
+        processedCount: succeededCount + failedCount,
+        totalCount: succeededCount + failedCount,
         warnings: result.warnings?.length ? result.warnings : undefined,
         errors: result.errors?.length ? result.errors : undefined,
         metadata: {

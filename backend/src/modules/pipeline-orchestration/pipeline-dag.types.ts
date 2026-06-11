@@ -15,6 +15,8 @@ export interface StageContext {
   trigger: 'scheduled' | 'manual' | 'retry';
   instrumentScope?: string[] | null;
   heartbeat(): void;
+  /** Fire-and-forget live progress update; also extends the lease (subsumes heartbeat). */
+  progress(update: { processed: number; total: number; succeeded?: number; failed?: number }): void;
   log(msg: string): void;
 }
 
@@ -22,6 +24,10 @@ export interface StageResult {
   status: 'COMPLETED' | 'PARTIAL' | 'FAILED' | 'SKIPPED';
   succeededCount?: number;
   failedCount?: number;
+  processedCount?: number;
+  totalCount?: number;
+  skippedCount?: number;
+  unchangedCount?: number;
   failedInstrumentIds?: string[];
   errors?: string[];
   warnings?: string[];

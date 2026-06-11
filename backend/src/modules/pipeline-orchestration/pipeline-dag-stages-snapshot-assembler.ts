@@ -71,10 +71,18 @@ export function createSnapshotAssemblerAdapter(
         );
       }
 
+      // totalCount: use scope length if scoped, else rowCount (best-effort for full runs)
+      const totalCount =
+        ctx.instrumentScope != null && ctx.instrumentScope.length > 0
+          ? ctx.instrumentScope.length
+          : succeededCount;
+
       return {
         status,
         succeededCount,
         failedCount: 0,
+        processedCount: succeededCount,
+        totalCount,
         warnings: warnings.length > 0 ? warnings : undefined,
         metadata: {
           rowCount: summary.rowCount,

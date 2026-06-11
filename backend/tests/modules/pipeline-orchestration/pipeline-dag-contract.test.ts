@@ -32,11 +32,26 @@ import type { DagRunInput } from '../../../src/modules/pipeline-orchestration/pi
 // Minimal in-memory fake persistence (mirrors pipeline-dag-runner.test.ts)
 // ---------------------------------------------------------------------------
 
-function makeFakePersistence(): DagPersistence {
+type ContractStageEntry = {
+  stageKey: string;
+  status: string;
+  succeededCount: number;
+  failedCount: number;
+  totalCount?: number;
+  processedCount?: number;
+  skippedCount?: number;
+  unchangedCount?: number;
+  durationMs: number;
+  errors: string[];
+  metadata: Record<string, unknown> | null;
+};
+
+function makeFakePersistence(): DagPersistence & { stages: Map<string, ContractStageEntry> } {
   const runs = new Map<string, RunRecord>();
-  const stages = new Map<string, { stageKey: string; status: string; succeededCount: number; failedCount: number; durationMs: number; errors: string[]; metadata: Record<string, unknown> | null }>();
+  const stages = new Map<string, ContractStageEntry>();
 
   return {
+    stages,
     async upsertRun(params) {
       const existing = runs.get(params.idempotencyKey);
       if (existing) return existing;
@@ -73,12 +88,17 @@ function makeFakePersistence(): DagPersistence {
       return { acquired: true, reason: 'ACQUIRED' };
     },
     async extendLease() { /* no-op */ },
+    async recordProgress() { /* no-op */ },
     async completeStage(params) {
       const s = stages.get(params.idempotencyKey);
       if (s) {
         s.status = params.status;
         s.succeededCount = params.succeededCount;
         s.failedCount = params.failedCount;
+        s.totalCount = params.totalCount;
+        s.processedCount = params.processedCount;
+        s.skippedCount = params.skippedCount;
+        s.unchangedCount = params.unchangedCount;
         s.durationMs = params.durationMs;
         s.errors = params.errors ?? [];
         s.metadata = params.metadata ?? null;
@@ -413,6 +433,7 @@ describe('pipeline-dag-contract — FIX 1 scope end-to-end', () => {
   });
 
   it('(a) DATA_QUALITY stub receives the scoped instrument ids on a manual run', async () => {
+    const persistence = makeFakePersistence();
     const services = {
       dataQualityService: dataQualityStub as any,
       signalGenerationService: makeSignalGenerationStub() as any,
@@ -434,7 +455,7 @@ describe('pipeline-dag-contract — FIX 1 scope end-to-end', () => {
     };
 
     const adapters = buildPipelineDagAdapters(services);
-    const runner = new PipelineDagRunner(adapters, { persistence: makeFakePersistence() });
+    const runner = new PipelineDagRunner(adapters, { persistence });
     await runner.execute(INPUT);
 
     // DATA_QUALITY must have been called with the two scoped ids
@@ -442,6 +463,15 @@ describe('pipeline-dag-contract — FIX 1 scope end-to-end', () => {
     const callArg = dataQualityStub.evaluateScheduledStage.mock.calls[0][0];
     expect(callArg.instrumentIds).toEqual(expect.arrayContaining(['i1', 'i2']));
     expect(callArg.instrumentIds).toHaveLength(2);
+
+    // DATA_QUALITY stage row in persistence must end with totalCount=2 / processedCount=2
+    // (the 2-instrument scope produces evaluatedCount=2 from the stub)
+    const dataQualityStageEntry = [...persistence.stages.values()].find(
+      (s) => s.stageKey === 'DATA_QUALITY',
+    );
+    expect(dataQualityStageEntry).toBeDefined();
+    expect(dataQualityStageEntry!.totalCount).toBe(2);
+    expect(dataQualityStageEntry!.processedCount).toBe(2);
   });
 
   it('(b) RAW_SIGNALS stub receives the scoped instrument ids on a manual run', async () => {

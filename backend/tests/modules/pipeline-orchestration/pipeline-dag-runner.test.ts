@@ -12,9 +12,22 @@ type StageEntry = {
   status: string;
   succeededCount: number;
   failedCount: number;
+  totalCount?: number;
+  processedCount?: number;
+  skippedCount?: number;
+  unchangedCount?: number;
   durationMs: number;
   errors: string[];
   metadata: Record<string, unknown> | null;
+};
+
+type ProgressCall = {
+  idempotencyKey: string;
+  processedCount: number;
+  totalCount: number;
+  succeededCount?: number;
+  failedCount?: number;
+  leaseMs: number;
 };
 
 function makeFakePersistence(): DagPersistence & {
@@ -22,22 +35,26 @@ function makeFakePersistence(): DagPersistence & {
   stages: Map<string, StageEntry>;
   leaseExtensions: Map<string, number>;
   resetCalls: string[];
+  progressCalls: ProgressCall[];
 } {
   const runs = new Map<string, RunRecord>();
   const stages = new Map<string, StageEntry>();
   const leaseExtensions = new Map<string, number>();
   const resetCalls: string[] = [];
+  const progressCalls: ProgressCall[] = [];
 
   const persistence: DagPersistence & {
     runs: Map<string, RunRecord>;
     stages: Map<string, StageEntry>;
     leaseExtensions: Map<string, number>;
     resetCalls: string[];
+    progressCalls: ProgressCall[];
   } = {
     runs,
     stages,
     leaseExtensions,
     resetCalls,
+    progressCalls,
 
     async upsertRun(params) {
       const existing = runs.get(params.idempotencyKey);
@@ -85,12 +102,22 @@ function makeFakePersistence(): DagPersistence & {
       leaseExtensions.set(idempotencyKey, (leaseExtensions.get(idempotencyKey) ?? 0) + 1);
     },
 
+    async recordProgress(params) {
+      progressCalls.push({ ...params });
+      // Also extend lease tracking to mirror the real implementation
+      leaseExtensions.set(params.idempotencyKey, (leaseExtensions.get(params.idempotencyKey) ?? 0) + 1);
+    },
+
     async completeStage(params) {
       const s = stages.get(params.idempotencyKey);
       if (s) {
         s.status = params.status;
         s.succeededCount = params.succeededCount;
         s.failedCount = params.failedCount;
+        s.totalCount = params.totalCount;
+        s.processedCount = params.processedCount;
+        s.skippedCount = params.skippedCount;
+        s.unchangedCount = params.unchangedCount;
         s.durationMs = params.durationMs;
         s.errors = params.errors ?? [];
         s.metadata = params.metadata ?? null;
@@ -601,6 +628,103 @@ test('retry — failed stage X is reset + re-run, downstream runs after', async 
   expect(retryResult.stages['down'].status).toBe('COMPLETED');
   // resetStage must have been called for X's stage key
   expect(persistence.resetCalls.length).toBeGreaterThan(0);
+});
+
+// ---------------------------------------------------------------------------
+// Test (progress): multi-batch adapter calling ctx.progress triggers
+// persistence.recordProgress with increasing processedCount and completion
+// persists totalCount/processedCount including the fallback path.
+// ---------------------------------------------------------------------------
+
+test('progress — multi-batch adapter triggers >=2 recordProgress writes with increasing processedCount', async () => {
+  const persistence = makeFakePersistence();
+  let capturedStageKey: string | null = null;
+
+  const origUpsert = persistence.upsertStage.bind(persistence);
+  persistence.upsertStage = async (params) => {
+    capturedStageKey = params.idempotencyKey;
+    return origUpsert(params);
+  };
+
+  const TOTAL = 6;
+  const BATCH = 2;
+
+  // Adapter simulates a 3-batch loop, calling ctx.progress after each batch
+  const adapters = [
+    makeAdapter(
+      'batchy',
+      1,
+      [],
+      async (ctx: StageContext) => {
+        let processed = 0;
+        for (let offset = 0; offset < TOTAL; offset += BATCH) {
+          processed += BATCH;
+          ctx.progress({ processed, total: TOTAL, succeeded: processed, failed: 0 });
+          await new Promise<void>((r) => setImmediate(r));
+        }
+        return { status: 'COMPLETED', succeededCount: TOTAL, processedCount: TOTAL, totalCount: TOTAL };
+      },
+      '1.0.0',
+      false,
+    ),
+  ];
+
+  const runner = new PipelineDagRunner(adapters, { persistence }, { leaseMs: 30_000 });
+  await runner.execute(baseInput);
+
+  const stageKey = capturedStageKey ?? '';
+  const calls = persistence.progressCalls.filter((c) => c.idempotencyKey === stageKey);
+
+  // Must have fired at least 2 progress writes
+  expect(calls.length).toBeGreaterThanOrEqual(2);
+
+  // processedCount must be strictly increasing across successive calls
+  for (let i = 1; i < calls.length; i++) {
+    expect(calls[i].processedCount).toBeGreaterThanOrEqual(calls[i - 1].processedCount);
+  }
+
+  // All calls carry the correct total
+  for (const c of calls) {
+    expect(c.totalCount).toBe(TOTAL);
+  }
+
+  // Completion must persist totalCount and processedCount
+  const stageEntry = persistence.stages.get(stageKey);
+  expect(stageEntry).toBeDefined();
+  expect(stageEntry!.totalCount).toBe(TOTAL);
+  expect(stageEntry!.processedCount).toBe(TOTAL);
+});
+
+test('progress — completion fallback: adapter omitting processedCount/totalCount still persists sane counts', async () => {
+  const persistence = makeFakePersistence();
+  let capturedStageKey: string | null = null;
+
+  const origUpsert = persistence.upsertStage.bind(persistence);
+  persistence.upsertStage = async (params) => {
+    capturedStageKey = params.idempotencyKey;
+    return origUpsert(params);
+  };
+
+  // Adapter returns ONLY succeededCount (legacy-style — no processedCount/totalCount)
+  const adapters = [
+    makeAdapter(
+      'legacy-style',
+      1,
+      [],
+      async (_ctx: StageContext) => {
+        return { status: 'COMPLETED', succeededCount: 4, failedCount: 1 };
+      },
+    ),
+  ];
+
+  const runner = new PipelineDagRunner(adapters, { persistence });
+  await runner.execute(baseInput);
+
+  const stageEntry = persistence.stages.get(capturedStageKey ?? '');
+  expect(stageEntry).toBeDefined();
+  // Fallback: processedCount = succeededCount + failedCount = 5; totalCount same
+  expect(stageEntry!.processedCount).toBe(5);
+  expect(stageEntry!.totalCount).toBe(5);
 });
 
 // ---------------------------------------------------------------------------

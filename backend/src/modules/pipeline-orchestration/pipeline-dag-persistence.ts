@@ -150,11 +150,35 @@ export class RepositoryDagPersistence implements DagPersistence {
     await this.repository.extendStageLease(idempotencyKey, leaseMs);
   }
 
+  async recordProgress(params: {
+    idempotencyKey: string;
+    processedCount: number;
+    totalCount: number;
+    succeededCount?: number;
+    failedCount?: number;
+    leaseMs: number;
+  }): Promise<void> {
+    // recordStageProgress keeps status='RUNNING' and also extends the lease via leaseMs.
+    // Progress writes therefore SUBSUME heartbeat lease extension for batching adapters.
+    await this.repository.recordStageProgress({
+      idempotencyKey: params.idempotencyKey,
+      processedCount: params.processedCount,
+      totalCount: params.totalCount,
+      succeededCount: params.succeededCount,
+      failedCount: params.failedCount,
+      leaseMs: params.leaseMs,
+    });
+  }
+
   async completeStage(params: {
     idempotencyKey: string;
     status: string;
     succeededCount: number;
     failedCount: number;
+    totalCount?: number;
+    processedCount?: number;
+    skippedCount?: number;
+    unchangedCount?: number;
     durationMs: number;
     errors?: string[];
     warnings?: string[];
@@ -165,6 +189,10 @@ export class RepositoryDagPersistence implements DagPersistence {
       status: params.status as any,
       succeededCount: params.succeededCount,
       failedCount: params.failedCount,
+      totalCount: params.totalCount,
+      processedCount: params.processedCount,
+      skippedCount: params.skippedCount,
+      unchangedCount: params.unchangedCount,
       durationMs: params.durationMs,
       errors: params.errors,
       warnings: params.warnings,

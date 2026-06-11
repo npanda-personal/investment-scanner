@@ -19,6 +19,7 @@ const stubPersistence = {
   upsertStage: async () => undefined,
   acquireStage: async () => ({ acquired: true, reason: 'ACQUIRED' }),
   extendLease: async () => undefined,
+  recordProgress: async () => undefined,
   completeStage: async () => undefined,
   findTerminalStage: async () => null,
   resetStage: async () => undefined,
