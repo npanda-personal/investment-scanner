@@ -102,7 +102,7 @@ test.describe('Backtesting Strategy Lab UI', () => {
       await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
     });
     let runPayload: any = null;
-    await page.route('**/api/v1/backtests/run', async (route) => {
+    await page.route(/\/api\/v1\/backtests\/run(\?|$)/, async (route) => {
       runPayload = route.request().postDataJSON();
       await route.fulfill({
         status: 201,
