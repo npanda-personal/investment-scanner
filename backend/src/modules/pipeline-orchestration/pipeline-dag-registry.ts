@@ -32,8 +32,12 @@ import {
   createExtendedStageAdapters,
   type ExtendedStageServices,
 } from './pipeline-dag-stages-extended';
+import {
+  createSnapshotAssemblerAdapter,
+  type SnapshotAssemblerStageServices,
+} from './pipeline-dag-stages-snapshot-assembler';
 
-export type PipelineDagServices = CoreStageServices & ExtendedStageServices;
+export type PipelineDagServices = CoreStageServices & ExtendedStageServices & SnapshotAssemblerStageServices;
 
 /** stageKey → dependsOn stage keys. Root stages (run as soon as the market-data sync hands over) have []. */
 export const PIPELINE_DAG_EDGES: Readonly<Record<string, readonly string[]>> = {
@@ -60,6 +64,11 @@ export const PIPELINE_DAG_EDGES: Readonly<Record<string, readonly string[]>> = {
   SIGNAL_POSITION_LEDGER: ['STRATEGY_DECISION'],
   STOCK_INTEREST_REFRESH: ['RAW_SIGNALS'],
   WORKBENCH_REFRESH: ['SIGNAL_QUALITY', 'SIGNAL_CALIBRATION'],
+  // SNAPSHOT_ASSEMBLER is the final stage.  It depends on:
+  //  - TODAY_REVIEW: runs trade-plan generation; assembler reads trade_plan_results after.
+  //  - SIGNAL_POSITION_LEDGER: assembler includes ledger-derived coverage in provenance.
+  //  - CONTEXT_SNAPSHOTS: writes smartMoneyContextSnapshot rows the assembler reads.
+  SNAPSHOT_ASSEMBLER: ['TODAY_REVIEW', 'SIGNAL_POSITION_LEDGER', 'CONTEXT_SNAPSHOTS'],
 };
 
 /**
@@ -71,6 +80,7 @@ export function buildPipelineDagAdapters(services: PipelineDagServices): Pipelin
   const adapters = [
     ...createCoreStageAdapters(services),
     ...createExtendedStageAdapters(services),
+    createSnapshotAssemblerAdapter(services),
   ];
 
   const adapterKeys = new Set(adapters.map((a) => a.key));

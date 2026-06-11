@@ -1,5 +1,6 @@
 import { createHash } from 'crypto';
 import { sendPipelineRunAlert } from '../notifications-delivery/pipeline-alert';
+import { SnapshotAssemblerService } from '../snapshot-assembler';
 import { DataQualityEngineService } from '../data-quality-engine';
 import { EarningsIntelligenceService } from '../earnings-intelligence';
 import { HistoricalContextSnapshotsService } from '../historical-context-snapshots';
@@ -215,7 +216,8 @@ export class PipelineOrchestrationService {
     private readonly marketPulseService = new MarketPulseSnapshotService(),
     private readonly earningsIntelligenceService = new EarningsIntelligenceService(),
     private readonly stockInterestService = new StockInterestSnapshotService(),
-    private readonly workbenchRefreshService = new WorkbenchRefreshService()
+    private readonly workbenchRefreshService = new WorkbenchRefreshService(),
+    private readonly snapshotAssemblerService = new SnapshotAssemblerService()
   ) {}
 
   // ---------------------------------------------------------------------------
@@ -244,6 +246,7 @@ export class PipelineOrchestrationService {
         marketPulseService: this.marketPulseService,
         stockInterestService: this.stockInterestService,
         workbenchRefreshService: this.workbenchRefreshService,
+        snapshotAssemblerService: this.snapshotAssemblerService,
       });
       const alertFn = (summary: DagAlertSummary): void => {
         this.firePipelineRunAlert(

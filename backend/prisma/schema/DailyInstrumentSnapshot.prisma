@@ -1,0 +1,77 @@
+// Assembled daily snapshot for one instrument/day.
+// One row per (instrumentId, tradingDate, snapshotVersion), written by the
+// snapshot-assembler stage (final DAG stage).  The ONLY read surface for
+// trader-facing queries — today-trade-review, ai-copilot, portfolio-intelligence
+// all read from here instead of fanning out to 11 services at query time.
+// snapshotVersion starts at 1; re-assembly on NSE data restates writes version N+1;
+// "latest version per (instrumentId, tradingDate)" is the live read view.
+model DailyInstrumentSnapshot {
+  id              String   @id @default(cuid())
+  instrumentId    String
+  stock           Stock    @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+  tradingDate     DateTime
+  snapshotVersion Int      @default(1)
+  region          String
+  assetType       String
+
+  // ── ELIGIBILITY (from instrument_eligibility) ────────────────────────────
+  signalEligible      Boolean
+  reviewEligible      Boolean
+  backtestEligible    Boolean
+  calibrationEligible Boolean
+  reviewReasons       String[]
+  signalReasons       String[]
+  readinessScore      Int
+  readinessStatus     String   // READY | LIMITED | NOT_READY
+
+  // ── SIGNALS ──────────────────────────────────────────────────────────────
+  signalScore        Float?
+  signalDirection    String?
+  signalModelVersion String?
+
+  // ── CALIBRATION ──────────────────────────────────────────────────────────
+  calibratedScore        Float?
+  calibrationAuthority   String?
+
+  // ── DECISION ─────────────────────────────────────────────────────────────
+  strategyDecision String?
+  rulesFired       String[]
+
+  // ── TRADE PLAN ───────────────────────────────────────────────────────────
+  stopLoss   Decimal?
+  target     Decimal?
+  rrRatio    Float?
+  planStatus String?
+
+  // ── CONTEXT ──────────────────────────────────────────────────────────────
+  marketRegime           String?
+  breadthPct             Float?
+  sectorRelativeStrength Float?
+
+  // ── DERIVATIVES ──────────────────────────────────────────────────────────
+  oiBuildup             String?
+  participantPositioning String?
+
+  // ── EARNINGS ─────────────────────────────────────────────────────────────
+  earningsProximityDays Int?
+
+  // ── SMART MONEY ──────────────────────────────────────────────────────────
+  smartMoneyCode  String?
+  smartMoneyScore Float?
+
+  // ── PROVENANCE ───────────────────────────────────────────────────────────
+  // Per-section status object: { eligibility, signals, calibration, decision,
+  // tradePlan, context, derivatives, earnings, smartMoney }
+  // Each value: "OK" | "STALE" | "FAILED" | "N_A"
+  provenance  Json
+  assembledAt DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([instrumentId, tradingDate, snapshotVersion], map: "daily_instrument_snapshot_instrument_date_version_key")
+  @@index([tradingDate, region, assetType], map: "daily_instrument_snapshot_date_scope_idx")
+  @@index([tradingDate, reviewEligible, calibratedScore], map: "daily_instrument_snapshot_date_review_score_idx")
+  @@index([instrumentId, tradingDate], map: "daily_instrument_snapshot_instrument_date_idx")
+  @@map("daily_instrument_snapshot")
+}

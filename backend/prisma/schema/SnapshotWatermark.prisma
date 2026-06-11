@@ -1,0 +1,16 @@
+// Watermark record marking a trading date as READY for a given scope.
+// Written by the snapshot-assembler after all rows for (region, assetType,
+// tradingDate) are assembled.  The read path enforces this — consumers may
+// not observe mid-pipeline state.
+model SnapshotWatermark {
+  id              String   @id @default(cuid())
+  region          String
+  assetType       String
+  tradingDate     DateTime
+  snapshotVersion Int
+  rowCount        Int
+  assembledAt     DateTime
+
+  @@unique([region, assetType, tradingDate], map: "snapshot_watermarks_scope_date_key")
+  @@map("snapshot_watermarks")
+}
