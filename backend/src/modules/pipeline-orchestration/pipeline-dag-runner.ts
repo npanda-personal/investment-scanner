@@ -125,6 +125,10 @@ export interface DagPersistence {
     assetType: string;
     timeframe: string;
     tradingDate: string;
+    // FIX 2: optional idempotency key — when provided the persistence layer
+    // must match it exactly so a scoped-retry record cannot be confused with
+    // a full-universe record and vice versa.
+    idempotencyKey?: string;
   }): Promise<TerminalStageRecord | null>;
 
   resetStage(idempotencyKey: string): Promise<void>;
@@ -403,9 +407,13 @@ export class PipelineDagRunner {
     if (input.fromStage) {
       const fromIdx = this.topoOrder.findIndex((a) => a.key === input.fromStage);
       if (fromIdx > 0) {
+        // FIX 2: use the CURRENT run's scope fingerprint, not '' (empty string),
+        // so a scoped fromStage lookup finds the correct prior-run stage record
+        // rather than a full-universe record with a different idempotency key.
+        const currentScopeFp = scopeFingerprint(input.instrumentScope);
         for (const prior of this.topoOrder.slice(0, fromIdx)) {
           const priorRecord = await this.safeFind(
-            stageIdempotencyKey(prior.key, prior.stageVersion, input, ''),
+            stageIdempotencyKey(prior.key, prior.stageVersion, input, currentScopeFp),
             input,
             prior,
           );
@@ -448,12 +456,16 @@ export class PipelineDagRunner {
       }
     };
 
-    // Statuses that a retry should re-run (not skip)
+    // Statuses that a retry should re-run (not skip). SKIPPED is included:
+    // an operator retry means "re-run whatever did not fully succeed", and a
+    // legitimately-empty stage re-running is a harmless no-op, while a
+    // wrongly-skipped stage staying cached forever is unrecoverable.
     const RETRY_RERUN: ReadonlySet<string> = new Set([
       'FAILED',
       'BLOCKED',
       'ABANDONED',
       'PARTIAL',
+      'SKIPPED',
     ]);
 
     const runStage = async (adapter: PipelineStageAdapter): Promise<void> => {
@@ -461,8 +473,10 @@ export class PipelineDagRunner {
 
       // Cached from prior run
       if (priorTerminalKeys.has(adapter.key)) {
+        // FIX 2: use current scope fingerprint here too — must match the key
+        // we looked up when building priorTerminalKeys above.
         const priorRecord = await this.safeFind(
-          stageIdempotencyKey(adapter.key, adapter.stageVersion, input, ''),
+          stageIdempotencyKey(adapter.key, adapter.stageVersion, input, scopeFp),
           input,
           adapter,
         );
@@ -578,10 +592,12 @@ export class PipelineDagRunner {
           assetType: input.assetType,
           timeframe: input.timeframe,
           trigger: input.trigger,
-          instrumentScope:
-            input.trigger === 'retry' && adapter.supportsInstrumentScope
-              ? (input.instrumentScope ?? null)
-              : null,
+          // FIX 1: pass instrumentScope for ALL trigger types (scheduled/manual/retry),
+          // not only retry. Stripping it for scheduled/manual caused every
+          // scope-supporting adapter to receive null and return SKIPPED (proc=0).
+          instrumentScope: adapter.supportsInstrumentScope
+            ? (input.instrumentScope ?? null)
+            : null,
           heartbeat: () => {
             this.persistence.extendLease(stKey, this.config.leaseMs).catch((err) => {
               console.error(`[DagRunner] heartbeat extendLease failed for ${adapter.key}:`, err instanceof Error ? err.message : String(err));
@@ -778,17 +794,22 @@ export class PipelineDagRunner {
   }
 
   private async safeFind(
-    _stKey: string,
+    stKey: string,
     _input: DagRunInput,
     adapter: PipelineStageAdapter,
   ): Promise<TerminalStageRecord | null> {
     try {
+      // FIX 2: pass the stage idempotency key so persistence can match it
+      // exactly — prevents cross-scope cache contamination where a scoped
+      // retry lookup would reuse a full-universe terminal record (same
+      // stageKey+date, different scopeFingerprint).
       return await this.persistence.findTerminalStage({
         stageKey: adapter.key,
         region: _input.region,
         assetType: _input.assetType,
         timeframe: _input.timeframe,
         tradingDate: _input.tradingDate,
+        idempotencyKey: stKey,
       });
     } catch (err) {
       console.error(`[DagRunner] findTerminalStage failed for ${adapter.key}:`, err instanceof Error ? err.message : String(err));

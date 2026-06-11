@@ -10306,6 +10306,11 @@ export class MarketDataFoundationService implements MarketDataReadApi {
         priceRowsUpdated: run.priceRowsUpdated,
         priceRowsNoOp: run.priceRowsNoOp,
         zeroRowProviderReturns: run.zeroRowProviderReturns,
+        // FIX C: A price-backfill completing must NOT trigger a full DAG run via the
+        // snapshot bridge — the DAG is only triggered from the scheduled market-data
+        // sync path.  Suppress the bridge so the orchestration service skips
+        // runDownstreamDataQualityForMarketDataSnapshot for PRICE_BACKFILL snapshots.
+        downstreamSnapshotBridgeSuppressed: true,
       },
     };
   }

@@ -491,12 +491,26 @@ function makeWorkbenchRefreshAdapter(svc: WorkbenchRefreshService): PipelineStag
     dependsOn: [],
     supportsInstrumentScope: true,
     async run(ctx: StageContext): Promise<StageResult> {
-      const instrumentIds = ctx.instrumentScope && ctx.instrumentScope.length > 0
-        ? [...ctx.instrumentScope]
-        : [];
+      // FIX 4: WorkbenchRefreshService.resolveInstrumentIds treats an empty/absent
+      // instrumentIds list as "refresh all active instruments" (falls through to the
+      // DB lookup branch — see workbench-refresh.service.ts resolveInstrumentIds).
+      // When scope is null/undefined that full-universe refresh is intentional.
+      // When scope is explicitly empty ([] — zero-instrument scoped run) we should
+      // skip rather than accidentally trigger a full-universe refresh.
+      const scopeProvided = ctx.instrumentScope != null;
+      const instrumentIds =
+        ctx.instrumentScope && ctx.instrumentScope.length > 0
+          ? [...ctx.instrumentScope]
+          : null; // null → resolveInstrumentIds falls back to full active set (desired for non-scoped)
+
+      if (scopeProvided && instrumentIds === null) {
+        // Explicitly scoped to zero instruments — nothing to do.
+        return { status: 'SKIPPED', succeededCount: 0, failedCount: 0 };
+      }
 
       const result = await svc.refreshWorkbenchSnapshots({
-        instrumentIds,
+        // null instrumentIds → service resolves the full active set (its "all" convention)
+        instrumentIds: instrumentIds ?? undefined,
         region: ctx.region,
         assetType: ctx.assetType,
         batchSize: DEFAULT_BATCH_SIZE,

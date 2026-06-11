@@ -98,7 +98,22 @@ function makeFakePersistence(): DagPersistence & {
     },
 
     async findTerminalStage(params): Promise<TerminalStageRecord | null> {
-      // Search the stages map for any entry whose stageKey matches
+      // FIX 2: when idempotencyKey is provided, look up by that key directly
+      // (prevents cross-scope cache contamination in the fake).
+      if (params.idempotencyKey) {
+        const entry = stages.get(params.idempotencyKey);
+        if (!entry) return null;
+        return {
+          status: entry.status,
+          succeededCount: entry.succeededCount,
+          failedCount: entry.failedCount,
+          durationMs: entry.durationMs,
+          errors: entry.errors,
+          metadata: entry.metadata,
+        };
+      }
+      // Fallback: search by stageKey (used by the duplicate short-circuit path
+      // where the run-level key is known but no stage idempotency key is available).
       for (const entry of stages.values()) {
         if (entry.stageKey === params.stageKey) {
           return {

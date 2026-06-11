@@ -170,29 +170,19 @@ export class MarketDataFoundationScheduler {
           now,
           ...this.sessionOptions(),
         });
+        // FIX D: reroute from the legacy runScheduledDataQualityStage chain to the DAG
+        // via runDownstreamCatchUp — which calls runScheduledPipelineCatchUpFromMarketDataSummary
+        // (now DAG-backed) or falls back to the direct executeDagPipeline shape.
         let scheduledDataQuality: unknown = null;
         if (summary && this.shouldRunScheduledDataQuality(summary)) {
-          try {
-            const pipelineOrchestration = this.pipelineOrchestration || await this.createScheduledDataQualityRunner();
-            scheduledDataQuality = await pipelineOrchestration.runScheduledDataQualityStage({
-              region: summary.region,
-              assetType: summary.assetType,
-              timeframe: '1d',
-              pipelineKey: 'market-intelligence',
-              triggerType: 'scheduled',
-              dataThroughDate: summary.dataThroughDate || summary.tradingDate,
-              sourceFingerprint: summary.sourceFingerprint || 'scheduled-source:missing',
-              changedInstrumentIds: summary.downstreamInstrumentIds?.length ? summary.downstreamInstrumentIds : summary.changedInstrumentIds || [],
-              batchSize: Math.max(1, Math.min(this.config.batchSize, 100)),
-              schedulerRunStartedAt: now.toISOString(),
-            });
-          } catch (error) {
-            console.error('[MarketDataScheduler] scheduled Data Quality stage failed', {
+          scheduledDataQuality = await this.runDownstreamCatchUp(summary, now).catch((error) => {
+            console.error('[MarketDataScheduler] scheduled DAG pipeline failed', {
               region: summary.region,
               assetType: summary.assetType,
               error: error instanceof Error ? error.message : 'unknown error',
             });
-          }
+            return null;
+          });
         }
         results.push({ region, skipped: false, decision, summary, scheduledDataQuality, activePriceBackfillRunId: activePriceBackfill?.runId });
       }

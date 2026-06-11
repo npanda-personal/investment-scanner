@@ -297,6 +297,7 @@ export class PipelineOrchestrationService {
       // Full daily refresh: resolve eligible set from market data service.
       const resolver = (this.marketDataService as any).listDailyRefreshEligibleInstrumentIds;
       if (typeof resolver === 'function') {
+        let eligibilityError: string | null = null;
         try {
           const eligibility = await resolver.call(this.marketDataService, {
             region: params.region,
@@ -307,11 +308,24 @@ export class PipelineOrchestrationService {
           const resolved = this.normalizeInstrumentIds(eligibility?.instrumentIds);
           if (resolved.length > 0) {
             instrumentScope = resolved;
+          } else {
+            eligibilityError = 'eligible-universe resolver returned empty instrument list';
           }
         } catch (err) {
-          console.warn('[executeDagPipeline] listDailyRefreshEligibleInstrumentIds failed, proceeding with null scope:', err instanceof Error ? err.message : String(err));
+          eligibilityError = err instanceof Error ? err.message : String(err);
+        }
+        // FIX E2: null scope means every scoped stage silently skips — loud failure is
+        // preferable so operators know something is wrong rather than seeing a phantom
+        // COMPLETED run with zero work done.
+        if (instrumentScope === null) {
+          throw new PipelineCommandError(
+            422,
+            `[executeDagPipeline] Cannot resolve instrument scope for ${params.region}:${params.assetType}:${params.tradingDate}: ${eligibilityError ?? 'no eligible instruments'}`,
+          );
         }
       }
+      // If the resolver method does not exist (tests, legacy stub), proceed with null scope
+      // so the runner falls back to its own universe logic (or skips scoped stages).
     }
 
     return runner.execute({
@@ -1747,7 +1761,10 @@ export class PipelineOrchestrationService {
         timeframe: request.timeframe,
         pipelineKey: request.pipelineKey,
       });
-      if (activeRun && !this.isStaleActiveRun(activeRun, now)) {
+      // FIX E5: even when the run row is stale, a stage might still be actively
+      // running (lease still valid).  Always check findBlockingActiveStageForScope
+      // when there is any active run row — stale or not.
+      if (activeRun) {
         const blockingStage = await this.findBlockingActiveStageForScope({
           region: request.region,
           assetType: request.assetType,
@@ -1837,10 +1854,13 @@ export class PipelineOrchestrationService {
         : Math.max(0, processedCount - failedCount - skippedCount);
 
       // Run downstream via DAG runner when there is a valid tradingDate.
+      // For full_latest_trading_date mode: pass even an empty changedInstrumentIds list —
+      // executeDagPipeline will call listDailyRefreshEligibleInstrumentIds to resolve scope
+      // and throws (FIX E2) when the resolver returns empty, so operators see the problem.
       let dagResult: DagRunResult | null = null;
       const dagWarnings: string[] = [];
       const dagErrors: string[] = [];
-      if (tradingDate && downstreamInstrumentIds.length > 0) {
+      if (tradingDate && (downstreamInstrumentIds.length > 0 || fullDailyMode)) {
         try {
           dagResult = await this.executeDagPipeline({
             tradingDate,
@@ -1856,10 +1876,8 @@ export class PipelineOrchestrationService {
           dagErrors.push(msg);
           console.error('[PIPELINE_RUN_ALL/DAG] downstream DAG pipeline failed:', msg);
         }
-      } else if (fullDailyMode && !tradingDate) {
+      } else if (!tradingDate) {
         dagWarnings.push('Full daily pipeline could not run downstream stages: no tradingDate from market-data sync.');
-      } else if (fullDailyMode && downstreamInstrumentIds.length === 0) {
-        dagWarnings.push('Full daily pipeline did not start downstream stages: no eligible instruments.');
       }
 
       const dagRunStatus = dagResult?.runStatus ?? null;
@@ -1978,7 +1996,7 @@ export class PipelineOrchestrationService {
   private async executeDagRetryCommand(
     request: PipelineCommandRequest,
     _context: PipelineCommandExecutionContext,
-    _policy: PipelineCommandPolicy,
+    policy: PipelineCommandPolicy,
     _now: Date
   ): Promise<PipelineCommandResponse> {
     if (request.timeframe !== '1d' || request.pipelineKey !== 'market-intelligence') {
@@ -1995,10 +2013,24 @@ export class PipelineOrchestrationService {
       limit: 50,
     });
 
-    const failedOrBlocked = failedStages.filter((s) => s.status === 'FAILED' || s.status === 'BLOCKED' || s.status === 'PARTIAL');
-    const tradingDate = failedOrBlocked[0]?.dataThroughDate?.slice(0, 10)
-      ?? failedStages[0]?.dataThroughDate?.slice(0, 10)
-      ?? new Date().toISOString().slice(0, 10);
+    // SKIPPED is retryable: a stage that skipped due to a scope/contract bug is
+    // terminal and would otherwise be served from cache forever; legitimately
+    // empty stages re-run as no-ops.
+    const failedOrBlocked = failedStages.filter(
+      (s) => s.status === 'FAILED' || s.status === 'BLOCKED' || s.status === 'PARTIAL' || s.status === 'SKIPPED'
+    );
+    // FIX E3: defaulting to today when no stage rows carry a dataThroughDate is
+    // silent wrong-date behaviour — throw 422 so the operator sees the problem.
+    const resolvedDate = failedOrBlocked[0]?.dataThroughDate?.slice(0, 10)
+      ?? failedStages[0]?.dataThroughDate?.slice(0, 10);
+    if (!resolvedDate) {
+      throw new PipelineCommandError(
+        422,
+        'PIPELINE_DAG_RETRY: no failed/blocked stage rows with a dataThroughDate were found — cannot determine which trading date to retry',
+        this.blockedCommandResponse(request, policy, 'No failed stage rows with a dataThroughDate were found for this scope. Run PIPELINE_RUN_ALL first or check the scope parameters.')
+      );
+    }
+    const tradingDate = resolvedDate;
 
     // Collect failed instrument ids across all failed stages.
     const failedIds: string[] = [];
@@ -2131,318 +2163,18 @@ export class PipelineOrchestrationService {
     if (marketDataStatus === 'FAILED') return 'FAILED';
     if (dagErrors.length > 0 && !dagRunStatus) return 'PARTIAL';
     if (!dagRunStatus) return marketDataStatus;
-    if (dagRunStatus === 'FAILED') return 'PARTIAL';
+    // FIX E1: FAILED means the DAG itself fully failed (no stages succeeded or all
+    // failed) — map to FAILED, not PARTIAL.  PARTIAL means some stages failed but
+    // others succeeded — keep PARTIAL.
+    if (dagRunStatus === 'FAILED') return 'FAILED';
     if (dagRunStatus === 'PARTIAL') return 'PARTIAL';
     return marketDataStatus === 'SKIPPED' ? 'SKIPPED' : 'COMPLETED';
   }
 
-  /** @deprecated Superseded by executeDailyPipelineViaDag. Retained for legacy test coverage; scheduled for deletion in Phase 4. */
-  async executeDailyPipelineCommand(
-    request: PipelineCommandRequest,
-    context: PipelineCommandExecutionContext,
-    policy: PipelineCommandPolicy,
-    now: Date
-  ): Promise<PipelineCommandResponse> {
-    if (request.timeframe !== '1d' || request.pipelineKey !== 'market-intelligence') {
-      throw new PipelineCommandError(400, 'PIPELINE_RUN_ALL supports only the market-intelligence 1d pipeline');
-    }
-
-    const commandIdempotencyKey = this.commandIdempotencyKey(request);
-    if (typeof (this.repository as any).findActiveRun === 'function') {
-      const activeRun = await this.repository.findActiveRun({
-        region: request.region,
-        assetType: request.assetType,
-        timeframe: request.timeframe,
-        pipelineKey: request.pipelineKey,
-      });
-      if (activeRun && !this.isStaleActiveRun(activeRun, now)) {
-        const blockingStage = await this.findBlockingActiveStageForScope({
-          region: request.region,
-          assetType: request.assetType,
-          timeframe: request.timeframe,
-          pipelineKey: request.pipelineKey,
-        }, now);
-        // A null stage means the active run row only has stale stage evidence, so
-        // the retry path may recover before the wider active-run stale timeout.
-        if (blockingStage !== null) {
-          throw new PipelineCommandError(
-            409,
-            'Pipeline run is already active for this scope',
-            this.activeRunHeldResponse(request, policy, commandIdempotencyKey, activeRun, blockingStage)
-          );
-        }
-      }
-    }
-
-    const commandRunId = `manual-daily-pipeline-${createHash('sha256').update(commandIdempotencyKey).digest('hex').slice(0, 16)}`;
-    const batchSize = Math.max(1, Math.min(request.batchSize || 100, 250));
-    const startedAt = now.toISOString();
-    const marketDataLeaseOwner = `manual-command:${request.commandKey}:${PROCESS_LOCAL_ID}`;
-
-    await this.recordMarketDataStageSnapshot({
-      region: request.region,
-      assetType: request.assetType,
-      timeframe: '1d',
-      pipelineKey: 'market-intelligence',
-      triggerType: 'manual',
-      operation: 'INCREMENTAL_EOD_LOAD',
-      runId: commandRunId,
-      status: 'RUNNING',
-      dataThroughDate: null,
-      totalCount: 0,
-      processedCount: 0,
-      succeededCount: 0,
-      failedCount: 0,
-      skippedCount: 0,
-      unchangedCount: 0,
-      changedInstrumentIds: [],
-      downstreamInstrumentIds: [],
-      batchSize,
-      nextOffset: 0,
-      hasMore: false,
-      startedAt,
-      completedAt: null,
-      leaseOwner: marketDataLeaseOwner,
-      leaseMs: DEFAULT_LEASE_MS,
-      warnings: [],
-      errors: [],
-      metadata: {
-        commandKey: request.commandKey,
-        commandIdempotencyKey,
-        requestedByUserId: context.requestedByUserId,
-        runMode: request.runMode,
-        reason: request.reason || null,
-      },
-    });
-
-    try {
-      const initialSummary = await this.marketDataService.syncScheduledRegion(request.region, {
-        assetType: request.assetType,
-        batchSize,
-        now,
-        syncDuringMarketHours: false,
-        skipWeekends: true,
-      });
-
-      // Market scan refresh — precompute daily aggregates so GETs read from snapshot.
-      // Non-blocking: errors are fully swallowed so scan failures never block the main pipeline.
-      try {
-        await this.marketDataService.refreshMarketScanSnapshots({
-          region: request.region,
-          assetType: request.assetType,
-          now,
-        });
-      } catch (scanErr) {
-        console.warn(`[PIPELINE_RUN_ALL] market scan refresh failed (non-blocking): ${scanErr instanceof Error ? scanErr.message : String(scanErr)}`);
-      }
-
-      const fullDailyMode = this.isFullDailyPipelineRun(request);
-      const summary = fullDailyMode
-        ? await this.withFullDailyDownstreamEligibility(initialSummary)
-        : initialSummary;
-      const downstreamExecutionSummary = fullDailyMode ? summary : this.incrementalChangedOnlyDownstreamSummary(summary);
-      const stageStatus = this.marketDataPipelineStageStatus(downstreamExecutionSummary);
-      const totalCount = this.marketDataPipelineTotalCount(downstreamExecutionSummary);
-      const providerSkippedCount = Math.max(0, Number(summary.providerFetchSkippedCount || summary.skippedBeforeFetchCount || 0));
-      const processedCount = stageStatus === 'SKIPPED'
-        ? Math.max(totalCount, providerSkippedCount)
-        : Math.max(0, Number(summary.instrumentsProcessed || 0));
-      const failedCount = Math.max(0, summary.errors?.length || 0);
-      const skippedCount = stageStatus === 'SKIPPED' ? Math.max(totalCount, providerSkippedCount) : 0;
-      const succeededCount = stageStatus === 'SKIPPED'
-        ? 0
-        : Math.max(0, processedCount - failedCount - skippedCount);
-      const downstreamSummary = fullDailyMode
-        ? downstreamExecutionSummary
-        : downstreamExecutionSummary.dqStageEligible
-          ? downstreamExecutionSummary
-          : null;
-      let downstreamResult: ScheduledDataQualityStageResponse | null = null;
-      let downstreamErrors: string[] = [];
-      const downstreamWarnings: string[] = [];
-      if (downstreamSummary) {
-        try {
-          downstreamResult = await this.runScheduledPipelineCatchUpFromMarketDataSummary(downstreamSummary, new Date(), {
-            allowCompletedTerminal: fullDailyMode,
-          });
-          if (!downstreamResult && fullDailyMode) {
-            downstreamWarnings.push('Full daily pipeline did not start downstream stages because no eligible instruments or active lease evidence was available.');
-          }
-        } catch (error) {
-          const message = error instanceof Error ? error.message : 'Downstream daily pipeline failed';
-          downstreamResult = {
-            status: 'FAILED',
-            pipelineRunId: null,
-            stageRunId: null,
-            stageKey: 'DATA_QUALITY',
-            scope: {
-              region: request.region,
-              assetType: request.assetType,
-              timeframe: request.timeframe,
-              pipelineKey: request.pipelineKey,
-            },
-            triggerType: 'scheduled',
-            dataThroughDate: summary.dataThroughDate || summary.tradingDate || '',
-            inputFingerprint: 'manual-daily-pipeline:downstream-error',
-            outputFingerprint: null,
-            batch: {
-              totalInstrumentCount: 0,
-              processedCount: 0,
-              batchSize,
-              nextOffset: null,
-              hasMore: false,
-            },
-            counts: {
-              totalCount: 0,
-              processedCount: 0,
-              succeededCount: 0,
-              partialCount: 0,
-              failedCount: 1,
-              skippedCount: 0,
-              unchangedCount: 0,
-            },
-            warnings: [],
-            errors: [message],
-            startedAt: null,
-            completedAt: null,
-          };
-        }
-      } else if (fullDailyMode) {
-        downstreamWarnings.push('Full daily pipeline could not run downstream stages because Market Data produced no dataThroughDate/sourceFingerprint evidence.');
-      }
-      downstreamErrors = this.scheduledChainErrors(downstreamResult);
-      const terminalStageStatus = this.dailyPipelineTerminalStatus(stageStatus, downstreamResult, fullDailyMode, downstreamWarnings);
-      const completedAt = new Date();
-      const completedStage = await this.recordMarketDataStageSnapshot({
-        region: request.region,
-        assetType: request.assetType,
-        timeframe: '1d',
-        pipelineKey: 'market-intelligence',
-        triggerType: 'manual',
-        operation: 'INCREMENTAL_EOD_LOAD',
-        runId: commandRunId,
-        status: terminalStageStatus,
-        dataThroughDate: summary.dataThroughDate || summary.tradingDate || null,
-        totalCount,
-        processedCount,
-        succeededCount,
-        failedCount,
-        skippedCount,
-        unchangedCount: Math.max(0, Number(summary.rowsNoOp || 0)),
-        changedInstrumentIds: downstreamExecutionSummary.changedInstrumentIds || [],
-        downstreamInstrumentIds: downstreamExecutionSummary.downstreamInstrumentIds?.length
-          ? downstreamExecutionSummary.downstreamInstrumentIds
-          : downstreamExecutionSummary.changedInstrumentIds || [],
-        batchSize,
-        nextOffset: null,
-        hasMore: false,
-        startedAt,
-        completedAt: completedAt.toISOString(),
-        warnings: [...(summary.warnings || []), ...downstreamWarnings],
-        errors: [...(summary.errors || []), ...downstreamErrors],
-        metadata: {
-          commandKey: request.commandKey,
-          commandIdempotencyKey,
-          requestedByUserId: context.requestedByUserId,
-          runMode: request.runMode,
-          reason: request.reason || null,
-          adapter: 'MarketDataFoundationService.syncScheduledRegion',
-          sourceFingerprint: summary.sourceFingerprint || null,
-          tradingDate: summary.tradingDate,
-          dataThroughDate: summary.dataThroughDate || null,
-          rowsReceived: summary.rowsReceived,
-          rowsInserted: summary.rowsInserted,
-          rowsUpdated: summary.rowsUpdated,
-          rowsSkipped: summary.rowsSkipped,
-          rowsNoOp: summary.rowsNoOp,
-          officialEodBulk: summary.officialEodBulk ?? null,
-          marketDataAvailabilityStatus: summary.officialEodBulk?.fallbackReason === 'OFFICIAL_EOD_NOT_AVAILABLE' ? 'NOT_AVAILABLE' : null,
-          downstreamInstrumentCount: downstreamExecutionSummary.downstreamInstrumentIds?.length || 0,
-          downstreamEligibilitySource: downstreamExecutionSummary.downstreamEligibilitySource || null,
-          changedInstrumentCount: summary.changedInstrumentIds?.length || 0,
-          downstreamStatus: this.scheduledChainStatus(downstreamResult),
-          downstreamErrors,
-          downstreamAlreadyExecuted: downstreamResult !== null,
-          downstreamSnapshotBridgeSuppressed: true,
-        },
-      });
-
-      const manualAlertStages = this.flattenStageTree(downstreamResult);
-      const manualAlertStatus = terminalStageStatus;
-      const manualAlertDuration = completedAt.getTime() - now.getTime();
-      const manualAlertErrors = this.scheduledChainErrors(downstreamResult);
-      this.firePipelineRunAlert(
-        manualAlertStatus,
-        request.region,
-        request.assetType,
-        summary.dataThroughDate || summary.tradingDate || null,
-        manualAlertDuration,
-        manualAlertStages,
-        manualAlertErrors[0] ?? null
-      );
-      return this.responseFromStage(
-        request,
-        policy,
-        commandIdempotencyKey,
-        completedStage,
-        { acquired: true, reason: 'ACQUIRED', stage: completedStage },
-        this.commandStatusFromStageStatus(terminalStageStatus)
-      );
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Daily pipeline command failed';
-      const failedAt = new Date();
-      const failedStage = await this.recordMarketDataStageSnapshot({
-        region: request.region,
-        assetType: request.assetType,
-        timeframe: '1d',
-        pipelineKey: 'market-intelligence',
-        triggerType: 'manual',
-        operation: 'INCREMENTAL_EOD_LOAD',
-        runId: commandRunId,
-        status: 'FAILED',
-        dataThroughDate: null,
-        totalCount: 1,
-        processedCount: 0,
-        succeededCount: 0,
-        failedCount: 1,
-        skippedCount: 0,
-        unchangedCount: 0,
-        changedInstrumentIds: [],
-        downstreamInstrumentIds: [],
-        batchSize,
-        nextOffset: null,
-        hasMore: false,
-        startedAt,
-        completedAt: failedAt.toISOString(),
-        warnings: [],
-        errors: [errorMessage],
-        metadata: {
-          commandKey: request.commandKey,
-          commandIdempotencyKey,
-          requestedByUserId: context.requestedByUserId,
-          adapter: 'MarketDataFoundationService.syncScheduledRegion',
-          error: errorMessage,
-        },
-      });
-      this.firePipelineRunAlert(
-        'FAILED',
-        request.region,
-        request.assetType,
-        null,
-        failedAt.getTime() - now.getTime(),
-        [],
-        errorMessage
-      );
-      return this.responseFromStage(
-        request,
-        policy,
-        commandIdempotencyKey,
-        failedStage,
-        { acquired: true, reason: 'ACQUIRED', stage: failedStage },
-        'FAILED'
-      );
-    }
-  }
+  // FIX B: executeDailyPipelineCommand deleted — it was a dead legacy path no longer
+  // called by executeCommand (which now routes to executeDailyPipelineViaDag) and had
+  // zero production callers after Phase 2 switchover.  Tests that previously exercised
+  // it now exercise PIPELINE_RUN_ALL via executeCommand instead.
 
   private manualEarningsMetadata(
     request: PipelineCommandRequest,
@@ -2877,10 +2609,14 @@ export class PipelineOrchestrationService {
     }
 
     if (!retryCommandKey || retryCommandKey === 'PIPELINE_RETRY_FAILED_STAGE') {
-      throw new PipelineCommandError(
-        422,
-        'No failed stage with retryable command metadata was found',
-        this.blockedCommandResponse(request, policy, 'No failed stage with retryable command metadata was found')
+      // FIX E4: DAG-written stage rows have no commandKey in metadata.  Delegate to
+      // PIPELINE_DAG_RETRY rather than throwing 'no retryable command metadata', which
+      // left DAG failures unrecoverable via this UI entry-point.
+      return this.executeDagRetryCommand(
+        { ...request, commandKey: 'PIPELINE_DAG_RETRY', runMode: request.runMode || 'full_latest_trading_date' },
+        context,
+        PIPELINE_COMMAND_POLICY_MAP.get('PIPELINE_DAG_RETRY')!,
+        now,
       );
     }
 
@@ -3328,8 +3064,11 @@ export class PipelineOrchestrationService {
     summary: ScheduledRegionSyncSummary,
     now = new Date(),
     options: { allowCompletedTerminal?: boolean } = {}
-  ): Promise<ScheduledDataQualityStageResponse | null> {
-    const dataThroughDate = summary.dataThroughDate || summary.tradingDate;
+  ): Promise<unknown | null> {
+    // FIX D: rerouted from the legacy runScheduledDataQualityStage chain to the DAG
+    // runner (executeDagPipeline), matching the snapshot-bridge path in
+    // runDownstreamDataQualityForMarketDataSnapshot.  Guards still run.
+    const dataThroughDate = (summary.dataThroughDate || summary.tradingDate || '').slice(0, 10);
     const changedInstrumentIds = this.normalizeInstrumentIds(
       summary.downstreamInstrumentIds?.length ? summary.downstreamInstrumentIds : summary.changedInstrumentIds
     );
@@ -3337,18 +3076,25 @@ export class PipelineOrchestrationService {
     if (await this.hasActiveScheduledDownstream(summary, dataThroughDate, now)) return null;
     if (!options.allowCompletedTerminal && await this.hasCompletedScheduledTerminal(summary, dataThroughDate)) return null;
 
-    return this.runScheduledDataQualityStage({
+    const sourceFingerprint = `${summary.sourceFingerprint}:catchup:${dataThroughDate}`;
+    return this.executeDagPipeline({
+      tradingDate: dataThroughDate,
       region: summary.region,
       assetType: summary.assetType,
       timeframe: '1d',
-      pipelineKey: 'market-intelligence',
-      triggerType: 'scheduled',
-      dataThroughDate,
-      sourceFingerprint: `${summary.sourceFingerprint}:catchup:${dataThroughDate.slice(0, 10)}`,
+      trigger: 'scheduled',
       changedInstrumentIds,
-      batchSize: Math.max(1, Math.min(100, changedInstrumentIds.length || 25)),
-      schedulerRunStartedAt: now.toISOString(),
-    }, now);
+      sourceFingerprint,
+    }).catch((error) => {
+      const message = error instanceof Error ? error.message : 'unknown error';
+      console.error('[PipelineOrchestration] runScheduledPipelineCatchUpFromMarketDataSummary DAG failed', {
+        region: summary.region,
+        assetType: summary.assetType,
+        dataThroughDate,
+        error: message,
+      });
+      return { runStatus: 'FAILED', stages: {}, durationMs: 0, errors: [message] };
+    });
   }
 
   async runScheduledRawSignalsStage(
@@ -6040,17 +5786,8 @@ export class PipelineOrchestrationService {
     return request.commandKey === 'PIPELINE_RUN_ALL' && request.runMode !== 'incremental_changed_only';
   }
 
-  private dailyPipelineTerminalStatus(
-    marketDataStatus: PipelineStageStatus,
-    downstreamResult: unknown | null,
-    downstreamRequired: boolean,
-    downstreamWarnings: string[]
-  ): PipelineStageStatus {
-    const status = this.marketDataRunStatusAfterDownstream(marketDataStatus, downstreamResult);
-    if (status === 'FAILED') return 'FAILED';
-    if (downstreamRequired && (!downstreamResult || downstreamWarnings.length > 0)) return status === 'SKIPPED' ? 'PARTIAL' : 'PARTIAL';
-    return status;
-  }
+  // dailyPipelineTerminalStatus deleted in FIX B — it was only used by
+  // executeDailyPipelineCommand which was deleted as a dead legacy path.
 
   private scheduledChainStatus(result: unknown | null): string | null {
     if (!result || typeof result !== 'object') return null;
@@ -6104,11 +5841,12 @@ export class PipelineOrchestrationService {
    * Market-data foundation calls recordMarketDataStageSnapshot on every sync
    * completion; this method picks up the payload and hands it to executeDagPipeline.
    *
-   * The guards hasActiveScheduledDownstream / hasCompletedScheduledTerminal still
-   * run via the shouldRun check above and the dataThroughDate guard below.
-   * hasCompletedScheduledTerminal checks for SIGNAL_POSITION_LEDGER — the DAG runner
-   * writes stageKey='SIGNAL_POSITION_LEDGER' verbatim (stageVersion='dag-v1'), so
-   * `latestStages` finds it with the same key; the guard remains effective.
+   * FIX A guard note: hasCompletedScheduledTerminal checks stageKey='SIGNAL_POSITION_LEDGER'
+   * via latestStages (pipelineKey='market-intelligence').  The DAG runner writes its run row
+   * under pipelineKey='market-intelligence' (overridden in RepositoryDagPersistence.upsertRun)
+   * and writes stage rows with stageKey='SIGNAL_POSITION_LEDGER' verbatim, so latestStages
+   * finds them and the guard is effective.  hasActiveScheduledDownstream similarly queries
+   * pipelineKey='market-intelligence' and will find DAG stage rows correctly.
    */
   private async runDownstreamDataQualityForMarketDataSnapshot(input: {
     request: MarketDataStageSnapshotRequest;

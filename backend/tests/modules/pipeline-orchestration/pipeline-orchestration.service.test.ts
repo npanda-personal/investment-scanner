@@ -1682,7 +1682,7 @@ describe('PipelineOrchestrationService', () => {
     expect(result.status).toBe('SKIPPED');
   });
 
-  it('marks the full daily pipeline partial when downstream catch-up fails', async () => {
+  it('marks the full daily pipeline FAILED when the DAG fully fails (FIX E1: FAILED not PARTIAL)', async () => {
     const repository = {
       findActiveRun: jest.fn().mockResolvedValue(null),
     };
@@ -1743,13 +1743,99 @@ describe('PipelineOrchestrationService', () => {
       force: false,
     }, { requestedByUserId: 'local-manual-operator' }, new Date('2026-05-25T03:00:00.000Z'));
 
+    // FIX E1: DAG runStatus='FAILED' → overall status='FAILED' (not 'PARTIAL').
+    // PARTIAL is reserved for mixed-outcome runs (some stages succeeded, some failed).
     expect(recordSnapshot).toHaveBeenNthCalledWith(2, expect.objectContaining({
-      status: 'PARTIAL',
+      status: 'FAILED',
       metadata: expect.objectContaining({
         dagRunStatus: 'FAILED',
       }),
     }));
-    expect(result.status).toBe('PARTIAL');
+    expect(result.status).toBe('FAILED');
+  });
+
+  it('FIX E2: executeDagPipeline throws PipelineCommandError when eligible-universe resolver returns empty', async () => {
+    // E2: when changedInstrumentIds is empty and the resolver returns empty,
+    // executeDagPipeline must throw (loud failure) rather than proceeding with null scope
+    // (null scope = every scoped stage skips silently — confirmed live bug).
+    const marketDataService = {
+      listDailyRefreshEligibleInstrumentIds: jest.fn().mockResolvedValue({ instrumentIds: [] }),
+    };
+    const service = new PipelineOrchestrationService(
+      {} as any, // repository — unused for this test
+      {} as any, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any,
+      {} as any, {} as any, {} as any,
+      marketDataService as any, // marketDataService with empty eligibility resolver
+    );
+    // Inject a mock runner — we should never reach it
+    const mockRunner = { execute: jest.fn() };
+    (service as any)._dagRunner = mockRunner;
+
+    await expect(service.executeDagPipeline({
+      tradingDate: '2026-05-25',
+      region: 'IN',
+      assetType: 'STOCK',
+      timeframe: '1d',
+      trigger: 'manual',
+      changedInstrumentIds: [], // empty — must trigger resolver
+    })).rejects.toThrow(/Cannot resolve instrument scope/);
+
+    expect(mockRunner.execute).not.toHaveBeenCalled();
+  });
+
+  it('FIX A: hasCompletedScheduledTerminal guard fires when SIGNAL_POSITION_LEDGER stage exists under market-intelligence pipelineKey', async () => {
+    // Simulate: latestStages returns a COMPLETED SIGNAL_POSITION_LEDGER row from a prior DAG run
+    // that wrote pipelineKey='market-intelligence' (after FIX A).
+    // hasCompletedScheduledTerminal should return true and runScheduledPipelineCatchUpFromMarketDataSummary should return null.
+    const repository = {
+      latestStages: jest.fn().mockImplementation(async (query: any) => {
+        if (query.stageKeys?.includes('SIGNAL_POSITION_LEDGER')) {
+          return [{
+            id: 'stage-spl-dag',
+            pipelineRunId: 'run-dag-1',
+            stageKey: 'SIGNAL_POSITION_LEDGER',
+            stageOrder: 13,
+            status: 'COMPLETED',
+            idempotencyKey: 'dag-spl-idem',
+            region: 'IN',
+            assetType: 'STOCK',
+            timeframe: '1d',
+            dataThroughDate: '2026-06-01T00:00:00.000Z',
+            changedInstrumentCount: 3,
+            batchSize: 3, offset: 0, nextOffset: null, hasMore: false,
+            totalCount: 3, processedCount: 3, succeededCount: 3,
+            partialCount: 0, failedCount: 0, skippedCount: 0, unchangedCount: 0,
+            attemptCount: 1, cacheKey: null, cacheStatus: 'BYPASS', cacheExpiresAt: null,
+            inputFingerprint: null, outputFingerprint: null,
+            leaseOwner: null, leaseExpiresAt: null,
+            startedAt: '2026-06-01T04:00:00.000Z', completedAt: '2026-06-01T04:01:00.000Z',
+            durationMs: 60000, warnings: [], errors: [], metadata: null,
+            createdAt: '2026-06-01T04:00:00.000Z', updatedAt: '2026-06-01T04:01:00.000Z',
+          }];
+        }
+        return [];
+      }),
+    };
+    const service = new PipelineOrchestrationService(repository as any);
+    const dagSpy = jest.spyOn(service, 'executeDagPipeline');
+
+    const result = await service.runScheduledPipelineCatchUpFromMarketDataSummary({
+      region: 'IN',
+      assetType: 'STOCK',
+      tradingDate: '2026-06-01',
+      dataThroughDate: '2026-06-01',
+      sourceFingerprint: 'nse:market-data:fingerprint',
+      changedInstrumentIds: ['stock-1', 'stock-2', 'stock-3'],
+      downstreamInstrumentIds: ['stock-1', 'stock-2', 'stock-3'],
+      dqStageEligible: true,
+      instrumentsProcessed: 3,
+      rowsReceived: 3, rowsInserted: 3, rowsUpdated: 0, rowsSkipped: 0, rowsNoOp: 0,
+      changedInstrumentCount: 3, warningCount: 0, warnings: [], errors: [],
+    }, new Date('2026-06-01T05:00:00.000Z'));
+
+    // Guard fires: prior SIGNAL_POSITION_LEDGER stage exists → no re-fire
+    expect(result).toBeNull();
+    expect(dagSpy).not.toHaveBeenCalled();
   });
 
   it('executes historical exchange backfill through Pipeline Ops with resume evidence', async () => {

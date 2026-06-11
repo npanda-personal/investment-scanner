@@ -42,14 +42,40 @@ export function createSnapshotAssemblerAdapter(
       ctx.heartbeat();
 
       const succeededCount = summary.rowCount;
+
+      // FIX 3: distinguish genuinely-empty scope (SKIPPED) from zero-row output
+      // when work was expected (PARTIAL with a warning).
+      // "Work was expected" when:
+      //  - ctx.instrumentScope was provided and non-empty (scoped run), OR
+      //  - the assembler itself resolved a non-empty instrument set (full run
+      //    where the service iterated over instruments internally).
+      const scopeNonEmpty =
+        ctx.instrumentScope != null && ctx.instrumentScope.length > 0;
+      // The assembler service resolves its own instrument set when instrumentIds
+      // is null — we cannot directly observe that here, but rowCount>0 would
+      // already make status COMPLETED. When rowCount===0 and instrumentIds was
+      // null we cannot tell "no instruments in DB" apart from "bug", so we keep
+      // SKIPPED for that case and only promote to PARTIAL for explicit scopes.
       const status: StageResult['status'] =
-        succeededCount === 0 ? 'SKIPPED' : 'COMPLETED';
+        succeededCount === 0
+          ? scopeNonEmpty
+            ? 'PARTIAL'
+            : 'SKIPPED'
+          : 'COMPLETED';
+
+      // Surface assembler warnings, and add our own when we detect empty output.
+      const warnings: string[] = [...summary.warnings];
+      if (succeededCount === 0 && scopeNonEmpty) {
+        warnings.push(
+          `SNAPSHOT_ASSEMBLER produced 0 rows for ${ctx.instrumentScope!.length} scoped instrument(s) — possible upstream data gap`,
+        );
+      }
 
       return {
         status,
         succeededCount,
         failedCount: 0,
-        warnings: summary.warnings.length > 0 ? summary.warnings : undefined,
+        warnings: warnings.length > 0 ? warnings : undefined,
         metadata: {
           rowCount: summary.rowCount,
           snapshotVersion: summary.snapshotVersion,

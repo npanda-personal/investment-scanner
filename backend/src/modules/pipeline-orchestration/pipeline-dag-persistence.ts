@@ -59,9 +59,14 @@ export class RepositoryDagPersistence implements DagPersistence {
     sourceFingerprint?: string | null;
     status: string;
   }): Promise<RunRecord> {
+    // FIX A: The runner hardcodes pipelineKey='dag-runner' in its execute() call,
+    // but guards hasCompletedScheduledTerminal / hasActiveScheduledDownstream and
+    // findActiveRun all query pipelineKey='market-intelligence'.  Override here so
+    // DAG run rows land under the same pipelineKey as every other pipeline row and
+    // the guards can find them.
     const record = await this.repository.upsertRun({
       idempotencyKey: params.idempotencyKey,
-      pipelineKey: params.pipelineKey,
+      pipelineKey: 'market-intelligence',
       triggerType: params.triggerType,
       region: params.region,
       assetType: params.assetType,
@@ -173,7 +178,35 @@ export class RepositoryDagPersistence implements DagPersistence {
     assetType: string;
     timeframe: string;
     tradingDate: string;
+    idempotencyKey?: string;
   }): Promise<TerminalStageRecord | null> {
+    // When an idempotencyKey is provided, look up the stage row directly first.
+    // This is the path used by the DAG runner for exact-match stage lookups.
+    if (params.idempotencyKey) {
+      const direct = await prisma.pipelineStageRun.findFirst({
+        where: { idempotencyKey: params.idempotencyKey },
+        select: {
+          status: true,
+          succeededCount: true,
+          failedCount: true,
+          durationMs: true,
+          errors: true,
+          metadata: true,
+        },
+      });
+      if (direct && TERMINAL_STAGE_STATUSES.has(direct.status)) {
+        return {
+          status: direct.status,
+          succeededCount: direct.succeededCount,
+          failedCount: direct.failedCount,
+          durationMs: direct.durationMs ?? null,
+          errors: (direct.errors as string[] | null) ?? [],
+          metadata: (direct.metadata as Record<string, unknown> | null) ?? null,
+        };
+      }
+      // Fall through to latestStages path if not found by idempotencyKey.
+    }
+
     const rows = await this.repository.latestStages({
       region: params.region,
       assetType: params.assetType,

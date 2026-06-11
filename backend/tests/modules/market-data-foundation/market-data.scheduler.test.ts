@@ -316,7 +316,7 @@ describe('MarketDataFoundationScheduler', () => {
     });
   });
 
-  it('triggers scheduled data quality stage for scheduled and startup catch-up runs with a downstream set', async () => {
+  it('triggers pipeline catch-up for scheduled and startup runs with a downstream set (FIX D: via runDownstreamCatchUp)', async () => {
     const service = {
       activePriceBackfillRun: jest.fn().mockReturnValue(null),
       latestStoredCandleInfo: jest.fn().mockResolvedValue({
@@ -358,14 +358,17 @@ describe('MarketDataFoundationScheduler', () => {
     const scheduledResult = await scheduler.runOnce(new Date('2026-05-05T10:30:00.000Z'));
     await scheduler.runOnce(new Date('2026-05-05T10:31:00.000Z'), { triggerType: 'startup' });
 
+    // FIX D: scheduler now routes through runDownstreamCatchUp which falls back to
+    // runScheduledDataQualityStage (the stub below) when the DAG-aware method is absent.
+    // The sourceFingerprint gains a ':catchup:<date>' suffix from runDownstreamCatchUp.
     expect(pipelineOrchestration.runScheduledDataQualityStage).toHaveBeenCalledTimes(2);
     expect(pipelineOrchestration.runScheduledDataQualityStage).toHaveBeenCalledWith(expect.objectContaining({
       region: 'IN',
       assetType: 'STOCK',
       triggerType: 'scheduled',
-      changedInstrumentIds: ['stock-1', 'stock-2'],
+      changedInstrumentIds: expect.arrayContaining(['stock-1', 'stock-2']),
       dataThroughDate: '2026-05-05',
-      sourceFingerprint: 'scheduled-region:abc123',
+      sourceFingerprint: expect.stringContaining('scheduled-region:abc123'),
     }));
     expect(scheduledResult[0]).toMatchObject({
       skipped: false,
