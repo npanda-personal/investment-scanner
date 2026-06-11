@@ -6,7 +6,8 @@ async function mockAuthenticatedUser(page: Page) {
     window.localStorage.setItem('investment_scanner_auth_token', 'playwright-route-segregation-token');
     window.localStorage.setItem('market_scope', JSON.stringify({ region: 'IN', assetType: 'STOCK' }));
   });
-  await page.route('**/api/v1/auth/me', async (route) => {
+  // Use trailing ** so the mock matches URLs with appended query params (e.g. ?region=IN&assetType=STOCK)
+  await page.route('**/api/v1/auth/me**', async (route) => {
     await route.fulfill({
       json: {
         id: 'playwright-route-segregation-user',
@@ -14,6 +15,13 @@ async function mockAuthenticatedUser(page: Page) {
         name: 'Test User',
       },
     });
+  });
+  // NavigationLayout fires these on every mount — mock to avoid real network calls.
+  await page.route('**/api/v1/alerts/events**', async (route) => {
+    await route.fulfill({ json: { events: [] } });
+  });
+  await page.route('**/api/v1/market-context/capital-posture**', async (route) => {
+    await route.fulfill({ json: { availability: 'NOT_READY', postureLabel: null, suggestedExposureBand: null, message: 'Not available in test.' } });
   });
 }
 
@@ -29,17 +37,19 @@ test.describe('User/admin route segregation', () => {
     await visitAuthenticated(page, '/');
 
     const drawerLinks = page.locator('.MuiDrawer-paper a[href]');
+    // Nav labels reflect the revamped grouped nav from navigationMetadata.tsx
     await expect(drawerLinks).toHaveText([
-      'Market Pulse',
-      'Stock Interest Radar',
-      'Earnings Intelligence',
-      'Compounder Radar',
-      'Trader Setup Radar',
-      'Risk Radar',
+      'Today',
+      'Market',
+      'Screener',
+      'Research Hub',
+      'Earnings',
+      'Derivatives / F&O',
       'Watchlists',
       'Portfolios',
       'Alerts',
-      'Instrument Workspace',
+      'Instrument',
+      'Copilot',
     ]);
 
     for (const href of [
@@ -70,6 +80,7 @@ test.describe('User/admin route segregation', () => {
       'Data Quality',
       'Historical Context',
       'Market Context',
+      'Breadth Internals',
       'Signal Generation',
       'Signal Quality Lab',
       'Signal Calibration',

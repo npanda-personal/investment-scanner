@@ -341,7 +341,9 @@ describe('MarketDataFoundationScheduler', () => {
       }),
     };
     const pipelineOrchestration = {
-      runScheduledDataQualityStage: jest.fn().mockResolvedValue({ status: 'COMPLETED' }),
+      // Phase 4b: runScheduledDataQualityStage removed; scheduler now routes exclusively
+      // through runScheduledPipelineCatchUpFromMarketDataSummary (DAG-backed catch-up).
+      runScheduledPipelineCatchUpFromMarketDataSummary: jest.fn().mockResolvedValue({ runStatus: 'COMPLETED' }),
     };
     const scheduler = new MarketDataFoundationScheduler(service as any, {
       enabled: true,
@@ -358,21 +360,22 @@ describe('MarketDataFoundationScheduler', () => {
     const scheduledResult = await scheduler.runOnce(new Date('2026-05-05T10:30:00.000Z'));
     await scheduler.runOnce(new Date('2026-05-05T10:31:00.000Z'), { triggerType: 'startup' });
 
-    // FIX D: scheduler now routes through runDownstreamCatchUp which falls back to
-    // runScheduledDataQualityStage (the stub below) when the DAG-aware method is absent.
-    // The sourceFingerprint gains a ':catchup:<date>' suffix from runDownstreamCatchUp.
-    expect(pipelineOrchestration.runScheduledDataQualityStage).toHaveBeenCalledTimes(2);
-    expect(pipelineOrchestration.runScheduledDataQualityStage).toHaveBeenCalledWith(expect.objectContaining({
-      region: 'IN',
-      assetType: 'STOCK',
-      triggerType: 'scheduled',
-      changedInstrumentIds: expect.arrayContaining(['stock-1', 'stock-2']),
-      dataThroughDate: '2026-05-05',
-      sourceFingerprint: expect.stringContaining('scheduled-region:abc123'),
-    }));
+    // Phase 4b: scheduler routes exclusively through runScheduledPipelineCatchUpFromMarketDataSummary.
+    // The summary object is passed directly (no sourceFingerprint rewriting in this path).
+    expect(pipelineOrchestration.runScheduledPipelineCatchUpFromMarketDataSummary).toHaveBeenCalledTimes(2);
+    expect(pipelineOrchestration.runScheduledPipelineCatchUpFromMarketDataSummary).toHaveBeenCalledWith(
+      expect.objectContaining({
+        region: 'IN',
+        assetType: 'STOCK',
+        tradingDate: '2026-05-05',
+        sourceFingerprint: 'scheduled-region:abc123',
+        downstreamInstrumentIds: expect.arrayContaining(['stock-1', 'stock-2']),
+      }),
+      expect.any(Date)
+    );
     expect(scheduledResult[0]).toMatchObject({
       skipped: false,
-      scheduledDataQuality: { status: 'COMPLETED' },
+      scheduledDataQuality: expect.objectContaining({ runStatus: 'COMPLETED' }),
     });
   });
 });

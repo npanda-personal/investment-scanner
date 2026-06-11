@@ -6,7 +6,8 @@ async function mockAuthenticatedUser(page: Page) {
     window.localStorage.setItem('investment_scanner_auth_token', 'playwright-research-hub-token');
     window.localStorage.setItem('market_scope', JSON.stringify({ region: 'IN', assetType: 'STOCK' }));
   });
-  await page.route('**/api/v1/auth/me', async (route) => {
+  // Use trailing ** so the mock matches URLs with appended query params (e.g. ?region=IN&assetType=STOCK)
+  await page.route('**/api/v1/auth/me**', async (route) => {
     await route.fulfill({
       json: {
         id: 'playwright-research-hub-user',
@@ -14,6 +15,27 @@ async function mockAuthenticatedUser(page: Page) {
         name: 'Test User',
       },
     });
+  });
+  // NavigationLayout fires these on every mount — mock to avoid real network calls.
+  await page.route('**/api/v1/alerts/events**', async (route) => {
+    await route.fulfill({ json: { events: [] } });
+  });
+  await page.route('**/api/v1/market-context/capital-posture**', async (route) => {
+    await route.fulfill({ json: { availability: 'NOT_READY', postureLabel: null, suggestedExposureBand: null, message: 'Not available in test.' } });
+  });
+  // ResearchDrilldownTabs fires these on mount for the Market Pulse, Breadth, Sector, and Smart Money tabs.
+  // Stub them so "Failed to load" does not appear and trip expectNoPageError.
+  await page.route('**/api/v1/market-intelligence/market-pulse**', async (route) => {
+    await route.fulfill({ json: { availability: 'EMPTY', scope: { region: 'IN', assetType: 'STOCK', timeframe: '1d' }, snapshot: null, message: 'Not available in test.', warnings: [] } });
+  });
+  await page.route('**/api/v1/market-intelligence/sectors**', async (route) => {
+    await route.fulfill({ json: { status: 'missing', scope: { region: 'IN', assetType: 'STOCK' }, snapshotDate: null, dataThroughDate: null, generatedAt: null, materialized: false, sourceLabels: {}, warnings: [], sectors: [] } });
+  });
+  await page.route('**/api/v1/market-context/persisted-breadth**', async (route) => {
+    await route.fulfill({ json: { availability: 'EMPTY', data: null, warnings: [] } });
+  });
+  await page.route('**/api/v1/smart-money/sectors**', async (route) => {
+    await route.fulfill({ json: [] });
   });
 }
 
@@ -134,7 +156,7 @@ test.describe('Research Hub UI', () => {
       await route.fulfill({ json: researchOverviewPayload() });
     });
 
-    await visitModule(page, '/research', 'Research Command Center');
+    await visitModule(page, '/research', 'Research Hub');
     await expect(page.getByRole('heading', { name: 'Actionability' })).toBeVisible();
     await expect(page.getByText('Reviewable setups not confirmed')).toBeVisible();
     await expect(page.getByText('Actionable setup review is not confirmed because required readiness evidence is unavailable.')).toBeVisible();
@@ -149,7 +171,7 @@ test.describe('Research Hub UI', () => {
     await expect(page.getByText('Confirmation Layers')).toBeVisible();
     await expect(page.getByText('NEW TRADE CANDIDATES')).toHaveCount(0);
     await expect(page.getByText('No framework-backed strategies are producing review candidates yet.')).toBeVisible();
-    await expect(page.getByText('No new review candidates since the last evaluation.')).toBeVisible();
+    await expect(page.getByText('No changes since the last snapshot.')).toBeVisible();
     await expect.poll(() => overviewRequests.some((search) => search.includes('region=IN') && search.includes('assetType=STOCK'))).toBe(true);
   });
 
@@ -157,23 +179,23 @@ test.describe('Research Hub UI', () => {
     await page.route('**/api/v1/research/overview**', async (route) => {
       await route.fulfill({ json: researchOverviewPayload() });
     });
-    await visitModule(page, '/research', 'Research Command Center');
-    await expect(page.getByRole('heading', { name: 'Research Command Center' })).toBeVisible();
+    await visitModule(page, '/research', 'Research Hub');
+    await expect(page.getByRole('heading', { name: 'Research Hub' }).first()).toBeVisible();
 
+    // Old operator-only research sub-routes must not appear as links
     await expect(page.locator('a[href="/research/strategy"]')).toHaveCount(0);
     await expect(page.locator('a[href="/research/signals"]')).toHaveCount(0);
     await expect(page.locator('a[href="/research/smart-money"]')).toHaveCount(0);
     await expect(page.locator('a[href="/research/market-context"]')).toHaveCount(0);
 
+    // Old standalone operator routes must not appear as links in the trader page
     await expect(page.locator('a[href="/strategy"]')).toHaveCount(0);
     await expect(page.locator('a[href="/signals"]')).toHaveCount(0);
     await expect(page.locator('a[href="/smart-money"]')).toHaveCount(0);
     await expect(page.locator('a[href="/market-context"]')).toHaveCount(0);
 
-    await expect(page.locator('a[href="/market-pulse"]').first()).toBeVisible();
-    await expect(page.locator('a[href="/market-map"]').first()).toBeVisible();
-    await expect(page.locator('a[href="/breadth"]').first()).toBeVisible();
-    await expect(page.locator('a[href="/institutional-flow"]').first()).toBeVisible();
+    // The current drilldown for trader use goes to /today-review (Daily Review button)
+    await expect(page.locator('a[href="/today-review"]').first()).toBeVisible();
   });
 
   test('renders research ideas from persisted reads without triggering import or generation workflows', async ({ page }) => {
@@ -191,7 +213,7 @@ test.describe('Research Hub UI', () => {
       await route.fulfill({ json: researchOverviewPayload() });
     });
 
-    await visitModule(page, '/research', 'Research Command Center');
+    await visitModule(page, '/research', 'Research Hub');
     await expect(page.getByRole('heading', { name: 'Review Candidates' })).toBeVisible();
 
     expect(forbiddenRequests).toEqual([]);

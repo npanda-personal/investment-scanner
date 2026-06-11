@@ -1,5 +1,29 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { visitModule } from './support/moduleAssertions';
+
+async function mockAuthenticatedUser(page: Page) {
+  await page.addInitScript(() => {
+    window.localStorage.setItem('investment_scanner_auth_token', 'playwright-backtests-token');
+    window.localStorage.setItem('market_scope', JSON.stringify({ region: 'IN', assetType: 'STOCK' }));
+  });
+  // Use trailing ** so the mock matches URLs with appended query params (e.g. ?region=IN&assetType=STOCK)
+  await page.route('**/api/v1/auth/me**', async (route) => {
+    await route.fulfill({
+      json: {
+        id: 'playwright-backtests-user',
+        email: 'test@example.com',
+        name: 'Test User',
+      },
+    });
+  });
+  // NavigationLayout fires these on every mount — mock to avoid real network calls.
+  await page.route('**/api/v1/alerts/events**', async (route) => {
+    await route.fulfill({ json: { events: [] } });
+  });
+  await page.route('**/api/v1/market-context/capital-posture**', async (route) => {
+    await route.fulfill({ json: { availability: 'NOT_READY', postureLabel: null, suggestedExposureBand: null, message: 'Not available in test.' } });
+  });
+}
 
 const strategy = (code: string, name: string, category: string) => ({
   code,
@@ -23,7 +47,8 @@ const strategy = (code: string, name: string, category: string) => ({
   examples: { triggers: [], blocks: [] },
 });
 
-const mockFrameworkStrategies = async (page: any) => {
+const mockFrameworkStrategies = async (page: Page) => {
+  await mockAuthenticatedUser(page);
   await page.route('**/api/v1/backtests/strategies', async (route: any) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
   });
@@ -147,6 +172,7 @@ test.describe('Backtesting Strategy Lab UI', () => {
   });
 
   test('marks legacy invalid saved-run aggregates and shows repaired trade returns', async ({ page }) => {
+    await mockAuthenticatedUser(page);
     await page.route('**/api/v1/backtests/strategies**', async (route) => {
       await route.fulfill({ json: [] });
     });
@@ -219,6 +245,6 @@ test.describe('Backtesting Strategy Lab UI', () => {
     await expect(page.getByText('-4.0%')).toBeVisible();
     await expect(page.getByText('3MINDIA.NS')).toBeVisible();
     await expect(page.getByText('-1.0%')).toBeVisible();
-    await expect(page.getByText('614')).toBeVisible();
+    await expect(page.getByRole('heading', { name: '614' })).toBeVisible();
   });
 });

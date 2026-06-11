@@ -1,18 +1,22 @@
 import { expect, test, type Page } from '@playwright/test';
 import { visitAuthenticated } from './support/auth';
 
+// Nav labels reflect the revamped grouped nav from navigationMetadata.tsx:
+// Daily Decisions: Today, Market
+// Discover: Screener, Research Hub, Earnings, Derivatives / F&O
+// My Workspace: Watchlists, Portfolios, Alerts, Instrument, Copilot
 const traderNavLabels = [
-  'Market Pulse',
-  'Daily Review Shortlist',
-  'Stock Interest Radar',
-  'Earnings Intelligence',
-  'Compounder Radar',
-  'Trader Setup Radar',
-  'Risk Radar',
+  'Today',
+  'Market',
+  'Screener',
+  'Research Hub',
+  'Earnings',
+  'Derivatives / F&O',
   'Watchlists',
   'Portfolios',
   'Alerts',
-  'Instrument Workspace',
+  'Instrument',
+  'Copilot',
 ];
 
 const hiddenTraderLabels = [
@@ -21,7 +25,6 @@ const hiddenTraderLabels = [
   'Institutional Flow',
   'Derivatives Context',
   'Research Workbench',
-  'Research Hub',
   'Data Ingestion',
   'Provider Validation',
   'Backfill',
@@ -219,6 +222,18 @@ async function setupReadOnlyPage(page: Page, responses: MarketIntelligenceRespon
       '/api/v1/signals/position-ledger/persisted/active': nextResponses.activeLedger,
       '/api/v1/portfolios': nextResponses.portfolios,
       '/api/v1/watchlists': nextResponses.watchlists,
+      // NavigationLayout fires these on every mount — allow them so the catch-all doesn't throw.
+      '/api/v1/alerts/events': { events: [] },
+      '/api/v1/market-context/capital-posture': { availability: 'NOT_READY', postureLabel: null, suggestedExposureBand: null, message: 'Not available in test.' },
+      // /screener is now the host for StockInterestRadarPage (tab) — stub the screener GET so the
+      // first tab (ScreenerPage) does not throw the read-model catch-all when tests navigate there.
+      '/api/v1/market-data/screener': { rows: [], total: 0, limit: 50, offset: 0, hasMore: false, warnings: [] },
+      // MarketScansPage (second tab on /screener) fires this on first render — stub it too.
+      '/api/v1/market-data/scans': { rows: [], total: 0, warnings: [] },
+      // InstrumentWorkspaceLandingPage mounts InstrumentSearchSelect which fires on mount — stub it.
+      '/api/v1/market-data/instruments': { instruments: [], total: 0, page: 1, pageSize: 20 },
+      // TodayReviewPage renders SignalTrackRecordPanel which calls this on mount — stub it.
+      '/api/v1/signals/quality/summary': { availability: 'EMPTY', totalSignals: 0, qualityBreakdown: [] },
     };
 
     if (path in implementedReads) {
@@ -271,23 +286,38 @@ test.describe('Market Intelligence persisted read-model pages', () => {
 
   test('empty and future pages show honest unavailable states without side-effect calls', async ({ page }) => {
     const apiRequests = await setupReadOnlyPage(page);
+    // Data snapshot pages: each shows a DataUnavailableState with 'No placeholder rows are shown.'
+    // (hardcoded in DataUnavailableState) and a message matching missingText.
+    // /market-pulse → redirects to / (MarketOverviewPage, "Health" tab = MarketPulsePage).
+    // /compounder-radar, /trader-setup-radar, /risk-radar → use unavailable() client-side stubs
+    //   (no real HTTP request), so missingText comes from the envelope.message field.
     const routes = [
-      ['/market-pulse', 'Market Pulse', 'Market Pulse snapshot is not available for this scope.'],
-      ['/stock-interest-radar', 'Stock Interest Radar', 'Stock Interest snapshot is not available for this scope.'],
+      ['/', 'Market Pulse', 'Market Pulse snapshot is not available for this scope.'],
       ['/earnings-intelligence', 'Earnings Intelligence', 'Earnings Intelligence snapshot is not available for this scope.'],
       ['/compounder-radar', 'Compounder Radar', 'Compounder Radar backend not available yet.'],
       ['/trader-setup-radar', 'Trader Setup Radar', 'Trader Setup Radar backend not available yet.'],
       ['/risk-radar', 'Risk Radar', 'Risk Radar backend not available yet.'],
-      ['/instrument-workspace', 'Instrument Workspace', 'Instrument Context backend not available yet.'],
     ];
 
     for (const [path, heading, missingText] of routes) {
       await visitAuthenticated(page, path);
       await expect(page.getByRole('heading', { name: heading }).first()).toBeVisible();
       await expect(page.getByText(missingText).first()).toBeVisible();
-      await expect(page.getByText('No fake rows are shown.').first()).toBeVisible();
+      // DataUnavailableState always renders this hardcoded line — confirms no fake placeholder data.
+      await expect(page.getByText('No placeholder rows are shown.').first()).toBeVisible();
       await expectNoSharedMutationsOrOperatorControls(page, apiRequests);
     }
+
+    // /stock-interest-radar → redirects to /screener (DiscoverWorkspacePage, "Stock Interest" tab).
+    // Navigate to /screener and click the "Stock Interest" tab to reach StockInterestRadarPage.
+    await visitAuthenticated(page, '/screener');
+    // Wait for the Screener (first tab) to finish its initial render before switching tabs.
+    await page.waitForLoadState('networkidle');
+    await page.getByRole('tab', { name: 'Stock Interest' }).click();
+    await expect(page.getByRole('heading', { name: 'Stock Interest Radar' }).first()).toBeVisible();
+    await expect(page.getByText('Stock Interest snapshot is not available for this scope.').first()).toBeVisible();
+    await expect(page.getByText('No placeholder rows are shown.').first()).toBeVisible();
+    await expectNoSharedMutationsOrOperatorControls(page, apiRequests);
   });
 
   test('Market Pulse renders backend snapshot, sector rows, PARTIAL state, and warnings', async ({ page }) => {
@@ -346,7 +376,8 @@ test.describe('Market Intelligence persisted read-model pages', () => {
       },
     });
 
-    await visitAuthenticated(page, '/market-pulse');
+    // /market-pulse redirects to / (MarketOverviewPage, "Health" tab = MarketPulsePage).
+    await visitAuthenticated(page, '/');
 
     await expect(page.getByText('Fragile').first()).toBeVisible();
     await expect(page.getByText('Partial').first()).toBeVisible();
@@ -354,7 +385,8 @@ test.describe('Market Intelligence persisted read-model pages', () => {
     await expect(page.getByText('Backend warning is displayed verbatim.').first()).toBeVisible();
     await expect(page.getByText('Sector Intelligence')).toBeVisible();
     await expect(page.getByText('Energy').first()).toBeVisible();
-    await expect(page.getByText('POSITIVE_1M_RETURN')).toBeVisible();
+    // reasonTags pass through humanizeCode: POSITIVE_1M_RETURN → 'Positive 1M Return'
+    await expect(page.getByText('Positive 1M Return')).toBeVisible();
     await expect(page.getByText('+7.5%')).toBeVisible();
     await expectNoSharedMutationsOrOperatorControls(page, apiRequests);
   });
@@ -416,7 +448,12 @@ test.describe('Market Intelligence persisted read-model pages', () => {
       },
     });
 
-    await visitAuthenticated(page, '/stock-interest-radar');
+    // /stock-interest-radar redirects to /screener (DiscoverWorkspacePage); StockInterestRadarPage
+    // is in the "Stock Interest" tab — click it to reach the page under test.
+    await visitAuthenticated(page, '/screener');
+    // Wait for the Screener (first tab) to finish its initial render before switching tabs.
+    await page.waitForLoadState('networkidle');
+    await page.getByRole('tab', { name: 'Stock Interest' }).click();
 
     const rows = page.locator('tbody tr');
     await expect(rows.nth(0)).toContainText('LOWFIRST');
@@ -433,7 +470,8 @@ test.describe('Market Intelligence persisted read-model pages', () => {
     await expect(page.getByText('stale-stock-interest-row')).toHaveCount(0);
 
     await page.getByRole('tab', { name: 'Growth Consistency' }).click();
-    await expect(page.getByText('No Growth Consistency rows were present in the backend snapshot.')).toBeVisible();
+    // Empty tab shows: 'No Growth Consistency rows in saved data.' (RadarPage default empty message)
+    await expect(page.getByText('No Growth Consistency rows in saved data.').first()).toBeVisible();
     await expectNoSharedMutationsOrOperatorControls(page, apiRequests);
   });
 
@@ -765,25 +803,31 @@ test.describe('Market Intelligence persisted read-model pages', () => {
       },
     });
 
-    await visitAuthenticated(page, '/daily-review-shortlist');
+    // /daily-review-shortlist redirects to /today-review (TodayHomePage); DailyReviewShortlistPage
+    // is in the "Shortlist" tab — click it to reach the page under test.
+    await visitAuthenticated(page, '/today-review');
+    await page.getByRole('tab', { name: 'Shortlist' }).click();
 
     await expect(page.getByRole('heading', { name: 'Daily Review Shortlist' })).toBeVisible();
     await expect(page.getByText('3 / 10')).toBeVisible();
-    await expect(page.getByText('Active Ledger')).toBeVisible();
-    await expect(page.getByText('1 selected')).toBeVisible();
-    await expect(page.getByText('Today Review')).toBeVisible();
-    await expect(page.getByText('Stock Interest')).toBeVisible();
+    await expect(page.getByText('Active Ledger').first()).toBeVisible();
+    await expect(page.getByText('1 selected').first()).toBeVisible();
+    await expect(page.getByText('Today Review').first()).toBeVisible();
+    await expect(page.getByText('Stock Interest').first()).toBeVisible();
     const rows = page.locator('tbody tr');
     await expect(rows.nth(0)).toContainText('WARNROW');
     await expect(rows.nth(1)).toContainText('OMEGA');
     await expect(rows.nth(2)).toContainText('GAMMA');
-    await expect(page.getByText('Portfolio: Core Portfolio')).toBeVisible();
-    await expect(page.getByText('Watchlist: Breakout Watchlist')).toBeVisible();
-    await expect(page.getByText('Selected from persisted Today Review groups in source rank order.')).toBeVisible();
-    await expect(page.getByText('Selected from persisted Stock Interest backend order only after Today Review and active-risk rows.')).toBeVisible();
-    await expect(page.getByText('Normal active ledger row excluded from new-review shortlist.')).toBeVisible();
-    await expect(page.getByText('RISKROW')).toBeVisible();
-    await expect(page.getByText('BLOCKED')).toBeVisible();
+    // Portfolio / Watchlist overlay is inside each accordion — expand to verify associations.
+    await page.locator('.MuiAccordionSummary-root').filter({ hasText: 'OMEGA' }).click();
+    await expect(page.getByText('Portfolio: Core Portfolio').first()).toBeVisible();
+    await page.locator('.MuiAccordionSummary-root').filter({ hasText: 'GAMMA' }).click();
+    await expect(page.getByText('Watchlist: Breakout Watchlist').first()).toBeVisible();
+    await expect(page.getByText('Selected from persisted Today Review groups in source rank order.').first()).toBeVisible();
+    await expect(page.getByText('Selected from persisted Stock Interest backend order only after Today Review and active-risk rows.').first()).toBeVisible();
+    await expect(page.getByText('Normal active ledger row excluded from new-review shortlist.').first()).toBeVisible();
+    await expect(page.getByText('RISKROW').first()).toBeVisible();
+    await expect(page.getByText('BLOCKED').first()).toBeVisible();
     await expect(page.getByText('No fake rows are shown.')).toHaveCount(0);
     await expectNoSharedMutationsOrOperatorControls(page, apiRequests);
   });
@@ -831,20 +875,27 @@ test.describe('Market Intelligence persisted read-model pages', () => {
     await visitAuthenticated(page, '/earnings-intelligence');
 
     await expect(page.getByText('EARNEST')).toBeVisible();
-    await expect(page.getByText('Estimated From Period Cadence')).toBeVisible();
+    // Revenue growth and main-table data visible without expanding columns.
+    await expect(page.getByText('+12.5%')).toBeVisible();
+    await expect(page.getByText('Estimated result dates are not official calendar events.')).toBeVisible();
+
+    // Expand all columns to check date provenance, risk tags, and warnings.
+    await page.getByRole('button', { name: 'Show all columns' }).click();
+    // resultDateSource ESTIMATED_FROM_PERIOD_CADENCE → rendered as 'Awaiting official calendar'
+    await expect(page.getByText('Awaiting official calendar').first()).toBeVisible();
     await expect(page.getByText('3/31/2026')).toBeVisible();
     await expect(page.getByText('5/10/2026')).toBeVisible();
-    await expect(page.getByText('ESTIMATED_RESULT_DATE')).toBeVisible();
-    await expect(page.getByText('RESULT_DATE_ESTIMATED_FROM_PERIOD_CADENCE')).toBeVisible();
-    await expect(page.getByText('+12.5%')).toBeVisible();
+    // riskTags pass through humanizeCode: ESTIMATED_RESULT_DATE → 'Estimated Result Date'
+    await expect(page.getByText('Estimated Result Date').first()).toBeVisible();
+    // warnings pass through humanizeCode: RESULT_DATE_ESTIMATED_FROM_PERIOD_CADENCE → 'Result Date Estimated From Period Cadence'
+    await expect(page.getByText('Result Date Estimated From Period Cadence')).toBeVisible();
     await expect(page.getByText('-1.5%')).toBeVisible();
-    await expect(page.getByText('Estimated result dates are not official calendar events.')).toBeVisible();
 
     await page.getByRole('tab', { name: 'Earnings Watchlist' }).click();
     await expect(page.getByText('EARNEST')).toBeVisible();
 
     await page.getByRole('tab', { name: 'Result Winners' }).click();
-    await expect(page.getByText('No Result Winners rows were present in the backend snapshot.')).toBeVisible();
+    await expect(page.getByText('No Result Winners rows in saved data.')).toBeVisible();
     await expectNoSharedMutationsOrOperatorControls(page, apiRequests);
   });
 });

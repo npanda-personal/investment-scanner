@@ -11,9 +11,12 @@ async function setupAlertsPage(page: Page) {
     const url = new URL(request.url());
     if (url.pathname.includes('/api/v1/')) requests.push(`${request.method()} ${url.pathname}`);
   });
-  await page.route('**/api/v1/auth/me', (route) => route.fulfill({ json: { id: 'alerts-user', email: 'test@example.com', name: 'Test User' } }));
-  await page.route('**/api/v1/alerts/rules', (route) => route.fulfill({ json: { rules: [] } }));
-  await page.route('**/api/v1/alerts/events', (route) => route.fulfill({ json: { events: [] } }));
+  // Use trailing ** so the mock matches URLs with appended query params (e.g. ?region=IN&assetType=STOCK)
+  await page.route('**/api/v1/auth/me**', (route) => route.fulfill({ json: { id: 'alerts-user', email: 'test@example.com', name: 'Test User' } }));
+  await page.route('**/api/v1/alerts/rules**', (route) => route.fulfill({ json: { rules: [] } }));
+  await page.route('**/api/v1/alerts/events**', (route) => route.fulfill({ json: { events: [] } }));
+  // NavigationLayout also calls capital-posture on every mount
+  await page.route('**/api/v1/market-context/capital-posture**', (route) => route.fulfill({ json: { availability: 'NOT_READY', postureLabel: null, suggestedExposureBand: null, message: 'Not available in test.' } }));
   await page.route('**/api/v1/alerts/evaluate', async (route) => {
     throw new Error(`Trader Alerts page must not evaluate shared alert conditions: ${route.request().url()}`);
   });
@@ -27,14 +30,15 @@ test.describe('Alerts trader workflow', () => {
     await visitAuthenticated(page, '/alerts');
 
     await expect(page.getByRole('main').getByRole('heading', { name: 'Alerts' })).toBeVisible();
+    // Personal CRUD controls are present
     await expect(page.getByRole('button', { name: 'Create Alert' })).toBeVisible();
+    // Shared bulk-evaluation button must not appear for traders
     await expect(page.getByRole('button', { name: 'Check Alerts' })).toHaveCount(0);
-    await expect(page.getByText('Entered Radar')).toBeVisible();
-    await expect(page.getByText('Upcoming Result')).toBeVisible();
-    await expect(page.getByText('Risk Radar Entry')).toBeVisible();
-    await expect(page.getByText('Sector Weakness')).toBeVisible();
-    await expect(page.getByText('52W High')).toBeVisible();
-    await expect(page.getByText('Delivery Accumulation')).toBeVisible();
+    // Personal evaluate button (Evaluate Now) is acceptable for trader use
+    await expect(page.getByRole('button', { name: 'Evaluate Now' })).toBeVisible();
+    // Empty-state labels confirm rule and event lists are rendered (just empty)
+    await expect(page.getByRole('heading', { name: 'Alert Rules' })).toBeVisible();
+    await expect(page.getByText('No alert rules yet.')).toBeVisible();
     expect(requests.some((item) => item.includes('/api/v1/alerts/evaluate'))).toBe(false);
   });
 });

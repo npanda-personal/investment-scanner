@@ -8,19 +8,7 @@ import type {
 } from './market-data-foundation.types';
 
 type ScheduledDataQualityRunner = {
-  runScheduledDataQualityStage(input: {
-    region: string;
-    assetType: string;
-    timeframe: '1d';
-    pipelineKey: 'market-intelligence';
-    triggerType: 'scheduled';
-    dataThroughDate: string;
-    sourceFingerprint: string;
-    changedInstrumentIds: string[];
-    batchSize: number;
-    schedulerRunStartedAt: string;
-  }): Promise<unknown>;
-  runScheduledPipelineCatchUpFromMarketDataSummary?(summary: ScheduledRegionSyncSummary, now?: Date): Promise<unknown>;
+  runScheduledPipelineCatchUpFromMarketDataSummary(summary: ScheduledRegionSyncSummary, now?: Date): Promise<unknown>;
 };
 
 export interface MarketDataSchedulerConfig {
@@ -336,26 +324,7 @@ export class MarketDataFoundationScheduler {
   private async runDownstreamCatchUp(summary: ScheduledRegionSyncSummary, now: Date): Promise<unknown> {
     if (!this.shouldRunScheduledDataQuality(summary)) return null;
     const pipelineOrchestration = this.pipelineOrchestration || await this.createScheduledDataQualityRunner();
-    if (typeof pipelineOrchestration.runScheduledPipelineCatchUpFromMarketDataSummary === 'function') {
-      return pipelineOrchestration.runScheduledPipelineCatchUpFromMarketDataSummary(summary, now);
-    }
-    return pipelineOrchestration.runScheduledDataQualityStage({
-      region: summary.region,
-      assetType: summary.assetType,
-      timeframe: '1d',
-      pipelineKey: 'market-intelligence',
-      triggerType: 'scheduled',
-      dataThroughDate: summary.dataThroughDate || summary.tradingDate,
-      // Use the deterministic trading date as the catchup suffix instead of a
-      // timestamp so that restarts cannot mint fresh idempotency keys for an
-      // already-processed trading date.  The pipeline layer deduplicates on
-      // (sourceFingerprint, tradingDate); a `:catchup:<date>` suffix produces
-      // DUPLICATE_TERMINAL on re-run — safe and intentional.
-      sourceFingerprint: `${summary.sourceFingerprint}:catchup:${summary.dataThroughDate || summary.tradingDate}`,
-      changedInstrumentIds: summary.downstreamInstrumentIds?.length ? summary.downstreamInstrumentIds : summary.changedInstrumentIds || [],
-      batchSize: Math.max(1, Math.min(this.config.batchSize, 100)),
-      schedulerRunStartedAt: now.toISOString(),
-    });
+    return pipelineOrchestration.runScheduledPipelineCatchUpFromMarketDataSummary(summary, now);
   }
 
   private toScheduledRegionSyncSummary(value: unknown): ScheduledRegionSyncSummary | null {

@@ -3,8 +3,10 @@ import { expect, test, type Page } from '@playwright/test';
 async function mockAuthenticatedUser(page: Page) {
   await page.addInitScript(() => {
     window.localStorage.setItem('investment_scanner_auth_token', 'playwright-pipeline-ops-token');
+    window.localStorage.setItem('market_scope', JSON.stringify({ region: 'IN', assetType: 'STOCK' }));
   });
-  await page.route('**/api/v1/auth/me', async (route) => {
+  // Use trailing ** so the mock matches URLs with appended query params (e.g. ?region=IN&assetType=STOCK)
+  await page.route('**/api/v1/auth/me**', async (route) => {
     await route.fulfill({
       json: {
         id: 'playwright-pipeline-ops-user',
@@ -18,6 +20,13 @@ async function mockAuthenticatedUser(page: Page) {
   });
   await page.route('**/api/v1/auth/logout', async (route) => {
     await route.fulfill({ json: { success: true } });
+  });
+  // NavigationLayout fires these on every mount — mock to avoid real network calls.
+  await page.route('**/api/v1/alerts/events**', async (route) => {
+    await route.fulfill({ json: { events: [] } });
+  });
+  await page.route('**/api/v1/market-context/capital-posture**', async (route) => {
+    await route.fulfill({ json: { availability: 'NOT_READY', postureLabel: null, suggestedExposureBand: null, message: 'Not available in test.' } });
   });
 }
 
@@ -192,7 +201,12 @@ test.describe('Pipeline Ops UI', () => {
       });
     });
 
-    await page.route('**/api/v1/pipeline/commands', async (route) => {
+    await page.route('**/api/v1/pipeline/commands**', async (route) => {
+      // Only count POST requests; catalog GET requests are handled by the catalog mock above
+      if (route.request().method() !== 'POST') {
+        await route.fallback();
+        return;
+      }
       commandPostCount += 1;
       commandPayload = route.request().postDataJSON();
       await route.fulfill({
