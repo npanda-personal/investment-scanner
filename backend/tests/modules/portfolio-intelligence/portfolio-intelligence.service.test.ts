@@ -68,11 +68,15 @@ const allocation = (holdings: any[]) => ({
 /**
  * Mock repository: cache miss on findByPortfolioId + findComputedAt so the
  * service falls through to compute + persist on every intelligence() call.
+ * findLatestWatermarks returns [] by default (no watermarks = no watermark-driven staleness).
+ * bulkLatestSnapshots returns empty map by default (no snapshot rows).
  */
 const mockRepo = () => ({
   findByPortfolioId: jest.fn().mockResolvedValue(null),
   findComputedAt: jest.fn().mockResolvedValue(null),
   upsertSnapshot: jest.fn().mockResolvedValue(undefined),
+  findLatestWatermarks: jest.fn().mockResolvedValue([]),
+  bulkLatestSnapshots: jest.fn().mockResolvedValue(new Map()),
 });
 
 const serviceWith = (holdings: any[]) => new PortfolioIntelligenceService(
@@ -176,6 +180,8 @@ describe('PortfolioIntelligenceService', () => {
         findByPortfolioId: jest.fn().mockResolvedValue(freshSnapshot),
         findComputedAt: jest.fn().mockResolvedValue(computedAt),
         upsertSnapshot: jest.fn(),
+        findLatestWatermarks: jest.fn().mockResolvedValue([]),
+        bulkLatestSnapshots: jest.fn().mockResolvedValue(new Map()),
       };
       const portfolioDetail = { portfolio: { ...portfolio, updatedAt: portfolioUpdatedAt.toISOString() }, holdings: [] };
       const svc = new PortfolioIntelligenceService(
@@ -197,6 +203,8 @@ describe('PortfolioIntelligenceService', () => {
         findByPortfolioId: jest.fn().mockResolvedValue(freshSnapshot),
         findComputedAt: jest.fn().mockResolvedValue(computedAt),
         upsertSnapshot: jest.fn().mockResolvedValue(undefined),
+        findLatestWatermarks: jest.fn().mockResolvedValue([]),
+        bulkLatestSnapshots: jest.fn().mockResolvedValue(new Map()),
       };
       const h = [holding()];
       const portfolioDetail = { portfolio: { ...portfolio, updatedAt: portfolioUpdatedAt.toISOString() }, holdings: h };
@@ -220,6 +228,8 @@ describe('PortfolioIntelligenceService', () => {
         findByPortfolioId: jest.fn().mockResolvedValue(null),
         findComputedAt: jest.fn().mockResolvedValue(null),
         upsertSnapshot: jest.fn(),
+        findLatestWatermarks: jest.fn().mockResolvedValue([]),
+        bulkLatestSnapshots: jest.fn().mockResolvedValue(new Map()),
       };
       const svc = new PortfolioIntelligenceService(
         { summary: jest.fn(), allocation: jest.fn(), getPortfolioDetail: jest.fn().mockResolvedValue(null) } as any,
@@ -235,6 +245,8 @@ describe('PortfolioIntelligenceService', () => {
         findByPortfolioId: jest.fn().mockResolvedValue(null),
         findComputedAt: jest.fn().mockResolvedValue(null),
         upsertSnapshot: jest.fn().mockResolvedValue(undefined),
+        findLatestWatermarks: jest.fn().mockResolvedValue([]),
+        bulkLatestSnapshots: jest.fn().mockResolvedValue(new Map()),
       };
       const h = [holding()];
       const portfolioDetail = { portfolio, holdings: h };
@@ -251,6 +263,278 @@ describe('PortfolioIntelligenceService', () => {
 
       // Must have persisted the first snapshot
       expect(repo.upsertSnapshot).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // ── Watermark-driven staleness tests ──────────────────────────────────────
+
+  describe('watermark staleness guard', () => {
+    const freshSnapshot = { portfolioId: 'portfolio-1', healthScore: 80, status: 'HEALTHY' } as any;
+    const computedAt = new Date('2026-06-10T20:00:00.000Z');
+    const portfolioUpdatedAt = new Date('2026-06-09T00:00:00.000Z'); // holdings NOT changed after compute
+
+    it('triggers recompute when latest watermark assembledAt is NEWER than computedAt', async () => {
+      const newerWatermark = { region: 'US', assetType: 'EQUITY', assembledAt: new Date('2026-06-11T02:00:00.000Z') };
+      const repo = {
+        findByPortfolioId: jest.fn().mockResolvedValue(freshSnapshot),
+        findComputedAt: jest.fn().mockResolvedValue(computedAt),
+        upsertSnapshot: jest.fn().mockResolvedValue(undefined),
+        findLatestWatermarks: jest.fn().mockResolvedValue([newerWatermark]),
+        bulkLatestSnapshots: jest.fn().mockResolvedValue(new Map()),
+      };
+      const h = [holding({ country: 'US' })];
+      const portfolioDetail = { portfolio: { ...portfolio, updatedAt: portfolioUpdatedAt.toISOString() }, holdings: h };
+      const svc = new PortfolioIntelligenceService(
+        {
+          summary: jest.fn().mockResolvedValue(summary(h)),
+          allocation: jest.fn().mockResolvedValue(allocation(h)),
+          getPortfolioDetail: jest.fn().mockResolvedValue(portfolioDetail),
+        } as any,
+        undefined, undefined, repo as any,
+      );
+
+      await svc.intelligence('portfolio-1');
+
+      // Should have recomputed because the watermark assembledAt is newer
+      expect(repo.upsertSnapshot).toHaveBeenCalledTimes(1);
+      expect(repo.findLatestWatermarks).toHaveBeenCalledTimes(1);
+    });
+
+    it('serves cached snapshot when watermark assembledAt is OLDER than computedAt', async () => {
+      const olderWatermark = { region: 'US', assetType: 'EQUITY', assembledAt: new Date('2026-06-09T02:00:00.000Z') };
+      const repo = {
+        findByPortfolioId: jest.fn().mockResolvedValue(freshSnapshot),
+        findComputedAt: jest.fn().mockResolvedValue(computedAt),
+        upsertSnapshot: jest.fn(),
+        findLatestWatermarks: jest.fn().mockResolvedValue([olderWatermark]),
+        bulkLatestSnapshots: jest.fn().mockResolvedValue(new Map()),
+      };
+      const h = [holding({ country: 'US' })];
+      const portfolioDetail = { portfolio: { ...portfolio, updatedAt: portfolioUpdatedAt.toISOString() }, holdings: h };
+      const svc = new PortfolioIntelligenceService(
+        {
+          summary: jest.fn(),
+          allocation: jest.fn(),
+          getPortfolioDetail: jest.fn().mockResolvedValue(portfolioDetail),
+        } as any,
+        undefined, undefined, repo as any,
+      );
+
+      const result = await svc.intelligence('portfolio-1');
+
+      // Served from cache — no recompute
+      expect(result).toBe(freshSnapshot);
+      expect(repo.upsertSnapshot).not.toHaveBeenCalled();
+    });
+
+    it('skips watermark check and serves cached snapshot when there are no holdings', async () => {
+      const repo = {
+        findByPortfolioId: jest.fn().mockResolvedValue(freshSnapshot),
+        findComputedAt: jest.fn().mockResolvedValue(computedAt),
+        upsertSnapshot: jest.fn(),
+        findLatestWatermarks: jest.fn().mockResolvedValue([]),
+        bulkLatestSnapshots: jest.fn().mockResolvedValue(new Map()),
+      };
+      const portfolioDetail = { portfolio: { ...portfolio, updatedAt: portfolioUpdatedAt.toISOString() }, holdings: [] };
+      const svc = new PortfolioIntelligenceService(
+        { summary: jest.fn(), allocation: jest.fn(), getPortfolioDetail: jest.fn().mockResolvedValue(portfolioDetail) } as any,
+        undefined, undefined, repo as any,
+      );
+
+      const result = await svc.intelligence('portfolio-1');
+
+      // Watermark query should not have been made (no holdings to derive scopes from)
+      expect(repo.findLatestWatermarks).not.toHaveBeenCalled();
+      expect(result).toBe(freshSnapshot);
+    });
+
+    it('skips watermark check when PORTFOLIO_SNAPSHOT_READS=false', async () => {
+      const origEnv = process.env.PORTFOLIO_SNAPSHOT_READS;
+      process.env.PORTFOLIO_SNAPSHOT_READS = 'false';
+      try {
+        const newerWatermark = { region: 'US', assetType: 'EQUITY', assembledAt: new Date('2026-06-11T02:00:00.000Z') };
+        const repo = {
+          findByPortfolioId: jest.fn().mockResolvedValue(freshSnapshot),
+          findComputedAt: jest.fn().mockResolvedValue(computedAt),
+          upsertSnapshot: jest.fn(),
+          findLatestWatermarks: jest.fn().mockResolvedValue([newerWatermark]),
+          bulkLatestSnapshots: jest.fn().mockResolvedValue(new Map()),
+        };
+        const h = [holding({ country: 'US' })];
+        const portfolioDetail = { portfolio: { ...portfolio, updatedAt: portfolioUpdatedAt.toISOString() }, holdings: h };
+        const svc = new PortfolioIntelligenceService(
+          { summary: jest.fn(), allocation: jest.fn(), getPortfolioDetail: jest.fn().mockResolvedValue(portfolioDetail) } as any,
+          undefined, undefined, repo as any,
+        );
+
+        const result = await svc.intelligence('portfolio-1');
+
+        // Flag off: watermark check skipped, cached snapshot served
+        expect(repo.findLatestWatermarks).not.toHaveBeenCalled();
+        expect(repo.upsertSnapshot).not.toHaveBeenCalled();
+        expect(result).toBe(freshSnapshot);
+      } finally {
+        if (origEnv === undefined) delete process.env.PORTFOLIO_SNAPSHOT_READS;
+        else process.env.PORTFOLIO_SNAPSHOT_READS = origEnv;
+      }
+    });
+  });
+
+  // ── Snapshot-backed holding classification tests ──────────────────────────
+
+  describe('snapshot-backed holding classification', () => {
+    const okProvenance = {
+      eligibility: 'OK', signals: 'OK', calibration: 'OK', decision: 'OK',
+      tradePlan: 'OK', context: 'OK', derivatives: 'N_A', earnings: 'OK', smartMoney: 'OK',
+    };
+    const buildSnapshotRow = (overrides: any = {}) => ({
+      instrumentId: 'stock-1',
+      signalScore: overrides.signalScore ?? 78,
+      signalDirection: overrides.signalDirection ?? 'BULLISH',
+      calibratedScore: overrides.calibratedScore ?? 80,
+      calibrationAuthority: overrides.calibrationAuthority ?? 'HIGH',
+      strategyDecision: overrides.strategyDecision ?? 'TRADE_CANDIDATE',
+      rulesFired: overrides.rulesFired ?? [],
+      marketRegime: overrides.marketRegime ?? 'RISK_ON',
+      breadthPct: overrides.breadthPct ?? 0.65,
+      provenance: overrides.provenance ?? okProvenance,
+      assembledAt: overrides.assembledAt ?? new Date('2026-06-11T02:00:00.000Z'),
+    });
+
+    it('uses snapshot signal when signals provenance is OK', async () => {
+      const snapshotMap = new Map([['stock-1', buildSnapshotRow({ signalDirection: 'BEARISH', signalScore: 20 })]]);
+      const h = [holding({ instrumentId: 'stock-1', signal: { score: 82, direction: 'BULLISH', confidence: 'HIGH', generatedAt: new Date().toISOString() } })];
+      const repo = {
+        findByPortfolioId: jest.fn().mockResolvedValue(null),
+        findComputedAt: jest.fn().mockResolvedValue(null),
+        upsertSnapshot: jest.fn().mockResolvedValue(undefined),
+        findLatestWatermarks: jest.fn().mockResolvedValue([]),
+        bulkLatestSnapshots: jest.fn().mockResolvedValue(snapshotMap),
+      };
+      const svc = new PortfolioIntelligenceService(
+        {
+          summary: jest.fn().mockResolvedValue(summary(h)),
+          allocation: jest.fn().mockResolvedValue(allocation(h)),
+          getPortfolioDetail: jest.fn().mockResolvedValue({ portfolio, holdings: h }),
+        } as any,
+        undefined, undefined, repo as any,
+      );
+
+      const result = await svc.intelligence('portfolio-1');
+
+      // Signal from snapshot should be BEARISH (not the live BULLISH)
+      expect(result?.holdings[0].latestSignal?.direction).toBe('BEARISH');
+      expect(result?.holdings[0].latestSignal?.score).toBe(20);
+    });
+
+    it('falls back to live signal when signals provenance is FAILED', async () => {
+      const failedProvenance = { ...okProvenance, signals: 'FAILED' };
+      const snapshotMap = new Map([['stock-1', buildSnapshotRow({ signalDirection: 'BEARISH', signalScore: 20, provenance: failedProvenance })]]);
+      const h = [holding({ instrumentId: 'stock-1', signal: { score: 82, direction: 'BULLISH', confidence: 'HIGH', generatedAt: new Date().toISOString() } })];
+      const repo = {
+        findByPortfolioId: jest.fn().mockResolvedValue(null),
+        findComputedAt: jest.fn().mockResolvedValue(null),
+        upsertSnapshot: jest.fn().mockResolvedValue(undefined),
+        findLatestWatermarks: jest.fn().mockResolvedValue([]),
+        bulkLatestSnapshots: jest.fn().mockResolvedValue(snapshotMap),
+      };
+      const svc = new PortfolioIntelligenceService(
+        {
+          summary: jest.fn().mockResolvedValue(summary(h)),
+          allocation: jest.fn().mockResolvedValue(allocation(h)),
+          getPortfolioDetail: jest.fn().mockResolvedValue({ portfolio, holdings: h }),
+        } as any,
+        undefined, undefined, repo as any,
+      );
+
+      const result = await svc.intelligence('portfolio-1');
+
+      // Should fall back to live signal (BULLISH) when snapshot signals provenance is FAILED
+      expect(result?.holdings[0].latestSignal?.direction).toBe('BULLISH');
+    });
+
+    it('falls back to live signal when signals provenance is N_A', async () => {
+      const naProvenance = { ...okProvenance, signals: 'N_A' };
+      const snapshotMap = new Map([['stock-1', buildSnapshotRow({ signalDirection: 'BEARISH', provenance: naProvenance })]]);
+      const h = [holding({ instrumentId: 'stock-1', signal: { score: 82, direction: 'BULLISH', confidence: 'HIGH', generatedAt: new Date().toISOString() } })];
+      const repo = {
+        findByPortfolioId: jest.fn().mockResolvedValue(null),
+        findComputedAt: jest.fn().mockResolvedValue(null),
+        upsertSnapshot: jest.fn().mockResolvedValue(undefined),
+        findLatestWatermarks: jest.fn().mockResolvedValue([]),
+        bulkLatestSnapshots: jest.fn().mockResolvedValue(snapshotMap),
+      };
+      const svc = new PortfolioIntelligenceService(
+        {
+          summary: jest.fn().mockResolvedValue(summary(h)),
+          allocation: jest.fn().mockResolvedValue(allocation(h)),
+          getPortfolioDetail: jest.fn().mockResolvedValue({ portfolio, holdings: h }),
+        } as any,
+        undefined, undefined, repo as any,
+      );
+
+      const result = await svc.intelligence('portfolio-1');
+
+      expect(result?.holdings[0].latestSignal?.direction).toBe('BULLISH');
+    });
+
+    it('uses snapshot signal when signals provenance is STALE', async () => {
+      const staleProvenance = { ...okProvenance, signals: 'STALE' };
+      const snapshotMap = new Map([['stock-1', buildSnapshotRow({ signalDirection: 'NEUTRAL', provenance: staleProvenance })]]);
+      const h = [holding({ instrumentId: 'stock-1', signal: { score: 82, direction: 'BULLISH', confidence: 'HIGH', generatedAt: new Date().toISOString() } })];
+      const repo = {
+        findByPortfolioId: jest.fn().mockResolvedValue(null),
+        findComputedAt: jest.fn().mockResolvedValue(null),
+        upsertSnapshot: jest.fn().mockResolvedValue(undefined),
+        findLatestWatermarks: jest.fn().mockResolvedValue([]),
+        bulkLatestSnapshots: jest.fn().mockResolvedValue(snapshotMap),
+      };
+      const svc = new PortfolioIntelligenceService(
+        {
+          summary: jest.fn().mockResolvedValue(summary(h)),
+          allocation: jest.fn().mockResolvedValue(allocation(h)),
+          getPortfolioDetail: jest.fn().mockResolvedValue({ portfolio, holdings: h }),
+        } as any,
+        undefined, undefined, repo as any,
+      );
+
+      const result = await svc.intelligence('portfolio-1');
+
+      // STALE is usable
+      expect(result?.holdings[0].latestSignal?.direction).toBe('NEUTRAL');
+    });
+
+    it('skips snapshot reads when PORTFOLIO_SNAPSHOT_READS=false (legacy path)', async () => {
+      const origEnv = process.env.PORTFOLIO_SNAPSHOT_READS;
+      process.env.PORTFOLIO_SNAPSHOT_READS = 'false';
+      try {
+        const snapshotMap = new Map([['stock-1', buildSnapshotRow({ signalDirection: 'BEARISH', signalScore: 20 })]]);
+        const repo = {
+          findByPortfolioId: jest.fn().mockResolvedValue(null),
+          findComputedAt: jest.fn().mockResolvedValue(null),
+          upsertSnapshot: jest.fn().mockResolvedValue(undefined),
+          findLatestWatermarks: jest.fn().mockResolvedValue([]),
+          bulkLatestSnapshots: jest.fn().mockResolvedValue(snapshotMap),
+        };
+        const h = [holding({ instrumentId: 'stock-1', signal: { score: 82, direction: 'BULLISH', confidence: 'HIGH', generatedAt: new Date().toISOString() } })];
+        const svc = new PortfolioIntelligenceService(
+          {
+            summary: jest.fn().mockResolvedValue(summary(h)),
+            allocation: jest.fn().mockResolvedValue(allocation(h)),
+            getPortfolioDetail: jest.fn().mockResolvedValue({ portfolio, holdings: h }),
+          } as any,
+          undefined, undefined, repo as any,
+        );
+
+        const result = await svc.intelligence('portfolio-1');
+
+        // Flag off: bulkLatestSnapshots should not be called; live signal used
+        expect(repo.bulkLatestSnapshots).not.toHaveBeenCalled();
+        expect(result?.holdings[0].latestSignal?.direction).toBe('BULLISH');
+      } finally {
+        if (origEnv === undefined) delete process.env.PORTFOLIO_SNAPSHOT_READS;
+        else process.env.PORTFOLIO_SNAPSHOT_READS = origEnv;
+      }
     });
   });
 });

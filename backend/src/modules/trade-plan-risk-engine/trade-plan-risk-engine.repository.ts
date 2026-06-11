@@ -128,6 +128,46 @@ export class TradePlanRiskEngineRepository {
     return dto;
   }
 
+  /**
+   * Bulk latest framework-backed trade plan per instrument.
+   * Returns a Map<instrumentId, TradePlanResultDto> — missing instruments are absent from the map.
+   * One DB query for all instrumentIds; no per-instrument fallback (caller handles that).
+   */
+  async latestForInstruments(
+    instrumentIds: string[],
+    scope: { region?: string; assetType?: string } = {}
+  ): Promise<Map<string, TradePlanResultDto>> {
+    if (instrumentIds.length === 0) return new Map();
+    const where: Prisma.TradePlanResultWhereInput = {
+      instrumentId: { in: instrumentIds },
+    };
+    if (scope.region) where.region = scope.region;
+    if (scope.assetType) where.assetType = scope.assetType;
+    (where as any).strategyProofSnapshot = { path: ['frameworkBacked'], equals: true };
+
+    // Fetch latest per instrument (order by instrumentId + generatedAt desc, then distinct by instrumentId)
+    // Prisma does not support DISTINCT ON directly; use findMany ordered and dedupe in JS.
+    const records = await this.db.tradePlanResult.findMany({
+      where,
+      orderBy: [{ instrumentId: 'asc' }, { generatedAt: 'desc' }],
+    });
+
+    // Dedupe: keep first (latest) record per instrumentId
+    const latestByInstrument = new Map<string, any>();
+    for (const record of records) {
+      if (!latestByInstrument.has(record.instrumentId)) {
+        latestByInstrument.set(record.instrumentId, record);
+      }
+    }
+
+    const result = new Map<string, TradePlanResultDto>();
+    for (const [instrumentId, record] of latestByInstrument.entries()) {
+      const [dto] = await this.canonicalizeAndRepairRecords([record]);
+      result.set(instrumentId, dto);
+    }
+    return result;
+  }
+
   async list(query: TradePlanListQuery): Promise<{ results: TradePlanResultDto[]; total: number }> {
     const repairScope = this.buildListWhere(query, { includeCanonicalFilters: false });
     await this.repairCanonicalRowsInScope(repairScope);

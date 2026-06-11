@@ -11,8 +11,26 @@ import type {
   CopilotDependencies,
   CopilotSummaryResponse,
 } from './ai-investment-copilot.types';
+import { AiCopilotRepository } from './ai-investment-copilot.repository';
+import type { StockSnapshotRow } from './ai-investment-copilot.repository';
+import type { ProvenanceStatus } from '../snapshot-assembler/snapshot-assembler.types';
 
 const DISCLAIMER = 'For research support only, not financial advice.';
+
+/**
+ * Returns true when COPILOT_SNAPSHOT_READS is not explicitly disabled.
+ * Default ON — set to '0' or 'false' to fall back to full live fan-out.
+ */
+function copilotSnapshotReadsEnabled(): boolean {
+  const v = process.env.COPILOT_SNAPSHOT_READS;
+  if (v === '0' || v === 'false') return false;
+  return true;
+}
+
+/** True when a snapshot provenance status is usable (OK or STALE). */
+function isUsable(status: ProvenanceStatus | undefined): boolean {
+  return status === 'OK' || status === 'STALE';
+}
 
 export class AiInvestmentCopilotService {
   /**
@@ -43,7 +61,8 @@ export class AiInvestmentCopilotService {
       watchlistManagementService: new WatchlistManagementService(),
       alertsMonitoringService: new AlertsMonitoringService(),
       subscriptionService: new SubscriptionBillingService(),
-    }
+    },
+    private readonly snapshotRepository: AiCopilotRepository | null = new AiCopilotRepository(),
   ) {}
 
   /**
@@ -105,6 +124,29 @@ export class AiInvestmentCopilotService {
     const tradePlanSvc = this.resolveTradePlanService();
     const todayReviewSvc = this.resolveTodayReviewService();
 
+    // -- Snapshot-first: read the latest daily_instrument_snapshot for this instrument (one indexed query).
+    //    When COPILOT_SNAPSHOT_READS is enabled (default ON) and the snapshot row exists,
+    //    fields with OK or STALE provenance are sourced from the snapshot and the
+    //    corresponding live service is NOT called.
+    let snapshotRow: StockSnapshotRow | null = null;
+    if (copilotSnapshotReadsEnabled() && this.snapshotRepository !== null) {
+      snapshotRow = await this.safe(() => this.snapshotRepository!.latestSnapshotForInstrument(instrumentId));
+    }
+
+    const prov = snapshotRow?.provenance ?? null;
+
+    // Section coverage flags: true = snapshot has usable data for that section.
+    const snapHasSignal = snapshotRow !== null && isUsable(prov?.signals) &&
+      (snapshotRow.signalScore !== null || snapshotRow.signalDirection !== null);
+    const snapHasSmartMoney = snapshotRow !== null && isUsable(prov?.smartMoney) &&
+      snapshotRow.smartMoneyCode !== null;
+    const snapHasContext = snapshotRow !== null && isUsable(prov?.context) &&
+      snapshotRow.marketRegime !== null;
+    const snapHasDecision = snapshotRow !== null && isUsable(prov?.decision) &&
+      snapshotRow.strategyDecision !== null;
+    const snapHasTradePlan = snapshotRow !== null && isUsable(prov?.tradePlan) &&
+      snapshotRow.planStatus !== null;
+
     // -- Derive instrument region so context calls use the correct market --
     // Fetch the instrument record first (lightweight, from persisted catalog).
     // Falls back to IN when the instrument is not found or has no region.
@@ -117,23 +159,104 @@ export class AiInvestmentCopilotService {
       // If the lookup fails, retain IN default — do not block the summary.
     }
 
-    const [research, signal, smartMoney, marketContext, strategyDecision, tradePlan, todayRun] = await Promise.all([
+    // -- Fan-out: only call live services for sections the snapshot cannot provide.
+    const [research, signalLive, smartMoneyLive, marketContextLive, strategyDecisionLive, tradePlanLive, todayRun] = await Promise.all([
+      // Stock research workbench — not covered by snapshot (overview/performance/fundamentals).
       this.safe(() => this.dependencies.stockResearchService.workbench(instrumentId, '1Y')),
-      this.safe(() => this.dependencies.signalService.latestForInstrument(instrumentId)),
-      this.safe(() => this.dependencies.smartMoneyService.stock(instrumentId)),
-      // Pass the derived region so the market-context summary reflects the right market.
-      // IN is the default when region is absent/unknown.
-      this.safe(() => this.dependencies.marketContextService.summary({ region: instrumentRegion })),
-      strategyDecisionSvc
-        ? this.safe(() => strategyDecisionSvc.latestForInstrument(instrumentId))
-        : Promise.resolve(null),
-      tradePlanSvc
-        ? this.safe(() => tradePlanSvc.latestForInstrument(instrumentId))
-        : Promise.resolve(null),
+      // Signal: skip live call when snapshot covers it.
+      snapHasSignal
+        ? Promise.resolve(null)
+        : this.safe(() => this.dependencies.signalService.latestForInstrument(instrumentId)),
+      // Smart money: skip live call when snapshot covers it.
+      snapHasSmartMoney
+        ? Promise.resolve(null)
+        : this.safe(() => this.dependencies.smartMoneyService.stock(instrumentId)),
+      // Market context: skip live call when snapshot covers it.
+      snapHasContext
+        ? Promise.resolve(null)
+        : this.safe(() => this.dependencies.marketContextService.summary({ region: instrumentRegion })),
+      // Strategy decision: skip live call when snapshot covers it.
+      snapHasDecision
+        ? Promise.resolve(null)
+        : strategyDecisionSvc
+          ? this.safe(() => strategyDecisionSvc.latestForInstrument(instrumentId))
+          : Promise.resolve(null),
+      // Trade plan: skip live call when snapshot covers it.
+      snapHasTradePlan
+        ? Promise.resolve(null)
+        : tradePlanSvc
+          ? this.safe(() => tradePlanSvc.latestForInstrument(instrumentId))
+          : Promise.resolve(null),
+      // Today review: not covered by snapshot.
       todayReviewSvc
         ? this.safe(() => todayReviewSvc.latest())
         : Promise.resolve(null),
     ]);
+
+    // -- Merge: snapshot fields take priority when available; live result is fallback.
+
+    // Signal
+    const signal = snapHasSignal
+      ? {
+          score: snapshotRow!.signalScore ?? 0,
+          direction: snapshotRow!.signalDirection ?? 'NEUTRAL',
+          confidence: snapshotRow!.calibrationAuthority ?? 'UNKNOWN',
+        }
+      : signalLive;
+
+    // Smart money
+    const smartMoney = snapHasSmartMoney
+      ? {
+          smartMoneyScore: snapshotRow!.smartMoneyScore ?? 0,
+          status: snapshotRow!.smartMoneyCode ?? 'UNKNOWN',
+          dataStatus: 'SNAPSHOT',
+          insiderOwnership: { ownershipDataStatus: 'SNAPSHOT' },
+        }
+      : smartMoneyLive;
+
+    // Market context
+    const marketContext = snapHasContext
+      ? {
+          regime: { regime: snapshotRow!.marketRegime!, explanation: `Market regime sourced from snapshot assembled at ${snapshotRow!.assembledAt.toISOString()}.` },
+          breadth: { percentAboveSma50: snapshotRow!.breadthPct ?? null, advanceDeclineRatio: null },
+          topSectors: [],
+          weakSectors: [],
+          macro: { macroStatus: 'SNAPSHOT', dataStatus: 'SNAPSHOT' },
+        }
+      : marketContextLive;
+
+    // Strategy decision
+    let strategyDecision: any = null;
+    if (snapHasDecision) {
+      const snap = snapshotRow!;
+      strategyDecision = {
+        decision: snap.strategyDecision,
+        strategy: 'SNAPSHOT',
+        decisionScore: snap.calibratedScore ?? null,
+        confidence: snap.calibrationAuthority ?? 'UNKNOWN',
+        reasons: snap.rulesFired.slice(0, 5),
+        blockers: [],
+      };
+    } else {
+      strategyDecision = strategyDecisionLive;
+    }
+
+    // Trade plan
+    let tradePlan: any = null;
+    if (snapHasTradePlan) {
+      const snap = snapshotRow!;
+      tradePlan = {
+        planStatus: snap.planStatus,
+        riskGrade: 'SNAPSHOT',
+        entryZone: null,
+        stopLoss: snap.stopLoss !== null ? { price: Number(snap.stopLoss), method: 'SNAPSHOT' } : null,
+        target: snap.target !== null ? { price: Number(snap.target), method: 'SNAPSHOT' } : null,
+        rewardRiskRatio: snap.rrRatio ?? null,
+        blockers: [],
+      };
+    } else {
+      tradePlan = tradePlanLive;
+    }
 
     // -- Today-review: find this instrument in the latest run's candidates --
     const todayCandidate = (todayRun?.candidates ?? []).find(
@@ -298,9 +421,29 @@ export class AiInvestmentCopilotService {
         : null,
     };
 
-    const sourceModules: string[] = ['stock-research-workbench', 'signal-generation-engine', 'smart-money-intelligence', 'market-context-intelligence'];
-    if (strategyDecision) sourceModules.push('strategy-decision-engine');
-    if (tradePlan) sourceModules.push('trade-plan-risk-engine');
+    // sourceModules: when a section was served from the snapshot, note it.
+    const sourceModules: string[] = ['stock-research-workbench'];
+    if (snapHasSignal) {
+      sourceModules.push('daily-instrument-snapshot:signals');
+    } else {
+      sourceModules.push('signal-generation-engine');
+    }
+    if (snapHasSmartMoney) {
+      sourceModules.push('daily-instrument-snapshot:smart-money');
+    } else {
+      sourceModules.push('smart-money-intelligence');
+    }
+    if (snapHasContext) {
+      sourceModules.push('daily-instrument-snapshot:context');
+    } else {
+      sourceModules.push('market-context-intelligence');
+    }
+    if (strategyDecision) {
+      sourceModules.push(snapHasDecision ? 'daily-instrument-snapshot:decision' : 'strategy-decision-engine');
+    }
+    if (tradePlan) {
+      sourceModules.push(snapHasTradePlan ? 'daily-instrument-snapshot:trade-plan' : 'trade-plan-risk-engine');
+    }
     if (todayCandidate) sourceModules.push('today-trade-review');
 
     // -- Cross-module conflict detection --
@@ -311,6 +454,9 @@ export class AiInvestmentCopilotService {
       strategyDecisionAction: strategyDecision?.decision ?? null,
       marketRegime: marketContext?.regime?.regime ?? null,
     });
+
+    // -- Additive freshness field: surface snapshot assembledAt when available.
+    const snapshotAssembledAt: string | null = snapshotRow ? snapshotRow.assembledAt.toISOString() : null;
 
     return this.response({
       title: `${overview.symbol || 'Stock'} Copilot Summary`,
@@ -355,6 +501,7 @@ export class AiInvestmentCopilotService {
       sourceModules,
       dataStatus: gaps.length > 0 ? 'PARTIAL' : 'COMPLETE',
       pipelineExplanation,
+      snapshotAssembledAt,
     } as any);
   }
 

@@ -1627,6 +1627,282 @@ describe('TodayTradeReviewService', () => {
       expect(earningsWatchReason).toBeUndefined();
     }
   });
+
+  // ── Phase 3: N+1 bulk trade-plan fix ────────────────────────────────────────
+
+  it('Phase3-N+1: uses bulk latestForInstruments and does NOT call per-instrument latestForInstrument in a loop', async () => {
+    const perInstrumentLatest = jest.fn().mockRejectedValue(new Error('per-instrument call should not be made'));
+    const bulkTradePlanMap = new Map([
+      ['stock-1', tradePlan({ id: 'bulk-plan-1', instrumentId: 'stock-1', symbol: 'ALPHA.NS' })],
+    ]);
+    const bulkLatestForInstruments = jest.fn().mockResolvedValue(bulkTradePlanMap);
+
+    const service = new TodayTradeReviewService(new MemoryTodayReviewRepository(), services({
+      tradePlanService: {
+        latestForInstrument: perInstrumentLatest,
+        generatePlan: jest.fn().mockResolvedValue(tradePlan()),
+        latestForInstruments: bulkLatestForInstruments,
+      },
+    }), () => fixedNow);
+
+    const result = await service.run({ skipTradePlanGeneration: false });
+
+    // Bulk was called once with all entry instrument IDs
+    expect(bulkLatestForInstruments).toHaveBeenCalledWith(['stock-1'], { region: 'IN', assetType: 'STOCK' });
+    // Per-instrument was NOT called (bulk covered it)
+    expect(perInstrumentLatest).not.toHaveBeenCalled();
+    // Candidate still produced
+    expect(result.groups.longReview[0]?.instrumentId).toBe('stock-1');
+  });
+
+  it('Phase3-N+1: falls back to per-instrument load when bulk latestForInstruments is absent (legacy service)', async () => {
+    const perInstrumentLatest = jest.fn().mockResolvedValue(tradePlan());
+    const generatePlan = jest.fn().mockResolvedValue(tradePlan());
+
+    const service = new TodayTradeReviewService(new MemoryTodayReviewRepository(), services({
+      tradePlanService: {
+        // No latestForInstruments — legacy service shape
+        latestForInstrument: perInstrumentLatest,
+        generatePlan,
+      },
+    }), () => fixedNow);
+
+    await service.run({ skipTradePlanGeneration: false });
+
+    // Per-instrument path was used
+    expect(perInstrumentLatest).toHaveBeenCalledWith('stock-1', expect.anything(), undefined, { region: 'IN', assetType: 'STOCK' });
+  });
+
+  it('Phase3-N+1: falls back to generatePlan for instruments with no persisted plan in bulk result', async () => {
+    // Bulk succeeds but returns empty map (no plan for stock-1)
+    const emptyBulkMap = new Map<string, TradePlanResultDto>();
+    const bulkLatestForInstruments = jest.fn().mockResolvedValue(emptyBulkMap);
+    const generatePlan = jest.fn().mockResolvedValue(tradePlan({ id: 'generated-plan' }));
+
+    const service = new TodayTradeReviewService(new MemoryTodayReviewRepository(), services({
+      tradePlanService: {
+        latestForInstrument: jest.fn().mockRejectedValue(new Error('should not be called')),
+        generatePlan,
+        latestForInstruments: bulkLatestForInstruments,
+      },
+    }), () => fixedNow);
+
+    const result = await service.run({ skipTradePlanGeneration: false });
+
+    expect(bulkLatestForInstruments).toHaveBeenCalledWith(['stock-1'], { region: 'IN', assetType: 'STOCK' });
+    expect(generatePlan).toHaveBeenCalledWith(expect.objectContaining({ instrumentId: 'stock-1' }));
+    // Candidate still produced via fallback
+    expect(result.groups.longReview[0]?.instrumentId).toBe('stock-1');
+  });
+
+  it('Phase3-N+1: skipTradePlanGeneration skips generatePlan even when no bulk plan found', async () => {
+    const emptyBulkMap = new Map<string, TradePlanResultDto>();
+    const bulkLatestForInstruments = jest.fn().mockResolvedValue(emptyBulkMap);
+    const generatePlan = jest.fn().mockResolvedValue(tradePlan());
+
+    const service = new TodayTradeReviewService(new MemoryTodayReviewRepository(), services({
+      tradePlanService: {
+        latestForInstrument: jest.fn().mockRejectedValue(new Error('should not be called')),
+        generatePlan,
+        latestForInstruments: bulkLatestForInstruments,
+      },
+    }), () => fixedNow);
+
+    await service.run({ skipTradePlanGeneration: true });
+
+    expect(generatePlan).not.toHaveBeenCalled();
+  });
+
+  // ── Phase 3: Snapshot-first context fields ───────────────────────────────────
+
+  it('Phase3-Snapshot: uses snapshot smart-money when provenance is OK', async () => {
+    const snapshotProvenance = { eligibility: 'OK', signals: 'OK', calibration: 'OK', decision: 'OK', tradePlan: 'OK', context: 'OK', derivatives: 'N_A', earnings: 'OK', smartMoney: 'OK' };
+    const snapshotRow = {
+      instrumentId: 'stock-1',
+      tradingDate: fixedNow,
+      snapshotVersion: 1,
+      region: 'IN',
+      assetType: 'STOCK',
+      signalEligible: true,
+      reviewEligible: true,
+      backtestEligible: true,
+      calibrationEligible: true,
+      reviewReasons: [],
+      signalReasons: [],
+      readinessScore: 85,
+      readinessStatus: 'GOOD',
+      signalScore: 77,
+      signalDirection: 'BULLISH',
+      signalModelVersion: 'sig-v1',
+      calibratedScore: 80,
+      calibrationAuthority: 'cal-v1',
+      strategyDecision: 'TRADE_CANDIDATE',
+      rulesFired: [],
+      stopLoss: 95,
+      target: 112,
+      rrRatio: 2.4,
+      planStatus: 'VALID',
+      marketRegime: 'RISK_ON',
+      breadthPct: 0.7,
+      sectorRelativeStrength: 74,
+      oiBuildup: null,
+      participantPositioning: null,
+      earningsProximityDays: null,
+      smartMoneyCode: 'ACCUMULATION',
+      smartMoneyScore: 72,
+      provenance: snapshotProvenance,
+      assembledAt: new Date('2026-05-11T05:00:00.000Z'),
+    };
+    const snapshotMap = new Map([['stock-1', snapshotRow]]);
+
+    const livesmartMoneyFn = jest.fn().mockRejectedValue(new Error('live smart money should not be called'));
+    const service = new TodayTradeReviewService(new MemoryTodayReviewRepository(), services({
+      smartMoneyService: {
+        latestPersistedStock: livesmartMoneyFn,
+        // No bulk — forces per-instrument path (which should be overridden by snapshot)
+      },
+      snapshotReaderService: {
+        latestSnapshotsForInstruments: jest.fn().mockResolvedValue(snapshotMap),
+        latestWatermark: jest.fn().mockResolvedValue({ assembledAt: new Date('2026-05-11T05:00:00.000Z'), snapshotVersion: 1, rowCount: 1 }),
+      },
+    }), () => fixedNow);
+    delete process.env.TODAY_REVIEW_SNAPSHOT_READS;
+
+    const result = await service.run({ skipTradePlanGeneration: true });
+
+    // Smart money sourced from snapshot (provenance OK) — live should not have been called
+    expect(livesmartMoneyFn).not.toHaveBeenCalled();
+    // The candidate's sourceSignalSnapshot should reflect snapshot smart money
+    const candidate = result.groups.longReview[0];
+    expect(candidate).toBeDefined();
+    const smartMoney = (candidate?.sourceSignalSnapshot as any)?.smartMoney;
+    expect(smartMoney?.status).toBe('ACCUMULATION');
+    expect(smartMoney?.score).toBe(72);
+  });
+
+  it('Phase3-Snapshot: falls back to live source when smart money snapshot provenance is FAILED', async () => {
+    const snapshotProvenance = { eligibility: 'OK', signals: 'OK', calibration: 'OK', decision: 'OK', tradePlan: 'OK', context: 'OK', derivatives: 'N_A', earnings: 'OK', smartMoney: 'FAILED' };
+    const snapshotRow = {
+      instrumentId: 'stock-1',
+      tradingDate: fixedNow,
+      snapshotVersion: 1,
+      region: 'IN',
+      assetType: 'STOCK',
+      signalEligible: true,
+      reviewEligible: true,
+      backtestEligible: true,
+      calibrationEligible: true,
+      reviewReasons: [],
+      signalReasons: [],
+      readinessScore: 85,
+      readinessStatus: 'GOOD',
+      signalScore: null,
+      signalDirection: null,
+      signalModelVersion: null,
+      calibratedScore: null,
+      calibrationAuthority: null,
+      strategyDecision: null,
+      rulesFired: [],
+      stopLoss: null,
+      target: null,
+      rrRatio: null,
+      planStatus: null,
+      marketRegime: null,
+      breadthPct: null,
+      sectorRelativeStrength: null,
+      oiBuildup: null,
+      participantPositioning: null,
+      earningsProximityDays: null,
+      smartMoneyCode: null,   // FAILED — no value
+      smartMoneyScore: null,
+      provenance: snapshotProvenance,
+      assembledAt: new Date('2026-05-11T05:00:00.000Z'),
+    };
+    const snapshotMap = new Map([['stock-1', snapshotRow]]);
+
+    const liveSmartMoneySummary = {
+      instrumentId: 'stock-1', symbol: 'ALPHA.NS', companyName: 'Alpha Ltd', sector: 'Financial Services',
+      smartMoneyScore: 70, status: 'ACCUMULATION', confidence: 'MEDIUM', explanation: 'Live.',
+      updatedAt: fixedNow.toISOString(), dataStatus: 'COMPLETE', source: 'live', range: '3M',
+      latestClose: 100, latestVolume: 1000000, averageVolume20: 900000, dailyChangePercent: 1,
+      signals: [],
+      insiderOwnership: { insiderBuyCount: null, insiderSellCount: null, netInsiderActivity: null, institutionalOwnershipPercent: null, ownershipDataStatus: 'MISSING', source: 'live', explanation: 'Missing.' },
+      researchUrl: '/research/stocks/stock-1',
+    };
+
+    const liveSmartMoney = jest.fn().mockResolvedValue(liveSmartMoneySummary);
+    const service = new TodayTradeReviewService(new MemoryTodayReviewRepository(), services({
+      smartMoneyService: {
+        latestPersistedStock: liveSmartMoney,
+      },
+      snapshotReaderService: {
+        latestSnapshotsForInstruments: jest.fn().mockResolvedValue(snapshotMap),
+        latestWatermark: jest.fn().mockResolvedValue(null),
+      },
+    }), () => fixedNow);
+    delete process.env.TODAY_REVIEW_SNAPSHOT_READS;
+
+    const result = await service.run({ skipTradePlanGeneration: true });
+
+    // Provenance is FAILED → should fall back to live
+    expect(liveSmartMoney).toHaveBeenCalled();
+    const candidate = result.groups.longReview[0];
+    expect(candidate).toBeDefined();
+    const smartMoney = (candidate?.sourceSignalSnapshot as any)?.smartMoney;
+    expect(smartMoney?.status).toBe('ACCUMULATION');
+    expect(smartMoney?.score).toBe(70);
+  });
+
+  it('Phase3-Snapshot: TODAY_REVIEW_SNAPSHOT_READS=0 disables snapshot path and uses legacy sources', async () => {
+    const snapshotReader = jest.fn().mockResolvedValue(new Map());
+    const service = new TodayTradeReviewService(new MemoryTodayReviewRepository(), services({
+      snapshotReaderService: {
+        latestSnapshotsForInstruments: snapshotReader,
+        latestWatermark: jest.fn().mockResolvedValue({ assembledAt: new Date(), snapshotVersion: 1, rowCount: 1 }),
+      },
+    }), () => fixedNow);
+    process.env.TODAY_REVIEW_SNAPSHOT_READS = '0';
+
+    try {
+      const result = await service.run({ skipTradePlanGeneration: true });
+
+      // Snapshot reader should not have been called
+      expect(snapshotReader).not.toHaveBeenCalled();
+      // snapshotAssembledAt should be null
+      expect(result.snapshotAssembledAt).toBeNull();
+    } finally {
+      delete process.env.TODAY_REVIEW_SNAPSHOT_READS;
+    }
+  });
+
+  it('Phase3-Snapshot: surfaces snapshotAssembledAt from watermark in run response', async () => {
+    const assembledAt = new Date('2026-05-11T05:00:00.000Z');
+    const service = new TodayTradeReviewService(new MemoryTodayReviewRepository(), services({
+      snapshotReaderService: {
+        latestSnapshotsForInstruments: jest.fn().mockResolvedValue(new Map()),
+        latestWatermark: jest.fn().mockResolvedValue({ assembledAt, snapshotVersion: 1, rowCount: 42 }),
+      },
+    }), () => fixedNow);
+    delete process.env.TODAY_REVIEW_SNAPSHOT_READS;
+
+    const result = await service.run({ skipTradePlanGeneration: true });
+
+    expect(result.snapshotAssembledAt).toBe('2026-05-11T05:00:00.000Z');
+  });
+
+  it('Phase3-Snapshot: snapshotAssembledAt is null when no watermark exists', async () => {
+    const service = new TodayTradeReviewService(new MemoryTodayReviewRepository(), services({
+      snapshotReaderService: {
+        latestSnapshotsForInstruments: jest.fn().mockResolvedValue(new Map()),
+        latestWatermark: jest.fn().mockResolvedValue(null),
+      },
+    }), () => fixedNow);
+    delete process.env.TODAY_REVIEW_SNAPSHOT_READS;
+
+    const result = await service.run({ skipTradePlanGeneration: true });
+
+    expect(result.snapshotAssembledAt).toBeNull();
+  });
 });
 
 describe('priceBehaviour snapshot assembly (NR-11)', () => {

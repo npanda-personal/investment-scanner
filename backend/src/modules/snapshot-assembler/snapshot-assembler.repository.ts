@@ -284,6 +284,95 @@ export class SnapshotAssemblerRepository {
     }));
   }
 
+  // ── Reader bulk queries ────────────────────────────────────────────────────
+
+  /**
+   * Bulk latest-version daily_instrument_snapshot per instrument for a given tradingDate.
+   * Returns a Map<instrumentId, ComposedSnapshotRow>.
+   * Used by today-trade-review reader migrations to source context fields from the snapshot.
+   *
+   * Falls back to the latest available snapshot when no row exists for tradingDate
+   * (callers must check assembledAt / provenance to decide whether to use or fall back to live).
+   */
+  async latestSnapshotsForInstruments(
+    instrumentIds: string[],
+    tradingDate: Date,
+  ): Promise<Map<string, ComposedSnapshotRow>> {
+    if (instrumentIds.length === 0) return new Map();
+
+    // Use raw query for "latest version per instrument on this date" — one query.
+    const rows = await this.db.$queryRaw<Array<ComposedSnapshotRow & { provenance: any }>>(
+      Prisma.sql`
+        SELECT DISTINCT ON ("instrumentId")
+          "instrumentId",
+          "tradingDate",
+          "snapshotVersion",
+          region,
+          "assetType",
+          "signalEligible",
+          "reviewEligible",
+          "backtestEligible",
+          "calibrationEligible",
+          "reviewReasons",
+          "signalReasons",
+          "readinessScore",
+          "readinessStatus",
+          "signalScore",
+          "signalDirection",
+          "signalModelVersion",
+          "calibratedScore",
+          "calibrationAuthority",
+          "strategyDecision",
+          "rulesFired",
+          "stopLoss",
+          "target",
+          "rrRatio",
+          "planStatus",
+          "marketRegime",
+          "breadthPct",
+          "sectorRelativeStrength",
+          "oiBuildup",
+          "participantPositioning",
+          "earningsProximityDays",
+          "smartMoneyCode",
+          "smartMoneyScore",
+          provenance,
+          "assembledAt"
+        FROM daily_instrument_snapshot
+        WHERE "instrumentId" = ANY(${instrumentIds}::text[])
+          AND "tradingDate" = ${tradingDate}
+        ORDER BY "instrumentId", "snapshotVersion" DESC
+      `,
+    );
+
+    const result = new Map<string, ComposedSnapshotRow>();
+    for (const row of rows) {
+      result.set(row.instrumentId, {
+        ...row,
+        stopLoss: row.stopLoss !== null ? Number(row.stopLoss) : null,
+        target: row.target !== null ? Number(row.target) : null,
+        provenance: typeof row.provenance === 'string' ? JSON.parse(row.provenance) : row.provenance,
+      });
+    }
+    return result;
+  }
+
+  /**
+   * Fetch the latest SnapshotWatermark for (region, assetType, tradingDate).
+   * Returns null when no watermark exists.
+   */
+  async latestWatermark(
+    region: string,
+    assetType: string,
+    tradingDate: Date,
+  ): Promise<{ assembledAt: Date; snapshotVersion: number; rowCount: number } | null> {
+    const row = await this.db.snapshotWatermark.findUnique({
+      where: { region_assetType_tradingDate: { region, assetType, tradingDate } },
+      select: { assembledAt: true, snapshotVersion: true, rowCount: true },
+    });
+    return row ?? null;
+  }
+
   // ── Versioning ──────────────────────────────────────────────────────────────
 
   /**

@@ -307,6 +307,13 @@ export interface TodayReviewRunResponse {
   };
   /** Capital Posture / regime context for this review session. Present when posture data is available. */
   marketPosture?: TodayReviewMarketPosture | null;
+  /**
+   * ISO-8601 assembledAt timestamp from the latest SnapshotWatermark for the run's tradingDate.
+   * Present when snapshot reads are enabled (TODAY_REVIEW_SNAPSHOT_READS != '0'/'false') and
+   * a watermark exists. Null when snapshot reads are disabled or no watermark is available.
+   * Used by UI freshness chips to show "snapshot as of <time>".
+   */
+  snapshotAssembledAt?: string | null;
 }
 
 export interface TodayReviewRunHistoryResponse {
@@ -367,6 +374,12 @@ export interface TodayReviewUpstreamServices {
   tradePlanService: {
     latestForInstrument(instrumentId: string, strategy?: string, portfolioId?: string, scope?: { region?: string; assetType?: string }): Promise<TradePlanResultDto | null>;
     generatePlan(request: { instrumentId: string; symbol: string; strategyDecisionId?: string; region?: string; assetType?: string }): Promise<TradePlanResultDto>;
+    /**
+     * Bulk latest framework-backed trade plan per instrument.
+     * Optional — when present, today-review uses it to eliminate the per-instrument N+1 loop.
+     * Returns a Map<instrumentId, TradePlanResultDto>.
+     */
+    latestForInstruments?(instrumentIds: string[], scope?: { region?: string; assetType?: string }): Promise<Map<string, TradePlanResultDto>>;
   };
   marketDataService: {
     latestStoredCandleInfo(region: string, assetType?: string, now?: Date): Promise<Record<string, unknown>>;
@@ -403,6 +416,16 @@ export interface TodayReviewUpstreamServices {
    */
   earningsService?: {
     latestProximityBySymbol(region: string, assetType: string): Promise<Map<string, TodayReviewEarningsProximity>>;
+  } | null;
+  /**
+   * Optional snapshot reader service for snapshot-first context sourcing.
+   * When present and TODAY_REVIEW_SNAPSHOT_READS env flag is ON (default),
+   * today-review reads context fields (earnings proximity, smart money, market regime,
+   * breadth, OI buildup) from daily_instrument_snapshot when provenance is OK or STALE.
+   */
+  snapshotReaderService?: {
+    latestSnapshotsForInstruments(instrumentIds: string[], tradingDate: Date): Promise<Map<string, import('../snapshot-assembler').ComposedSnapshotRow>>;
+    latestWatermark(region: string, assetType: string, tradingDate: Date): Promise<{ assembledAt: Date; snapshotVersion: number; rowCount: number } | null>;
   } | null;
 }
 

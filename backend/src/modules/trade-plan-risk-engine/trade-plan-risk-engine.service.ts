@@ -966,6 +966,20 @@ export class TradePlanRiskEngineService {
      return plan ? this.withSinglePlanProofChain(plan) : null;
   }
 
+  /**
+   * Bulk latest framework-backed trade plan per instrument.
+   * Returns a Map<instrumentId, TradePlanResultDto>; absent entries mean no persisted plan.
+   * Additive — used by today-trade-review to eliminate the N+1 per-instrument loop.
+   */
+  async latestForInstruments(instrumentIds: string[], scope: { region?: string; assetType?: string } = {}): Promise<Map<string, TradePlanResultDto>> {
+    const planMap = await this.repository.latestForInstruments(instrumentIds, scope);
+    const result = new Map<string, TradePlanResultDto>();
+    for (const [instrumentId, plan] of planMap.entries()) {
+      result.set(instrumentId, this.withSinglePlanProofChain(plan));
+    }
+    return result;
+  }
+
   async list(query: TradePlanListQuery) {
      const result = await this.repository.list(query);
      return {

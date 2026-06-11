@@ -10,6 +10,8 @@ import { SmartMoneyIntelligenceService } from '../smart-money-intelligence';
 import { getLatestOiBuildup, type OiBuildupRow } from '../derivatives-intelligence/derivatives-intelligence.oi-buildup.service';
 import { StrategyDecisionEngineService, type StrategyDecisionDto } from '../strategy-decision-engine';
 import { TradePlanRiskEngineService, type TradePlanResultDto } from '../trade-plan-risk-engine';
+import { SnapshotAssemblerRepository } from '../snapshot-assembler';
+import type { ComposedSnapshotRow, ProvenanceStatus } from '../snapshot-assembler';
 import { TodayTradeReviewRepository } from './today-trade-review.repository';
 import type {
   TodayReviewBoardSection,
@@ -108,6 +110,7 @@ export class TodayTradeReviewService {
       calibrationService: new SignalCalibrationEngineService(),
       smartMoneyService: new SmartMoneyIntelligenceService(),
       earningsService: new EarningsIntelligenceService(),
+      snapshotReaderService: new SnapshotAssemblerRepository(),
     },
     private readonly clock: () => Date = () => new Date(),
     /**
@@ -170,7 +173,9 @@ export class TodayTradeReviewService {
         sourceSnapshot,
         candidates,
       });
-      return this.toRunResponse(completed, scope, marketPosture);
+      // Load snapshot watermark (additive — never blocks the run)
+      const snapshotAssembledAt = await this.loadSnapshotAssembledAt(scope, runDate);
+      return this.toRunResponse(completed, scope, marketPosture, snapshotAssembledAt);
     } catch (error: any) {
       warnings.push(`Today review run failed: ${error?.message || 'unknown error'}`);
       const failed = await this.repository.completeRun({
@@ -193,7 +198,10 @@ export class TodayTradeReviewService {
       this.repository.latest(scope.region, scope.assetType, { enrich: query.enrich }),
       this.loadMarketPosture(scope.region),
     ]);
-    return this.toRunResponse(run, scope, marketPosture);
+    // For latest read, use the run's date to look up the watermark.
+    const runDate = run?.runDate ? this.utcDay(new Date(run.runDate)) : this.utcDay(this.clock());
+    const snapshotAssembledAt = await this.loadSnapshotAssembledAt(scope, runDate);
+    return this.toRunResponse(run, scope, marketPosture, snapshotAssembledAt);
   }
 
   async runs(query: TodayReviewQuery = {}): Promise<TodayReviewRunHistoryResponse> {
@@ -559,7 +567,19 @@ export class TodayTradeReviewService {
     const hasBulkCalibration = typeof this.services.calibrationService.latestPersistedForInstruments === 'function';
     const hasBulkSmartMoney = typeof this.services.smartMoneyService.latestPersistedStocks === 'function';
     const hasGetEligibility = typeof this.services.dataQualityService.getEligibility === 'function';
-    const [dataQualityRows, eligibilityRows, rawSignalRows, calibrationRows, smartMoneyRows] = await Promise.all([
+    const hasBulkTradePlans = typeof this.services.tradePlanService.latestForInstruments === 'function';
+
+    // Determine snapshot-reads flag: ON by default, disabled by TODAY_REVIEW_SNAPSHOT_READS=0 or =false
+    const snapshotReadsEnabled = this.isSnapshotReadsEnabled();
+    const hasSnapshotReader = snapshotReadsEnabled && typeof this.services.snapshotReaderService?.latestSnapshotsForInstruments === 'function';
+
+    // Snapshot-first: resolve the run's trading date from the market data context
+    // Use the clock's UTC day as a best-effort tradingDate for the snapshot query
+    const snapshotTradingDate = this.utcDay(this.clock());
+
+    // Bulk loads — all in parallel
+    const entryInstrumentIds = decisions.filter((item) => item.sourceKind === 'ENTRY').map(({ decision }) => decision.instrumentId!).filter(Boolean);
+    const [dataQualityRows, eligibilityRows, rawSignalRows, calibrationRows, smartMoneyRows, bulkTradePlanMap, snapshotMap] = await Promise.all([
       this.safe(() => this.services.dataQualityService.getEvaluationsForInstruments(instrumentIds), 'Data quality snapshots are unavailable.', warnings),
       hasGetEligibility
         ? this.safe(() => this.services.dataQualityService.getEligibility!(instrumentIds), 'Instrument eligibility rows are unavailable.', warnings)
@@ -573,30 +593,84 @@ export class TodayTradeReviewService {
       hasBulkSmartMoney
         ? this.safe(() => this.services.smartMoneyService.latestPersistedStocks!(instrumentIds, '3M'), 'Smart-money snapshots are unavailable.', warnings)
         : Promise.resolve(null),
+      // BULK trade plan read: replaces per-instrument N+1 loop for entry decisions
+      hasBulkTradePlans && entryInstrumentIds.length > 0
+        ? this.safe(() => this.services.tradePlanService.latestForInstruments!(entryInstrumentIds, scope), 'Bulk trade plan read is unavailable; falling back to per-instrument load.', warnings)
+        : Promise.resolve(null),
+      // Snapshot-first reads
+      hasSnapshotReader && instrumentIds.length > 0
+        ? this.safe(() => this.services.snapshotReaderService!.latestSnapshotsForInstruments!(instrumentIds, snapshotTradingDate), 'Daily instrument snapshot read is unavailable.', warnings)
+        : Promise.resolve(null),
     ]);
     const dataQualityByInstrument = new Map((dataQualityRows || []).map((evaluation) => [evaluation.instrumentId, evaluation]));
     const eligibilityByInstrument = new Map((eligibilityRows || []).map((row) => [row.instrumentId, row]));
     const rawSignalByInstrument = new Map((rawSignalRows || []).map((signal) => [signal.instrument_id, signal]));
     const calibrationByInstrument = new Map((calibrationRows || []).map((calibration) => [calibration.instrumentId, calibration]));
     const smartMoneyByInstrument = new Map((smartMoneyRows || []).map((summary) => [summary.instrumentId, summary]));
+    // bulkTradePlanMap is Map<instrumentId, TradePlanResultDto> | null (null = bulk failed or unavailable)
+    const persistedTradePlanByInstrument: Map<string, TradePlanResultDto> = bulkTradePlanMap ?? new Map();
+    // snapshotMap is Map<instrumentId, ComposedSnapshotRow> | null
+    const snapshotByInstrument: Map<string, ComposedSnapshotRow> = (snapshotMap as Map<string, ComposedSnapshotRow> | null) ?? new Map();
 
     const result: TodayReviewCandidateSource[] = [];
     for (const item of decisions) {
       const instrumentId = item.decision.instrumentId!;
+      const snapshot = snapshotByInstrument.get(instrumentId) ?? null;
+
+      // --- Snapshot-first: smart money ---
+      const snapshotSmartMoneyProvenance: ProvenanceStatus | null = snapshot?.provenance?.smartMoney ?? null;
+      const useSnapshotSmartMoney = snapshotReadsEnabled && snapshot !== null && (snapshotSmartMoneyProvenance === 'OK' || snapshotSmartMoneyProvenance === 'STALE') && snapshot.smartMoneyCode !== null;
+
+      // --- Trade plan: use bulk result if available, else fall back to per-instrument load ---
+      let tradePlanPromise: Promise<TradePlanResultDto | null>;
+      if (item.sourceKind !== 'ENTRY') {
+        tradePlanPromise = Promise.resolve(null);
+      } else if (hasBulkTradePlans && bulkTradePlanMap !== null) {
+        // Bulk succeeded: use map result directly (null = no plan for this instrument)
+        const persistedPlan = persistedTradePlanByInstrument.get(instrumentId) ?? null;
+        if (persistedPlan) {
+          tradePlanPromise = Promise.resolve(persistedPlan);
+        } else if (skipTradePlanGeneration) {
+          warnings.push(`${item.decision.symbol} persisted legacy risk snapshot is unavailable; scheduler publication skipped compatibility snapshot generation.`);
+          tradePlanPromise = Promise.resolve(null);
+        } else {
+          // No persisted plan in bulk result → fall back to generatePlan
+          tradePlanPromise = this.safe(
+            () => this.services.tradePlanService.generatePlan({
+              instrumentId: item.decision.instrumentId!,
+              symbol: item.decision.symbol!,
+              strategyDecisionId: item.decision.id,
+              region: scope.region,
+              assetType: scope.assetType,
+            }),
+            `${item.decision.symbol} exit/invalidation evidence snapshot could not be generated.`,
+            warnings
+          );
+        }
+      } else {
+        // Bulk unavailable → fall back to per-instrument load (original behavior)
+        tradePlanPromise = this.loadTradePlan(item.decision, scope, warnings, skipTradePlanGeneration);
+      }
+
+      // Determine smart money source: snapshot (when provenance OK/STALE) skips the live call entirely.
+      const smartMoneyPromise: Promise<import('../smart-money-intelligence').SmartMoneyStockSummary | null> =
+        useSnapshotSmartMoney
+          ? Promise.resolve(this.snapshotSmartMoneyToSummary(snapshot!, instrumentId, item.decision.symbol))
+          : hasBulkSmartMoney
+            ? Promise.resolve(smartMoneyByInstrument.get(instrumentId) || null)
+            : this.safe(() => this.services.smartMoneyService.latestPersistedStock(instrumentId, '3M'), `${item.decision.symbol} smart-money support is unavailable.`, warnings);
+
       const [tradePlan, rawSignal, calibration, smartMoney] = await Promise.all([
-        item.sourceKind === 'ENTRY'
-          ? this.loadTradePlan(item.decision, scope, warnings, skipTradePlanGeneration)
-          : Promise.resolve(null),
+        tradePlanPromise,
         hasBulkRawSignals
           ? Promise.resolve(rawSignalByInstrument.get(instrumentId) || null)
           : this.safe(() => this.services.signalService.latestForInstrument(instrumentId), `${item.decision.symbol} raw signal support is unavailable.`, warnings),
         hasBulkCalibration
           ? Promise.resolve(calibrationByInstrument.get(instrumentId) || null)
           : this.safe(() => this.services.calibrationService.latestPersistedForInstrument(instrumentId), `${item.decision.symbol} calibration support is unavailable.`, warnings),
-        hasBulkSmartMoney
-          ? Promise.resolve(smartMoneyByInstrument.get(instrumentId) || null)
-          : this.safe(() => this.services.smartMoneyService.latestPersistedStock(instrumentId, '3M'), `${item.decision.symbol} smart-money support is unavailable.`, warnings),
+        smartMoneyPromise,
       ]);
+
       const derivativesEligible = derivativesEligibleById.get(instrumentId)
         ?? derivativesEligibleBySymbol.get(item.decision.symbol || '')
         ?? null;
@@ -615,6 +689,59 @@ export class TodayTradeReviewService {
       });
     }
     return result;
+  }
+
+  /**
+   * Whether snapshot reads are enabled (TODAY_REVIEW_SNAPSHOT_READS env flag).
+   * Defaults to enabled; set to '0' or 'false' to disable → pure legacy path.
+   */
+  private isSnapshotReadsEnabled(): boolean {
+    const flag = process.env.TODAY_REVIEW_SNAPSHOT_READS;
+    if (flag === '0' || flag === 'false') return false;
+    return true;
+  }
+
+  /**
+   * Convert a ComposedSnapshotRow smart-money fields into a SmartMoneyStockSummary-compatible shape
+   * for the candidate source (best-effort — only carries the fields used by today-review scoring).
+   */
+  private snapshotSmartMoneyToSummary(snapshot: ComposedSnapshotRow, instrumentId: string, symbol?: string | null): import('../smart-money-intelligence').SmartMoneyStockSummary {
+    return {
+      instrumentId,
+      symbol: symbol || instrumentId,
+      companyName: null,
+      sector: null,
+      smartMoneyScore: snapshot.smartMoneyScore ?? 0,
+      status: (snapshot.smartMoneyCode as any) ?? 'NEUTRAL',
+      confidence: 'MEDIUM',
+      explanation: 'From daily_instrument_snapshot (snapshot-first).',
+      updatedAt: snapshot.assembledAt.toISOString(),
+      dataStatus: 'COMPLETE',
+      source: 'snapshot',
+      range: '3M',
+      latestClose: null,
+      latestVolume: null,
+      averageVolume20: null,
+      dailyChangePercent: null,
+      signals: [],
+      insiderOwnership: { insiderBuyCount: null, insiderSellCount: null, netInsiderActivity: null, institutionalOwnershipPercent: null, ownershipDataStatus: 'MISSING', source: 'snapshot', explanation: 'Snapshot-first.' },
+      researchUrl: `/research/stocks/${instrumentId}`,
+    } as any;
+  }
+
+  /**
+   * Load the snapshot watermark's assembledAt for the run's trading date.
+   * Returns null on any error — never blocks the run.
+   */
+  private async loadSnapshotAssembledAt(scope: { region: string; assetType: string }, tradingDate: Date): Promise<string | null> {
+    if (!this.isSnapshotReadsEnabled()) return null;
+    if (typeof this.services.snapshotReaderService?.latestWatermark !== 'function') return null;
+    try {
+      const watermark = await this.services.snapshotReaderService.latestWatermark(scope.region, scope.assetType, tradingDate);
+      return watermark?.assembledAt?.toISOString() ?? null;
+    } catch {
+      return null;
+    }
   }
 
   private async loadTradePlan(decision: StrategyDecisionDto, scope: { region: string; assetType: string }, warnings: string[], skipGeneration = false) {
@@ -1885,12 +2012,13 @@ export class TodayTradeReviewService {
     }, {});
   }
 
-  private toRunResponse(run: TodayReviewRunDto | null, scope: { region: string; assetType: string }, marketPosture?: TodayReviewMarketPosture | null): TodayReviewRunResponse {
+  private toRunResponse(run: TodayReviewRunDto | null, scope: { region: string; assetType: string }, marketPosture?: TodayReviewMarketPosture | null, snapshotAssembledAt?: string | null): TodayReviewRunResponse {
     return {
       run,
       groups: this.groupCandidates(run?.candidates || []),
       scope,
       marketPosture: marketPosture ?? null,
+      snapshotAssembledAt: snapshotAssembledAt ?? null,
     };
   }
 

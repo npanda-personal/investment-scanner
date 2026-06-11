@@ -12,7 +12,7 @@ const createServiceWithBilling = (subscriptionService: any, overrides: any = {})
   alertsMonitoringService: { listEvents: jest.fn().mockResolvedValue([]) },
   subscriptionService,
   ...overrides,
-});
+}, null /* snapshotRepository: disabled in billing tests */);
 
 const createService = (overrides: any = {}) => new AiInvestmentCopilotService({
   stockResearchService: {
@@ -89,7 +89,11 @@ const createService = (overrides: any = {}) => new AiInvestmentCopilotService({
   todayReviewService: overrides.todayReviewService !== undefined
     ? overrides.todayReviewService
     : null,
-});
+},
+// snapshotRepository: null disables snapshot-first reads in existing tests
+// so behaviour is identical to pre-Phase-3 (live fan-out always).
+overrides.snapshotRepository !== undefined ? overrides.snapshotRepository : null,
+);
 
 describe('AiInvestmentCopilotService', () => {
   it('generates stock summary from structured module data', async () => {
@@ -617,5 +621,177 @@ describe('AiInvestmentCopilotService.detectConflicts (CB-27 cross-module conflic
   it('returns no conflicts when aligned', () => {
     const c = svc.detectConflicts({ symbol: 'HDFCBANK', signalDirection: 'BULLISH', todayCandidateState: 'LONG_REVIEW', strategyDecisionAction: 'ENTRY_CANDIDATE', marketRegime: 'RISK_ON' });
     expect(c).toEqual([]);
+  });
+});
+
+// ── Phase 3: snapshot-first stockSummary tests ────────────────────────────────
+
+describe('AiInvestmentCopilotService — snapshot-first stockSummary', () => {
+  const okProvenance = {
+    eligibility: 'OK', signals: 'OK', calibration: 'OK', decision: 'OK',
+    tradePlan: 'OK', context: 'OK', derivatives: 'N_A', earnings: 'OK', smartMoney: 'OK',
+  };
+
+  const buildSnapshot = (overrides: any = {}) => ({
+    instrumentId: 'stock-1',
+    tradingDate: new Date('2026-06-11'),
+    signalScore: overrides.signalScore ?? 78,
+    signalDirection: overrides.signalDirection ?? 'BULLISH',
+    signalModelVersion: 'v1',
+    calibratedScore: overrides.calibratedScore ?? 80,
+    calibrationAuthority: 'HIGH',
+    strategyDecision: overrides.strategyDecision ?? 'TRADE_CANDIDATE',
+    rulesFired: overrides.rulesFired ?? ['Rule A fired.'],
+    stopLoss: overrides.stopLoss ?? '462.50',
+    target: overrides.target ?? '540.00',
+    rrRatio: overrides.rrRatio ?? 2.12,
+    planStatus: overrides.planStatus ?? 'VALID',
+    marketRegime: overrides.marketRegime ?? 'RISK_ON',
+    breadthPct: overrides.breadthPct ?? 0.65,
+    earningsProximityDays: overrides.earningsProximityDays ?? 14,
+    smartMoneyCode: overrides.smartMoneyCode ?? 'ACCUMULATION',
+    smartMoneyScore: overrides.smartMoneyScore ?? 76,
+    provenance: overrides.provenance ?? okProvenance,
+    assembledAt: overrides.assembledAt ?? new Date('2026-06-11T02:00:00.000Z'),
+  });
+
+  it('uses snapshot signal and does NOT call signalService when signals provenance is OK', async () => {
+    const signalSvc = { latestForInstrument: jest.fn() };
+    const snapshotRepo = { latestSnapshotForInstrument: jest.fn().mockResolvedValue(buildSnapshot({ signalDirection: 'BEARISH', signalScore: 25 })) };
+
+    const result = await createService({
+      signalService: signalSvc,
+      snapshotRepository: snapshotRepo,
+    }).stockSummary('stock-1');
+
+    expect(signalSvc.latestForInstrument).not.toHaveBeenCalled();
+    expect(result.bullishFactors.join(' ') + result.bearishFactors.join(' ')).toContain('bearish');
+  });
+
+  it('uses snapshot smartMoney and does NOT call smartMoneyService.stock when smartMoney provenance is OK', async () => {
+    const smartMoneySvc = { stock: jest.fn(), sectors: jest.fn().mockResolvedValue([]) };
+    const snapshotRepo = { latestSnapshotForInstrument: jest.fn().mockResolvedValue(buildSnapshot({ smartMoneyCode: 'ACCUMULATION' })) };
+
+    await createService({
+      smartMoneyService: smartMoneySvc,
+      snapshotRepository: snapshotRepo,
+    }).stockSummary('stock-1');
+
+    expect(smartMoneySvc.stock).not.toHaveBeenCalled();
+  });
+
+  it('uses snapshot context and does NOT call marketContextService when context provenance is OK', async () => {
+    const mktCtxSvc = { summary: jest.fn() };
+    const snapshotRepo = { latestSnapshotForInstrument: jest.fn().mockResolvedValue(buildSnapshot({ marketRegime: 'RISK_ON' })) };
+
+    const result = await createService({
+      marketContextService: mktCtxSvc,
+      snapshotRepository: snapshotRepo,
+    }).stockSummary('stock-1');
+
+    expect(mktCtxSvc.summary).not.toHaveBeenCalled();
+    expect(result.keyTakeaways.join(' ')).toContain('RISK_ON');
+  });
+
+  it('surfaces snapshotAssembledAt in the response payload', async () => {
+    const assembledAt = new Date('2026-06-11T02:30:00.000Z');
+    const snapshotRepo = { latestSnapshotForInstrument: jest.fn().mockResolvedValue(buildSnapshot({ assembledAt })) };
+
+    const result = await createService({ snapshotRepository: snapshotRepo }).stockSummary('stock-1') as any;
+
+    expect(result.snapshotAssembledAt).toBe(assembledAt.toISOString());
+  });
+
+  it('falls back to live signalService when snapshot signals provenance is FAILED', async () => {
+    const failedProv = { ...okProvenance, signals: 'FAILED' };
+    const snapshotRepo = { latestSnapshotForInstrument: jest.fn().mockResolvedValue(buildSnapshot({ provenance: failedProv })) };
+    const signalSvc = { latestForInstrument: jest.fn().mockResolvedValue({ score: 82, direction: 'BULLISH', confidence: 'HIGH' }) };
+
+    await createService({ signalService: signalSvc, snapshotRepository: snapshotRepo }).stockSummary('stock-1');
+
+    expect(signalSvc.latestForInstrument).toHaveBeenCalledWith('stock-1');
+  });
+
+  it('falls back to live services when snapshot row is null (no snapshot exists)', async () => {
+    const snapshotRepo = { latestSnapshotForInstrument: jest.fn().mockResolvedValue(null) };
+    const signalSvc = { latestForInstrument: jest.fn().mockResolvedValue({ score: 82, direction: 'BULLISH', confidence: 'HIGH' }) };
+    const smartMoneySvc = {
+      stock: jest.fn().mockResolvedValue({ smartMoneyScore: 70, status: 'NEUTRAL', dataStatus: 'COMPLETE', insiderOwnership: { ownershipDataStatus: 'AVAILABLE' } }),
+      sectors: jest.fn().mockResolvedValue([]),
+    };
+
+    await createService({ signalService: signalSvc, smartMoneyService: smartMoneySvc, snapshotRepository: snapshotRepo }).stockSummary('stock-1');
+
+    expect(signalSvc.latestForInstrument).toHaveBeenCalledWith('stock-1');
+    expect(smartMoneySvc.stock).toHaveBeenCalledWith('stock-1');
+  });
+
+  it('falls back to live services when COPILOT_SNAPSHOT_READS=false', async () => {
+    const origEnv = process.env.COPILOT_SNAPSHOT_READS;
+    process.env.COPILOT_SNAPSHOT_READS = 'false';
+    try {
+      const snapshotRepo = { latestSnapshotForInstrument: jest.fn().mockResolvedValue(buildSnapshot()) };
+      const signalSvc = { latestForInstrument: jest.fn().mockResolvedValue({ score: 82, direction: 'BULLISH', confidence: 'HIGH' }) };
+
+      await createService({ signalService: signalSvc, snapshotRepository: snapshotRepo }).stockSummary('stock-1');
+
+      // Snapshot repo must NOT have been queried; live signal service IS called
+      expect(snapshotRepo.latestSnapshotForInstrument).not.toHaveBeenCalled();
+      expect(signalSvc.latestForInstrument).toHaveBeenCalled();
+    } finally {
+      if (origEnv === undefined) delete process.env.COPILOT_SNAPSHOT_READS;
+      else process.env.COPILOT_SNAPSHOT_READS = origEnv;
+    }
+  });
+
+  it('complete snapshot short-circuits all three lazy services (strategy-decision, trade-plan, today-review NOT touched)', async () => {
+    // strategy-decision, trade-plan, today-review are the "lazy" services.
+    // When the snapshot covers their sections, they should not be called.
+    const snapshotRepo = { latestSnapshotForInstrument: jest.fn().mockResolvedValue(buildSnapshot()) };
+    // These are the services that WOULD be called via lazy-require in the live path
+    const stratDecisionSvc = { latestForInstrument: jest.fn() };
+    const tradePlanSvc = { latestForInstrument: jest.fn() };
+    const todayReviewSvc = { latest: jest.fn() };
+
+    await createService({
+      snapshotRepository: snapshotRepo,
+      strategyDecisionService: stratDecisionSvc,
+      tradePlanService: tradePlanSvc,
+      todayReviewService: todayReviewSvc,
+    }).stockSummary('stock-1');
+
+    // Snapshot covers decision + tradePlan; these live services must not be called
+    expect(stratDecisionSvc.latestForInstrument).not.toHaveBeenCalled();
+    expect(tradePlanSvc.latestForInstrument).not.toHaveBeenCalled();
+    // today-review is NOT covered by snapshot — it's still called
+    expect(todayReviewSvc.latest).toHaveBeenCalled();
+  });
+
+  it('notes snapshot source modules in the response when snapshot is used', async () => {
+    const snapshotRepo = { latestSnapshotForInstrument: jest.fn().mockResolvedValue(buildSnapshot()) };
+
+    const result = await createService({ snapshotRepository: snapshotRepo }).stockSummary('stock-1');
+
+    expect(result.sourceModules.join(' ')).toContain('daily-instrument-snapshot');
+  });
+
+  it('falls back per-section when N_A provenance and snapshot has no data for that section', async () => {
+    // When smartMoney provenance is N_A (no smart money data in snapshot),
+    // the live service should be invoked for that section.
+    const naProv = { ...okProvenance, smartMoney: 'N_A' };
+    const snapshotRepo = {
+      latestSnapshotForInstrument: jest.fn().mockResolvedValue(
+        buildSnapshot({ smartMoneyCode: null, smartMoneyScore: null, provenance: naProv })
+      ),
+    };
+    const smartMoneySvc = {
+      stock: jest.fn().mockResolvedValue({ smartMoneyScore: 60, status: 'NEUTRAL', dataStatus: 'COMPLETE', insiderOwnership: { ownershipDataStatus: 'AVAILABLE' } }),
+      sectors: jest.fn().mockResolvedValue([]),
+    };
+
+    await createService({ smartMoneyService: smartMoneySvc, snapshotRepository: snapshotRepo }).stockSummary('stock-1');
+
+    // N_A provenance on smartMoney → live service must be called
+    expect(smartMoneySvc.stock).toHaveBeenCalledWith('stock-1');
   });
 });

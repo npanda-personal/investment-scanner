@@ -5,6 +5,7 @@ import type {
   PortfolioAllocationDto,
   PortfolioSummaryDto,
 } from '../portfolio-management';
+import type { SignalDirection, SignalConfidence } from '../signal-generation-engine';
 import type {
   GoodBadNeedsAttentionSummary,
   HoldingActionSuggestion,
@@ -23,6 +24,23 @@ import {
   statusForHealthScore,
 } from './portfolio-intelligence.validation';
 import { PortfolioIntelligenceRepository } from './portfolio-intelligence.repository';
+import type { HoldingSnapshotRow } from './portfolio-intelligence.repository';
+import type { ProvenanceStatus } from '../snapshot-assembler/snapshot-assembler.types';
+
+/**
+ * Returns true when PORTFOLIO_SNAPSHOT_READS is not explicitly disabled.
+ * Default ON — set to '0' or 'false' to fall back to legacy live reads.
+ */
+function snapshotReadsEnabled(): boolean {
+  const v = process.env.PORTFOLIO_SNAPSHOT_READS;
+  if (v === '0' || v === 'false') return false;
+  return true;
+}
+
+/** True when provenance status is usable (OK or STALE). */
+function isUsable(status: ProvenanceStatus | undefined): boolean {
+  return status === 'OK' || status === 'STALE';
+}
 
 const SIGNAL_ORDER: Record<string, number> = { BEARISH: 0, NEUTRAL: 1, BULLISH: 2 };
 const DECISION_ORDER: Record<HoldingDecisionLabel, number> = { HIGH_RISK: 0, REVIEW: 1, WATCH: 2, GOOD: 3 };
@@ -82,11 +100,33 @@ export class PortfolioIntelligenceService {
       return this.refreshPortfolioIntelligence(portfolioId, userId);
     }
 
-    // 4. Staleness guard: if the snapshot was computed BEFORE the last
-    //    holdings change (portfolio.updatedAt > computedAt), recompute.
+    // 4a. Staleness guard: if the snapshot was computed BEFORE the last
+    //     holdings change (portfolio.updatedAt > computedAt), recompute.
     const portfolioUpdatedAt = new Date(portfolio.portfolio.updatedAt);
     if (portfolioUpdatedAt > computedAt) {
       return this.refreshPortfolioIntelligence(portfolioId, userId);
+    }
+
+    // 4b. Watermark staleness guard: if a new nightly assembly has landed
+    //     since the intelligence was computed, recompute now.
+    //     One watermark bulk-read; only active when snapshot reads are enabled.
+    if (snapshotReadsEnabled()) {
+      const holdings = (portfolio as any).holdings as Array<{ instrumentId: string; country?: string }> | undefined;
+      if (holdings && holdings.length > 0) {
+        // Derive distinct (region, assetType) scopes from holdings.
+        // We use assetType='EQUITY' as the default — consistent with the assembler scope.
+        const scopeSet = new Map<string, { region: string; assetType: string }>();
+        for (const h of holdings) {
+          const region = (h as any).country ?? 'IN';
+          const key = `${region}:EQUITY`;
+          if (!scopeSet.has(key)) scopeSet.set(key, { region, assetType: 'EQUITY' });
+        }
+        const watermarks = await this.repository.findLatestWatermarks([...scopeSet.values()]);
+        const newerAssembly = watermarks.some((wm) => wm.assembledAt > computedAt);
+        if (newerAssembly) {
+          return this.refreshPortfolioIntelligence(portfolioId, userId);
+        }
+      }
     }
 
     // 5. Happy path: snapshot is fresh — serve it without recomputation.
@@ -109,7 +149,16 @@ export class PortfolioIntelligenceService {
     if (!summary) return null;
     const allocation = await this.portfolioService.allocation(portfolioId, userId);
     if (!allocation) return null;
-    const payload = await this.buildIntelligence(summary, allocation);
+
+    // Bulk-read daily_instrument_snapshot rows for held instruments (one query).
+    // Only when PORTFOLIO_SNAPSHOT_READS is enabled (default ON).
+    let holdingSnapshots: Map<string, HoldingSnapshotRow> = new Map();
+    if (snapshotReadsEnabled() && summary.holdings.length > 0) {
+      const instrumentIds = summary.holdings.map((h) => h.instrumentId);
+      holdingSnapshots = await this.repository.bulkLatestSnapshots(instrumentIds);
+    }
+
+    const payload = await this.buildIntelligence(summary, allocation, holdingSnapshots);
     await this.repository.upsertSnapshot(payload);
     return payload;
   }
@@ -124,8 +173,12 @@ export class PortfolioIntelligenceService {
     return result?.reviewRanking ?? null;
   }
 
-  async buildIntelligence(summary: PortfolioSummaryDto, allocation: PortfolioAllocationDto): Promise<PortfolioIntelligenceResponse> {
-    const holdings = summary.holdings.map((holding) => this.classifyHolding(holding));
+  async buildIntelligence(
+    summary: PortfolioSummaryDto,
+    allocation: PortfolioAllocationDto,
+    holdingSnapshots: Map<string, HoldingSnapshotRow> = new Map(),
+  ): Promise<PortfolioIntelligenceResponse> {
+    const holdings = summary.holdings.map((holding) => this.classifyHolding(holding, holdingSnapshots.get(holding.instrumentId)));
     const redFlags = this.detectRedFlags(summary, allocation);
     const scoreBreakdown = this.scoreBreakdown(summary, allocation, holdings);
     const healthScore = this.clampScore(Math.round(
@@ -158,9 +211,29 @@ export class PortfolioIntelligenceService {
     };
   }
 
-  classifyHolding(holding: HoldingValuationDto): HoldingIntelligence {
+  classifyHolding(holding: HoldingValuationDto, snapshotRow?: HoldingSnapshotRow): HoldingIntelligence {
     const reasons: string[] = [];
-    const signal = holding.signal;
+
+    // -- Signal: prefer snapshot when signals provenance is OK or STALE,
+    //    else fall back to the live signal attached to the holding valuation.
+    let signal = holding.signal;
+    if (snapshotRow && isUsable(snapshotRow.provenance?.signals)) {
+      const rawDir = snapshotRow.signalDirection;
+      const validDirections: SignalDirection[] = ['BULLISH', 'NEUTRAL', 'BEARISH'];
+      const direction: SignalDirection = (rawDir && validDirections.includes(rawDir as SignalDirection))
+        ? (rawDir as SignalDirection)
+        : 'NEUTRAL';
+      const snapshotSignal = snapshotRow.signalScore !== null || snapshotRow.signalDirection !== null
+        ? {
+            score: snapshotRow.signalScore ?? 0,
+            direction,
+            confidence: (snapshotRow.calibrationAuthority ?? 'UNKNOWN') as SignalConfidence,
+            generatedAt: snapshotRow.assembledAt.toISOString(),
+          }
+        : null;
+      if (snapshotSignal !== null) signal = snapshotSignal;
+    }
+
     const staleSignal = signal ? this.isStale(signal.generatedAt) : false;
     const pnl = holding.unrealizedPnLPercent;
     const allocation = holding.allocationPercent;

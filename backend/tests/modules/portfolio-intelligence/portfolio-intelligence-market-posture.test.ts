@@ -74,11 +74,14 @@ const ASSEMBLED_AT = '2026-06-04T10:00:00.000Z';
 /**
  * Mock repository: always a cache miss on findByPortfolioId + findComputedAt
  * so the service falls through to compute + persist on every intelligence() call.
+ * findLatestWatermarks returns [] (no new assembly), bulkLatestSnapshots returns empty map.
  */
 const mockRepo = () => ({
   findByPortfolioId: jest.fn().mockResolvedValue(null),
   findComputedAt: jest.fn().mockResolvedValue(null),
   upsertSnapshot: jest.fn().mockResolvedValue(undefined),
+  findLatestWatermarks: jest.fn().mockResolvedValue([]),
+  bulkLatestSnapshots: jest.fn().mockResolvedValue(new Map()),
 });
 
 /** Build a service with mocked CapitalPostureService and portfolio service. */
