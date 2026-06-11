@@ -10,6 +10,7 @@ export type EarningsFreshness = 'FRESH' | 'PARTIAL' | 'STALE' | 'MISSING';
 
 export type EarningsResultDateSource =
   | 'OFFICIAL_CALENDAR'
+  | 'DATE_TBA'
   | 'ESTIMATED_FROM_PERIOD_CADENCE'
   | 'PERIOD_END_DATE_FALLBACK'
   | 'VALIDATED_AT_FALLBACK'
@@ -20,6 +21,7 @@ export interface EarningsProvenanceSummary {
   resultDateSourceCounts: Record<string, number>;
   warningCounts: Record<string, number>;
   officialCalendarRows: number;
+  tbaDatesRows: number;
   estimatedRows: number;
   fallbackRows: number;
   unknownRows: number;
@@ -69,17 +71,17 @@ export interface EarningsSnapshotDto {
   resultDate: string | null;
   /**
    * Human-readable label that indicates whether the result date is authoritative
-   * (from the official NSE board-meeting calendar) or an estimate derived from
-   * period-end cadence.  Consumers should display this label next to the date so
-   * the trader immediately knows the reliability level without decoding the enum.
+   * (from the official NSE board-meeting calendar) or not yet announced.
+   * Consumers should display this label next to the date so the trader
+   * immediately knows the reliability level without decoding the enum.
    *
    * Values:
    *   "Official"   — resultDateSource === 'OFFICIAL_CALENDAR'
-   *   "Estimated"  — resultDateSource === 'ESTIMATED_FROM_PERIOD_CADENCE'
-   *   (absent/null for fallback/unknown sources where a date is not meaningful
-   *   as a forward-looking result window)
+   *   "TBA"        — resultDateSource === 'DATE_TBA' (no official date available;
+   *                  resultDate will be null)
+   *   null         — fallback/unknown sources where label is not meaningful
    */
-  resultDateLabel: 'Official' | 'Estimated' | null;
+  resultDateLabel: 'Official' | 'TBA' | null;
   resultDateSource: EarningsResultDateSource | string;
   periodEndDate: string | null;
   validatedAt: string | null;

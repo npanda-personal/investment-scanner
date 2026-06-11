@@ -510,7 +510,9 @@ function todayCandidateToShortlistRow(
     ...candidate.watchReasons,
     ...(candidate.dataQualitySnapshot?.warnings ?? []),
     ...(candidate.explainability?.watchReasons?.map((reason) => reason.label) ?? []),
-    ...(candidate.explainability?.blockers?.map((reason) => reason.label) ?? []),
+    // explainability.blockers labels are rendered in the accordion via the blockers[] array;
+    // do NOT include them in warnings[] — their text (e.g. "blocked", "unusable") would
+    // falsely trip the Blocker branch of warningSeverity for every shortlist row.
   ];
   const sourceContributions = contributions([
     'Today Review',

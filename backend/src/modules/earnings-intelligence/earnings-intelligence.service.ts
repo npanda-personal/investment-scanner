@@ -247,7 +247,7 @@ export class EarningsIntelligenceService {
       deliveryInterest,
       priceReaction,
       preResultPriceMove,
-      upcoming: resultDateSource === 'ESTIMATED_FROM_PERIOD_CADENCE',
+      upcoming: resultDateSource === 'OFFICIAL_CALENDAR' && daysToResult !== null && daysToResult >= 0,
       resultDateSource,
     });
     const riskTags = this.riskTags({
@@ -262,7 +262,7 @@ export class EarningsIntelligenceService {
       consistencyScore,
       priceReaction,
       prices: input.prices,
-      estimatedResultDate: resultDateSource === 'ESTIMATED_FROM_PERIOD_CADENCE',
+      estimatedResultDate: resultDateSource === 'DATE_TBA' || resultDateSource === 'ESTIMATED_FROM_PERIOD_CADENCE',
       authoritativeResultDate: resultDateSource === 'OFFICIAL_CALENDAR',
     });
     const warnings = this.rowWarnings(resultDateSource);
@@ -293,7 +293,7 @@ export class EarningsIntelligenceService {
 
     const resultDateLabel: EarningsSnapshotUpsertInput['resultDateLabel'] =
       resultDateSource === 'OFFICIAL_CALENDAR' ? 'Official'
-      : resultDateSource === 'ESTIMATED_FROM_PERIOD_CADENCE' ? 'Estimated'
+      : resultDateSource === 'DATE_TBA' ? 'TBA'
       : null;
 
     return {
@@ -390,18 +390,17 @@ export class EarningsIntelligenceService {
   }): EarningsIntelligenceCategory[] {
     const categories: EarningsIntelligenceCategory[] = [];
     const hasAuthoritativeResultDate = input.resultDateSource === 'OFFICIAL_CALENDAR';
-    // Treat ESTIMATED_FROM_PERIOD_CADENCE as a plausible result date for the
-    // recent-result window.  Without official NSE board-meeting dates (which
-    // require the ingest script to have run), estimated cadence is the best
-    // available signal for Q3/Q4 results that landed in the last 60 days.
-    // RESULT_WINNERS / RESULT_DISAPPOINTMENTS are labelled with ESTIMATED_RESULT_DATE
-    // so the trader can see the provenance.
-    const hasUsableResultDate = hasAuthoritativeResultDate || input.resultDateSource === 'ESTIMATED_FROM_PERIOD_CADENCE';
+    // Only official result dates qualify for the recent-result window and
+    // UPCOMING_RESULTS.  DATE_TBA / ESTIMATED_FROM_PERIOD_CADENCE rows must NOT
+    // appear in UPCOMING_RESULTS as if they had a known date.
+    const hasUsableResultDate = hasAuthoritativeResultDate;
     const recentResult = Boolean(hasUsableResultDate && input.resultDate && this.daysBetween(input.resultDate, input.snapshotDate) <= RECENT_RESULT_WINDOW_DAYS && input.resultDate <= input.snapshotDate);
+    // UPCOMING_RESULTS: only rows with a confirmed OFFICIAL_CALENDAR date and
+    // a non-null daysToResult within the window.
     const upcoming = input.daysToResult !== null
       && input.daysToResult >= 0
       && input.daysToResult <= UPCOMING_WINDOW_DAYS
-      && ['OFFICIAL_CALENDAR', 'ESTIMATED_FROM_PERIOD_CADENCE'].includes(input.resultDateSource);
+      && input.resultDateSource === 'OFFICIAL_CALENDAR';
     if (upcoming) categories.push('UPCOMING_RESULTS');
     if (upcoming && (input.deliveryInterest || (input.preResultPriceMove !== null && input.preResultPriceMove >= 3))) {
       categories.push('PRE_RESULT_INTEREST');
@@ -511,8 +510,12 @@ export class EarningsIntelligenceService {
 
   private rowWarnings(resultDateSource: EarningsResultDateSource): string[] {
     const warnings: string[] = [];
-    if (resultDateSource !== 'OFFICIAL_CALENDAR') warnings.push('OFFICIAL_CALENDAR_NOT_AVAILABLE');
-    if (resultDateSource === 'ESTIMATED_FROM_PERIOD_CADENCE') warnings.push('RESULT_DATE_ESTIMATED_FROM_PERIOD_CADENCE');
+    // DATE_TBA: result date has not been announced on the official NSE calendar.
+    // Use a single calm warning code — no per-row OFFICIAL_CALENDAR_NOT_AVAILABLE spam.
+    if (resultDateSource === 'DATE_TBA') warnings.push('RESULT_DATE_NOT_ANNOUNCED');
+    // Legacy ESTIMATED_FROM_PERIOD_CADENCE rows in persisted snapshots: treat the same
+    // as DATE_TBA at materialisation time (these will disappear after a re-materialisation).
+    if (resultDateSource === 'ESTIMATED_FROM_PERIOD_CADENCE') warnings.push('RESULT_DATE_NOT_ANNOUNCED');
     if (resultDateSource === 'PERIOD_END_DATE_FALLBACK') warnings.push('RESULT_DATE_USES_PERIOD_END_DATE_FALLBACK');
     if (resultDateSource === 'VALIDATED_AT_FALLBACK') warnings.push('RESULT_DATE_USES_VALIDATED_AT_FALLBACK');
     if (resultDateSource === 'UNKNOWN') warnings.push('RESULT_DATE_SOURCE_UNKNOWN');
@@ -634,15 +637,17 @@ export class EarningsIntelligenceService {
       };
     }
 
+    // Do NOT emit a row-level resultDate from period cadence.
+    // Return DATE_TBA so the UI shows "Date TBA" rather than a fabricated date
+    // that gives all stocks with the same periodEnd the same fake date.
+    // The expectedResultDate is computed internally (above) but not surfaced
+    // in the DTO as a precise forward-looking date.
     if (expectedResultDate) {
-      const daysToExpected = this.daysBetween(snapshotDate, expectedResultDate);
-      if (daysToExpected >= 0 && daysToExpected <= UPCOMING_WINDOW_DAYS) {
-        return {
-          resultDate: expectedResultDate,
-          resultDateSource: 'ESTIMATED_FROM_PERIOD_CADENCE',
-          daysToResult: daysToExpected,
-        };
-      }
+      return {
+        resultDate: null,
+        resultDateSource: 'DATE_TBA',
+        daysToResult: null,
+      };
     }
 
     const periodEndDate = this.safeUtcDay(latest.periodEndDate);
@@ -704,7 +709,26 @@ export class EarningsIntelligenceService {
   private groupByCategory(rows: EarningsSnapshotDto[], limit: number): Record<EarningsIntelligenceCategory, EarningsSnapshotDto[]> {
     const grouped = this.emptyCategoryBuckets();
     for (const category of EARNINGS_INTELLIGENCE_CATEGORIES) {
-      grouped[category] = rows.filter((row) => row.categories.includes(category)).slice(0, limit);
+      const categoryRows = rows.filter((row) => row.categories.includes(category));
+      if (category === 'UPCOMING_RESULTS') {
+        // Order: (1) official dates first (has daysToResult), soonest first;
+        // (2) DATE_TBA / legacy estimated rows at the end;
+        // (3) consistencyScore desc as tiebreak within each group.
+        grouped[category] = categoryRows
+          .sort((left, right) => {
+            const leftHasDate = left.resultDateSource === 'OFFICIAL_CALENDAR' && left.daysToResult !== null ? 1 : 0;
+            const rightHasDate = right.resultDateSource === 'OFFICIAL_CALENDAR' && right.daysToResult !== null ? 1 : 0;
+            if (leftHasDate !== rightHasDate) return rightHasDate - leftHasDate; // official first
+            if (leftHasDate && rightHasDate) {
+              const daysDiff = (left.daysToResult as number) - (right.daysToResult as number);
+              if (daysDiff !== 0) return daysDiff; // soonest first
+            }
+            return right.consistencyScore - left.consistencyScore; // tiebreak
+          })
+          .slice(0, limit);
+      } else {
+        grouped[category] = categoryRows.slice(0, limit);
+      }
     }
     return grouped;
   }
@@ -722,10 +746,10 @@ export class EarningsIntelligenceService {
     const summary = this.provenanceSummary(rows);
     if (truncated) warnings.push('Snapshot read was truncated at the backend safety limit.');
     if (summary.rowCount > 0 && summary.officialCalendarRows === 0) {
-      warnings.push('No official earnings calendar dates are present in this snapshot; fallback dates are labelled per row.');
+      warnings.push('OFFICIAL_CALENDAR_NOT_AVAILABLE');
     }
-    if (summary.resultDateSourceCounts.ESTIMATED_FROM_PERIOD_CADENCE > 0) {
-      warnings.push('Estimated result dates are not official calendar events.');
+    if (summary.tbaDatesRows > 0) {
+      warnings.push(`${summary.tbaDatesRows} instrument(s) do not yet have an official result date announcement (Date TBA).`);
     }
     if (summary.resultDateSourceCounts.PERIOD_END_DATE_FALLBACK > 0) {
       warnings.push('Some result dates use the fiscal period end as a fallback and are not earnings announcement dates.');
@@ -753,6 +777,9 @@ export class EarningsIntelligenceService {
       resultDateSourceCounts,
       warningCounts,
       officialCalendarRows: resultDateSourceCounts.OFFICIAL_CALENDAR || 0,
+      // tbaDatesRows counts both new DATE_TBA rows and legacy ESTIMATED_FROM_PERIOD_CADENCE
+      // rows in persisted snapshots that have not been re-materialised yet.
+      tbaDatesRows: (resultDateSourceCounts.DATE_TBA || 0) + (resultDateSourceCounts.ESTIMATED_FROM_PERIOD_CADENCE || 0),
       estimatedRows: resultDateSourceCounts.ESTIMATED_FROM_PERIOD_CADENCE || 0,
       fallbackRows: (resultDateSourceCounts.PERIOD_END_DATE_FALLBACK || 0) + (resultDateSourceCounts.VALIDATED_AT_FALLBACK || 0),
       unknownRows: resultDateSourceCounts.UNKNOWN || 0,

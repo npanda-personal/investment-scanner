@@ -21,6 +21,7 @@ import {
   Select,
   Skeleton,
   Stack,
+  TablePagination,
   Tooltip,
   Typography,
 } from '@mui/material';
@@ -237,10 +238,13 @@ export function MarketEventsPage() {
   const [envelope, setEnvelope] = useState<EventFeedEnvelope | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(25);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setPage(0);
     try {
       const data = await fetchEventFeed(days);
       setEnvelope(data);
@@ -253,13 +257,20 @@ export function MarketEventsPage() {
 
   useEffect(() => { void load(); }, [load]);
 
+  useEffect(() => { setPage(0); }, [filterType]);
+
   const filteredEvents = useMemo(() => {
     if (!envelope) return [];
     if (filterType === 'ALL') return envelope.events;
     return envelope.events.filter((ev) => ev.type === filterType);
   }, [envelope, filterType]);
 
-  const groups = useMemo(() => groupByDate(filteredEvents), [filteredEvents]);
+  const pagedEvents = useMemo(
+    () => filteredEvents.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage),
+    [filteredEvents, page, rowsPerPage],
+  );
+
+  const groups = useMemo(() => groupByDate(pagedEvents), [pagedEvents]);
 
   if (profile.isCrypto) {
     return (
@@ -269,7 +280,7 @@ export function MarketEventsPage() {
             Market Events
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Morning briefing — chronological feed from persisted data. Research support only, not investment advice.
+            Morning briefing — chronological feed of recent market events. Research support only, not investment advice.
           </Typography>
         </Box>
         <NotApplicableForAssetClass
@@ -289,7 +300,7 @@ export function MarketEventsPage() {
             Market Events
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Morning briefing — chronological feed from persisted data. Research support only, not investment advice.
+            Morning briefing — chronological feed of recent market events. Research support only, not investment advice.
           </Typography>
           {envelope?.asOf && (
             <Typography variant="caption" color="text.secondary">
@@ -370,9 +381,25 @@ export function MarketEventsPage() {
             <DateGroup key={date} date={date} events={events} />
           ))}
           <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center', display: 'block', mt: 1 }}>
-            Showing {filteredEvents.length} event(s) from persisted data. For research purposes only.
+            Showing {pagedEvents.length} of {filteredEvents.length} event(s). For research purposes only.
           </Typography>
         </Stack>
+      )}
+
+      {/* Pagination */}
+      {!loading && !error && filteredEvents.length > 0 && (
+        <Paper variant="outlined" sx={{ mt: 2 }}>
+          <TablePagination
+            component="div"
+            count={filteredEvents.length}
+            page={page}
+            onPageChange={(_e, newPage) => setPage(newPage)}
+            rowsPerPage={rowsPerPage}
+            onRowsPerPageChange={(e) => { setRowsPerPage(parseInt(e.target.value, 10)); setPage(0); }}
+            rowsPerPageOptions={[10, 25, 50, 100]}
+            labelRowsPerPage="Events per page:"
+          />
+        </Paper>
       )}
     </Box>
   );

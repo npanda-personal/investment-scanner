@@ -4437,7 +4437,9 @@ export class MarketDataFoundationRepository {
       }
     }
     if (options.minDeliveryPct != null) {
-      filters.push(Prisma.sql`dd."deliveryPct" >= ${options.minDeliveryPct}`);
+      // Alias is `ld` (latest_delivery) in both query shapes — `dd` was a stale alias that
+      // would error whenever this filter was active.
+      filters.push(Prisma.sql`ld."deliveryPct" >= ${options.minDeliveryPct}`);
     }
     if (options.min52wPositionPct != null) {
       filters.push(Prisma.sql`pr."range52wPositionPct" >= ${options.min52wPositionPct}`);
@@ -4450,7 +4452,7 @@ export class MarketDataFoundationRepository {
 
     const whereClause = Prisma.join(filters, ' AND ');
 
-    const rows = await this.prisma.$queryRaw<Array<{
+    type ScreenerRow = {
       instrumentId: string;
       symbol: string;
       companyName: string;
@@ -4462,12 +4464,89 @@ export class MarketDataFoundationRepository {
       deliveryPct: Prisma.Decimal | null;
       range52wPositionPct: Prisma.Decimal | null;
       inFnoBan: boolean;
-    }>>(Prisma.sql`
-      -- All heavy CTEs are MATERIALIZED so the planner computes each once and
-      -- HASH-joins them. Without this, the functional region/support predicates
-      -- make Postgres underestimate the stocks row count (rows=1) and pick a
-      -- nested loop that re-evaluates the full signal/delivery sorts PER stock
-      -- (the cause of the screener's multi-minute hang).
+    };
+
+    // FAST PATH (no min52wPositionPct filter — the common case incl. the default no-filter load):
+    // rank + LIMIT on the cheap columns first, then compute latest price + 52-week range ONLY for
+    // the ~50 returned rows. The full query below computed the 52w range for the ENTIRE ~2900-stock
+    // universe on every request (EXPLAIN ANALYZE: price_range = 4.2s of 6.9s; 20-35s under load),
+    // even though price/52w are used only for OUTPUT, never as filter or sort keys. Limiting first
+    // is therefore equivalent and cuts isolated time ~6.9s -> ~1.9s (no more LOADING_STUCK stalls).
+    const fastQuery = Prisma.sql`
+      WITH latest_signal AS MATERIALIZED (
+        SELECT DISTINCT ON (sr."instrumentId")
+          sr."instrumentId", sr.direction AS "signalDirection", sr.score AS "signalScore"
+        FROM signal_results sr
+        WHERE sr."generatedDate" IS NOT NULL
+        ORDER BY sr."instrumentId", sr."generatedDate" DESC
+      ),
+      latest_delivery AS MATERIALIZED (
+        SELECT DISTINCT ON (d.symbol) d.symbol, d."deliveryPercent" AS "deliveryPct"
+        FROM market_delivery_snapshots d
+        WHERE d."deliveryPercent" IS NOT NULL AND d."deliveryPercent" > 0
+        ORDER BY d.symbol, d."tradingDate" DESC
+      ),
+      fno_ban AS (
+        SELECT fbl.symbol, TRUE AS "inBan"
+        FROM fno_ban_list fbl
+        WHERE fbl.ban_date = (SELECT MAX(ban_date) FROM fno_ban_list)
+      ),
+      ranked AS (
+        SELECT
+          s.id AS "instrumentId", s.symbol, COALESCE(s.name, s.symbol) AS "companyName",
+          regexp_replace(
+            COALESCE(NULLIF(s."sourceSymbol", ''), NULLIF(s.symbol, ''), NULLIF(s."providerSymbol", '')),
+            '\\.(NS|BO)$', '', 'i'
+          ) AS price_symbol,
+          ls."signalDirection", ls."signalScore", s.sector, s."marketCap",
+          ld."deliveryPct", COALESCE(fno."inBan", FALSE) AS "inFnoBan"
+        FROM stocks s
+        LEFT JOIN latest_signal ls ON ls."instrumentId" = s.id
+        LEFT JOIN latest_delivery ld ON ld.symbol = s.symbol
+        LEFT JOIN fno_ban fno ON fno.symbol = s.symbol
+        WHERE ${whereClause}
+        ORDER BY COALESCE(ls."signalScore", 0) DESC
+        LIMIT ${rowLimit}
+      )
+      SELECT
+        r."instrumentId", r.symbol, r."companyName",
+        lp.price AS price, r."signalDirection", r."signalScore", r.sector, r."marketCap", r."deliveryPct",
+        CASE
+          WHEN rng."high52w" > rng."low52w"
+          THEN ((lp.price - rng."low52w") / NULLIF(rng."high52w" - rng."low52w", 0) * 100)
+          ELSE NULL
+        END AS "range52wPositionPct",
+        r."inFnoBan"
+      FROM ranked r
+      LEFT JOIN LATERAL (
+        SELECT COALESCE(pt."adjustedClose", pt.close) AS price, pt.timestamp AS price_ts
+        FROM price_ticks pt
+        WHERE pt.symbol = r.price_symbol
+          AND UPPER(COALESCE(pt."dataStatus", 'COMPLETE')) = 'COMPLETE'
+          AND UPPER(COALESCE(pt.source, '')) NOT LIKE 'TEST\\_%'
+        ORDER BY pt.timestamp DESC
+        LIMIT 1
+      ) lp ON TRUE
+      LEFT JOIN LATERAL (
+        SELECT
+          MAX(COALESCE(pt."adjustedClose", pt.close)) AS "high52w",
+          MIN(COALESCE(pt."adjustedClose", pt.close)) AS "low52w"
+        FROM price_ticks pt
+        WHERE pt.symbol = r.price_symbol
+          AND pt.timestamp >= lp.price_ts - (${LOOKBACK_DAYS} * INTERVAL '1 day')
+          AND pt.timestamp < lp.price_ts
+          AND UPPER(COALESCE(pt."dataStatus", 'COMPLETE')) = 'COMPLETE'
+          AND UPPER(COALESCE(pt.source, '')) NOT LIKE 'TEST\\_%'
+      ) rng ON TRUE
+      ORDER BY COALESCE(r."signalScore", 0) DESC
+    `;
+
+    // FULL PATH (min52wPositionPct filter active): the 52w range must be known before filtering,
+    // so it is computed for the universe up front. All heavy CTEs are MATERIALIZED so the planner
+    // computes each once and HASH-joins them. Without this, the functional region/support predicates
+    // make Postgres underestimate the stocks row count (rows=1) and pick a nested loop that
+    // re-evaluates the full signal/delivery sorts PER stock (the cause of the screener's hang).
+    const fullQuery = Prisma.sql`
       WITH latest_signal AS MATERIALIZED (
         SELECT DISTINCT ON (sr."instrumentId")
           sr."instrumentId",
@@ -4565,7 +4644,11 @@ export class MarketDataFoundationRepository {
       WHERE ${whereClause}
       ORDER BY COALESCE(ls."signalScore", 0) DESC
       LIMIT ${rowLimit}
-    `);
+    `;
+
+    const rows = await this.prisma.$queryRaw<Array<ScreenerRow>>(
+      options.min52wPositionPct == null ? fastQuery : fullQuery,
+    );
 
     // Derive capBand from stored marketCap
     return rows.map((row) => {

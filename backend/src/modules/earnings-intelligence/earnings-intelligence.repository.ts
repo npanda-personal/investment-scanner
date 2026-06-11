@@ -269,22 +269,51 @@ export class EarningsIntelligenceRepository {
   }
 
   private toDto(record: any): EarningsSnapshotDto {
-    const resultDateSource: string = record.resultDateSource || 'UNKNOWN';
+    const rawSource: string = record.resultDateSource || 'UNKNOWN';
+
+    // Read-time backward-compat mapping:
+    // Legacy persisted rows with ESTIMATED_FROM_PERIOD_CADENCE are treated as
+    // DATE_TBA at read time so the fix takes effect for existing snapshots
+    // without requiring a re-materialisation.  New snapshots will already
+    // have DATE_TBA written by the service.
+    const isLegacyEstimated = rawSource === 'ESTIMATED_FROM_PERIOD_CADENCE';
+    const resultDateSource: string = isLegacyEstimated ? 'DATE_TBA' : rawSource;
+
     const resultDateLabel: EarningsSnapshotDto['resultDateLabel'] =
       resultDateSource === 'OFFICIAL_CALENDAR' ? 'Official'
-      : resultDateSource === 'ESTIMATED_FROM_PERIOD_CADENCE' ? 'Estimated'
+      : resultDateSource === 'DATE_TBA' ? 'TBA'
       : null;
+
+    // For DATE_TBA rows (including legacy estimated): suppress the fake date and
+    // daysToResult so the UI renders "—" instead of a fabricated date.
+    const isTba = resultDateSource === 'DATE_TBA';
+
+    // Also replace RESULT_DATE_ESTIMATED_FROM_PERIOD_CADENCE warning with
+    // RESULT_DATE_NOT_ANNOUNCED for legacy rows; drop OFFICIAL_CALENDAR_NOT_AVAILABLE
+    // per-row spam.
+    const warnings = stringArray(record.warnings)
+      .map((w) =>
+        w === 'RESULT_DATE_ESTIMATED_FROM_PERIOD_CADENCE' ? 'RESULT_DATE_NOT_ANNOUNCED'
+        : w === 'OFFICIAL_CALENDAR_NOT_AVAILABLE' ? null
+        : w
+      )
+      .filter((w): w is string => w !== null);
+    // Ensure DATE_TBA / legacy rows have the canonical warning.
+    if (isTba && !warnings.includes('RESULT_DATE_NOT_ANNOUNCED')) {
+      warnings.push('RESULT_DATE_NOT_ANNOUNCED');
+    }
+
     return {
       id: record.id,
       snapshotDate: this.iso(record.snapshotDate) ?? '',
       dataThroughDate: this.iso(record.dataThroughDate),
       symbol: record.symbol,
-      resultDate: this.iso(record.resultDate),
+      resultDate: isTba ? null : this.iso(record.resultDate),
       resultDateLabel,
       resultDateSource,
       periodEndDate: this.iso(record.periodEndDate),
       validatedAt: this.iso(record.validatedAt),
-      daysToResult: record.daysToResult ?? null,
+      daysToResult: isTba ? null : (record.daysToResult ?? null),
       revenueGrowth: nullableNumber(record.revenueGrowth),
       profitGrowth: nullableNumber(record.profitGrowth),
       epsGrowth: nullableNumber(record.epsGrowth),
@@ -293,7 +322,7 @@ export class EarningsIntelligenceRepository {
       accelerationScore: Number(record.accelerationScore),
       reasonTags: stringArray(record.reasonTags),
       riskTags: stringArray(record.riskTags),
-      warnings: stringArray(record.warnings),
+      warnings,
       freshness: record.freshness,
       categories: stringArray(record.categories).filter(isKnownCategory) as EarningsIntelligenceCategory[],
     };

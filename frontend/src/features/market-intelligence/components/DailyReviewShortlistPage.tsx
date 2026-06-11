@@ -8,6 +8,7 @@ import {
   Box,
   Button,
   Chip,
+  Collapse,
   LinearProgress,
   Paper,
   Skeleton,
@@ -20,6 +21,7 @@ import {
   TableRow,
   Typography,
 } from '@mui/material';
+import { useState } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import { humanizeCode } from '@/shared/format/enumLabels';
 import { PageHeader } from '@/shared/components';
@@ -41,7 +43,7 @@ export function DailyReviewShortlistPage() {
       <Box className="page-container page-container--hub">
         <PageHeader
           title="Daily Review Shortlist"
-          subtitle="The first answer for the daily workflow: what are the 10 names to review today, using persisted source evidence only."
+          subtitle="The first answer for the daily workflow: what are the 10 names to review today."
         />
         <NotApplicableForAssetClass
           feature="Daily Review"
@@ -55,11 +57,11 @@ export function DailyReviewShortlistPage() {
     <Box className="page-container page-container--hub">
       <PageHeader
         title="Daily Review Shortlist"
-        subtitle="The first answer for the daily workflow: what are the 10 names to review today, using persisted source evidence only."
+        subtitle="The first answer for the daily workflow: what are the 10 names to review today."
         badges={(
           <Stack direction="row" gap={1} flexWrap="wrap" useFlexGap>
             <Chip label={`${scope.region} / ${scope.assetType}`} color="primary" variant="outlined" size="small" />
-            <Chip label="Read-only" variant="outlined" size="small" />
+            <Chip label="Saved data" variant="outlined" size="small" />
             <Chip label="10 review slots" variant="outlined" size="small" />
           </Stack>
         )}
@@ -69,7 +71,7 @@ export function DailyReviewShortlistPage() {
         <Stack spacing={2}>
           <LinearProgress />
           <Typography variant="body2" color="text.secondary">
-            Loading shortlist — collecting persisted sources (Today Review, Active Ledger, Stock Interest, Data Quality, Market Pulse)…
+            Loading shortlist — reading saved data from Today Review, Active Ledger, Stock Interest, Data Quality, and Market Pulse…
           </Typography>
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(4, 1fr)' }, gap: 2 }}>
             {[0, 1, 2, 3].map((i) => (
@@ -138,9 +140,9 @@ function OverviewGrid({ data }: { data: DailyReviewShortlistResult }) {
 
   return (
     <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(4, 1fr)' }, gap: 2 }}>
-      <MetricCard label="Shortlist Count" value={`${data.rows.length} / ${data.targetCount}`} helper="Rows shown from persisted sources." />
+      <MetricCard label="Shortlist Count" value={`${data.rows.length} / ${data.targetCount}`} helper="Rows shown from saved data." />
       <MetricCard label="Review Mode" value={formatEnum(review?.reviewMode)} helper={review?.trustStatus ? `Trust: ${formatEnum(review.trustStatus)}` : 'Review readiness unavailable.'} />
-      <MetricCard label="Market Pulse" value={pulse?.marketHealthLabel || 'Unavailable'} helper={pulse?.status ? `Status: ${formatEnum(pulse.status)}` : data.marketPulse?.message || 'No persisted pulse loaded.'} />
+      <MetricCard label="Market Pulse" value={pulse?.marketHealthLabel || 'Unavailable'} helper={pulse?.status ? `Status: ${formatEnum(pulse.status)}` : data.marketPulse?.message || 'Market Pulse data not available.'} />
       <MetricCard label="Data Quality" value={dq ? formatNumber(dq.signalReadyCount) : 'Unavailable'} helper={dq ? `Signal-ready rows; DQ status ${formatEnum(dq.dataStatus)}.` : 'Summary unavailable.'} />
     </Box>
   );
@@ -150,7 +152,7 @@ function SourceContributionPanel({ data }: { data: DailyReviewShortlistResult })
   return (
     <Paper variant="outlined" sx={{ p: 2 }}>
       <Stack spacing={1.25}>
-        <SectionTitle title="Source Contribution" subtitle="Selected count uses source-owned ordering. The page does not calculate a new score." />
+        <SectionTitle title="Source Contribution" subtitle="Selected count reflects saved source ordering." />
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(5, 1fr)' }, gap: 1 }}>
           {data.sourceContributions.map((source) => (
             <Paper key={source.source} variant="outlined" sx={{ p: 1.25 }}>
@@ -170,7 +172,7 @@ function ShortlistTable({ rows, targetCount }: { rows: DailyReviewShortlistRow[]
     return (
       <Alert severity="info">
         <Stack spacing={0.5}>
-          <Typography fontWeight={800}>No persisted review names qualify for the shortlist.</Typography>
+          <Typography fontWeight={800}>No review names qualify for the shortlist in saved data.</Typography>
           <Typography variant="body2">No fake rows are shown. Review Ready Universe, Today Review, Stock Interest, or Active Ledger evidence may be missing or blocked for this scope.</Typography>
         </Stack>
       </Alert>
@@ -213,7 +215,7 @@ function ShortlistTable({ rows, targetCount }: { rows: DailyReviewShortlistRow[]
                 <TableCell>
                   <Stack spacing={0.25}>
                     <Typography variant="body2">{formatEnum(row.dataQualityStatus)}</Typography>
-                    <Typography variant="caption" color="text.secondary">{firstOrFallback(row.dataQualityReasons, 'No DQ reason in row snapshot.')}</Typography>
+                    <Typography variant="caption" color="text.secondary">{firstOrFallback(row.dataQualityReasons, 'No data quality reason available.')}</Typography>
                   </Stack>
                 </TableCell>
                 <TableCell sx={{ minWidth: 260 }}>
@@ -234,12 +236,38 @@ function ShortlistTable({ rows, targetCount }: { rows: DailyReviewShortlistRow[]
           </TableBody>
         </Table>
       </TableContainer>
-      <Box sx={{ px: 2, pb: 2 }}>
-        <Stack spacing={1}>
-          {rows.map((row) => <ExplainabilityAccordion key={`${row.id}:why`} row={row} />)}
-        </Stack>
-      </Box>
+      <AccordionStack rows={rows} />
     </Paper>
+  );
+}
+
+const ACCORDION_PAGE_SIZE = 10;
+
+function AccordionStack({ rows }: { rows: DailyReviewShortlistRow[] }) {
+  const [expanded, setExpanded] = useState(false);
+  const visible = expanded ? rows : rows.slice(0, ACCORDION_PAGE_SIZE);
+  const hidden = rows.length - ACCORDION_PAGE_SIZE;
+
+  return (
+    <Box sx={{ px: 2, pb: 2 }}>
+      <Stack spacing={1}>
+        {visible.map((row) => <ExplainabilityAccordion key={`${row.id}:why`} row={row} />)}
+      </Stack>
+      {rows.length > ACCORDION_PAGE_SIZE && (
+        <Box sx={{ mt: 1 }}>
+          <Collapse in={!expanded} unmountOnExit>
+            <Button size="small" onClick={() => setExpanded(true)}>
+              Show all ({hidden} more)
+            </Button>
+          </Collapse>
+          <Collapse in={expanded} unmountOnExit>
+            <Button size="small" onClick={() => setExpanded(false)}>
+              Show fewer
+            </Button>
+          </Collapse>
+        </Box>
+      )}
+    </Box>
   );
 }
 
@@ -281,7 +309,7 @@ function EvidencePanels({ data }: { data: DailyReviewShortlistResult }) {
     <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: 'repeat(2, 1fr)' }, gap: 2 }}>
       <Paper variant="outlined" sx={{ p: 2 }}>
         <Stack spacing={1.25}>
-          <SectionTitle title="Review Ready Universe" subtitle="Read from the Market Data / Data Quality readiness contract." />
+          <SectionTitle title="Review Ready Universe" subtitle="Saved readiness status from Market Data / Data Quality." />
           <InlineFact label="Review mode" value={formatEnum(review?.reviewMode)} />
           <InlineFact label="Trust status" value={formatEnum(review?.trustStatus)} />
           <InlineFact label="User decision" value={formatEnum(review?.userDecision)} />
@@ -302,9 +330,9 @@ function EvidencePanels({ data }: { data: DailyReviewShortlistResult }) {
 
       <Paper variant="outlined" sx={{ p: 2 }}>
         <Stack spacing={1.25}>
-          <SectionTitle title="Evidence Caveats" subtitle="Warnings stay visible and secondary to the shortlist answer." />
+          <SectionTitle title="Evidence Caveats" subtitle="Warnings are shown alongside the shortlist for context." />
           {data.sourceWarnings.length === 0 ? (
-            <Typography variant="body2" color="text.secondary">No source warnings were returned by the loaded read models.</Typography>
+            <Typography variant="body2" color="text.secondary">No source warnings.</Typography>
           ) : (
             data.sourceWarnings.slice(0, 6).map((warning) => <Alert key={warning} severity="warning">{warning}</Alert>)
           )}
@@ -330,9 +358,9 @@ function EvidencePanels({ data }: { data: DailyReviewShortlistResult }) {
         <Stack spacing={1.25}>
           <SectionTitle title="Warning-Heavy Rows" subtitle="Blocked, unproven, insufficient-data, or risk-avoid rows are disclosed outside the top-10 list." />
           {data.warningRows.length === 0 ? (
-            <Typography variant="body2" color="text.secondary">No separate warning-heavy rows were returned by the loaded sources.</Typography>
+            <Typography variant="body2" color="text.secondary">No warning-heavy rows in saved data.</Typography>
           ) : (
-            <SimpleRows rows={data.warningRows.slice(0, 8).map((row) => ({
+            <SimpleRows rows={data.warningRows.map((row) => ({
               symbol: row.symbol,
               label: `${row.source} / ${row.severity}`,
               detail: row.reason,
@@ -374,10 +402,16 @@ function InlineFact({ label, value }: { label: string; value: string }) {
   );
 }
 
+const SIMPLE_ROWS_PAGE_SIZE = 10;
+
 function SimpleRows({ rows }: { rows: Array<{ symbol: string; label: string; detail: string }> }) {
+  const [expanded, setExpanded] = useState(false);
+  const visible = expanded ? rows : rows.slice(0, SIMPLE_ROWS_PAGE_SIZE);
+  const hidden = rows.length - SIMPLE_ROWS_PAGE_SIZE;
+
   return (
     <Stack spacing={1}>
-      {rows.map((row) => (
+      {visible.map((row) => (
         <Paper key={`${row.symbol}:${row.detail}`} variant="outlined" sx={{ p: 1.25 }}>
           <Stack spacing={0.25}>
             <Typography fontWeight={800}>{row.symbol}</Typography>
@@ -386,6 +420,20 @@ function SimpleRows({ rows }: { rows: Array<{ symbol: string; label: string; det
           </Stack>
         </Paper>
       ))}
+      {rows.length > SIMPLE_ROWS_PAGE_SIZE && (
+        <>
+          <Collapse in={!expanded} unmountOnExit>
+            <Button size="small" onClick={() => setExpanded(true)}>
+              Show all ({hidden} more)
+            </Button>
+          </Collapse>
+          <Collapse in={expanded} unmountOnExit>
+            <Button size="small" onClick={() => setExpanded(false)}>
+              Show fewer
+            </Button>
+          </Collapse>
+        </>
+      )}
     </Stack>
   );
 }

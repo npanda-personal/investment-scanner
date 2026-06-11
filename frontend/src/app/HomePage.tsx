@@ -1,5 +1,5 @@
-import { MarketPulsePage } from '@/features/market-intelligence/components/MarketIntelligencePages';
+import { MarketOverviewPage } from '@/features/market-intelligence/components/MarketOverviewPage';
 
 export default function HomePage() {
-  return <MarketPulsePage />;
+  return <MarketOverviewPage />;
 }

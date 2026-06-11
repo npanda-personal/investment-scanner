@@ -1,7 +1,12 @@
 import ClearIcon from '@mui/icons-material/Clear';
 import DownloadIcon from '@mui/icons-material/Download';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import SearchIcon from '@mui/icons-material/Search';
 import {
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
   Alert,
   Box,
   Button,
@@ -39,6 +44,7 @@ import { PageHeader } from '@/shared/components/PageHeader';
 import { NotApplicableForAssetClass } from '@/shared/components/NotApplicableForAssetClass';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
 import { humanizeCode, humanizeEmbedded } from '@/shared/format/enumLabels';
+import SignalTrackRecordPanel from '@/features/research-hub/components/SignalTrackRecordPanel';
 import { useTodayReview } from '../hooks/useTodayReview';
 import type {
   TodayReviewCandidate,
@@ -96,8 +102,8 @@ export function TodayReviewPage() {
       <Box className="page-container page-container--workspace">
         <Stack spacing={3}>
           <PageHeader
-            title="Daily Review"
-            subtitle="Persisted research support shortlist built from trusted OHLCV coverage, entry trigger context, exit/invalidation evidence, data quality, and supporting evidence. This page does not run review generation."
+            title="Today's Review"
+            subtitle="Today's research candidates, ranked. Updated daily after market close."
             badges={<Chip label={`${scope.region} / ${scope.assetType}`} color="primary" variant="outlined" />}
           />
           <NotApplicableForAssetClass
@@ -109,90 +115,239 @@ export function TodayReviewPage() {
     );
   }
 
+  // Derive posture strip text from run's persisted regime + marketPosture
+  const sourceSnapshot = run ? sourceSnapshotForRun(run) : null;
+  const runRegime: string | null = (sourceSnapshot as any)?.marketContext?.regime?.regime ?? null;
+  const postureLabel = marketPosture?.availability === 'READY' && marketPosture.postureLabel
+    ? marketPosture.postureLabel
+    : null;
+  const postureStripText = derivePostureStripText(runRegime, postureLabel);
+  const dataThroughLabel = run?.dataThroughDate ? `Data through ${formatDate(run.dataThroughDate)}` : null;
+
+  // Only show the compact warning line above the fold when run is genuinely degraded
+  const showDegradedWarning = run && (run.status === 'PARTIAL' || run.status === 'FAILED');
+  const degradedWarningText = showDegradedWarning
+    ? (run.warnings[0] || `Review status: ${run.status} — some data may be incomplete.`)
+    : null;
+
   return (
     <Box className="page-container page-container--workspace">
-      <Stack spacing={3}>
-      <PageHeader
-        title="Daily Review"
-        subtitle="Persisted research support shortlist built from trusted OHLCV coverage, entry trigger context, exit/invalidation evidence, data quality, and supporting evidence. This page does not run review generation."
-        badges={<Chip label={`${scope.region} / ${scope.assetType}`} color="primary" variant="outlined" />}
-      />
+      <Stack spacing={2}>
+        <PageHeader
+          title="Today's Review"
+          subtitle="Today's research candidates, ranked. Updated daily after market close."
+          badges={<Chip label={`${scope.region} / ${scope.assetType}`} color="primary" variant="outlined" />}
+        />
 
-      {loading && (
-        <Alert severity="info" icon={<CircularProgress size={18} />}>
-          Loading Daily Review for {scope.region} / {scope.assetType}.
-        </Alert>
-      )}
-
-      {error && (
-        <Alert severity="error">
-          {error}
-        </Alert>
-      )}
-
-      {!loading && !error && !run && (
-        <Alert severity="info">
-          No Daily Review snapshot has been published for {scope.region} / {scope.assetType}. Data-production workflows are handled in Admin / Data Ops.
-        </Alert>
-      )}
-
-      {run && (
-        <>
-          <RunStatusPanel run={run} marketPosture={marketPosture} />
-          <CoveragePanel run={run} />
-          {run.warnings.length > 0 && (
-            <Alert severity={run.status === 'PARTIAL' ? 'warning' : 'info'}>
-              {run.warnings.join(' ')}
-            </Alert>
-          )}
-          <Grid container spacing={2}>
-            <SummaryCard label="Long review candidates" value={totals.long} tone="success" />
-            <SummaryCard label="Exit-risk review candidates" value={totals.exit} tone="warning" />
-            <SummaryCard label="Watch only" value={totals.watch} tone="info" />
-            <SummaryCard label="Special cases" value={totals.special} tone="info" />
-            <SummaryCard label="Strategy-backed" value={totals.strategyBacked} tone="success" />
-            <SummaryCard label="Lite discovery" value={totals.lite} tone="default" />
-            <SummaryCard label="Suppressed" value={totals.suppressed} tone="warning" />
-            <SummaryCard label="Blocked" value={totals.blocked} tone="error" />
-            <SummaryCard label="Data gaps/warnings" value={totals.warnings} tone="default" />
-            <SummaryCard label="Missing DQ tier context" value={totals.missingTierContext} tone="warning" />
-          </Grid>
-          <BoardSelectionPanel run={run} />
-          <ExclusionExplainabilityPanel run={run} />
-
-          <Alert severity="info">
-            Signals and calibration are supporting evidence only. Promoted review candidates require trusted price data, enough OHLCV history, entry trigger context, exit/invalidation evidence, and data quality.
+        {loading && (
+          <Alert severity="info" icon={<CircularProgress size={18} />}>
+            Loading Today's Review for {scope.region} / {scope.assetType}.
           </Alert>
-          <Alert severity="info">
-            Data Quality tiers are read-only context from Data Quality Engine and never change Today Review ranking or promotion in this view.
+        )}
+
+        {error && (
+          <Alert severity="error">
+            {error}
           </Alert>
+        )}
 
-          {groups.longReview.length === 0 && (
-            <Alert severity="warning">
-              No long review candidates are currently promoted. Trusted instruments scanned: {formatNumber(run.scanFunnel?.trustedInstrumentsScanned ?? sourceSnapshotForRun(run).scanFunnel?.trustedInstrumentsScanned ?? 0)}; setups detected: {formatNumber(run.scanFunnel?.setupsDetected ?? sourceSnapshotForRun(run).scanFunnel?.setupsDetected ?? 0)}; watch/unproven: {formatNumber((run.scanFunnel?.watchOnly ?? sourceSnapshotForRun(run).scanFunnel?.watchOnly ?? 0) + (run.scanFunnel?.unproven ?? sourceSnapshotForRun(run).scanFunnel?.unproven ?? 0))}.
-            </Alert>
-          )}
+        {!loading && !error && !run && (
+          <Alert severity="info">
+            No review data is available yet for {scope.region} / {scope.assetType}.
+          </Alert>
+        )}
 
-          <Card variant="outlined">
-            <Tabs value={tab} onChange={(_, value) => setTab(value)} variant="scrollable" scrollButtons="auto">
-              {groupTabs.map((item) => (
-                <Tab key={item.key} value={item.key} label={`${item.label} (${candidatesForTab(groups, item.key).length})`} />
-              ))}
-            </Tabs>
-            <CardContent>
-              {activeCandidates.length === 0 ? (
-                <Typography color="text.secondary">
-                  {emptySectionExplanation(tab, run)}
-                </Typography>
-              ) : (
-                <CandidateTable candidates={activeCandidates} run={run} />
-              )}
-            </CardContent>
-          </Card>
-        </>
-      )}
+        {run && (
+          <>
+            {/* A1: Market posture strip — answer-first, single line */}
+            <PostureStrip
+              text={postureStripText}
+              dataThroughLabel={dataThroughLabel}
+              runRegime={runRegime}
+              postureLabel={postureLabel}
+              totals={totals}
+            />
+
+            {/* Only show a compact degraded warning above the fold if genuinely broken */}
+            {degradedWarningText && (
+              <Alert severity="warning" sx={{ py: 0.5 }}>
+                {degradedWarningText}
+              </Alert>
+            )}
+
+            {/* A1: Candidate table immediately below posture strip */}
+            <Card variant="outlined">
+              <Tabs value={tab} onChange={(_, value) => setTab(value)} variant="scrollable" scrollButtons="auto">
+                {groupTabs.map((item) => (
+                  <Tab key={item.key} value={item.key} label={`${item.label} (${candidatesForTab(groups, item.key).length})`} />
+                ))}
+              </Tabs>
+              <CardContent>
+                {activeCandidates.length === 0 ? (
+                  <EmptyTabState tab={tab} run={run} groups={groups} />
+                ) : (
+                  <CandidateTable candidates={activeCandidates} run={run} />
+                )}
+              </CardContent>
+            </Card>
+
+            {/* C1: Track record section */}
+            <SignalTrackRecordPanel />
+
+            {/* A1: Methodology / details accordion — collapsed by default */}
+            <Accordion variant="outlined" disableGutters defaultExpanded={false}>
+              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                <Typography variant="subtitle2">How today's list was built</Typography>
+              </AccordionSummary>
+              <AccordionDetails>
+                <Stack spacing={2}>
+                  <RunStatusPanel run={run} marketPosture={marketPosture} />
+                  <CoveragePanel run={run} />
+                  <BoardSelectionPanel run={run} />
+                  <ExclusionReasonsPanel run={run} />
+                  <Alert severity="info">
+                    Signals and calibration are supporting evidence only. Review candidates require trusted price data, entry trigger context, exit/invalidation evidence, and data quality.
+                  </Alert>
+                  <Alert severity="info">
+                    Data quality tiers shown here are context only and do not affect ranking or promotion.
+                  </Alert>
+                  {run.warnings.length > 0 && (
+                    <Alert severity={run.status === 'PARTIAL' ? 'warning' : 'info'}>
+                      {run.warnings.join(' ')}
+                    </Alert>
+                  )}
+                  <Grid container spacing={2}>
+                    <SummaryCard label="Long review candidates" value={totals.long} tone="success" />
+                    <SummaryCard label="Exit-risk review candidates" value={totals.exit} tone="warning" />
+                    <SummaryCard label="Watch only" value={totals.watch} tone="info" />
+                    <SummaryCard label="Special cases" value={totals.special} tone="info" />
+                    <SummaryCard label="Strategy-backed" value={totals.strategyBacked} tone="success" />
+                    <SummaryCard label="Lite discovery" value={totals.lite} tone="default" />
+                    <SummaryCard label="Suppressed" value={totals.suppressed} tone="warning" />
+                    <SummaryCard label="Blocked" value={totals.blocked} tone="error" />
+                    <SummaryCard label="Data gaps / warnings" value={totals.warnings} tone="default" />
+                    <SummaryCard label="Missing DQ tier context" value={totals.missingTierContext} tone="warning" />
+                  </Grid>
+                </Stack>
+              </AccordionDetails>
+            </Accordion>
+          </>
+        )}
       </Stack>
     </Box>
+  );
+}
+
+/** Derives a plain-English posture strip label from persisted regime + capital posture. */
+function derivePostureStripText(regime: string | null, postureLabel: string | null): string {
+  const label = postureLabel || regime;
+  if (!label) return 'Market context unavailable';
+  if (label === 'RISK_ON') return 'Risk-on — broad participation supported';
+  if (label === 'RISK_OFF') return 'Risk-off — favor caution; selective entries only';
+  if (label === 'NEUTRAL') return 'Neutral — selective participation';
+  // Fallback: humanize whatever code we have
+  return humanizeCode(label);
+}
+
+function PostureStrip({
+  text,
+  dataThroughLabel,
+  runRegime,
+  postureLabel,
+  totals,
+}: {
+  text: string;
+  dataThroughLabel: string | null;
+  runRegime: string | null;
+  postureLabel: string | null;
+  totals: { long: number; watch: number; exit: number; blocked: number };
+}) {
+  const regimeOrPosture = postureLabel || runRegime;
+  const chipColor = regimeOrPosture === 'RISK_ON' ? 'success' : regimeOrPosture === 'RISK_OFF' ? 'error' : regimeOrPosture ? 'warning' : 'default';
+
+  return (
+    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ xs: 'flex-start', sm: 'center' }} flexWrap="wrap" useFlexGap>
+      <Chip
+        label={text}
+        color={chipColor as any}
+        variant="filled"
+        sx={{ fontWeight: 600, fontSize: 13 }}
+      />
+      {dataThroughLabel && (
+        <Typography variant="body2" color="text.secondary">
+          {dataThroughLabel}
+        </Typography>
+      )}
+      <Typography variant="body2" color="text.secondary">·</Typography>
+      <Typography variant="body2" color="text.secondary">
+        {totals.long} candidates · {totals.watch} watch · {totals.blocked} excluded
+      </Typography>
+    </Stack>
+  );
+}
+
+/** Calm thin-day empty state — A4 */
+function EmptyTabState({ tab, run, groups }: { tab: keyof TodayReviewGroups; run: TodayReviewRun; groups: TodayReviewGroups }) {
+  const boardSelection = sourceSnapshotForRun(run).boardSelection || null;
+  const eligibleCounts = boardSelection?.eligibleCounts || {};
+  const sourceSnapshot = sourceSnapshotForRun(run);
+  const runRegime: string | null = (sourceSnapshot as any).marketContext?.regime?.regime ?? null;
+  const watchCount = groups.watchOnly.length + groups.unproven.length + groups.insufficientData.length;
+  const scanFunnel: Partial<TodayReviewScanFunnel> = run.scanFunnel || sourceSnapshot.scanFunnel || {};
+
+  if (tab === 'longReview') {
+    const regimeIsQuiet = runRegime === 'RISK_OFF' || runRegime === 'NEUTRAL';
+    if (regimeIsQuiet && watchCount > 0) {
+      return (
+        <Typography color="text.secondary">
+          Quiet market — {watchCount} {watchCount === 1 ? 'name' : 'names'} worth watching, nothing high-conviction today.
+        </Typography>
+      );
+    }
+    const eligible = (eligibleCounts as any).LONG_REVIEW || 0;
+    if (eligible > 0) {
+      return (
+        <Typography color="text.secondary">
+          No long review candidates reached the board this session. {eligible} {eligible === 1 ? 'name was' : 'names were'} eligible but fell below the quota threshold.
+        </Typography>
+      );
+    }
+    const scanned = scanFunnel.trustedInstrumentsScanned ?? 0;
+    const setupsFound = scanFunnel.setupsDetected ?? 0;
+    return (
+      <Typography color="text.secondary">
+        No setups reached review today.{scanned > 0 ? ` Scanned ${formatNumber(scanned)} instruments — ${formatNumber(setupsFound)} ${setupsFound === 1 ? 'setup' : 'setups'} detected, none promoted.` : ''}
+      </Typography>
+    );
+  }
+  if (tab === 'watchOnly') {
+    const eligible = (eligibleCounts as any).WATCH_ONLY || 0;
+    return (
+      <Typography color="text.secondary">
+        {eligible > 0
+          ? `No watch names on the board this session. ${eligible} ${eligible === 1 ? 'name was' : 'names were'} eligible.`
+          : 'No names in the watch-only section for this session.'}
+      </Typography>
+    );
+  }
+  if (tab === 'exitRiskReview') {
+    return (
+      <Typography color="text.secondary">
+        No exit-risk or short review names this session.
+      </Typography>
+    );
+  }
+  if (tab === 'specialCases') {
+    return (
+      <Typography color="text.secondary">
+        No special cases this session.
+      </Typography>
+    );
+  }
+  return (
+    <Typography color="text.secondary">
+      No candidates in this section for the current session.
+    </Typography>
   );
 }
 
@@ -200,7 +355,6 @@ function RunStatusPanel({ run, marketPosture }: { run: TodayReviewRun | null; ma
   if (!run) return null;
   const sourceSnapshot = sourceSnapshotForRun(run);
   const reviewReadiness = sourceSnapshot.reviewReadiness || {};
-  const reviewUniverse = sourceSnapshot.reviewUniverse || {};
   const postureLabel = marketPosture?.availability === 'READY' && marketPosture.postureLabel
     ? marketPosture.postureLabel
     : null;
@@ -208,48 +362,47 @@ function RunStatusPanel({ run, marketPosture }: { run: TodayReviewRun | null; ma
   const postureBandText = marketPosture?.suggestedExposureBand
     ? ` (${marketPosture.suggestedExposureBand.minPct}–${marketPosture.suggestedExposureBand.maxPct}%)`
     : '';
-  // Run-level market regime from persisted market context snapshot (captured at run-generation time).
   const runRegime: string | null = (sourceSnapshot as any).marketContext?.regime?.regime ?? null;
   const regimeColor = runRegime === 'RISK_ON' ? 'success' : runRegime === 'RISK_OFF' ? 'error' : runRegime ? 'warning' : 'default';
-  // Timestamp for the regime annotation: when the run was generated (finishedAt, else startedAt).
   const runGeneratedAt = run.finishedAt || run.startedAt;
   const runGeneratedLabel = runGeneratedAt ? new Date(runGeneratedAt).toLocaleString() : null;
   return (
     <Card variant="outlined">
       <CardContent>
-        <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} useFlexGap flexWrap="wrap" alignItems={{ xs: 'flex-start', md: 'center' }}>
-          <Chip label={`Run status: ${run.status}`} color={run.status === 'COMPLETED' ? 'success' : run.status === 'PARTIAL' ? 'warning' : 'error'} />
-          <Chip label={`Trust: ${run.trustStatus}`} color={run.trustStatus === 'OK' ? 'success' : run.trustStatus === 'FAILED' ? 'error' : 'warning'} variant="outlined" />
-          <Chip label={`Market Data trust: ${reviewReadiness.trustStatus || 'UNKNOWN'}`} variant="outlined" />
-          {runRegime ? (
-            <Tooltip
-              title={`Regime (as of ${runGeneratedLabel ?? 'run generation'}): ${humanizeCode(runRegime)}. This is the market regime captured when the run was generated — it may differ from the current live regime.`}
-              arrow
-            >
-              <Chip
-                label={`Regime (as of ${runGeneratedLabel ?? 'run'}): ${humanizeCode(runRegime)}`}
-                color={regimeColor as any}
-                variant="filled"
-                size="small"
-              />
-            </Tooltip>
-          ) : null}
-          {marketPosture ? (
-            <Tooltip title={marketPosture.availability !== 'READY' ? 'Capital posture data is unavailable for this run.' : `Suggested exposure band${postureBandText}`} arrow>
-              <Chip
-                label={`Capital Posture: ${postureLabel ?? 'Unavailable'}`}
-                color={postureColor as any}
-                variant="outlined"
-              />
-            </Tooltip>
-          ) : null}
-          <Typography variant="body2" color="text.secondary">Last run: {formatDateTime(run.finishedAt || run.startedAt)}</Typography>
-          <Typography variant="body2" color="text.secondary">Data-through: {formatDate(run.dataThroughDate)}</Typography>
-          <Typography variant="body2" color="text.secondary">Scope: {run.region} / {run.assetType}</Typography>
-          <Typography variant="body2" color="text.secondary">Review mode: {humanizeCode(coverageValue(run, 'mode'))}</Typography>
-          <Typography variant="body2" color="text.secondary">Trusted universe: {formatNumber(Number(coverageValue(run, 'trustedCount') || 0))} / Catalog {formatNumber(Number(coverageValue(run, 'catalogCount') || 0))}</Typography>
-          <Typography variant="body2" color="text.secondary">Required data-through: {reviewUniverse.requiredDataThroughDate || reviewReadiness.requiredDataThroughDate || 'Unavailable'}</Typography>
-          <Typography variant="body2" color="text.secondary">Stored data-through: {reviewUniverse.storedDataThroughDate || reviewReadiness.storedDataThroughDate || reviewUniverse.dataThroughDate || 'Unavailable'}</Typography>
+        <Stack spacing={1}>
+          <Typography variant="subtitle2" color="text.secondary">Session status</Typography>
+          <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} useFlexGap flexWrap="wrap" alignItems={{ xs: 'flex-start', md: 'center' }}>
+            <Chip label={`Status: ${run.status}`} color={run.status === 'COMPLETED' ? 'success' : run.status === 'PARTIAL' ? 'warning' : 'error'} />
+            <Chip label={`Trust: ${run.trustStatus}`} color={run.trustStatus === 'OK' ? 'success' : run.trustStatus === 'FAILED' ? 'error' : 'warning'} variant="outlined" />
+            <Chip label={`Market data trust: ${reviewReadiness.trustStatus || 'UNKNOWN'}`} variant="outlined" />
+            {runRegime ? (
+              <Tooltip
+                title={`Regime (as of ${runGeneratedLabel ?? 'session'}): ${humanizeCode(runRegime)}. Captured when the session was generated — may differ from current live regime.`}
+                arrow
+              >
+                <Chip
+                  label={`Regime: ${humanizeCode(runRegime)}`}
+                  color={regimeColor as any}
+                  variant="filled"
+                  size="small"
+                />
+              </Tooltip>
+            ) : null}
+            {marketPosture ? (
+              <Tooltip title={marketPosture.availability !== 'READY' ? 'Capital posture data is unavailable for this session.' : `Suggested exposure band${postureBandText}`} arrow>
+                <Chip
+                  label={`Capital posture: ${postureLabel ?? 'Unavailable'}`}
+                  color={postureColor as any}
+                  variant="outlined"
+                />
+              </Tooltip>
+            ) : null}
+            <Typography variant="body2" color="text.secondary">Last updated: {formatDateTime(run.finishedAt || run.startedAt)}</Typography>
+            <Typography variant="body2" color="text.secondary">Data through: {formatDate(run.dataThroughDate)}</Typography>
+            <Typography variant="body2" color="text.secondary">Scope: {run.region} / {run.assetType}</Typography>
+            <Typography variant="body2" color="text.secondary">Mode: {humanizeCode(coverageValue(run, 'mode'))}</Typography>
+            <Typography variant="body2" color="text.secondary">Trusted universe: {formatNumber(Number(coverageValue(run, 'trustedCount') || 0))} / Catalog {formatNumber(Number(coverageValue(run, 'catalogCount') || 0))}</Typography>
+          </Stack>
         </Stack>
       </CardContent>
     </Card>
@@ -270,64 +423,56 @@ function CoveragePanel({ run }: { run: TodayReviewRun }) {
     <Card variant="outlined">
       <CardContent>
         <Stack spacing={1.5}>
-          <Typography variant="subtitle2">Trusted baseline context (read-only source: Market Data Foundation)</Typography>
+          <Typography variant="subtitle2">Price data coverage</Typography>
           <Stack direction={{ xs: 'column', md: 'row' }} spacing={1} useFlexGap flexWrap="wrap">
-            <Chip label={`Review mode: ${humanizeCode(coverageValue(run, 'mode'))}`} color={coverageValue(run, 'mode') === 'FULL_REVIEW' ? 'success' : coverageValue(run, 'mode') === 'LIMITED_REVIEW' ? 'warning' : 'default'} />
-            <Chip label={`Trusted universe: ${formatNumber(Number(coverageValue(run, 'trustedCount') || 0))}`} variant="outlined" />
+            <Chip label={`Mode: ${humanizeCode(coverageValue(run, 'mode'))}`} color={coverageValue(run, 'mode') === 'FULL_REVIEW' ? 'success' : coverageValue(run, 'mode') === 'LIMITED_REVIEW' ? 'warning' : 'default'} />
+            <Chip label={`Trusted: ${formatNumber(Number(coverageValue(run, 'trustedCount') || 0))}`} variant="outlined" />
             <Chip label={`Catalog: ${formatNumber(Number(coverageValue(run, 'catalogCount') || 0))}`} variant="outlined" />
-            <Chip label={`Review session: ${reviewUniverse.targetTradingDate || 'Unavailable'}`} variant="outlined" />
-            <Chip label={`Required data-through: ${reviewUniverse.requiredDataThroughDate || 'Unavailable'}`} variant="outlined" />
-            <Chip label={`Stored data-through: ${reviewUniverse.storedDataThroughDate || reviewUniverse.dataThroughDate || formatDate(run.dataThroughDate)}`} variant="outlined" />
-            <Chip label={`Readiness decision: ${humanizeCode(reviewReadiness.userDecision || 'WAIT')}`} variant="outlined" />
+            <Chip label={`Session date: ${reviewUniverse.targetTradingDate || 'Unavailable'}`} variant="outlined" />
+            <Chip label={`Data through: ${reviewUniverse.storedDataThroughDate || reviewUniverse.dataThroughDate || formatDate(run.dataThroughDate)}`} variant="outlined" />
           </Stack>
           {missingReadiness && (
             <Alert severity="warning">
-              Market Data readiness snapshot is missing from this run. Conservative context mode is active for run-level evidence.
+              Some market context was unavailable when this list was built; a conservative view is shown.
             </Alert>
           )}
           {reviewModeMismatch && (
             <Alert severity="error">
-              Today Review readiness mode does not match the Market Data summary snapshot.
+              Today Review readiness mode does not match the market data summary.
             </Alert>
           )}
           {reviewReadiness.reviewMode && (
             <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} useFlexGap flexWrap="wrap">
-              <Typography variant="caption">Market Data summary mode: {humanizeCode(reviewReadiness.reviewMode)}</Typography>
+              <Typography variant="caption">Market data mode: {humanizeCode(reviewReadiness.reviewMode)}</Typography>
               <Typography variant="caption">Trust status: {humanizeCode(reviewReadiness.trustStatus || 'UNKNOWN')}</Typography>
-              <Typography variant="caption">Next bounded action: {reviewReadiness.nextAction?.label || 'none'}</Typography>
-              <Typography variant="caption">Batch size: {reviewReadiness.nextAction?.boundedRequest?.batchSize || 'n/a'}</Typography>
             </Stack>
           )}
           {coverageValue(run, 'mode') === 'LIMITED_REVIEW' && (
             <Alert severity="warning">
-              Limited review mode: candidates are generated only from stocks with current price, sufficient OHLCV history, and recent volume. Missing sector/market-cap data is shown as context gaps.
+              Limited review mode: candidates are generated only from stocks with current price, enough price history, and recent volume. Missing sector/market-cap data is shown as context gaps.
             </Alert>
           )}
           {coverageValue(run, 'mode') === 'NO_REVIEW' && (
             <Alert severity="warning">
-              No review mode: trusted price-action universe is unavailable or below the lite threshold. Today review cannot publish candidates until the trusted-universe evidence is ready.
+              No review mode: trusted price-action universe is unavailable. Review cannot publish candidates until price data is ready.
             </Alert>
           )}
           {trustedLoadStatus === 'LOAD_FAILED' && (
             <Alert severity="error">
-              Trusted universe membership unavailable. {membershipFailureReason || 'Today review cannot publish candidates until membership can be loaded reliably.'}
+              Price data universe unavailable. {membershipFailureReason || 'Review cannot publish candidates until the universe can be loaded reliably.'}
             </Alert>
           )}
           {trustedLoadStatus === 'CONFIGURED_PARTIAL' && (
             <Alert severity="warning">
-              Partial trusted-universe scan: scanned {formatNumber(scanFunnel.trustedInstrumentsScanned)} of {formatNumber(scanFunnel.trustedUniverseCount)} instruments using {scanFunnel.scanOrdering || 'configured'} ordering.
+              Partial scan: scanned {formatNumber(scanFunnel.trustedInstrumentsScanned)} of {formatNumber(scanFunnel.trustedUniverseCount)} instruments.
             </Alert>
           )}
           <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} useFlexGap flexWrap="wrap">
-            <Typography variant="caption">Trusted available: {formatNumber(Number(scanFunnel.trustedUniverseCount ?? coverageValue(run, 'trustedCount') ?? 0))}</Typography>
             <Typography variant="caption">Scanned: {formatNumber(scanFunnel.trustedInstrumentsScanned)}</Typography>
-            <Typography variant="caption">Scan complete: {scanFunnel.scanComplete === false ? 'no' : 'yes'}</Typography>
-            <Typography variant="caption">Membership load: {trustedLoadStatus}</Typography>
             <Typography variant="caption">Setups detected: {formatNumber(scanFunnel.setupsDetected)}</Typography>
             <Typography variant="caption">Promoted: {formatNumber(scanFunnel.promotedCandidates)}</Typography>
             <Typography variant="caption">Watch/unproven: {formatNumber((scanFunnel.watchOnly || 0) + (scanFunnel.unproven || 0))}</Typography>
             <Typography variant="caption">Blocked: {formatNumber(scanFunnel.blocked)}</Typography>
-            <Typography variant="caption">Strategy outside trusted universe: {formatNumber(scanFunnel.outsideTrustedUniverse)}</Typography>
           </Stack>
           {warnings.slice(0, 3).map((warning: string, warningIndex: number) => (
             <Typography key={`warning-${warningIndex}-${warning}`} variant="caption" color="text.secondary">{warning}</Typography>
@@ -338,7 +483,7 @@ function CoveragePanel({ run }: { run: TodayReviewRun }) {
   );
 }
 
-function ExclusionExplainabilityPanel({ run }: { run: TodayReviewRun }) {
+function ExclusionReasonsPanel({ run }: { run: TodayReviewRun }) {
   const explainability = run.explainability || sourceSnapshotForRun(run).explainability;
   if (!explainability) return null;
   const summaries = explainability.exclusionSummaries || [];
@@ -357,7 +502,7 @@ function ExclusionExplainabilityPanel({ run }: { run: TodayReviewRun }) {
             <Chip label={`Insufficient data ${formatNumber(explainability.insufficientDataCount)}`} variant="outlined" />
           </Stack>
           {summaries.length === 0 ? (
-            <Typography color="text.secondary">No exclusion summary was stored for this run.</Typography>
+            <Typography color="text.secondary">No exclusion summary was stored for this session.</Typography>
           ) : (
             <Stack direction={{ xs: 'column', md: 'row' }} spacing={1} useFlexGap flexWrap="wrap">
               {summaries.slice(0, 8).map((summary: any) => (
@@ -372,13 +517,13 @@ function ExclusionExplainabilityPanel({ run }: { run: TodayReviewRun }) {
           )}
           {examples.length > 0 && (
             <TableContainer>
-              <Table size="small" aria-label="Today review excluded examples">
+              <Table size="small" aria-label="Excluded examples">
                 <TableHead>
                   <TableRow>
                     <TableCell>Excluded example</TableCell>
                     <TableCell>Primary reason</TableCell>
                     <TableCell>Categories</TableCell>
-                    <TableCell>Promotion</TableCell>
+                    <TableCell>Promoted</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -422,7 +567,7 @@ function BoardSelectionPanel({ run }: { run: TodayReviewRun }) {
   if (!boardSelection) {
     return (
       <Alert severity="info">
-        Board contract metadata is unavailable for this persisted run. Legacy snapshots still use state-based grouping.
+        List layout metadata is unavailable for this session. Older saved data uses state-based grouping.
       </Alert>
     );
   }
@@ -436,10 +581,7 @@ function BoardSelectionPanel({ run }: { run: TodayReviewRun }) {
     <Card variant="outlined">
       <CardContent>
         <Stack spacing={1.25}>
-          <Stack direction="row" spacing={1} alignItems="center" useFlexGap flexWrap="wrap">
-            <Typography variant="h6">Board Contract</Typography>
-            <Chip label={boardSelection.contractVersion} size="small" variant="outlined" />
-          </Stack>
+          <Typography variant="h6">How today's list was built</Typography>
           <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
             {sections.map((section) => (
               <Chip
@@ -463,6 +605,7 @@ function BoardSelectionPanel({ run }: { run: TodayReviewRun }) {
   );
 }
 
+// --- A3: Updated column definitions ---
 type SortDirection = 'asc' | 'desc';
 type SortKey =
   | 'rank'
@@ -489,6 +632,7 @@ interface CandidateColumn {
   label: string;
   width: number;
   align?: 'left' | 'right' | 'center';
+  primary?: boolean; // shown by default; false = in "More" secondary set
   value: (candidate: TodayReviewCandidate) => string | number;
   render: (candidate: TodayReviewCandidate) => ReactNode;
 }
@@ -521,7 +665,7 @@ function csvCell(value: string | number | null | undefined): string {
 function downloadTodayReviewCsv(rows: TodayReviewCandidate[], tabLabel: string) {
   const header = todayReviewExportColumns.map((column) => csvCell(column.label)).join(',');
   const body = rows.map((candidate) => todayReviewExportColumns.map((column) => csvCell(column.value(candidate))).join(',')).join('\r\n');
-  const csv = `\uFEFF${header}\r\n${body}`;
+  const csv = `﻿${header}\r\n${body}`;
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -536,7 +680,6 @@ function downloadTodayReviewCsv(rows: TodayReviewCandidate[], tabLabel: string) 
 
 function CandidateTable({ candidates, run }: { candidates: TodayReviewCandidate[]; run: TodayReviewRun | null }) {
   const navigate = useNavigate();
-  // Run-level regime from persisted market context — used as per-row fallback when per-candidate snapshot lacks it.
   const runRegime: string | null = run ? ((sourceSnapshotForRun(run) as any).marketContext?.regime?.regime ?? null) : null;
   const [query, setQuery] = useState('');
   const [gradeFilter, setGradeFilter] = useState('ALL');
@@ -547,6 +690,7 @@ function CandidateTable({ candidates, run }: { candidates: TodayReviewCandidate[
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [showSecondaryColumns, setShowSecondaryColumns] = useState(false);
   const candidateKey = useMemo(() => candidates.map((candidate) => candidate.id).join('|'), [candidates]);
 
   useEffect(() => {
@@ -571,33 +715,56 @@ function CandidateTable({ candidates, run }: { candidates: TodayReviewCandidate[
     });
   }, [candidates, dataQualityFilter, gradeFilter, query, readinessFilter]);
 
-  const columns = useMemo<CandidateColumn[]>(() => [
+  // A3: primary columns (answer-first) + secondary ("More") columns
+  const allColumns = useMemo<CandidateColumn[]>(() => [
+    // --- Primary columns ---
     {
       id: 'rank',
       label: 'Rank',
       width: 72,
       align: 'right',
+      primary: true,
       value: (candidate) => candidate.rank,
       render: (candidate) => <EllipsisCell fullText={String(candidate.rank)} align="right" strong />,
     },
     {
       id: 'symbol',
-      label: 'Symbol',
-      width: 170,
+      label: 'Symbol / Company',
+      width: 190,
+      primary: true,
       value: (candidate) => `${candidate.symbol} ${candidate.companyName || ''}`,
       render: (candidate) => (
         <Stack spacing={0.5} alignItems="flex-start">
-          <Tooltip title={`${candidate.symbol} - ${candidate.companyName || 'Company unavailable'}`} arrow enterDelay={350}>
-            <Link
-              component={RouterLink}
-              to={`/today-review/candidates/${candidate.id}`}
-              fontWeight={700}
-              onClick={(event) => event.stopPropagation()}
-              sx={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-            >
-              {candidate.symbol}
-            </Link>
-          </Tooltip>
+          <Stack direction="row" spacing={0.5} alignItems="center">
+            <Tooltip title={`${candidate.symbol} - ${candidate.companyName || 'Company unavailable'}`} arrow enterDelay={350}>
+              <Link
+                component={RouterLink}
+                to={`/today-review/candidates/${candidate.id}`}
+                fontWeight={700}
+                onClick={(event) => event.stopPropagation()}
+                sx={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+              >
+                {candidate.symbol}
+              </Link>
+            </Tooltip>
+            {candidate.instrumentId && (
+              <Tooltip title="Open stock workspace" arrow enterDelay={200}>
+                <Link
+                  component={RouterLink}
+                  to={`/stocks/${candidate.instrumentId}`}
+                  onClick={(event) => event.stopPropagation()}
+                  sx={{ display: 'flex', alignItems: 'center', color: 'text.secondary', '&:hover': { color: 'primary.main' } }}
+                >
+                  <OpenInNewIcon sx={{ fontSize: 13 }} />
+                </Link>
+              </Tooltip>
+            )}
+          </Stack>
+          {candidate.companyName && (
+            <Typography component="span" variant="caption" color="text.secondary" sx={{ fontSize: 11, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 180 }}>
+              {candidate.companyName}
+            </Typography>
+          )}
           <EarningsProximityChip earningsProximity={candidate.earningsProximity} />
           <FnoBanChip inFnoBan={candidate.inFnoBan} />
           <SmartMoneyChip status={candidate.smartMoneyStatus} score={candidate.smartMoneyScore} />
@@ -607,44 +774,18 @@ function CandidateTable({ candidates, run }: { candidates: TodayReviewCandidate[
     },
     {
       id: 'state',
-      label: 'State',
-      width: 160,
+      label: 'Direction / State',
+      width: 140,
+      primary: true,
       value: (candidate) => stateLabel(candidate.state),
       render: (candidate) => <EllipsisCell fullText={stateLabel(candidate.state)} />,
     },
     {
-      id: 'setup',
-      label: 'Setup',
-      width: 170,
-      value: (candidate) => humanizeCode(candidate.setupType || candidate.strategyCode),
-      render: (candidate) => <EllipsisCell fullText={humanizeCode(candidate.setupType || candidate.strategyCode)} />,
-    },
-    {
-      id: 'board',
-      label: 'Board',
-      width: 230,
-      value: (candidate) => `${boardSectionLabel(candidate)} ${boardSourceLabel(candidate)} ${humanizeEmbedded(candidate.boardReason) || ''}`,
-      render: (candidate) => <EllipsisCell fullText={`${boardSectionLabel(candidate)} / ${boardSourceLabel(candidate)} - ${humanizeEmbedded(candidate.boardReason) || 'Standard board selection.'}`} />,
-    },
-    {
-      id: 'entry',
-      label: 'Entry evidence',
-      width: 190,
-      value: (candidate) => formatEntry(candidate.tradePlanSnapshot as any),
-      render: (candidate) => <EllipsisCell fullText={formatEntry(candidate.tradePlanSnapshot as any)} />,
-    },
-    {
-      id: 'exit',
-      label: 'Exit / invalidation',
-      width: 240,
-      value: (candidate) => formatStop(candidate.tradePlanSnapshot as any, candidate),
-      render: (candidate) => <EllipsisCell fullText={formatStop(candidate.tradePlanSnapshot as any, candidate)} />,
-    },
-    {
       id: 'confidence',
-      label: 'Confidence',
-      width: 140,
+      label: 'Score',
+      width: 100,
       align: 'right',
+      primary: true,
       value: (candidate) => Number(candidate.confidenceScore || 0),
       render: (candidate) => {
         const confidence = confidenceDisplay(candidate);
@@ -652,9 +793,77 @@ function CandidateTable({ candidates, run }: { candidates: TodayReviewCandidate[
       },
     },
     {
+      id: 'reason',
+      label: 'Why',
+      width: 280,
+      primary: true,
+      value: (candidate) => safeReviewText(candidate.reasonSummary),
+      render: (candidate) => (
+        <Tooltip title={safeReviewText(candidate.reasonSummary)} arrow enterDelay={200} placement="top">
+          <Typography
+            component="span"
+            sx={{ display: 'block', maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 'inherit' }}
+          >
+            {safeReviewText(candidate.reasonSummary) || '—'}
+          </Typography>
+        </Tooltip>
+      ),
+    },
+    {
+      id: 'entry',
+      label: 'Entry zone',
+      width: 190,
+      primary: true,
+      value: (candidate) => formatEntry(candidate.tradePlanSnapshot as any),
+      render: (candidate) => <EllipsisCell fullText={formatEntry(candidate.tradePlanSnapshot as any)} />,
+    },
+    {
+      id: 'exit',
+      label: 'Invalidation',
+      width: 240,
+      primary: true,
+      value: (candidate) => formatStop(candidate.tradePlanSnapshot as any, candidate),
+      render: (candidate) => <EllipsisCell fullText={formatStop(candidate.tradePlanSnapshot as any, candidate)} />,
+    },
+    {
+      id: 'sector',
+      label: 'Sector',
+      width: 200,
+      primary: true,
+      value: sectorAlignment,
+      render: (candidate) => <SectorCell candidate={candidate} />,
+    },
+    {
+      id: 'market',
+      label: 'Regime',
+      width: 120,
+      primary: true,
+      value: (candidate) => marketLabel(candidate, runRegime),
+      render: (candidate) => <EllipsisCell fullText={marketLabel(candidate, runRegime)} />,
+    },
+
+    // --- Secondary (operator / "More") columns ---
+    {
+      id: 'setup',
+      label: 'Setup',
+      width: 170,
+      primary: false,
+      value: (candidate) => humanizeCode(candidate.setupType || candidate.strategyCode),
+      render: (candidate) => <EllipsisCell fullText={humanizeCode(candidate.setupType || candidate.strategyCode)} />,
+    },
+    {
+      id: 'board',
+      label: 'Source',
+      width: 230,
+      primary: false,
+      value: (candidate) => `${boardSectionLabel(candidate)} ${boardSourceLabel(candidate)} ${humanizeEmbedded(candidate.boardReason) || ''}`,
+      render: (candidate) => <EllipsisCell fullText={`${boardSectionLabel(candidate)} / ${boardSourceLabel(candidate)} - ${humanizeEmbedded(candidate.boardReason) || 'Standard selection.'}`} />,
+    },
+    {
       id: 'grade',
       label: 'Grade',
       width: 104,
+      primary: false,
       value: (candidate) => gradeSortValue(candidate.grade),
       render: (candidate) => <Chip label={candidate.grade} size="small" color={gradeColor(candidate.grade) as any} sx={chipNoWrapSx} />,
     },
@@ -662,6 +871,7 @@ function CandidateTable({ candidates, run }: { candidates: TodayReviewCandidate[
       id: 'dailyReview',
       label: 'Daily tier',
       width: 150,
+      primary: false,
       value: (candidate) => tierContextForCandidate(candidate).dailyReview.status,
       render: (candidate) => {
         const tier = tierContextForCandidate(candidate).dailyReview;
@@ -672,6 +882,7 @@ function CandidateTable({ candidates, run }: { candidates: TodayReviewCandidate[
       id: 'automation',
       label: 'Automation',
       width: 150,
+      primary: false,
       value: (candidate) => tierContextForCandidate(candidate).automation.status,
       render: (candidate) => {
         const tier = tierContextForCandidate(candidate).automation;
@@ -682,6 +893,7 @@ function CandidateTable({ candidates, run }: { candidates: TodayReviewCandidate[
       id: 'dataFreshness',
       label: 'Data through',
       width: 140,
+      primary: false,
       value: (candidate) => latestDataDate(candidate),
       render: (candidate) => <EllipsisCell fullText={formatDate(latestDataDate(candidate))} />,
     },
@@ -689,6 +901,7 @@ function CandidateTable({ candidates, run }: { candidates: TodayReviewCandidate[
       id: 'dataQuality',
       label: 'DQ',
       width: 150,
+      primary: false,
       value: dataQualityLabel,
       render: (candidate) => <EllipsisCell fullText={dataQualityLabel(candidate)} />,
     },
@@ -696,44 +909,31 @@ function CandidateTable({ candidates, run }: { candidates: TodayReviewCandidate[
       id: 'proof',
       label: 'Proof',
       width: 130,
+      primary: false,
       value: proofLabel,
       render: (candidate) => <EllipsisCell fullText={proofLabel(candidate)} />,
-    },
-    {
-      id: 'market',
-      label: 'Regime',
-      width: 140,
-      value: (candidate) => marketLabel(candidate, runRegime),
-      render: (candidate) => <EllipsisCell fullText={marketLabel(candidate, runRegime)} />,
-    },
-    {
-      id: 'sector',
-      label: 'Sector',
-      width: 200,
-      value: sectorAlignment,
-      render: (candidate) => <SectorCell candidate={candidate} />,
-    },
-    {
-      id: 'reason',
-      label: 'Reason',
-      width: 320,
-      value: (candidate) => safeReviewText(candidate.reasonSummary),
-      render: (candidate) => <EllipsisCell fullText={safeReviewText(candidate.reasonSummary)} />,
     },
     {
       id: 'blocker',
       label: 'Blocker',
       width: 300,
+      primary: false,
       value: (candidate) => safeReviewText(blockerLabel(candidate)),
       render: (candidate) => <EllipsisCell fullText={safeReviewText(blockerLabel(candidate))} />,
     },
-  ], []);
+  ], [runRegime]);
+
+  const columns = useMemo(
+    () => allColumns.filter((col) => col.primary || showSecondaryColumns),
+    [allColumns, showSecondaryColumns]
+  );
+
   const tableMinWidth = useMemo(() => columns.reduce((total, column) => total + column.width, 0), [columns]);
 
   const sortedCandidates = useMemo(() => {
-    const column = columns.find((item) => item.id === sortBy) || columns[0];
+    const column = allColumns.find((item) => item.id === sortBy) || allColumns[0];
     return [...filteredCandidates].sort((a, b) => compareValues(column.value(a), column.value(b), sortDirection));
-  }, [columns, filteredCandidates, sortBy, sortDirection]);
+  }, [allColumns, filteredCandidates, sortBy, sortDirection]);
 
   const pagedCandidates = useMemo(() => {
     const start = page * pageSize;
@@ -768,7 +968,7 @@ function CandidateTable({ candidates, run }: { candidates: TodayReviewCandidate[
 
   const exportTable = () => {
     downloadTodayReviewCsv(sortedCandidates, 'current-table');
-    setActionMessage(`Exported ${sortedCandidates.length} Today Review rows as an Excel-compatible CSV.`);
+    setActionMessage(`Exported ${sortedCandidates.length} rows as CSV.`);
   };
 
   const missingTierCount = useMemo(() => candidates.filter(hasMissingTierContext).length, [candidates]);
@@ -778,13 +978,13 @@ function CandidateTable({ candidates, run }: { candidates: TodayReviewCandidate[
       {actionMessage && <Alert severity="success">{actionMessage}</Alert>}
       {missingTierCount > 0 && (
         <Alert severity="info">
-          Confidence scores are conservatively downgraded where DQ tier context is missing ({missingTierCount} of {candidates.length} candidates in this view). Scores shown as &ldquo;X (from Y)&rdquo; are display-only adjustments and do not affect ranking.
+          Confidence scores are conservatively downgraded where data quality tier context is missing ({missingTierCount} of {candidates.length} candidates in this view). Scores shown as &ldquo;X (from Y)&rdquo; are display-only adjustments and do not affect ranking.
         </Alert>
       )}
       <Box
         sx={{
           display: 'grid',
-          gridTemplateColumns: { xs: '1fr', md: 'minmax(260px, 1.2fr) repeat(3, minmax(150px, 0.55fr)) auto auto' },
+          gridTemplateColumns: { xs: '1fr', md: 'minmax(260px, 1.2fr) repeat(3, minmax(150px, 0.55fr)) auto auto auto' },
           gap: 1.25,
           alignItems: 'center',
         }}
@@ -853,7 +1053,7 @@ function CandidateTable({ candidates, run }: { candidates: TodayReviewCandidate[
             {filterOptions.dataQuality.map((status) => <MenuItem key={status} value={status}>{status}</MenuItem>)}
           </Select>
         </FormControl>
-        <Tooltip title="Clear table filters" arrow>
+        <Tooltip title="Clear filters" arrow>
           <span>
             <IconButton
               aria-label="Clear table filters"
@@ -867,6 +1067,14 @@ function CandidateTable({ candidates, run }: { candidates: TodayReviewCandidate[
           </span>
         </Tooltip>
         <Button
+          variant={showSecondaryColumns ? 'contained' : 'outlined'}
+          size="small"
+          onClick={() => setShowSecondaryColumns((prev) => !prev)}
+          sx={{ justifySelf: { xs: 'start', md: 'end' }, whiteSpace: 'nowrap' }}
+        >
+          {showSecondaryColumns ? 'Fewer columns' : 'More columns'}
+        </Button>
+        <Button
           variant="outlined"
           startIcon={<DownloadIcon />}
           onClick={exportTable}
@@ -879,10 +1087,10 @@ function CandidateTable({ candidates, run }: { candidates: TodayReviewCandidate[
 
       <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1}>
         <Typography variant="caption" color="text.secondary">
-          Showing {filteredCandidates.length === 0 ? 0 : page * pageSize + 1}-{Math.min((page + 1) * pageSize, filteredCandidates.length)} of {filteredCandidates.length} filtered candidates.
+          Showing {filteredCandidates.length === 0 ? 0 : page * pageSize + 1}–{Math.min((page + 1) * pageSize, filteredCandidates.length)} of {filteredCandidates.length} candidates.
         </Typography>
         <Typography variant="caption" color="text.secondary">
-          Hover any clipped cell to read the full value.
+          Click any row to open detail. Hover clipped cells for full text.
         </Typography>
       </Stack>
 
@@ -944,7 +1152,7 @@ function CandidateTable({ candidates, run }: { candidates: TodayReviewCandidate[
             {pagedCandidates.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={columns.length} sx={{ py: 4, textAlign: 'center' }}>
-                  <Typography color="text.secondary">No candidates match the current table filters.</Typography>
+                  <Typography color="text.secondary">No candidates match the current filters.</Typography>
                 </TableCell>
               </TableRow>
             ) : pagedCandidates.map((candidate) => (
@@ -1115,7 +1323,7 @@ function FnoBanChip({ inFnoBan }: { inFnoBan?: boolean }) {
 
 /**
  * NR-101: Small chip showing the smart-money accumulation/distribution status.
- * Green for ACCUMULATION, red for DISTRIBUTION. Renders "—" (absent) when no snapshot.
+ * Green for ACCUMULATION, red for DISTRIBUTION.
  */
 function SmartMoneyChip({ status, score }: { status?: 'ACCUMULATION' | 'DISTRIBUTION' | 'NEUTRAL' | null; score?: number | null }) {
   if (!status) return null;
@@ -1143,13 +1351,8 @@ function SmartMoneyChip({ status, score }: { status?: 'ACCUMULATION' | 'DISTRIBU
 
 /**
  * NR-85 / NR-95: Reads 52-week range position.
- * Primary: read-time fields (range52wPositionPct etc.) computed at backend read time
- * from price_ticks — available for every candidate including legacy runs.
- * Fallback: persisted priceBehaviour snapshot (lite path only, new runs).
- * Returns null only when the stock genuinely lacks 52w price history.
  */
 function range52wFromCandidate(candidate: TodayReviewCandidate): { positionPct: number; high: number; low: number; current: number } | null {
-  // Prefer read-time fields (NR-95 — covers legacy + new runs)
   if (
     typeof candidate.range52wPositionPct === 'number' &&
     typeof candidate.range52wHigh === 'number' &&
@@ -1163,7 +1366,6 @@ function range52wFromCandidate(candidate: TodayReviewCandidate): { positionPct: 
       current: candidate.range52wCurrentClose,
     };
   }
-  // Fallback: lite snapshot priceBehaviour (NR-85 — new runs only)
   const signal = candidate.sourceSignalSnapshot as any;
   const pb = signal?.priceBehaviour;
   if (!pb) return null;
@@ -1177,8 +1379,6 @@ function range52wFromCandidate(candidate: TodayReviewCandidate): { positionPct: 
 
 /**
  * NR-85: Small inline 52-week range position indicator shown below the symbol.
- * Shows "X% of 52w range" as a percentage text + mini progress bar.
- * Renders "—" when 52w data is absent (strategy path or legacy runs).
  */
 function RangePositionIndicator({ candidate }: { candidate: TodayReviewCandidate }) {
   const range = range52wFromCandidate(candidate);
@@ -1308,7 +1508,6 @@ function proofLabel(candidate: TodayReviewCandidate) {
 
 function marketLabel(candidate: TodayReviewCandidate, runRegime?: string | null) {
   const market = candidate.marketContextSnapshot as any;
-  // Per-candidate snapshot (strategy path). Falls back to run-level regime (lite path + legacy runs).
   const regime = market?.regime?.regime || runRegime || null;
   return regime ? humanizeCode(regime) : '—';
 }
@@ -1343,23 +1542,23 @@ function tierContextForCandidate(candidate: TodayReviewCandidate): CandidateTier
 
   const dailyReviewStatus: TierStatus = dailyReview?.status || 'MISSING';
   const automationStatus: TierStatus = automation ? 'BLOCKED' : 'MISSING';
-  const missingTierBlocker = 'Data Quality use-case tier context is missing; confidence view is conservatively downgraded.';
+  const missingTierBlocker = 'Data quality tier context is missing; confidence is shown conservatively.';
   const upstreamAutomationStatus = automation?.status || null;
 
   return {
     dailyReview: {
       status: dailyReviewStatus,
       label: dailyReview ? `Daily: ${dailyReview.status}` : '—',
-      reason: dailyReview?.reasons?.[0] || (dailyReview ? null : 'Daily review tier not available in this run snapshot.'),
+      reason: dailyReview?.reasons?.[0] || (dailyReview ? null : 'Daily review tier not available for this session.'),
     },
     automation: {
       status: automationStatus,
       label: automation ? 'Automation: BLOCKED' : '—',
       reason: !automation
-        ? 'Automation tier not available; execution remains policy-blocked.'
+        ? 'Automation tier not available; trading is not enabled.'
         : upstreamAutomationStatus !== 'BLOCKED'
-          ? `Upstream tier reported ${upstreamAutomationStatus}; Today Review keeps automation policy-blocked (PHASE0_AUTOMATION_NOT_AUTHORIZED).`
-          : automation.reasons?.[0] || 'PHASE0_AUTOMATION_NOT_AUTHORIZED',
+          ? `Upstream tier reported ${upstreamAutomationStatus}; automated trading is not enabled in this phase.`
+          : automation.reasons?.[0] || 'Automated trading is not enabled.',
     },
     blocker: !tiers
       ? missingTierBlocker
@@ -1374,7 +1573,7 @@ function confidenceDisplay(candidate: TodayReviewCandidate) {
   const hasContext = !hasMissingTierContext(candidate);
   if (hasContext) return { label: String(score), note: null as string | null };
   const conservative = Math.max(0, Math.round(score * 0.8));
-  return { label: `${conservative} (from ${score})`, note: 'Conservative display-only downgrade: missing DQ tier context' };
+  return { label: `${conservative} (from ${score})`, note: 'Conservative view: data quality tier context missing' };
 }
 
 function candidatesForTab(groups: TodayReviewGroups, tab: keyof TodayReviewGroups) {
@@ -1383,16 +1582,6 @@ function candidatesForTab(groups: TodayReviewGroups, tab: keyof TodayReviewGroup
   if (tab === 'specialCases') return groups.specialCases;
   if (tab === 'blocked') return [...groups.blocked, ...groups.avoid];
   return groups[tab] || [];
-}
-
-function emptySectionExplanation(tab: keyof TodayReviewGroups, run: TodayReviewRun) {
-  const boardSelection = sourceSnapshotForRun(run).boardSelection || null;
-  const eligibleCounts = boardSelection?.eligibleCounts || {};
-  if (tab === 'longReview') return `No Long Review rows were displayed. Eligible Long Review candidates: ${formatNumber((eligibleCounts as any).LONG_REVIEW || 0)}.`;
-  if (tab === 'watchOnly') return `No Watch Only rows were displayed. Eligible Watch Only candidates: ${formatNumber((eligibleCounts as any).WATCH_ONLY || 0)}.`;
-  if (tab === 'exitRiskReview') return `No Exit Risk or Short Review rows were displayed. Eligible exit/short-risk candidates: ${formatNumber((eligibleCounts as any).EXIT_RISK || 0)}.`;
-  if (tab === 'specialCases') return `No SPECIAL_CASES rows matched existing overlap, ledger, Stock Interest, newly appeared, or high-quality missing-evidence rules. Eligible special cases: ${formatNumber((eligibleCounts as any).SPECIAL_CASES || 0)}.`;
-  return 'No candidates in this section for the current persisted run.';
 }
 
 function emptyGroups(): TodayReviewGroups {
@@ -1482,8 +1671,6 @@ function gradeColor(grade: string) {
 }
 
 function sectorAlignment(candidate: TodayReviewCandidate) {
-  // Primary: catalog sector joined at read time (always present for legacy + new runs).
-  // Fallbacks: snapshot paths retained for forward-compatibility.
   const dq = candidate.dataQualitySnapshot as TodayReviewCandidateDataQualitySnapshot | null;
   const signal = candidate.sourceSignalSnapshot as any;
   const sector = candidate.catalogSector

@@ -13,7 +13,9 @@ import {
   TableBody,
   TableCell,
   TableContainer,
+  TableFooter,
   TableHead,
+  TablePagination,
   TableRow,
   Tabs,
   Tooltip,
@@ -24,7 +26,7 @@ import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import type { MarketPulseAdvanceDeclineSummary, MarketPulseVixSummary } from '../types';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
-import { InstrumentSearchSelect, PageHeader, StalenessBadge } from '@/shared/components';
+import { FreshnessChip, InstrumentSearchSelect, PageHeader } from '@/shared/components';
 import type { V1Instrument } from '@/features/market-data-foundation';
 import { humanizeCode, indexLabel, isHeadlineIndex } from '@/shared/format/enumLabels';
 import { money, changeColor } from '@/shared/format/money';
@@ -131,11 +133,11 @@ export function MarketPulsePage() {
   return (
     <SnapshotPageShell
       title="Market Pulse"
-      subtitle="Is the market healthy enough to take risk? This page presents only persisted Market Pulse snapshot fields."
+      subtitle="Is the market healthy enough to take risk?"
       loading={view.loading}
       error={view.error}
       envelope={view.data}
-      missingTitle="Market Pulse backend not available yet."
+      missingTitle="Market Pulse data not available yet."
     >
       <EarningsSeasonBadge loading={earningsView.loading} upcomingCount={upcomingEarningsCount} />
       {snapshot && <MarketPulseSnapshotView snapshot={snapshot} shownWarnings={view.data?.warnings ?? []} />}
@@ -161,12 +163,12 @@ export function StockInterestRadarPage() {
   return (
     <RadarPage
       title="Stock Interest Radar"
-      subtitle="Which stocks deserve attention now? Rows are displayed in backend snapshot order."
+      subtitle="Which stocks deserve attention now? Rows are shown in saved data order."
       tabs={stockInterestTabs}
       envelope={view.data}
       loading={view.loading}
       error={view.error}
-      missingTitle="Stock Interest Radar backend not available yet."
+      missingTitle="Stock Interest Radar data not available yet."
       getRowCategories={(row) => [(row as StockInterestSnapshot).category]}
       renderTable={(rows) => <StockInterestTable rows={rows as StockInterestSnapshot[]} />}
     />
@@ -176,24 +178,23 @@ export function StockInterestRadarPage() {
 /** Per-category empty-state messages for the Earnings Intelligence screen. */
 const EARNINGS_EMPTY_MESSAGES: Record<string, string> = {
   UPCOMING_RESULTS:
-    'No stocks have a result date within the next 90 days in the persisted snapshot. ' +
-    'This category populates when an official earnings calendar has been ingested or when ' +
-    'period-cadence estimates fall within 90 days. Run the earnings-intelligence refresh ' +
-    'pipeline to re-materialise with today\'s date.',
+    'No stocks have a result date within the next 90 days in saved data. ' +
+    'This category populates when an official earnings calendar is available or when ' +
+    'period-cadence estimates fall within 90 days. Data updates on the next scheduled refresh.',
   PRE_RESULT_INTEREST:
     'No upcoming-result stocks showed elevated pre-result delivery or price-move interest. ' +
     'Pre-result Interest rows require an Upcoming Results classification first.',
   RESULT_WINNERS:
-    'No stocks showed strong post-result growth in the last 60 days in the snapshot. ' +
+    'No stocks showed strong post-result growth in the last 60 days in saved data. ' +
     'Winners are identified from revenue, profit, and EPS growth with at least 2 positive metrics.',
   RESULT_DISAPPOINTMENTS:
-    'No stocks showed a significant earnings miss or price drop in the last 60 days in the snapshot.',
+    'No stocks showed a significant earnings miss or price drop in the last 60 days in saved data.',
   RESULT_REACTION_HISTORY:
     'No stocks have a price-reaction history calculated yet. ' +
-    'This category requires an official earnings date (via the ingest pipeline) ' +
-    'and at least one price bar 5 trading sessions after the result date.',
+    'This category requires an official earnings date and ' +
+    'at least one price bar 5 trading sessions after the result date.',
   EARNINGS_WATCHLIST:
-    'No stocks qualified for the earnings watchlist. This is unusual — run the refresh pipeline to materialise.',
+    'No stocks qualified for the earnings watchlist. This is unusual — data should populate after the next scheduled refresh.',
 };
 
 export function EarningsIntelligencePage() {
@@ -215,7 +216,7 @@ export function EarningsIntelligencePage() {
       envelope={view.data}
       loading={view.loading}
       error={view.error}
-      missingTitle="Earnings Intelligence backend not available yet."
+      missingTitle="Earnings Intelligence data not available yet."
       getRowCategories={(row) => (row as EarningsIntelligenceSnapshot).categories}
       renderTable={(rows) => <EarningsTable rows={rows as EarningsIntelligenceSnapshot[]} />}
       tabEmptyMessages={EARNINGS_EMPTY_MESSAGES}
@@ -239,12 +240,12 @@ export function CompounderRadarPage() {
   return (
     <RadarPage
       title="Compounder Radar"
-      subtitle="Which companies show durable long-term growth? The page uses compounder candidates, not multibagger language."
+      subtitle="Which companies show durable long-term growth?"
       tabs={compounderTabs}
       envelope={view.data}
       loading={view.loading}
       error={view.error}
-      missingTitle="Compounder Radar backend not available yet."
+      missingTitle="Compounder Radar data not available yet."
       suggestionLink={deadEndSuggestionLink}
       getRowCategories={() => []}
       renderTable={(rows) => <CompounderTable rows={rows as CompounderSnapshot[]} />}
@@ -274,7 +275,7 @@ export function TraderSetupRadarPage() {
       envelope={view.data}
       loading={view.loading}
       error={view.error}
-      missingTitle="Trader Setup Radar backend not available yet."
+      missingTitle="Trader Setup Radar data not available yet."
       suggestionLink={deadEndSuggestionLink}
       getRowCategories={() => []}
       renderTable={(rows) => <TraderSetupTable rows={rows as TraderSetupSnapshot[]} />}
@@ -296,12 +297,12 @@ export function RiskRadarPage() {
   return (
     <RadarPage
       title="Risk Radar"
-      subtitle="What should be avoided? Risk rows are displayed from persisted risk snapshots only."
+      subtitle="What should be avoided? Showing saved risk data."
       tabs={riskTabs}
       envelope={view.data}
       loading={view.loading}
       error={view.error}
-      missingTitle="Risk Radar backend not available yet."
+      missingTitle="Risk Radar data not available yet."
       suggestionLink={deadEndSuggestionLink}
       getRowCategories={() => []}
       renderTable={(rows) => <RiskTable rows={rows as RiskRadarSnapshot[]} />}
@@ -316,7 +317,7 @@ export function InstrumentWorkspaceLandingPage() {
     <Box className="page-container page-container--hub">
       <PageHeader
         title="Instrument Workspace"
-        subtitle="Open any NSE/BSE stock to study it in one place — price action, market regime, sector strength, smart-money context, and the latest research-support signal. Everything is read from persisted data; no data jobs run from here."
+        subtitle="Open any NSE/BSE stock to study it in one place — price action, market regime, sector strength, smart-money context, and the latest research-support signal."
       />
       <Paper variant="outlined" sx={{ p: 2.5, maxWidth: 680 }}>
         <Stack spacing={1.5}>
@@ -349,12 +350,12 @@ export function MarketIntelligenceCompatibilityPage({ title }: { title: string }
     <Box className="page-container page-container--hub">
       <PageHeader
         title={title}
-        subtitle="Compatibility route retained for localhost history. This page is not part of primary trader navigation."
+        subtitle="This page has moved. Use the main navigation to find the current view."
       />
       <DataUnavailableState
-        title={`${title} read model is not available in the trader revamp.`}
-        message="Use the primary trader workflow pages for snapshot-based review. Backend dependencies are documented for future persisted read APIs."
-        warnings={['No fake rows are shown.']}
+        title={`${title} is not available here.`}
+        message="Use the main trader workflow pages to review saved data."
+        warnings={['No placeholder rows are shown.']}
       />
     </Box>
   );
@@ -379,12 +380,31 @@ function SnapshotPageShell({
   suggestionLink?: { to: string; label: string };
   children: ReactNode;
 }) {
+  const [dataStatusExpanded, setDataStatusExpanded] = useState(false);
+
   const showUnavailable = !loading
     && !error
     && envelope
     && ['EMPTY', 'BACKEND_UNAVAILABLE', 'ERROR'].includes(envelope.availability)
     && (Array.isArray(envelope.snapshot) ? envelope.snapshot.length === 0 : envelope.snapshot === null);
-  const showWarnings = !loading && !error && envelope && !showUnavailable && envelope.warnings.length > 0;
+
+  const allWarnings = envelope?.warnings ?? [];
+  // Genuinely stale: any warning present when data is available (not unavailable)
+  const hasWarnings = !loading && !error && envelope && !showUnavailable && allWarnings.length > 0;
+  // Auto-expand the disclosure only when data is significantly behind (>2 cal days)
+  const dataThroughDate = envelope?.dataThroughDate;
+  const isGenuinelyStale = dataThroughDate
+    ? (() => {
+        const asOf = dataThroughDate.slice(0, 10);
+        const today = new Date().toISOString().slice(0, 10);
+        const diff = Math.round((Date.UTC(
+          Number(today.slice(0, 4)), Number(today.slice(5, 7)) - 1, Number(today.slice(8, 10)),
+        ) - Date.UTC(
+          Number(asOf.slice(0, 4)), Number(asOf.slice(5, 7)) - 1, Number(asOf.slice(8, 10)),
+        )) / 86_400_000);
+        return diff > 2;
+      })()
+    : false;
 
   return (
     <Box className="page-container page-container--hub">
@@ -394,22 +414,38 @@ function SnapshotPageShell({
         badges={envelope ? (
           <Stack direction="row" gap={1} flexWrap="wrap" useFlexGap>
             <Chip label={`${envelope.scope.region} / ${envelope.scope.assetType}`} color="primary" variant="outlined" size="small" />
-            <Chip label={formatEnum(envelope.availability)} color={envelope.availability === 'ERROR' ? 'error' : envelope.availability === 'STALE' || envelope.availability === 'PARTIAL' ? 'warning' : 'default'} variant="outlined" size="small" />
+            {/* FreshnessChip replaces the duplicate Stale/Partial availability chip */}
+            <FreshnessChip dataThrough={envelope.dataThroughDate} label={title} />
           </Stack>
         ) : undefined}
       />
       {loading && <LinearProgress sx={{ mb: 2 }} />}
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-      {!loading && !error && envelope && <SnapshotMetadata envelope={envelope} />}
-      {showWarnings && (
-        <Stack spacing={1} sx={{ mb: 2 }}>
-          {envelope?.warnings.map((warning) => <Alert key={warning} severity="warning">{humanizeCode(warning)}</Alert>)}
-        </Stack>
+      {/* Data status disclosure — collapsed by default; auto-expands only when genuinely stale (>2 days) */}
+      {hasWarnings && (
+        <Box sx={{ mb: 2 }}>
+          <Button
+            size="small"
+            variant="text"
+            onClick={() => setDataStatusExpanded((prev) => !prev)}
+            startIcon={dataStatusExpanded || isGenuinelyStale ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+            sx={{ alignSelf: 'flex-start', mb: 0.5 }}
+          >
+            Data status
+          </Button>
+          <Collapse in={dataStatusExpanded || isGenuinelyStale} unmountOnExit>
+            <Stack spacing={1}>
+              {allWarnings.map((warning) => (
+                <Alert key={warning} severity="warning">{humanizeCode(warning)}</Alert>
+              ))}
+            </Stack>
+          </Collapse>
+        </Box>
       )}
       {showUnavailable && (
         <DataUnavailableState
           title={missingTitle}
-          message={envelope?.message && envelope.message !== missingTitle ? envelope.message : 'This radar requires a persisted read API that has not been produced yet.'}
+          message={envelope?.message && envelope.message !== missingTitle ? envelope.message : 'Market data for this view is not available yet.'}
           warnings={envelope?.warnings ?? []}
           suggestionLink={suggestionLink}
         />
@@ -450,7 +486,7 @@ function RadarPage<T>({
   const rows = envelope?.snapshot ?? [];
   const filteredRows = rows.filter((row) => getRowCategories(row).includes(activeTab));
   const emptyMessage = tabEmptyMessages?.[activeTab]
-    ?? `No ${activeLabel} rows were present in the backend snapshot.`;
+    ?? `No ${activeLabel} rows in saved data.`;
 
   return (
     <SnapshotPageShell title={title} subtitle={subtitle} loading={loading} error={error} envelope={envelope} missingTitle={missingTitle} suggestionLink={suggestionLink}>
@@ -462,7 +498,7 @@ function RadarPage<T>({
       {rows.length > 0 && (
         filteredRows.length > 0
           ? renderTable(filteredRows)
-          : <EmptyState title={`No ${activeLabel} rows in snapshot.`} message={emptyMessage} />
+          : <EmptyState title={`No ${activeLabel} rows in saved data.`} message={emptyMessage} />
       )}
     </SnapshotPageShell>
   );
@@ -485,8 +521,8 @@ function EarningsSeasonBadge({ loading, upcomingCount }: { loading: boolean; upc
       : `Earnings season: ${upcomingCount} result${upcomingCount !== 1 ? 's' : ''} in next 2 weeks`;
   const color = upcomingCount !== null && upcomingCount > 0 ? 'warning' : 'default';
   const tooltipText = upcomingCount === null
-    ? 'Earnings Intelligence snapshot unavailable — result count cannot be derived.'
-    : `${upcomingCount} stock${upcomingCount !== 1 ? 's' : ''} from the Earnings Intelligence snapshot have a result date within 0–14 calendar days.`;
+    ? 'Earnings Intelligence data not available yet — result count cannot be shown.'
+    : `${upcomingCount} stock${upcomingCount !== 1 ? 's' : ''} from saved Earnings Intelligence data have a result date within 0–14 calendar days.`;
   return (
     <Stack direction="row" sx={{ mb: 2 }}>
       <Tooltip title={tooltipText} arrow>
@@ -506,13 +542,14 @@ function computeIndexFreshness(
   snapshotDataThroughDate: string,
   latestCompletedTradingDate: string | null | undefined,
 ): string {
-  if (!latestCompletedTradingDate) return 'Unavailable';
+  if (!latestCompletedTradingDate) return '—';
   const snapshotMs = new Date(snapshotDataThroughDate).getTime();
   const latestMs = new Date(latestCompletedTradingDate).getTime();
-  if (!Number.isFinite(snapshotMs) || !Number.isFinite(latestMs)) return 'Unavailable';
+  if (!Number.isFinite(snapshotMs) || !Number.isFinite(latestMs)) return '—';
   const diffDays = Math.round((latestMs - snapshotMs) / 86_400_000);
-  if (diffDays > 1) return `Stale (${diffDays}d behind)`;
-  return 'Fresh';
+  // When fresh, omit the cell content so the table stays quiet
+  if (diffDays <= 1) return '';
+  return `${diffDays}d behind`;
 }
 
 function SectorDrillChip({ rawSector, tone = 'default' }: { rawSector: string; tone?: 'default' | 'warning' }) {
@@ -553,12 +590,26 @@ function MarketPulseSnapshotView({
   const shownSet = new Set(shownWarnings);
   const uniqSnapshotWarnings = snapshot.warnings.filter((w) => !shownSet.has(w));
 
+  // B3: detect if health was capped due to stale data (only if sourceSummary freshness is STALE)
+  const healthCappedByStale =
+    snapshot.sourceSummary?.status === 'STALE' || snapshot.sourceSummary?.status === 'FAILED';
+
   return (
     <Stack spacing={2}>
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ xs: 'flex-start', sm: 'center' }} flexWrap="wrap" useFlexGap>
-        <SectionHeader title="Market Health" subtitle="Displayed exactly as provided by the Market Pulse read model." />
-        {/* NR-37: visible staleness badge — shown whenever snapshot.dataThroughDate is more than 0 calendar days behind today */}
-        <StalenessBadge asOf={snapshot.dataThroughDate} label="Market Pulse" />
+        {/* B3: label the section clearly + info tooltip distinguishing from top-bar Posture chip */}
+        <Stack direction="row" spacing={0.75} alignItems="center">
+          <SectionHeader title="Market health (data-quality weighted)" />
+          <Tooltip
+            title="Health blends index trend, sector strength, breadth, delivery and data freshness. The top-bar Posture chip is a broader risk stance (regime + breadth + health) — they can differ."
+            arrow
+          >
+            <Chip label="?" size="small" variant="outlined" sx={{ fontWeight: 700, fontSize: '0.7rem', minWidth: 22, height: 22, cursor: 'help', borderRadius: '50%' }} />
+          </Tooltip>
+          {healthCappedByStale && (
+            <Chip label="capped by stale data" size="small" variant="outlined" color="warning" sx={{ fontWeight: 600 }} />
+          )}
+        </Stack>
       </Stack>
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(4, 1fr)' }, gap: 2 }}>
         <ScoreCard label="Health Label" value={snapshot.marketHealthLabel} />
@@ -576,7 +627,7 @@ function MarketPulseSnapshotView({
             </Stack>
           }
         />
-        <ScoreCard label="Snapshot Status" value={formatEnum(snapshot.status)} />
+        <ScoreCard label="Status" value={formatEnum(snapshot.status)} />
         <ScoreCard label="Data Through" value={formatDate(snapshot.dataThroughDate)} />
         <ScoreCard label="Generated At" value={formatDateTime(snapshot.generatedAt)} />
         <ScoreCard label="Candidate Count" value={formatOptional(snapshot.candidateCount)} />
@@ -586,23 +637,28 @@ function MarketPulseSnapshotView({
         <VixWidget vix={snapshot.vixSummary} />
         <AdvanceDeclineWidget ad={snapshot.advanceDecline} />
       </Stack>
-      {/* NR-98: inline staleness badge on the index-trend section using snapshot.dataThroughDate */}
-      <SectionPanel title="Top 5 Indices" headerBadge={snapshot.dataThroughDate ? <StalenessBadge asOf={snapshot.dataThroughDate} label="Index trend" /> : undefined}>
-        {displayIndices.length === 0 ? <EmptyState title="No index rows in snapshot." /> : (
+      {/* Heading reflects the actual count rather than promising 5 when data has fewer */}
+      <SectionPanel title={displayIndices.length > 0 ? `Key Indices (${displayIndices.length})` : 'Key Indices'}>
+        {displayIndices.length === 0 ? <EmptyState title="No index data available." /> : (
           <TableContainer>
             <Table size="small">
-              <TableHead><TableRow><TableCell>Index</TableCell><TableCell align="right">Value</TableCell><TableCell align="right">Move</TableCell><TableCell>Freshness</TableCell></TableRow></TableHead>
+              <TableHead><TableRow><TableCell>Index</TableCell><TableCell align="right">Value</TableCell><TableCell align="right">Move</TableCell><TableCell>Age</TableCell></TableRow></TableHead>
               <TableBody>
-                {displayIndices.map((row) => (
-                  <TableRow key={row.symbol}>
-                    {/* Fix 1: display friendly name via indexLabel instead of raw code */}
-                    <TableCell>{indexLabel(row.symbol)}</TableCell>
-                    <TableCell align="right">{formatOptional(row.value)}</TableCell>
-                    <TableCell align="right">{formatRatioPercent(row.changePercent)}</TableCell>
-                    {/* Fix 3: derive freshness from dates, not from the backend's cached status string */}
-                    <TableCell>{computeIndexFreshness(snapshot.dataThroughDate, latestCompletedTradingDate)}</TableCell>
-                  </TableRow>
-                ))}
+                {displayIndices.map((row) => {
+                  const freshnessText = computeIndexFreshness(snapshot.dataThroughDate, latestCompletedTradingDate);
+                  return (
+                    <TableRow key={row.symbol}>
+                      <TableCell>{indexLabel(row.symbol)}</TableCell>
+                      <TableCell align="right">{formatOptional(row.value)}</TableCell>
+                      <TableCell align="right">{formatRatioPercent(row.changePercent)}</TableCell>
+                      <TableCell>
+                        {freshnessText
+                          ? <Typography variant="caption" color="text.secondary">{freshnessText}</Typography>
+                          : null}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </TableContainer>
@@ -612,12 +668,12 @@ function MarketPulseSnapshotView({
         {/* Fix 2: render sector names via indexLabel (handles ^CNXMETAL etc.) — chips are drill-down links to the Signals screener */}
         <SectionPanel title="Strong Sectors">
           {snapshot.strongSectors.length === 0
-            ? <Typography variant="body2" color="text.secondary">No strong sectors in snapshot.</Typography>
+            ? <Typography variant="body2" color="text.secondary">No strong sectors in saved data.</Typography>
             : <Stack direction="row" gap={0.75} flexWrap="wrap" useFlexGap>{snapshot.strongSectors.map((s) => <SectorDrillChip key={s} rawSector={s} />)}</Stack>}
         </SectionPanel>
         <SectionPanel title="Weak Sectors">
           {snapshot.weakSectors.length === 0
-            ? <Typography variant="body2" color="text.secondary">No weak sectors in snapshot.</Typography>
+            ? <Typography variant="body2" color="text.secondary">No weak sectors in saved data.</Typography>
             : <Stack direction="row" gap={0.75} flexWrap="wrap" useFlexGap>{snapshot.weakSectors.map((s) => <SectorDrillChip key={s} rawSector={s} tone="warning" />)}</Stack>}
         </SectionPanel>
         <SectionPanel title="Breadth Summary"><Typography>{snapshot.breadthSummary || 'Unavailable'}</Typography></SectionPanel>
@@ -671,7 +727,7 @@ function VixWidget({ vix }: { vix: MarketPulseVixSummary | null | undefined }) {
 
   return (
     <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" useFlexGap>
-      <Tooltip title={unavailable ? 'India VIX data is not available in the persisted snapshot.' : `Posture: ${postureLabel}${vix?.asOf ? ` (as of ${vix.asOf})` : ''}`} arrow>
+      <Tooltip title={unavailable ? 'India VIX data is not available yet.' : `Posture: ${postureLabel}${vix?.asOf ? ` (as of ${vix.asOf})` : ''}`} arrow>
         <Chip
           label={`${vixText}${rangeText}`}
           color={postureColor as 'default' | 'error' | 'warning' | 'success'}
@@ -679,8 +735,6 @@ function VixWidget({ vix }: { vix: MarketPulseVixSummary | null | undefined }) {
           size="small"
         />
       </Tooltip>
-      {/* NR-38: surface VIX asOf date as a visible staleness badge — previously hidden in tooltip only */}
-      {!unavailable && <StalenessBadge asOf={vix!.asOf} label="VIX" />}
     </Stack>
   );
 }
@@ -930,7 +984,7 @@ function SectorConstituentsTable({
   return (
     <Stack spacing={0.75}>
       <Typography variant="caption" color="text.secondary">
-        {data.count} constituent stock{data.count !== 1 ? 's' : ''} — top by market cap, persisted-read only
+        {data.count} constituent stock{data.count !== 1 ? 's' : ''} — top by market cap, saved data
       </Typography>
       {data.warnings.map((w) => <Alert key={w} severity="warning" sx={{ py: 0 }}><Typography variant="caption">{w}</Typography></Alert>)}
       <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 340, overflowY: 'auto' }}>
@@ -1009,21 +1063,21 @@ function SectorIntelligencePanel({
   const { scope } = useMarketScope();
   const rows = envelope?.snapshot ?? [];
 
-  // NR-98: pick dataThroughDate from envelope level; fall back to first row if envelope field absent
-  const sectorAsOf = envelope?.dataThroughDate ?? rows[0]?.dataThroughDate ?? null;
+  const [sectorPage, setSectorPage] = useState(0);
+  const [sectorRowsPerPage, setSectorRowsPerPage] = useState(5);
+
+  const pagedRows = rows.slice(sectorPage * sectorRowsPerPage, sectorPage * sectorRowsPerPage + sectorRowsPerPage);
 
   return (
     <SectionPanel
       title="Sector Intelligence"
-      headerBadge={sectorAsOf ? <StalenessBadge asOf={sectorAsOf} label="Sector data" /> : undefined}
     >
       <Stack spacing={1.25}>
         {loading && <LinearProgress />}
         {error && <Alert severity="error">{error}</Alert>}
-        {envelope && <SnapshotMetadata envelope={envelope} compact />}
         {!loading && !error && envelope?.warnings.map((warning) => <Alert key={warning} severity="warning">{humanizeCode(warning)}</Alert>)}
         {!loading && !error && rows.length === 0 && (
-          <EmptyState title="No persisted sector rows for this scope/date." message={envelope?.message || 'No persisted Sector Intelligence rows are available for this scope.'} />
+          <EmptyState title="No sector data saved for this scope/date." message={envelope?.message || 'No Sector Intelligence data is available for this scope yet.'} />
         )}
         {rows.length > 0 && (
           <TableContainer>
@@ -1043,7 +1097,7 @@ function SectorIntelligencePanel({
                 </TableRow>
               </TableHead>
               <TableBody>
-                {rows.map((row) => (
+                {pagedRows.map((row) => (
                   <SectorRowWithDrillDown
                     key={row.sector}
                     row={row}
@@ -1052,6 +1106,21 @@ function SectorIntelligencePanel({
                   />
                 ))}
               </TableBody>
+              <TableFooter>
+                <TableRow>
+                  <TablePagination
+                    rowsPerPageOptions={[5, 10, 25]}
+                    count={rows.length}
+                    rowsPerPage={sectorRowsPerPage}
+                    page={sectorPage}
+                    onPageChange={(_event, newPage) => setSectorPage(newPage)}
+                    onRowsPerPageChange={(event) => {
+                      setSectorRowsPerPage(parseInt(event.target.value, 10));
+                      setSectorPage(0);
+                    }}
+                  />
+                </TableRow>
+              </TableFooter>
             </Table>
           </TableContainer>
         )}
@@ -1061,73 +1130,196 @@ function SectorIntelligencePanel({
 }
 
 function StockInterestTable({ rows }: { rows: StockInterestSnapshot[] }) {
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(25);
+
+  // Reset to page 0 whenever the filtered row set changes (tab/scope change).
+  useEffect(() => { setPage(0); }, [rows]);
+
+  const pagedRows = rows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+
+  const columns: Array<{ label: string; align?: 'right' | 'left' }> = [
+    { label: 'Symbol' },
+    { label: 'Company' },
+    { label: 'Sector' },
+    { label: 'Interest Score', align: 'right' },
+    { label: 'Direction' },
+    { label: 'Reasons' },
+    { label: 'Risks' },
+    { label: 'Freshness' },
+    { label: 'Data Through' },
+    { label: 'Workspace' },
+  ];
+
   return (
-    <RankingTable
-      rows={rows}
-      columns={['Symbol', 'Company', 'Sector', 'Interest Score', 'Direction', 'Reasons', 'Risks', 'Freshness', 'Data Through', 'Workspace']}
-      renderRow={(row) => [
-        row.symbol,
-        row.company,
-        row.sector || 'Unavailable',
-        formatOptional(row.score),
-        row.direction,
-        <ReasonTags key="reasons" tags={row.reasonTags} />,
-        <RiskTags key="risks" tags={row.riskTags} />,
-        row.freshness || 'Unavailable',
-        formatDate(row.dataThroughDate),
-        <Button key="workspace" size="small" component={RouterLink} to={`/instrument-workspace/${encodeURIComponent(row.symbol)}`}>Open</Button>,
-      ]}
-    />
+    <TableContainer component={Paper} variant="outlined">
+      <Table size="small">
+        <TableHead>
+          <TableRow>
+            {columns.map((col) => (
+              <TableCell key={col.label} align={col.align}>{col.label}</TableCell>
+            ))}
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {pagedRows.map((row, rowIndex) => {
+            const sectorDisplay = (!row.sector || row.sector === 'Unavailable') ? '—' : row.sector;
+            const sectorTitle = (!row.sector || row.sector === 'Unavailable') ? 'Sector metadata not available for this instrument' : undefined;
+            return (
+              <TableRow key={rowIndex}>
+                <TableCell sx={{ whiteSpace: 'nowrap' }}>{row.symbol}</TableCell>
+                <TableCell sx={{ maxWidth: 180, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={row.company}>{row.company}</TableCell>
+                <TableCell sx={{ whiteSpace: 'nowrap', color: sectorDisplay === '—' ? 'text.disabled' : undefined }} title={sectorTitle}>{sectorDisplay}</TableCell>
+                <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>{formatOptional(row.score)}</TableCell>
+                <TableCell sx={{ whiteSpace: 'nowrap' }}>{row.direction}</TableCell>
+                <TableCell><ReasonTags tags={row.reasonTags} /></TableCell>
+                <TableCell><RiskTags tags={row.riskTags} /></TableCell>
+                <TableCell sx={{ whiteSpace: 'nowrap' }}>{row.freshness || '—'}</TableCell>
+                <TableCell sx={{ whiteSpace: 'nowrap' }}>{formatDate(row.dataThroughDate)}</TableCell>
+                <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                  <Button size="small" component={RouterLink} to={`/instrument-workspace/${encodeURIComponent(row.symbol)}`}>Open</Button>
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+        <TableFooter>
+          <TableRow>
+            <TablePagination
+              rowsPerPageOptions={[10, 25, 50, 100]}
+              count={rows.length}
+              rowsPerPage={rowsPerPage}
+              page={page}
+              onPageChange={(_event, newPage) => setPage(newPage)}
+              onRowsPerPageChange={(event) => {
+                setRowsPerPage(parseInt(event.target.value, 10));
+                setPage(0);
+              }}
+            />
+          </TableRow>
+        </TableFooter>
+      </Table>
+    </TableContainer>
   );
 }
 
-function ResultDateCell({ resultDate, resultDateLabel }: { resultDate: string | null; resultDateLabel?: 'Official' | 'Estimated' | null }) {
-  const dateText = formatDate(resultDate);
-  if (!resultDateLabel) {
+function ResultDateCell({ resultDate, resultDateLabel }: { resultDate: string | null; resultDateLabel?: 'Official' | 'TBA' | 'Estimated' | null }) {
+  // No announced date (TBA, legacy estimates, or missing basis): never show a
+  // computed/fabricated date as if it were real.
+  if (resultDateLabel !== 'Official' || !resultDate) {
     return (
-      <Stack direction="row" spacing={0.5} alignItems="center">
-        <span>{dateText}</span>
-        <Chip label="date basis unknown" size="small" variant="outlined" sx={{ color: 'text.disabled', borderColor: 'divider', fontSize: '0.65rem' }} />
-      </Stack>
+      <Typography variant="body2" color="text.secondary" component="span">
+        Date TBA
+      </Typography>
     );
   }
   return (
     <Stack direction="row" spacing={0.5} alignItems="center">
-      <span>{dateText}</span>
-      <Chip
-        label={resultDateLabel}
-        size="small"
-        variant="outlined"
-        color={resultDateLabel === 'Official' ? 'success' : 'warning'}
-      />
+      <span>{formatDate(resultDate)}</span>
+      <Chip label="Official" size="small" variant="outlined" color="success" />
     </Stack>
   );
 }
 
 function EarningsTable({ rows }: { rows: EarningsIntelligenceSnapshot[] }) {
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(25);
+  const [showAllColumns, setShowAllColumns] = useState(false);
+
+  // Reset to page 0 whenever the filtered row set changes (tab/scope change).
+  useEffect(() => { setPage(0); }, [rows]);
+
+  const pagedRows = rows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+
+  const numericCellSx = { whiteSpace: 'nowrap' as const };
+
   return (
-    <RankingTable
-      rows={rows}
-      columns={['Symbol', 'Result Date / Basis', 'Date Source', 'Period End', 'Validated At', 'Days To Result', 'Revenue Growth', 'Profit Growth', 'EPS Growth', 'Margin Trend', 'Consistency', 'Acceleration', 'Freshness', 'Reasons', 'Risks', 'Warnings']}
-      renderRow={(row) => [
-        row.symbol,
-        <ResultDateCell key="result-date" resultDate={row.resultDate} resultDateLabel={row.resultDateLabel} />,
-        formatEnum(row.resultDateSource),
-        formatDate(row.periodEndDate),
-        formatDate(row.validatedAt),
-        formatOptional(row.daysToResult),
-        formatPercentPoints(row.revenueGrowth),
-        formatPercentPoints(row.profitGrowth),
-        formatPercentPoints(row.epsGrowth),
-        formatPercentPoints(row.marginTrend),
-        formatOptional(row.consistencyScore),
-        formatOptional(row.accelerationScore),
-        row.freshness || 'Unavailable',
-        <ReasonTags key="reasons" tags={row.reasonTags.map(humanizeCode)} />,
-        <RiskTags key="risks" tags={row.riskTags.map(humanizeCode)} />,
-        <RiskTags key="warnings" tags={(row.warnings || []).map(humanizeCode)} />,
-      ]}
-    />
+    <TableContainer component={Paper} variant="outlined">
+      <Stack direction="row" justifyContent="flex-end" sx={{ px: 1, pt: 1 }}>
+        <Button size="small" onClick={() => setShowAllColumns((v) => !v)}>
+          {showAllColumns ? 'Show fewer columns' : 'Show all columns'}
+        </Button>
+      </Stack>
+      <Table size="small">
+        <TableHead>
+          <TableRow>
+            <TableCell>Symbol</TableCell>
+            <TableCell>Result Date</TableCell>
+            <TableCell align="right">Days To Result</TableCell>
+            <TableCell align="right">Rev Growth</TableCell>
+            <TableCell align="right">Profit Growth</TableCell>
+            <TableCell align="right">Consistency</TableCell>
+            <TableCell>Reasons</TableCell>
+            {showAllColumns && (
+              <>
+                <TableCell>Date Source</TableCell>
+                <TableCell>Period End</TableCell>
+                <TableCell>Validated At</TableCell>
+                <TableCell align="right">EPS Growth</TableCell>
+                <TableCell align="right">Margin Trend</TableCell>
+                <TableCell align="right">Acceleration</TableCell>
+                <TableCell>Freshness</TableCell>
+                <TableCell>Risks</TableCell>
+                <TableCell>Warnings</TableCell>
+              </>
+            )}
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {pagedRows.map((row, rowIndex) => {
+            const sourceFull = row.resultDateSource === 'DATE_TBA' || row.resultDateSource === 'ESTIMATED_FROM_PERIOD_CADENCE'
+              ? 'Awaiting official calendar'
+              : formatEnum(row.resultDateSource);
+            return (
+              <TableRow key={rowIndex}>
+                <TableCell sx={{ whiteSpace: 'nowrap' }}>{row.symbol}</TableCell>
+                <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                  <ResultDateCell resultDate={row.resultDate} resultDateLabel={row.resultDateLabel} />
+                </TableCell>
+                <TableCell align="right" sx={numericCellSx}>{formatOptional(row.daysToResult)}</TableCell>
+                <TableCell align="right" sx={numericCellSx}>{formatPercentPoints(row.revenueGrowth)}</TableCell>
+                <TableCell align="right" sx={numericCellSx}>{formatPercentPoints(row.profitGrowth)}</TableCell>
+                <TableCell align="right" sx={numericCellSx}>{formatOptional(row.consistencyScore)}</TableCell>
+                <TableCell><ReasonTags tags={row.reasonTags.map(humanizeCode)} /></TableCell>
+                {showAllColumns && (
+                  <>
+                    <TableCell
+                      sx={{ maxWidth: 160, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+                      title={sourceFull}
+                    >
+                      {sourceFull}
+                    </TableCell>
+                    <TableCell sx={{ whiteSpace: 'nowrap' }}>{formatDate(row.periodEndDate)}</TableCell>
+                    <TableCell sx={{ whiteSpace: 'nowrap' }}>{formatDate(row.validatedAt)}</TableCell>
+                    <TableCell align="right" sx={numericCellSx}>{formatPercentPoints(row.epsGrowth)}</TableCell>
+                    <TableCell align="right" sx={numericCellSx}>{formatPercentPoints(row.marginTrend)}</TableCell>
+                    <TableCell align="right" sx={numericCellSx}>{formatOptional(row.accelerationScore)}</TableCell>
+                    <TableCell sx={{ whiteSpace: 'nowrap' }}>{row.freshness || '—'}</TableCell>
+                    <TableCell><RiskTags tags={row.riskTags.map(humanizeCode)} /></TableCell>
+                    <TableCell><RiskTags tags={(row.warnings || []).map(humanizeCode)} /></TableCell>
+                  </>
+                )}
+              </TableRow>
+            );
+          })}
+        </TableBody>
+        <TableFooter>
+          <TableRow>
+            <TablePagination
+              rowsPerPageOptions={[10, 25, 50, 100]}
+              count={rows.length}
+              rowsPerPage={rowsPerPage}
+              page={page}
+              onPageChange={(_event, newPage) => setPage(newPage)}
+              onRowsPerPageChange={(event) => {
+                setRowsPerPage(parseInt(event.target.value, 10));
+                setPage(0);
+              }}
+            />
+          </TableRow>
+        </TableFooter>
+      </Table>
+    </TableContainer>
   );
 }
 
@@ -1217,38 +1409,16 @@ function ScoreCard({ label, value }: { label: string; value: ReactNode }) {
   );
 }
 
-function SnapshotMetadata({ envelope, compact = false }: { envelope: SnapshotEnvelope<unknown>; compact?: boolean }) {
-  const items = [
-    ['Status', envelope.status || envelope.availability],
-    ['Freshness', envelope.freshness],
-    ['Snapshot Date', formatDate(envelope.snapshotDate)],
-    ['Data Through', formatDate(envelope.dataThroughDate)],
-    ['Generated At', formatDateTime(envelope.generatedAt)],
-  ].filter(([, value]) => value && value !== 'Unavailable');
-
-  if (items.length === 0) return null;
-
-  return (
-    <Stack direction="row" gap={1} flexWrap="wrap" useFlexGap sx={{ mb: compact ? 0 : 2 }}>
-      {items.map(([label, value]) => (
-        // Fix 3: Freshness is already a derived human string ("Fresh" / "Stale (Nd behind)") —
-        // do not pass it through formatEnum which would corrupt "Stale (2d behind)" etc.
-        <Chip key={label} size="small" variant="outlined" label={`${label}: ${label === 'Status' ? formatEnum(String(value)) : value}`} />
-      ))}
-    </Stack>
-  );
-}
-
 function HealthBadge({ label }: { label: string }) {
   return <Chip label={label} color={label.toLowerCase().includes('risk') ? 'warning' : 'primary'} variant="outlined" />;
 }
 
 function ReasonTags({ tags }: { tags: string[] }) {
-  return <TagList values={tags} emptyLabel="No reasons in snapshot." />;
+  return <TagList values={tags} emptyLabel="No reasons." />;
 }
 
 function RiskTags({ tags }: { tags: string[] }) {
-  return <TagList values={tags} emptyLabel="No risks in snapshot." tone="warning" />;
+  return <TagList values={tags} emptyLabel="No risks." tone="warning" />;
 }
 
 function TagList({ values, emptyLabel, tone = 'default' }: { values: string[]; emptyLabel: string; tone?: 'default' | 'warning' }) {

@@ -115,6 +115,23 @@ export class SignalQualityLabService {
     return this.outcomesForSignals(signals, query);
   }
 
+  /**
+   * Per-instrument track-record aggregate from persisted signal_outcomes.
+   * Win-rate is directional (BULLISH + BEARISH only; NEUTRAL excluded).
+   * Returns null when no mature (dataComplete=true) rows exist.
+   */
+  async instrumentOutcomeAggregate(
+    instrumentId: string,
+    horizon: QualityHorizon,
+  ): Promise<{
+    matureCount: number;
+    directionalSampleSize: number;
+    winRate: number | null;
+    avgForwardReturn: number | null;
+  } | null> {
+    return this.repository.instrumentOutcomeAggregate(instrumentId, horizon);
+  }
+
   async dashboard(query: QualityQuery) {
     // Trader-facing read: serve from persisted SignalOutcome rows only.
     // No live price-history fetch happens on this GET path.

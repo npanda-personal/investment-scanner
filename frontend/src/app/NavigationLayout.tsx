@@ -52,15 +52,25 @@ function useUnreadAlertCount() {
   return count;
 }
 
+const POSTURE_HUMAN: Record<string, string> = {
+  RISK_ON: 'Risk-On',
+  RISK_OFF: 'Risk-Off',
+  NEUTRAL: 'Neutral',
+};
+
+function humanizePosture(raw: string): string {
+  return POSTURE_HUMAN[raw] ?? raw.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 function useCapitalPosture() {
-  const [posture, setPosture] = useState<{ label: string; color: 'success' | 'warning' | 'error' | 'default'; band: string } | null>(null);
+  const [posture, setPosture] = useState<{ label: string; humanLabel: string; color: 'success' | 'warning' | 'error' | 'default'; band: string } | null>(null);
   useEffect(() => {
     let cancelled = false;
     fetchCapitalPosture()
       .then((dto) => {
         if (cancelled) return;
         if (dto.availability !== 'READY' || !dto.postureLabel) {
-          setPosture({ label: 'Regime: unavailable', color: 'default', band: '' });
+          setPosture({ label: 'unavailable', humanLabel: 'Unavailable', color: 'default', band: '' });
           return;
         }
         const color: 'success' | 'warning' | 'error' =
@@ -69,10 +79,10 @@ function useCapitalPosture() {
         const band = dto.suggestedExposureBand
           ? `${dto.suggestedExposureBand.minPct}–${dto.suggestedExposureBand.maxPct}%`
           : '';
-        setPosture({ label: dto.postureLabel, color, band });
+        setPosture({ label: dto.postureLabel, humanLabel: humanizePosture(dto.postureLabel), color, band });
       })
       .catch(() => {
-        if (!cancelled) setPosture({ label: 'Regime: unavailable', color: 'default', band: '' });
+        if (!cancelled) setPosture({ label: 'unavailable', humanLabel: 'Unavailable', color: 'default', band: '' });
       });
     return () => { cancelled = true; };
   }, []);
@@ -166,9 +176,15 @@ export default function NavigationLayout() {
           </Stack>
           <Stack direction="row" alignItems="center" spacing={1.5}>
             {!profile.isCrypto && capitalPosture && (
-              <Tooltip title={capitalPosture.band ? `Suggested exposure: ${capitalPosture.band}` : 'Capital posture is based on persisted market context snapshots.'} arrow>
+              <Tooltip
+                title={
+                  `Capital posture blends market regime, breadth, and health — distinct from the Market Pulse health gauge.` +
+                  (capitalPosture.band ? ` Suggested exposure: ${capitalPosture.band}.` : '')
+                }
+                arrow
+              >
                 <Chip
-                  label={capitalPosture.label}
+                  label={`Posture: ${capitalPosture.humanLabel}`}
                   color={capitalPosture.color}
                   size="small"
                   variant="outlined"

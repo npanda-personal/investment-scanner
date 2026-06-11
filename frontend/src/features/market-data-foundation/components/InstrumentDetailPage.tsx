@@ -87,7 +87,12 @@ const safeSource = (instrumentSource: string | null | undefined, priceSource?: s
   return src;
 };
 
-const InstrumentDetailPage: React.FC = () => {
+interface InstrumentDetailPageProps {
+  /** When rendered inside UnifiedStockPage, the active tab controls which sections are shown. */
+  activeTab?: 'overview' | 'prices' | 'fundamentals' | string;
+}
+
+const InstrumentDetailPage: React.FC<InstrumentDetailPageProps> = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { scope, profile } = useMarketScope();
@@ -219,10 +224,10 @@ const InstrumentDetailPage: React.FC = () => {
       <Paper sx={{ p: 2, mb: 3 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap', alignItems: 'flex-start' }}>
           <Box>
-            <Typography variant="overline" color="text.secondary">Persisted Evidence</Typography>
+            <Typography variant="overline" color="text.secondary">Data Coverage</Typography>
             <Typography variant="h6">Data through: {formatOptionalDate(dataThrough)}</Typography>
             <Typography variant="body2" color="text.secondary">Expected latest session: {formatOptionalDate(expectedThrough)}</Typography>
-            <Typography variant="body2" color="text.secondary">Last persisted update: {formatOptionalDateTime(latestUpdatedAt)}</Typography>
+            <Typography variant="body2" color="text.secondary">Last updated: {formatOptionalDateTime(latestUpdatedAt)}</Typography>
           </Box>
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, justifyContent: { xs: 'flex-start', md: 'flex-end' } }}>
             <Chip label={`Freshness: ${formatStatusLabel(freshnessStatus)}`} size="small" color={statusChipColor(freshnessStatus)} variant="outlined" />

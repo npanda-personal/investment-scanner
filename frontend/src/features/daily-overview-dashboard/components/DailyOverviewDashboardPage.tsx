@@ -6,10 +6,6 @@ import {
   Box,
   Button,
   Chip,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
   Divider,
   Grid,
   LinearProgress,
@@ -18,12 +14,6 @@ import {
   Paper,
   Skeleton,
   Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
   ToggleButton,
   ToggleButtonGroup,
   Tooltip,
@@ -36,7 +26,6 @@ import { NotApplicableForAssetClass } from '@/shared/components/NotApplicableFor
 import { useMarketScope } from '@/contexts/MarketScopeContext';
 import { useDailyOverviewDashboard } from '../hooks/useDailyOverviewDashboard';
 import type {
-  CandidateGroupSummary,
   MarketMoverRange,
   MarketMoverRow,
   TodayReviewCandidateGroupSet,
@@ -49,7 +38,6 @@ export function DailyOverviewDashboardPage() {
   const { profile } = useMarketScope();
   const dashboard = useDailyOverviewDashboard();
   const [moverRange, setMoverRange] = useState<MarketMoverRange>('1D');
-  const [selectedCandidate, setSelectedCandidate] = useState<CandidateGroupSummary['rows'][number] | null>(null);
 
   const todayReview = dashboard.critical.todayReview.data;
   const marketMovers = dashboard.critical.marketMovers.data;
@@ -64,12 +52,6 @@ export function DailyOverviewDashboardPage() {
     insufficientData: todayReview?.groups.insufficientData ?? [],
     unproven: todayReview?.groups.unproven ?? [],
   }), [todayReview]);
-
-  const topSignalCandidates = useMemo(() => mapTodayReviewRows([
-    ...todayReviewGroups.bullishReview,
-    ...todayReviewGroups.bearishReview,
-    ...todayReviewGroups.exitRiskReview,
-  ]).slice(0, 10), [todayReviewGroups]);
 
   const moverSummary = marketMovers?.ranges.find((item) => item.range === moverRange) ?? null;
   const hotStocks = useMemo(() => {
@@ -118,7 +100,7 @@ export function DailyOverviewDashboardPage() {
                   Daily Overview
                 </Typography>
                 <Typography color="text.secondary" sx={{ mt: 0.5 }}>
-                  Stock market snapshot for movers, top signal candidates, and sector strength.
+                  Stock market snapshot for movers, mover-backed signals, and sector strength.
                 </Typography>
               </Box>
               <Stack direction={{ xs: 'column', sm: 'row' }} gap={1}>
@@ -257,79 +239,7 @@ export function DailyOverviewDashboardPage() {
         </Grid>
 
         <Grid container spacing={2}>
-          <Grid item xs={12} lg={7}>
-            <Paper variant="outlined" sx={{ p: 2, height: '100%' }}>
-              <Stack spacing={1.5}>
-                <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', md: 'center' }} gap={1}>
-                  <Typography variant="h6">Top Signal Candidates</Typography>
-                  <Typography variant="body2" color="text.secondary">Top 10 by Today Review rank</Typography>
-                </Stack>
-                {dashboard.critical.todayReview.loading && <LinearProgress />}
-                {dashboard.critical.todayReview.error && !dashboard.critical.todayReview.loading && (
-                  <SectionError message={dashboard.critical.todayReview.error} onRetry={() => void dashboard.refresh()} />
-                )}
-                {!dashboard.critical.todayReview.loading && !dashboard.critical.todayReview.error && topSignalCandidates.length === 0 && (
-                  <Alert severity="info">No ranked signal candidates are currently published for this scope.</Alert>
-                )}
-                {!dashboard.critical.todayReview.loading && !dashboard.critical.todayReview.error && topSignalCandidates.length > 0 && (
-                  <TableContainer sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, maxHeight: 430 }}>
-                    <Table stickyHeader size="small" sx={{
-                      minWidth: 820,
-                      '& .MuiTableCell-root': {
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                      },
-                    }}>
-                      <TableHead>
-                        <TableRow>
-                          <TableCell sx={{ width: 64 }}>Rank</TableCell>
-                          <TableCell sx={{ minWidth: 150 }}>Stock</TableCell>
-                          <TableCell sx={{ minWidth: 120 }}>Type</TableCell>
-                          <TableCell sx={{ minWidth: 110 }}>Grade</TableCell>
-                          <TableCell sx={{ minWidth: 180 }}>Strategy</TableCell>
-                          <TableCell sx={{ minWidth: 280 }}>Trigger Reason</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {topSignalCandidates.map((row) => (
-                          <TableRow
-                            key={row.id}
-                            hover
-                            onClick={() => setSelectedCandidate(row)}
-                            sx={{ cursor: 'pointer' }}
-                          >
-                            <TableCell>#{row.rank}</TableCell>
-                            <TableCell>
-                              <Tooltip title={`${row.symbol} - ${row.companyName || 'Company unavailable'}`} arrow>
-                                <Typography variant="body2" fontWeight={800} noWrap>
-                                  {row.symbol} - {row.companyName || 'Company unavailable'}
-                                </Typography>
-                              </Tooltip>
-                            </TableCell>
-                            <TableCell>{labelize(row.direction || row.state)}</TableCell>
-                            <TableCell>{row.grade} / {Math.round(row.confidenceScore)}</TableCell>
-                            <TableCell>
-                              <Tooltip title={`${row.strategyCode} v${row.strategyVersion || 'N/A'}`} arrow>
-                                <Typography variant="body2" noWrap>{row.strategyCode} v{row.strategyVersion || 'N/A'}</Typography>
-                              </Tooltip>
-                            </TableCell>
-                            <TableCell>
-                              <Tooltip title={row.reasonSummary} arrow>
-                                <Typography variant="body2" color="text.secondary" noWrap>{row.reasonSummary}</Typography>
-                              </Tooltip>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </TableContainer>
-                )}
-              </Stack>
-            </Paper>
-          </Grid>
-
-          <Grid item xs={12} lg={5}>
+          <Grid item xs={12}>
             <Paper variant="outlined" sx={{ p: 2, height: '100%' }}>
               <Stack spacing={1.5}>
                 <Typography variant="h6">Mover-Backed Signal Candidates</Typography>
@@ -345,7 +255,7 @@ export function DailyOverviewDashboardPage() {
                 )}
                 <Grid container spacing={1}>
                   {hotStocks.map((item) => (
-                    <Grid key={`${item.mover.instrumentId}-${item.candidate?.id}`} item xs={12} sm={6}>
+                    <Grid key={`${item.mover.instrumentId}-${item.candidate?.id}`} item xs={12} sm={6} md={4} lg={2}>
                       <Paper variant="outlined" sx={{ p: 1.25, height: '100%' }}>
                         <Stack spacing={0.5}>
                           <Stack direction="row" justifyContent="space-between" gap={1}>
@@ -389,58 +299,7 @@ export function DailyOverviewDashboardPage() {
           </Stack>
         </Paper>
       </Stack>
-      <CandidateDetailDialog candidate={selectedCandidate} onClose={() => setSelectedCandidate(null)} />
     </Box>
-  );
-}
-
-function CandidateDetailDialog({ candidate, onClose }: { candidate: CandidateGroupSummary['rows'][number] | null; onClose: () => void }) {
-  return (
-    <Dialog open={Boolean(candidate)} onClose={onClose} maxWidth="md" fullWidth>
-      {candidate && (
-        <>
-          <DialogTitle>
-            <Stack spacing={0.5}>
-              <Typography variant="h6">{candidate.symbol} rule-ranked candidate</Typography>
-              <Typography variant="body2" color="text.secondary">{candidate.companyName || 'Company unavailable'}</Typography>
-            </Stack>
-          </DialogTitle>
-          <DialogContent dividers>
-            <Stack spacing={2}>
-              <Stack direction="row" gap={1} flexWrap="wrap" useFlexGap>
-                <Chip label={`Rank #${candidate.rank}`} variant="outlined" />
-                <Chip label={`${candidate.grade} / ${Math.round(candidate.confidenceScore)}`} variant="outlined" />
-                <Chip label={labelize(candidate.direction || candidate.state)} variant="outlined" />
-                <Chip label={`Strategy ${candidate.strategyCode} v${candidate.strategyVersion || 'N/A'}`} variant="outlined" />
-                <Chip label={`DQ ${candidate.dataQualityStatus || 'Unavailable'}`} variant="outlined" />
-              </Stack>
-              <Box>
-                <Typography variant="subtitle2" fontWeight={800}>Trigger Reason</Typography>
-                <Typography color="text.secondary">{candidate.reasonSummary}</Typography>
-              </Box>
-              {candidate.watchReasons.length > 0 && (
-                <Box>
-                  <Typography variant="subtitle2" fontWeight={800}>Review Notes</Typography>
-                  <Typography color="text.secondary">{candidate.watchReasons.join(' ')}</Typography>
-                </Box>
-              )}
-              {candidate.blockers.length > 0 && (
-                <Box>
-                  <Typography variant="subtitle2" fontWeight={800}>Blockers</Typography>
-                  <Typography color="text.secondary">{candidate.blockers.join(' ')}</Typography>
-                </Box>
-              )}
-              <Typography variant="body2" color="text.secondary">
-                Source timestamp: {formatDateTime(candidate.sourceTimestamp)}
-              </Typography>
-            </Stack>
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={onClose}>Close</Button>
-          </DialogActions>
-        </>
-      )}
-    </Dialog>
   );
 }
 
@@ -528,39 +387,6 @@ function SectorList({ title, rows, loading }: { title: string; rows: Array<{ sec
   );
 }
 
-function mapTodayReviewRows(rows: TodayReviewCandidateGroupSet[keyof TodayReviewCandidateGroupSet]): CandidateGroupSummary['rows'] {
-  return [...rows]
-    .sort((left, right) => {
-      const rankDelta = (Number.isFinite(left.rank) ? left.rank : Number.MAX_SAFE_INTEGER) - (Number.isFinite(right.rank) ? right.rank : Number.MAX_SAFE_INTEGER);
-      if (rankDelta !== 0) return rankDelta;
-      return right.confidenceScore - left.confidenceScore;
-    })
-    .map((item) => ({
-      id: item.id,
-      rank: item.rank,
-      symbol: item.symbol,
-      companyName: item.companyName,
-      direction: item.direction,
-      state: item.state,
-      setupType: item.setupType,
-      grade: item.grade,
-      confidenceScore: item.confidenceScore,
-      strategyCode: item.strategyCode,
-      strategyVersion: item.strategyVersion,
-      reasonSummary: item.reasonSummary,
-      dataQualityStatus: typeof item.dataQualitySnapshot?.signalReadinessStatus === 'string' ? item.dataQualitySnapshot.signalReadinessStatus : null,
-      blockers: item.blockers || [],
-      watchReasons: item.watchReasons || [],
-      sourceTimestamp: item.updatedAt || item.createdAt || null,
-      targetRoute: '/today-review',
-    }));
-}
-
-function formatDateTime(value: string | null | undefined) {
-  if (!value) return unavailableLabel;
-  return new Date(value).toLocaleString();
-}
-
 function formatDate(value: string | null | undefined) {
   if (!value) return unavailableLabel;
   return new Date(value).toLocaleDateString();
@@ -573,15 +399,6 @@ function formatNumber(value: number | null | undefined) {
 
 function formatStatus(value: string | null | undefined) {
   return value || unavailableLabel;
-}
-
-function labelize(value: string | null | undefined): string {
-  if (!value) return unavailableLabel;
-  return value
-    .toLowerCase()
-    .split('_')
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ');
 }
 
 function formatPercent(value: number | null | undefined) {

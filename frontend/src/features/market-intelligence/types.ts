@@ -123,7 +123,7 @@ export interface EarningsIntelligenceSnapshot {
   symbol: string;
   resultDate: string | null;
   resultDateSource: string;
-  resultDateLabel?: 'Official' | 'Estimated' | null;
+  resultDateLabel?: 'Official' | 'TBA' | 'Estimated' | null;
   periodEndDate?: string | null;
   validatedAt?: string | null;
   daysToResult?: number | null;

@@ -1,7 +1,9 @@
 import {
   Alert,
   Box,
+  Button,
   Chip,
+  Collapse,
   LinearProgress,
   Paper,
   Stack,
@@ -10,15 +12,18 @@ import {
   TableCell,
   TableContainer,
   TableHead,
+  TablePagination,
   TableRow,
   TableSortLabel,
   Tooltip,
   Typography,
 } from '@mui/material';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PageHeader, StalenessBadge } from '@/shared/components';
-import { humanizeCode, humanizeEmbedded, indexLabel } from '@/shared/format/enumLabels';
+import { FreshnessChip, PageHeader } from '@/shared/components';
+import { humanizeEmbedded, indexLabel } from '@/shared/format/enumLabels';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
 import { NotApplicableForAssetClass } from '@/shared/components/NotApplicableForAssetClass';
 import { fetchSectorRotation } from '../api/marketIntelligenceService';
@@ -175,8 +180,16 @@ function pctColor(value: number | null | undefined): 'success.main' | 'error.mai
 function SectorRotationTable({ sectors }: { sectors: SectorRotationRow[] }) {
   const [sortKey, setSortKey] = useState<SortKey>('rotationQuadrant');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+
+  // Reset to page 0 whenever the sectors list changes (scope/filter change)
+  useEffect(() => {
+    setPage(0);
+  }, [sectors]);
 
   const handleSort = (key: SortKey) => {
+    setPage(0);
     if (sortKey === key) {
       setSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'));
     } else {
@@ -185,7 +198,17 @@ function SectorRotationTable({ sectors }: { sectors: SectorRotationRow[] }) {
     }
   };
 
+  const handleChangePage = (_event: React.MouseEvent<HTMLButtonElement> | null, newPage: number) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
   const sorted = [...sectors].sort((a, b) => compareRows(a, b, sortKey, sortDir));
+  const pageRows = sorted.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
 
   const col = (key: SortKey, label: string, align: 'left' | 'right' = 'right') => (
     <TableCell align={align} sortDirection={sortKey === key ? sortDir : false}>
@@ -213,7 +236,7 @@ function SectorRotationTable({ sectors }: { sectors: SectorRotationRow[] }) {
           </TableRow>
         </TableHead>
         <TableBody>
-          {sorted.map((row) => (
+          {pageRows.map((row) => (
             <TableRow key={row.sector} hover>
               <TableCell>
                 <Typography
@@ -264,6 +287,15 @@ function SectorRotationTable({ sectors }: { sectors: SectorRotationRow[] }) {
           ))}
         </TableBody>
       </Table>
+      <TablePagination
+        component="div"
+        count={sorted.length}
+        page={page}
+        onPageChange={handleChangePage}
+        rowsPerPage={rowsPerPage}
+        onRowsPerPageChange={handleChangeRowsPerPage}
+        rowsPerPageOptions={[10, 25, 50]}
+      />
     </TableContainer>
   );
 }
@@ -309,11 +341,13 @@ export function SectorRotationPage() {
     );
   }
 
+  const [warningsExpanded, setWarningsExpanded] = useState(false);
+
   return (
     <Box className="page-container page-container--hub">
       <PageHeader
         title="Sector Rotation"
-        subtitle="Which sectors are money rotating into vs out of? Derived from persisted sector intelligence snapshots using relative strength score and 1M momentum."
+        subtitle="Which sectors are money rotating into vs out of? Derived from saved sector intelligence data using relative strength score and 1M momentum."
         badges={
           data ? (
             <Stack direction="row" gap={1} flexWrap="wrap" useFlexGap>
@@ -323,14 +357,8 @@ export function SectorRotationPage() {
                 variant="outlined"
                 size="small"
               />
-              <Chip
-                label={humanizeCode(data.availability)}
-                color={data.availability === 'ERROR' ? 'error' : data.availability === 'EMPTY' ? 'warning' : 'default'}
-                variant="outlined"
-                size="small"
-              />
               {data.dataThroughDate && (
-                <StalenessBadge asOf={data.dataThroughDate} label="Sector snapshot" />
+                <FreshnessChip dataThrough={data.dataThroughDate} label="Sector data" />
               )}
             </Stack>
           ) : undefined
@@ -341,13 +369,26 @@ export function SectorRotationPage() {
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
       {!loading && !error && data && data.warnings.length > 0 && (
-        <Stack spacing={1} sx={{ mb: 2 }}>
-          {data.warnings.slice(0, 3).map((w) => (
-            <Alert key={w} severity="warning">
-              {humanizeEmbedded(w)}
-            </Alert>
-          ))}
-        </Stack>
+        <Box sx={{ mb: 2 }}>
+          <Button
+            size="small"
+            variant="text"
+            onClick={() => setWarningsExpanded((prev) => !prev)}
+            startIcon={warningsExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+            sx={{ alignSelf: 'flex-start', mb: 0.5 }}
+          >
+            Data status
+          </Button>
+          <Collapse in={warningsExpanded} unmountOnExit>
+            <Stack spacing={1}>
+              {data.warnings.map((w) => (
+                <Alert key={w} severity="warning">
+                  {humanizeEmbedded(w)}
+                </Alert>
+              ))}
+            </Stack>
+          </Collapse>
+        </Box>
       )}
 
       {!loading && !error && data && data.availability !== 'READY' && (

@@ -3,8 +3,6 @@ import {
   Alert,
   Box,
   Button,
-  Card,
-  CardContent,
   Chip,
   CircularProgress,
   Divider,
@@ -12,80 +10,53 @@ import {
   Paper,
   Stack,
   Tab,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
   Tabs,
+  Tooltip,
   Typography,
 } from '@mui/material';
-import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { ArrowForwardOutlined } from '@mui/icons-material';
+import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import InstrumentDetailPage from './InstrumentDetailPage';
 import StockResearchWorkbenchPage from '@/features/stock-research-workbench';
 import { PageHeader } from '@/shared/components';
-import { fetchInstrumentContextSnapshot } from '@/features/market-intelligence/api/marketIntelligenceService';
+import { fetchInstrumentContextSnapshot, fetchInstrumentSignalHistory, fetchInstrumentOutcomes } from '@/features/market-intelligence/api/marketIntelligenceService';
+import type { InstrumentOutcomeAggregate, SignalHistoryRow } from '@/features/market-intelligence/api/marketIntelligenceService';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
-import { fetchInstruments } from '../api/marketDataFoundationService';
+import { fetchInstruments, fetchInstrument } from '../api/marketDataFoundationService';
 
 const tabs = [
   { value: 'overview', label: 'Overview' },
   { value: 'research', label: 'Research' },
   { value: 'prices', label: 'Prices' },
   { value: 'fundamentals', label: 'Fundamentals' },
-  { value: 'signals', label: 'Signals' },
-  { value: 'quality', label: 'Signal Quality' },
-  { value: 'calibration', label: 'Calibration' },
-  { value: 'smart-money', label: 'Smart Money' },
+  { value: 'signals-history', label: 'Signals & History' },
 ];
-
-/**
- * Map of module tab values to their admin dashboard base paths.
- * Each link is deep-linked with ?instrumentId=<id> so the dashboard
- * can pre-filter to this instrument.
- */
-const MODULE_TAB_LINKS: Record<
-  string,
-  { label: string; path: string; description: string; detail: string }
-> = {
-  signals: {
-    label: 'Signal Generation Engine',
-    path: '/signal-generation-engine',
-    description: 'Signal results and outcome history for this instrument.',
-    detail:
-      'The Signal Generation Engine computes directional signals (BULLISH / BEARISH / NEUTRAL) from price action, momentum, fundamentals, and regime context. Opening this instrument there shows its full signal history, current signal state, and any active exit candidates.',
-  },
-  quality: {
-    label: 'Signal Quality Lab',
-    path: '/signal-quality-lab',
-    description: 'Outcome accuracy, win rates, and track-record depth for this instrument.',
-    detail:
-      'The Signal Quality Lab scores each signal against its forward return. For this instrument you can review win rates by signal direction, sample depth, calibrated conviction scores, and reliability tier (FULL / PARTIAL). Low-sample signals are flagged with a confidence interval warning.',
-  },
-  calibration: {
-    label: 'Signal Calibration Engine',
-    path: '/signal-calibration-engine',
-    description: 'Calibration results, score distribution, and per-bucket confidence.',
-    detail:
-      'Calibration maps raw composite scores to empirical win-rate buckets. For this instrument the dashboard shows the score distribution across historical signals, calibration curve quality, and how the current score compares to the calibrated expectation.',
-  },
-  'smart-money': {
-    label: 'Smart Money Intelligence',
-    path: '/smart-money-intelligence',
-    description: 'Institutional flow and smart money signals for this instrument.',
-    detail:
-      'The Smart Money Intelligence module tracks institutional delivery data (NSE/BSE) to identify accumulation or distribution patterns. This dashboard shows net institutional flow, price correlation, and any active smart money signals for this instrument.',
-  },
-};
 
 export default function UnifiedStockPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { id } = useParams<{ id: string }>();
   const activeTab = searchParams.get('tab') || 'overview';
+  const { scope } = useMarketScope();
 
-  const moduleTabLink = id ? MODULE_TAB_LINKS[activeTab] : null;
+  // Fetch instrument record so we can pass derivativesEligible to the rail
+  const [derivativesEligible, setDerivativesEligible] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (!id) return;
+    fetchInstrument(id, { region: scope.region, assetType: scope.assetType })
+      .then((inst) => setDerivativesEligible(inst.derivatives_eligible ?? null))
+      .catch(() => setDerivativesEligible(null));
+  }, [id, scope.region, scope.assetType]);
 
   return (
     <Box sx={{ maxWidth: 1500, mx: 'auto' }}>
       <PageHeader
-        title="Instrument Workspace"
-        subtitle="Read-only instrument evidence, market context gaps, personal research workflow links, and source freshness."
+        title="Stock Workspace"
+        subtitle="Price history, market context, research tools, and signal track record for this stock."
         backTo="/instrument-workspace"
         backLabel="Instrument search"
       />
@@ -103,92 +74,282 @@ export default function UnifiedStockPage() {
           ))}
         </Tabs>
       </Paper>
+
       {activeTab === 'research' ? (
         <StockResearchWorkbenchPage />
-      ) : activeTab === 'overview' || activeTab === 'prices' || activeTab === 'fundamentals' ? (
+      ) : activeTab === 'signals-history' ? (
+        <SignalsHistoryTab instrumentId={id} />
+      ) : (
         <Grid container spacing={2}>
           <Grid item xs={12} lg={8}>
-            <InstrumentDetailPage />
+            <InstrumentDetailPage activeTab={activeTab} />
           </Grid>
           <Grid item xs={12} lg={4}>
-            <MarketContextRail instrumentId={id} />
+            <MarketContextRail instrumentId={id} derivativesEligible={derivativesEligible} />
           </Grid>
         </Grid>
-      ) : moduleTabLink ? (
-        <ModuleTabCard
-          tabLabel={tabs.find((tab) => tab.value === activeTab)?.label ?? activeTab}
-          link={moduleTabLink}
-          instrumentId={id}
-        />
-      ) : (
-        <Paper sx={{ p: 3 }}>
-          <Typography variant="h6">
-            {tabs.find((tab) => tab.value === activeTab)?.label}
-          </Typography>
-          <Typography color="text.secondary">
-            This tab is reserved for the module-owned view. Use the main module dashboards for
-            full analysis.
-          </Typography>
-        </Paper>
       )}
     </Box>
   );
 }
 
-/**
- * Renders an informative call-to-action card for a module tab that lives in
- * a separate dashboard. Shows a short description, contextual detail, and a
- * prominent link button rather than a bare URL stub.
- */
-function ModuleTabCard({
-  tabLabel,
-  link,
-  instrumentId,
-}: {
-  tabLabel: string;
-  link: { label: string; path: string; description: string; detail: string };
-  instrumentId: string | undefined;
-}) {
-  const deepLinkHref = instrumentId
-    ? `${link.path}?instrumentId=${instrumentId}`
-    : link.path;
+// ---------------------------------------------------------------------------
+// Signals & History tab
+// ---------------------------------------------------------------------------
+
+function confidenceChipColor(
+  confidence: WinRateConfidence | null,
+): 'success' | 'warning' | 'error' | 'default' {
+  if (confidence === 'HIGH') return 'success';
+  if (confidence === 'MEDIUM') return 'warning';
+  if (confidence === 'LOW') return 'error';
+  return 'default';
+}
+
+type WinRateConfidence = 'HIGH' | 'MEDIUM' | 'LOW';
+
+function sampleConfidence(sampleSize: number): WinRateConfidence {
+  if (sampleSize >= 100) return 'HIGH';
+  if (sampleSize >= 30) return 'MEDIUM';
+  return 'LOW';
+}
+
+function formatPct(value: number | null | undefined): string {
+  if (value === null || value === undefined) return '—';
+  const sign = value >= 0 ? '+' : '';
+  return `${sign}${(value * 100).toFixed(1)}%`;
+}
+
+function formatWinRate(value: number | null | undefined): string {
+  if (value === null || value === undefined) return '—';
+  return `${Math.round(value * 100)}%`;
+}
+
+function formatScore(value: number | null | undefined): string {
+  if (value === null || value === undefined) return '—';
+  return String(Math.round(Number(value)));
+}
+
+function directionColor(direction: string): 'success' | 'error' | 'default' {
+  if (direction === 'BULLISH') return 'success';
+  if (direction === 'BEARISH') return 'error';
+  return 'default';
+}
+
+function SignalsHistoryTab({ instrumentId }: { instrumentId?: string }) {
+  const [history, setHistory] = useState<SignalHistoryRow[]>([]);
+  const [aggregate, setAggregate] = useState<InstrumentOutcomeAggregate | null>(null);
+  const [loading, setLoading] = useState(!!instrumentId);
+  const [error, setError] = useState<string | null>(null);
+  const [latestSignal, setLatestSignal] = useState<SignalHistoryRow | null>(null);
+
+  useEffect(() => {
+    if (!instrumentId) {
+      setLoading(false);
+      return;
+    }
+    let canceled = false;
+    setLoading(true);
+    setError(null);
+
+    Promise.all([
+      fetchInstrumentSignalHistory(instrumentId),
+      fetchInstrumentOutcomes(instrumentId, '20D'),
+    ])
+      .then(([histRes, outRes]) => {
+        if (canceled) return;
+        const items = histRes.items ?? [];
+        setHistory(items);
+        setLatestSignal(items[0] ?? null);
+        setAggregate(outRes.aggregate ?? null);
+        setLoading(false);
+      })
+      .catch((err) => {
+        if (canceled) return;
+        setError(err instanceof Error ? err.message : 'Failed to load signal data');
+        setLoading(false);
+      });
+
+    return () => { canceled = true; };
+  }, [instrumentId]);
+
+  if (!instrumentId) {
+    return (
+      <Alert severity="info">No instrument selected.</Alert>
+    );
+  }
+
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, p: 3 }}>
+        <CircularProgress size={20} />
+        <Typography variant="body2" color="text.secondary">Loading signal data…</Typography>
+      </Box>
+    );
+  }
+
+  if (error) {
+    return <Alert severity="warning">{error}</Alert>;
+  }
+
+  const confidence = aggregate ? sampleConfidence(aggregate.directionalSampleSize) : null;
 
   return (
-    <Card variant="outlined">
-      <CardContent>
-        <Stack spacing={2}>
-          <Box>
-            <Typography variant="overline" color="text.secondary">
-              {tabLabel}
+    <Stack spacing={2}>
+      {/* Latest signal card */}
+      {latestSignal ? (
+        <Paper variant="outlined" sx={{ p: 2 }}>
+          <Typography variant="overline" color="text.secondary">Latest Signal</Typography>
+          <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.5, flexWrap: 'wrap', gap: 1 }}>
+            <Chip
+              label={latestSignal.direction}
+              color={directionColor(latestSignal.direction)}
+              size="small"
+            />
+            <Chip
+              label={`Score ${formatScore(latestSignal.score)}`}
+              size="small"
+              variant="outlined"
+            />
+            <Chip
+              label={latestSignal.confidence}
+              size="small"
+              variant="outlined"
+            />
+            <Typography variant="caption" color="text.secondary">
+              Generated {latestSignal.generatedAt ? new Date(latestSignal.generatedAt).toLocaleDateString() : '—'}
             </Typography>
-            <Typography variant="h6" gutterBottom>
-              {link.description}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {link.detail}
-            </Typography>
-          </Box>
-          <Divider />
-          <Box>
-            <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
-              This analysis lives in a dedicated dashboard. Use the link below to open
-              {instrumentId ? ' this instrument' : ' the dashboard'} there.
-            </Typography>
-            <Button
-              component={Link}
-              to={deepLinkHref}
-              variant="contained"
-              endIcon={<ArrowForwardOutlined />}
-              size="large"
-            >
-              Open in {link.label}
-            </Button>
-          </Box>
+          </Stack>
+        </Paper>
+      ) : (
+        <Paper variant="outlined" sx={{ p: 2 }}>
+          <Typography variant="overline" color="text.secondary">Latest Signal</Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+            No signals available for this stock yet.
+          </Typography>
+        </Paper>
+      )}
+
+      {/* Track record strip */}
+      <Paper variant="outlined" sx={{ p: 2 }}>
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+          <Typography variant="subtitle2" fontWeight={700}>
+            Track Record (20-day horizon)
+          </Typography>
+          {confidence && (
+            <Tooltip title={`Based on ${aggregate?.directionalSampleSize ?? 0} directional signals with completed outcomes. HIGH ≥ 100, MEDIUM ≥ 30, LOW < 30.`}>
+              <Chip
+                label={`${confidence} confidence`}
+                size="small"
+                color={confidenceChipColor(confidence)}
+                variant="outlined"
+              />
+            </Tooltip>
+          )}
         </Stack>
-      </CardContent>
-    </Card>
+
+        {aggregate ? (
+          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 2 }}>
+            <Box>
+              <Typography variant="caption" color="text.secondary">Win Rate</Typography>
+              <Typography variant="h6">{formatWinRate(aggregate.winRate)}</Typography>
+              <Typography variant="caption" color="text.secondary">
+                {aggregate.directionalSampleSize} directional signals
+              </Typography>
+            </Box>
+            <Box>
+              <Typography variant="caption" color="text.secondary">Avg Forward Return</Typography>
+              <Typography
+                variant="h6"
+                color={
+                  aggregate.avgForwardReturn === null ? 'text.primary'
+                    : aggregate.avgForwardReturn >= 0 ? 'success.main'
+                    : 'error.main'
+                }
+              >
+                {formatPct(aggregate.avgForwardReturn)}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                Absolute return, not vs benchmark
+              </Typography>
+            </Box>
+            <Box>
+              <Typography variant="caption" color="text.secondary">Completed Signals</Typography>
+              <Typography variant="h6">{aggregate.matureCount}</Typography>
+              <Typography variant="caption" color="text.secondary">
+                with price data
+              </Typography>
+            </Box>
+          </Box>
+        ) : (
+          <Typography variant="body2" color="text.secondary">
+            No completed signal outcomes yet for this stock. Track record is built as signals mature over time.
+          </Typography>
+        )}
+      </Paper>
+
+      {/* Recent signal table */}
+      <Paper variant="outlined">
+        <Box sx={{ p: 2, pb: 0 }}>
+          <Typography variant="subtitle2" fontWeight={700}>
+            Recent Signals
+          </Typography>
+        </Box>
+        {history.length === 0 ? (
+          <Box sx={{ p: 2 }}>
+            <Typography variant="body2" color="text.secondary">No signal history available.</Typography>
+          </Box>
+        ) : (
+          <TableContainer>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Date</TableCell>
+                  <TableCell>Direction</TableCell>
+                  <TableCell align="right">Score</TableCell>
+                  <TableCell>Confidence</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {history.slice(0, 20).map((row, i) => (
+                  <TableRow key={row.signalResultId || row.id || i}>
+                    <TableCell>
+                      <Typography variant="caption">
+                        {row.generatedAt ? new Date(row.generatedAt).toLocaleDateString() : '—'}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        label={row.direction}
+                        color={directionColor(row.direction)}
+                        size="small"
+                        sx={{ fontSize: '0.65rem', height: 20 }}
+                      />
+                    </TableCell>
+                    <TableCell align="right">
+                      <Typography variant="caption">{formatScore(row.score)}</Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="caption">{row.confidence}</Typography>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
+      </Paper>
+
+      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', px: 0.5 }}>
+        For research support only, not financial advice. Returns shown are absolute and not benchmark-adjusted.
+      </Typography>
+    </Stack>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Market Context Rail helpers
+// ---------------------------------------------------------------------------
 
 function formatPercent(value: number | null | undefined): string {
   if (value === null || value === undefined) return '—';
@@ -219,17 +380,25 @@ function sectorClassColor(cls: string | null | undefined): 'success' | 'warning'
   return 'default';
 }
 
-function ContextRow({ label, value, color, sub }: {
+function ContextRow({ label, value, color, sub, tooltip }: {
   label: string;
   value: string;
   color?: 'success' | 'warning' | 'error' | 'default';
   sub?: string;
+  tooltip?: string;
 }) {
+  const labelEl = (
+    <Typography variant="caption" color="text.secondary" sx={{ minWidth: 120, pt: 0.4, cursor: tooltip ? 'help' : undefined }}>
+      {label}
+    </Typography>
+  );
   return (
     <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 1, py: 0.5 }}>
-      <Typography variant="caption" color="text.secondary" sx={{ minWidth: 120, pt: 0.4 }}>
-        {label}
-      </Typography>
+      {tooltip ? (
+        <Tooltip title={tooltip} placement="left">
+          {labelEl}
+        </Tooltip>
+      ) : labelEl}
       <Stack alignItems="flex-end" spacing={0}>
         <Chip
           label={value}
@@ -248,7 +417,13 @@ function ContextRow({ label, value, color, sub }: {
   );
 }
 
-function MarketContextRail({ instrumentId }: { instrumentId?: string }) {
+function MarketContextRail({
+  instrumentId,
+  derivativesEligible,
+}: {
+  instrumentId?: string;
+  derivativesEligible?: boolean | null;
+}) {
   const { scope, profile } = useMarketScope();
 
   const [snapshot, setSnapshot] = useState<import('@/features/market-intelligence/types').InstrumentContextSnapshot | null>(null);
@@ -318,13 +493,17 @@ function MarketContextRail({ instrumentId }: { instrumentId?: string }) {
     ? '—'
     : `${ctx?.latestSignal.value?.direction ?? '—'} (${ctx?.latestSignal.value?.score !== undefined ? Math.round(ctx?.latestSignal.value?.score ?? 0) : '—'})`;
 
+  const fnoEligibleValue =
+    derivativesEligible === true ? 'Yes'
+    : derivativesEligible === false ? 'No'
+    : '—';
+
   return (
     <Stack spacing={2}>
       <Paper variant="outlined" sx={{ p: 2 }}>
-        <Typography variant="h6">Market Context Rail</Typography>
+        <Typography variant="h6">Market Context</Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-          Assembled from persisted read models only — no live generation on GET.
-          Missing evidence shown honestly.
+          Assembled from saved data. Missing data shown clearly.
         </Typography>
       </Paper>
 
@@ -364,6 +543,7 @@ function MarketContextRail({ instrumentId }: { instrumentId?: string }) {
                 value={regimeValue}
                 color={regimeColor(ctx.marketRegime.value?.regime)}
                 sub={ctx.marketRegime.asOf ? `as of ${ctx.marketRegime.asOf}` : undefined}
+                tooltip="Broad market posture: RISK_ON = favorable conditions, NEUTRAL = mixed, RISK_OFF = unfavorable."
               />
               <Divider sx={{ my: 0.5 }} />
               <ContextRow
@@ -371,6 +551,7 @@ function MarketContextRail({ instrumentId }: { instrumentId?: string }) {
                 value={sectorValue}
                 color={sectorClassColor(ctx.sectorStrength.value?.classification)}
                 sub={ctx.sectorStrength.absent ? ctx.sectorStrength.source : undefined}
+                tooltip="How this stock's sector is trending relative to its recent average."
               />
               <Divider sx={{ my: 0.5 }} />
               <ContextRow
@@ -383,10 +564,11 @@ function MarketContextRail({ instrumentId }: { instrumentId?: string }) {
                     : 'warning'
                 }
                 sub={ctx.relativeStrength.asOf ? `prices as of ${ctx.relativeStrength.asOf}` : undefined}
+                tooltip="How this stock's 63-day return compares to the benchmark index."
               />
               <Divider sx={{ my: 0.5 }} />
               <ContextRow
-                label="Smart money"
+                label="Institutional flow"
                 value={smValue}
                 color={
                   ctx.smartMoney.absent ? 'default'
@@ -395,6 +577,18 @@ function MarketContextRail({ instrumentId }: { instrumentId?: string }) {
                     : 'default'
                 }
                 sub={ctx.smartMoney.asOf ? `as of ${ctx.smartMoney.asOf}` : undefined}
+                tooltip="Institutional buying (ACCUMULATION) or selling (DISTRIBUTION) pattern from NSE/BSE delivery data."
+              />
+              <Divider sx={{ my: 0.5 }} />
+              <ContextRow
+                label="F&O eligible"
+                value={fnoEligibleValue}
+                color={
+                  derivativesEligible === true ? 'success'
+                    : derivativesEligible === false ? 'default'
+                    : 'default'
+                }
+                tooltip="Whether this stock has futures and options contracts listed on NSE."
               />
               <Divider sx={{ my: 0.5 }} />
               <ContextRow
@@ -406,6 +600,7 @@ function MarketContextRail({ instrumentId }: { instrumentId?: string }) {
                     : 'success'
                 }
                 sub={ctx.fnoBan.asOf ? `ban list ${ctx.fnoBan.asOf}` : undefined}
+                tooltip="Stocks in the F&O ban period cannot have new derivative positions opened."
               />
               <Divider sx={{ my: 0.5 }} />
               <ContextRow
@@ -413,6 +608,7 @@ function MarketContextRail({ instrumentId }: { instrumentId?: string }) {
                 value={signalValue}
                 color={signalColor(ctx.latestSignal.value?.direction)}
                 sub={ctx.latestSignal.asOf ? `as of ${ctx.latestSignal.asOf}` : undefined}
+                tooltip="The most recent signal direction and score for this stock."
               />
             </>
           )}
@@ -420,7 +616,7 @@ function MarketContextRail({ instrumentId }: { instrumentId?: string }) {
       </Paper>
 
       <Alert severity="info" sx={{ fontSize: '0.75rem' }}>
-        Personal actions: Watchlists, Alerts, and Portfolios. Context updates via daily data pipeline.
+        Watchlists, Alerts, and Portfolios are personal tools. Context data updates via the daily pipeline.
       </Alert>
     </Stack>
   );

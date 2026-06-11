@@ -398,9 +398,9 @@ const StockResearchWorkbenchPage: React.FC = () => {
                     sx={{ height: 18, fontSize: 10 }}
                   />
                 )}
-                <Tooltip title="Calibrated score from the latest persisted SignalCalibrationResult for this instrument. Sourced from historical signal outcomes — for research reference only." arrow>
+                <Tooltip title="Calibrated score from this instrument's latest stored calibration, based on historical signal outcomes — for research reference only." arrow>
                   <Typography variant="caption" color="text.disabled" sx={{ cursor: 'help', ml: 'auto' }}>
-                    persisted calibration
+                    calibrated from history
                   </Typography>
                 </Tooltip>
               </Box>
@@ -648,7 +648,7 @@ const MetricGrid: React.FC<{ items: Record<string, React.ReactNode> }> = ({ item
 /** Wraps a formatted value with a small "derived" badge when the value was computed, not persisted. */
 const DerivedValue: React.FC<{ value: string; derived: boolean }> = ({ value, derived }) =>
   derived ? (
-    <Tooltip title="Computed from available inputs — not a persisted XBRL value" arrow>
+    <Tooltip title="Computed from available inputs — not a value reported in the company's filings" arrow>
       <Box component="span" sx={{ display: 'inline-flex', alignItems: 'baseline', gap: 0.4 }}>
         {value}
         <Typography component="span" variant="caption" sx={{ fontSize: '0.6rem', color: 'text.secondary', fontWeight: 400 }}>
@@ -683,7 +683,7 @@ const SignalEvidencePanel: React.FC<{ evidence?: SignalEvidenceSection }> = ({ e
         <Box>
           <Typography variant="h6">Signal Evidence / Track Record</Typography>
           <Typography variant="caption" color="text.secondary">
-            Persisted read — sourced from signal outcomes and calibration records. Not recomputed on page load.
+            Based on stored signal outcomes and calibration records, updated after market close.
           </Typography>
         </Box>
         <Stack direction="row" spacing={1} alignItems="center">

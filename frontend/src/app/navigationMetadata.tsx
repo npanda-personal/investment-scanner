@@ -1,22 +1,18 @@
 import type { ReactNode } from 'react';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import AssessmentIcon from '@mui/icons-material/Assessment';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import FactCheckIcon from '@mui/icons-material/FactCheck';
 import NotificationsNoneIcon from '@mui/icons-material/NotificationsNone';
 import SavedSearchIcon from '@mui/icons-material/SavedSearch';
 import ShowChartIcon from '@mui/icons-material/ShowChart';
-import SmartToyIcon from '@mui/icons-material/SmartToy';
-import SpaceDashboardIcon from '@mui/icons-material/SpaceDashboard';
 import StarBorderIcon from '@mui/icons-material/StarBorder';
 import TodayIcon from '@mui/icons-material/Today';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
-import SyncAltIcon from '@mui/icons-material/SyncAlt';
 import FilterAltIcon from '@mui/icons-material/FilterAlt';
 import WorkspacesIcon from '@mui/icons-material/Workspaces';
-import EventNoteIcon from '@mui/icons-material/EventNote';
-import TableChartIcon from '@mui/icons-material/TableChart';
 
 export type NavItem = {
   path: string;
@@ -33,30 +29,46 @@ export type NavGroup = {
   operatorOnly?: boolean;
 };
 
+// Consolidated trader nav: 20 flat items -> grouped workspaces. Several former top-level screens
+// are now TABS inside a merged workspace (their routes still resolve for deep-links / bookmarks
+// but now REDIRECT to the workspace root, since TabbedWorkspace uses local state):
+//   - Market (/)            = Health (Market Pulse) + Sectors (Sector Rotation) + Events (Market Events)
+//   - Today (/today-review) = Daily Review + Review Shortlist + Daily Overview
+//   - Discover (/screener)  = Screener + Market Scans + Stock Interest + Index Constituents
+// Alias routes that now redirect:
+//   /market-pulse, /sector-rotation, /market-events  → /
+//   /daily-review-shortlist, /daily-overview          → /today-review
+//   /market-scans, /stock-interest-radar, /index-constituents → /screener
+//   /notifications → /account  (preferences live inline in AccountPage)
+//   /crypto → /  (inactive under IN equity scope; component kept)
+// Removed from nav entirely: Crypto (not applicable under the IN equity scope), Notifications
+// (configuration — lives under Account).
+// AI Copilot is functional — accessible via "Copilot" in the My Workspace nav group.
 export const navGroups: NavGroup[] = [
   {
-    group: 'Trader Workflow',
+    group: 'Daily Decisions',
     items: [
-      { path: '/', label: 'Market Pulse', icon: <DashboardIcon />, aliases: ['/market-pulse'] },
-      { path: '/crypto', label: 'Crypto Market', icon: <TrendingUpIcon /> },
-      { path: '/sector-rotation', label: 'Sector Rotation', icon: <SyncAltIcon /> },
-      { path: '/index-constituents', label: 'Index Constituents', icon: <TableChartIcon /> },
-      { path: '/market-events', label: 'Market Events', icon: <EventNoteIcon /> },
-      { path: '/today-review', label: 'Daily Review', icon: <TodayIcon />, matchPrefixes: ['/today-review/'] },
-      { path: '/daily-overview', label: 'Daily Overview', icon: <SpaceDashboardIcon /> },
+      { path: '/today-review', label: 'Today', icon: <TodayIcon />, matchPrefixes: ['/today-review/'] },
+      { path: '/', label: 'Market', icon: <DashboardIcon />, aliases: ['/market-pulse', '/sector-rotation', '/market-events'] },
+    ],
+  },
+  {
+    group: 'Discover',
+    items: [
+      { path: '/screener', label: 'Screener', icon: <FilterAltIcon />, aliases: ['/market-scans', '/stock-interest-radar', '/index-constituents'] },
       { path: '/research', label: 'Research Hub', icon: <WorkspacesIcon /> },
-      { path: '/daily-review-shortlist', label: 'Review Shortlist', icon: <FactCheckIcon /> },
-      { path: '/stock-interest-radar', label: 'Stock Interest Radar', icon: <SavedSearchIcon /> },
-      { path: '/earnings-intelligence', label: 'Earnings Intelligence', icon: <CalendarMonthIcon /> },
-      { path: '/market-scans', label: 'Market Scans', icon: <FilterAltIcon /> },
-      { path: '/screener', label: 'Screener', icon: <FilterAltIcon /> },
+      { path: '/earnings-intelligence', label: 'Earnings', icon: <CalendarMonthIcon /> },
       { path: '/derivatives', label: 'Derivatives / F&O', icon: <ShowChartIcon /> },
+    ],
+  },
+  {
+    group: 'My Workspace',
+    items: [
       { path: '/watchlists', label: 'Watchlists', icon: <StarBorderIcon />, matchPrefixes: ['/watchlists/'] },
       { path: '/portfolios', label: 'Portfolios', icon: <AccountBalanceWalletIcon />, matchPrefixes: ['/portfolios/'] },
       { path: '/alerts', label: 'Alerts', icon: <NotificationsNoneIcon /> },
-      { path: '/notifications', label: 'Notifications', icon: <NotificationsNoneIcon /> },
-      { path: '/copilot', label: 'AI Copilot', icon: <SmartToyIcon /> },
-      { path: '/instrument-workspace', label: 'Instrument Workspace', icon: <AssessmentIcon />, matchPrefixes: ['/stocks/', '/research/stocks/'] },
+      { path: '/instrument-workspace', label: 'Instrument', icon: <AssessmentIcon />, matchPrefixes: ['/stocks/', '/research/stocks/'] },
+      { path: '/copilot', label: 'Copilot', icon: <AutoAwesomeIcon /> },
     ],
   },
 ];

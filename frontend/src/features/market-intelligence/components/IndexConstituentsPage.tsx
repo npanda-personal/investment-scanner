@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   Alert,
   Box,
+  Button,
   Chip,
   FormControl,
   InputLabel,
@@ -16,6 +17,7 @@ import {
   TableCell,
   TableContainer,
   TableHead,
+  TablePagination,
   TableRow,
   Tooltip,
   Typography,
@@ -138,6 +140,15 @@ export function IndexConstituentsPage() {
   const [loading, setLoading] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>('symbol');
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(25);
+  // H3: show a sensible default column subset; extra columns (Sector, Mkt Cap) hidden until toggled
+  const [showAllColumns, setShowAllColumns] = useState(false);
+
+  // Reset to first page whenever the selected index changes
+  useEffect(() => {
+    setPage(0);
+  }, [selectedIndex]);
 
   useEffect(() => {
     setLoading(true);
@@ -169,10 +180,12 @@ export function IndexConstituentsPage() {
       setSortKey(key);
       setSortOrder('asc');
     }
+    setPage(0);
   };
 
   const indexOption = INDEX_OPTIONS.find((o) => o.value === selectedIndex);
   const rows = envelope ? sortedRows(envelope.constituents, sortKey, sortOrder) : [];
+  const pagedRows = rows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
 
   if (!profile.capabilities.hasIndexConstituents) {
     return (
@@ -244,142 +257,169 @@ export function IndexConstituentsPage() {
 
       {/* Members table */}
       {rows.length > 0 && (
-        <TableContainer component={Paper} variant="outlined">
-          <Table size="small" stickyHeader>
-            <TableHead>
-              <TableRow>
-                <TableCell sx={{ width: 40 }}>#</TableCell>
-                <TableCell>
-                  <TableSortLabel
-                    active={sortKey === 'symbol'}
-                    direction={sortKey === 'symbol' ? sortOrder : 'asc'}
-                    onClick={() => handleSort('symbol')}
-                  >
-                    Symbol
-                  </TableSortLabel>
-                </TableCell>
-                <TableCell>Company</TableCell>
-                <TableCell>
-                  <TableSortLabel
-                    active={sortKey === 'sector'}
-                    direction={sortKey === 'sector' ? sortOrder : 'asc'}
-                    onClick={() => handleSort('sector')}
-                  >
-                    Sector
-                  </TableSortLabel>
-                </TableCell>
-                <TableCell align="right">
-                  <TableSortLabel
-                    active={sortKey === 'latestPrice'}
-                    direction={sortKey === 'latestPrice' ? sortOrder : 'asc'}
-                    onClick={() => handleSort('latestPrice')}
-                  >
-                    Price
-                  </TableSortLabel>
-                </TableCell>
-                <TableCell align="right">
-                  <TableSortLabel
-                    active={sortKey === 'change1D'}
-                    direction={sortKey === 'change1D' ? sortOrder : 'asc'}
-                    onClick={() => handleSort('change1D')}
-                  >
-                    1D %
-                  </TableSortLabel>
-                </TableCell>
-                <TableCell>
-                  <TableSortLabel
-                    active={sortKey === 'signalScore'}
-                    direction={sortKey === 'signalScore' ? sortOrder : 'asc'}
-                    onClick={() => handleSort('signalScore')}
-                  >
-                    Signal
-                  </TableSortLabel>
-                </TableCell>
-                <TableCell align="right">
-                  <TableSortLabel
-                    active={sortKey === 'marketCap'}
-                    direction={sortKey === 'marketCap' ? sortOrder : 'asc'}
-                    onClick={() => handleSort('marketCap')}
-                  >
-                    Mkt Cap
-                  </TableSortLabel>
-                </TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {rows.map((row, idx) => (
-                <TableRow
-                  key={row.symbol}
-                  hover
-                  sx={{ opacity: row.instrumentId === null ? 0.5 : 1 }}
-                >
+        <Stack spacing={1}>
+          <Stack direction="row" justifyContent="flex-end">
+            <Button size="small" variant="text" onClick={() => setShowAllColumns((v) => !v)}>
+              {showAllColumns ? 'Show fewer columns' : 'Show all columns'}
+            </Button>
+          </Stack>
+          <TableContainer component={Paper} variant="outlined">
+            <Table size="small" stickyHeader>
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{ width: 40 }}>#</TableCell>
                   <TableCell>
-                    <Typography variant="caption" color="text.secondary">{idx + 1}</Typography>
-                  </TableCell>
-                  <TableCell>
-                    {row.instrumentId ? (
-                      <Typography
-                        variant="body2"
-                        component={Link}
-                        to={`/instrument-workspace/${encodeURIComponent(row.symbol)}`}
-                        sx={{ fontWeight: 600, color: 'primary.main', textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
-                      >
-                        {row.symbol}
-                      </Typography>
-                    ) : (
-                      <Typography variant="body2" fontWeight={600} color="text.secondary">
-                        {row.symbol}
-                      </Typography>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2" noWrap sx={{ maxWidth: 200 }}>
-                      {row.companyName ?? <Typography component="span" variant="body2" color="text.secondary">—</Typography>}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2" color="text.secondary" noWrap>
-                      {row.sector ?? '—'}
-                    </Typography>
-                  </TableCell>
-                  <TableCell align="right">
-                    <Typography variant="body2" fontFamily="monospace">
-                      {row.latestPrice !== null ? money(row.latestPrice, profile.currency, { fractionDigits: 1 }) : '—'}
-                    </Typography>
-                  </TableCell>
-                  <TableCell align="right">
-                    {row.change1D !== null ? (
-                      <Typography
-                        variant="body2"
-                        fontFamily="monospace"
-                        sx={{ color: changeColor(row.change1D) }}
-                      >
-                        {row.change1D >= 0 ? '+' : ''}{row.change1D.toFixed(2)}%
-                      </Typography>
-                    ) : (
-                      <Typography variant="body2" color="text.secondary">—</Typography>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Tooltip
-                      title={row.signalScore !== null ? `Score: ${row.signalScore.toFixed(1)}` : 'No signal generated'}
-                      arrow
+                    <TableSortLabel
+                      active={sortKey === 'symbol'}
+                      direction={sortKey === 'symbol' ? sortOrder : 'asc'}
+                      onClick={() => handleSort('symbol')}
                     >
-                      <span>
-                        <SignalChip direction={row.signalDirection} />
-                      </span>
-                    </Tooltip>
+                      Symbol
+                    </TableSortLabel>
+                  </TableCell>
+                  <TableCell>Company</TableCell>
+                  {showAllColumns && (
+                    <TableCell>
+                      <TableSortLabel
+                        active={sortKey === 'sector'}
+                        direction={sortKey === 'sector' ? sortOrder : 'asc'}
+                        onClick={() => handleSort('sector')}
+                      >
+                        Sector
+                      </TableSortLabel>
+                    </TableCell>
+                  )}
+                  <TableCell align="right">
+                    <TableSortLabel
+                      active={sortKey === 'latestPrice'}
+                      direction={sortKey === 'latestPrice' ? sortOrder : 'asc'}
+                      onClick={() => handleSort('latestPrice')}
+                    >
+                      Price
+                    </TableSortLabel>
                   </TableCell>
                   <TableCell align="right">
-                    <Typography variant="body2" color="text.secondary">
-                      {row.marketCap !== null ? compact(row.marketCap, profile.currency) : '—'}
-                    </Typography>
+                    <TableSortLabel
+                      active={sortKey === 'change1D'}
+                      direction={sortKey === 'change1D' ? sortOrder : 'asc'}
+                      onClick={() => handleSort('change1D')}
+                    >
+                      1D %
+                    </TableSortLabel>
                   </TableCell>
+                  <TableCell>
+                    <TableSortLabel
+                      active={sortKey === 'signalScore'}
+                      direction={sortKey === 'signalScore' ? sortOrder : 'asc'}
+                      onClick={() => handleSort('signalScore')}
+                    >
+                      Signal
+                    </TableSortLabel>
+                  </TableCell>
+                  {showAllColumns && (
+                    <TableCell align="right">
+                      <TableSortLabel
+                        active={sortKey === 'marketCap'}
+                        direction={sortKey === 'marketCap' ? sortOrder : 'asc'}
+                        onClick={() => handleSort('marketCap')}
+                      >
+                        Mkt Cap
+                      </TableSortLabel>
+                    </TableCell>
+                  )}
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
+              </TableHead>
+              <TableBody>
+                {pagedRows.map((row, idx) => (
+                  <TableRow
+                    key={row.symbol}
+                    hover
+                    sx={{ opacity: row.instrumentId === null ? 0.5 : 1 }}
+                  >
+                    <TableCell>
+                      <Typography variant="caption" color="text.secondary">{page * rowsPerPage + idx + 1}</Typography>
+                    </TableCell>
+                    <TableCell>
+                      {row.instrumentId ? (
+                        <Typography
+                          variant="body2"
+                          component={Link}
+                          to={`/instrument-workspace/${encodeURIComponent(row.symbol)}`}
+                          sx={{ fontWeight: 600, color: 'primary.main', textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
+                        >
+                          {row.symbol}
+                        </Typography>
+                      ) : (
+                        <Typography variant="body2" fontWeight={600} color="text.secondary">
+                          {row.symbol}
+                        </Typography>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2" noWrap sx={{ maxWidth: 200 }}>
+                        {row.companyName ?? <Typography component="span" variant="body2" color="text.secondary">—</Typography>}
+                      </Typography>
+                    </TableCell>
+                    {showAllColumns && (
+                      <TableCell>
+                        <Typography variant="body2" color="text.secondary" noWrap>
+                          {row.sector ?? '—'}
+                        </Typography>
+                      </TableCell>
+                    )}
+                    <TableCell align="right">
+                      <Typography variant="body2" fontFamily="monospace">
+                        {row.latestPrice !== null ? money(row.latestPrice, profile.currency, { fractionDigits: 1 }) : '—'}
+                      </Typography>
+                    </TableCell>
+                    <TableCell align="right">
+                      {row.change1D !== null ? (
+                        <Typography
+                          variant="body2"
+                          fontFamily="monospace"
+                          sx={{ color: changeColor(row.change1D) }}
+                        >
+                          {row.change1D >= 0 ? '+' : ''}{row.change1D.toFixed(2)}%
+                        </Typography>
+                      ) : (
+                        <Typography variant="body2" color="text.secondary">—</Typography>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Tooltip
+                        title={row.signalScore !== null ? `Score: ${row.signalScore.toFixed(1)}` : 'No signal generated'}
+                        arrow
+                      >
+                        <span>
+                          <SignalChip direction={row.signalDirection} />
+                        </span>
+                      </Tooltip>
+                    </TableCell>
+                    {showAllColumns && (
+                      <TableCell align="right">
+                        <Typography variant="body2" color="text.secondary">
+                          {row.marketCap !== null ? compact(row.marketCap, profile.currency) : '—'}
+                        </Typography>
+                      </TableCell>
+                    )}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            <TablePagination
+              component="div"
+              count={rows.length}
+              page={page}
+              onPageChange={(_e, newPage) => setPage(newPage)}
+              rowsPerPage={rowsPerPage}
+              onRowsPerPageChange={(e) => {
+                setRowsPerPage(parseInt(e.target.value, 10));
+                setPage(0);
+              }}
+              rowsPerPageOptions={[10, 25, 50, 100]}
+            />
+          </TableContainer>
+        </Stack>
       )}
     </Box>
   );

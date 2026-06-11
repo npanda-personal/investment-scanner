@@ -3,6 +3,8 @@ import { Navigate } from 'react-router-dom';
 import NavigationLayout from './NavigationLayout';
 import HomePage from './HomePage';
 import AdminHomePage from './AdminHomePage';
+// CryptoMarketOverviewPage is kept (not deleted) but the route is redirected
+// to "/" while the crypto scope is inactive under the IN equity focus.
 import { marketIntelligenceRoutes } from '@/features/market-intelligence';
 import { marketDataFoundationRoutes, marketScansRoutes, screenerRoutes } from '@/features/market-data-foundation';
 import UnifiedStockPage, { InstrumentWorkspaceSymbolRedirect } from '@/features/market-data-foundation/components/UnifiedStockPage';
@@ -30,8 +32,8 @@ import { tradePlanRiskEngineRoutes } from '@/features/trade-plan-risk-engine';
 import { todayTradeReviewRoutes } from '@/features/today-trade-review';
 import { pipelineOpsRoutes } from '@/features/pipeline-ops';
 import { signalPositionLedgerRoutes } from '@/features/signal-position-ledger';
-import { DailyOverviewDashboardPage } from '@/features/daily-overview-dashboard';
-import CryptoMarketOverviewPage from '@/features/market-data-foundation/components/CryptoMarketOverviewPage';
+// DailyOverviewDashboardPage import removed — /daily-overview now redirects to /today-review
+// (it is a duplicated tab in TodayReviewPage).
 
 const userInstrumentRoutes: RouteObject[] = [
   { path: 'stocks', element: <Navigate to="/instrument-workspace" replace /> },
@@ -99,8 +101,10 @@ export const appRoutes: RouteObject[] = [
           ...alertsMonitoringRoutes,
           ...aiInvestmentCopilotRoutes,
           ...notificationsDeliveryRoutes,
-          { path: 'daily-overview', element: <DailyOverviewDashboardPage /> },
-          { path: 'crypto', element: <CryptoMarketOverviewPage /> },
+          // /daily-overview is a duplicated tab inside TodayReviewPage — redirect for deep-link compat.
+          { path: 'daily-overview', element: <Navigate to="/today-review" replace /> },
+          // /crypto route kept for URL stability; redirects to "/" while crypto scope is inactive.
+          { path: 'crypto', element: <Navigate to="/" replace /> },
           ...protectedAuthIdentityRoutes,
           { path: 'admin', element: <AdminHomePage /> },
           ...prefixedAdminRoutes(operatorRoutes),

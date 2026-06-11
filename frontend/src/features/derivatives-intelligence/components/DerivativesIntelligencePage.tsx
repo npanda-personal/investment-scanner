@@ -42,8 +42,8 @@ export const DerivativesIntelligencePage: React.FC = () => {
       <Stack spacing={0.5} sx={{ mb: 2 }}>
         <Typography variant="h4" fontWeight={700}>Derivatives / F&amp;O</Typography>
         <Typography variant="body2" color="text.secondary">
-          NSE futures &amp; options positioning intelligence — open-interest buildup, derived from the
-          end-of-day F&amp;O bhavcopy. Persisted daily; for research support only.
+          NSE futures &amp; options positioning intelligence — open-interest buildup from official
+          NSE end-of-day F&amp;O data. Updated daily; for research support only.
         </Typography>
       </Stack>
 

@@ -264,7 +264,7 @@ export class MarketPulseSnapshotService {
         tradingDate: rowDate,
         importedAt: row.importedAt ? row.importedAt.toISOString() : null,
       };
-      if (stale) warnings.push(`Source segment ${segment} is stale at ${rowDate}; expected ${latestCompletedTradingDate}.`);
+      if (stale) warnings.push(`${segment} data last updated ${rowDate} (expected ${latestCompletedTradingDate}).`);
       if (REQUIRED_SOURCE_SEGMENTS.includes(segment as typeof REQUIRED_SOURCE_SEGMENTS[number])) {
         requiredPresentCount += 1;
         if (stale) staleRequiredCount += 1;

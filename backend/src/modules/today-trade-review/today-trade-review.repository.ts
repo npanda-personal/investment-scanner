@@ -211,43 +211,35 @@ export class TodayTradeReviewRepository implements TodayReviewRepositoryContract
     // ordered by timestamp DESC and compute max/min adjusted-close + latest close.
     // COALESCE(adjustedClose, close) ensures we fall back to raw close when
     // adjustedClose is not populated (older ingested rows).
+    // Use a LATERAL that pulls ONLY the latest 252 rows per symbol via the
+    // (symbol, timestamp) index, instead of a window function over each symbol's full history.
+    // On a 39.7M-row price_ticks the old window read ~81k rows (all history for ~40 candidates)
+    // and ran ~1.8s isolated (20s+ under concurrent DB load → Daily Review page timeout); this
+    // reads ~10k rows and runs ~35ms, with identical high/low/current values (verified).
     const rowsClean = await this.db.$queryRaw<Array<{
       symbol: string;
       high52w: number;
       low52w: number;
       current_close: number;
     }>>(Prisma.sql`
-      WITH windowed AS (
+      SELECT
+        s.symbol,
+        MAX(p.adj_close)::float8 AS high52w,
+        MIN(p.adj_close)::float8 AS low52w,
+        (array_agg(p.adj_close ORDER BY p.ts DESC))[1]::float8 AS current_close
+      FROM unnest(${symbols}::text[]) AS s(symbol)
+      CROSS JOIN LATERAL (
         SELECT
-          pt.symbol,
           COALESCE(pt."adjustedClose", pt.close)::float8 AS adj_close,
-          ROW_NUMBER() OVER (PARTITION BY pt.symbol ORDER BY pt.timestamp DESC) AS rn
+          pt.timestamp AS ts
         FROM price_ticks pt
-        WHERE pt.symbol = ANY(${symbols})
+        WHERE pt.symbol = s.symbol
           AND UPPER(COALESCE(pt."dataStatus", 'COMPLETE')) = 'COMPLETE'
           AND UPPER(COALESCE(pt.source, '')) NOT LIKE 'TEST\\_%'
-      ),
-      range_agg AS (
-        SELECT
-          symbol,
-          MAX(adj_close) AS high52w,
-          MIN(adj_close) AS low52w
-        FROM windowed
-        WHERE rn <= 252
-        GROUP BY symbol
-      ),
-      latest_close AS (
-        SELECT symbol, adj_close AS current_close
-        FROM windowed
-        WHERE rn = 1
-      )
-      SELECT
-        r.symbol,
-        r.high52w::float8,
-        r.low52w::float8,
-        l.current_close::float8
-      FROM range_agg r
-      JOIN latest_close l ON l.symbol = r.symbol
+        ORDER BY pt.timestamp DESC
+        LIMIT 252
+      ) p
+      GROUP BY s.symbol
     `);
 
     const map = new Map<string, { high52w: number; low52w: number; currentClose: number; positionPct: number }>();

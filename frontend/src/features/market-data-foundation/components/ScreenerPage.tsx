@@ -18,6 +18,7 @@ import {
   TableCell,
   TableContainer,
   TableHead,
+  TablePagination,
   TableRow,
   TextField,
   Tooltip,
@@ -118,11 +119,10 @@ const DEFAULT_FILTERS: ScreenerFilters = {
 // ---------------------------------------------------------------------------
 
 export default function ScreenerPage() {
-  const { profile, scope } = useMarketScope();
+  const { profile } = useMarketScope();
   // India-only NSE/BSE features (delivery %, F&O ban) — gate by capability.
   const hasDelivery = profile.capabilities.hasDelivery;
-  const universeLabel = scope.region === 'IN' ? 'NSE/BSE' : scope.region === 'US' ? 'US' : scope.region === 'EU' ? 'EU' : 'global';
-  const screenerSubtitle = `Filter the ${universeLabel} universe by signal, sector, cap-band,${hasDelivery ? ' delivery,' : ''} and 52-week position.`;
+  const screenerSubtitle = `Filter NSE/BSE stocks by technicals, fundamentals and signals.`;
   const [filters, setFilters] = useState<ScreenerFilters>(DEFAULT_FILTERS);
   const [rows, setRows] = useState<ScreenerRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -130,6 +130,8 @@ export default function ScreenerPage() {
   const [warnings, setWarnings] = useState<string[]>([]);
   const [generatedAt, setGeneratedAt] = useState<string | null>(null);
   const [count, setCount] = useState<number | null>(null);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(25);
 
   // Debounce timer
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -162,10 +164,12 @@ export default function ScreenerPage() {
   }, [filters]);
 
   const setFilter = <K extends keyof ScreenerFilters>(key: K, value: ScreenerFilters[K]) => {
+    setPage(0);
     setFilters((prev) => ({ ...prev, [key]: value }));
   };
 
   const clearFilter = <K extends keyof ScreenerFilters>(key: K) => {
+    setPage(0);
     setFilters((prev) => {
       const next = { ...prev };
       delete next[key];
@@ -177,7 +181,7 @@ export default function ScreenerPage() {
     return (
       <Box sx={{ p: 3 }}>
         <PageHeader
-          title="Stock Screener"
+          title="Screener"
           subtitle={screenerSubtitle}
         />
         <NotApplicableForAssetClass
@@ -191,7 +195,7 @@ export default function ScreenerPage() {
   return (
     <Box sx={{ p: 3 }}>
       <PageHeader
-        title="Stock Screener"
+        title="Screener"
         subtitle={screenerSubtitle}
       />
 
@@ -415,7 +419,7 @@ export default function ScreenerPage() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {rows.map((row) => (
+              {rows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((row) => (
                 <TableRow key={row.instrumentId} hover>
                   <TableCell>
                     <SymbolLink instrumentId={row.instrumentId} symbol={row.symbol} />
@@ -470,6 +474,18 @@ export default function ScreenerPage() {
               ))}
             </TableBody>
           </Table>
+          <TablePagination
+            component="div"
+            count={rows.length}
+            page={page}
+            onPageChange={(_e, newPage) => setPage(newPage)}
+            rowsPerPage={rowsPerPage}
+            onRowsPerPageChange={(e) => {
+              setRowsPerPage(parseInt(e.target.value, 10));
+              setPage(0);
+            }}
+            rowsPerPageOptions={[10, 25, 50, 100]}
+          />
         </TableContainer>
       )}
     </Box>

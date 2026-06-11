@@ -2,8 +2,7 @@ import { Navigate, type RouteObject } from 'react-router-dom';
 import MarketDataFoundationPage from './components/MarketDataFoundationPage';
 import AddInstrumentPage from './components/AddInstrumentPage';
 import UnifiedStockPage from './components/UnifiedStockPage';
-import MarketScansPage from './components/MarketScansPage';
-import ScreenerPage from './components/ScreenerPage';
+import { DiscoverWorkspacePage } from './components/DiscoverWorkspacePage';
 
 export const marketDataFoundationRoutes: RouteObject[] = [
   { path: 'market-data-foundation', element: <MarketDataFoundationPage /> },
@@ -14,12 +13,13 @@ export const marketDataFoundationRoutes: RouteObject[] = [
   { path: 'stocks/:id', element: <UnifiedStockPage /> },
 ];
 
-/** User-facing route — lives in the main trader workflow nav. */
+// /market-scans is now a tab inside the Discover workspace (/screener).
+// Redirect for deep-link / bookmark compat.
 export const marketScansRoutes: RouteObject[] = [
-  { path: 'market-scans', element: <MarketScansPage /> },
+  { path: 'market-scans', element: <Navigate to="/screener" replace /> },
 ];
 
-/** Multi-factor screener — core trader tool. */
+/** Discover workspace — merged Screener / Market Scans / Stock Interest / Index Constituents. */
 export const screenerRoutes: RouteObject[] = [
-  { path: 'screener', element: <ScreenerPage /> },
+  { path: 'screener', element: <DiscoverWorkspacePage /> },
 ];

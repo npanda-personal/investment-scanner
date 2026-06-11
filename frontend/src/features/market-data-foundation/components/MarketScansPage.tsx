@@ -11,6 +11,7 @@ import {
   TableCell,
   TableContainer,
   TableHead,
+  TablePagination,
   TableRow,
   Tabs,
   Tooltip,
@@ -126,152 +127,184 @@ function formatVolume(vol: number): string {
 
 // ---- 52W High/Low Table ----
 
-function Table52w({ rows, scanType, currency }: { rows: MarketScanRow52w[]; scanType: '52w-high' | '52w-low'; currency?: string }) {
+interface PaginationProps {
+  page: number;
+  rowsPerPage: number;
+  onPageChange: (newPage: number) => void;
+  onRowsPerPageChange: (newRowsPerPage: number) => void;
+}
+
+function Table52w({ rows, scanType, currency, page, rowsPerPage, onPageChange, onRowsPerPageChange }: { rows: MarketScanRow52w[]; scanType: '52w-high' | '52w-low'; currency?: string } & PaginationProps) {
   if (!rows.length) {
     return <EmptyState message="No instruments found matching the scan criteria." />;
   }
+  const visibleRows = rows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
   return (
-    <TableContainer>
-      <Table size="small">
-        <TableHead>
-          <TableRow>
-            <TableCell>Symbol</TableCell>
-            <TableCell>Company</TableCell>
-            <TableCell>Sector</TableCell>
-            <TableCell align="right">Current Price</TableCell>
-            <TableCell align="right">52W High</TableCell>
-            <TableCell align="right">52W Low</TableCell>
-            <TableCell align="right">% from High</TableCell>
-            <TableCell align="right">% from Low</TableCell>
-            <TableCell>Basis</TableCell>
-            <TableCell>Signal</TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {rows.map((row) => (
-            <TableRow key={row.instrumentId} hover>
-              <TableCell>
-                <SymbolLink instrumentId={row.instrumentId} symbol={row.symbol} />
-              </TableCell>
-              <TableCell>
-                <Tooltip title={row.companyName}>
-                  <Typography variant="body2" noWrap sx={{ maxWidth: 180 }}>
-                    {row.companyName}
-                  </Typography>
-                </Tooltip>
-              </TableCell>
-              <TableCell><SectorChip sector={row.sector} /></TableCell>
-              <TableCell align="right">
-                <Typography variant="body2" fontWeight={600}>{money(row.currentPrice, currency)}</Typography>
-              </TableCell>
-              <TableCell align="right">
-                <Typography variant="body2" color={scanType === '52w-high' ? 'success.main' : 'text.secondary'}>
-                  {money(row.high52w, currency)}
-                </Typography>
-              </TableCell>
-              <TableCell align="right">
-                <Typography variant="body2" color={scanType === '52w-low' ? 'error.main' : 'text.secondary'}>
-                  {money(row.low52w, currency)}
-                </Typography>
-              </TableCell>
-              <TableCell align="right">
-                <Typography variant="body2" color={pctColor(row.pctFromHigh)} fontWeight={scanType === '52w-high' ? 700 : 400}>
-                  {formatPct(row.pctFromHigh)}
-                </Typography>
-              </TableCell>
-              <TableCell align="right">
-                <Typography variant="body2" color={pctColor(row.pctFromLow)} fontWeight={scanType === '52w-low' ? 700 : 400}>
-                  {formatPct(row.pctFromLow)}
-                </Typography>
-              </TableCell>
-              <TableCell>
-                <Typography variant="caption" color="text.secondary">
-                  {row.priceBasis === 'ADJUSTED_CLOSE' ? 'Adj' : 'Raw'}
-                </Typography>
-              </TableCell>
-              <TableCell>
-                <SignalChip direction={row.signalDirection} score={row.signalScore} />
-              </TableCell>
+    <>
+      <TableContainer>
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+              <TableCell>Symbol</TableCell>
+              <TableCell>Company</TableCell>
+              <TableCell>Sector</TableCell>
+              <TableCell align="right">Current Price</TableCell>
+              <TableCell align="right">52W High</TableCell>
+              <TableCell align="right">52W Low</TableCell>
+              <TableCell align="right">% from High</TableCell>
+              <TableCell align="right">% from Low</TableCell>
+              <TableCell>Basis</TableCell>
+              <TableCell>Signal</TableCell>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </TableContainer>
+          </TableHead>
+          <TableBody>
+            {visibleRows.map((row) => (
+              <TableRow key={row.instrumentId} hover>
+                <TableCell>
+                  <SymbolLink instrumentId={row.instrumentId} symbol={row.symbol} />
+                </TableCell>
+                <TableCell>
+                  <Tooltip title={row.companyName}>
+                    <Typography variant="body2" noWrap sx={{ maxWidth: 180 }}>
+                      {row.companyName}
+                    </Typography>
+                  </Tooltip>
+                </TableCell>
+                <TableCell><SectorChip sector={row.sector} /></TableCell>
+                <TableCell align="right">
+                  <Typography variant="body2" fontWeight={600}>{money(row.currentPrice, currency)}</Typography>
+                </TableCell>
+                <TableCell align="right">
+                  <Typography variant="body2" color={scanType === '52w-high' ? 'success.main' : 'text.secondary'}>
+                    {money(row.high52w, currency)}
+                  </Typography>
+                </TableCell>
+                <TableCell align="right">
+                  <Typography variant="body2" color={scanType === '52w-low' ? 'error.main' : 'text.secondary'}>
+                    {money(row.low52w, currency)}
+                  </Typography>
+                </TableCell>
+                <TableCell align="right">
+                  <Typography variant="body2" color={pctColor(row.pctFromHigh)} fontWeight={scanType === '52w-high' ? 700 : 400}>
+                    {formatPct(row.pctFromHigh)}
+                  </Typography>
+                </TableCell>
+                <TableCell align="right">
+                  <Typography variant="body2" color={pctColor(row.pctFromLow)} fontWeight={scanType === '52w-low' ? 700 : 400}>
+                    {formatPct(row.pctFromLow)}
+                  </Typography>
+                </TableCell>
+                <TableCell>
+                  <Typography variant="caption" color="text.secondary">
+                    {row.priceBasis === 'ADJUSTED_CLOSE' ? 'Adj' : 'Raw'}
+                  </Typography>
+                </TableCell>
+                <TableCell>
+                  <SignalChip direction={row.signalDirection} score={row.signalScore} />
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
+      <TablePagination
+        component="div"
+        count={rows.length}
+        page={page}
+        rowsPerPage={rowsPerPage}
+        rowsPerPageOptions={[10, 25, 50, 100]}
+        onPageChange={(_e, newPage) => onPageChange(newPage)}
+        onRowsPerPageChange={(e) => onRowsPerPageChange(parseInt(e.target.value, 10))}
+      />
+    </>
   );
 }
 
 // ---- Delivery Spike Table ----
 
-function TableDeliverySpike({ rows }: { rows: MarketScanRowDeliverySpike[] }) {
+function TableDeliverySpike({ rows, page, rowsPerPage, onPageChange, onRowsPerPageChange }: { rows: MarketScanRowDeliverySpike[] } & PaginationProps) {
   if (!rows.length) {
     return <EmptyState message="No delivery-spike candidates found. Delivery data covers NSE-listed stocks only." />;
   }
+  const visibleRows = rows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
   return (
-    <TableContainer>
-      <Table size="small">
-        <TableHead>
-          <TableRow>
-            <TableCell>Symbol</TableCell>
-            <TableCell>Company</TableCell>
-            <TableCell>Sector</TableCell>
-            <TableCell align="right">Latest Delivery %</TableCell>
-            <TableCell align="right">Avg Delivery %</TableCell>
-            <TableCell align="right">Spike Ratio</TableCell>
-            <TableCell align="right">Lookback (bars)</TableCell>
-            <TableCell>Signal</TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {rows.map((row) => (
-            <TableRow key={row.instrumentId} hover>
-              <TableCell>
-                <SymbolLink instrumentId={row.instrumentId} symbol={row.symbol} />
-              </TableCell>
-              <TableCell>
-                <Tooltip title={row.companyName}>
-                  <Typography variant="body2" noWrap sx={{ maxWidth: 180 }}>
-                    {row.companyName}
-                  </Typography>
-                </Tooltip>
-              </TableCell>
-              <TableCell><SectorChip sector={row.sector} /></TableCell>
-              <TableCell align="right">
-                <Typography variant="body2" fontWeight={600} color="success.main">
-                  {row.deliveryPct.toFixed(1)}%
-                </Typography>
-              </TableCell>
-              <TableCell align="right">
-                <Typography variant="body2" color="text.secondary">
-                  {row.avgDeliveryPct.toFixed(1)}%
-                </Typography>
-              </TableCell>
-              <TableCell align="right">
-                <Typography variant="body2" fontWeight={700} color="warning.main">
-                  {row.spikeRatio.toFixed(2)}x
-                </Typography>
-              </TableCell>
-              <TableCell align="right">
-                <Typography variant="body2" color="text.secondary">{row.lookbackBars}</Typography>
-              </TableCell>
-              <TableCell>
-                <SignalChip direction={row.signalDirection} score={row.signalScore} />
-              </TableCell>
+    <>
+      <TableContainer>
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+              <TableCell>Symbol</TableCell>
+              <TableCell>Company</TableCell>
+              <TableCell>Sector</TableCell>
+              <TableCell align="right">Latest Delivery %</TableCell>
+              <TableCell align="right">Avg Delivery %</TableCell>
+              <TableCell align="right">Spike Ratio</TableCell>
+              <TableCell align="right">Lookback (bars)</TableCell>
+              <TableCell>Signal</TableCell>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </TableContainer>
+          </TableHead>
+          <TableBody>
+            {visibleRows.map((row) => (
+              <TableRow key={row.instrumentId} hover>
+                <TableCell>
+                  <SymbolLink instrumentId={row.instrumentId} symbol={row.symbol} />
+                </TableCell>
+                <TableCell>
+                  <Tooltip title={row.companyName}>
+                    <Typography variant="body2" noWrap sx={{ maxWidth: 180 }}>
+                      {row.companyName}
+                    </Typography>
+                  </Tooltip>
+                </TableCell>
+                <TableCell><SectorChip sector={row.sector} /></TableCell>
+                <TableCell align="right">
+                  <Typography variant="body2" fontWeight={600} color="success.main">
+                    {row.deliveryPct.toFixed(1)}%
+                  </Typography>
+                </TableCell>
+                <TableCell align="right">
+                  <Typography variant="body2" color="text.secondary">
+                    {row.avgDeliveryPct.toFixed(1)}%
+                  </Typography>
+                </TableCell>
+                <TableCell align="right">
+                  <Typography variant="body2" fontWeight={700} color="warning.main">
+                    {row.spikeRatio.toFixed(2)}x
+                  </Typography>
+                </TableCell>
+                <TableCell align="right">
+                  <Typography variant="body2" color="text.secondary">{row.lookbackBars}</Typography>
+                </TableCell>
+                <TableCell>
+                  <SignalChip direction={row.signalDirection} score={row.signalScore} />
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
+      <TablePagination
+        component="div"
+        count={rows.length}
+        page={page}
+        rowsPerPage={rowsPerPage}
+        rowsPerPageOptions={[10, 25, 50, 100]}
+        onPageChange={(_e, newPage) => onPageChange(newPage)}
+        onRowsPerPageChange={(e) => onRowsPerPageChange(parseInt(e.target.value, 10))}
+      />
+    </>
   );
 }
 
 // ---- Volume Spike Table ----
 
-function TableVolumeSpike({ rows }: { rows: MarketScanRowVolumeSpike[] }) {
+function TableVolumeSpike({ rows, page, rowsPerPage, onPageChange, onRowsPerPageChange }: { rows: MarketScanRowVolumeSpike[] } & PaginationProps) {
   if (!rows.length) {
     return <EmptyState message="No volume-spike candidates found. Check that recent price data has been ingested." />;
   }
   // Derive lookback window from first row (all rows share the same lookback param)
   const lookbackWindow = rows[0]?.lookbackBars ?? null;
+  const visibleRows = rows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
   return (
     <>
       {lookbackWindow != null && (
@@ -294,7 +327,7 @@ function TableVolumeSpike({ rows }: { rows: MarketScanRowVolumeSpike[] }) {
             </TableRow>
           </TableHead>
           <TableBody>
-            {rows.map((row) => (
+            {visibleRows.map((row) => (
               <TableRow key={row.instrumentId} hover>
                 <TableCell>
                   <SymbolLink instrumentId={row.instrumentId} symbol={row.symbol} />
@@ -333,6 +366,15 @@ function TableVolumeSpike({ rows }: { rows: MarketScanRowVolumeSpike[] }) {
           </TableBody>
         </Table>
       </TableContainer>
+      <TablePagination
+        component="div"
+        count={rows.length}
+        page={page}
+        rowsPerPage={rowsPerPage}
+        rowsPerPageOptions={[10, 25, 50, 100]}
+        onPageChange={(_e, newPage) => onPageChange(newPage)}
+        onRowsPerPageChange={(e) => onRowsPerPageChange(parseInt(e.target.value, 10))}
+      />
     </>
   );
 }
@@ -344,6 +386,18 @@ export default function MarketScansPage() {
   // Delivery-spike is NSE-delivery-based — not applicable to crypto.
   const visibleTabs = TABS.filter((t) => t.id !== 'delivery-spike' || profile.capabilities.hasDelivery);
   const [activeTab, setActiveTab] = useState<TabId>('52w-high');
+
+  // Shared pagination state — reset to page 0 whenever the active tab changes.
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(25);
+
+  function handlePageChange(newPage: number) {
+    setPage(newPage);
+  }
+  function handleRowsPerPageChange(newRowsPerPage: number) {
+    setRowsPerPage(newRowsPerPage);
+    setPage(0);
+  }
 
   const [data52wHigh, setData52wHigh] = useState<MarketScanSummary52w | null>(null);
   const [data52wLow, setData52wLow] = useState<MarketScanSummary52w | null>(null);
@@ -405,6 +459,7 @@ export default function MarketScansPage() {
     setDataDelivery(null);
     setDataVolume(null);
     setActiveTab((prev) => (visibleTabs.some((t) => t.id === prev) ? prev : '52w-high'));
+    setPage(0);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scope.region, scope.assetType]);
 
@@ -449,7 +504,7 @@ export default function MarketScansPage() {
         return (
           <>
             <ScanWarning warnings={data52wHigh.warnings} />
-            <Table52w rows={data52wHigh.results} scanType="52w-high" currency={profile.currency} />
+            <Table52w rows={data52wHigh.results} scanType="52w-high" currency={profile.currency} page={page} rowsPerPage={rowsPerPage} onPageChange={handlePageChange} onRowsPerPageChange={handleRowsPerPageChange} />
           </>
         );
       case '52w-low':
@@ -457,7 +512,7 @@ export default function MarketScansPage() {
         return (
           <>
             <ScanWarning warnings={data52wLow.warnings} />
-            <Table52w rows={data52wLow.results} scanType="52w-low" currency={profile.currency} />
+            <Table52w rows={data52wLow.results} scanType="52w-low" currency={profile.currency} page={page} rowsPerPage={rowsPerPage} onPageChange={handlePageChange} onRowsPerPageChange={handleRowsPerPageChange} />
           </>
         );
       case 'delivery-spike':
@@ -465,7 +520,7 @@ export default function MarketScansPage() {
         return (
           <>
             <ScanWarning warnings={dataDelivery.warnings} />
-            <TableDeliverySpike rows={dataDelivery.results} />
+            <TableDeliverySpike rows={dataDelivery.results} page={page} rowsPerPage={rowsPerPage} onPageChange={handlePageChange} onRowsPerPageChange={handleRowsPerPageChange} />
           </>
         );
       case 'volume-spike':
@@ -473,7 +528,7 @@ export default function MarketScansPage() {
         return (
           <>
             <ScanWarning warnings={dataVolume.warnings} />
-            <TableVolumeSpike rows={dataVolume.results} />
+            <TableVolumeSpike rows={dataVolume.results} page={page} rowsPerPage={rowsPerPage} onPageChange={handlePageChange} onRowsPerPageChange={handleRowsPerPageChange} />
           </>
         );
       default:
@@ -501,7 +556,7 @@ export default function MarketScansPage() {
         <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
           <Tabs
             value={activeTab}
-            onChange={(_e, val: TabId) => setActiveTab(val)}
+            onChange={(_e, val: TabId) => { setActiveTab(val); setPage(0); }}
             variant="scrollable"
             scrollButtons="auto"
           >

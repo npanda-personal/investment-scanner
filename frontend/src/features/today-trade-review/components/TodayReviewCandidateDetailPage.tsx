@@ -36,7 +36,7 @@ export function TodayReviewCandidateDetailPage() {
     return (
       <Stack spacing={3}>
         <PageHeader title="Daily Review Candidate" backTo="/today-review" backLabel="Daily Review" />
-        <Alert severity="info" icon={<CircularProgress size={18} />}>Loading candidate research snapshot.</Alert>
+        <Alert severity="info" icon={<CircularProgress size={18} />}>Loading candidate details.</Alert>
       </Stack>
     );
   }
@@ -54,7 +54,7 @@ export function TodayReviewCandidateDetailPage() {
     return (
       <Stack spacing={3}>
         <PageHeader title="Daily Review Candidate" backTo="/today-review" backLabel="Daily Review" />
-        <Alert severity="warning">Candidate snapshot was not found.</Alert>
+        <Alert severity="warning">Candidate not found.</Alert>
       </Stack>
     );
   }
@@ -72,7 +72,7 @@ export function TodayReviewCandidateDetailPage() {
   return (
     <Stack spacing={3}>
       <PageHeader
-        title={`${candidate.symbol} research support`}
+        title={`${candidate.symbol} research review`}
         subtitle={candidate.companyName || 'Company unavailable'}
         backTo="/today-review"
         backLabel="Today Review"
@@ -124,7 +124,7 @@ export function TodayReviewCandidateDetailPage() {
           <CardContent>
             <Typography variant="h6" gutterBottom>Price behaviour</Typography>
             <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic', mb: 1 }}>
-              Deterministic summary assembled from persisted snapshot data. Descriptive context only — not investment advice.
+              Summary based on saved data. Descriptive context only — not investment advice.
             </Typography>
             <Typography>{priceBehaviourText}</Typography>
           </CardContent>
@@ -138,7 +138,7 @@ export function TodayReviewCandidateDetailPage() {
       )}
       {dqTierContext.missingTierContext && (
         <Alert severity="warning">
-          Data Quality use-case tier context is missing for this candidate snapshot. This detail view applies conservative read-only confidence downgrade and does not assume readiness.
+          Data Quality tier context is missing for this candidate. Confidence is shown conservatively and readiness is not assumed.
         </Alert>
       )}
       {(dqTierContext.dailyReview.status === 'LIMITED' || dqTierContext.dailyReview.status === 'BLOCKED') && (
@@ -147,7 +147,7 @@ export function TodayReviewCandidateDetailPage() {
         </Alert>
       )}
       <Alert severity={dqTierContext.automation.status === 'BLOCKED' ? 'info' : 'warning'}>
-        Automation is policy-blocked in Today Review and is never broker-authorized in this phase.
+        Automated trading is not enabled in Today Review.
       </Alert>
 
       {explainability && (
@@ -199,7 +199,7 @@ export function TodayReviewCandidateDetailPage() {
             ['Last evaluated', formatDateTime(dataQuality?.lastEvaluatedAt)],
           ]} />
         </Panel>
-        <Panel title="Use-case tiers (read-only)">
+        <Panel title="Data quality tiers">
           <FactStack items={[
             ['Daily review tier', tierDetailLabel(dqTierContext.dailyReview.status, dqTierContext.dailyReview.reason)],
             ['Signal tier', tierDetailLabel(dqTierContext.signal.status, dqTierContext.signal.reason)],
@@ -285,7 +285,7 @@ function FactStack({ items }: { items: Array<[string, string]> }) {
 }
 
 function ReasonList({ reasons }: { reasons: Array<{ code: string; label: string; category: string; severity: string; sourceModule: string; evidenceDate?: string | null }> }) {
-  if (reasons.length === 0) return <Typography color="text.secondary">No candidate reasons were stored for this panel.</Typography>;
+  if (reasons.length === 0) return <Typography color="text.secondary">No reasons available.</Typography>;
   return (
     <List dense disablePadding>
       {reasons.map((reason, i) => {
@@ -343,8 +343,8 @@ function detailTierContext(dataQuality: TodayReviewCandidateDataQualitySnapshot 
       reason: !tiers?.automation
         ? 'Missing from snapshot; policy remains blocked.'
         : tiers.automation.status !== 'BLOCKED'
-          ? `Upstream status ${tiers.automation.status}; Today Review policy remains BLOCKED (PHASE0_AUTOMATION_NOT_AUTHORIZED).`
-          : automationTier.reason || 'PHASE0_AUTOMATION_NOT_AUTHORIZED',
+          ? `Upstream tier reported ${tiers.automation.status}; automated trading is not enabled in this phase.`
+          : automationTier.reason || 'Automated trading is not enabled.',
     },
     missingTierContext,
   };
@@ -353,7 +353,7 @@ function detailTierContext(dataQuality: TodayReviewCandidateDataQualitySnapshot 
 function detailConfidenceDisplay(score: number, missingTierContext: boolean) {
   if (!missingTierContext) return String(score);
   const conservative = Math.max(0, Math.round(Number(score || 0) * 0.8));
-  return `${conservative} (from ${score}; conservative due to missing DQ tiers)`;
+  return `${conservative} (from ${score}; conservative view — data quality tiers missing)`;
 }
 
 function tierDetailLabel(status: DetailTierStatus, reason: string | null) {

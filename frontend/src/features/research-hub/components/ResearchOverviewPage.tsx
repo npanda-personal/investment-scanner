@@ -42,6 +42,7 @@ import { NotApplicableForAssetClass } from '@/shared/components/NotApplicableFor
 import { useMarketScope } from '@/contexts/MarketScopeContext';
 import type { ActionabilityDimension, ActionabilityStatus, ResearchOverview, NextAction, ResearchPriorityCandidate, ResearchWhatChangedDelta } from '../api/researchHubApi';
 import { ResearchDrilldownTabs } from './ResearchDrilldownTabs';
+import { SignalTrackRecordPanel } from './SignalTrackRecordPanel';
 
 const ResearchOverviewPage: React.FC = () => {
   const { scope, profile } = useMarketScope();
@@ -51,7 +52,7 @@ const ResearchOverviewPage: React.FC = () => {
     return (
       <Box className="page-container page-container--hub">
         <PageHeader
-          title="Research Command Center"
+          title="Research Hub"
           subtitle={`Prioritized market intelligence for ${scope.region} / ${scope.assetType}.`}
         />
         <NotApplicableForAssetClass
@@ -132,7 +133,7 @@ const ResearchOverviewPage: React.FC = () => {
   return (
     <Box className="page-container page-container--hub">
       <PageHeader
-        title="Research Command Center"
+        title="Research Hub"
         subtitle={`Prioritized market intelligence for ${scope.region} / ${scope.assetType}.`}
         primaryAction={<Button variant="outlined" onClick={reload} startIcon={<UpdateOutlined />}>Reload Snapshot</Button>}
       />
@@ -143,7 +144,7 @@ const ResearchOverviewPage: React.FC = () => {
             Data is being prepared by the daily pipeline
           </Typography>
           <Typography variant="body2">
-            The Research Command Center snapshot hasn't been computed yet. Check back after the next
+            The Research Hub snapshot hasn't been computed yet. Check back after the next
             pipeline run, or ask an admin to trigger the strategy evaluation pipeline from the
             Pipeline Ops page. All sections below will populate once the snapshot is ready.
           </Typography>
@@ -184,7 +185,12 @@ const ResearchOverviewPage: React.FC = () => {
           <MarketReadinessHero readiness={marketReadiness} actionability={actionability} nextActions={nextActions} />
         </Grid>
 
-        {/* 2. Research Priority Board */}
+        {/* 2. Signal Track Record — G3 trust surface */}
+        <Grid item xs={12}>
+          <SignalTrackRecordPanel />
+        </Grid>
+
+        {/* 3. Research Priority Board */}
         <Grid item xs={12} md={8}>
           <Typography variant="h6" sx={{ mb: 2, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
             <LocalFireDepartmentOutlined color="primary" /> Research Priority Board
@@ -192,7 +198,7 @@ const ResearchOverviewPage: React.FC = () => {
           <ResearchPriorityBoard priorities={researchPriorities} generatedAt={data.generatedAt} />
         </Grid>
 
-        {/* 3. Confirmation & What Changed Panel */}
+        {/* 4. Confirmation & What Changed Panel */}
         <Grid item xs={12} md={4}>
           <Stack spacing={4}>
             <Box>
@@ -219,7 +225,7 @@ const ResearchOverviewPage: React.FC = () => {
           </Stack>
         </Grid>
 
-        {/* 4. Drilldown Tabs — full width */}
+        {/* 5. Drilldown Tabs — full width */}
         <Grid item xs={12}>
           <Typography variant="h6" sx={{ mb: 2, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
             <TimelineOutlined color="info" /> Drilldown Analysis

@@ -484,6 +484,71 @@ export async function fetchEventFeed(days: number = 5): Promise<EventFeedEnvelop
 
 // ─── Index Constituents (NR-103) ────────────────────────────────────────────
 
+// ---------------------------------------------------------------------------
+// Signal history & outcomes for a single instrument (signal-quality-lab router)
+// ---------------------------------------------------------------------------
+
+export interface SignalHistoryRow {
+  id: string;
+  signalResultId: string;
+  instrument_id: string;
+  symbol: string;
+  direction: string;
+  confidence: string;
+  score: number;
+  generatedAt: string;
+  researchUrl: string;
+  [key: string]: unknown;
+}
+
+export interface SignalOutcomeRow {
+  signalResultId: string;
+  instrumentId: string;
+  symbol: string;
+  direction: string;
+  confidence: string;
+  score: number;
+  generatedAt: string;
+  priceHistoryAvailable: boolean;
+  outcomes: Array<{
+    horizon: string;
+    forwardReturnPercent: number | null;
+    available: boolean;
+    priceAtSignal: number | null;
+    futurePrice: number | null;
+    futureDate: string | null;
+  }>;
+  [key: string]: unknown;
+}
+
+export interface InstrumentOutcomeAggregate {
+  matureCount: number;
+  directionalSampleSize: number;
+  winRate: number | null;
+  avgForwardReturn: number | null;
+}
+
+export interface InstrumentOutcomesResponse {
+  items: SignalOutcomeRow[];
+  aggregate: InstrumentOutcomeAggregate | null;
+}
+
+export async function fetchInstrumentSignalHistory(instrumentId: string): Promise<{ items: SignalHistoryRow[] }> {
+  const response = await axios.get<{ items: SignalHistoryRow[] }>(
+    `/api/v1/signals/${encodeURIComponent(instrumentId)}/history`,
+    { params: { limit: 20 } },
+  );
+  return response.data;
+}
+
+export async function fetchInstrumentOutcomes(instrumentId: string, horizon = '20D'): Promise<InstrumentOutcomesResponse> {
+  const response = await axios.get<InstrumentOutcomesResponse>(
+    `/api/v1/signals/${encodeURIComponent(instrumentId)}/outcomes`,
+    { params: { horizon } },
+  );
+  return response.data;
+}
+
 export async function fetchIndexConstituents(index: string): Promise<IndexConstituentsEnvelope> {
   try {
     const response = await axios.get<IndexConstituentsEnvelope>(

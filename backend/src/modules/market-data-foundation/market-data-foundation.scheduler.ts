@@ -91,6 +91,23 @@ export class MarketDataFoundationScheduler {
     try {
       const results = [];
       const schedulerTriggerType = options.triggerType || 'scheduled';
+
+      // The stock lane only syncs the CM segment; INDEX/SECTOR_INDEX/VIX and
+      // DELIVERY have no other automated trigger, so catch them up here every
+      // tick. Idempotent: already-ingested trading dates are skipped.
+      if (this.config.assetType === 'STOCK' && this.config.regions.includes('IN')) {
+        try {
+          const catchUp = await this.service.runNseIndexAndDeliveryCatchUp();
+          if (catchUp.index.length || catchUp.delivery.length) {
+            console.log('[MarketDataScheduler] NSE index/delivery catch-up ran', catchUp);
+          }
+        } catch (error) {
+          console.error('[MarketDataScheduler] NSE index/delivery catch-up failed', {
+            error: error instanceof Error ? error.message : 'unknown error',
+          });
+        }
+      }
+
       for (const region of this.config.regions) {
         const latest = await this.service.latestStoredCandleInfo(region, this.config.assetType, now);
         const activePriceBackfill = this.service.activePriceBackfillRun({

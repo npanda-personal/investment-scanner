@@ -51,7 +51,15 @@ export class SignalQualityLabController {
   };
 
   outcomes = async (req: Request, res: Response) => {
-    try { return res.json({ items: await this.service.outcomes(requireInstrumentId(req.params.instrumentId), parseQualityQuery(req.query)) }); }
+    try {
+      const instrumentId = requireInstrumentId(req.params.instrumentId);
+      const query = parseQualityQuery(req.query);
+      const [items, aggregate] = await Promise.all([
+        this.service.outcomes(instrumentId, query),
+        this.service.instrumentOutcomeAggregate(instrumentId, query.horizon),
+      ]);
+      return res.json({ items, aggregate });
+    }
     catch (error) { return this.error(res, error, 'Failed to load signal outcomes', 400); }
   };
 

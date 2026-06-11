@@ -5931,6 +5931,60 @@ export class MarketDataFoundationService {
     });
   }
 
+  /**
+   * Catch-up ingest for the NSE INDEX EOD file (which also carries the
+   * SECTOR_INDEX and VIX rows) and the DELIVERY bhavdata. The stock-lane
+   * scheduler only syncs the CM segment, so these lagged silently until run
+   * by hand. Called from the scheduler on every IN/STOCK tick; idempotent —
+   * already-COMPLETED trading dates are skipped before any download happens.
+   */
+  async runNseIndexAndDeliveryCatchUp(input: { maxLookbackDays?: number } = {}): Promise<{
+    index: Array<{ tradingDate: string; status: string }>;
+    delivery: Array<{ tradingDate: string; status: string }>;
+  }> {
+    const maxLookbackDays = Math.max(1, Math.min(input.maxLookbackDays ?? 10, 31));
+    const endDate = this.latestCompletedExchangeTradingDateOrThrow('IN');
+    const startDate = new Date(endDate);
+    startDate.setUTCDate(startDate.getUTCDate() - maxLookbackDays);
+
+    const candidateDates: Date[] = [];
+    for (const cursor = new Date(startDate); cursor <= endDate; cursor.setUTCDate(cursor.getUTCDate() + 1)) {
+      const dow = cursor.getUTCDay();
+      if (dow !== 0 && dow !== 6) candidateDates.push(new Date(cursor));
+    }
+
+    const repository = this.repository as any;
+    const results: { index: Array<{ tradingDate: string; status: string }>; delivery: Array<{ tradingDate: string; status: string }> } = {
+      index: [],
+      delivery: [],
+    };
+
+    for (const lane of [
+      { segment: 'INDEX', run: (tradingDate: Date) => this.importNseIndexOfficialDaily({ tradingDate }) , bucket: results.index },
+      { segment: 'DELIVERY', run: (tradingDate: Date) => this.importNseDeliveryOfficialDaily({ tradingDate }), bucket: results.delivery },
+    ] as const) {
+      const completed: Date[] = typeof repository.listCompletedSourceFileImportDates === 'function'
+        ? await repository.listCompletedSourceFileImportDates({ source: 'NSE', segment: lane.segment, startDate, endDate })
+        : [];
+      const completedKeys = new Set(completed.map((d) => d.toISOString().slice(0, 10)));
+      const missing = candidateDates.filter((d) => !completedKeys.has(d.toISOString().slice(0, 10)));
+      for (const tradingDate of missing) {
+        const dateText = tradingDate.toISOString().slice(0, 10);
+        try {
+          const summary = await lane.run(tradingDate);
+          lane.bucket.push({ tradingDate: dateText, status: String(summary.status) });
+        } catch (error) {
+          // Holidays produce download failures — log and continue.
+          lane.bucket.push({ tradingDate: dateText, status: 'FAILED' });
+          console.warn(`[MarketDataFoundation] ${lane.segment} catch-up failed for ${dateText}`, {
+            error: error instanceof Error ? error.message : 'unknown error',
+          });
+        }
+      }
+    }
+    return results;
+  }
+
   async importNseIndexEodDaily(input: {
     tradingDate: Date | string;
     csvText?: string;

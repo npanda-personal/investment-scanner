@@ -189,8 +189,11 @@ export class TodayTradeReviewService {
 
   async latest(query: TodayReviewQuery = {}): Promise<TodayReviewRunResponse> {
     const scope = this.normalizeScope(query);
-    const run = await this.repository.latest(scope.region, scope.assetType, { enrich: query.enrich });
-    return this.toRunResponse(run, scope);
+    const [run, marketPosture] = await Promise.all([
+      this.repository.latest(scope.region, scope.assetType, { enrich: query.enrich }),
+      this.loadMarketPosture(scope.region),
+    ]);
+    return this.toRunResponse(run, scope, marketPosture);
   }
 
   async runs(query: TodayReviewQuery = {}): Promise<TodayReviewRunHistoryResponse> {
@@ -1085,9 +1088,9 @@ export class TodayTradeReviewService {
   private liteReasonSummary(state: TodayReviewCandidateState, evidence: { label: string; sampleSize: number }, blockers: string[], watchReasons: string[]) {
     if (state === 'BLOCKED') return `Blocked: ${blockers[0] || 'hard blocker exists.'}`;
     if (state === 'WATCH_ONLY') return `Watch only: ${watchReasons[0] || 'lite evidence is not strong enough for research review.'}`;
-    if (state === 'SHORT_REVIEW') return `Short review candidate from price-action setup and ${evidence.label.toLowerCase()} OHLCV evidence across ${evidence.sampleSize} prior occurrences.`;
+    if (state === 'SHORT_REVIEW') return `Short review candidate from price-action setup and ${evidence.label.toLowerCase()} price-history evidence across ${evidence.sampleSize} prior occurrences.`;
     if (state === 'AVOID') return 'Caution/avoid context: bearish setup detected but instrument is not F&O-eligible; short is not executable in the cash segment. Review for risk context only.';
-    return `Long review candidate from price-action setup and ${evidence.label.toLowerCase()} OHLCV evidence across ${evidence.sampleSize} prior occurrences.`;
+    return `Long review candidate from price-action setup and ${evidence.label.toLowerCase()} price-history evidence across ${evidence.sampleSize} prior occurrences.`;
   }
 
   private mergeCandidates(candidates: TodayReviewCandidateDto[]) {
