@@ -5,10 +5,14 @@
  * persisted datasets: bulk/block deals, F&O ban additions, 52-week breakouts,
  * and FII/DII daily flows.
  *
+ * Split into three tabs: Bulk Deals, Block Deals, and Other Events (F&O bans,
+ * breakouts, FII/DII flows). Each tab has its own pagination. The days-window
+ * selector is global; changing it reloads all three tabs and resets their pages.
+ *
  * Research-support view only — descriptive, never advice.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type SyntheticEvent } from 'react';
 import {
   Alert,
   Box,
@@ -21,7 +25,9 @@ import {
   Select,
   Skeleton,
   Stack,
+  Tab,
   TablePagination,
+  Tabs,
   Tooltip,
   Typography,
 } from '@mui/material';
@@ -92,6 +98,12 @@ const TYPE_CHIP_COLOR: Record<EventType, 'default' | 'primary' | 'success' | 'er
 };
 
 // ---------------------------------------------------------------------------
+// Tab identifiers
+// ---------------------------------------------------------------------------
+
+type EventTab = 'BULK_DEAL' | 'BLOCK_DEAL' | 'OTHER';
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -116,6 +128,10 @@ function groupByDate(events: MarketEvent[]): Array<{ date: string; events: Marke
   return [...map.entries()]
     .sort(([a], [b]) => b.localeCompare(a))
     .map(([date, evs]) => ({ date, events: evs }));
+}
+
+function isOtherEvent(type: EventType): boolean {
+  return type !== 'BULK_DEAL' && type !== 'BLOCK_DEAL';
 }
 
 // ---------------------------------------------------------------------------
@@ -211,15 +227,13 @@ function DateGroup({ date, events }: { date: string; events: MarketEvent[] }) {
 }
 
 // ---------------------------------------------------------------------------
-// Filter bar
+// Other-events filter (non-deal types only)
 // ---------------------------------------------------------------------------
 
-type FilterType = 'ALL' | EventType;
+type OtherFilterType = 'ALL_OTHER' | 'FNO_BAN_ENTRY' | 'FNO_BAN_BATCH' | 'BREAKOUT_52W_HIGH' | 'BREAKOUT_52W_LOW' | 'FII_DII_FLOWS';
 
-const FILTER_OPTIONS: Array<{ value: FilterType; label: string }> = [
-  { value: 'ALL', label: 'All Events' },
-  { value: 'BULK_DEAL', label: 'Bulk Deals' },
-  { value: 'BLOCK_DEAL', label: 'Block Deals' },
+const OTHER_FILTER_OPTIONS: Array<{ value: OtherFilterType; label: string }> = [
+  { value: 'ALL_OTHER', label: 'All Other' },
   { value: 'FNO_BAN_ENTRY', label: 'F&O Ban Entry' },
   { value: 'FNO_BAN_BATCH', label: 'F&O Ban List' },
   { value: 'BREAKOUT_52W_HIGH', label: '52W Highs' },
@@ -228,23 +242,107 @@ const FILTER_OPTIONS: Array<{ value: FilterType; label: string }> = [
 ];
 
 // ---------------------------------------------------------------------------
+// Per-tab pagination state
+// ---------------------------------------------------------------------------
+
+interface TabPagination {
+  page: number;
+  rowsPerPage: number;
+}
+
+const DEFAULT_ROWS_PER_PAGE = 25;
+
+function resetPagination(): TabPagination {
+  return { page: 0, rowsPerPage: DEFAULT_ROWS_PER_PAGE };
+}
+
+// ---------------------------------------------------------------------------
+// Tab panel — renders one tab's event list with its own pagination
+// ---------------------------------------------------------------------------
+
+interface TabPanelProps {
+  events: MarketEvent[];
+  emptyText: string;
+  pagination: TabPagination;
+  onPageChange: (page: number) => void;
+  onRowsPerPageChange: (rowsPerPage: number) => void;
+}
+
+function EventTabPanel({ events, emptyText, pagination, onPageChange, onRowsPerPageChange }: TabPanelProps) {
+  const { page, rowsPerPage } = pagination;
+
+  const pagedEvents = useMemo(
+    () => events.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage),
+    [events, page, rowsPerPage],
+  );
+
+  const groups = useMemo(() => groupByDate(pagedEvents), [pagedEvents]);
+
+  if (events.length === 0) {
+    return (
+      <Paper variant="outlined" sx={{ p: 4, textAlign: 'center' }}>
+        <Typography variant="body1" color="text.secondary">
+          {emptyText}
+        </Typography>
+      </Paper>
+    );
+  }
+
+  return (
+    <>
+      <Stack spacing={3}>
+        {groups.map(({ date, events: grpEvents }) => (
+          <DateGroup key={date} date={date} events={grpEvents} />
+        ))}
+        <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center', display: 'block', mt: 1 }}>
+          Showing {pagedEvents.length} of {events.length} event(s). For research purposes only.
+        </Typography>
+      </Stack>
+      <Paper variant="outlined" sx={{ mt: 2 }}>
+        <TablePagination
+          component="div"
+          count={events.length}
+          page={page}
+          onPageChange={(_e, newPage) => onPageChange(newPage)}
+          rowsPerPage={rowsPerPage}
+          onRowsPerPageChange={(e) => { onRowsPerPageChange(parseInt(e.target.value, 10)); }}
+          rowsPerPageOptions={[10, 25, 50, 100]}
+          labelRowsPerPage="Events per page:"
+        />
+      </Paper>
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main page
 // ---------------------------------------------------------------------------
 
 export function MarketEventsPage() {
   const { profile } = useMarketScope();
   const [days, setDays] = useState(5);
-  const [filterType, setFilterType] = useState<FilterType>('ALL');
   const [envelope, setEnvelope] = useState<EventFeedEnvelope | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(25);
+
+  // Three independent pagination states — one per tab
+  const [bulkPagination, setBulkPagination] = useState<TabPagination>(resetPagination());
+  const [blockPagination, setBlockPagination] = useState<TabPagination>(resetPagination());
+  const [otherPagination, setOtherPagination] = useState<TabPagination>(resetPagination());
+
+  // Active tab (preserved across days reload)
+  const [activeTab, setActiveTab] = useState<EventTab>('BULK_DEAL');
+
+  // Other-events type filter
+  const [otherFilter, setOtherFilter] = useState<OtherFilterType>('ALL_OTHER');
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
-    setPage(0);
+    // Reset all paginations on reload
+    setBulkPagination(resetPagination());
+    setBlockPagination(resetPagination());
+    setOtherPagination(resetPagination());
     try {
       const data = await fetchEventFeed(days);
       setEnvelope(data);
@@ -257,20 +355,33 @@ export function MarketEventsPage() {
 
   useEffect(() => { void load(); }, [load]);
 
-  useEffect(() => { setPage(0); }, [filterType]);
+  // Reset other-tab pagination when its filter changes
+  useEffect(() => { setOtherPagination(resetPagination()); }, [otherFilter]);
 
-  const filteredEvents = useMemo(() => {
-    if (!envelope) return [];
-    if (filterType === 'ALL') return envelope.events;
-    return envelope.events.filter((ev) => ev.type === filterType);
-  }, [envelope, filterType]);
-
-  const pagedEvents = useMemo(
-    () => filteredEvents.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage),
-    [filteredEvents, page, rowsPerPage],
+  // Derived event lists for each tab
+  const bulkEvents = useMemo(
+    () => envelope?.events.filter((ev) => ev.type === 'BULK_DEAL') ?? [],
+    [envelope],
   );
 
-  const groups = useMemo(() => groupByDate(pagedEvents), [pagedEvents]);
+  const blockEvents = useMemo(
+    () => envelope?.events.filter((ev) => ev.type === 'BLOCK_DEAL') ?? [],
+    [envelope],
+  );
+
+  const otherEventsBase = useMemo(
+    () => envelope?.events.filter((ev) => isOtherEvent(ev.type)) ?? [],
+    [envelope],
+  );
+
+  const otherEvents = useMemo(() => {
+    if (otherFilter === 'ALL_OTHER') return otherEventsBase;
+    return otherEventsBase.filter((ev) => ev.type === otherFilter);
+  }, [otherEventsBase, otherFilter]);
+
+  const handleTabChange = (_event: SyntheticEvent, value: EventTab) => {
+    setActiveTab(value);
+  };
 
   if (profile.isCrypto) {
     return (
@@ -309,7 +420,8 @@ export function MarketEventsPage() {
             </Typography>
           )}
         </Box>
-        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+        {/* Global days selector */}
+        <Stack direction="row" spacing={1} alignItems="center">
           <FormControl size="small" sx={{ minWidth: 110 }}>
             <InputLabel>Days</InputLabel>
             <Select
@@ -319,18 +431,6 @@ export function MarketEventsPage() {
             >
               {[1, 3, 5, 7, 10].map((d) => (
                 <MenuItem key={d} value={d}>{d}d</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <FormControl size="small" sx={{ minWidth: 160 }}>
-            <InputLabel>Type</InputLabel>
-            <Select
-              value={filterType}
-              label="Type"
-              onChange={(e) => setFilterType(e.target.value as FilterType)}
-            >
-              {FILTER_OPTIONS.map((opt) => (
-                <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
               ))}
             </Select>
           </FormControl>
@@ -360,46 +460,103 @@ export function MarketEventsPage() {
         <Alert severity="error">{error}</Alert>
       )}
 
-      {/* Empty state */}
-      {!loading && !error && filteredEvents.length === 0 && (
-        <Paper variant="outlined" sx={{ p: 4, textAlign: 'center' }}>
-          <Typography variant="body1" color="text.secondary" sx={{ mb: 1 }}>
-            No market events found
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            {filterType !== 'ALL'
-              ? `No "${TYPE_LABEL[filterType as EventType]}" events in the last ${days} day(s). Try changing the filter or expanding the date range.`
-              : `No events in the last ${days} day(s). Data may not have been ingested yet for this period.`}
-          </Typography>
-        </Paper>
-      )}
+      {/* Three-tab layout */}
+      {!loading && !error && (
+        <>
+          {/* Tab strip */}
+          <Paper variant="outlined" sx={{ mb: 2 }}>
+            <Tabs
+              value={activeTab}
+              onChange={handleTabChange}
+              variant="scrollable"
+              scrollButtons="auto"
+              allowScrollButtonsMobile
+              aria-label="Market events by category"
+            >
+              <Tab
+                value="BULK_DEAL"
+                label={
+                  <Stack direction="row" spacing={0.75} alignItems="center">
+                    <span>Bulk Deals</span>
+                    <Chip label={bulkEvents.length} size="small" variant="outlined" sx={{ height: 18, fontSize: 10, pointerEvents: 'none' }} />
+                  </Stack>
+                }
+              />
+              <Tab
+                value="BLOCK_DEAL"
+                label={
+                  <Stack direction="row" spacing={0.75} alignItems="center">
+                    <span>Block Deals</span>
+                    <Chip label={blockEvents.length} size="small" variant="outlined" sx={{ height: 18, fontSize: 10, pointerEvents: 'none' }} />
+                  </Stack>
+                }
+              />
+              <Tab
+                value="OTHER"
+                label={
+                  <Stack direction="row" spacing={0.75} alignItems="center">
+                    <span>Other Events</span>
+                    <Chip label={otherEventsBase.length} size="small" variant="outlined" sx={{ height: 18, fontSize: 10, pointerEvents: 'none' }} />
+                  </Stack>
+                }
+              />
+            </Tabs>
+          </Paper>
 
-      {/* Event groups */}
-      {!loading && !error && groups.length > 0 && (
-        <Stack spacing={3}>
-          {groups.map(({ date, events }) => (
-            <DateGroup key={date} date={date} events={events} />
-          ))}
-          <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center', display: 'block', mt: 1 }}>
-            Showing {pagedEvents.length} of {filteredEvents.length} event(s). For research purposes only.
-          </Typography>
-        </Stack>
-      )}
+          {/* Bulk Deals tab */}
+          {activeTab === 'BULK_DEAL' && (
+            <EventTabPanel
+              events={bulkEvents}
+              emptyText={`No bulk deals in the last ${days} day(s).`}
+              pagination={bulkPagination}
+              onPageChange={(p) => setBulkPagination((prev) => ({ ...prev, page: p }))}
+              onRowsPerPageChange={(rpp) => setBulkPagination({ page: 0, rowsPerPage: rpp })}
+            />
+          )}
 
-      {/* Pagination */}
-      {!loading && !error && filteredEvents.length > 0 && (
-        <Paper variant="outlined" sx={{ mt: 2 }}>
-          <TablePagination
-            component="div"
-            count={filteredEvents.length}
-            page={page}
-            onPageChange={(_e, newPage) => setPage(newPage)}
-            rowsPerPage={rowsPerPage}
-            onRowsPerPageChange={(e) => { setRowsPerPage(parseInt(e.target.value, 10)); setPage(0); }}
-            rowsPerPageOptions={[10, 25, 50, 100]}
-            labelRowsPerPage="Events per page:"
-          />
-        </Paper>
+          {/* Block Deals tab */}
+          {activeTab === 'BLOCK_DEAL' && (
+            <EventTabPanel
+              events={blockEvents}
+              emptyText={`No block deals in the last ${days} day(s).`}
+              pagination={blockPagination}
+              onPageChange={(p) => setBlockPagination((prev) => ({ ...prev, page: p }))}
+              onRowsPerPageChange={(rpp) => setBlockPagination({ page: 0, rowsPerPage: rpp })}
+            />
+          )}
+
+          {/* Other Events tab */}
+          {activeTab === 'OTHER' && (
+            <Box>
+              {/* Type filter for Other Events only */}
+              <Stack direction="row" justifyContent="flex-end" sx={{ mb: 2 }}>
+                <FormControl size="small" sx={{ minWidth: 170 }}>
+                  <InputLabel>Event Type</InputLabel>
+                  <Select
+                    value={otherFilter}
+                    label="Event Type"
+                    onChange={(e) => setOtherFilter(e.target.value as OtherFilterType)}
+                  >
+                    {OTHER_FILTER_OPTIONS.map((opt) => (
+                      <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Stack>
+              <EventTabPanel
+                events={otherEvents}
+                emptyText={
+                  otherFilter !== 'ALL_OTHER'
+                    ? `No "${OTHER_FILTER_OPTIONS.find((o) => o.value === otherFilter)?.label ?? otherFilter}" events in the last ${days} day(s).`
+                    : `No other events in the last ${days} day(s).`
+                }
+                pagination={otherPagination}
+                onPageChange={(p) => setOtherPagination((prev) => ({ ...prev, page: p }))}
+                onRowsPerPageChange={(rpp) => setOtherPagination({ page: 0, rowsPerPage: rpp })}
+              />
+            </Box>
+          )}
+        </>
       )}
     </Box>
   );

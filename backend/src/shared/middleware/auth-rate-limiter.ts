@@ -46,6 +46,21 @@ setInterval(() => {
 
 // ── Core ──────────────────────────────────────────────────────────────────────
 
+// Local-first personal tool: the legitimate user (and the dev/QA tooling) always connects over
+// the loopback interface. Rate-limiting loopback only locks out the real user during normal
+// dev/testing (which is exactly what happened), so exempt it. Brute-force protection still
+// applies to any genuinely remote IP. We key off the actual TCP socket address — not the
+// spoofable X-Forwarded-For header — so a remote client cannot bypass the limiter.
+function isLoopbackConnection(req: Request): boolean {
+  const addr = req.socket.remoteAddress ?? '';
+  return (
+    addr === '::1' ||
+    addr === '::ffff:127.0.0.1' ||
+    addr === '127.0.0.1' ||
+    addr.startsWith('127.')
+  );
+}
+
 function getClientIp(req: Request): string {
   // Express 5 / typical proxy setups
   const forwarded = req.headers['x-forwarded-for'];
@@ -64,6 +79,12 @@ function makeRateLimiter(
   return (req: Request, res: Response, next: NextFunction): void => {
     // Disabled in test environment so test suites can call login/signup freely.
     if (process.env.NODE_ENV === 'test') {
+      next();
+      return;
+    }
+
+    // Never rate-limit the local user / loopback (dev, QA, the single-user app itself).
+    if (isLoopbackConnection(req)) {
       next();
       return;
     }

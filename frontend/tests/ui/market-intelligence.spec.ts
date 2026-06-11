@@ -59,6 +59,7 @@ type MarketIntelligenceResponses = {
   portfolioSummaries?: Record<string, unknown>;
   watchlists?: unknown;
   watchlistDetails?: Record<string, unknown>;
+  eventFeed?: unknown;
 };
 
 function defaultResponses(): Required<MarketIntelligenceResponses> {
@@ -174,6 +175,16 @@ function defaultResponses(): Required<MarketIntelligenceResponses> {
     portfolioSummaries: {},
     watchlists: { watchlists: [] },
     watchlistDetails: {},
+    eventFeed: {
+      availability: 'EMPTY',
+      generatedAt: '2026-06-01T05:45:00.000Z',
+      asOf: null,
+      days: 5,
+      events: [],
+      eventCount: 0,
+      message: 'No events in the selected window.',
+      warnings: [],
+    },
   };
 }
 
@@ -235,6 +246,12 @@ async function setupReadOnlyPage(page: Page, responses: MarketIntelligenceRespon
       // TodayReviewPage renders SignalTrackRecordPanel which calls this on mount — stub it.
       '/api/v1/signals/quality/summary': { availability: 'EMPTY', totalSignals: 0, qualityBreakdown: [] },
     };
+
+    // event-feed uses a query param (?days=N) — match by pathname only
+    if (path === '/api/v1/market-intelligence/event-feed') {
+      await route.fulfill({ json: nextResponses.eventFeed });
+      return;
+    }
 
     if (path in implementedReads) {
       await route.fulfill({ json: implementedReads[path] });
@@ -896,6 +913,90 @@ test.describe('Market Intelligence persisted read-model pages', () => {
 
     await page.getByRole('tab', { name: 'Result Winners' }).click();
     await expect(page.getByText('No Result Winners rows in saved data.')).toBeVisible();
+    await expectNoSharedMutationsOrOperatorControls(page, apiRequests);
+  });
+
+  test('Market Events shows three tabs with counts, per-tab pagination, and routes deals to correct tabs', async ({ page }) => {
+    const makeBulkDeal = (id: string, symbol: string, date: string) => ({
+      id,
+      type: 'BULK_DEAL',
+      date,
+      symbols: [symbol],
+      description: `Bulk deal in ${symbol} on ${date}.`,
+      tone: 'info',
+    });
+    const makeBlockDeal = (id: string, symbol: string, date: string) => ({
+      id,
+      type: 'BLOCK_DEAL',
+      date,
+      symbols: [symbol],
+      description: `Block deal in ${symbol} on ${date}.`,
+      tone: 'info',
+    });
+    const makeBan = (id: string, symbol: string, date: string) => ({
+      id,
+      type: 'FNO_BAN_ENTRY',
+      date,
+      symbols: [symbol],
+      description: `${symbol} added to F&O ban list.`,
+      tone: 'risk',
+    });
+
+    // 3 bulk deals on two dates, 2 block deals, 1 F&O ban — total 6 events
+    const events = [
+      makeBulkDeal('bd-1', 'RELIANCE', '2026-06-10'),
+      makeBulkDeal('bd-2', 'INFY', '2026-06-10'),
+      makeBulkDeal('bd-3', 'TCS', '2026-06-09'),
+      makeBlockDeal('blk-1', 'HDFC', '2026-06-10'),
+      makeBlockDeal('blk-2', 'SBIN', '2026-06-09'),
+      makeBan('ban-1', 'PNB', '2026-06-10'),
+    ];
+
+    const apiRequests = await setupReadOnlyPage(page, {
+      eventFeed: {
+        availability: 'READY',
+        generatedAt: '2026-06-10T06:00:00.000Z',
+        asOf: '2026-06-10',
+        days: 5,
+        events,
+        eventCount: events.length,
+        message: 'Events loaded.',
+        warnings: [],
+      },
+    });
+
+    // Market Events is the "Events" tab on / (MarketOverviewPage = HomePage)
+    await visitAuthenticated(page, '/');
+    await page.waitForLoadState('networkidle');
+    await page.getByRole('tab', { name: 'Events' }).click();
+
+    // Three inner tabs should be visible with correct counts
+    await expect(page.getByRole('tab', { name: /Bulk Deals/ })).toBeVisible();
+    await expect(page.getByRole('tab', { name: /Block Deals/ })).toBeVisible();
+    await expect(page.getByRole('tab', { name: /Other Events/ })).toBeVisible();
+
+    // Bulk Deals tab is active by default — verify symbol chips (link role) for deal rows
+    await expect(page.getByRole('link', { name: 'RELIANCE' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'INFY' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'TCS' })).toBeVisible();
+    // Block deal symbols should NOT be visible on this tab
+    await expect(page.getByRole('link', { name: 'HDFC' })).toHaveCount(0);
+
+    // Switch to Block Deals — HDFC and SBIN should appear, bulk deals hidden
+    await page.getByRole('tab', { name: /Block Deals/ }).click();
+    await expect(page.getByRole('link', { name: 'HDFC' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'SBIN' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'RELIANCE' })).toHaveCount(0);
+
+    // Switch to Other Events — F&O ban for PNB should appear
+    await page.getByRole('tab', { name: /Other Events/ }).click();
+    await expect(page.getByRole('link', { name: 'PNB' })).toBeVisible();
+    // Other tab has a type filter dropdown visible; the label "Event Type" appears in the UI
+    await expect(page.getByText('Event Type').first()).toBeVisible();
+    // Bulk/block deal symbols not here
+    await expect(page.getByRole('link', { name: 'RELIANCE' })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'HDFC' })).toHaveCount(0);
+
     await expectNoSharedMutationsOrOperatorControls(page, apiRequests);
   });
 });
