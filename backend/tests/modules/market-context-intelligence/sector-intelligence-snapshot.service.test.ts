@@ -28,7 +28,7 @@ const sectorIndex = (
 
 describe('Sector Intelligence Snapshot read model', () => {
   it('ranks sector indexes, generates scores, and classifies strong/improving/weak sectors', () => {
-    const service = new MarketContextIntelligenceService({} as any, {} as any, {} as any);
+    const service = new MarketContextIntelligenceService({} as any, {} as any);
 
     const snapshots = service.buildSectorSnapshots([
       sectorIndex('NIFTY IT', { current: 140, oneWeek: 130, oneMonth: 120, threeMonth: 100 }),
@@ -65,7 +65,7 @@ describe('Sector Intelligence Snapshot read model', () => {
       ]),
       saveSectorSnapshots: jest.fn().mockResolvedValue({ savedCount: 2, createdCount: 1, updatedCount: 1 }),
     };
-    const service = new MarketContextIntelligenceService(repository as any, {} as any, {} as any);
+    const service = new MarketContextIntelligenceService(repository as any, {} as any);
 
     const first = await service.refreshSectorSnapshots({ region: 'IN', assetType: 'STOCK', dataThroughDate: '2026-05-29' });
     const second = await service.refreshSectorSnapshots({ region: 'IN', assetType: 'STOCK', dataThroughDate: '2026-05-29' });

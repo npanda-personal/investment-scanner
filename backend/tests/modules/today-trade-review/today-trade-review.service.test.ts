@@ -1905,6 +1905,340 @@ describe('TodayTradeReviewService', () => {
   });
 });
 
+// ── Phase 4: snapshot cutover — signal/calibration skip + fallback ─────────────
+
+/** Full-sections-OK snapshot row for stock-1 */
+const fullSnapshotRow = (overrides: Partial<import('../../../src/modules/snapshot-assembler').ComposedSnapshotRow> = {}) => ({
+  instrumentId: 'stock-1',
+  tradingDate: fixedNow,
+  snapshotVersion: 1,
+  region: 'IN',
+  assetType: 'STOCK',
+  signalEligible: true,
+  reviewEligible: true,
+  backtestEligible: true,
+  calibrationEligible: true,
+  reviewReasons: [],
+  signalReasons: [],
+  readinessScore: 85,
+  readinessStatus: 'GOOD',
+  signalScore: 77,
+  signalDirection: 'BULLISH',
+  signalModelVersion: 'sig-v1',
+  calibratedScore: 80,
+  calibrationAuthority: 'cal-v1',
+  strategyDecision: 'TRADE_CANDIDATE',
+  rulesFired: [],
+  stopLoss: 95,
+  target: 112,
+  rrRatio: 2.4,
+  planStatus: 'VALID',
+  marketRegime: 'RISK_ON',
+  breadthPct: 0.7,
+  sectorRelativeStrength: 74,
+  oiBuildup: null,
+  participantPositioning: null,
+  earningsProximityDays: null,
+  smartMoneyCode: 'ACCUMULATION',
+  smartMoneyScore: 72,
+  provenance: {
+    eligibility: 'OK' as const,
+    signals: 'OK' as const,
+    calibration: 'OK' as const,
+    decision: 'OK' as const,
+    tradePlan: 'OK' as const,
+    context: 'OK' as const,
+    derivatives: 'N_A' as const,
+    earnings: 'OK' as const,
+    smartMoney: 'OK' as const,
+  },
+  assembledAt: new Date('2026-05-11T05:00:00.000Z'),
+  ...overrides,
+});
+
+describe('Phase 4: snapshot cutover — signal and calibration skip', () => {
+  beforeEach(() => {
+    delete process.env.TODAY_REVIEW_SNAPSHOT_READS;
+  });
+  afterEach(() => {
+    delete process.env.TODAY_REVIEW_SNAPSHOT_READS;
+  });
+
+  it('skips signal bulk read when all instruments have usable snapshot signals (provenance OK)', async () => {
+    const snapshotMap = new Map([['stock-1', fullSnapshotRow()]]);
+    const bulkSignalsFn = jest.fn().mockRejectedValue(new Error('signal bulk should NOT be called'));
+    const perInstrumentSignalFn = jest.fn().mockRejectedValue(new Error('per-instrument signal should NOT be called'));
+
+    const service = new TodayTradeReviewService(new MemoryTodayReviewRepository(), services({
+      signalService: {
+        latestForInstrument: perInstrumentSignalFn,
+        latestPersistedForInstruments: bulkSignalsFn,
+        latestSignalUniverse: jest.fn().mockResolvedValue([]),
+      },
+      snapshotReaderService: {
+        latestSnapshotsForInstruments: jest.fn().mockResolvedValue(snapshotMap),
+        latestWatermark: jest.fn().mockResolvedValue({ assembledAt: new Date('2026-05-11T05:00:00.000Z'), snapshotVersion: 1, rowCount: 1 }),
+      },
+    }), () => fixedNow);
+
+    const result = await service.run({ skipTradePlanGeneration: true });
+
+    // Both signal calls must NOT have been made — snapshot covered it
+    expect(bulkSignalsFn).not.toHaveBeenCalled();
+    expect(perInstrumentSignalFn).not.toHaveBeenCalled();
+    // Candidate sourced correctly from snapshot signals
+    const candidate = result.groups.longReview[0];
+    expect(candidate).toBeDefined();
+    const rawSignal = (candidate?.sourceSignalSnapshot as any)?.rawSignal;
+    expect(rawSignal?.direction).toBe('BULLISH');
+    expect(rawSignal?.score).toBe(77);
+    expect(rawSignal?.supportOnly).toBe(true);
+  });
+
+  it('skips calibration bulk read when all instruments have usable snapshot calibration (provenance OK)', async () => {
+    const snapshotMap = new Map([['stock-1', fullSnapshotRow()]]);
+    const bulkCalibrationFn = jest.fn().mockRejectedValue(new Error('calibration bulk should NOT be called'));
+    const perInstrumentCalibrationFn = jest.fn().mockRejectedValue(new Error('per-instrument calibration should NOT be called'));
+
+    const service = new TodayTradeReviewService(new MemoryTodayReviewRepository(), services({
+      calibrationService: {
+        latestPersistedForInstrument: perInstrumentCalibrationFn,
+        latestPersistedForInstruments: bulkCalibrationFn,
+      },
+      snapshotReaderService: {
+        latestSnapshotsForInstruments: jest.fn().mockResolvedValue(snapshotMap),
+        latestWatermark: jest.fn().mockResolvedValue({ assembledAt: new Date('2026-05-11T05:00:00.000Z'), snapshotVersion: 1, rowCount: 1 }),
+      },
+    }), () => fixedNow);
+
+    const result = await service.run({ skipTradePlanGeneration: true });
+
+    // Both calibration calls must NOT have been made — snapshot covered it
+    expect(bulkCalibrationFn).not.toHaveBeenCalled();
+    expect(perInstrumentCalibrationFn).not.toHaveBeenCalled();
+    // Candidate sourced correctly from snapshot calibration
+    const candidate = result.groups.longReview[0];
+    expect(candidate).toBeDefined();
+    const calibration = (candidate?.sourceSignalSnapshot as any)?.calibration;
+    expect(calibration?.calibratedScore).toBe(80);
+    expect(calibration?.supportOnly).toBe(true);
+  });
+
+  it('uses live signal bulk read when signal snapshot provenance is FAILED for any instrument', async () => {
+    const snapshotMap = new Map([['stock-1', fullSnapshotRow({
+      provenance: {
+        eligibility: 'OK',
+        signals: 'FAILED',   // FAILED — signal section unusable
+        calibration: 'OK',
+        decision: 'OK',
+        tradePlan: 'OK',
+        context: 'OK',
+        derivatives: 'N_A',
+        earnings: 'OK',
+        smartMoney: 'OK',
+      } as any,
+      signalScore: null,
+      signalDirection: null,
+    })]]);
+    const liveSignalRow = {
+      instrument_id: 'stock-1',
+      symbol: 'ALPHA.NS',
+      company_name: 'Alpha Ltd',
+      sector: 'Financial Services',
+      country: 'India',
+      currentPrice: 100,
+      previousClose: 99,
+      dailyChange: 1,
+      dailyChangePercent: 1,
+      currency: 'INR',
+      priceTimestamp: fixedNow.toISOString(),
+      score: 65,
+      direction: 'BULLISH',
+      confidence: 'MEDIUM',
+      triggered_signals: [],
+      negative_signals: [],
+      explanation: 'Live fallback signal.',
+      generated_at: fixedNow.toISOString(),
+      source: 'live',
+      data_status: 'COMPLETE',
+    };
+    const bulkSignalsFn = jest.fn().mockResolvedValue([liveSignalRow]);
+
+    const service = new TodayTradeReviewService(new MemoryTodayReviewRepository(), services({
+      signalService: {
+        latestForInstrument: jest.fn().mockRejectedValue(new Error('per-instrument should not be called when bulk is available')),
+        latestPersistedForInstruments: bulkSignalsFn,
+        latestSignalUniverse: jest.fn().mockResolvedValue([]),
+      },
+      snapshotReaderService: {
+        latestSnapshotsForInstruments: jest.fn().mockResolvedValue(snapshotMap),
+        latestWatermark: jest.fn().mockResolvedValue(null),
+      },
+    }), () => fixedNow);
+
+    const result = await service.run({ skipTradePlanGeneration: true });
+
+    // Signal section was FAILED in snapshot → bulk live read must have been called
+    expect(bulkSignalsFn).toHaveBeenCalledWith(['stock-1']);
+    // Candidate uses live signal
+    const candidate = result.groups.longReview[0];
+    expect(candidate).toBeDefined();
+    const rawSignal = (candidate?.sourceSignalSnapshot as any)?.rawSignal;
+    expect(rawSignal?.score).toBe(65);
+  });
+
+  it('uses live calibration bulk read when calibration snapshot provenance is FAILED for any instrument', async () => {
+    const snapshotMap = new Map([['stock-1', fullSnapshotRow({
+      provenance: {
+        eligibility: 'OK',
+        signals: 'OK',
+        calibration: 'FAILED',   // FAILED — calibration section unusable
+        decision: 'OK',
+        tradePlan: 'OK',
+        context: 'OK',
+        derivatives: 'N_A',
+        earnings: 'OK',
+        smartMoney: 'OK',
+      } as any,
+      calibratedScore: null,
+      calibrationAuthority: null,
+    })]]);
+    const liveCalibrationRow = {
+      signalResultId: 'sig-1',
+      instrumentId: 'stock-1',
+      symbol: 'ALPHA.NS',
+      companyName: 'Alpha Ltd',
+      sector: 'Financial Services',
+      country: 'India',
+      rawScore: 77,
+      calibratedScore: 55,
+      scoreDelta: -22,
+      rawDirection: 'BULLISH',
+      calibratedDirection: 'BULLISH',
+      rawConfidence: 'HIGH',
+      calibratedConfidence: 'MEDIUM',
+      boosts: [],
+      penalties: [],
+      calibrationReasons: [],
+      dataGaps: [],
+      calibrationModelVersion: 'cal-v1',
+      rawSignalModelVersion: 'sig-v1',
+      generatedAt: fixedNow.toISOString(),
+      dataStatus: 'COMPLETE',
+      researchUrl: '/research/stocks/stock-1',
+    };
+    const bulkCalibrationFn = jest.fn().mockResolvedValue([liveCalibrationRow]);
+
+    const service = new TodayTradeReviewService(new MemoryTodayReviewRepository(), services({
+      calibrationService: {
+        latestPersistedForInstrument: jest.fn().mockRejectedValue(new Error('per-instrument should not run when bulk available')),
+        latestPersistedForInstruments: bulkCalibrationFn,
+      },
+      snapshotReaderService: {
+        latestSnapshotsForInstruments: jest.fn().mockResolvedValue(snapshotMap),
+        latestWatermark: jest.fn().mockResolvedValue(null),
+      },
+    }), () => fixedNow);
+
+    const result = await service.run({ skipTradePlanGeneration: true });
+
+    // Calibration section was FAILED in snapshot → live bulk read must have been called
+    expect(bulkCalibrationFn).toHaveBeenCalledWith(['stock-1']);
+    const candidate = result.groups.longReview[0];
+    expect(candidate).toBeDefined();
+    const calibration = (candidate?.sourceSignalSnapshot as any)?.calibration;
+    expect(calibration?.calibratedScore).toBe(55);
+  });
+
+  it('skips both signal and calibration bulk reads when snapshot is STALE (not just OK)', async () => {
+    const snapshotMap = new Map([['stock-1', fullSnapshotRow({
+      provenance: {
+        eligibility: 'OK',
+        signals: 'STALE',   // STALE is also acceptable
+        calibration: 'STALE',
+        decision: 'OK',
+        tradePlan: 'OK',
+        context: 'OK',
+        derivatives: 'N_A',
+        earnings: 'OK',
+        smartMoney: 'OK',
+      } as any,
+    })]]);
+    const bulkSignalsFn = jest.fn().mockRejectedValue(new Error('signal bulk should NOT be called for STALE'));
+    const bulkCalibrationFn = jest.fn().mockRejectedValue(new Error('calibration bulk should NOT be called for STALE'));
+
+    const service = new TodayTradeReviewService(new MemoryTodayReviewRepository(), services({
+      signalService: {
+        latestForInstrument: jest.fn().mockRejectedValue(new Error('per-instrument signal should NOT be called')),
+        latestPersistedForInstruments: bulkSignalsFn,
+        latestSignalUniverse: jest.fn().mockResolvedValue([]),
+      },
+      calibrationService: {
+        latestPersistedForInstrument: jest.fn().mockRejectedValue(new Error('per-instrument calibration should NOT be called')),
+        latestPersistedForInstruments: bulkCalibrationFn,
+      },
+      snapshotReaderService: {
+        latestSnapshotsForInstruments: jest.fn().mockResolvedValue(snapshotMap),
+        latestWatermark: jest.fn().mockResolvedValue({ assembledAt: new Date('2026-05-11T05:00:00.000Z'), snapshotVersion: 1, rowCount: 1 }),
+      },
+    }), () => fixedNow);
+
+    const result = await service.run({ skipTradePlanGeneration: true });
+
+    // STALE provenance still skips the bulk reads
+    expect(bulkSignalsFn).not.toHaveBeenCalled();
+    expect(bulkCalibrationFn).not.toHaveBeenCalled();
+    // Candidate still produced
+    expect(result.groups.longReview[0]).toBeDefined();
+  });
+
+  it('does not skip bulk reads when TODAY_REVIEW_SNAPSHOT_READS=0', async () => {
+    process.env.TODAY_REVIEW_SNAPSHOT_READS = '0';
+    const snapshotReader = jest.fn().mockResolvedValue(new Map([['stock-1', fullSnapshotRow()]]));
+    const bulkSignalsFn = jest.fn().mockResolvedValue([{
+      instrument_id: 'stock-1',
+      symbol: 'ALPHA.NS',
+      company_name: 'Alpha Ltd',
+      sector: 'Financial Services',
+      country: 'India',
+      currentPrice: 100,
+      previousClose: 99,
+      dailyChange: 1,
+      dailyChangePercent: 1,
+      currency: 'INR',
+      priceTimestamp: fixedNow.toISOString(),
+      score: 42,
+      direction: 'BULLISH',
+      confidence: 'MEDIUM',
+      triggered_signals: [],
+      negative_signals: [],
+      explanation: 'Legacy signal.',
+      generated_at: fixedNow.toISOString(),
+      source: 'live',
+      data_status: 'COMPLETE',
+    }]);
+
+    const service = new TodayTradeReviewService(new MemoryTodayReviewRepository(), services({
+      signalService: {
+        latestForInstrument: jest.fn().mockResolvedValue(null),
+        latestPersistedForInstruments: bulkSignalsFn,
+        latestSignalUniverse: jest.fn().mockResolvedValue([]),
+      },
+      snapshotReaderService: {
+        latestSnapshotsForInstruments: snapshotReader,
+        latestWatermark: jest.fn().mockResolvedValue(null),
+      },
+    }), () => fixedNow);
+
+    await service.run({ skipTradePlanGeneration: true });
+
+    // Flag off → snapshot reader not called
+    expect(snapshotReader).not.toHaveBeenCalled();
+    // Bulk signal called because snapshot is disabled
+    expect(bulkSignalsFn).toHaveBeenCalled();
+  });
+});
+
 describe('priceBehaviour snapshot assembly (NR-11)', () => {
   it('lite candidate sourceSignalSnapshot includes priceBehaviour with recentReturn3D and volumeVsAvg20D computed from priceHistory', async () => {
     // Build a price history with a known pattern: 160 bars, volume 1000 per bar, last close 114.0

@@ -358,6 +358,89 @@ export class SnapshotAssemblerRepository {
   }
 
   /**
+   * Bulk latest-version daily_instrument_snapshot rows for an entire
+   * (region, assetType) scope.  Used by research-hub's snapshot-first reader.
+   *
+   * Strategy:
+   *  1. Find the most-recent watermarked tradingDate for the scope.
+   *  2. Fetch DISTINCT ON instrumentId (highest snapshotVersion) for that date.
+   *
+   * Returns an empty Map when no watermark / no rows exist.
+   * One query total (after the watermark lookup) — never N+1.
+   */
+  async latestSnapshotsForRegion(
+    region: string,
+    assetType: string,
+  ): Promise<Map<string, ComposedSnapshotRow>> {
+    // Step 1 — find the latest watermarked trading date for this scope.
+    const watermark = await this.db.snapshotWatermark.findFirst({
+      where: { region, assetType },
+      orderBy: { tradingDate: 'desc' },
+      select: { tradingDate: true },
+    });
+    if (!watermark) return new Map();
+
+    const tradingDate = watermark.tradingDate;
+
+    // Step 2 — single bulk query for all rows on that date/scope.
+    const rows = await this.db.$queryRaw<Array<ComposedSnapshotRow & { provenance: any }>>(
+      Prisma.sql`
+        SELECT DISTINCT ON ("instrumentId")
+          "instrumentId",
+          "tradingDate",
+          "snapshotVersion",
+          region,
+          "assetType",
+          "signalEligible",
+          "reviewEligible",
+          "backtestEligible",
+          "calibrationEligible",
+          "reviewReasons",
+          "signalReasons",
+          "readinessScore",
+          "readinessStatus",
+          "signalScore",
+          "signalDirection",
+          "signalModelVersion",
+          "calibratedScore",
+          "calibrationAuthority",
+          "strategyDecision",
+          "rulesFired",
+          "stopLoss",
+          "target",
+          "rrRatio",
+          "planStatus",
+          "marketRegime",
+          "breadthPct",
+          "sectorRelativeStrength",
+          "oiBuildup",
+          "participantPositioning",
+          "earningsProximityDays",
+          "smartMoneyCode",
+          "smartMoneyScore",
+          provenance,
+          "assembledAt"
+        FROM daily_instrument_snapshot
+        WHERE region = ${region}
+          AND "assetType" = ${assetType}
+          AND "tradingDate" = ${tradingDate}
+        ORDER BY "instrumentId", "snapshotVersion" DESC
+      `,
+    );
+
+    const result = new Map<string, ComposedSnapshotRow>();
+    for (const row of rows) {
+      result.set(row.instrumentId, {
+        ...row,
+        stopLoss: row.stopLoss !== null ? Number(row.stopLoss) : null,
+        target: row.target !== null ? Number(row.target) : null,
+        provenance: typeof row.provenance === 'string' ? JSON.parse(row.provenance) : row.provenance,
+      });
+    }
+    return result;
+  }
+
+  /**
    * Fetch the latest SnapshotWatermark for (region, assetType, tradingDate).
    * Returns null when no watermark exists.
    */

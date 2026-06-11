@@ -702,6 +702,51 @@ export class MarketContextIntelligenceRepository {
     return rows.reverse();
   }
 
+  /**
+   * Returns the latest direction + score per instrument from the most-recent
+   * signal-generation run for the given region.
+   *
+   * Semantics are identical to the former topSignals({ limit, region }) call on
+   * SignalGenerationEngineService: fetch rows from the latest generatedDate batch,
+   * deduplicate by instrumentId (keep first occurrence = highest score within batch),
+   * and return up to `limit` results.
+   *
+   * No cross-module service import is needed — signal_results is a shared persisted
+   * table that both modules are entitled to read directly.
+   */
+  async latestSignalDirections(
+    region?: string,
+    limit: number = 100,
+  ): Promise<Array<{ instrumentId: string; direction: string; score: number }>> {
+    const latestRun = await this.db.signalResult.findFirst({
+      where: region ? { country: region } : undefined,
+      orderBy: { generatedAt: 'desc' },
+      select: { generatedDate: true },
+    });
+    if (!latestRun) return [];
+
+    const rows = await this.db.signalResult.findMany({
+      where: {
+        generatedDate: latestRun.generatedDate,
+        ...(region ? { country: region } : {}),
+      },
+      orderBy: { generatedAt: 'desc' },
+      take: limit,
+      select: { instrumentId: true, direction: true, score: true },
+    });
+
+    // Deduplicate: keep first (highest-score) occurrence per instrument within the batch.
+    const seen = new Set<string>();
+    const result: Array<{ instrumentId: string; direction: string; score: number }> = [];
+    for (const row of rows) {
+      if (!seen.has(row.instrumentId)) {
+        seen.add(row.instrumentId);
+        result.push({ instrumentId: row.instrumentId, direction: row.direction, score: Number(row.score) });
+      }
+    }
+    return result;
+  }
+
   private weakSectorSlice(sectors: SectorRotationItem[]) {
     if (sectors.length <= 1) return [];
     return sectors.slice(-Math.min(5, sectors.length - 1)).reverse();

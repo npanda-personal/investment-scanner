@@ -30,10 +30,6 @@ function makeMarketDataService(pricesOverride?: number[]) {
   };
 }
 
-function makeSignalService() {
-  return { topSignals: jest.fn().mockResolvedValue({ signals: [] }) };
-}
-
 function makeRepository() {
   const savedSnapshots: Array<{ summary: any; region: string; asOf: Date | undefined }> = [];
   return {
@@ -47,6 +43,8 @@ function makeRepository() {
       loadIndexPrices: jest.fn().mockResolvedValue([]),
       // NR-5: wider cap-band universe loader (returns empty array in unit tests)
       loadCapBandUniverse: jest.fn().mockResolvedValue([]),
+      // Signal directions: direct DB read replaces the former signalService.topSignals call
+      latestSignalDirections: jest.fn().mockResolvedValue([]),
     },
     savedSnapshots,
   };
@@ -57,7 +55,7 @@ describe('MarketContextIntelligenceService — point-in-time (asOf)', () => {
     const asOf = new Date('2024-06-01T00:00:00.000Z');
     const { service: mds, capturedEndDates } = makeMarketDataService();
     const { repo } = makeRepository();
-    const svc = new MarketContextIntelligenceService(repo as any, mds as any, makeSignalService() as any);
+    const svc = new MarketContextIntelligenceService(repo as any, mds as any);
 
     await svc.runAsOf('IN', asOf);
 
@@ -73,7 +71,7 @@ describe('MarketContextIntelligenceService — point-in-time (asOf)', () => {
     const asOf = new Date('2023-03-15T00:00:00.000Z');
     const { service: mds } = makeMarketDataService();
     const { repo, savedSnapshots } = makeRepository();
-    const svc = new MarketContextIntelligenceService(repo as any, mds as any, makeSignalService() as any);
+    const svc = new MarketContextIntelligenceService(repo as any, mds as any);
 
     await svc.runAsOf('IN', asOf);
 
@@ -86,7 +84,7 @@ describe('MarketContextIntelligenceService — point-in-time (asOf)', () => {
   it('omitting asOf passes no endDate (current behaviour unchanged)', async () => {
     const { service: mds, capturedEndDates } = makeMarketDataService();
     const { repo } = makeRepository();
-    const svc = new MarketContextIntelligenceService(repo as any, mds as any, makeSignalService() as any);
+    const svc = new MarketContextIntelligenceService(repo as any, mds as any);
 
     await svc.runAsOf('IN', undefined);
 
@@ -100,7 +98,7 @@ describe('MarketContextIntelligenceService — point-in-time (asOf)', () => {
   it('run() delegates to runAsOf without asOf (no endDate filter)', async () => {
     const { service: mds, capturedEndDates } = makeMarketDataService();
     const { repo } = makeRepository();
-    const svc = new MarketContextIntelligenceService(repo as any, mds as any, makeSignalService() as any);
+    const svc = new MarketContextIntelligenceService(repo as any, mds as any);
 
     await svc.run('IN');
 
@@ -114,7 +112,7 @@ describe('MarketContextIntelligenceService — point-in-time (asOf)', () => {
     const asOf = new Date('2022-09-01T00:00:00.000Z');
     const { service: mds } = makeMarketDataService();
     const { repo } = makeRepository();
-    const svc = new MarketContextIntelligenceService(repo as any, mds as any, makeSignalService() as any);
+    const svc = new MarketContextIntelligenceService(repo as any, mds as any);
 
     await svc.runAsOf('IN', asOf);
 
@@ -131,7 +129,7 @@ describe('MarketContextIntelligenceService — point-in-time (asOf)', () => {
   it('saveSnapshot is called without asOf date when asOf omitted', async () => {
     const { service: mds } = makeMarketDataService();
     const { repo } = makeRepository();
-    const svc = new MarketContextIntelligenceService(repo as any, mds as any, makeSignalService() as any);
+    const svc = new MarketContextIntelligenceService(repo as any, mds as any);
 
     await svc.run('IN');
 

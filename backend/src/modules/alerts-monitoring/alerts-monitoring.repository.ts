@@ -21,6 +21,21 @@ export class AlertsMonitoringRepository {
     return rules.map(this.toRuleDto);
   }
 
+  /**
+   * Return the distinct set of userId values that own at least one enabled alert
+   * rule.  Includes null (representing the global/default-user bucket).
+   * Used by evaluateAllRuleOwners() to drive per-user evaluation without
+   * exposing the raw DB record shape outside the repository.
+   */
+  async enabledRuleOwnerIds(): Promise<Array<string | null>> {
+    const rows = await this.db.alertRule.findMany({
+      where: { enabled: true },
+      select: { userId: true },
+      distinct: ['userId'],
+    });
+    return rows.map((r) => r.userId ?? null);
+  }
+
   async getRule(id: string, userId = 'default-user'): Promise<AlertRuleDto | null> {
     const rule = await this.db.alertRule.findFirst({ where: { id, ...this.ownerWhere(userId) } });
     return rule ? this.toRuleDto(rule) : null;

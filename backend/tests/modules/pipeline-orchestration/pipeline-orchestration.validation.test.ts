@@ -3,7 +3,9 @@ import {
   parsePipelineCommandCatalogQuery,
   parsePipelineCommandRequest,
   parsePipelineStatusQuery,
+  isPipelineCommandKey,
 } from '../../../src/modules/pipeline-orchestration';
+import { PIPELINE_COMMAND_KEYS } from '../../../src/modules/pipeline-orchestration/pipeline-orchestration.types';
 
 describe('pipeline orchestration validation', () => {
   it('defaults to scoped market-intelligence status', () => {
@@ -294,5 +296,56 @@ describe('pipeline orchestration validation', () => {
       runMode: 'single_batch',
       offset: -1,
     })).toThrow('offset must be a non-negative integer');
+  });
+
+  // ── Derivation invariant tests (FIX 2 — drift class must be structurally impossible) ───────
+
+  it('isPipelineCommandKey accepts every key in PIPELINE_COMMAND_KEYS', () => {
+    for (const key of PIPELINE_COMMAND_KEYS) {
+      expect(isPipelineCommandKey(key)).toBe(true);
+    }
+  });
+
+  it('isPipelineCommandKey rejects strings not in PIPELINE_COMMAND_KEYS', () => {
+    expect(isPipelineCommandKey('NOT_REAL')).toBe(false);
+    expect(isPipelineCommandKey('MARKET_SCAN_REFRES')).toBe(false); // off-by-one typo
+    expect(isPipelineCommandKey('')).toBe(false);
+  });
+
+  it('isPipelineCommandKey accepts MARKET_SCAN_REFRESH and MARKET_CONTEXT_SNAPSHOT_REFRESH (the two previously missing live-400 keys)', () => {
+    expect(isPipelineCommandKey('MARKET_SCAN_REFRESH')).toBe(true);
+    expect(isPipelineCommandKey('MARKET_CONTEXT_SNAPSHOT_REFRESH')).toBe(true);
+  });
+
+  it('parsePipelineCommandRequest accepts MARKET_SCAN_REFRESH as a valid command key', () => {
+    expect(parsePipelineCommandRequest({
+      commandKey: 'MARKET_SCAN_REFRESH',
+      region: 'in',
+      assetType: 'stock',
+      runMode: 'single_batch',
+      idempotencyKey: 'scan-1',
+    })).toEqual(expect.objectContaining({
+      commandKey: 'MARKET_SCAN_REFRESH',
+      region: 'IN',
+      assetType: 'STOCK',
+      runMode: 'single_batch',
+      idempotencyKey: 'scan-1',
+      force: false,
+    }));
+  });
+
+  it('parsePipelineCommandRequest accepts MARKET_CONTEXT_SNAPSHOT_REFRESH as a valid command key', () => {
+    expect(parsePipelineCommandRequest({
+      commandKey: 'MARKET_CONTEXT_SNAPSHOT_REFRESH',
+      region: 'in',
+      assetType: 'stock',
+      runMode: 'single_batch',
+      idempotencyKey: 'ctx-snap-1',
+    })).toEqual(expect.objectContaining({
+      commandKey: 'MARKET_CONTEXT_SNAPSHOT_REFRESH',
+      runMode: 'single_batch',
+      idempotencyKey: 'ctx-snap-1',
+      force: false,
+    }));
   });
 });

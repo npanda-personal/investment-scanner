@@ -4,40 +4,13 @@ import type {
   PipelineCommandRequest,
   PipelineStatusQuery,
 } from './pipeline-orchestration.types';
+import { PIPELINE_COMMAND_KEYS } from './pipeline-orchestration.types';
 
 const DEFAULT_LIMIT = 25;
 const MAX_LIMIT = 100;
 const MAX_STAGE_KEYS = 25;
 const DEFAULT_BATCH_SIZE = 25;
 const MAX_BATCH_SIZE = 100;
-const SUPPORTED_COMMAND_KEYS: PipelineCommandKey[] = [
-  'DATA_QUALITY_EVALUATE_SCOPE',
-  'MARKET_DATA_INCREMENTAL_EOD_LOAD',
-  'MARKET_DATA_PRICE_BACKFILL',
-  'MARKET_DATA_CATALOG_SYNC',
-  'RAW_SIGNALS_GENERATE_SCOPE',
-  'SIGNAL_CALIBRATION_REFRESH_SCOPE',
-  'SIGNAL_QUALITY_DIAGNOSTICS_REFRESH',
-  'CONTEXT_SNAPSHOTS_GENERATE_SCOPE',
-  'MARKET_CONTEXT_REFRESH_REGION',
-  'MARKET_PULSE_REFRESH',
-  'SECTOR_INTELLIGENCE_REFRESH',
-  'SMART_MONEY_REFRESH_SCOPE',
-  'STRATEGY_DECISION_EVALUATE_SCOPE',
-  'BACKTEST_PROOF_REFRESH',
-  'RESEARCH_PROJECTION_REFRESH',
-  'TODAY_REVIEW_PUBLISH',
-  'SIGNAL_POSITION_LEDGER_REFRESH',
-  'EARNINGS_INTELLIGENCE_REFRESH',
-  'STOCK_INTEREST_REFRESH',
-  'PIPELINE_RUN_ALL',
-  'MARKET_DATA_HISTORICAL_EXCHANGE_BACKFILL',
-  'MARKET_DATA_MANUAL_VERIFIED_FUNDAMENTALS_IMPORT',
-  'PIPELINE_RETRY_FAILED_STAGE',
-  'PIPELINE_DAG_RETRY',
-  'PIPELINE_DRAIN_ALL_BATCHES',
-  'PIPELINE_CANCEL_ACTIVE',
-];
 
 export function parsePipelineStatusQuery(query: Record<string, unknown>): PipelineStatusQuery {
   const stageKeys = parseStageKeys(query.stageKeys);
@@ -78,7 +51,7 @@ export function parsePipelineCommandRequest(input: Record<string, unknown>): Pip
 }
 
 export function isPipelineCommandKey(value: string): value is PipelineCommandKey {
-  return SUPPORTED_COMMAND_KEYS.includes(value as PipelineCommandKey);
+  return (PIPELINE_COMMAND_KEYS as readonly string[]).includes(value);
 }
 
 function first(value: unknown): unknown {

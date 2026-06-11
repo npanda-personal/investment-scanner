@@ -4,6 +4,8 @@ import { SignalGenerationEngineService } from '../signal-generation-engine';
 import { SmartMoneyIntelligenceService } from '../smart-money-intelligence';
 import { StrategyFrameworkService } from '../strategy-framework';
 import { SignalCalibrationEngineService } from '../signal-calibration-engine';
+import { ResearchHubSnapshotReader } from './research-hub.snapshot-reader';
+import type { SnapshotBulkRead } from './research-hub.snapshot-reader';
 import prisma from '../../db/prisma';
 import type { StrategyDecisionDto, StrategyQuery } from '../strategy-decision-engine';
 import type { CalibrationHealthResponse } from '../signal-calibration-engine';
@@ -43,6 +45,17 @@ const RESEARCH_OVERVIEW_PIPELINE_KEY = 'research-hub-overview';
 const RESEARCH_OVERVIEW_CACHE_VERSION = 'research-overview-v1';
 const RESEARCH_OVERVIEW_PRIOR_KEY_PREFIX = 'research-overview-v1-prior';
 
+/**
+ * RESEARCH_HUB_SNAPSHOT_READS — env flag (default ON).
+ * Set to '0' or 'false' to disable snapshot-first reads and revert to pure
+ * legacy fan-out (for debugging or rollback).
+ */
+function isSnapshotReadsEnabled(): boolean {
+  const v = process.env['RESEARCH_HUB_SNAPSHOT_READS'];
+  if (v === '0' || v === 'false') return false;
+  return true; // default ON
+}
+
 export class ResearchHubService {
   constructor(
     private readonly strategyService = new StrategyDecisionEngineService(),
@@ -63,7 +76,12 @@ export class ResearchHubService {
      * NR-57: Optional trade-plan-risk-engine service injection.
      * Same cycle-safety contract as todayTradeReviewService.
      */
-    private readonly tradePlanRiskEngineService?: TradePlanRiskEngineServiceLike | null
+    private readonly tradePlanRiskEngineService?: TradePlanRiskEngineServiceLike | null,
+    /**
+     * Snapshot reader for snapshot-first reads (RESEARCH_HUB_SNAPSHOT_READS=ON).
+     * Injected by tests; defaults to a new instance that uses the shared DB.
+     */
+    private readonly snapshotReader?: ResearchHubSnapshotReader | null,
   ) {}
 
   /**
@@ -115,8 +133,28 @@ export class ResearchHubService {
     const region = query.region || 'IN';
     const assetType = query.assetType || 'STOCK';
 
-    // Aggregate data from all core research modules with individual error handling
-    const [gate, context, strategyCandidates, strategyExits, strategyShortCandidates, signalDiagnostics, smartMoneyRes] = await Promise.all([
+    // ── Snapshot-first read (RESEARCH_HUB_SNAPSHOT_READS=ON, default) ─────────
+    // Attempt ONE bulk query against daily_instrument_snapshot.  When rows exist
+    // with usable provenance (OK/STALE), their data replaces the corresponding
+    // live service calls.  Falls back to the live service on FAILED/N_A/missing.
+    // Flag '0'/'false' bypasses entirely → pure legacy path.
+    let snapshot: SnapshotBulkRead | null = null;
+    if (isSnapshotReadsEnabled()) {
+      try {
+        const reader = this.snapshotReader ?? new ResearchHubSnapshotReader(undefined, this.db as any);
+        snapshot = await reader.read(region, assetType);
+        if (snapshot.rows.size === 0) snapshot = null; // no rows → fall through to legacy
+      } catch (err) {
+        console.error('Snapshot bulk read failed; falling back to live sources:', err);
+        snapshot = null;
+      }
+    }
+
+    // ── Fan-out: region-level deps (always live) ───────────────────────────────
+    // market gate and market context are region-level, not per-instrument.
+    // They have no equivalent in daily_instrument_snapshot (§4.3: "Region-level
+    // context it needs beyond per-row copies … may stay on market_context_snapshots").
+    const [gate, context] = await Promise.all([
       this.strategyService.marketGate(region).catch(err => {
         console.error('Market gate error:', err);
         dataGaps.push('Market gate status unavailable');
@@ -127,32 +165,73 @@ export class ResearchHubService {
         dataGaps.push('Market context intelligence unavailable');
         return null;
       }),
-      this.fetchStrategyDecisionProofPool({ region, assetType }).catch(err => {
+    ]);
+
+    // ── Fan-out: per-instrument deps (snapshot or live) ────────────────────────
+
+    // Strategy candidates: from snapshot decision rows when provenance is OK/STALE;
+    // live fan-out (4 strategyService.candidates calls) when snapshot unavailable.
+    let strategyCandidates: StrategyDecisionDto[];
+    if (snapshot) {
+      strategyCandidates = snapshot.candidates.filter(c =>
+        ['TRADE_CANDIDATE', 'WATCH', 'WAIT', 'AVOID'].includes((c as any).decision)
+      );
+    } else {
+      strategyCandidates = await this.fetchStrategyDecisionProofPool({ region, assetType }).catch(err => {
         console.error('Strategy candidates error:', err);
         dataGaps.push('Strategy candidates unavailable');
         return [];
-      }),
-      this.strategyService.exits(undefined, region, assetType).catch(err => {
+      });
+    }
+
+    // Strategy exits: from snapshot EXIT_CANDIDATE rows when snapshot available;
+    // live strategyService.exits otherwise.
+    let strategyExits: StrategyDecisionDto[];
+    if (snapshot) {
+      strategyExits = snapshot.candidates.filter(c => (c as any).decision === 'EXIT_CANDIDATE');
+    } else {
+      strategyExits = await this.strategyService.exits(undefined, region, assetType).catch(err => {
         console.error('Strategy exits error:', err);
         dataGaps.push('Strategy exit candidates unavailable');
         return [];
-      }),
-      this.fetchShortReviewCandidates({ region, assetType }).catch(err => {
-        console.error('Short-review candidates error:', err);
-        dataGaps.push('Short-review candidates unavailable');
-        return [];
-      }),
-      this.signalService.funnelDiagnostics({ region, assetType }).catch(err => {
+      });
+    }
+
+    // Short-review candidates: snapshot does not store strategy codes (only the
+    // decision verdict), so derivativesEligible gating requires the live service.
+    // This dep stays live; it is a bounded call (2 strategy codes × limit:10).
+    const strategyShortCandidates = await this.fetchShortReviewCandidates({ region, assetType }).catch(err => {
+      console.error('Short-review candidates error:', err);
+      dataGaps.push('Short-review candidates unavailable');
+      return [];
+    });
+
+    // Signal diagnostics: derive aggregate counts from snapshot signal directions
+    // when snapshot available; live funnelDiagnostics otherwise.
+    let signalDiagnostics: { total: number; bullish: number; bearish: number; neutral: number; byDirection: Record<string, number> };
+    if (snapshot) {
+      signalDiagnostics = snapshot.signalCounts;
+    } else {
+      signalDiagnostics = await this.signalService.funnelDiagnostics({ region, assetType }).catch(err => {
         console.error('Top signals error:', err);
         dataGaps.push('Signal generation engine data unavailable');
         return { total: 0, bullish: 0, bearish: 0, neutral: 0, byDirection: {} };
-      }),
-      this.smartMoneyService.top({ limit: 25, range: '3M', region, assetType }).catch(err => {
+      });
+    }
+
+    // Smart money: use snapshot smartMoney rows when available (provenance OK/STALE);
+    // live smartMoneyService.top as fallback.
+    let smartMoneyRes: { results: Array<{ instrumentId: string; status: string }> };
+    if (snapshot && snapshot.smartMoney.length > 0) {
+      smartMoneyRes = { results: snapshot.smartMoney as any };
+    } else {
+      // snapshot missing or all smartMoney provenance FAILED/N_A → live fallback
+      smartMoneyRes = await this.smartMoneyService.top({ limit: 25, range: '3M', region, assetType }).catch(err => {
         console.error('Smart money error:', err);
         dataGaps.push('Smart money intelligence data unavailable');
         return { results: [], total: 0 };
-      })
-    ]);
+      });
+    }
 
     const smartMoney = smartMoneyRes.results || [];
 
@@ -248,6 +327,8 @@ export class ResearchHubService {
       nextActions,
       generatedAt: new Date().toISOString(),
       dataGaps,
+      // Additive metadata: present when snapshot-first reads were used.
+      ...(snapshot?.assembledAt != null ? { snapshotAssembledAt: snapshot.assembledAt } : {}),
     };
   }
 

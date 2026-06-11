@@ -20,6 +20,7 @@ const createService = (rules: any[], overrides: any = {}) => {
   const events: any[] = [];
   const repository = {
     enabledRules: jest.fn().mockResolvedValue(rules),
+    enabledRuleOwnerIds: jest.fn().mockResolvedValue([]),
     createRule: jest.fn(async (input) => ({ ...rule(input), id: 'new-rule' })),
     listRules: jest.fn().mockResolvedValue(rules),
     getRule: jest.fn().mockResolvedValue(rules[0] || null),
@@ -103,6 +104,73 @@ describe('AlertsMonitoringService', () => {
     expect(repository.markRead).toHaveBeenCalledWith('event-1', 'user-a');
     expect(repository.dismiss).toHaveBeenCalledWith('event-1', 'user-a');
     expect(repository.markAllRead).toHaveBeenCalledWith('user-a');
+  });
+
+  describe('evaluateAllRuleOwners', () => {
+    it('evaluates each distinct userId bucket and the null-userId bucket', async () => {
+      const { service, repository } = createService([]);
+      repository.enabledRuleOwnerIds.mockResolvedValue(['user-a', 'user-b', null]);
+      repository.enabledRules.mockResolvedValue([]);
+
+      const result = await service.evaluateAllRuleOwners();
+      // user-a, user-b, plus the null-userId pass = 3 evaluate() calls
+      expect(result.usersEvaluated).toBe(3);
+      expect(result.warnings).toHaveLength(0);
+    });
+
+    it('only runs the null-bucket pass when there are no non-null userIds', async () => {
+      const { service, repository } = createService([]);
+      repository.enabledRuleOwnerIds.mockResolvedValue([null]);
+      repository.enabledRules.mockResolvedValue([]);
+
+      const result = await service.evaluateAllRuleOwners();
+      expect(result.usersEvaluated).toBe(1);
+      expect(result.warnings).toHaveLength(0);
+    });
+
+    it('still runs the null-bucket pass when no rules exist at all', async () => {
+      const { service, repository } = createService([]);
+      repository.enabledRuleOwnerIds.mockResolvedValue([]);
+      repository.enabledRules.mockResolvedValue([]);
+
+      const result = await service.evaluateAllRuleOwners();
+      // no real userIds → falls through to null-bucket pass
+      expect(result.usersEvaluated).toBe(1);
+      expect(result.warnings).toHaveLength(0);
+    });
+
+    it('accumulates warnings when a per-user evaluate() call fails', async () => {
+      const { service, repository } = createService([]);
+      repository.enabledRuleOwnerIds.mockResolvedValue(['user-x']);
+      // First call (for user-x) throws; second call (null bucket) also throws
+      repository.enabledRules
+        .mockRejectedValueOnce(new Error('DB error for user-x'))
+        .mockRejectedValueOnce(new Error('DB error for default'));
+
+      const result = await service.evaluateAllRuleOwners();
+      expect(result.warnings.length).toBeGreaterThanOrEqual(1);
+      expect(result.warnings.some((w) => w.includes('user-x') || w.includes('DB error'))).toBe(true);
+    });
+
+    it('returns usersEvaluated=0 and a warning when enabledRuleOwnerIds() itself throws', async () => {
+      const { service, repository } = createService([]);
+      repository.enabledRuleOwnerIds.mockRejectedValue(new Error('index scan failed'));
+
+      const result = await service.evaluateAllRuleOwners();
+      expect(result.usersEvaluated).toBe(0);
+      expect(result.warnings.some((w) => w.includes('index scan failed'))).toBe(true);
+    });
+
+    it('deduplicates repeated userIds in the owner list', async () => {
+      const { service, repository } = createService([]);
+      // Same userId appears twice (two rules for the same user)
+      repository.enabledRuleOwnerIds.mockResolvedValue(['user-dup', 'user-dup', null]);
+      repository.enabledRules.mockResolvedValue([]);
+
+      const result = await service.evaluateAllRuleOwners();
+      // user-dup (once, deduplicated) + null-userId pass = 2
+      expect(result.usersEvaluated).toBe(2);
+    });
   });
 
   describe('SIGNAL_DIRECTION_CHANGED prior-state logic (BUG 2 regression)', () => {

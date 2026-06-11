@@ -50,6 +50,58 @@ export class AlertsMonitoringService {
     return this.repository.deleteRule(id);
   }
 
+  /**
+   * Enumerate every distinct userId that owns at least one enabled alert rule,
+   * call evaluate(userId) for each, then call evaluate(undefined) for the
+   * null-userId (global/default-user) bucket.  All per-user failures are
+   * aggregated as warnings rather than thrown.
+   *
+   * This is the canonical hook for post-assembly alert evaluation; it keeps the
+   * repository private and removes the need for callers to reach through via
+   * `(service as any).repository`.
+   */
+  async evaluateAllRuleOwners(): Promise<{ usersEvaluated: number; warnings: string[] }> {
+    const warnings: string[] = [];
+    let usersEvaluated = 0;
+
+    // Collect distinct userIds that own at least one enabled rule.
+    // enabledRuleOwnerIds() returns both non-null userIds and null (global bucket).
+    let ownerIds: Array<string | null> = [];
+    try {
+      ownerIds = await this.repository.enabledRuleOwnerIds();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      warnings.push(`alerts evaluateAllRuleOwners: failed to list enabled rule owners: ${msg}`);
+      return { usersEvaluated: 0, warnings };
+    }
+
+    const userIds = [...new Set(ownerIds.filter((id): id is string => !!id))];
+    const hasNullBucket = ownerIds.includes(null);
+
+    for (const userId of userIds) {
+      try {
+        await this.evaluate(userId);
+        usersEvaluated += 1;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        warnings.push(`alerts evaluation failed for user ${userId}: ${msg}`);
+      }
+    }
+
+    // Evaluate rules with null userId (default-user / global rules) if any exist
+    if (hasNullBucket || userIds.length === 0) {
+      try {
+        await this.evaluate(undefined);
+        usersEvaluated += 1;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        warnings.push(`alerts evaluation failed for default rules: ${msg}`);
+      }
+    }
+
+    return { usersEvaluated, warnings };
+  }
+
   async evaluate(userId?: string): Promise<AlertEvaluationResult> {
     const rules = await this.repository.enabledRules(userId);
     const events = [];

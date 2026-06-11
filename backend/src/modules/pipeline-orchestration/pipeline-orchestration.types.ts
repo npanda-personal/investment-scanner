@@ -304,6 +304,45 @@ export type PipelineCommandKey =
   | 'PIPELINE_DRAIN_ALL_BATCHES'
   | 'PIPELINE_CANCEL_ACTIVE';
 
+/**
+ * Canonical runtime inventory of every PipelineCommandKey value.
+ *
+ * Both the validator (isPipelineCommandKey) and the service boot-time check
+ * derive from this array.  The `satisfies` constraint ensures the array stays
+ * in sync with the union type above: TypeScript will error if a value is added
+ * here that is not in the union, or vice-versa (caught by the boot-time check).
+ */
+export const PIPELINE_COMMAND_KEYS: readonly PipelineCommandKey[] = [
+  'DATA_QUALITY_EVALUATE_SCOPE',
+  'MARKET_DATA_INCREMENTAL_EOD_LOAD',
+  'MARKET_DATA_PRICE_BACKFILL',
+  'MARKET_DATA_CATALOG_SYNC',
+  'RAW_SIGNALS_GENERATE_SCOPE',
+  'SIGNAL_CALIBRATION_REFRESH_SCOPE',
+  'SIGNAL_QUALITY_DIAGNOSTICS_REFRESH',
+  'CONTEXT_SNAPSHOTS_GENERATE_SCOPE',
+  'MARKET_CONTEXT_REFRESH_REGION',
+  'MARKET_CONTEXT_SNAPSHOT_REFRESH',
+  'MARKET_PULSE_REFRESH',
+  'SECTOR_INTELLIGENCE_REFRESH',
+  'SMART_MONEY_REFRESH_SCOPE',
+  'STRATEGY_DECISION_EVALUATE_SCOPE',
+  'BACKTEST_PROOF_REFRESH',
+  'RESEARCH_PROJECTION_REFRESH',
+  'TODAY_REVIEW_PUBLISH',
+  'SIGNAL_POSITION_LEDGER_REFRESH',
+  'EARNINGS_INTELLIGENCE_REFRESH',
+  'STOCK_INTEREST_REFRESH',
+  'MARKET_SCAN_REFRESH',
+  'PIPELINE_RUN_ALL',
+  'MARKET_DATA_HISTORICAL_EXCHANGE_BACKFILL',
+  'MARKET_DATA_MANUAL_VERIFIED_FUNDAMENTALS_IMPORT',
+  'PIPELINE_RETRY_FAILED_STAGE',
+  'PIPELINE_DAG_RETRY',
+  'PIPELINE_DRAIN_ALL_BATCHES',
+  'PIPELINE_CANCEL_ACTIVE',
+] satisfies PipelineCommandKey[];
+
 export type PipelineCommandAvailability = 'ENABLED' | 'DEFERRED' | 'FORBIDDEN';
 export type PipelineCommandRunMode = 'single_batch' | 'incremental_changed_only' | 'full_latest_trading_date';
 export type PipelineCommandResultStatus =

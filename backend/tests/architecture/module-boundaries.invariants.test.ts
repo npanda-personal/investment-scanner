@@ -91,6 +91,19 @@ function walkShared(): Array<{ rel: string; abs: string; lines: string[] }> {
 // ---------------------------------------------------------------------------
 
 /**
+ * Invariant 1 allowlist — cross-module .repository imports via static `import … from`.
+ * Each entry is "file.rel: static import from ../target-module/filename.repository"
+ * matching the exact violation string emitted by the test.
+ * TODO-FIX: Remove each entry once the static import is replaced with a
+ * service-layer API call.
+ */
+const ALLOWED_STATIC_REPOSITORY_IMPORTS: ReadonlySet<string> = new Set([
+  // research-hub → snapshot-assembler.repository
+  // TODO-FIX: expose a typed read method on SnapshotAssemblerService instead.
+  'research-hub/research-hub.snapshot-reader.ts: static import from ../snapshot-assembler/snapshot-assembler.repository',
+]);
+
+/**
  * Invariant 1 allowlist — cross-module .repository imports via require().
  * Each entry is "sourceModule:targetModule/filename.repository" (no quotes).
  * TODO-FIX: Remove each entry once the corresponding lazy-require is replaced
@@ -202,14 +215,6 @@ const ALLOWED_LAZY_REQUIRE_SITES: ReadonlyMap<string, string> = new Map([
 
   // signal-generation-engine
   [
-    'signal-generation-engine:../market-context-intelligence',
-    'Lazy-require to break signal-gen → market-context cycle.',
-  ],
-  [
-    'signal-generation-engine:../smart-money-intelligence',
-    'Lazy-require to break signal-gen → smart-money cycle.',
-  ],
-  [
     'signal-generation-engine:../strategy-framework/strategy-framework.service',
     'Lazy-require to break signal-gen → strategy-framework cycle.',
   ],
@@ -300,14 +305,17 @@ describe('Module boundary invariants', () => {
         const ip = imp.split('/');
         // ip[0] === '..', ip[1] === target module dir
         if (ip.length >= 2 && ip[1] !== file.module) {
-          violations.push(`${file.rel}: static import from ${imp}`);
+          const violationKey = `${file.rel}: static import from ${imp}`;
+          if (!ALLOWED_STATIC_REPOSITORY_IMPORTS.has(violationKey)) {
+            violations.push(violationKey);
+          }
         }
       }
     }
 
     if (violations.length > 0) {
       throw new Error(
-        'Static cross-module .repository imports found (fix or add to allowlist):\n' +
+        'Static cross-module .repository imports found (fix or add to ALLOWED_STATIC_REPOSITORY_IMPORTS):\n' +
           violations.map((v) => '  ' + v).join('\n'),
       );
     }
@@ -480,6 +488,36 @@ describe('Module boundary invariants', () => {
     if (stale.length > 0) {
       throw new Error(
         'Stale entries in ALLOWED_LAZY_REQUIRE_SITES (require no longer exists — remove from allowlist):\n' +
+          stale.map((s) => '  ' + s).join('\n'),
+      );
+    }
+  });
+
+  it('ALLOWED_STATIC_REPOSITORY_IMPORTS has no stale entries (every entry matches at least one source location)', () => {
+    const presentKeys = new Set<string>();
+
+    for (const file of moduleFiles) {
+      for (const line of file.lines) {
+        const m = line.match(/from\s+['"]([.][.][/\\][^'"]*[.]repository)['"]/);
+        if (!m) continue;
+        const imp = normPath(m[1]);
+        const ip = imp.split('/');
+        if (ip.length >= 2 && ip[1] !== file.module) {
+          presentKeys.add(`${file.rel}: static import from ${imp}`);
+        }
+      }
+    }
+
+    const stale: string[] = [];
+    for (const key of ALLOWED_STATIC_REPOSITORY_IMPORTS) {
+      if (!presentKeys.has(key)) {
+        stale.push(key);
+      }
+    }
+
+    if (stale.length > 0) {
+      throw new Error(
+        'Stale entries in ALLOWED_STATIC_REPOSITORY_IMPORTS (violation no longer exists — remove from allowlist):\n' +
           stale.map((s) => '  ' + s).join('\n'),
       );
     }

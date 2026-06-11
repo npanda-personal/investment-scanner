@@ -644,6 +644,94 @@ export class SignalGenerationEngineRepository {
     };
   }
 
+  /**
+   * Reads the latest persisted market-context snapshot for the given region
+   * directly from the DB — no cross-module service import required.
+   *
+   * Mirrors what MarketContextIntelligenceService.latestPersistedSummary() returns
+   * for the regime/breadth/sector fields that signal generation needs.
+   */
+  async latestPersistedMarketContext(region?: string): Promise<{
+    regime: { regime: string };
+    breadth: { percentAboveSma50: number | null };
+    topSectors: Array<{ sector: string; leadershipStatus: string; relativeStrengthScore: number }>;
+    weakSectors: Array<{ sector: string; leadershipStatus: string; relativeStrengthScore: number }>;
+  } | null> {
+    const effectiveRegion = region || 'IN';
+    const market = await this.db.marketContextSnapshot.findFirst({
+      where: { region: effectiveRegion },
+      orderBy: [{ snapshotDate: 'desc' }, { updatedAt: 'desc' }],
+      select: { regime: true, regimeScore: true, breadthPercentAboveSma50: true, snapshotDate: true },
+    }).catch(() => null);
+    if (!market) return null;
+
+    const sectorRows = await this.db.sectorContextSnapshot.findMany({
+      where: {
+        region: effectiveRegion,
+        snapshotDate: market.snapshotDate,
+      },
+      orderBy: { relativeStrengthScore: 'desc' },
+      select: { sector: true, relativeStrengthScore: true, leadershipStatus: true },
+    }).catch(() => []);
+
+    const allSectors = sectorRows.map((s: any) => ({
+      sector: s.sector,
+      leadershipStatus: s.leadershipStatus || 'LAGGING',
+      relativeStrengthScore: Number(s.relativeStrengthScore),
+    }));
+    const topSectors = allSectors.slice(0, 5);
+    const weakSectors = allSectors.length > 1
+      ? allSectors.slice(-Math.min(5, allSectors.length - 1)).reverse()
+      : [];
+
+    return {
+      regime: { regime: market.regime },
+      breadth: { percentAboveSma50: market.breadthPercentAboveSma50 !== null ? Number(market.breadthPercentAboveSma50) : null },
+      topSectors,
+      weakSectors,
+    };
+  }
+
+  /**
+   * Reads the latest persisted smart-money context snapshots for the given
+   * instrumentIds directly from the DB — no cross-module service import required.
+   *
+   * Mirrors SmartMoneyIntelligenceService.latestPersistedStocks() semantics:
+   * for each instrument pick the most-recent row for the given range.
+   */
+  async latestPersistedSmartMoneyStocks(
+    instrumentIds: string[],
+    range: string = '3M',
+  ): Promise<Map<string, { smartMoneyScore: number; status: string }>> {
+    const uniqueIds = [...new Set(instrumentIds.filter(Boolean))];
+    if (uniqueIds.length === 0) return new Map();
+
+    const latestByInstrument = await this.db.smartMoneyContextSnapshot.groupBy({
+      by: ['instrumentId'],
+      where: { instrumentId: { in: uniqueIds }, range },
+      _max: { updatedAt: true },
+    }).catch(() => []);
+
+    const latestPairs = (latestByInstrument as any[]).flatMap(
+      (item: any) => (item._max?.updatedAt ? [{ instrumentId: item.instrumentId, updatedAt: item._max.updatedAt }] : []),
+    );
+    if (latestPairs.length === 0) return new Map();
+
+    const rows = await this.db.smartMoneyContextSnapshot.findMany({
+      where: { range, OR: latestPairs },
+      orderBy: [{ updatedAt: 'desc' }],
+      select: { instrumentId: true, smartMoneyScore: true, status: true, updatedAt: true },
+    }).catch(() => []);
+
+    const result = new Map<string, { smartMoneyScore: number; status: string }>();
+    for (const row of rows as any[]) {
+      if (!result.has(row.instrumentId)) {
+        result.set(row.instrumentId, { smartMoneyScore: Number(row.smartMoneyScore), status: row.status });
+      }
+    }
+    return result;
+  }
+
   private runToDto(record: any): SignalGenerationRunAudit {
     return {
       id: record.id,

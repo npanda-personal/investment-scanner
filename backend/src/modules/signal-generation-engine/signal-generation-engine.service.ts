@@ -1399,38 +1399,26 @@ export class SignalGenerationEngineService {
   }
 
   private async latestPersistedMarketSummary(region?: string | null): Promise<any | null> {
-    const service = this.marketContextService || this.defaultMarketContextService();
-    if (typeof service.latestPersistedSummary === 'function') {
-      return service.latestPersistedSummary(region || undefined).catch(() => null);
+    if (this.marketContextService) {
+      if (typeof this.marketContextService.latestPersistedSummary === 'function') {
+        return this.marketContextService.latestPersistedSummary(region || undefined).catch(() => null);
+      }
+      return null;
     }
-    return null;
+    // Production default: direct persisted-read via repository — no cross-module service import.
+    if (typeof this.repository.latestPersistedMarketContext !== 'function') return null;
+    return this.repository.latestPersistedMarketContext(region || undefined).catch(() => null);
   }
 
   private async latestPersistedSmartMoney(instrumentIds: string[]): Promise<Map<string, any>> {
-    const service = this.smartMoneyService || this.defaultSmartMoneyService();
-    if (typeof service.latestPersistedStocks !== 'function') return new Map();
-    const rows = await service.latestPersistedStocks(instrumentIds, '3M').catch(() => []);
-    return new Map((Array.isArray(rows) ? rows : []).map((row: any) => [row.instrumentId, row]));
-  }
-
-  private defaultMarketContextService(): any {
-    if (process.env.NODE_ENV === 'test') return {};
-    try {
-      const { MarketContextIntelligenceService } = require('../market-context-intelligence') as typeof import('../market-context-intelligence');
-      return new MarketContextIntelligenceService();
-    } catch {
-      return {};
+    if (this.smartMoneyService) {
+      if (typeof this.smartMoneyService.latestPersistedStocks !== 'function') return new Map();
+      const rows = await this.smartMoneyService.latestPersistedStocks(instrumentIds, '3M').catch(() => []);
+      return new Map((Array.isArray(rows) ? rows : []).map((row: any) => [row.instrumentId, row]));
     }
-  }
-
-  private defaultSmartMoneyService(): any {
-    if (process.env.NODE_ENV === 'test') return {};
-    try {
-      const { SmartMoneyIntelligenceService } = require('../smart-money-intelligence') as typeof import('../smart-money-intelligence');
-      return new SmartMoneyIntelligenceService();
-    } catch {
-      return {};
-    }
+    // Production default: direct persisted-read via repository — no cross-module service import.
+    if (typeof this.repository.latestPersistedSmartMoneyStocks !== 'function') return new Map();
+    return this.repository.latestPersistedSmartMoneyStocks(instrumentIds, '3M').catch(() => new Map());
   }
 
   private strategyContextForSignal(signal: SignalResultDto, prices: SignalPricePoint[], instrument: any): StrategyContext {

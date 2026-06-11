@@ -92,13 +92,13 @@ describe('MarketContextIntelligenceService', () => {
       listInstruments: jest.fn().mockResolvedValue({ instruments: [{ id: 'stock-1', symbol: 'AAA', sector: 'Financial Services', country: 'India' }] }),
       listPricesByInstrumentId: jest.fn().mockResolvedValue({ prices: instrument().prices.map((close: number) => ({ adjusted_close: close })) }),
     };
-    const signalService = { topSignals: jest.fn().mockResolvedValue({ signals: [] }) };
     const repository = {
       saveSnapshot: jest.fn().mockResolvedValue(undefined),
       loadIndexPrices: jest.fn().mockResolvedValue([]),
       loadCapBandUniverse: jest.fn().mockResolvedValue([]),
+      latestSignalDirections: jest.fn().mockResolvedValue([]),
     };
-    const service = new MarketContextIntelligenceService(repository as any, marketDataService as any, signalService as any);
+    const service = new MarketContextIntelligenceService(repository as any, marketDataService as any);
 
     await service.run('IN');
 
@@ -225,7 +225,7 @@ describe('MarketContextIntelligenceService', () => {
       latestPersistedSnapshot: jest.fn().mockResolvedValue(persistedSnapshot),
       saveSnapshot: jest.fn(),
     };
-    const service = new MarketContextIntelligenceService(repository as any, {} as any, {} as any);
+    const service = new MarketContextIntelligenceService(repository as any, {} as any);
 
     const summary = await service.summary();
 
@@ -240,7 +240,7 @@ describe('MarketContextIntelligenceService', () => {
     const repository = {
       latestPersistedSnapshot: jest.fn().mockResolvedValue(null),
     };
-    const service = new MarketContextIntelligenceService(repository as any, {} as any, {} as any);
+    const service = new MarketContextIntelligenceService(repository as any, {} as any);
 
     const summary = await service.summary();
 
@@ -252,13 +252,13 @@ describe('MarketContextIntelligenceService', () => {
       listInstruments: jest.fn().mockResolvedValue({ instruments: [{ id: 'stock-1', symbol: 'AAA', sector: 'Technology', country: 'India' }] }),
       listPricesByInstrumentId: jest.fn().mockResolvedValue({ prices: instrument().prices.map((close: number) => ({ adjusted_close: close })) }),
     };
-    const signalService = { topSignals: jest.fn().mockResolvedValue({ signals: [{ instrument_id: 'stock-1', direction: 'BULLISH', score: 80 }] }) };
     const repository = {
       saveSnapshot: jest.fn().mockResolvedValue(undefined),
       loadIndexPrices: jest.fn().mockResolvedValue([]),
       loadCapBandUniverse: jest.fn().mockResolvedValue([]),
+      latestSignalDirections: jest.fn().mockResolvedValue([{ instrumentId: 'stock-1', direction: 'BULLISH', score: 80 }]),
     };
-    const service = new MarketContextIntelligenceService(repository as any, marketDataService as any, signalService as any);
+    const service = new MarketContextIntelligenceService(repository as any, marketDataService as any);
 
     await service.run('IN');
 
@@ -267,7 +267,7 @@ describe('MarketContextIntelligenceService', () => {
       page: 1, pageSize: 500, region: 'IN',
       exchange: 'NSE', instrumentSegment: 'CASH', sortBy: 'marketCap', sortOrder: 'desc',
     });
-    expect(signalService.topSignals).toHaveBeenCalledWith({ limit: 100, region: 'IN' });
+    expect(repository.latestSignalDirections).toHaveBeenCalledWith('IN', 100);
     expect(repository.saveSnapshot).toHaveBeenCalledWith(expect.objectContaining({
       regime: expect.any(Object),
       breadth: expect.any(Object),
@@ -292,15 +292,13 @@ describe('MarketContextIntelligenceService', () => {
       saveSnapshot: jest.fn(),
     };
     const marketDataService = { listInstruments: jest.fn() };
-    const signalService = { topSignals: jest.fn() };
-    const service = new MarketContextIntelligenceService(repository as any, marketDataService as any, signalService as any);
+    const service = new MarketContextIntelligenceService(repository as any, marketDataService as any);
 
     const result = await service.summary({ region: 'IN' });
 
     expect(repository.latestPersistedSnapshot).toHaveBeenCalledWith('IN');
     expect(repository.saveSnapshot).not.toHaveBeenCalled();
     expect(marketDataService.listInstruments).not.toHaveBeenCalled();
-    expect(signalService.topSignals).not.toHaveBeenCalled();
     expect(result).toBe(summary);
   });
 
@@ -324,8 +322,7 @@ describe('MarketContextIntelligenceService', () => {
       listInstruments: jest.fn(),
       listPricesByInstrumentId: jest.fn(),
     };
-    const signalService = { topSignals: jest.fn() };
-    const service = new MarketContextIntelligenceService(repository as any, marketDataService as any, signalService as any);
+    const service = new MarketContextIntelligenceService(repository as any, marketDataService as any);
 
     const result = await service.latestPersistedSummary('IN');
 
@@ -333,7 +330,6 @@ describe('MarketContextIntelligenceService', () => {
     expect(repository.latestPersistedSnapshot).toHaveBeenCalledWith('IN');
     expect(repository.saveSnapshot).not.toHaveBeenCalled();
     expect(marketDataService.listInstruments).not.toHaveBeenCalled();
-    expect(signalService.topSignals).not.toHaveBeenCalled();
   });
 
   it('returns null for latest persisted summary without generating when no snapshot exists', async () => {
@@ -345,8 +341,7 @@ describe('MarketContextIntelligenceService', () => {
       listInstruments: jest.fn(),
       listPricesByInstrumentId: jest.fn(),
     };
-    const signalService = { topSignals: jest.fn() };
-    const service = new MarketContextIntelligenceService(repository as any, marketDataService as any, signalService as any);
+    const service = new MarketContextIntelligenceService(repository as any, marketDataService as any);
 
     const result = await service.latestPersistedSummary('IN');
 
@@ -354,7 +349,6 @@ describe('MarketContextIntelligenceService', () => {
     expect(repository.latestPersistedSnapshot).toHaveBeenCalledWith('IN');
     expect(repository.saveSnapshot).not.toHaveBeenCalled();
     expect(marketDataService.listInstruments).not.toHaveBeenCalled();
-    expect(signalService.topSignals).not.toHaveBeenCalled();
   });
 
   it('returns a ready persisted breadth envelope from persisted storage only', async () => {
@@ -390,8 +384,7 @@ describe('MarketContextIntelligenceService', () => {
       listInstruments: jest.fn(),
       listPricesByInstrumentId: jest.fn(),
     };
-    const signalService = { topSignals: jest.fn() };
-    const service = new MarketContextIntelligenceService(repository as any, marketDataService as any, signalService as any);
+    const service = new MarketContextIntelligenceService(repository as any, marketDataService as any);
     const summarySpy = jest.spyOn(service, 'summary');
     const runSpy = jest.spyOn(service, 'run');
 
@@ -429,7 +422,6 @@ describe('MarketContextIntelligenceService', () => {
     expect(runSpy).not.toHaveBeenCalled();
     expect(marketDataService.listInstruments).not.toHaveBeenCalled();
     expect(marketDataService.listPricesByInstrumentId).not.toHaveBeenCalled();
-    expect(signalService.topSignals).not.toHaveBeenCalled();
   });
 
   it('returns a missing persisted breadth envelope without generating when no persisted summary exists', async () => {
@@ -442,8 +434,7 @@ describe('MarketContextIntelligenceService', () => {
       listInstruments: jest.fn(),
       listPricesByInstrumentId: jest.fn(),
     };
-    const signalService = { topSignals: jest.fn() };
-    const service = new MarketContextIntelligenceService(repository as any, marketDataService as any, signalService as any);
+    const service = new MarketContextIntelligenceService(repository as any, marketDataService as any);
     const summarySpy = jest.spyOn(service, 'summary');
     const runSpy = jest.spyOn(service, 'run');
 
@@ -472,6 +463,5 @@ describe('MarketContextIntelligenceService', () => {
     expect(summarySpy).not.toHaveBeenCalled();
     expect(runSpy).not.toHaveBeenCalled();
     expect(marketDataService.listInstruments).not.toHaveBeenCalled();
-    expect(signalService.topSignals).not.toHaveBeenCalled();
   });
 });

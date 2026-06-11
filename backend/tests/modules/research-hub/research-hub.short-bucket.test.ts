@@ -67,6 +67,9 @@ describe('ResearchHubService — short-review bucket', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    // Disable snapshot-first reads in legacy-path tests to isolate live service mocks.
+    // Snapshot-first behaviour is covered by research-hub.snapshot-reads.test.ts.
+    process.env['RESEARCH_HUB_SNAPSHOT_READS'] = '0';
 
     strategyService = new StrategyDecisionEngineService() as any;
     contextService = new MarketContextIntelligenceService() as any;
@@ -90,6 +93,10 @@ describe('ResearchHubService — short-review bucket', () => {
       smartMoneyService,
       strategyFrameworkService,
     );
+  });
+
+  afterEach(() => {
+    delete process.env['RESEARCH_HUB_SNAPSHOT_READS'];
   });
 
   function setupMocks(opts: {

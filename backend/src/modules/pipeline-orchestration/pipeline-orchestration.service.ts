@@ -50,6 +50,7 @@ import type {
   PipelineStatusSnapshot,
   PipelineStatusStageDto,
 } from './pipeline-orchestration.types';
+import { PIPELINE_COMMAND_KEYS } from './pipeline-orchestration.types';
 
 const LEDGER_VERSION = 'pipeline-ledger-v1';
 const ACTIVE_STATUSES = new Set(['PENDING', 'RUNNING']);
@@ -124,6 +125,29 @@ const PIPELINE_COMMAND_POLICIES: PipelineCommandPolicy[] = [
 ];
 
 const PIPELINE_COMMAND_POLICY_MAP = new Map(PIPELINE_COMMAND_POLICIES.map((policy) => [policy.commandKey, policy]));
+
+// ── Boot-time invariant: policy table must exactly match the canonical key inventory ──────────
+// Any key in PIPELINE_COMMAND_KEYS without a policy entry, or any policy key not in the
+// inventory, is a structural drift that would cause 400 errors at runtime.  Fail fast at
+// module-load time so the mistake is caught immediately (in tests and at startup).
+(function assertPolicyInventorySync() {
+  const policyKeys = new Set(PIPELINE_COMMAND_POLICIES.map((p) => p.commandKey));
+  const inventoryKeys = new Set<string>(PIPELINE_COMMAND_KEYS);
+
+  const missingFromPolicies = PIPELINE_COMMAND_KEYS.filter((k) => !policyKeys.has(k));
+  const missingFromInventory = PIPELINE_COMMAND_POLICIES.map((p) => p.commandKey).filter((k: string) => !inventoryKeys.has(k));
+
+  const errors: string[] = [];
+  if (missingFromPolicies.length > 0) {
+    errors.push(`Keys in PIPELINE_COMMAND_KEYS but missing from PIPELINE_COMMAND_POLICIES: ${missingFromPolicies.join(', ')}`);
+  }
+  if (missingFromInventory.length > 0) {
+    errors.push(`Policy keys missing from PIPELINE_COMMAND_KEYS inventory: ${missingFromInventory.join(', ')}`);
+  }
+  if (errors.length > 0) {
+    throw new Error(`[PipelineOrchestration] Policy/inventory drift detected at module load:\n  ${errors.join('\n  ')}`);
+  }
+})();
 
 export class PipelineCommandError extends Error {
   constructor(

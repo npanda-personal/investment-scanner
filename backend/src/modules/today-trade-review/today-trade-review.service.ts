@@ -577,17 +577,48 @@ export class TodayTradeReviewService {
     // Use the clock's UTC day as a best-effort tradingDate for the snapshot query
     const snapshotTradingDate = this.utcDay(this.clock());
 
-    // Bulk loads — all in parallel
+    // ── Phase A: fetch snapshot rows first so we can gate downstream bulk reads ──
+    // When the snapshot is fresh and covers all instruments, the signal and
+    // calibration bulk reads are skipped entirely (the '11 deps → 1' design).
+    const snapshotMap = hasSnapshotReader && instrumentIds.length > 0
+      ? await this.safe(() => this.services.snapshotReaderService!.latestSnapshotsForInstruments!(instrumentIds, snapshotTradingDate), 'Daily instrument snapshot read is unavailable.', warnings)
+      : null;
+    // snapshotByInstrument is Map<instrumentId, ComposedSnapshotRow> | null
+    const snapshotByInstrument: Map<string, ComposedSnapshotRow> = (snapshotMap as Map<string, ComposedSnapshotRow> | null) ?? new Map();
+
+    // Determine which bulk reads can be skipped because the snapshot fully covers them.
+    // "Fully covered" = every decision instrument has a usable (OK or STALE) snapshot row
+    // for that section with a non-null value.
+    const snapshotSignalsUsableFor = (id: string): boolean => {
+      const row = snapshotByInstrument.get(id);
+      if (!row) return false;
+      const prov = row.provenance?.signals;
+      return (prov === 'OK' || prov === 'STALE') && row.signalScore !== null && row.signalDirection !== null;
+    };
+    const snapshotCalibrationUsableFor = (id: string): boolean => {
+      const row = snapshotByInstrument.get(id);
+      if (!row) return false;
+      const prov = row.provenance?.calibration;
+      return (prov === 'OK' || prov === 'STALE') && row.calibratedScore !== null;
+    };
+    // Skip bulk reads only when ALL instruments in this run are covered by the snapshot.
+    const allInstrumentsCoveredBySnapshot = instrumentIds.length > 0 && snapshotByInstrument.size > 0;
+    const skipSignalBulkRead = snapshotReadsEnabled && allInstrumentsCoveredBySnapshot && instrumentIds.every(snapshotSignalsUsableFor);
+    const skipCalibrationBulkRead = snapshotReadsEnabled && allInstrumentsCoveredBySnapshot && instrumentIds.every(snapshotCalibrationUsableFor);
+
+    // ── Phase B: remaining bulk reads (signal/calibration conditionally skipped) ──
     const entryInstrumentIds = decisions.filter((item) => item.sourceKind === 'ENTRY').map(({ decision }) => decision.instrumentId!).filter(Boolean);
-    const [dataQualityRows, eligibilityRows, rawSignalRows, calibrationRows, smartMoneyRows, bulkTradePlanMap, snapshotMap] = await Promise.all([
+    const [dataQualityRows, eligibilityRows, rawSignalRows, calibrationRows, smartMoneyRows, bulkTradePlanMap] = await Promise.all([
       this.safe(() => this.services.dataQualityService.getEvaluationsForInstruments(instrumentIds), 'Data quality snapshots are unavailable.', warnings),
       hasGetEligibility
         ? this.safe(() => this.services.dataQualityService.getEligibility!(instrumentIds), 'Instrument eligibility rows are unavailable.', warnings)
         : Promise.resolve(null),
-      hasBulkRawSignals
+      // Signal bulk: skip when snapshot fully covers all instruments for this section.
+      (!skipSignalBulkRead && hasBulkRawSignals)
         ? this.safe(() => this.services.signalService.latestPersistedForInstruments!(instrumentIds), 'Raw signal snapshots are unavailable.', warnings)
         : Promise.resolve(null),
-      hasBulkCalibration
+      // Calibration bulk: skip when snapshot fully covers all instruments for this section.
+      (!skipCalibrationBulkRead && hasBulkCalibration)
         ? this.safe(() => this.services.calibrationService.latestPersistedForInstruments!(instrumentIds), 'Calibration snapshots are unavailable.', warnings)
         : Promise.resolve(null),
       hasBulkSmartMoney
@@ -597,10 +628,6 @@ export class TodayTradeReviewService {
       hasBulkTradePlans && entryInstrumentIds.length > 0
         ? this.safe(() => this.services.tradePlanService.latestForInstruments!(entryInstrumentIds, scope), 'Bulk trade plan read is unavailable; falling back to per-instrument load.', warnings)
         : Promise.resolve(null),
-      // Snapshot-first reads
-      hasSnapshotReader && instrumentIds.length > 0
-        ? this.safe(() => this.services.snapshotReaderService!.latestSnapshotsForInstruments!(instrumentIds, snapshotTradingDate), 'Daily instrument snapshot read is unavailable.', warnings)
-        : Promise.resolve(null),
     ]);
     const dataQualityByInstrument = new Map((dataQualityRows || []).map((evaluation) => [evaluation.instrumentId, evaluation]));
     const eligibilityByInstrument = new Map((eligibilityRows || []).map((row) => [row.instrumentId, row]));
@@ -609,8 +636,6 @@ export class TodayTradeReviewService {
     const smartMoneyByInstrument = new Map((smartMoneyRows || []).map((summary) => [summary.instrumentId, summary]));
     // bulkTradePlanMap is Map<instrumentId, TradePlanResultDto> | null (null = bulk failed or unavailable)
     const persistedTradePlanByInstrument: Map<string, TradePlanResultDto> = bulkTradePlanMap ?? new Map();
-    // snapshotMap is Map<instrumentId, ComposedSnapshotRow> | null
-    const snapshotByInstrument: Map<string, ComposedSnapshotRow> = (snapshotMap as Map<string, ComposedSnapshotRow> | null) ?? new Map();
 
     const result: TodayReviewCandidateSource[] = [];
     for (const item of decisions) {
@@ -620,6 +645,18 @@ export class TodayTradeReviewService {
       // --- Snapshot-first: smart money ---
       const snapshotSmartMoneyProvenance: ProvenanceStatus | null = snapshot?.provenance?.smartMoney ?? null;
       const useSnapshotSmartMoney = snapshotReadsEnabled && snapshot !== null && (snapshotSmartMoneyProvenance === 'OK' || snapshotSmartMoneyProvenance === 'STALE') && snapshot.smartMoneyCode !== null;
+
+      // --- Snapshot-first: raw signal ---
+      // When signals provenance is OK/STALE and the bulk read was skipped, produce a
+      // minimal synthetic SignalResultDto from snapshot fields. Fields unused by today-review
+      // scoring (deliveryPercent, sector, etc.) are left null — the snapshot does not store them.
+      const useSnapshotSignal = snapshotReadsEnabled && snapshotSignalsUsableFor(instrumentId);
+
+      // --- Snapshot-first: calibration ---
+      // When calibration provenance is OK/STALE, produce a minimal synthetic calibration
+      // result. calibratedDirection is inferred from signalDirection (same source data),
+      // since the snapshot does not store it separately.
+      const useSnapshotCalibration = snapshotReadsEnabled && snapshotCalibrationUsableFor(instrumentId);
 
       // --- Trade plan: use bulk result if available, else fall back to per-instrument load ---
       let tradePlanPromise: Promise<TradePlanResultDto | null>;
@@ -660,14 +697,28 @@ export class TodayTradeReviewService {
             ? Promise.resolve(smartMoneyByInstrument.get(instrumentId) || null)
             : this.safe(() => this.services.smartMoneyService.latestPersistedStock(instrumentId, '3M'), `${item.decision.symbol} smart-money support is unavailable.`, warnings);
 
+      // Determine signal source: snapshot (when provenance OK/STALE) → synthetic minimal
+      // SignalResultDto; otherwise fall through to bulk/per-instrument live read.
+      const rawSignalPromise: Promise<import('../signal-generation-engine').SignalResultDto | null> =
+        useSnapshotSignal
+          ? Promise.resolve(this.snapshotSignalToRawSignal(snapshot!, instrumentId, item.decision.symbol))
+          : hasBulkRawSignals
+            ? Promise.resolve(rawSignalByInstrument.get(instrumentId) || null)
+            : this.safe(() => this.services.signalService.latestForInstrument(instrumentId), `${item.decision.symbol} raw signal support is unavailable.`, warnings);
+
+      // Determine calibration source: snapshot (when provenance OK/STALE) → synthetic
+      // minimal calibration result; otherwise fall through to bulk/per-instrument live read.
+      const calibrationPromise: Promise<import('../signal-calibration-engine').SignalCalibrationResultDto | null> =
+        useSnapshotCalibration
+          ? Promise.resolve(this.snapshotCalibrationToResult(snapshot!, instrumentId, item.decision.symbol))
+          : hasBulkCalibration
+            ? Promise.resolve(calibrationByInstrument.get(instrumentId) || null)
+            : this.safe(() => this.services.calibrationService.latestPersistedForInstrument(instrumentId), `${item.decision.symbol} calibration support is unavailable.`, warnings);
+
       const [tradePlan, rawSignal, calibration, smartMoney] = await Promise.all([
         tradePlanPromise,
-        hasBulkRawSignals
-          ? Promise.resolve(rawSignalByInstrument.get(instrumentId) || null)
-          : this.safe(() => this.services.signalService.latestForInstrument(instrumentId), `${item.decision.symbol} raw signal support is unavailable.`, warnings),
-        hasBulkCalibration
-          ? Promise.resolve(calibrationByInstrument.get(instrumentId) || null)
-          : this.safe(() => this.services.calibrationService.latestPersistedForInstrument(instrumentId), `${item.decision.symbol} calibration support is unavailable.`, warnings),
+        rawSignalPromise,
+        calibrationPromise,
         smartMoneyPromise,
       ]);
 
@@ -725,6 +776,73 @@ export class TodayTradeReviewService {
       dailyChangePercent: null,
       signals: [],
       insiderOwnership: { insiderBuyCount: null, insiderSellCount: null, netInsiderActivity: null, institutionalOwnershipPercent: null, ownershipDataStatus: 'MISSING', source: 'snapshot', explanation: 'Snapshot-first.' },
+      researchUrl: `/research/stocks/${instrumentId}`,
+    } as any;
+  }
+
+  /**
+   * Convert ComposedSnapshotRow signal fields into a minimal SignalResultDto-compatible shape
+   * for the candidate source. Only carries the fields used by today-review scoring/display:
+   * direction, score. Fields not stored in the snapshot (deliveryPercent, sector, company_name,
+   * dailyChangePercent, deliveryEvidence) are left null — the DTO consumers handle null gracefully.
+   */
+  private snapshotSignalToRawSignal(snapshot: ComposedSnapshotRow, instrumentId: string, symbol?: string | null): import('../signal-generation-engine').SignalResultDto {
+    return {
+      instrument_id: instrumentId,
+      symbol: symbol || instrumentId,
+      company_name: null,
+      sector: null,
+      country: null,
+      currentPrice: null,
+      previousClose: null,
+      dailyChange: null,
+      dailyChangePercent: null,
+      currency: null,
+      priceTimestamp: null,
+      score: snapshot.signalScore ?? 0,
+      direction: (snapshot.signalDirection as any) ?? null,
+      confidence: null,
+      triggered_signals: [],
+      negative_signals: [],
+      explanation: 'From daily_instrument_snapshot (snapshot-first).',
+      generated_at: snapshot.assembledAt.toISOString(),
+      source: 'snapshot',
+      data_status: 'COMPLETE',
+      deliveryPercent: null,
+      deliveryEvidence: null,
+    } as any;
+  }
+
+  /**
+   * Convert ComposedSnapshotRow calibration fields into a minimal SignalCalibrationResultDto-compatible shape
+   * for the candidate source. calibratedDirection is inferred from signalDirection (the snapshot does not store
+   * calibrated direction separately — it is the same source signal direction after calibration adjustment).
+   * Fields not stored in the snapshot (calibratedConfidence, evidenceStatus) are set to safe defaults.
+   */
+  private snapshotCalibrationToResult(snapshot: ComposedSnapshotRow, instrumentId: string, symbol?: string | null): import('../signal-calibration-engine').SignalCalibrationResultDto {
+    return {
+      signalResultId: null,
+      instrumentId,
+      symbol: symbol || instrumentId,
+      companyName: null,
+      sector: null,
+      country: null,
+      rawScore: snapshot.signalScore ?? 0,
+      calibratedScore: snapshot.calibratedScore ?? 0,
+      scoreDelta: snapshot.calibratedScore !== null && snapshot.signalScore !== null ? snapshot.calibratedScore - snapshot.signalScore : 0,
+      rawDirection: (snapshot.signalDirection as any) ?? null,
+      calibratedDirection: (snapshot.signalDirection as any) ?? null,
+      rawConfidence: null,
+      calibratedConfidence: null,
+      boosts: [],
+      penalties: [],
+      calibrationReasons: [],
+      dataGaps: [],
+      calibrationModelVersion: snapshot.calibrationAuthority ?? null,
+      rawSignalModelVersion: snapshot.signalModelVersion ?? null,
+      generatedAt: snapshot.assembledAt.toISOString(),
+      dataStatus: 'COMPLETE',
+      evidenceStatus: null,
       researchUrl: `/research/stocks/${instrumentId}`,
     } as any;
   }

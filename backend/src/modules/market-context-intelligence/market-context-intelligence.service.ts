@@ -1,5 +1,4 @@
 import { MarketDataFoundationService } from '../market-data-foundation';
-import { SignalGenerationEngineService } from '../signal-generation-engine';
 import { isKnownSector } from '../../shared/utils/sector-metadata';
 import { resolveMarketProfile } from '../../shared/utils/market-profile';
 import { MarketContextIntelligenceRepository } from './market-context-intelligence.repository';
@@ -66,7 +65,6 @@ export class MarketContextIntelligenceService {
   constructor(
     private readonly repository = new MarketContextIntelligenceRepository(),
     private readonly marketDataService = new MarketDataFoundationService(),
-    private readonly signalService = new SignalGenerationEngineService()
   ) {}
 
   async run(region?: string): Promise<{ status: string }> {
@@ -646,11 +644,13 @@ export class MarketContextIntelligenceService {
   }
 
   private async loadSignalMap(region?: string) {
-    const response = await this.signalService.topSignals({ limit: 100, region }).catch(() => ({ signals: [] }));
-    const signals = response && 'signals' in response ? response.signals : [];
+    // Persisted table-level read: no cross-module service import required.
+    // Semantics are identical to the former topSignals({ limit: 100, region }) call —
+    // latest direction + score per instrument from the most-recent generation run.
+    const rows = await this.repository.latestSignalDirections(region, 100).catch(() => []);
     const map = new Map<string, Partial<ContextInstrument>>();
-    for (const signal of signals as any[]) {
-      map.set(signal.instrument_id, { signalDirection: signal.direction, signalScore: signal.score });
+    for (const row of rows) {
+      map.set(row.instrumentId, { signalDirection: row.direction as any, signalScore: row.score });
     }
     return map;
   }

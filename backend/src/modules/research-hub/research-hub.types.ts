@@ -169,4 +169,11 @@ export interface ResearchOverview {
   nextActions: NextAction[];
   generatedAt: string;
   dataGaps: string[];
+  /**
+   * ISO timestamp of the daily_instrument_snapshot rows used when
+   * RESEARCH_HUB_SNAPSHOT_READS is ON and rows were available.
+   * Absent when snapshot-first reads are disabled or no snapshot existed
+   * (pure legacy fan-out).  Additive — existing callers are unaffected.
+   */
+  snapshotAssembledAt?: string | null;
 }
