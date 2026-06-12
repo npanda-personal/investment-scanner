@@ -12,12 +12,9 @@
  * service's job (shared equity tables, region='US').  No paid source.
  */
 
-const NASDAQ_LISTED_URL =
-  process.env.MARKET_DATA_CATALOG_NASDAQ_LISTED_URL ||
-  'https://www.nasdaqtrader.com/dynamic/SymDir/nasdaqlisted.txt';
-const NASDAQ_OTHER_URL =
-  process.env.MARKET_DATA_CATALOG_NASDAQ_OTHER_URL ||
-  'https://www.nasdaqtrader.com/dynamic/SymDir/otherlisted.txt';
+import { nasdaqListedUrl, nasdaqOtherUrl } from './market-data-foundation.endpoints';
+import { marketDataFetchText } from './market-data-foundation.http';
+
 const HTTP_TIMEOUT_MS = Number(process.env.MARKET_DATA_CATALOG_DOWNLOAD_TIMEOUT_MS || 15000);
 
 export interface UsUniverseCandidate {
@@ -48,18 +45,11 @@ const OTHER_EXCHANGE_MAP: Record<string, UsUniverseCandidate['exchange']> = {
 const PLAIN_TICKER_RE = /^[A-Z0-9]{1,6}$/;
 
 async function fetchText(url: string): Promise<string> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), HTTP_TIMEOUT_MS);
-  try {
-    const response = await fetch(url, {
-      signal: controller.signal,
-      headers: { Accept: 'text/plain', 'User-Agent': 'investment-scanner/us-catalog' },
-    });
-    if (!response.ok) throw new Error(`HTTP ${response.status} ${response.statusText} for ${url}`);
-    return await response.text();
-  } finally {
-    clearTimeout(timer);
-  }
+  return marketDataFetchText(url, {
+    accept: 'text/plain',
+    userAgent: 'investment-scanner/us-catalog',
+    timeoutMs: HTTP_TIMEOUT_MS,
+  });
 }
 
 /** Split a pipe-delimited file into header + data rows, dropping the footer. */
@@ -130,8 +120,8 @@ function parseOtherListed(text: string, warnings: string[]): UsUniverseCandidate
 export async function fetchNasdaqTraderUniverse(): Promise<UsUniverseResult> {
   const warnings: string[] = [];
   const [listedText, otherText] = await Promise.all([
-    fetchText(NASDAQ_LISTED_URL),
-    fetchText(NASDAQ_OTHER_URL),
+    fetchText(nasdaqListedUrl()),
+    fetchText(nasdaqOtherUrl()),
   ]);
 
   const seen = new Set<string>();

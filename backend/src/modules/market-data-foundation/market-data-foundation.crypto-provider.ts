@@ -1,4 +1,5 @@
 import type { CryptoAssetInput, CryptoHistoricalPrice } from './market-data-foundation.crypto-repository';
+import { getCryptoEndpoints } from './market-data-foundation.endpoints';
 
 /**
  * Crypto market-data provider (FREE sources only).
@@ -22,9 +23,10 @@ import type { CryptoAssetInput, CryptoHistoricalPrice } from './market-data-foun
  * left untouched.  No API keys are required for the free tiers used here.
  */
 
-const COINPAPRIKA_BASE = process.env.COINPAPRIKA_API_BASE || 'https://api.coinpaprika.com/v1';
-const COINGECKO_BASE = process.env.COINGECKO_API_BASE || 'https://api.coingecko.com/api/v3';
-const BINANCE_BASE = process.env.BINANCE_API_BASE || 'https://api.binance.com/api/v3';
+const cryptoEndpoints = getCryptoEndpoints();
+const COINPAPRIKA_BASE = cryptoEndpoints.coinpaprikaBase.url;
+const COINGECKO_BASE = cryptoEndpoints.coingeckoBase.url;
+const BINANCE_BASE = cryptoEndpoints.binanceBase.url;
 const COINGECKO_PAGE_SIZE = 250; // CoinGecko free max per_page
 const COINGECKO_THROTTLE_MS = Number(process.env.CRYPTO_COINGECKO_THROTTLE_MS || 6500);
 const BINANCE_THROTTLE_MS = Number(process.env.CRYPTO_BINANCE_THROTTLE_MS || 250);

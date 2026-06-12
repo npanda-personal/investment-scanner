@@ -20,13 +20,16 @@
  *   - Source constant exported so the script and tests share one definition
  */
 
+import { nseIndexHistoryBaseUrl } from './market-data-foundation.endpoints';
+
 // ---------------------------------------------------------------------------
 // Public constants
 // ---------------------------------------------------------------------------
 
 export const NSE_INDEX_EOD_SOURCE = 'NSE_INDEX_EOD';
 export const NSE_INDEX_EOD_SYMBOL = '^NSEI';
-export const NSE_INDEX_HISTORY_BASE_URL = 'https://www.nseindia.com/api/historical/indicesHistory';
+/** Sourced from the central endpoint registry (override: MARKET_DATA_NSE_WWW_BASE). */
+export const NSE_INDEX_HISTORY_BASE_URL = nseIndexHistoryBaseUrl();
 export const NSE_INDEX_HISTORY_INDEX_TYPE = 'NIFTY 50';
 
 // ---------------------------------------------------------------------------

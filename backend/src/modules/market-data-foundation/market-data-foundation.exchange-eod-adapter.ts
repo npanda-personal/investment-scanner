@@ -1,6 +1,11 @@
 import { createHash } from 'crypto';
 import type { HistoricalPrice } from './market-data-foundation.types';
 import { partitionHistoricalPrices } from './market-data-foundation.validation';
+import {
+  nseUdiffCmBhavcopyArchiveUrl,
+  nseSecurityBhavdataArchiveUrl,
+  nseLegacyCmBhavcopyArchiveUrl,
+} from './market-data-foundation.endpoints';
 
 export type IndianExchangeCode = 'NSE' | 'BSE';
 
@@ -201,7 +206,7 @@ export const buildNseUdiffCmBhavcopyArchiveUrl = (tradingDate: Date | string): N
     pattern: 'NSE_UDIFF_CM_BHAVCOPY_ZIP',
     sourceName: 'NSE_UDIFF_CM_BHAVCOPY',
     fileName,
-    url: `https://nsearchives.nseindia.com/content/cm/${fileName}`,
+    url: nseUdiffCmBhavcopyArchiveUrl(fileName),
     activeFrom: NSE_UDIFF_ACTIVE_FROM,
   };
 };
@@ -213,7 +218,7 @@ export const buildNseSecurityBhavdataArchiveUrl = (tradingDate: Date | string): 
     pattern: 'NSE_SECURITY_BHAVDATA_CSV',
     sourceName: 'NSE_SECURITY_BHAVDATA',
     fileName,
-    url: `https://archives.nseindia.com/products/content/${fileName}`,
+    url: nseSecurityBhavdataArchiveUrl(fileName),
   };
 };
 
@@ -224,7 +229,7 @@ export const buildNseLegacyCmBhavcopyArchiveUrl = (tradingDate: Date | string): 
     pattern: 'NSE_LEGACY_CM_BHAVCOPY_ZIP',
     sourceName: 'NSE_LEGACY_CM_BHAVCOPY',
     fileName,
-    url: `https://nsearchives.nseindia.com/content/historical/EQUITIES/${parts.yyyy}/${parts.mmm}/${fileName}`,
+    url: nseLegacyCmBhavcopyArchiveUrl(parts.yyyy, parts.mmm, fileName),
     discontinuedFrom: NSE_UDIFF_ACTIVE_FROM,
   };
 };

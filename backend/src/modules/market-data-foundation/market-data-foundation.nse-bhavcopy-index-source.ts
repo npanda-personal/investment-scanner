@@ -25,6 +25,8 @@
 // Re-export shared constants (defined in the original source module)
 // ---------------------------------------------------------------------------
 
+import { nseIndexCloseAllArchiveUrl } from './market-data-foundation.endpoints';
+
 export {
   NSE_INDEX_EOD_SOURCE,
   NSE_INDEX_EOD_SYMBOL,
@@ -142,7 +144,7 @@ export function buildBhavcopyCsvUrl(date: Date): string {
   const dd   = String(date.getUTCDate()).padStart(2, '0');
   const mm   = String(date.getUTCMonth() + 1).padStart(2, '0');
   const yyyy = date.getUTCFullYear();
-  return `https://archives.nseindia.com/content/indices/ind_close_all_${dd}${mm}${yyyy}.csv`;
+  return nseIndexCloseAllArchiveUrl(`ind_close_all_${dd}${mm}${yyyy}.csv`);
 }
 
 // ---------------------------------------------------------------------------

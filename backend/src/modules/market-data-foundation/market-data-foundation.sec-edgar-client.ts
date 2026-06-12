@@ -10,8 +10,10 @@
  * No paid provider is ever used.
  */
 
-export const SEC_BASE = process.env.SEC_EDGAR_BASE || 'https://data.sec.gov';
-export const SEC_WWW = process.env.SEC_WWW_BASE || 'https://www.sec.gov';
+import { getSecEndpoints } from './market-data-foundation.endpoints';
+
+export const SEC_BASE = getSecEndpoints().dataBase.url;
+export const SEC_WWW = getSecEndpoints().wwwBase.url;
 export const SEC_EDGAR_USER_AGENT =
   process.env.SEC_EDGAR_USER_AGENT || 'investment-scanner research (contact: admin@example.com)';
 export const SEC_EDGAR_THROTTLE_MS = Number(process.env.SEC_EDGAR_THROTTLE_MS || 200);

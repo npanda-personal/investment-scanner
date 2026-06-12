@@ -39,6 +39,8 @@
  *   the series has a structural break at that date.
  */
 
+import { nseCorporateActionsEndpoint } from './market-data-foundation.endpoints';
+
 // ---------------------------------------------------------------------------
 // Public types
 // ---------------------------------------------------------------------------
@@ -117,8 +119,8 @@ export interface ImportMappingResult {
 // ---------------------------------------------------------------------------
 
 export const NSE_CORPORATE_ACTIONS_SOURCE = 'NSE_CORPORATE_ACTIONS';
-export const NSE_CORPORATE_ACTIONS_ENDPOINT =
-  'https://www.nseindia.com/api/corporates-corporateActions';
+/** Sourced from the central endpoint registry (override: MARKET_DATA_NSE_WWW_BASE). */
+export const NSE_CORPORATE_ACTIONS_ENDPOINT = nseCorporateActionsEndpoint();
 
 /** URL pattern builder — mirrors the bhavcopy URL pattern convention. */
 export const buildNseCorporateActionsUrl = (

@@ -1,5 +1,6 @@
 import type { CorporateAction, HistoricalPrice } from './market-data-foundation.types';
 import type { MarketRegion } from '../../shared/utils/market-scope';
+import { getYahooEndpoints } from './market-data-foundation.endpoints';
 
 /**
  * Yahoo EOD provider (FREE — US/EU equities + indices).
@@ -20,7 +21,7 @@ import type { MarketRegion } from '../../shared/utils/market-scope';
  * intermittent throttling without aborting the whole run.
  */
 
-const YAHOO_BASE = (process.env.YAHOO_CHART_API_BASE || 'https://query1.finance.yahoo.com').replace(/\/+$/, '');
+const YAHOO_BASE = getYahooEndpoints().chartBase.url;
 const YAHOO_THROTTLE_MS = Number(process.env.YAHOO_THROTTLE_MS || 300);
 const HTTP_TIMEOUT_MS = Number(process.env.YAHOO_HTTP_TIMEOUT_MS || 20000);
 const YAHOO_MAX_RETRIES = Number(process.env.YAHOO_MAX_RETRIES || 4);

@@ -1,5 +1,6 @@
 import { promises as fs } from 'fs';
 import path from 'path';
+import { getNseEndpoints, nseGetQuotesEquityUrl } from './market-data-foundation.endpoints';
 
 export type NseFinancialResultsApiPeriod = 'Quarterly' | 'Annual';
 export type ManualVerifiedFundamentalsCsvPeriodType = 'QUARTERLY' | 'ANNUAL';
@@ -108,15 +109,19 @@ export interface NseFinancialResultsClient {
 
 type FetchLike = (url: string, init?: RequestInit) => Promise<Response>;
 
-const NSE_FINANCIAL_RESULTS_PAGE_URL = 'https://www.nseindia.com/companies-listing/corporate-filings-financial-results';
-const NSE_FINANCIAL_RESULTS_API_URL = 'https://www.nseindia.com/api/corporates-financial-results';
-const NSE_INTEGRATED_FILING_FINANCIALS_PAGE_URL = 'https://www.nseindia.com/companies-listing/corporate-integrated-filing?integratedType=integratedfilingfinancials&tabIndex=equity';
-const NSE_INTEGRATED_FILING_RESULTS_API_URL = 'https://www.nseindia.com/api/integrated-filing-results';
+// External NSE hosts come from the central endpoint registry (overridable via
+// MARKET_DATA_NSE_WWW_BASE / MARKET_DATA_NSE_ARCHIVES_BASE).
+const NSE_WWW_BASE = getNseEndpoints().wwwBase.url;
+const NSE_ARCHIVES_BASE = getNseEndpoints().archivesBase.url;
+const NSE_FINANCIAL_RESULTS_PAGE_URL = `${NSE_WWW_BASE}/companies-listing/corporate-filings-financial-results`;
+const NSE_FINANCIAL_RESULTS_API_URL = `${NSE_WWW_BASE}/api/corporates-financial-results`;
+const NSE_INTEGRATED_FILING_FINANCIALS_PAGE_URL = `${NSE_WWW_BASE}/companies-listing/corporate-integrated-filing?integratedType=integratedfilingfinancials&tabIndex=equity`;
+const NSE_INTEGRATED_FILING_RESULTS_API_URL = `${NSE_WWW_BASE}/api/integrated-filing-results`;
 const NSE_INTEGRATED_FILING_FINANCIALS_TYPE = 'Integrated Filing- Financials';
 const NSE_INTEGRATED_FILING_PAGE_SIZE = 100;
 const NSE_INTEGRATED_FILING_MAX_PAGES = 5;
 const NSE_LEGACY_FINANCIAL_RESULTS_INDICES: readonly NseLegacyFinancialResultsIndex[] = ['equities', 'insurance'];
-const NSE_XBRL_ARCHIVE_PREFIX = 'https://nsearchives.nseindia.com/corporate/xbrl/';
+const NSE_XBRL_ARCHIVE_PREFIX = `${NSE_ARCHIVES_BASE}/corporate/xbrl/`;
 const DEFAULT_MAX_SYMBOLS = 50;
 const DEFAULT_QUARTERLY_PERIODS = 8;
 const DEFAULT_ANNUAL_PERIODS = 3;
@@ -267,7 +272,7 @@ export class NseOfficialFinancialResultsClient implements NseFinancialResultsCli
 
   private async warmSession(symbol?: string): Promise<void> {
     const url = symbol
-      ? `https://www.nseindia.com/get-quotes/equity?symbol=${encodeURIComponent(symbol.trim().toUpperCase())}`
+      ? nseGetQuotesEquityUrl(symbol)
       : NSE_FINANCIAL_RESULTS_PAGE_URL;
     const response = await this.fetchImpl(url, { headers: this.headers(symbol) });
     this.captureCookie(response);
@@ -299,7 +304,7 @@ export class NseOfficialFinancialResultsClient implements NseFinancialResultsCli
       Accept: 'application/json, text/plain, */*',
       'Accept-Language': 'en-US,en;q=0.9',
       Referer: referer || (symbol
-        ? `https://www.nseindia.com/get-quotes/equity?symbol=${encodeURIComponent(symbol.trim().toUpperCase())}`
+        ? nseGetQuotesEquityUrl(symbol)
         : NSE_FINANCIAL_RESULTS_PAGE_URL),
     };
     if (this.cookie) headers.Cookie = this.cookie;
@@ -773,7 +778,7 @@ const normalizeNseXbrlUrl = (value: string): string | null => {
   const trimmed = value.trim();
   if (!trimmed || trimmed === '-' || /^NA$/i.test(trimmed)) return null;
   if (/^https:\/\/nsearchives\.nseindia\.com\/corporate\/xbrl\/.+\.xml$/i.test(trimmed)) return trimmed;
-  if (/^\/corporate\/xbrl\/.+\.xml$/i.test(trimmed)) return `https://nsearchives.nseindia.com${trimmed}`;
+  if (/^\/corporate\/xbrl\/.+\.xml$/i.test(trimmed)) return `${NSE_ARCHIVES_BASE}${trimmed}`;
   const fileName = path.basename(trimmed);
   if (/^[A-Za-z0-9_.-]+\.xml$/i.test(fileName)) return `${NSE_XBRL_ARCHIVE_PREFIX}${fileName}`;
   return null;

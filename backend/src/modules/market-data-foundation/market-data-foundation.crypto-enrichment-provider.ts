@@ -11,8 +11,11 @@
  * Pure HTTP — NO database access (mirrors crypto-provider.ts). All keyless & free.
  */
 
-const COINPAPRIKA_BASE = process.env.COINPAPRIKA_API_BASE || 'https://api.coinpaprika.com/v1';
-const DEFILLAMA_BASE = process.env.DEFILLAMA_API_BASE || 'https://api.llama.fi';
+import { getCryptoEndpoints } from './market-data-foundation.endpoints';
+
+const enrichmentEndpoints = getCryptoEndpoints();
+const COINPAPRIKA_BASE = enrichmentEndpoints.coinpaprikaBase.url;
+const DEFILLAMA_BASE = enrichmentEndpoints.defillamaBase.url;
 const HTTP_TIMEOUT_MS = Number(process.env.CRYPTO_HTTP_TIMEOUT_MS || 20000);
 const COINPAPRIKA_DETAIL_THROTTLE_MS = Number(process.env.CRYPTO_COINPAPRIKA_DETAIL_THROTTLE_MS || 150);
 

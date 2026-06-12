@@ -108,6 +108,12 @@ import { validateInstrumentInput } from './market-data-foundation.validation';
 import { getMarketSessionConfig, latestCompletedTradingDateForRegion, registerNseHolidayProvider, shouldRunMarketDataSync, tradingDateForRegion } from './market-data-foundation.market-session';
 import { resolveMarketProfile } from '../../shared/utils/market-profile';
 import { regionUsesRegionProviderPath } from './market-data-foundation.provider-registry';
+import {
+  nseHolidayMasterUrl,
+  nseIndexCloseAllArchiveUrl,
+  nseDefaultReferer,
+  getNseEndpoints,
+} from './market-data-foundation.endpoints';
 import { usEquityIngestionService } from './market-data-foundation.us-equity-ingestion.service';
 import { isKnownNseFnoStockUnderlying } from './market-data-foundation.fno-underlyings';
 import {
@@ -6998,7 +7004,7 @@ export class MarketDataFoundationService implements MarketDataReadApi {
           totalCalendarDates: config.totalCalendarDates,
           skippedNonTradingDates: config.skippedNonTradingDates,
           skippedOfficialHolidayDates: config.skippedOfficialHolidayDates,
-          officialHolidayCalendarSource: 'https://www.nseindia.com/api/holiday-master?type=trading&year={year}',
+          officialHolidayCalendarSource: `${getNseEndpoints().wwwBase.url}/api/holiday-master?type=trading&year={year}`,
         },
         startedAt: now,
       },
@@ -8137,7 +8143,7 @@ export class MarketDataFoundationService implements MarketDataReadApi {
   private async nseCmTradingHolidayDatesForYear(year: number): Promise<Map<string, string>> {
     const cached = this.nseTradingHolidayCache.get(year);
     if (cached && cached.expiresAt > Date.now()) return cached.holidays;
-    const sourceUrl = `https://www.nseindia.com/api/holiday-master?type=trading&year=${year}`;
+    const sourceUrl = nseHolidayMasterUrl(year);
     const holidays = await this.fetchOfficialNseTradingHolidayDatesForYear(year, sourceUrl);
     const ttlMs = this.clampNumber(
       this.readPositiveNumber(process.env.MARKET_DATA_NSE_HOLIDAY_CACHE_TTL_MS, 24 * 60 * 60_000),
@@ -8150,7 +8156,7 @@ export class MarketDataFoundationService implements MarketDataReadApi {
   }
 
   private async fetchOfficialNseTradingHolidayDatesForYear(year: number, sourceUrl?: string): Promise<Map<string, string>> {
-    const url = sourceUrl || `https://www.nseindia.com/api/holiday-master?type=trading&year=${year}`;
+    const url = sourceUrl || nseHolidayMasterUrl(year);
     const payload = await this.downloadOfficialExchangeJson(url);
     const rows = Array.isArray(payload?.CM) ? payload.CM : [];
     if (rows.length === 0) {
@@ -8720,7 +8726,7 @@ export class MarketDataFoundationService implements MarketDataReadApi {
     return {
       sourceName: 'NSE_INDEX_EOD',
       fileName,
-      url: `https://archives.nseindia.com/content/indices/${fileName}`,
+      url: nseIndexCloseAllArchiveUrl(fileName),
     };
   }
 
@@ -9153,7 +9159,7 @@ export class MarketDataFoundationService implements MarketDataReadApi {
         headers: {
           accept: 'application/json, text/plain, */*',
           'accept-language': 'en-US,en;q=0.9',
-          referer: 'https://www.nseindia.com/resources/exchange-communication-holidays',
+          referer: nseDefaultReferer(),
           'user-agent': 'Mozilla/5.0 investment-scanner-market-data-foundation/1.0',
         },
       });
