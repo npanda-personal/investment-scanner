@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Box, Typography, Button, CircularProgress, Alert, Paper, Grid, Divider, List, ListItem, ListItemText, ListItemIcon, Chip, Stack } from '@mui/material';
+import { humanizeCode } from '@/shared/format/enumLabels';
 import { Link, useParams } from 'react-router-dom';
 import { TradePlanApi } from '../api';
 import { TradePlanResultDto } from '../types';
@@ -262,8 +263,8 @@ export const TradePlanDetail: React.FC = () => {
             <Grid container spacing={2}>
               <Grid item xs={12} md={3}>
                 <Typography variant="subtitle2">Strategy Proof</Typography>
-                <Typography variant="body2">Rating: {plan.strategyProofSnapshot?.strategyRating || plan.strategyRating || 'UNPROVEN'}</Typography>
-                <Typography variant="body2">Label: {plan.strategyProofSnapshot?.readinessLabel || plan.readinessLabel || 'RESEARCH_ONLY'}</Typography>
+                <Typography variant="body2">Rating: {humanizeCode(plan.strategyProofSnapshot?.strategyRating || plan.strategyRating || 'UNPROVEN')}</Typography>
+                <Typography variant="body2">Label: {humanizeCode(plan.strategyProofSnapshot?.readinessLabel || plan.readinessLabel || 'RESEARCH_ONLY')}</Typography>
                 <Typography variant="body2">Proof: {plan.strategyProofSnapshot?.proofStatus || 'MISSING'}</Typography>
                 <Typography variant="body2">Timeframe: {plan.backtestTimeframe || 'N/A'}</Typography>
               </Grid>

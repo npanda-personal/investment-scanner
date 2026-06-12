@@ -372,6 +372,7 @@ function SectorView({ sectors }: { sectors: SectorSmartMoneySummary[] }) {
                 <TableCell align="right">Accum.</TableCell>
                 <TableCell align="right">Distrib.</TableCell>
                 <TableCell align="right">Unusual Vol.</TableCell>
+                <TableCell align="right">Instr.</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -389,6 +390,7 @@ function SectorView({ sectors }: { sectors: SectorSmartMoneySummary[] }) {
                   <TableCell align="right">{sector.accumulationCount}</TableCell>
                   <TableCell align="right">{sector.distributionCount}</TableCell>
                   <TableCell align="right">{sector.unusualVolumeCount}</TableCell>
+                  <TableCell align="right">{sector.instrumentCount}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

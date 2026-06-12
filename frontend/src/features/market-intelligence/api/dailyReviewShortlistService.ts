@@ -44,7 +44,7 @@ export type DailyReviewShortlistLane =
   | 'Stock interest review';
 
 export type DailyReviewShortlistPrimarySource =
-  | 'Active Ledger'
+  | 'Active Positions'
   | 'Today Review'
   | 'Stock Interest';
 
@@ -212,7 +212,7 @@ async function loadSources(scope: MarketScope): Promise<SourceBundle> {
   const stockInterest = settledValue(settled[2], 'Stock Interest', sourceErrors);
   const earnings = settledValue(settled[3], 'Fundamentals / Earnings', sourceErrors);
   const dataQualitySummary = settledValue(settled[4], 'Data Quality', sourceErrors);
-  const activeLedger = settledValue(settled[5], 'Active Ledger', sourceErrors);
+  const activeLedger = settledValue(settled[5], 'Active Positions', sourceErrors);
   const overlays = settledValue(settled[6], 'Portfolio / Watchlist overlays', sourceErrors) ?? emptyOverlays();
 
   // Review-readiness is read from the PERSISTED today-review run snapshot (the daily-review
@@ -230,7 +230,7 @@ async function loadSources(scope: MarketScope): Promise<SourceBundle> {
     ...envelopeWarnings('Stock Interest', stockInterest),
     ...envelopeWarnings('Fundamentals', earnings),
     ...(todayReview?.run?.warnings ?? []).map((warning) => `Today Review: ${warning}`),
-    ...(activeLedger?.warnings ?? []).map((warning) => `Active Ledger: ${warning}`),
+    ...(activeLedger?.warnings ?? []).map((warning) => `Active Positions: ${warning}`),
   ];
 
   return {
@@ -441,7 +441,7 @@ function activeLedgerToShortlistRow(
   const earnings = symbolKey ? earningsBySymbol.get(symbolKey) : undefined;
   const sector = stockInterest?.sector ?? null;
   const sourceContributions = contributions([
-    'Active Ledger',
+    'Active Positions',
     stockInterest ? 'Stock Interest' : null,
     earnings ? 'Fundamentals' : null,
     'Data Quality',
@@ -461,12 +461,12 @@ function activeLedgerToShortlistRow(
     companyName: row.companyName,
     sector,
     lane: row.healthState === 'EXIT_TRIGGERED' ? 'Exit / invalidation review' : 'Active risk review',
-    primarySource: 'Active Ledger',
-    sourceOrderLabel: `Active ledger row ${index + 1}`,
+    primarySource: 'Active Positions',
+    sourceOrderLabel: `Active positions row ${index + 1}`,
     sourceContributions,
     reasonSummary: row.exitReasonSummary || row.entryReasonSummary || 'Active ledger warning needs review.',
     explainability: compactMessages([
-      'Selected from persisted Active Ledger warning rows before new review candidates.',
+      'Selected from Active Positions warning rows before new review candidates.',
       row.healthState ? `Ledger health state: ${formatEnum(row.healthState)}.` : null,
       row.exitRuleId ? `Exit or invalidation rule: ${row.exitRuleId}.` : null,
       dataQualitySentence(row.currentDataQualityStatus, []),
@@ -536,7 +536,7 @@ function todayCandidateToShortlistRow(
     explainability: compactMessages([
       'Selected from persisted Today Review groups in source rank order.',
       candidate.boardReason ? `Board reason: ${candidate.boardReason}.` : null,
-      candidate.strategyCode ? `Strategy: ${candidate.strategyCode}${candidate.strategyVersion ? ` v${candidate.strategyVersion}` : ''}.` : null,
+      candidate.strategyCode ? `Strategy: ${candidate.strategyCode}.` : null,
       dataQualitySentence(dailyTier?.status ?? candidate.dataQualitySnapshot?.signalReadinessStatus, dailyTier?.reasons ?? candidate.dataQualitySnapshot?.readinessReasons ?? []),
       stockInterest ? `Stock Interest overlap: ${formatEnum(stockInterest.category)}.` : null,
       fundamentalsContext,
@@ -628,8 +628,8 @@ function sourceContributions(rows: DailyReviewShortlistRow[], bundle: SourceBund
       availableCount: (bundle.stockInterest?.snapshot ?? []).filter((row) => row.category !== 'RISK_AVOID').length,
     },
     {
-      source: 'Active Ledger',
-      selectedCount: rows.filter((row) => row.primarySource === 'Active Ledger').length,
+      source: 'Active Positions',
+      selectedCount: rows.filter((row) => row.primarySource === 'Active Positions').length,
       availableCount: bundle.activeLedgerRows.filter((row) => row.healthState === 'RISK_WARNING' || row.healthState === 'EXIT_TRIGGERED').length,
     },
     {

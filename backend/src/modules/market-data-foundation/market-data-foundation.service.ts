@@ -1255,7 +1255,7 @@ export class MarketDataFoundationService implements MarketDataReadApi {
         .map((r) => ({ ...r, currency: (r as any).currency || scopeCurrency, region: (r as any).region || scope.region }));
       const losers = ((losersSnap?.rows ?? []).slice(0, limit) as unknown as MarketMoverRow[])
         .map((r) => ({ ...r, currency: (r as any).currency || scopeCurrency, region: (r as any).region || scope.region }));
-      const warnings = ['Price movers served from persisted daily snapshot. Excludes unsupported instruments, stale candles, insufficient liquidity/history, mixed sources, and mixed adjusted/close basis.'];
+      const warnings = ['Price movers served from stored daily snapshot. Excludes unsupported instruments, stale candles, insufficient liquidity/history, mixed sources, and mixed adjusted/close basis.'];
       ranges.push({ range, gainers, losers, warnings });
     }
 
@@ -1321,7 +1321,7 @@ export class MarketDataFoundationService implements MarketDataReadApi {
       range,
       materialized: false,
       sourceLabels: { catalog: 'Market Data Foundation stock catalog', prices: 'Stored daily price history' },
-      warnings: ['Map returns served from persisted daily snapshot. Excludes unsupported, stale, insufficient-history, low-liquidity, or mixed-source rows.'],
+      warnings: ['Map returns served from stored daily snapshot. Excludes unsupported, stale, insufficient-history, low-liquidity, or mixed-source rows.'],
       gaps,
       groups,
       tiles,
@@ -15728,7 +15728,7 @@ export class MarketDataFoundationService implements MarketDataReadApi {
       generatedAt: new Date().toISOString(),
       proximityPct,
       results,
-      warnings: ['Prices use adjusted close where available. Proximity is to the 52-week adjusted-close high/low over ~365 calendar days of price history. Served from persisted daily snapshot.'],
+      warnings: ['Prices use adjusted close where available. Proximity is to the 52-week adjusted-close high/low over ~365 calendar days of price history. Served from stored daily snapshot.'],
     };
   }
 
@@ -15781,7 +15781,7 @@ export class MarketDataFoundationService implements MarketDataReadApi {
       generatedAt: new Date().toISOString(),
       minSpikeRatio,
       results,
-      warnings: ['Delivery% spikes served from persisted daily snapshot. NSE delivery data only — BSE-only stocks will not appear.'],
+      warnings: ['Delivery% spikes served from stored daily snapshot. NSE delivery data only — BSE-only stocks will not appear.'],
     };
   }
 
@@ -15825,7 +15825,7 @@ export class MarketDataFoundationService implements MarketDataReadApi {
       generatedAt: new Date().toISOString(),
       minSpikeRatio,
       results,
-      warnings: ['Volume spike served from persisted daily snapshot. Instruments lacking consistent volume data in NSE/BSE exchange files are excluded.'],
+      warnings: ['Volume spike served from stored daily snapshot. Instruments lacking consistent volume data in NSE/BSE exchange files are excluded.'],
     };
   }
 

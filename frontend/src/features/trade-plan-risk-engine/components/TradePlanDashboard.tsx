@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Box, Typography, Button, Alert, Tab, Tabs, FormControlLabel, Switch, FormControl, InputLabel, MenuItem, Select, Stack, Grid, Paper, Chip, List, ListItem, ListItemText, CircularProgress, LinearProgress } from '@mui/material';
+import { humanizeCode } from '@/shared/format/enumLabels';
 import { TradePlanApi } from '../api';
 import { TradePlanTable } from './TradePlanTable';
 import { CountItem, PaperReadinessProofChain, TradePlanFunnelDiagnostics, TradePlanResultDto } from '../types';
@@ -362,14 +363,14 @@ export const TradePlanDashboard: React.FC = () => {
           <InputLabel>Rating</InputLabel>
           <Select label="Rating" value={strategyRating} onChange={(event) => { setStrategyRating(event.target.value); setPage(0); }}>
             <MenuItem value="">All</MenuItem>
-            {['EXCELLENT', 'GOOD', 'AVERAGE', 'WEAK', 'UNPROVEN'].map((item) => <MenuItem key={item} value={item}>{item}</MenuItem>)}
+            {['EXCELLENT', 'GOOD', 'AVERAGE', 'WEAK', 'UNPROVEN'].map((item) => <MenuItem key={item} value={item}>{humanizeCode(item)}</MenuItem>)}
           </Select>
         </FormControl>
         <FormControl size="small" sx={{ minWidth: 190 }}>
           <InputLabel>Proof Label</InputLabel>
           <Select label="Proof Label" value={readinessLabel} onChange={(event) => { setReadinessLabel(event.target.value); setPage(0); }}>
             <MenuItem value="">All</MenuItem>
-            {['PAPER_TEST_CANDIDATE', 'WATCHLIST_CANDIDATE', 'RESEARCH_ONLY', 'NOT_AUTOMATION_READY'].map((item) => <MenuItem key={item} value={item}>{item}</MenuItem>)}
+            {['PAPER_TEST_CANDIDATE', 'WATCHLIST_CANDIDATE', 'RESEARCH_ONLY', 'NOT_AUTOMATION_READY'].map((item) => <MenuItem key={item} value={item}>{humanizeCode(item)}</MenuItem>)}
           </Select>
         </FormControl>
       </Stack>

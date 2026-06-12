@@ -165,9 +165,9 @@ export const ActivePositionsTable: React.FC<ActivePositionsTableProps> = ({
       minWidth: 220,
       maxWidth: 300,
       render: (row) => (
-        <Tooltip title={`${row.strategyId || 'Unavailable'} - ${row.entryRuleId || 'Entry rule unavailable'}`} arrow>
+        <Tooltip title={`${row.strategyId || 'Unavailable'} - ${row.entryRuleId || '—'}`} arrow>
           <Typography variant="body2" noWrap>
-            {row.strategyId || 'Unavailable'} - {row.entryRuleId || 'Entry rule unavailable'}
+            {row.strategyId || 'Unavailable'} - {row.entryRuleId || '—'}
           </Typography>
         </Tooltip>
       ),
@@ -234,7 +234,7 @@ export const ActivePositionsTable: React.FC<ActivePositionsTableProps> = ({
                 <Divider />
 
                 <Stack direction={{ xs: 'column', md: 'row' }} gap={2}>
-                  <DetailBlock label="Strategy" value={`${selectedRow.strategyId || 'Unavailable'} v${selectedRow.strategyVersion || 'N/A'}`} />
+                  <DetailBlock label="Strategy" value={selectedRow.strategyId || '—'} />
                   <DetailBlock label="Decision" value={labelize(selectedRow.strategyDecision)} />
                   <DetailBlock label="Entry Rule" value={selectedRow.entryRuleId || 'Unavailable'} />
                 </Stack>

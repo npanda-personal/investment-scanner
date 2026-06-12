@@ -47,7 +47,7 @@ export function DailyReviewShortlistPage() {
         />
         <NotApplicableForAssetClass
           feature="Daily Review"
-          detail="Crypto coverage in this release is available on Signals, Market Scans, and the Instrument workspace. This view will support crypto in a later update."
+          detail="Crypto coverage in this release is available on Market Scans and the Instrument workspace. This view will support crypto in a later update."
         />
       </Box>
     );
@@ -61,7 +61,7 @@ export function DailyReviewShortlistPage() {
         badges={(
           <Stack direction="row" gap={1} flexWrap="wrap" useFlexGap>
             <Chip label={`${scope.region} / ${scope.assetType}`} color="primary" variant="outlined" size="small" />
-            <Chip label="Saved data" variant="outlined" size="small" />
+            <Chip label="Snapshot" variant="outlined" size="small" />
             <Chip label="10 review slots" variant="outlined" size="small" />
           </Stack>
         )}
@@ -71,7 +71,7 @@ export function DailyReviewShortlistPage() {
         <Stack spacing={2}>
           <LinearProgress />
           <Typography variant="body2" color="text.secondary">
-            Loading shortlist — reading saved data from Today Review, Active Ledger, Stock Interest, Data Quality, and Market Pulse…
+            Loading shortlist — reading stored data from Today Review, Active Positions, Stock Interest, Data Quality, and Market Pulse…
           </Typography>
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(4, 1fr)' }, gap: 2 }}>
             {[0, 1, 2, 3].map((i) => (
@@ -140,7 +140,7 @@ function OverviewGrid({ data }: { data: DailyReviewShortlistResult }) {
 
   return (
     <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(4, 1fr)' }, gap: 2 }}>
-      <MetricCard label="Shortlist Count" value={`${data.rows.length} / ${data.targetCount}`} helper="Rows shown from saved data." />
+      <MetricCard label="Shortlist Count" value={`${data.rows.length} / ${data.targetCount}`} helper="Rows shown from stored data." />
       <MetricCard label="Review Mode" value={formatEnum(review?.reviewMode)} helper={review?.trustStatus ? `Trust: ${formatEnum(review.trustStatus)}` : 'Review readiness unavailable.'} />
       <MetricCard label="Market Pulse" value={pulse?.marketHealthLabel || 'Unavailable'} helper={pulse?.status ? `Status: ${formatEnum(pulse.status)}` : data.marketPulse?.message || 'Market Pulse data not available.'} />
       <MetricCard label="Data Quality" value={dq ? formatNumber(dq.signalReadyCount) : 'Unavailable'} helper={dq ? `Signal-ready rows; DQ status ${formatEnum(dq.dataStatus)}.` : 'Summary unavailable.'} />
@@ -172,8 +172,8 @@ function ShortlistTable({ rows, targetCount }: { rows: DailyReviewShortlistRow[]
     return (
       <Alert severity="info">
         <Stack spacing={0.5}>
-          <Typography fontWeight={800}>No review names qualify for the shortlist in saved data.</Typography>
-          <Typography variant="body2">No fake rows are shown. Review Ready Universe, Today Review, Stock Interest, or Active Ledger evidence may be missing or blocked for this scope.</Typography>
+          <Typography fontWeight={800}>No review names qualify for the shortlist in stored data.</Typography>
+          <Typography variant="body2">No fake rows are shown. Review Ready Universe, Today Review, Stock Interest, or Active Positions evidence may be missing or blocked for this scope.</Typography>
         </Stack>
       </Alert>
     );
@@ -205,8 +205,8 @@ function ShortlistTable({ rows, targetCount }: { rows: DailyReviewShortlistRow[]
                 <TableCell>
                   <Stack spacing={0.25}>
                     <Typography fontWeight={800}>{row.symbol}</Typography>
-                    <Typography variant="caption" color="text.secondary">{row.companyName || 'Company unavailable'}</Typography>
-                    <Typography variant="caption" color="text.secondary">{row.sector || 'Sector unavailable'}</Typography>
+                    <Typography variant="caption" color="text.secondary">{row.companyName || 'Not available'}</Typography>
+                    <Typography variant="caption" color="text.secondary">{row.sector || 'Not available'}</Typography>
                   </Stack>
                 </TableCell>
                 <TableCell>{row.lane}</TableCell>
@@ -215,7 +215,7 @@ function ShortlistTable({ rows, targetCount }: { rows: DailyReviewShortlistRow[]
                 <TableCell>
                   <Stack spacing={0.25}>
                     <Typography variant="body2">{formatEnum(row.dataQualityStatus)}</Typography>
-                    <Typography variant="caption" color="text.secondary">{firstOrFallback(row.dataQualityReasons, 'No data quality reason available.')}</Typography>
+                    <Typography variant="caption" color="text.secondary">{firstOrFallback(row.dataQualityReasons, 'Not available')}</Typography>
                   </Stack>
                 </TableCell>
                 <TableCell sx={{ minWidth: 260 }}>
@@ -341,13 +341,13 @@ function EvidencePanels({ data }: { data: DailyReviewShortlistResult }) {
 
       <Paper variant="outlined" sx={{ p: 2 }}>
         <Stack spacing={1.25}>
-          <SectionTitle title="Active Rows Excluded" subtitle="Normal active ledger rows are not repeated as new-review names." />
+          <SectionTitle title="Active Rows Excluded" subtitle="Normal active position rows are not repeated as new-review names." />
           {data.excludedActiveRows.length === 0 ? (
             <Typography variant="body2" color="text.secondary">No normal active rows were excluded.</Typography>
           ) : (
             <SimpleRows rows={data.excludedActiveRows.map((row) => ({
               symbol: row.symbol,
-              label: row.companyName || 'Company unavailable',
+              label: row.companyName || 'Not available',
               detail: row.reason,
             }))} />
           )}
@@ -358,7 +358,7 @@ function EvidencePanels({ data }: { data: DailyReviewShortlistResult }) {
         <Stack spacing={1.25}>
           <SectionTitle title="Warning-Heavy Rows" subtitle="Blocked, unproven, insufficient-data, or risk-avoid rows are disclosed outside the top-10 list." />
           {data.warningRows.length === 0 ? (
-            <Typography variant="body2" color="text.secondary">No warning-heavy rows in saved data.</Typography>
+            <Typography variant="body2" color="text.secondary">No warning-heavy rows in stored data.</Typography>
           ) : (
             <SimpleRows rows={data.warningRows.map((row) => ({
               symbol: row.symbol,

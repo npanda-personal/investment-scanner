@@ -23,6 +23,7 @@ import FactCheckIcon from '@mui/icons-material/FactCheck';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import ScienceIcon from '@mui/icons-material/Science';
 import { DataTable, PageHeader } from '@/shared/components';
+import { humanizeCode } from '@/shared/format/enumLabels';
 import { InstrumentSearchSelect } from '@/shared/components/EntitySearchSelect';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
 import type { V1Instrument } from '@/features/market-data-foundation';
@@ -245,7 +246,7 @@ const StrategyFrameworkPage: React.FC = () => {
             onSortChange={(nextSortBy, nextDirection) => { setSortBy(nextSortBy); setSortDirection(nextDirection); }}
             onPageChange={() => undefined}
             onPageSizeChange={() => undefined}
-            emptyMessage="No persisted rankings yet. Run a manual backtest to create one."
+            emptyMessage="No saved rankings yet. Run a manual backtest to create one."
           />
         </Stack>
       )}
@@ -315,7 +316,7 @@ function StrategyProofRegistryView({ registry, timeframe, onTimeframeChange, onS
           </Select>
         </FormControl>
         <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-          {(['PROVEN', 'LIMITED', 'UNPROVEN', 'BLOCKED', 'MISSING'] as const).map((status) => <Chip key={status} size="small" label={`${status} ${counts[status] || 0}`} color={proofStatusColor(status)} variant={status === 'MISSING' ? 'outlined' : 'filled'} />)}
+          {(['PROVEN', 'LIMITED', 'UNPROVEN', 'BLOCKED', 'MISSING'] as const).map((status) => <Chip key={status} size="small" label={`${humanizeCode(status)} ${counts[status] || 0}`} color={proofStatusColor(status)} variant={status === 'MISSING' ? 'outlined' : 'filled'} />)}
         </Stack>
       </Stack>
       <DataTable
@@ -481,7 +482,7 @@ function EvaluationList({ results, instrument }: { results: StrategyEvaluationRe
 }
 
 function ratingChip(grade?: string | null) {
-  return <Chip size="small" label={grade || 'UNPROVEN'} color={grade === 'EXCELLENT' ? 'success' : grade === 'GOOD' ? 'primary' : grade === 'WEAK' ? 'warning' : 'default'} />;
+  return <Chip size="small" label={humanizeCode(grade || 'UNPROVEN')} color={grade === 'EXCELLENT' ? 'success' : grade === 'GOOD' ? 'primary' : grade === 'WEAK' ? 'warning' : 'default'} />;
 }
 
 function proofStatusChip(status: StrategyProofRegistryRow['status']) {
@@ -550,7 +551,7 @@ function categoryFilterLabel(filter: typeof categoryFilters[number], strategies:
 
 function readinessChip(label?: string | null) {
   const safe = label === 'PAPER_TEST_CANDIDATE' || label === 'WATCHLIST_CANDIDATE' || label === 'NOT_AUTOMATION_READY' ? label : 'RESEARCH_ONLY';
-  return <Chip size="small" label={safe} color={safe === 'PAPER_TEST_CANDIDATE' ? 'primary' : safe === 'WATCHLIST_CANDIDATE' ? 'success' : safe === 'NOT_AUTOMATION_READY' ? 'warning' : 'default'} />;
+  return <Chip size="small" label={humanizeCode(safe)} color={safe === 'PAPER_TEST_CANDIDATE' ? 'primary' : safe === 'WATCHLIST_CANDIDATE' ? 'success' : safe === 'NOT_AUTOMATION_READY' ? 'warning' : 'default'} />;
 }
 
 function labLink(code: string, timeframe: StrategyTimeframe, region: string, assetType: string) {

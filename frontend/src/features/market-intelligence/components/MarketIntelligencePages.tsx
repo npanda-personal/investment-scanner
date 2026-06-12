@@ -42,6 +42,7 @@ import {
 } from '../api/marketIntelligenceService';
 import { useReadModelSnapshot } from '../hooks/useMarketIntelligenceSnapshot';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
+import { instrumentWorkspaceSubtitle } from '@/shared/format/exchangeLabels';
 import { NotApplicableForAssetClass } from '@/shared/components/NotApplicableForAssetClass';
 import type {
   CompounderSnapshot,
@@ -155,7 +156,7 @@ export function StockInterestRadarPage() {
         <PageHeader title="Stock Interest Radar" subtitle="Which stocks deserve attention now?" />
         <NotApplicableForAssetClass
           feature="Stock Interest Radar"
-          detail="Crypto coverage in this release is available on Signals, Market Scans, and the Instrument workspace. This view will support crypto in a later update."
+          detail="Crypto coverage in this release is available on Market Scans and the Instrument workspace. This view will support crypto in a later update."
         />
       </Box>
     );
@@ -163,7 +164,7 @@ export function StockInterestRadarPage() {
   return (
     <RadarPage
       title="Stock Interest Radar"
-      subtitle="Which stocks deserve attention now? Rows are shown in saved data order."
+      subtitle="Which stocks deserve attention now? Rows are shown in stored data order."
       tabs={stockInterestTabs}
       envelope={view.data}
       loading={view.loading}
@@ -178,17 +179,17 @@ export function StockInterestRadarPage() {
 /** Per-category empty-state messages for the Earnings Intelligence screen. */
 const EARNINGS_EMPTY_MESSAGES: Record<string, string> = {
   UPCOMING_RESULTS:
-    'No stocks have a result date within the next 90 days in saved data. ' +
+    'No stocks have a result date within the next 90 days in stored data. ' +
     'This category populates when an official earnings calendar is available or when ' +
     'period-cadence estimates fall within 90 days. Data updates on the next scheduled refresh.',
   PRE_RESULT_INTEREST:
     'No upcoming-result stocks showed elevated pre-result delivery or price-move interest. ' +
     'Pre-result Interest rows require an Upcoming Results classification first.',
   RESULT_WINNERS:
-    'No stocks showed strong post-result growth in the last 60 days in saved data. ' +
+    'No stocks showed strong post-result growth in the last 60 days in stored data. ' +
     'Winners are identified from revenue, profit, and EPS growth with at least 2 positive metrics.',
   RESULT_DISAPPOINTMENTS:
-    'No stocks showed a significant earnings miss or price drop in the last 60 days in saved data.',
+    'No stocks showed a significant earnings miss or price drop in the last 60 days in stored data.',
   RESULT_REACTION_HISTORY:
     'No stocks have a price-reaction history calculated yet. ' +
     'This category requires an official earnings date and ' +
@@ -262,7 +263,7 @@ export function TraderSetupRadarPage() {
         <PageHeader title="Trader Setup Radar" subtitle="Which setups are actionable for swing review?" />
         <NotApplicableForAssetClass
           feature="Trader Setup Radar"
-          detail="Crypto coverage in this release is available on Signals, Market Scans, and the Instrument workspace. This view will support crypto in a later update."
+          detail="Crypto coverage in this release is available on Market Scans and the Instrument workspace. This view will support crypto in a later update."
         />
       </Box>
     );
@@ -297,7 +298,7 @@ export function RiskRadarPage() {
   return (
     <RadarPage
       title="Risk Radar"
-      subtitle="What should be avoided? Showing saved risk data."
+      subtitle="What should be avoided? Showing stored risk data."
       tabs={riskTabs}
       envelope={view.data}
       loading={view.loading}
@@ -312,12 +313,13 @@ export function RiskRadarPage() {
 
 export function InstrumentWorkspaceLandingPage() {
   const navigate = useNavigate();
+  const { scope, profile } = useMarketScope();
 
   return (
     <Box className="page-container page-container--hub">
       <PageHeader
         title="Instrument Workspace"
-        subtitle="Open any NSE/BSE stock to study it in one place — price action, market regime, sector strength, smart-money context, and the latest research-support signal."
+        subtitle={instrumentWorkspaceSubtitle(scope)}
       />
       <Paper variant="outlined" sx={{ p: 2.5, maxWidth: 680 }}>
         <Stack spacing={1.5}>
@@ -336,7 +338,9 @@ export function InstrumentWorkspaceLandingPage() {
             <Typography component="li" variant="body2" color="text.secondary">Market regime and breadth context for the current session.</Typography>
             <Typography component="li" variant="body2" color="text.secondary">The stock&apos;s sector strength and rotation standing.</Typography>
             <Typography component="li" variant="body2" color="text.secondary">Relative strength versus the benchmark.</Typography>
-            <Typography component="li" variant="body2" color="text.secondary">Smart-money accumulation / distribution read and F&amp;O ban status.</Typography>
+            {profile.capabilities.hasInstitutionalFlow && (
+              <Typography component="li" variant="body2" color="text.secondary">Smart-money accumulation / distribution read and F&amp;O ban status.</Typography>
+            )}
             <Typography component="li" variant="body2" color="text.secondary">The latest signal, shown as supporting evidence only — never an instruction.</Typography>
           </Stack>
         </Stack>
@@ -354,7 +358,7 @@ export function MarketIntelligenceCompatibilityPage({ title }: { title: string }
       />
       <DataUnavailableState
         title={`${title} is not available here.`}
-        message="Use the main trader workflow pages to review saved data."
+        message="Use the main trader workflow pages to review stored data."
         warnings={['No placeholder rows are shown.']}
       />
     </Box>
@@ -486,7 +490,7 @@ function RadarPage<T>({
   const rows = envelope?.snapshot ?? [];
   const filteredRows = rows.filter((row) => getRowCategories(row).includes(activeTab));
   const emptyMessage = tabEmptyMessages?.[activeTab]
-    ?? `No ${activeLabel} rows in saved data.`;
+    ?? `No ${activeLabel} rows in stored data.`;
 
   return (
     <SnapshotPageShell title={title} subtitle={subtitle} loading={loading} error={error} envelope={envelope} missingTitle={missingTitle} suggestionLink={suggestionLink}>
@@ -498,7 +502,7 @@ function RadarPage<T>({
       {rows.length > 0 && (
         filteredRows.length > 0
           ? renderTable(filteredRows)
-          : <EmptyState title={`No ${activeLabel} rows in saved data.`} message={emptyMessage} />
+          : <EmptyState title={`No ${activeLabel} rows in stored data.`} message={emptyMessage} />
       )}
     </SnapshotPageShell>
   );
@@ -668,12 +672,12 @@ function MarketPulseSnapshotView({
         {/* Fix 2: render sector names via indexLabel (handles ^CNXMETAL etc.) — chips are drill-down links to the Signals screener */}
         <SectionPanel title="Strong Sectors">
           {snapshot.strongSectors.length === 0
-            ? <Typography variant="body2" color="text.secondary">No strong sectors in saved data.</Typography>
+            ? <Typography variant="body2" color="text.secondary">No strong sectors in stored data.</Typography>
             : <Stack direction="row" gap={0.75} flexWrap="wrap" useFlexGap>{snapshot.strongSectors.map((s) => <SectorDrillChip key={s} rawSector={s} />)}</Stack>}
         </SectionPanel>
         <SectionPanel title="Weak Sectors">
           {snapshot.weakSectors.length === 0
-            ? <Typography variant="body2" color="text.secondary">No weak sectors in saved data.</Typography>
+            ? <Typography variant="body2" color="text.secondary">No weak sectors in stored data.</Typography>
             : <Stack direction="row" gap={0.75} flexWrap="wrap" useFlexGap>{snapshot.weakSectors.map((s) => <SectorDrillChip key={s} rawSector={s} tone="warning" />)}</Stack>}
         </SectionPanel>
         <SectionPanel title="Breadth Summary"><Typography>{snapshot.breadthSummary || 'Unavailable'}</Typography></SectionPanel>
@@ -984,7 +988,7 @@ function SectorConstituentsTable({
   return (
     <Stack spacing={0.75}>
       <Typography variant="caption" color="text.secondary">
-        {data.count} constituent stock{data.count !== 1 ? 's' : ''} — top by market cap, saved data
+        {data.count} constituent stock{data.count !== 1 ? 's' : ''} — top by market cap, stored data
       </Typography>
       {data.warnings.map((w) => <Alert key={w} severity="warning" sx={{ py: 0 }}><Typography variant="caption">{w}</Typography></Alert>)}
       <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 340, overflowY: 'auto' }}>

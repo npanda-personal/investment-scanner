@@ -57,7 +57,7 @@ const ResearchOverviewPage: React.FC = () => {
         />
         <NotApplicableForAssetClass
           feature="Research Hub"
-          detail="Crypto coverage in this release is available on Signals, Market Scans, and the Instrument workspace. This view will support crypto in a later update."
+          detail="Crypto coverage in this release is available on Market Scans and the Instrument workspace. This view will support crypto in a later update."
         />
       </Box>
     );

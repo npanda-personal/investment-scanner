@@ -108,7 +108,7 @@ export function TodayReviewPage() {
           />
           <NotApplicableForAssetClass
             feature="Today Review"
-            detail="Crypto coverage in this release is available on Signals, Market Scans, and the Instrument workspace. This view will support crypto in a later update."
+            detail="Crypto coverage in this release is available on Market Scans and the Instrument workspace. This view will support crypto in a later update."
           />
         </Stack>
       </Box>
@@ -978,7 +978,7 @@ function CandidateTable({ candidates, run }: { candidates: TodayReviewCandidate[
       {actionMessage && <Alert severity="success">{actionMessage}</Alert>}
       {missingTierCount > 0 && (
         <Alert severity="info">
-          Confidence scores are conservatively downgraded where data quality tier context is missing ({missingTierCount} of {candidates.length} candidates in this view). Scores shown as &ldquo;X (from Y)&rdquo; are display-only adjustments and do not affect ranking.
+          {missingTierCount} of {candidates.length} candidates in this view are missing data-quality tier context — read their confidence scores with that caveat. This is a data-pipeline limitation, not a per-stock judgement, and does not affect ranking.
         </Alert>
       )}
       <Box
@@ -1569,11 +1569,11 @@ function tierContextForCandidate(candidate: TodayReviewCandidate): CandidateTier
 }
 
 function confidenceDisplay(candidate: TodayReviewCandidate) {
+  // Show the real per-stock score. The data-quality tier-context caveat is a
+  // pipeline-wide condition surfaced once as a banner — not a fake per-row
+  // "(from N)" penalty repeated identically on every row (G-IN1).
   const score = Number(candidate.confidenceScore || 0);
-  const hasContext = !hasMissingTierContext(candidate);
-  if (hasContext) return { label: String(score), note: null as string | null };
-  const conservative = Math.max(0, Math.round(score * 0.8));
-  return { label: `${conservative} (from ${score})`, note: 'Conservative view: data quality tier context missing' };
+  return { label: String(score), note: null as string | null };
 }
 
 function candidatesForTab(groups: TodayReviewGroups, tab: keyof TodayReviewGroups) {

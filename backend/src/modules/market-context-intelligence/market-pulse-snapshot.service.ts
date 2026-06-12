@@ -416,7 +416,7 @@ export class MarketPulseSnapshotService {
       .slice(0, 5);
 
     if (scoringRows.some((row) => row.return3M === null)) {
-      warnings.push('Some index rows have insufficient persisted history for 3M trend scoring.');
+      warnings.push('Some index rows have insufficient price history for 3M trend scoring.');
     }
 
     return {
@@ -430,7 +430,7 @@ export class MarketPulseSnapshotService {
     const groups = this.groupPrices(prices);
     const warnings: string[] = [];
     if (groups.size === 0) {
-      return { score: 0, rows: [], warnings: ['Sector strength score unavailable because persisted sector index rows are missing.'] };
+      return { score: 0, rows: [], warnings: ['Sector strength score unavailable because sector index rows are missing.'] };
     }
 
     const rows = [...groups.entries()].map(([symbol, series]) => {
@@ -447,7 +447,7 @@ export class MarketPulseSnapshotService {
     }).sort((left, right) => right.score - left.score);
 
     if (rows.some((row) => row.return3M === null)) {
-      warnings.push('Some sector index rows have insufficient persisted history for 3M strength scoring.');
+      warnings.push('Some sector index rows have insufficient price history for 3M strength scoring.');
     }
 
     return {

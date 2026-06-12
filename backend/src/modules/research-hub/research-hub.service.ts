@@ -768,7 +768,7 @@ export class ResearchHubService {
         sourceModule: 'signal-calibration-engine',
         blocking: false,
         count,
-        message: `${count} calibrated signals persisted. Evidence is usable but downstream influence is not yet wired into Research Hub actionability.`,
+        message: `${count} calibrated signals saved. Evidence is usable but is not yet wired into Research Hub actionability.`,
         evidenceDate: health.latestGeneratedAt ?? undefined,
       };
     }
@@ -779,7 +779,7 @@ export class ResearchHubService {
       sourceModule: 'signal-calibration-engine',
       blocking: false,
       count,
-      message: `${count} calibrated signals persisted (readiness: ${readinessStatus ?? 'unknown'}). Evidence needs refresh before downstream influence can be confirmed.`,
+      message: `${count} calibrated signals saved (readiness: ${readinessStatus ?? 'unknown'}). Evidence needs a refresh before it can inform Research Hub actionability.`,
       evidenceDate: health.latestGeneratedAt ?? undefined,
     };
   }

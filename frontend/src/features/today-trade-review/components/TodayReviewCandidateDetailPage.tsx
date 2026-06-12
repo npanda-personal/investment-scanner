@@ -124,7 +124,7 @@ export function TodayReviewCandidateDetailPage() {
           <CardContent>
             <Typography variant="h6" gutterBottom>Price behaviour</Typography>
             <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic', mb: 1 }}>
-              Summary based on saved data. Descriptive context only — not investment advice.
+              Summary based on available data. Descriptive context only — not investment advice.
             </Typography>
             <Typography>{priceBehaviourText}</Typography>
           </CardContent>

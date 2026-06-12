@@ -17,6 +17,7 @@ import { AddToWatchlistDialog } from '@/features/watchlist-management';
 import { CreateAlertDialog } from '@/features/alerts-monitoring';
 import { DataTable, StatusBadge, type DataTableColumn, type SortDirection } from '@/shared/components';
 import type { SignalResult } from '../types';
+import { humanizeCode } from '@/shared/format/enumLabels';
 
 const formatMoney = (value: number | null, currency: string | null) => {
   if (value === null) return 'N/A';
@@ -71,7 +72,7 @@ const StrategyMatchDetails = ({ signal }: { signal: SignalResult }) => (
     {(signal.strategyMatches || []).map((match) => (
       <Box key={`${match.strategyCode}-${match.strategyVersion}`} sx={{ mb: 1 }}>
         <Typography variant="subtitle2" fontWeight={700}>{match.strategyName || match.strategyCode} v{match.strategyVersion}</Typography>
-        <Typography variant="caption" display="block">Score {match.score} · {match.confidence} · {match.ratingGrade || 'UNPROVEN'} · {match.readinessLabel || 'RESEARCH_ONLY'}</Typography>
+        <Typography variant="caption" display="block">Score {match.score} · {match.confidence} · {humanizeCode(match.ratingGrade || 'UNPROVEN')} · {humanizeCode(match.readinessLabel || 'RESEARCH_ONLY')}</Typography>
         {match.reasons.slice(0, 3).map((reason, index) => <Typography key={index} variant="caption" display="block">- {reason}</Typography>)}
       </Box>
     ))}
@@ -203,9 +204,9 @@ export function SignalTable({ signals, totalCount, loading, page, pageSize, sort
       id: 'audit',
       label: 'Audit',
       render: (signal) => (
-        <Tooltip title={`${signal.rulesetVersion || signal.modelVersion || 'legacy'} | source ${formatDate(signal.sourceDataDate)}`} arrow>
+        <Tooltip title={`${signal.rulesetVersion || signal.modelVersion || 'Default'} | source ${formatDate(signal.sourceDataDate)}`} arrow>
           <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', maxWidth: 180 }}>
-            <Chip size="small" variant="outlined" label={signal.modelVersion || 'legacy'} />
+            <Chip size="small" variant="outlined" label={signal.modelVersion || 'Default'} />
             <Chip size="small" variant="outlined" label={formatDate(signal.sourceDataDate)} color={signal.auditStatus === 'LEGACY_MISSING' ? 'warning' : 'default'} />
           </Box>
         </Tooltip>
@@ -376,7 +377,7 @@ export function SignalTable({ signals, totalCount, loading, page, pageSize, sort
               <Typography variant="subtitle2" gutterBottom>Generation Audit</Typography>
               <Stack spacing={0.75}>
                 <Typography variant="body2" color="text.secondary">Model: {selectedSignal.modelVersion || 'N/A'}</Typography>
-                <Typography variant="body2" color="text.secondary">Ruleset: {selectedSignal.rulesetVersion || 'N/A'}</Typography>
+                <Typography variant="body2" color="text.secondary">Ruleset: {selectedSignal.rulesetVersion || '—'}</Typography>
                 <Typography variant="body2" color="text.secondary">Generated date: {formatDate(selectedSignal.generatedDate || selectedSignal.generated_at)}</Typography>
                 <Typography variant="body2" color="text.secondary">Source data date: {formatDate(selectedSignal.sourceDataDate)}</Typography>
                 <Typography variant="body2" color="text.secondary">Source price date: {formatDate(selectedSignal.sourcePriceDate)}</Typography>

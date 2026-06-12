@@ -79,7 +79,7 @@ const CryptoMarketOverviewPage: React.FC = () => {
       />
       {lastUpdated && (
         <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-          Prices as of {lastUpdated} (latest saved data).
+          Prices as of {lastUpdated} (latest available data).
         </Typography>
       )}
 

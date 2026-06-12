@@ -2,6 +2,86 @@ import { Prisma, PrismaClient } from '@prisma/client';
 import defaultPrisma from '../../db/prisma';
 import type { HistoricalPrice, SyncSummary } from './market-data-foundation.types';
 
+// ── Stablecoin / pegged-asset exclusion ────────────────────────────────────
+// Keep this list maintainable: add/remove symbols here to control scan universe.
+// Covers USD-pegged, EUR-pegged, gold-pegged, and other non-trending peg tokens.
+export const KNOWN_STABLECOIN_SYMBOLS = new Set([
+  // USD-pegged stablecoins
+  'USDT', 'USDC', 'USDS', 'DAI', 'TUSD', 'FDUSD', 'BUSD', 'USDP', 'GUSD',
+  'USDD', 'FRAX', 'LUSD', 'PYUSD', 'USDE', 'USDX', 'CRVUSD', 'SUSD', 'MUSD',
+  'DOLA', 'USDM', 'USDY', 'UXD', 'ZUSD', 'USDL',
+  // Newer / exchange-issued USD stablecoins
+  'RLUSD',  // Ripple USD
+  'BFUSD',  // BingX stablecoin
+  'XUSD',   // StraitsX USD
+  'USD1',   // USD1 stablecoin
+  'USDG',   // Global Dollar
+  'USDF',   // USDF
+  'LISUSD', // Lista USD
+  'USDJ',   // USDJ
+  // EUR-pegged stablecoins
+  'EURT', 'EURC', 'EUROC', 'EURS', 'AEUR', 'AGEUR', 'EUROE',
+  'EURI',   // Eurite
+  'EUR',    // EUR currency token (Binance EUR/USDT pair base)
+  // Gold / commodity-pegged (non-trending)
+  'XAUT', 'PAXG', 'CACHE', 'DGLD',
+]);
+
+/**
+ * Returns true when the asset should be treated as a stablecoin / pegged asset
+ * and excluded from trend-based scans (52W high/low, movers).
+ *
+ * Detection strategy (no schema change needed):
+ *  1. categoryTags contains 'stablecoin' or 'stablecoins' (case-insensitive).
+ *  2. The canonical symbol, displaySymbol, or name (uppercased) is in the
+ *     KNOWN_STABLECOIN_SYMBOLS set.
+ *  3. Heuristic: displaySymbol or stripped base symbol ends with 'USD', 'USDT',
+ *     or 'EUR' AND does NOT appear in the legitimate crypto pairs list
+ *     (e.g. BTCUSDT is NOT a stablecoin; USDTUSD or USDCUSDT would be).
+ */
+export function isStablecoin(asset: {
+  symbol: string;
+  displaySymbol?: string | null;
+  name: string;
+  categoryTags: string[];
+}): boolean {
+  // 1. Category tag check
+  const hasStablecoinTag = asset.categoryTags.some((t) =>
+    t.toLowerCase() === 'stablecoin' || t.toLowerCase() === 'stablecoins'
+  );
+  if (hasStablecoinTag) return true;
+
+  // 2. Known-symbol set check (displaySymbol = base token like "USDC")
+  const display = (asset.displaySymbol ?? '').toUpperCase();
+  if (display && KNOWN_STABLECOIN_SYMBOLS.has(display)) return true;
+
+  // 3. Name-based check (e.g. "USD Coin", "Tether USD", "Ripple USD")
+  const nameLower = asset.name.toLowerCase();
+  if (
+    KNOWN_STABLECOIN_SYMBOLS.has(asset.name.toUpperCase()) ||
+    nameLower.includes('tether') ||
+    nameLower.includes('usd coin') ||
+    nameLower.includes('united stables') ||
+    nameLower.includes('stablesx') ||
+    nameLower.includes('straits') && nameLower.includes('usd') ||
+    (nameLower.includes('stablecoin') && !nameLower.includes('protocol'))
+  ) return true;
+
+  // 4. Canonical-symbol heuristic: stablecoins often trade as USDCUSDT,
+  //    USDTUSDT, TUSDUSDT, etc. — the base part is itself a stablecoin.
+  const sym = asset.symbol.toUpperCase();
+  // Strip common quote currencies to get the base
+  const base = sym.endsWith('USDT') ? sym.slice(0, -4)
+    : sym.endsWith('BUSD') ? sym.slice(0, -4)
+    : sym.endsWith('USDC') ? sym.slice(0, -4)
+    : sym.endsWith('USD') ? sym.slice(0, -3)
+    : sym.endsWith('EUR') ? sym.slice(0, -3)
+    : null;
+  if (base && KNOWN_STABLECOIN_SYMBOLS.has(base)) return true;
+
+  return false;
+}
+
 /**
  * Crypto foundation repository — owns the crypto_* market-data tables
  * (crypto_assets, crypto_price_ticks, crypto_latest_prices).
@@ -135,14 +215,22 @@ export class MarketDataFoundationCryptoRepository {
     return and.length ? { AND: and } : undefined;
   }
 
-  async listAssets(options: { activeOnly?: boolean; limit?: number; offset?: number; search?: string } = {}) {
-    return this.prisma.cryptoAsset.findMany({
+  async listAssets(options: { activeOnly?: boolean; limit?: number; offset?: number; search?: string; excludeStablecoins?: boolean } = {}) {
+    const rows = await this.prisma.cryptoAsset.findMany({
       // Ranked by market cap (rank asc ≈ market-cap desc); equity `sortBy` is intentionally ignored.
       where: this.assetWhere(options),
       orderBy: [{ rank: 'asc' }, { symbol: 'asc' }],
-      take: options.limit,
-      skip: options.offset,
+      // When excluding stablecoins we over-fetch then filter in-memory (avoids Prisma array-contains
+      // awkwardness and is fine at this universe size — typically <1 000 active assets).
+      take: options.excludeStablecoins ? undefined : options.limit,
+      skip: options.excludeStablecoins ? undefined : options.offset,
     });
+    if (!options.excludeStablecoins) return rows;
+    const filtered = rows.filter((a) => !isStablecoin(a));
+    // Re-apply limit/offset after in-memory filter
+    const start = options.offset ?? 0;
+    const end = options.limit != null ? start + options.limit : undefined;
+    return filtered.slice(start, end);
   }
 
   /** Count crypto assets matching the same filter as listAssets (for pagination). */
@@ -227,7 +315,7 @@ export class MarketDataFoundationCryptoRepository {
     const WINDOW = 365;
     const PROXIMITY_PCT = 5;
     const VOLUME_SPIKE_MIN = 2;
-    const assets = await this.listAssets({ activeOnly: true });
+    const assets = await this.listAssets({ activeOnly: true, excludeStablecoins: true });
     const signals = await this.prisma.cryptoSignalResult.findMany({ orderBy: { generatedAt: 'desc' } });
     const sigByInstrument = new Map<string, { direction: string; score: number }>();
     for (const s of signals) if (!sigByInstrument.has(s.instrumentId)) sigByInstrument.set(s.instrumentId, { direction: s.direction, score: s.score });

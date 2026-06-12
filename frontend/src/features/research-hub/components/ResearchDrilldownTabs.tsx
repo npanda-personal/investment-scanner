@@ -370,7 +370,7 @@ const BreadthTabPanel: React.FC<{ scope: MarketScope }> = ({ scope }) => {
               color="text.secondary"
               sx={{ ml: 1 }}
             >
-              (derived from our price universe — not official NSE data)
+              (derived from our price universe — not official exchange data)
             </Typography>
           </Typography>
           <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
@@ -407,7 +407,8 @@ const BreadthTabPanel: React.FC<{ scope: MarketScope }> = ({ scope }) => {
         </Box>
       )}
 
-      {/* NR-42: official NSE A/D — show row with honest "not ingested" label instead of hiding it */}
+      {/* NR-42: official NSE A/D — India NSE-only; hidden under non-IN scopes. */}
+      {String(scope.region || '').toUpperCase() === 'IN' && (
       <Box>
         <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
           Official NSE Advances / Declines
@@ -448,6 +449,7 @@ const BreadthTabPanel: React.FC<{ scope: MarketScope }> = ({ scope }) => {
           </Typography>
         )}
       </Box>
+      )}
 
       {data?.gaps && data.gaps.length > 0 && (
         <Alert severity="warning" sx={{ mt: 1 }}>

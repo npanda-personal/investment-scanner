@@ -137,6 +137,25 @@ class NseFetchClient {
 }
 
 // ---------------------------------------------------------------------------
+// Field-name normalizer
+//
+// The live NSE API (as of 2026) returns bm_* prefixed field names:
+//   bm_symbol → symbol, bm_date → meetingDate, bm_purpose → purpose
+// The parser expects the canonical names used in the test fixtures.
+// ---------------------------------------------------------------------------
+
+function normalizeNseRow(raw: Record<string, unknown>): NseBoardMeetingRow {
+  return {
+    symbol: String(raw.bm_symbol ?? raw.symbol ?? ''),
+    company: String(raw.sm_name ?? raw.company ?? ''),
+    purpose: String(raw.bm_purpose ?? raw.purpose ?? ''),
+    meetingDate: String(raw.bm_date ?? raw.meetingDate ?? ''),
+    bm_desc: String(raw.bm_desc ?? ''),
+    ...raw,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -169,9 +188,9 @@ async function main() {
   try {
     const data = await client.fetchJson(url, SINGLE_SYMBOL ?? undefined);
     if (Array.isArray(data)) {
-      rawRows = data as NseBoardMeetingRow[];
+      rawRows = (data as Record<string, unknown>[]).map(normalizeNseRow);
     } else if (data && typeof data === 'object' && Array.isArray((data as any).data)) {
-      rawRows = (data as any).data as NseBoardMeetingRow[];
+      rawRows = ((data as any).data as Record<string, unknown>[]).map(normalizeNseRow);
     } else {
       console.warn('[ingest-nse-earnings-dates] Unexpected response shape — no array found. Raw:', JSON.stringify(data).slice(0, 300));
     }

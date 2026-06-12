@@ -29,7 +29,7 @@ export default function SubscriptionBillingPage() {
       <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" gap={2} sx={{ mb: 3 }}>
         <Box>
           <Typography variant="h4" fontWeight={700}>Subscription & Billing</Typography>
-          <Typography color="text.secondary">MVP plan readiness, feature limits, and usage metering. Billing provider is manual/disabled by default.</Typography>
+          <Typography color="text.secondary">Plan readiness, feature limits, and usage metering. Billing provider is manual/disabled by default.</Typography>
         </Box>
         <Chip label={me?.plan.name || humanizeCode(me?.subscription.planCode || 'FREE')} color={planColor(me?.subscription.planCode || 'FREE')} />
       </Stack>

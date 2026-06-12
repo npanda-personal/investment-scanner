@@ -185,7 +185,7 @@ export default function AccountPage() {
                   <Chip label={`SMTP configured: ${providerStatus.smtpConfigured ? 'Yes' : 'No'}`} color={providerStatus.smtpConfigured ? 'warning' : 'default'} size="small" />
                   <Chip label={`SMTP active: ${providerStatus.smtpAvailable ? 'Yes' : 'No'}`} color={providerStatus.smtpAvailable ? 'success' : 'default'} size="small" />
                 </Stack>
-                <Alert severity="info" sx={{ mt: 0.5 }}>MVP delivery is free/local-friendly. The log email provider records deliveries without requiring a paid email service.</Alert>
+                <Alert severity="info" sx={{ mt: 0.5 }}>Local email delivery is free and requires no paid email service — deliveries are recorded locally.</Alert>
               </Stack>
             ) : (
               <Typography color="text.secondary">Provider status is unavailable.</Typography>

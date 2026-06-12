@@ -327,7 +327,7 @@ const DataQualityEnginePage: React.FC = () => {
           <Stack spacing={1.25}>
             <Stack direction={{ xs: 'column', md: 'row' }} spacing={1} useFlexGap flexWrap="wrap" alignItems={{ xs: 'flex-start', md: 'center' }}>
               <Typography variant="subtitle2" fontWeight={700}>Review Readiness Summary</Typography>
-              <Chip size="small" label={`Mode: ${reviewReadiness.reviewMode}`} color={reviewReadiness.reviewMode === 'FULL_REVIEW' ? 'success' : reviewReadiness.reviewMode === 'LIMITED_REVIEW' ? 'warning' : 'error'} />
+              <Chip size="small" label={`Mode: ${humanizeCode(reviewReadiness.reviewMode)}`} color={reviewReadiness.reviewMode === 'FULL_REVIEW' ? 'success' : reviewReadiness.reviewMode === 'LIMITED_REVIEW' ? 'warning' : 'error'} />
               <Chip size="small" label={`Decision: ${reviewReadiness.userDecision}`} variant="outlined" />
               <Chip size="small" label={`Trust: ${reviewReadiness.trustStatus}`} variant="outlined" />
             </Stack>

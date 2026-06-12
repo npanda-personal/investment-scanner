@@ -282,8 +282,8 @@ const SignalsDashboardPage: React.FC = () => {
             </Typography>
             <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" sx={{ mt: 1 }}>
               <Chip size="small" label={latestRun?.status || 'No run'} color={latestRun?.status === 'FAILED' ? 'error' : latestRun?.status === 'PARTIAL' ? 'warning' : 'default'} />
-              <Chip size="small" variant="outlined" label={`Model ${latestRun?.modelVersion || 'signal-engine-v1'}`} />
-              <Chip size="small" variant="outlined" label={`Ruleset ${latestRun?.rulesetVersion || 'signal-engine-v1'}`} />
+              <Chip size="small" variant="outlined" label={`Model ${latestRun?.modelVersion || 'Default'}`} />
+              <Chip size="small" variant="outlined" label={`Ruleset ${latestRun?.rulesetVersion || 'Default'}`} />
               <Chip size="small" variant="outlined" label={`Source ${latestRun?.sourceDataDate ? new Date(latestRun.sourceDataDate).toLocaleDateString() : 'N/A'}`} />
             </Stack>
           </Box>

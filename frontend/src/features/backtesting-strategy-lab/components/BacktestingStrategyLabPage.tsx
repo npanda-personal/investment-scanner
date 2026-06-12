@@ -47,6 +47,7 @@ import { useBacktestingStrategyLab } from '../hooks';
 import type { BacktestMetrics, BacktestRun, BacktestStrategyConfig, EntryRuleType, ExitRuleType, MonthlyReturnCell, PositionSizeType, UniverseType } from '../types';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
 import { fetchStrategies, type StrategyDefinition, type StrategyTimeframe } from '@/features/strategy-framework';
+import { humanizeCode } from '@/shared/format/enumLabels';
 
 const today = new Date().toISOString().slice(0, 10);
 const defaultStart = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
@@ -118,7 +119,7 @@ export default function BacktestingStrategyLabPage() {
     removeRun,
   } = useBacktestingStrategyLab();
   const [name, setName] = useState('SMA Trend Strategy');
-  const [description, setDescription] = useState('Daily close MVP strategy using trend and signal proxy rules.');
+  const [description, setDescription] = useState('Daily close sample strategy using trend and signal proxy rules.');
   const [symbolsText, setSymbolsText] = useState('RELIANCE,TCS,INFY');
   const [config, setConfig] = useState<BacktestStrategyConfig>(defaultConfig);
   const [mode, setMode] = useState<'registered' | 'custom' | 'runs'>(searchParams.get('mode') === 'custom' ? 'custom' : 'registered');
@@ -542,7 +543,7 @@ function ResultsPanel({ run, chartData }: { run: BacktestRun | null; chartData: 
               <Typography variant="body2" color="text.secondary">{run.config.strategyCode} {run.config.strategyVersion ? `v${run.config.strategyVersion}` : ''} · {run.config.timeframe} · {run.config.region || 'IN'} · {run.config.assetType || 'STOCK'}</Typography>
             </Box>
             <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-              <Chip size="small" label={metrics?.frameworkRating?.ratingGrade || 'UNPROVEN'} color={metrics?.frameworkRating?.ratingGrade === 'EXCELLENT' ? 'success' : metrics?.frameworkRating?.ratingGrade === 'GOOD' ? 'primary' : 'default'} />
+              <Chip size="small" label={humanizeCode(metrics?.frameworkRating?.ratingGrade || 'UNPROVEN')} color={metrics?.frameworkRating?.ratingGrade === 'EXCELLENT' ? 'success' : metrics?.frameworkRating?.ratingGrade === 'GOOD' ? 'primary' : 'default'} />
               <Chip size="small" label={safeReadiness(metrics?.frameworkRating?.readinessLabel)} />
               <Chip size="small" label={metrics?.availabilityStatus || 'NOT_RUN'} />
               {run.config.strategyCode && <Button size="small" href={`/strategies?strategyCode=${encodeURIComponent(run.config.strategyCode)}`}>Strategy Framework</Button>}

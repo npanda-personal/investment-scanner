@@ -217,7 +217,7 @@ interface SignalTrackRecordPanelProps {
 const HORIZONS_ORDER: string[] = ['1D', '5D', '10D', '20D', '60D'];
 
 export const SignalTrackRecordPanel: React.FC<SignalTrackRecordPanelProps> = ({ modelVersion }) => {
-  const { profile } = useMarketScope();
+  const { profile, scope } = useMarketScope();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [summary, setSummary] = useState<ScorecardSummary[]>([]);
@@ -246,8 +246,12 @@ export const SignalTrackRecordPanel: React.FC<SignalTrackRecordPanelProps> = ({ 
 
   useEffect(() => { load(); }, [load]);
 
-  // Crypto has no equity signal track record (samples are equity-derived) — hide.
-  if (profile.isCrypto) return null;
+  // Track record is derived from Indian (NSE) signal outcomes — signal_outcomes
+  // carry no per-region tag, so the numbers are IN history. Show only under the
+  // IN scope to avoid silently presenting Indian history under a US/EU label
+  // (G-US4). Crypto is equity-derived too, so also hidden.
+  const trackRecordRegion = String(scope.region || '').toUpperCase();
+  if (profile.isCrypto || (trackRecordRegion && trackRecordRegion !== 'IN' && trackRecordRegion !== 'INDIA')) return null;
 
   const totalSamples = summary.reduce((acc, s) => Math.max(acc, s.directionalSampleSize), 0);
   const hasData = summary.length > 0 && totalSamples > 0;

@@ -1,6 +1,7 @@
 import earningsIntelligenceRouter from './earnings-intelligence.router';
 
 export { earningsIntelligenceRouter };
+export * from './earnings-intelligence.board-meetings-ingest';
 export * from './earnings-intelligence.controller';
 export * from './earnings-intelligence.repository';
 export * from './earnings-intelligence.router';

@@ -140,7 +140,7 @@ const HistoricalContextSnapshotsPage: React.FC = () => {
             <TextField label="Smart-money limit" value={limit} onChange={(event) => setLimit(event.target.value)} size="small" />
             <Button variant="contained" onClick={runGenerate}>Generate</Button>
           </Stack>
-          <Typography color="text.secondary" variant="body2" sx={{ mt: 2 }}>Generation is manual in MVP. No scheduler or paid data provider is required.</Typography>
+          <Typography color="text.secondary" variant="body2" sx={{ mt: 2 }}>Generation is manual in this version. No scheduler or paid data provider is required.</Typography>
         </Paper>
 
         <Paper sx={{ p: 2 }}>

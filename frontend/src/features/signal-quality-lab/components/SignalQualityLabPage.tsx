@@ -74,7 +74,7 @@ const MetricCard: React.FC<{ label: string; value: string; tone?: 'success' | 'w
   </Paper>
 );
 
-const NULL_COL_TOOLTIP = 'not computed in persisted path';
+const NULL_COL_TOOLTIP = 'not computed in stored path';
 
 const REGIME_ORDER = ['RISK_ON', 'NEUTRAL', 'RISK_OFF', 'UNKNOWN'] as const;
 type KnownRegime = typeof REGIME_ORDER[number];
@@ -283,7 +283,7 @@ const SignalQualityLabPage: React.FC = () => {
       });
       if (result) {
         await reload();
-        setActionMessage(`Signal quality refresh complete. Processed ${result.aggregate.processedCount} / ${result.aggregate.totalCount ?? result.aggregate.processedCount} signal records. Evaluated ${result.aggregate.evaluatedCount}, insufficient future price rows ${result.aggregate.unevaluatedCount}, missing local price history ${result.aggregate.missingPriceHistoryCount}. Outcomes are refreshed and persisted.`);
+        setActionMessage(`Signal quality refresh complete. Processed ${result.aggregate.processedCount} / ${result.aggregate.totalCount ?? result.aggregate.processedCount} signal records. Evaluated ${result.aggregate.evaluatedCount}, insufficient future price rows ${result.aggregate.unevaluatedCount}, missing local price history ${result.aggregate.missingPriceHistoryCount}. Outcomes are refreshed and saved.`);
       }
     } catch (err: any) {
       setFormError(err.response?.data?.error || err.message || 'Signal quality diagnostics refresh failed');
@@ -405,7 +405,7 @@ const SignalQualityLabPage: React.FC = () => {
             label="Model version"
             value={filters.modelVersion || ''}
             onChange={(event) => setFilters({ ...filters, modelVersion: event.target.value.trim() || undefined })}
-            placeholder="signal-engine-v1"
+            placeholder="Default"
             sx={{ minWidth: 180 }}
           />
           <FormControlLabel control={<Checkbox checked={Boolean(filters.onlySignalReady)} onChange={(event) => setFilters({ ...filters, onlySignalReady: event.target.checked })} />} label="Only signal-ready" />
@@ -479,7 +479,7 @@ const SignalQualityLabPage: React.FC = () => {
           <MetricTable
             title="Performance by Data Quality"
             rows={byDataQuality}
-            emptyReason={summary?.warnings?.find((w) => /data.quality/i.test(w)) || (byDataQuality.length === 0 ? 'By-data-quality breakdown is not available in the persisted path.' : undefined)}
+            emptyReason={summary?.warnings?.find((w) => /data.quality/i.test(w)) || (byDataQuality.length === 0 ? 'By-data-quality breakdown is not yet available.' : undefined)}
           />
         </Box>
       )}
@@ -546,7 +546,7 @@ const SignalQualityLabPage: React.FC = () => {
                     <TableCell>{item.score}</TableCell>
                     <TableCell>{item.direction}</TableCell>
                     <TableCell>{item.confidence}</TableCell>
-                    <TableCell>{item.modelVersion || 'signal-engine-v1'}</TableCell>
+                    <TableCell>{item.modelVersion || 'Default'}</TableCell>
                     <TableCell>{outcome?.available ? percent(outcome.forwardReturnPercent) : 'Insufficient future data'}</TableCell>
                     <TableCell align="right">
                       <Tooltip title="Open Research" arrow>

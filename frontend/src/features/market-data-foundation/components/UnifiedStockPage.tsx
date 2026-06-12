@@ -27,6 +27,7 @@ import { PageHeader } from '@/shared/components';
 import { fetchInstrumentContextSnapshot, fetchInstrumentSignalHistory, fetchInstrumentOutcomes } from '@/features/market-intelligence/api/marketIntelligenceService';
 import type { InstrumentOutcomeAggregate, SignalHistoryRow } from '@/features/market-intelligence/api/marketIntelligenceService';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
+import { exchangeLabel } from '@/shared/format/exchangeLabels';
 import { fetchInstruments, fetchInstrument } from '../api/marketDataFoundationService';
 
 const tabs = [
@@ -577,31 +578,36 @@ function MarketContextRail({
                     : 'default'
                 }
                 sub={ctx.smartMoney.asOf ? `as of ${ctx.smartMoney.asOf}` : undefined}
-                tooltip="Institutional buying (ACCUMULATION) or selling (DISTRIBUTION) pattern from NSE/BSE delivery data."
+                tooltip={`Institutional buying (ACCUMULATION) or selling (DISTRIBUTION) pattern from ${exchangeLabel(scope)} delivery data.`}
               />
-              <Divider sx={{ my: 0.5 }} />
-              <ContextRow
-                label="F&O eligible"
-                value={fnoEligibleValue}
-                color={
-                  derivativesEligible === true ? 'success'
-                    : derivativesEligible === false ? 'default'
-                    : 'default'
-                }
-                tooltip="Whether this stock has futures and options contracts listed on NSE."
-              />
-              <Divider sx={{ my: 0.5 }} />
-              <ContextRow
-                label="F&O ban"
-                value={fnoBanValue}
-                color={
-                  ctx.fnoBan.absent ? 'default'
-                    : ctx.fnoBan.value?.banned ? 'error'
-                    : 'success'
-                }
-                sub={ctx.fnoBan.asOf ? `ban list ${ctx.fnoBan.asOf}` : undefined}
-                tooltip="Stocks in the F&O ban period cannot have new derivative positions opened."
-              />
+              {/* F&O eligibility / ban are India NSE-only concepts — gate by capability. */}
+              {profile.capabilities.hasDelivery && (
+                <>
+                  <Divider sx={{ my: 0.5 }} />
+                  <ContextRow
+                    label="F&O eligible"
+                    value={fnoEligibleValue}
+                    color={
+                      derivativesEligible === true ? 'success'
+                        : derivativesEligible === false ? 'default'
+                        : 'default'
+                    }
+                    tooltip="Whether this stock has futures and options contracts listed on NSE."
+                  />
+                  <Divider sx={{ my: 0.5 }} />
+                  <ContextRow
+                    label="F&O ban"
+                    value={fnoBanValue}
+                    color={
+                      ctx.fnoBan.absent ? 'default'
+                        : ctx.fnoBan.value?.banned ? 'error'
+                        : 'success'
+                    }
+                    sub={ctx.fnoBan.asOf ? `ban list ${ctx.fnoBan.asOf}` : undefined}
+                    tooltip="Stocks in the F&O ban period cannot have new derivative positions opened."
+                  />
+                </>
+              )}
               <Divider sx={{ my: 0.5 }} />
               <ContextRow
                 label="Latest signal"

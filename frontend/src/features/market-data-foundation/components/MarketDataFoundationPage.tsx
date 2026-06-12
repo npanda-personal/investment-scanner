@@ -1131,7 +1131,7 @@ const MarketDataFoundationPage: React.FC = () => {
     <Box className="page-container page-container--workspace" sx={{ minWidth: 0 }}>
       <PageHeader
         title="Market Data Foundation"
-        subtitle="Explore instruments, exchange-file evidence, persisted prices, fundamentals, corporate actions, and data health."
+        subtitle="Explore instruments, exchange-file evidence, recorded prices, fundamentals, corporate actions, and data health."
         primaryAction={
           <Button variant="contained" startIcon={<AddIcon />} onClick={() => navigate('/admin/market-data-foundation/add')}>
             Add Instrument

@@ -175,7 +175,7 @@ const NotificationsDeliveryPage: React.FC = () => {
                 <Chip label={`SMTP configured: ${providerStatus.smtpConfigured ? 'Yes' : 'No'}`} color={providerStatus.smtpConfigured ? 'warning' : 'default'} />
                 <Chip label={`SMTP active: ${providerStatus.smtpAvailable ? 'Yes' : 'No'}`} color={providerStatus.smtpAvailable ? 'success' : 'default'} />
               </Stack>
-              <Alert severity="info">MVP delivery is free/local-friendly. The log email provider records deliveries without requiring a paid email service.</Alert>
+              <Alert severity="info">Local email delivery is free and requires no paid email service — deliveries are recorded locally.</Alert>
             </Stack>
           ) : (
             <Typography color="text.secondary">Provider status is unavailable.</Typography>

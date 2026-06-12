@@ -43,6 +43,23 @@ function classifySectorScore(score: number): SectorSmartMoneyStatus {
   return 'STRONG_DISTRIBUTION';
 }
 
+/**
+ * Minimum instruments before a sector may carry an extreme ("STRONG_*") verdict.
+ * A 1–2 stock "sector" cannot honestly be called Strong Distribution/Accumulation,
+ * so below this threshold the verdict is softened to the non-extreme band.
+ */
+const MIN_UNIVERSE_FOR_STRONG_VERDICT = 3;
+
+function softenStrongVerdictForThinUniverse(
+  status: SectorSmartMoneyStatus,
+  instrumentCount: number
+): SectorSmartMoneyStatus {
+  if (instrumentCount >= MIN_UNIVERSE_FOR_STRONG_VERDICT) return status;
+  if (status === 'STRONG_ACCUMULATION') return 'ACCUMULATING';
+  if (status === 'STRONG_DISTRIBUTION') return 'DISTRIBUTING';
+  return status;
+}
+
 const RANGE_LIMITS: Record<SmartMoneyRange, number> = { '1M': 35, '3M': 90, '6M': 180 };
 const SMART_MONEY_REFRESH_RANGES: SmartMoneyRange[] = ['1M', '3M', '6M'];
 const SMART_MONEY_DEFAULT_REGION = 'IN';
@@ -453,7 +470,10 @@ export class SmartMoneyIntelligenceService {
     });
     return [...groups.entries()].map(([sector, items]) => {
       const average = Math.round(items.reduce((sum, item) => sum + item.smartMoneyScore, 0) / Math.max(1, items.length));
-      const sectorStatus: SectorSmartMoneyStatus = classifySectorScore(average);
+      const sectorStatus: SectorSmartMoneyStatus = softenStrongVerdictForThinUniverse(
+        classifySectorScore(average),
+        items.length
+      );
       const dataStatus: SmartMoneyDataStatus = items.some((item) => item.dataStatus === 'PARTIAL') ? 'PARTIAL' : 'COMPLETE';
       const updatedAt = items.map((item) => item.updatedAt).sort().at(-1) || new Date(0).toISOString();
       return {

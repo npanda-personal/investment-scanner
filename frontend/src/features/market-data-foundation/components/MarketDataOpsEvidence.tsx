@@ -372,7 +372,7 @@ function userMessage(message: string) {
   if (/HTTP\s*404|404|not found|missing|unavailable/i.test(text)) return 'Official exchange file is not available for one or more dates.';
   if (/HTTP\s*429|rate limit|too many requests/i.test(text)) return 'Exchange request was throttled; retry later.';
   if (/HTTP\s*5\d\d|service unavailable|gateway/i.test(text)) return 'Exchange service returned a temporary error; retry later.';
-  if (/latestPrice\.upsert|latest_prices|LatestPrice|Prisma/i.test(text)) return 'Latest price rebuild failed for one or more dates; persisted candle import needs review.';
+  if (/latestPrice\.upsert|latest_prices|LatestPrice|Prisma/i.test(text)) return 'Latest price rebuild failed — data import needs review.';
   if (/already completed|already imported/i.test(text)) return 'Some dates were already imported and skipped.';
   return text.length > 140 ? `${text.slice(0, 137)}...` : text;
 }

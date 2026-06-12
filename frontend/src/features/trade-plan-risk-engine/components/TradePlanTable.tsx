@@ -3,6 +3,7 @@ import { Chip, Typography, Button } from '@mui/material';
 import { TradePlanResultDto } from '../types';
 import { Link } from 'react-router-dom';
 import { DataTable, DataTableColumn, SortDirection } from '@/shared/components/DataTable';
+import { humanizeCode } from '@/shared/format/enumLabels';
 
 interface TradePlanTableProps {
   plans: TradePlanResultDto[];
@@ -102,7 +103,7 @@ export const TradePlanTable: React.FC<TradePlanTableProps> = ({
         />
       )
     },
-    { id: 'strategyRating', label: 'Rating', sortable: true, render: (p) => <Chip size="small" label={p.strategyRating || 'UNPROVEN'} variant="outlined" /> },
+    { id: 'strategyRating', label: 'Rating', sortable: true, render: (p) => <Chip size="small" label={humanizeCode(p.strategyRating || 'UNPROVEN')} variant="outlined" /> },
     { id: 'latestPrice', label: 'Price', render: (p) => fmtMoney(p, p.latestPrice ?? p.marketDataSnapshot?.latestPrice) },
     { id: 'reason', label: 'Reason', render: (p) => <Typography variant="body2" noWrap sx={{ maxWidth: 200 }}>{p.strategyDecisionSnapshot?.reasons?.[0] || p.paperReadinessReasons?.[0] || p.warnings?.[0] || '-'}</Typography> },
     { id: 'actions', label: 'Actions', align: 'right', render: (p) => <Button size="small" component={Link} to={`/trade-plans/${p.instrumentId}`}>View</Button> },

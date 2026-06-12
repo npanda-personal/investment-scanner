@@ -30,6 +30,7 @@ import { PageHeader } from '@/shared/components';
 import { NotApplicableForAssetClass } from '@/shared/components/NotApplicableForAssetClass';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
 import { compactByProfile, money } from '@/shared/format/money';
+import { screenerSubtitle as buildScreenerSubtitle } from '@/shared/format/exchangeLabels';
 import type { ScreenerFilters, ScreenerRow, ScreenerCapBand, ScreenerSignalDirection } from '../types';
 import { fetchScreener } from '../api/screenerService';
 
@@ -119,10 +120,10 @@ const DEFAULT_FILTERS: ScreenerFilters = {
 // ---------------------------------------------------------------------------
 
 export default function ScreenerPage() {
-  const { profile } = useMarketScope();
+  const { profile, scope } = useMarketScope();
   // India-only NSE/BSE features (delivery %, F&O ban) — gate by capability.
   const hasDelivery = profile.capabilities.hasDelivery;
-  const screenerSubtitle = `Filter NSE/BSE stocks by technicals, fundamentals and signals.`;
+  const screenerSubtitle = buildScreenerSubtitle(scope);
   const [filters, setFilters] = useState<ScreenerFilters>(DEFAULT_FILTERS);
   const [rows, setRows] = useState<ScreenerRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -186,7 +187,7 @@ export default function ScreenerPage() {
         />
         <NotApplicableForAssetClass
           feature="Screener"
-          detail="Crypto coverage in this release is available on Signals, Market Scans, and the Instrument workspace. This view will support crypto in a later update."
+          detail="Crypto coverage in this release is available on Market Scans and the Instrument workspace. This view will support crypto in a later update."
         />
       </Box>
     );
