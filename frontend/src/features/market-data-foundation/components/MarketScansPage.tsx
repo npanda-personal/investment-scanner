@@ -548,8 +548,8 @@ export default function MarketScansPage() {
       <PageHeader
         title="Market Scans"
         subtitle={profile.isCrypto
-          ? 'Daily screening scans for crypto assets (top market-cap universe). Persisted-read — data reflects the latest ingested OHLCV.'
-          : `Daily screening scans for ${scope.region === 'IN' ? 'Indian NSE/BSE' : scope.region} equities. Persisted-read — data reflects the latest ingested price data.`}
+          ? 'Daily screening scans for crypto assets (top market-cap universe). Data reflects the latest stored prices.'
+          : `Daily screening scans for ${scope.region === 'IN' ? 'Indian NSE/BSE' : scope.region} equities. Data reflects the latest stored prices.`}
       />
 
       <Paper sx={{ p: 0 }}>
