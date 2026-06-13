@@ -10,7 +10,7 @@ export {
   marketDataV1Router,
 } from './market-data-foundation.router';
 export { MarketDataFoundationController } from './market-data-foundation.controller';
-export { MarketDataFoundationService, StockService } from './market-data-foundation.service';
+export { MarketDataFoundationService } from './market-data-foundation.service';
 export type { MarketDataReadApi } from './analytics/market-data-read.api';
 export { isWatermarkGateEnabled, getWatermarkDate, evictWatermarkCache } from './analytics/market-data-read.api';
 export { MarketDataFoundationRepository } from './market-data-foundation.repository';
