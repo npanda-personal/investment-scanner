@@ -21,11 +21,13 @@ function arg(name: string): string | undefined {
 }
 
 async function main(): Promise<void> {
+  const region = (arg('region') || 'US').toUpperCase();
   const lookbackDays = Number(arg('lookback') || 15);
   const concurrency = Number(arg('concurrency') || process.env.MARKET_DATA_US_FETCH_CONCURRENCY || 6);
-  console.log(`[backfill-us-tracked] lookbackDays=${lookbackDays} concurrency=${concurrency}`);
+  console.log(`[backfill-tracked] region=${region} lookbackDays=${lookbackDays} concurrency=${concurrency}`);
   const service = new UsEquityIngestionService();
   const summary = await service.backfillPrices({
+    region,
     lookbackDays,
     concurrency,
     onSymbolComplete: (symbol, info) => {

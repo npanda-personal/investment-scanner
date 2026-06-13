@@ -18,6 +18,12 @@ import {
  * scheduler's GLOBAL:CRYPTO lane (P3).
  */
 
+/** OHLC sanity: all finite & positive, and low ≤ {open,close} ≤ high. */
+function isValidOhlc(open: number, high: number, low: number, close: number): boolean {
+  if (![open, high, low, close].every((v) => Number.isFinite(v) && v > 0)) return false;
+  return low <= high && low <= open && low <= close && open <= high && close <= high;
+}
+
 export interface CryptoUniverseIngestSummary {
   source: 'CRYPTO';
   universeRequested: number;
@@ -34,6 +40,12 @@ export interface CryptoPriceBackfillSummary {
   barsInserted: number;
   barsUpdated: number;
   barsSkipped: number;
+  /** Symbols whose fetch/store threw (isolated — did not abort the run). */
+  symbolsFailed: number;
+  /** Bars dropped at ingest for failing OHLC sanity (low<=high, positive prices). */
+  barsDropped: number;
+  /** True if the circuit breaker paused the run (provider likely down/throttling). */
+  aborted: boolean;
   perSymbol: Array<{ symbol: string; received: number; inserted: number; updated: number }>;
   warnings: string[];
 }
@@ -65,9 +77,10 @@ export class CryptoIngestionService {
    * Backfill daily OHLCV for the given symbols (or all active crypto assets when
    * omitted) into crypto_price_ticks + crypto_latest_prices.
    */
-  async backfillPrices(options: { symbols?: string[]; lookbackDays?: number; maxBars?: number; incremental?: boolean; minLookbackDays?: number } = {}): Promise<CryptoPriceBackfillSummary> {
+  async backfillPrices(options: { symbols?: string[]; lookbackDays?: number; maxBars?: number; incremental?: boolean; minLookbackDays?: number; maxConsecutiveFailures?: number } = {}): Promise<CryptoPriceBackfillSummary> {
     const warnings: string[] = [];
     const DAY_MS = 24 * 60 * 60 * 1000;
+    const maxConsecutiveFailures = Math.max(1, options.maxConsecutiveFailures ?? 25);
     let symbols = options.symbols;
     if (!symbols || symbols.length === 0) {
       const assets = await this.repo.listAssets({ activeOnly: true });
@@ -86,11 +99,16 @@ export class CryptoIngestionService {
       barsInserted: 0,
       barsUpdated: 0,
       barsSkipped: 0,
+      symbolsFailed: 0,
+      barsDropped: 0,
+      aborted: false,
       perSymbol: [],
       warnings,
     };
 
+    let consecutiveFailures = 0;
     for (const symbol of symbols) {
+      if (summary.aborted) break;
       try {
         // Incremental: resume from the latest stored candle (minus a small overlap
         // floor); full backfill when nothing is stored yet for the symbol.
@@ -99,7 +117,12 @@ export class CryptoIngestionService {
           const latest = await this.repo.latestStoredCandleDate(symbol);
           startTime = latest ? new Date(latest.getTime() - minLookbackDays * DAY_MS) : null;
         }
-        const bars = await fetchCryptoHistory(symbol, { interval: '1d', limit: maxBars, startTime });
+        const rawBars = await fetchCryptoHistory(symbol, { interval: '1d', limit: maxBars, startTime });
+        consecutiveFailures = 0;
+        // OHLC sanity: drop malformed candles (non-finite, non-positive, or low>high)
+        // so a bad provider row never enters crypto_price_ticks.
+        const bars = rawBars.filter((b) => isValidOhlc(b.open, b.high, b.low, b.close));
+        summary.barsDropped += rawBars.length - bars.length;
         const stored = await this.repo.storeHistoricalPrices(bars, { source: 'BINANCE_KLINES' });
         summary.symbolsProcessed += 1;
         summary.barsInserted += stored.rowsInserted;
@@ -113,7 +136,15 @@ export class CryptoIngestionService {
         });
         if (stored.warnings.length) warnings.push(...stored.warnings);
       } catch (error) {
+        consecutiveFailures += 1;
+        summary.symbolsFailed += 1;
         warnings.push(`Backfill failed for ${symbol}: ${(error as Error).message}`);
+        // Circuit breaker: a sustained failure run means the provider is down or
+        // throttling — stop hammering it across the remaining symbols.
+        if (consecutiveFailures >= maxConsecutiveFailures) {
+          summary.aborted = true;
+          warnings.push(`Crypto backfill paused after ${consecutiveFailures} consecutive failures (provider likely down/throttling).`);
+        }
       }
     }
 

@@ -44,6 +44,7 @@ export class FreeProviderIngestionAdapter implements RegionIngestionAdapter {
 
   async syncDaily(request: RegionDailySyncRequest): Promise<RegionDailySyncResult> {
     const backfill = await usEquityIngestionService.backfillPrices({
+      region: request.region,
       symbols: request.symbols,
       lookbackDays: request.lookbackTradingDays,
     });

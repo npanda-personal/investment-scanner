@@ -74,4 +74,27 @@ describe('US ingestion robustness', () => {
       expect(mockFetch.mock.calls.length).toBe(10);
     });
   });
+
+  describe('backfillPrices region parameterization (EU region-stamping fix)', () => {
+    it('flows region through to the stock query and the price-region stamping', async () => {
+      mockFetch.mockReset().mockResolvedValue([
+        { symbol: 'X', date: new Date('2026-06-12T00:00:00Z'), open: 1, high: 2, low: 0.5, close: 1.5, volume: 100 },
+      ]);
+      const findMany = jest.fn().mockResolvedValue([{ id: 'eu-1', symbol: 'X', exchange: 'XETRA' }]);
+      let inferRegionResult: any = null;
+      const storeHistoricalBulk = jest.fn().mockImplementation((bars: any[], inferRegion: () => any) => {
+        inferRegionResult = inferRegion();
+        return { rowsReceived: bars.length, rowsInserted: bars.length, rowsUpdated: 0, rowsSkipped: 0, warnings: [] };
+      });
+      const repo: any = { prisma: { stock: { findMany } }, storeHistoricalBulk, upsertCorporateActions: jest.fn() };
+
+      const summary = await new UsEquityIngestionService(repo).backfillPrices({ region: 'EU', symbols: ['X'], withCorporateActions: false });
+
+      // (a) the stock query is scoped to region='EU' (not the hardcoded 'US')
+      expect(findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ region: 'EU' }) }));
+      // (b) price rows are stamped region='EU' (the bug fix)
+      expect(inferRegionResult).toMatchObject({ region: 'EU', exchange: 'XETRA' });
+      expect(summary.barsInserted).toBe(1);
+    });
+  });
 });

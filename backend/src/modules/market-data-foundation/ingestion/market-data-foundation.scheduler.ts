@@ -418,6 +418,16 @@ export const defaultCryptoLaneRunner: CryptoLaneRunner = async (now: Date) => {
   // Incremental per-symbol ingest (resumes from the latest stored candle); a small
   // lookback floor handles 24/7 boundary/overlap. Free-API friendly; provider throttles internally.
   const ingest = await cryptoIngestionService.backfillPrices({ incremental: true, minLookbackDays: 2 });
+  // Surface lane outcome (was previously silent — per-symbol failures never logged).
+  console.log('[CryptoLane] backfill', {
+    symbolsProcessed: ingest.symbolsProcessed,
+    inserted: ingest.barsInserted,
+    updated: ingest.barsUpdated,
+    failed: ingest.symbolsFailed,
+    droppedBadOhlc: ingest.barsDropped,
+    aborted: ingest.aborted,
+    warnings: ingest.warnings.length,
+  });
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   const { cryptoSignalGenerationService } = require('../../signal-generation-engine/signal-generation-engine.crypto-service');
   const signals = await cryptoSignalGenerationService.generateAll({ asOf: now });

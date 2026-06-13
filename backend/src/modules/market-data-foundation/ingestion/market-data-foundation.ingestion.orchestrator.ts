@@ -214,7 +214,7 @@ export class RegionSyncOrchestrator {
       const regionAdapter = resolveRegionAdapter(region, assetType);
       const backfill = regionAdapter
         ? await regionAdapter.syncDaily({ region, assetType, symbols, lookbackTradingDays: lookbackDays })
-        : await usEquityIngestionService.backfillPrices({ symbols, lookbackDays });
+        : await usEquityIngestionService.backfillPrices({ region, symbols, lookbackDays });
 
       const changedInstrumentIds = this.host.instrumentIdsForImportedSymbols(tasks, backfill.changedSymbols);
       const downstreamInstrumentIds = changedInstrumentIds.length > 0

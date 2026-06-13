@@ -55,6 +55,8 @@ export interface UsPriceBackfillSummary {
 }
 
 export interface UsPriceBackfillOptions {
+  /** Region to ingest for (default 'US'). EU rides the same Yahoo path via the adapter. */
+  region?: string;
   symbols?: string[];
   lookbackDays?: number;
   all?: boolean;
@@ -177,10 +179,10 @@ export class UsEquityIngestionService {
     return 'inserted';
   }
 
-  /** List active US stock rows (id + symbol + exchange) for price backfill. */
-  private async listUsSymbols(): Promise<Array<{ id: string; symbol: string; exchange: string | null }>> {
+  /** List active stock rows (id + symbol + exchange) for a region's price backfill. */
+  private async listRegionSymbols(region: string): Promise<Array<{ id: string; symbol: string; exchange: string | null }>> {
     const rows = await this.repo.prisma.stock.findMany({
-      where: { region: 'US', isActive: true, isDelisted: false },
+      where: { region, isActive: true, isDelisted: false },
       select: { id: true, symbol: true, exchange: true },
       orderBy: { symbol: 'asc' },
     });
@@ -196,7 +198,8 @@ export class UsEquityIngestionService {
    * `onSymbolComplete` to checkpoint progress for a long full-universe run.
    */
   async backfillPrices(options: UsPriceBackfillOptions = {}): Promise<UsPriceBackfillSummary> {
-    const provider = resolveEodProvider('US');
+    const region = (options.region || 'US').toUpperCase();
+    const provider = resolveEodProvider(region);
     const withCorporateActions = options.withCorporateActions !== false;
     const summary: UsPriceBackfillSummary = {
       source: 'US_EQUITY',
@@ -216,18 +219,18 @@ export class UsEquityIngestionService {
       warnings: [],
     };
     if (!provider) {
-      summary.warnings.push('US EOD provider disabled (MARKET_DATA_US_PROVIDER_ENABLED=false).');
+      summary.warnings.push(`${region} EOD provider disabled (MARKET_DATA_${region}_PROVIDER_ENABLED=false).`);
       return summary;
     }
 
     let targets: Array<{ id?: string; symbol: string; exchange: string | null }>;
     if (options.symbols && options.symbols.length > 0) {
       const wanted = new Set(options.symbols.map((s) => s.trim().toUpperCase()));
-      const known = await this.listUsSymbols();
+      const known = await this.listRegionSymbols(region);
       const bySymbol = new Map(known.map((r) => [r.symbol, r] as const));
       targets = [...wanted].map((symbol) => bySymbol.get(symbol) ?? { symbol, exchange: null });
     } else {
-      targets = await this.listUsSymbols();
+      targets = await this.listRegionSymbols(region);
     }
 
     const skip = options.skipSymbols;
@@ -235,7 +238,7 @@ export class UsEquityIngestionService {
       ? new Date(Date.now() - options.lookbackDays * 24 * 60 * 60 * 1000)
       : null;
 
-    // Region info per symbol so price_ticks rows carry region='US' + exchange.
+    // Region info per symbol so price_ticks rows carry the correct region + exchange.
     const regionInfoBySymbol = new Map<string, { region: string; exchange?: string | null }>();
 
     // Efficiency: fetch up to `concurrency` symbols in parallel (1,500 names finish
@@ -278,10 +281,10 @@ export class UsEquityIngestionService {
           options.onSymbolComplete?.(target.symbol, { index: myIndex, total, bars: 0, actions: 0, hadData: false, ok: true });
           return;
         }
-        regionInfoBySymbol.set(target.symbol, { region: 'US', exchange: target.exchange ?? null });
+        regionInfoBySymbol.set(target.symbol, { region, exchange: target.exchange ?? null });
         const stored = await this.repo.storeHistoricalBulk(
           bars,
-          () => ({ region: 'US', exchange: target.exchange ?? null }),
+          () => ({ region, exchange: target.exchange ?? null }),
           regionInfoBySymbol
         );
         summary.barsReceived += stored.rowsReceived;
@@ -298,7 +301,7 @@ export class UsEquityIngestionService {
         // Persist corporate actions (dividends/splits) — needs the resolved stockId.
         let actionsUpserted = 0;
         if (withCorporateActions && actions.length > 0) {
-          const stockId = target.id ?? (await this.resolveUsStockId(target.symbol));
+          const stockId = target.id ?? (await this.resolveRegionStockId(region, target.symbol));
           if (stockId) {
             try {
               await this.repo.upsertCorporateActions(stockId, actions);
@@ -324,20 +327,20 @@ export class UsEquityIngestionService {
         if (consecutiveFailures >= maxConsecutiveFailures && !aborted) {
           aborted = true;
           summary.aborted = true;
-          summary.warnings.push(`Circuit breaker tripped after ${consecutiveFailures} consecutive failures — pausing US backfill to avoid provider bans.`);
+          summary.warnings.push(`Circuit breaker tripped after ${consecutiveFailures} consecutive failures — pausing ${region} backfill to avoid provider bans.`);
         }
       }
     }, () => aborted);
     if (aborted) {
-      summary.warnings.push(`US backfill paused early after ~${index}/${total} symbols attempted (circuit breaker tripped on sustained provider failures).`);
+      summary.warnings.push(`${region} backfill paused early after ~${index}/${total} symbols attempted (circuit breaker tripped on sustained provider failures).`);
     }
     return summary;
   }
 
-  /** Resolve the stockId for a US symbol (collision-safe — only matches region='US'). */
-  private async resolveUsStockId(symbol: string): Promise<string | null> {
+  /** Resolve the stockId for a region's symbol (collision-safe — region-scoped). */
+  private async resolveRegionStockId(region: string, symbol: string): Promise<string | null> {
     const row = await this.repo.prisma.stock.findFirst({
-      where: { symbol: symbol.toUpperCase(), region: 'US' },
+      where: { symbol: symbol.toUpperCase(), region },
       select: { id: true },
     });
     return row?.id ?? null;
