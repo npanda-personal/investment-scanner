@@ -39,8 +39,21 @@ describe('market data market session decisions', () => {
     });
   });
 
-  it('runs during IN post-close finalization window', () => {
+  it('waits between IN close and the EOD finalization grace (bhavcopy not published yet)', () => {
+    // 10:30 UTC = 16:00 IST — market closed (15:30) but before the ≈18:30 IST
+    // finalization grace, so the official EOD file is typically not published.
     const decision = shouldRunMarketDataSync('IN', new Date('2026-05-05T10:30:00.000Z'));
+
+    expect(decision).toMatchObject({
+      shouldRun: false,
+      reasonCode: 'MARKET_CLOSED_NO_SYNC',
+      todayTradingDate: '2026-05-05',
+    });
+  });
+
+  it('runs during IN post-close finalization window', () => {
+    // 13:15 UTC = 18:45 IST — inside [18:30, 20:30] post-close window.
+    const decision = shouldRunMarketDataSync('IN', new Date('2026-05-05T13:15:00.000Z'));
 
     expect(decision).toMatchObject({
       shouldRun: true,
@@ -50,7 +63,7 @@ describe('market data market session decisions', () => {
   });
 
   it('skips after final candle is confirmed', () => {
-    const decision = shouldRunMarketDataSync('IN', new Date('2026-05-05T10:30:00.000Z'), {
+    const decision = shouldRunMarketDataSync('IN', new Date('2026-05-05T13:15:00.000Z'), {
       latestTradingDate: '2026-05-05',
       finalConfirmed: true,
     });
@@ -75,7 +88,8 @@ describe('market data market session decisions', () => {
   });
 
   it('reports current trading day as latest completed after IN close grace', () => {
-    expect(latestCompletedTradingDateForRegion('IN', new Date('2026-05-05T10:30:00.000Z'))).toBe('2026-05-05');
+    // 13:15 UTC = 18:45 IST — past the ≈18:30 IST finalization grace.
+    expect(latestCompletedTradingDateForRegion('IN', new Date('2026-05-05T13:15:00.000Z'))).toBe('2026-05-05');
   });
 });
 
@@ -87,8 +101,8 @@ describe('expectedLatestTradingDate', () => {
   // We use a time well after market close on Wed to ensure today's candle
   // would normally be chosen.
   const NSE_HOLIDAY_WED = '2026-05-06';
-  // 12:00 UTC = 17:30 IST (after close + grace)
-  const afterCloseOnHoliday = new Date('2026-05-06T12:00:00.000Z');
+  // 13:30 UTC = 19:00 IST (after close + 180m finalization grace → 18:30 IST)
+  const afterCloseOnHoliday = new Date('2026-05-06T13:30:00.000Z');
 
   it('returns the holiday date itself when no holidays provided (weekend-only degrade)', () => {
     const { date, calendarUncertain } = expectedLatestTradingDate('IN', afterCloseOnHoliday);
@@ -135,7 +149,7 @@ describe('expectedLatestTradingDate', () => {
   it('returns calendarUncertain=false and a date when holidays Set is provided', () => {
     const { date, calendarUncertain } = expectedLatestTradingDate(
       'IN',
-      new Date('2026-05-05T12:00:00.000Z'),
+      new Date('2026-05-05T13:30:00.000Z'),
       { holidays: new Set<string>() }
     );
     expect(date).toBe('2026-05-05');

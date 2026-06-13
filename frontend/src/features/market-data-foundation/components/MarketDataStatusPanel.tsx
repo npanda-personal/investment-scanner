@@ -135,6 +135,12 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
             )}
           </Typography>
           <Typography variant="body2" color="text.secondary">Latest timestamp: {formatTimestamp(health?.latestDataTimestamp)}</Typography>
+          {health?.trackedCoverage && (
+            <Typography variant="body2" color="text.secondary">
+              Tracked coverage: {formatCount(health.trackedCoverage.currentToLatest)}/{formatCount(health.trackedCoverage.trackedTotal)} current ({health.trackedCoverage.coveragePct}%)
+              {health.trackedCoverage.latestDate ? ` · through ${health.trackedCoverage.latestDate}` : ''}
+            </Typography>
+          )}
           <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" sx={{ mt: 1 }}>
             <Chip size="small" label={health?.data_status || 'UNKNOWN'} color={statusColor(health?.data_status)} />
             <Chip size="small" label={health?.source || 'database'} />
@@ -155,10 +161,17 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
         <Paper variant="outlined" sx={{ p: 2 }}>
           <Typography variant="overline" color="text.secondary">Scheduler</Typography>
           <Typography variant="h6">{scheduler?.enabled ? 'Enabled' : 'Disabled'}</Typography>
-          <Typography variant="body2" color="text.secondary">Last run: {formatTimestamp(scheduler?.lastRunAt)}</Typography>
+          {/* "Last checked" is when the scheduler last evaluated the feed (every
+              poll, even when there was nothing new to load) — it tells you the
+              scheduler is alive. "Data through" is the trading date of the data
+              actually on hand, which is naturally older on weekends/holidays.
+              Keeping them as separate lines avoids reading a valid data date as
+              a stale run. */}
+          <Typography variant="body2" color="text.secondary">Last checked: {formatTimestamp(scheduler?.lastRunAt)}</Typography>
+          <Typography variant="body2" color="text.secondary">Data through: {schedulerRegion?.latestStoredTradingDate || 'none'}</Typography>
           {scheduler?.nextSuggestedRunAt && (
             <Typography variant="body2" color="text.secondary">
-              Next suggested run: {formatTimestamp(scheduler.nextSuggestedRunAt)}
+              Next run: {formatTimestamp(scheduler.nextSuggestedRunAt)}
             </Typography>
           )}
           <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" sx={{ mt: 1 }}>

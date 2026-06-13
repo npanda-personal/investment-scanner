@@ -979,11 +979,20 @@ export interface V1SyncResponse {
   errors?: string[];
 }
 
+export interface MarketDataTrackedCoverage {
+  trackedTotal: number;
+  currentToLatest: number;
+  latestDate: string | null;
+  coveragePct: number;
+}
+
 export interface MarketDataHealth {
   status: string;
   module: string;
   instrumentCount: number;
   latestDataTimestamp: string | null;
+  /** Freshness of the curated tracked set for the scoped region (null if uncurated). */
+  trackedCoverage?: MarketDataTrackedCoverage | null;
   source: string;
   ingestion_timestamp: string;
   last_updated_timestamp: string | null;

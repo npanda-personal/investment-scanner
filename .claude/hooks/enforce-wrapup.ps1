@@ -9,7 +9,7 @@ if (Test-Path $marker) {
     Remove-Item $marker -Force -Confirm:$false
     $out = @{
         decision = 'block'
-        reason   = 'Post-Work Protocol not confirmed: source files were edited this session. Run /wrap-up (scoped QA pass; /refresh-snapshots if snapshot-producing code changed; stop processes you spawned, never the default FE/BE/Docker; Done Report with proof) - or state explicitly why it does not apply, then finish.'
+        reason   = 'Post-Work Protocol not confirmed: source files were edited this session. Run /wrap-up: scoped QA pass; FOR SUBSTANTIAL CHANGES (multi-file / schema / data-mutation / cross-cutting / new-module / downstream-affecting) an independent code-reviewer pass AND a qa-verifier pass are REQUIRED before "done" - self tsc/jest is the developer self-check, NOT review or QA; /refresh-snapshots if snapshot-producing code changed; stop processes you spawned (never the default FE/BE/Docker); Done Report with review + QA evidence - or state explicitly why a gate does not apply, then finish.'
     } | ConvertTo-Json -Compress
     Write-Output $out
 }

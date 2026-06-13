@@ -2,6 +2,7 @@ import { MarketDataFoundationRepository } from '../../market-data-foundation.rep
 import { fetchNasdaqTraderUniverse, UsUniverseCandidate } from './market-data-foundation.us-catalog-source';
 import { resolveEodProvider, isRegionProviderEnabled } from '../market-data-foundation.provider-registry';
 import { YAHOO_PROVIDER_THROTTLE_MS } from '../market-data-foundation.yahoo-eod-provider';
+import { eachWithConcurrency } from '../../util/market-data-foundation.util.concurrency';
 
 /**
  * US equity ingestion service — orchestrates the FREE US providers
@@ -44,6 +45,12 @@ export interface UsPriceBackfillSummary {
   symbolsWithActions: number;
   /** Symbols whose backfill inserted or updated at least one bar (for DQ downstream). */
   changedSymbols: string[];
+  /** Symbols whose fetch/store threw (isolated — did not abort the run). */
+  symbolsFailed: number;
+  /** Epoch/pre-listing artifact bars dropped at ingest (data hygiene). */
+  barsDroppedStale: number;
+  /** True if the circuit breaker paused the run (provider likely throttling/banning). */
+  aborted: boolean;
   warnings: string[];
 }
 
@@ -55,6 +62,12 @@ export interface UsPriceBackfillOptions {
   skipSymbols?: Set<string>;
   /** Parse + persist dividend/split corporate actions alongside prices (default true). */
   withCorporateActions?: boolean;
+  /** Max symbols fetched in parallel (default MARKET_DATA_US_FETCH_CONCURRENCY or 6). */
+  concurrency?: number;
+  /** Trip the circuit breaker after this many consecutive failures (default 25). */
+  maxConsecutiveFailures?: number;
+  /** Drop bars dated before this year as epoch/pre-listing artifacts (default 1971). */
+  priceFloorYear?: number;
   /**
    * Per-symbol progress callback for checkpointing / logging.  `ok` is false only
    * when the fetch/store threw — callers should checkpoint on `ok` (a clean empty
@@ -197,6 +210,9 @@ export class UsEquityIngestionService {
       corporateActionsUpserted: 0,
       symbolsWithActions: 0,
       changedSymbols: [],
+      symbolsFailed: 0,
+      barsDroppedStale: 0,
+      aborted: false,
       warnings: [],
     };
     if (!provider) {
@@ -222,34 +238,45 @@ export class UsEquityIngestionService {
     // Region info per symbol so price_ticks rows carry region='US' + exchange.
     const regionInfoBySymbol = new Map<string, { region: string; exchange?: string | null }>();
 
+    // Efficiency: fetch up to `concurrency` symbols in parallel (1,500 names finish
+    // in one post-close pass). Robustness: a circuit breaker pauses the run if the
+    // provider starts mass-rejecting (avoids IP bans) — `consecutiveFailures` is a
+    // failure-pressure signal (failures with no intervening success across the
+    // interleaved workers); under a genuine ban no success resets it, so it climbs
+    // to the threshold, at which point the abort predicate stops launching new
+    // fetches. Per-symbol errors stay isolated; epoch/pre-listing bars are dropped.
+    const concurrency = Math.max(1, Math.min(options.concurrency ?? (Number(process.env.MARKET_DATA_US_FETCH_CONCURRENCY) || 6), 32));
+    const maxConsecutiveFailures = Math.max(1, options.maxConsecutiveFailures ?? 25);
+    const floorYear = options.priceFloorYear ?? (Number(process.env.MARKET_DATA_US_PRICE_FLOOR_YEAR) || 1971);
     const total = targets.length;
     let index = 0;
-    for (const target of targets) {
-      index += 1;
+    let consecutiveFailures = 0;
+    let aborted = false;
+
+    await eachWithConcurrency(targets, concurrency, async (target) => {
+      if (aborted) return;
+      const myIndex = (index += 1);
       if (skip && skip.has(target.symbol.toUpperCase())) {
         summary.symbolsSkipped += 1;
-        continue;
+        return;
       }
       try {
         const withEvents = withCorporateActions && typeof provider.fetchHistoryWithEvents === 'function';
         const fetched = withEvents
-          ? await provider.fetchHistoryWithEvents!(target.symbol, {
-              exchange: target.exchange,
-              startTime,
-              throttleMs: YAHOO_PROVIDER_THROTTLE_MS,
-            })
-          : { bars: await provider.fetchHistory(target.symbol, {
-              exchange: target.exchange,
-              startTime,
-              throttleMs: YAHOO_PROVIDER_THROTTLE_MS,
-            }), actions: [] };
-        const bars = fetched.bars;
+          ? await provider.fetchHistoryWithEvents!(target.symbol, { exchange: target.exchange, startTime, throttleMs: YAHOO_PROVIDER_THROTTLE_MS })
+          : { bars: await provider.fetchHistory(target.symbol, { exchange: target.exchange, startTime, throttleMs: YAHOO_PROVIDER_THROTTLE_MS }), actions: [] };
+        consecutiveFailures = 0;
+        const rawBars = fetched.bars;
         const actions = fetched.actions ?? [];
+        // Drop epoch/pre-listing artifact bars (e.g. Yahoo's spurious 1970-01-02
+        // leading row) so they never enter price_ticks.
+        const bars = floorYear > 0 ? rawBars.filter((b) => b.date.getUTCFullYear() >= floorYear) : rawBars;
+        summary.barsDroppedStale += rawBars.length - bars.length;
         summary.symbolsProcessed += 1;
         if (bars.length === 0) {
           summary.symbolsWithNoData += 1;
-          options.onSymbolComplete?.(target.symbol, { index, total, bars: 0, actions: 0, hadData: false, ok: true });
-          continue;
+          options.onSymbolComplete?.(target.symbol, { index: myIndex, total, bars: 0, actions: 0, hadData: false, ok: true });
+          return;
         }
         regionInfoBySymbol.set(target.symbol, { region: 'US', exchange: target.exchange ?? null });
         const stored = await this.repo.storeHistoricalBulk(
@@ -286,13 +313,23 @@ export class UsEquityIngestionService {
           }
         }
 
-        options.onSymbolComplete?.(target.symbol, { index, total, bars: bars.length, actions: actionsUpserted, hadData: true, ok: true });
+        options.onSymbolComplete?.(target.symbol, { index: myIndex, total, bars: bars.length, actions: actionsUpserted, hadData: true, ok: true });
       } catch (error) {
+        consecutiveFailures += 1;
+        summary.symbolsFailed += 1;
         if (summary.warnings.length < 25) {
           summary.warnings.push(`Backfill failed for ${target.symbol}: ${(error as Error).message}`);
         }
-        options.onSymbolComplete?.(target.symbol, { index, total, bars: 0, actions: 0, hadData: false, ok: false });
+        options.onSymbolComplete?.(target.symbol, { index: myIndex, total, bars: 0, actions: 0, hadData: false, ok: false });
+        if (consecutiveFailures >= maxConsecutiveFailures && !aborted) {
+          aborted = true;
+          summary.aborted = true;
+          summary.warnings.push(`Circuit breaker tripped after ${consecutiveFailures} consecutive failures — pausing US backfill to avoid provider bans.`);
+        }
       }
+    }, () => aborted);
+    if (aborted) {
+      summary.warnings.push(`US backfill paused early after ~${index}/${total} symbols attempted (circuit breaker tripped on sustained provider failures).`);
     }
     return summary;
   }

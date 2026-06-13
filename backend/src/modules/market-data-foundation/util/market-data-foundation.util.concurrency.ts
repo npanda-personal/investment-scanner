@@ -3,11 +3,20 @@
 // it lives here as module-level variables (equivalent to the prior static service fields).
 import os from 'os';
 
-export async function eachWithConcurrency<T>(items: T[], concurrency: number, worker: (item: T) => Promise<void>) {
+export async function eachWithConcurrency<T>(
+  items: T[],
+  concurrency: number,
+  worker: (item: T) => Promise<void>,
+  shouldStop?: () => boolean,
+) {
   let index = 0;
   const workerCount = Math.max(1, Math.min(concurrency, items.length));
   await Promise.all(Array.from({ length: workerCount }, async () => {
     while (index < items.length) {
+      // Honour a caller abort signal in the pull loop itself (not just inside the
+      // worker), so a tripped circuit breaker promptly stops launching new work
+      // rather than iterating every remaining item.
+      if (shouldStop && shouldStop()) break;
       const current = items[index];
       index += 1;
       await worker(current);

@@ -4046,7 +4046,10 @@ describe('MarketDataFoundationService syncV1', () => {
       latestStoredTradingDateForRegion: jest.fn().mockResolvedValue('2026-05-18'),
       getSyncState: jest.fn().mockResolvedValue({
         status: 'SYNCED',
-        lastCheckedAt: new Date('2026-05-18T12:00:00.000Z').toISOString(),
+        // Kept equal to `now` so the per-instrument sync stays RECENTLY_SYNCED
+        // (skipped) — the point of this test is that the official EOD bulk
+        // download still runs even when the per-instrument gate skips.
+        lastCheckedAt: new Date('2026-05-18T13:15:00.000Z').toISOString(),
       }),
       updateStockLoadTimestampBySymbol: jest.fn().mockResolvedValue({}),
     };
@@ -4074,7 +4077,9 @@ describe('MarketDataFoundationService syncV1', () => {
       const summary = await service.syncScheduledRegion('IN', {
         assetType: 'STOCK',
         batchSize: 1,
-        now: new Date('2026-05-18T12:00:00.000Z'),
+        // 13:15 UTC = 18:45 IST — past the NSE finalization grace (≈18:30 IST),
+        // so today's (2026-05-18) candle is the latest completed one to fetch.
+        now: new Date('2026-05-18T13:15:00.000Z'),
       });
 
       expect(global.fetch).toHaveBeenCalledTimes(1);
@@ -4334,7 +4339,9 @@ describe('MarketDataFoundationService syncV1', () => {
 
   it('continues catalog sync for stale instruments when the region-level latest candle is current', async () => {
     resetCatalogSyncRuns();
-    jest.useFakeTimers().setSystemTime(new Date('2026-05-18T12:00:00.000Z'));
+    // 13:15 UTC = 18:45 IST — past the NSE finalization grace (≈18:30 IST), so
+    // the region's latest completed candle is today (2026-05-18).
+    jest.useFakeTimers().setSystemTime(new Date('2026-05-18T13:15:00.000Z'));
     const timeoutSpy = jest.spyOn(global, 'setTimeout').mockImplementation((() => 0) as any);
     const tasks = [
       {
@@ -4352,7 +4359,9 @@ describe('MarketDataFoundationService syncV1', () => {
       latestStoredTradingDateForRegion: jest.fn().mockResolvedValue('2026-05-18'),
       getSyncState: jest.fn().mockResolvedValue({
         status: 'SYNCED',
-        lastCheckedAt: new Date('2026-05-18T12:00:00.000Z').toISOString(),
+        // Equal to `now` so the catalog gate stays RECENTLY_SYNCED → the stale
+        // catch-up branch runs with providerEndDate = end-of-day(targetTradingDate).
+        lastCheckedAt: new Date('2026-05-18T13:15:00.000Z').toISOString(),
       }),
       upsertSyncState: jest.fn().mockResolvedValue({}),
     };

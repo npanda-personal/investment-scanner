@@ -6,27 +6,34 @@ import {
 } from '../../../src/modules/market-data-foundation';
 
 describe('MarketDataFoundationScheduler', () => {
-  it('defaults to daily startup catch-up while ignoring legacy Angel provider scheduler flags', async () => {
+  it('defaults to a short poll cadence and ignores legacy Angel provider scheduler flags', async () => {
     expect(readMarketDataSchedulerConfig({ ANGEL_ONE_ENABLE_MARKET_DATA: 'true' } as any)).toMatchObject({
       enabled: false,
-      intervalMinutes: 1440,
+      intervalMinutes: 15,
       runOnStartup: true,
     });
+    // The operator's configured interval is honoured (no legacy 1440-min floor),
+    // so the gate-driven poll actually fires often enough to catch the EOD window.
     expect(readMarketDataSchedulerConfig({
       ANGEL_ONE_ENABLE_MARKET_DATA: 'true',
       MARKET_DATA_SCHEDULER_INTERVAL_MINUTES: '15',
-    } as any).intervalMinutes).toBe(1440);
+    } as any).intervalMinutes).toBe(15);
 
-    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const log = jest.spyOn(console, 'log').mockImplementation(() => undefined);
     try {
       await expect(startMarketDataStartupPriceBackfill({
         NODE_ENV: 'development',
         ANGEL_ONE_ENABLE_MARKET_DATA: 'true',
         MARKET_DATA_STARTUP_PRICE_BACKFILL_ENABLED: 'true',
       } as any)).resolves.toBeNull();
-      expect(warn).toHaveBeenCalledWith(expect.stringContaining('provider startup price backfill disabled'));
+      // Startup price backfill is an intentional no-op stub (seed scripts handle
+      // initial history); assert it announces that rather than silently doing work.
+      expect(log).toHaveBeenCalledWith(
+        expect.stringContaining('startup price backfill is a no-op stub'),
+        expect.anything(),
+      );
     } finally {
-      warn.mockRestore();
+      log.mockRestore();
     }
   });
 
@@ -57,6 +64,53 @@ describe('MarketDataFoundationScheduler', () => {
 
     expect(result[0]).toMatchObject({ region: 'IN', skipped: true });
     expect(service.syncScheduledRegion).not.toHaveBeenCalled();
+  });
+
+  it('on startup inside the pre-finalization wait window: skips when current, catches up when stale', async () => {
+    // 10:30 UTC = 16:00 IST — NSE closed (15:30) but before the ≈18:30 finalization
+    // grace, so the base session decision is MARKET_CLOSED_NO_SYNC (wait). Grace is
+    // intentionally omitted so the region's 180m base applies (not a test override).
+    const baseConfig = {
+      enabled: true,
+      intervalMinutes: 15,
+      regions: ['IN'],
+      assetType: 'STOCK',
+      batchSize: 25,
+      syncDuringMarketHours: false,
+      skipWeekends: true,
+    } as const;
+    const preGraceWindow = new Date('2026-05-05T10:30:00.000Z');
+
+    // (a) Yesterday's candle is already stored → nothing to do on boot; the 15-min
+    // poll will fire the EOD load once the ≈18:30 IST window opens.
+    const current = {
+      activePriceBackfillRun: jest.fn().mockReturnValue(null),
+      latestStoredCandleInfo: jest.fn().mockResolvedValue({
+        latestTradingDate: '2026-05-04', finalConfirmed: false, syncState: null, tradingDate: '2026-05-05',
+      }),
+      syncScheduledRegion: jest.fn(),
+    };
+    const skipResult = await new MarketDataFoundationScheduler(current as any, baseConfig as any)
+      .runOnce(preGraceWindow, { triggerType: 'startup' });
+    expect(skipResult[0]).toMatchObject({ region: 'IN', skipped: true });
+    expect(current.syncScheduledRegion).not.toHaveBeenCalled();
+
+    // (b) localhost was down for days → latest stored lags the completed candle;
+    // the missing-completed override runs the catch-up even though the session
+    // decision alone would wait.
+    const stale = {
+      activePriceBackfillRun: jest.fn().mockReturnValue(null),
+      latestStoredCandleInfo: jest.fn().mockResolvedValue({
+        latestTradingDate: '2026-05-01', finalConfirmed: false, syncState: null, tradingDate: '2026-05-05',
+      }),
+      syncScheduledRegion: jest.fn().mockResolvedValue({
+        region: 'IN', assetType: 'STOCK', tradingDate: '2026-05-05', rowsInserted: 1, rowsUpdated: 0, rowsNoOp: 0,
+      }),
+    };
+    const catchUpResult = await new MarketDataFoundationScheduler(stale as any, baseConfig as any)
+      .runOnce(preGraceWindow, { triggerType: 'startup' });
+    expect(catchUpResult[0]).toMatchObject({ region: 'IN', skipped: false });
+    expect(stale.syncScheduledRegion).toHaveBeenCalledTimes(1);
   });
 
   it('runs catch-up sync when latest completed candle is missing even if session decision would skip', async () => {

@@ -158,41 +158,21 @@ export function addTradingSessions(
 }
 
 // ─── NSE holiday provider ──────────────────────────────────────────────────
-//
-// The live holiday fetcher lives in MarketDataFoundationService (async, hits
-// the NSE API).  To make holiday data available synchronously here — without
-// creating a circular dependency — we use a simple in-process registry:
-//
-//   1. `getKnownNseHolidaysForYear(year)` returns the best-available list for
-//      that year: live cache if already warm, otherwise the static fallback.
-//   2. `registerNseHolidayProvider(provider)` lets the service inject a
-//      synchronous reader backed by its own in-process cache once it is warm.
-//   3. `getKnownNseHolidaysForSessionDate(date)` is a convenience that covers
-//      the current and surrounding years (handles year-boundary proximity).
+// Live NSE holidays are fetched async by MarketDataFoundationService; to read
+// them synchronously here without a circular dependency we keep a small
+// in-process registry and fall back to the static list until the cache warms.
 
 type NseHolidayProvider = (year: number) => string[] | null;
 let _nseHolidayProvider: NseHolidayProvider | null = null;
 
-/**
- * Register a synchronous NSE holiday provider backed by the live in-process
- * cache.  Call this once from MarketDataFoundationService after the cache is
- * first populated.  Before registration (cold start), the static fallback list
- * is used automatically — holiday detection is always active.
- */
+/** Register a live-cache-backed NSE holiday provider (static fallback used until it warms). */
 export function registerNseHolidayProvider(provider: NseHolidayProvider): void {
   _nseHolidayProvider = provider;
 }
 
 /**
- * Returns the best-available list of NSE trading holiday date strings
- * (YYYY-MM-DD) for the given calendar year.
- *
- * Priority:
- *   1. Live provider (in-process cache from the service's fetcher), if registered.
- *   2. Static fallback list from `market-data-foundation.nse-holidays.ts`.
- *
- * The result is always non-null — the static fallback ensures holiday detection
- * works even on the very first scheduler tick before the live fetch runs.
+ * Best-available NSE holiday date strings (YYYY-MM-DD) for a calendar year:
+ * live provider if registered, else the static fallback (always non-null).
  */
 export function getKnownNseHolidaysForYear(year: number): string[] {
   if (_nseHolidayProvider) {
@@ -202,12 +182,7 @@ export function getKnownNseHolidaysForYear(year: number): string[] {
   return getStaticNseHolidaysForYear(year);
 }
 
-/**
- * Returns the combined NSE holiday list for the year(s) touched by a session
- * that starts on `tradingDate` (YYYY-MM-DD).  In practice this covers the
- * current year; the previous/next year entries are harmless extras that make
- * the helper safe to call near year-boundaries.
- */
+/** Combined NSE holiday list for the year(s) around `tradingDate` (year-boundary safe). */
 export function getKnownNseHolidaysForSessionDate(tradingDate: string): string[] {
   const year = Number(tradingDate.slice(0, 4));
   const years = [year - 1, year, year + 1].filter((y) => y > 2020 && y < 2100);
@@ -238,8 +213,12 @@ export const DEFAULT_MARKET_SESSION_CONFIGS: Record<string, Omit<MarketSessionCo
     timezone: 'Asia/Kolkata',
     regularOpen: '09:15',
     regularClose: '15:30',
-    postCloseSyncWindowMinutes: 120,
-    finalizationGraceMinutes: 15,
+    // NSE's official UDiFF bhavcopy is typically published ~18:00 IST, so the
+    // final daily candle is only treated as "expected" ~3h after the 15:30
+    // close (≈18:30 IST), and the post-close fetch/retry window runs to ≈20:30
+    // IST. Attempting earlier just 404s against the not-yet-published archive.
+    postCloseSyncWindowMinutes: 300,
+    finalizationGraceMinutes: 180,
     weekdays: [1, 2, 3, 4, 5],
     // Populated dynamically via getKnownNseHolidaysForSessionDate() at call
     // sites.  Left empty here so static object construction never needs an
@@ -362,6 +341,22 @@ export function shouldRunMarketDataSync(
         : 'Market is open, but in-progress daily candle updates are disabled for 1D strategy workflows.',
       todayTradingDate: tradingDate,
       nextSuggestedRunAt: closeAt.toISOString(),
+    };
+  }
+
+  // Market has closed but the official end-of-day file is typically not
+  // published until the finalization grace elapses (NSE bhavcopy ≈18:00 IST).
+  // Wait rather than hammer the provider with attempts that 404. A multi-day
+  // stale backlog is unaffected: the caller's missing-completed override
+  // (scheduler + sync-gate) still triggers a catch-up inside this window.
+  if (now > closeAt && now < closeGraceAt) {
+    return {
+      shouldRun: false,
+      reasonCode: 'MARKET_CLOSED_NO_SYNC',
+      sessionState: 'MARKET_CLOSED_NO_SYNC',
+      reason: `${config.region} market closed; awaiting end-of-day file publication (eligible after the finalization grace).`,
+      todayTradingDate: tradingDate,
+      nextSuggestedRunAt: closeGraceAt.toISOString(),
     };
   }
 

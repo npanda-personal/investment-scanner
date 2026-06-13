@@ -409,7 +409,7 @@ describe('Market Data Foundation universe readiness', () => {
     const result = await service.trustedReviewUniverseHealth({
       region: 'IN',
       assetType: 'STOCK',
-      now: new Date('2026-05-12T10:30:00.000Z'),
+      now: new Date('2026-05-12T13:15:00.000Z'),
     } as any);
 
     expect(result.targetTradingDate).toBe('2026-05-13');
@@ -441,7 +441,7 @@ describe('Market Data Foundation universe readiness', () => {
     const result = await service.trustedReviewUniverseHealth({
       region: 'IN',
       assetType: 'STOCK',
-      now: new Date('2026-05-12T10:30:00.000Z'),
+      now: new Date('2026-05-12T13:15:00.000Z'),
     } as any);
 
     expect(result.targetTradingDate).toBe('2026-05-13');

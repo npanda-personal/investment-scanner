@@ -1249,7 +1249,7 @@ const MarketDataFoundationPage: React.FC = () => {
               Background market-data load is running. Operator actions are disabled until this run completes.
             </Typography>
             <Typography variant="caption">
-              Latest-day candle scheduler is active. Last run {schedulerStatus?.lastRunAt || 'starting'}.
+              Latest-day candle scheduler is active. Last checked {schedulerStatus?.lastRunAt || 'starting'}.
             </Typography>
             <LinearProgress aria-label="Latest-day candle scheduler progress" />
           </Stack>

@@ -18,8 +18,12 @@ export interface MarketDataSchedulerConfig {
   assetType: string;
   batchSize: number;
   syncDuringMarketHours: boolean;
-  postCloseSyncWindowMinutes: number;
-  finalizationGraceMinutes: number;
+  // Optional: when left undefined the region-specific base values from
+  // market-session config take effect (NSE = 18:30 IST finalization / 20:30
+  // post-close window). Only set these to FORCE a global override across every
+  // scheduled region — which is rarely what you want once US/EU are scheduled.
+  postCloseSyncWindowMinutes?: number;
+  finalizationGraceMinutes?: number;
   skipWeekends: boolean;
   runOnStartup?: boolean;
 }
@@ -29,6 +33,7 @@ export class MarketDataFoundationScheduler {
   private activeRun = false;
   private lastRunAt: Date | null = null;
   private nextSuggestedRunAt: string | null = null;
+  private lastCryptoLaneRunAt: Date | null = null;
 
   constructor(
     private readonly service = new MarketDataFoundationService(),
@@ -203,6 +208,16 @@ export class MarketDataFoundationScheduler {
    */
   private async runCryptoLane(now: Date): Promise<CryptoLaneResult | null> {
     if (!this.cryptoLaneEnabled() || !this.cryptoLaneRunner) return null;
+    // The equity EOD gate now polls every ~15 min (so it reliably catches the
+    // post-close window). The crypto lane is heavier — incremental OHLCV ingest
+    // + signals + market scans + crypto context — and the free providers
+    // throttle, so cap it to at most once per MARKET_DATA_CRYPTO_LANE_INTERVAL
+    // (default 60 min) independently of the faster equity poll cadence.
+    const minIntervalMinutes = Math.max(parseNumber(process.env.MARKET_DATA_CRYPTO_LANE_INTERVAL_MINUTES, 60), 1);
+    if (this.lastCryptoLaneRunAt && now.getTime() - this.lastCryptoLaneRunAt.getTime() < minIntervalMinutes * 60_000) {
+      return null;
+    }
+    this.lastCryptoLaneRunAt = now;
     return this.cryptoLaneRunner(now);
   }
 
@@ -344,13 +359,19 @@ export function readMarketDataSchedulerConfig(env = process.env): MarketDataSche
 
   return {
     enabled: parseBoolean(env.MARKET_DATA_SCHEDULER_ENABLED, false),
-    intervalMinutes: Math.max(parseNumber(env.MARKET_DATA_SCHEDULER_INTERVAL_MINUTES, 1440), 1440),
+    // Short poll cadence (default 15 min). The market-session gate decides when
+    // a tick actually fetches — so polling frequently lets the scheduler hit the
+    // post-close EOD window regardless of when the server booted, while staying
+    // idempotent (FINAL_CONFIRMED / RECENTLY_SYNCED skips bound provider load).
+    intervalMinutes: Math.max(parseNumber(env.MARKET_DATA_SCHEDULER_INTERVAL_MINUTES, 15), 1),
     regions: rawRegions.length > 0 ? rawRegions : ['IN'],
     assetType: (env.MARKET_DATA_SCHEDULER_ASSET_TYPE || 'STOCK').trim().toUpperCase(),
     batchSize: parseNumber(env.MARKET_DATA_SCHEDULER_BATCH_SIZE, 25),
     syncDuringMarketHours: parseBoolean(env.MARKET_DATA_SCHEDULER_SYNC_DURING_MARKET_HOURS, false),
-    postCloseSyncWindowMinutes: parseNumber(env.MARKET_DATA_SCHEDULER_POST_CLOSE_WINDOW_MINUTES, 120),
-    finalizationGraceMinutes: parseNumber(env.MARKET_DATA_SCHEDULER_FINALIZATION_GRACE_MINUTES, 15),
+    // Left undefined unless explicitly set, so each region uses its own base
+    // market-session window/grace (see DEFAULT_MARKET_SESSION_CONFIGS).
+    postCloseSyncWindowMinutes: parseOptionalNumber(env.MARKET_DATA_SCHEDULER_POST_CLOSE_WINDOW_MINUTES),
+    finalizationGraceMinutes: parseOptionalNumber(env.MARKET_DATA_SCHEDULER_FINALIZATION_GRACE_MINUTES),
     skipWeekends: parseBoolean(env.MARKET_DATA_SCHEDULER_SKIP_WEEKENDS, true),
     runOnStartup: parseBoolean(env.MARKET_DATA_SCHEDULER_RUN_ON_STARTUP, true),
   };
@@ -461,4 +482,10 @@ function parseNumber(value: string | undefined, fallback: number) {
   if (!value) return fallback;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function parseOptionalNumber(value: string | undefined): number | undefined {
+  if (value === undefined || value.trim() === '') return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
 }

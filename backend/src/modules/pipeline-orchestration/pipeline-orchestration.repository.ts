@@ -419,11 +419,12 @@ export class PipelineOrchestrationRepository {
         // with real data work headline the Pipeline Ops header.
         status: { in: MEANINGFUL_RUN_STATUSES },
       },
-      // Prefer the run covering the freshest data, then break ties by most-recently completed.
-      // dataThroughDate is nullable and Postgres defaults to NULLS FIRST on desc — force
-      // nulls LAST so a run WITH a real data date (e.g. 06-05) outranks a dateless run
-      // (e.g. a market-pulse-only or empty run) for the header.
-      orderBy: [{ dataThroughDate: { sort: 'desc', nulls: 'last' } }, { completedAt: 'desc' }, { updatedAt: 'desc' }],
+      // "Last run" must mean the most-recently EXECUTED run (what an operator expects),
+      // NOT the run covering the freshest data — otherwise a backfill that processed an
+      // older data date but completed later, or an earlier run that happened to carry the
+      // freshest date, could headline the panel and make it read as stale/wrong. Order by
+      // execution recency (startedAt, always set), then completedAt, then dataThroughDate.
+      orderBy: [{ startedAt: 'desc' }, { completedAt: { sort: 'desc', nulls: 'last' } }, { dataThroughDate: { sort: 'desc', nulls: 'last' } }],
     });
     return row ? this.toRunRecord(row) : null;
   }

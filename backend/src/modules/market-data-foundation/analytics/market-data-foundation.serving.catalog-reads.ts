@@ -12,6 +12,10 @@
 // byte-identical to the pre-extraction inline implementation.
 
 import type { MarketDataServingHost } from './market-data-foundation.serving-host';
+import { CoverageRepository } from '../persistence/market-data-foundation.repository.coverage';
+
+/** Lazy shared coverage reader for health freshness (curated-region tracked set). */
+const coverageReader = new CoverageRepository();
 import type { PaginationOptions } from '../market-data-foundation.types';
 import { isCryptoScope } from '../../../shared/data-access/market-repository-router';
 import { getCatalogSourceConfigs } from '../ingestion/market-data-foundation.catalog-sources';
@@ -82,9 +86,10 @@ export class CatalogReadsService {
     if (isCryptoScope(options)) {
       return this.host.cryptoHealth();
     }
-    const [instrumentCount, latestDataTimestamp] = await Promise.all([
+    const [instrumentCount, latestDataTimestamp, trackedCoverage] = await Promise.all([
       this.host.repository.instrumentCount(options),
       this.host.repository.latestDataTimestamp(options),
+      options.region ? coverageReader.trackedCoverageStats(options.region).catch(() => null) : Promise.resolve(null),
     ]);
 
     console.log('[MarketDataFoundation] health market filter', {
@@ -98,6 +103,7 @@ export class CatalogReadsService {
       module: 'market-data-foundation',
       instrumentCount,
       latestDataTimestamp: latestDataTimestamp?.toISOString() ?? null,
+      trackedCoverage,
       source: 'database',
       ingestion_timestamp: new Date().toISOString(),
       last_updated_timestamp: latestDataTimestamp?.toISOString() ?? null,

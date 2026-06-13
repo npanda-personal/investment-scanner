@@ -117,6 +117,30 @@ model Stock {
   @@map("stocks")
 }
 
+// Coverage policy: which instruments are actively TRACKED (price-synced + fed to
+// downstream analysis) vs catalog-only. Region-agnostic and decoupled from the
+// Stock model (no relation - joined by stockId) so it never mutates cross-cutting
+// Stock identity. For curated regions the curation job derives Stock.isActive from
+// isTracked, the universal downstream-exclusion lever.
+model InstrumentCoverage {
+  id             String    @id @default(cuid())
+  stockId        String    @unique
+  symbol         String
+  region         String
+  isTracked      Boolean   @default(false)
+  trackingTier   String? // CORE (pinned indices/ETFs) | STANDARD (liquidity)
+  reason         String? // INDEX | ETF | LIQUIDITY | MANUAL
+  liquidityScore Decimal? // trailing avg daily turnover (close*volume) at last rank
+  liquidityRank  Int?
+  rankedAt       DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([region, isTracked])
+  @@index([symbol])
+  @@map("instrument_coverage")
+}
+
 model SourceFileImport {
   id                           String                       @id @default(cuid())
   source                       String

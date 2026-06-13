@@ -43,7 +43,7 @@ Research-support market intelligence app (localhost-first, zero-incremental-cost
 
 - Plan first for multi-file changes; respect module boundaries (one module = controller/service/repository/types/validation/index).
 - Flag out-of-scope findings as separate tasks — do not fix inline.
-- Done = typecheck + tests green + shown proof (real command output / endpoint response).
+- **Done has two tiers.** *Always:* typecheck + tests green + shown proof (real command output / endpoint response) — this is the **developer self-check**. *For substantial changes* (multi-file · schema/data-mutation · cross-cutting/shared file · new module · downstream-affecting): **ALSO** an independent **code-review pass** (`code-reviewer` agent — separate from the implementer) **and** a **QA pass** (`qa-verifier`), with review + QA evidence in the Done Report. Self tsc/jest is the self-check, **NOT** review or QA — don't let momentum or satisfying the Stop hook substitute for the gates. (`docs/agents/delivery-workflow.md`: completion requires *review evidence* AND *QA evidence*.)
 - Subagent models: haiku/sonnet for mechanical sweeps and searches; opus for design, review, synthesis.
 
 ## Token Efficiency (usage-data driven, 2026-06)
