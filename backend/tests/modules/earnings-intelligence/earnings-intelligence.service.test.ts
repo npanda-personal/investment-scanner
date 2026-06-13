@@ -108,10 +108,10 @@ describe('EarningsIntelligenceService', () => {
     expect(winner.warnings).toEqual([]);
   });
 
-  it('generates upcoming estimated categories with explicit estimated provenance', () => {
+  it('reports DATE_TBA (never fabricates a forward date) and keeps estimated rows out of UPCOMING_RESULTS', () => {
     const service = new EarningsIntelligenceService({} as any);
 
-    const upcoming = service.calculateSnapshot({
+    const tba = service.calculateSnapshot({
       stockId: 'stock-1',
       symbol: 'AAA',
       region: 'IN',
@@ -128,27 +128,26 @@ describe('EarningsIntelligenceService', () => {
       ],
     });
 
-    expect(upcoming.daysToResult).toBe(30);
-    expect(upcoming.resultDateSource).toBe('ESTIMATED_FROM_PERIOD_CADENCE');
-    expect(upcoming.riskTags).toContain('ESTIMATED_RESULT_DATE');
-    expect(upcoming.reasonTags).toContain('RESULT_WINDOW_ESTIMATED_FROM_PERSISTED_PERIODS');
-    expect(upcoming.warnings).toEqual(expect.arrayContaining([
-      'OFFICIAL_CALENDAR_NOT_AVAILABLE',
-      'RESULT_DATE_ESTIMATED_FROM_PERIOD_CADENCE',
-    ]));
-    expect(upcoming.categories).toEqual(expect.arrayContaining([
-      'UPCOMING_RESULTS',
-      'PRE_RESULT_INTEREST',
-    ]));
+    // No official date → no fabricated forward date; row must not enter the
+    // official-only UPCOMING_RESULTS / PRE_RESULT_INTEREST buckets.
+    expect(tba.daysToResult).toBeNull();
+    expect(tba.resultDate).toBeNull();
+    expect(tba.resultDateSource).toBe('DATE_TBA');
+    expect(tba.resultDateLabel).toBe('TBA');
+    expect(tba.riskTags).toContain('ESTIMATED_RESULT_DATE');
+    expect(tba.reasonTags).toContain('PRE_RESULT_DELIVERY_INTEREST');
+    expect(tba.warnings).toEqual(expect.arrayContaining(['RESULT_DATE_NOT_ANNOUNCED']));
+    expect(tba.categories).not.toContain('UPCOMING_RESULTS');
+    expect(tba.categories).not.toContain('PRE_RESULT_INTEREST');
+    expect(tba.categories).toContain('EARNINGS_WATCHLIST');
   });
 
-  it('uses period end fallback without treating validatedAt as the result date', () => {
+  it('does not treat validatedAt or period end as the result date when no official date exists', () => {
     const service = new EarningsIntelligenceService({} as any);
 
-    // snapshotDate=2026-05-01 puts the Q4FY26 estimated result date (2026-08-14) at
-    // 105 days out — beyond UPCOMING_WINDOW_DAYS (90) — so we get PERIOD_END_DATE_FALLBACK.
-    // (snapshotDate=2026-06-01 now yields ESTIMATED_FROM_PERIOD_CADENCE because Aug-14
-    //  is only 74 days away, within the expanded 90-day window.)
+    // With no official date the engine reports DATE_TBA (resultDate null) rather
+    // than surfacing the fiscal period end or validation timestamp as a date.
+    // periodEndDate / validatedAt are still preserved as separate provenance fields.
     const snapshot = service.calculateSnapshot({
       stockId: 'stock-1',
       symbol: 'AAA',
@@ -167,17 +166,14 @@ describe('EarningsIntelligenceService', () => {
       deliverySnapshots: [],
     });
 
-    expect(snapshot.resultDateSource).toBe('PERIOD_END_DATE_FALLBACK');
-    expect(snapshot.resultDate?.toISOString()).toBe('2026-03-31T00:00:00.000Z');
+    expect(snapshot.resultDateSource).toBe('DATE_TBA');
+    expect(snapshot.resultDate).toBeNull();
     expect(snapshot.periodEndDate?.toISOString()).toBe('2026-03-31T00:00:00.000Z');
     expect(snapshot.validatedAt?.toISOString()).toBe('2026-05-10T00:00:00.000Z');
     expect(snapshot.categories).not.toContain('RESULT_WINNERS');
     expect(snapshot.categories).not.toContain('RESULT_REACTION_HISTORY');
     expect(snapshot.riskTags).toContain('PRICE_REACTION_REQUIRES_OFFICIAL_RESULT_DATE');
-    expect(snapshot.warnings).toEqual(expect.arrayContaining([
-      'OFFICIAL_CALENDAR_NOT_AVAILABLE',
-      'RESULT_DATE_USES_PERIOD_END_DATE_FALLBACK',
-    ]));
+    expect(snapshot.warnings).toEqual(expect.arrayContaining(['RESULT_DATE_NOT_ANNOUNCED']));
   });
 
   it('marks stale freshness from period end even when validatedAt is recent', () => {
@@ -201,7 +197,7 @@ describe('EarningsIntelligenceService', () => {
       deliverySnapshots: [],
     });
 
-    expect(snapshot.resultDateSource).toBe('PERIOD_END_DATE_FALLBACK');
+    expect(snapshot.resultDateSource).toBe('DATE_TBA');
     expect(snapshot.freshness).toBe('STALE');
     expect(snapshot.riskTags).toContain('STALE_EARNINGS_DATA');
   });
@@ -435,9 +431,8 @@ describe('EarningsIntelligenceService', () => {
     expect(snapshot.riskTags).not.toContain('ESTIMATED_RESULT_DATE');
   });
 
-  it('CB-44: estimated result date produces resultDateLabel="Estimated" with estimation warning', () => {
+  it('CB-44: absent official date produces resultDateLabel="TBA" with not-announced warning', () => {
     const service = new EarningsIntelligenceService({} as any);
-    // snapshotDate must be close enough to the estimated result date (within 45 days)
     const snapshot = service.calculateSnapshot({
       stockId: 'stock-1',
       symbol: 'AAA',
@@ -455,18 +450,14 @@ describe('EarningsIntelligenceService', () => {
       deliverySnapshots: [],
     });
 
-    expect(snapshot.resultDateSource).toBe('ESTIMATED_FROM_PERIOD_CADENCE');
-    expect(snapshot.resultDateLabel).toBe('Estimated');
-    expect(snapshot.warnings).toContain('OFFICIAL_CALENDAR_NOT_AVAILABLE');
-    expect(snapshot.warnings).toContain('RESULT_DATE_ESTIMATED_FROM_PERIOD_CADENCE');
+    expect(snapshot.resultDateSource).toBe('DATE_TBA');
+    expect(snapshot.resultDateLabel).toBe('TBA');
+    expect(snapshot.warnings).toContain('RESULT_DATE_NOT_ANNOUNCED');
     expect(snapshot.riskTags).toContain('ESTIMATED_RESULT_DATE');
   });
 
-  it('CB-44: fallback (period-end) result date produces resultDateLabel=null', () => {
+  it('CB-44: DATE_TBA suppresses the fabricated date regardless of snapshot proximity', () => {
     const service = new EarningsIntelligenceService({} as any);
-    // snapshotDate=2026-05-01 → estimated result Aug-14 is 105 days away (>90) → PERIOD_END_DATE_FALLBACK.
-    // (snapshotDate=2026-06-01 now yields ESTIMATED_FROM_PERIOD_CADENCE because the expanded
-    //  90-day window covers the ~74 remaining days to the Aug-14 estimate.)
     const snapshot = service.calculateSnapshot({
       stockId: 'stock-1',
       symbol: 'AAA',
@@ -482,8 +473,9 @@ describe('EarningsIntelligenceService', () => {
       deliverySnapshots: [],
     });
 
-    expect(snapshot.resultDateSource).toBe('PERIOD_END_DATE_FALLBACK');
-    expect(snapshot.resultDateLabel).toBeNull();
+    expect(snapshot.resultDateSource).toBe('DATE_TBA');
+    expect(snapshot.resultDate).toBeNull();
+    expect(snapshot.resultDateLabel).toBe('TBA');
   });
 
   it('CB-44: latestProximityBySymbol returns only rows with daysToResult populated', async () => {
@@ -491,8 +483,8 @@ describe('EarningsIntelligenceService', () => {
       ...persistedRow(['UPCOMING_RESULTS']),
       symbol: 'UPCO',
       daysToResult: 2,
-      resultDateSource: 'ESTIMATED_FROM_PERIOD_CADENCE',
-      resultDateLabel: 'Estimated',
+      resultDateSource: 'OFFICIAL_CALENDAR',
+      resultDateLabel: 'Official',
     };
     const rowNoDays: EarningsSnapshotDto = {
       ...persistedRow(['EARNINGS_WATCHLIST']),
@@ -516,6 +508,100 @@ describe('EarningsIntelligenceService', () => {
     expect(map.has('NOUP')).toBe(false);
     const entry = map.get('UPCO')!;
     expect(entry.daysToResult).toBe(2);
-    expect(entry.resultDateLabel).toBe('Estimated');
+    expect(entry.resultDateLabel).toBe('Official');
+  });
+
+  // ── B1: consistency/acceleration scoring must not mix period types ──────────
+
+  it('B1: consistency score ignores an interleaved annual row and scores the quarterly series only', () => {
+    const service = new EarningsIntelligenceService({} as any);
+    // Three cleanly-rising quarters plus one large ANNUAL row whose magnitude
+    // would corrupt a mixed-series comparison (rise-then-collapse).  Single-class
+    // scoring must keep the quarterly progression at a perfect 100.
+    const snapshot = service.calculateSnapshot({
+      stockId: 'stock-1',
+      symbol: 'MIX',
+      region: 'IN',
+      assetType: 'STOCK',
+      snapshotDate: new Date('2025-11-01T00:00:00.000Z'),
+      dataThroughDate: null,
+      fundamentals: [
+        fundamental('2025-09-30', 120, 12, 1.2),
+        { ...fundamental('2025-07-31', 400, 40, 4), periodType: 'ANNUAL' },
+        fundamental('2025-06-30', 110, 11, 1.1),
+        fundamental('2025-03-31', 100, 10, 1),
+      ],
+      prices: [],
+      deliverySnapshots: [],
+    });
+
+    expect(snapshot.consistencyScore).toBe(100);
+  });
+
+  // ── B2: US/TTM fundamentals are not reported as missing quarterly + annual ──
+
+  it('B2: a TTM (US) series is recognised, not flagged as missing quarterly AND annual', () => {
+    const service = new EarningsIntelligenceService({} as any);
+    const ttm = (periodEndDate: string, revenue: number, netIncome: number, eps: number): EarningsFundamentalInput =>
+      ({ ...fundamental(periodEndDate, revenue, netIncome, eps), periodType: 'TTM' });
+
+    const snapshot = service.calculateSnapshot({
+      stockId: 'stock-us',
+      symbol: 'AAPL',
+      region: 'US',
+      assetType: 'STOCK',
+      snapshotDate: new Date('2025-11-15T00:00:00.000Z'),
+      dataThroughDate: null,
+      fundamentals: [
+        ttm('2025-09-30', 1000, 100, 10),
+        ttm('2024-09-30', 900, 80, 8),
+      ],
+      prices: [],
+      deliverySnapshots: [],
+    });
+
+    expect(snapshot.riskTags).not.toContain('MISSING_QUARTERLY_RESULTS');
+    expect(snapshot.riskTags).not.toContain('MISSING_ANNUAL_RESULTS');
+    expect(snapshot.reasonTags).toContain('LATEST_TTM_RESULT');
+  });
+
+  it('B2: a quarterly-only stock is still flagged as missing annual results', () => {
+    const service = new EarningsIntelligenceService({} as any);
+    const snapshot = service.calculateSnapshot({
+      stockId: 'stock-q',
+      symbol: 'QONLY',
+      region: 'IN',
+      assetType: 'STOCK',
+      snapshotDate: new Date('2025-11-01T00:00:00.000Z'),
+      dataThroughDate: null,
+      fundamentals: [
+        fundamental('2025-09-30', 120, 12, 1.2),
+        fundamental('2025-06-30', 110, 11, 1.1),
+      ],
+      prices: [],
+      deliverySnapshots: [],
+    });
+
+    expect(snapshot.riskTags).toContain('MISSING_ANNUAL_RESULTS');
+    expect(snapshot.riskTags).not.toContain('MISSING_QUARTERLY_RESULTS');
+  });
+
+  // ── Region config: unknown region degrades gracefully with a warning ────────
+
+  it('surfaces an unconfigured-region warning while still returning a response', async () => {
+    const repository = {
+      latestSnapshot: jest.fn().mockResolvedValue({
+        rows: [persistedRow(['EARNINGS_WATCHLIST'])],
+        truncated: false,
+        snapshotDate: '2026-06-01',
+        dataThroughDate: '2026-05-31',
+      }),
+    };
+    const service = new EarningsIntelligenceService(repository as any);
+
+    const response = await service.latest({ region: 'MARS', assetType: 'STOCK', limit: 10 }, new Date('2026-06-01T06:00:00.000Z'));
+
+    expect(response.warnings.some((w) => w.includes('no dedicated Earnings Intelligence configuration'))).toBe(true);
+    expect(response.scope.region).toBe('MARS');
   });
 });

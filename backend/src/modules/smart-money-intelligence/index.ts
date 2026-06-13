@@ -9,6 +9,22 @@ export { SmartMoneyIntelligenceProvider } from './smart-money-intelligence.provi
 export { SmartMoneyIntelligenceRepository, type SmartMoneySnapshotWriteAction } from './smart-money-intelligence.repository';
 export { SmartMoneyIntelligenceService } from './smart-money-intelligence.service';
 export { getParam, parseLimit, parseOffset, parseOptionalText, parseRange, SMART_MONEY_RANGES } from './smart-money-intelligence.validation';
+export {
+  resolveSmartMoneyConfig,
+  DEFAULT_SMART_MONEY_CONFIG,
+  DEFAULT_EQUITY_SCORING,
+  type SmartMoneyScoringConfig,
+  type SmartMoneyScoringTunables,
+} from './smart-money-intelligence.config';
+export {
+  detectSignals,
+  detectRangeSignals,
+  calculateScore,
+  classifyStockStatus,
+  classifySectorScore,
+  softenStrongVerdictForThinUniverse,
+  aggregateSectorSummaries,
+} from './smart-money-intelligence.scoring';
 export type {
   InsiderOwnershipSummary,
   SectorSmartMoneyStatus,

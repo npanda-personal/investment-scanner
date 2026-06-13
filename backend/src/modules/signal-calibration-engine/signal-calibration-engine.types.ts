@@ -1,8 +1,55 @@
 import type { SignalConfidence, SignalDirection, SignalItem, SignalResultDto } from '../signal-generation-engine';
 import type { DataQualityEvaluationDto } from '../data-quality-engine';
+import type { NoisySignalItem, QualityMetricGroup, SignalTypePerformance } from '../signal-quality-lab';
 import type { EligibilityFacts } from '../../shared/types/eligibility-policy';
 
+/** Which data path produced the quality metrics used for calibration. */
+export type MetricsSource = 'PERSISTED_OUTCOMES' | 'ON_DEMAND';
+
+/** A signal-type metric keyed lookup (winRate / forward return / sample size). */
+export type SignalTypeMetric = { winRate: number | null; averageForwardReturn: number | null; sampleSize: number };
+
+/**
+ * Pre-aggregated Signal Quality metrics for a calibration batch, indexed for
+ * O(1) per-signal lookup so grouping is fetched once per batch, not per signal.
+ */
+export interface BatchQualityMetrics {
+  byType: SignalTypePerformance[];
+  byScore: QualityMetricGroup[];
+  bySector: QualityMetricGroup[];
+  noisy: NoisySignalItem[];
+  signalTypeMetrics: Map<string, SignalTypeMetric>;
+  scoreBucketMetrics: Map<string, QualityMetricGroup>;
+  sectorMetrics: Map<string, QualityMetricGroup>;
+  noisyIssueTypesByInstrumentId: Map<string, string[]>;
+  metricsSource: MetricsSource;
+  /** Real mature outcome count from countMatureByHorizon (persisted path only). */
+  persistedMatureCount?: number;
+}
+
 export type CalibrationDataStatus = 'COMPLETE' | 'PARTIAL' | 'MISSING' | 'ERROR';
+
+/** Per-horizon outcome availability counts from Signal Quality. */
+export interface HorizonAvailabilityEntry {
+  eligible: number;
+  evaluated: number;
+  insufficientFuturePrice: number;
+}
+
+/**
+ * Shape of the Signal Quality summary the calibration engine consumes.
+ * Named so the engine no longer threads `any` through its evidence path.
+ */
+export interface QualitySummary {
+  generatedAt?: string | null;
+  dataStatus?: string;
+  evaluationDiagnostics?: {
+    evaluatedSignals?: number;
+    latestAvailablePriceDate?: string | null;
+    nextEvaluableDate?: string | null;
+  } | null;
+  horizonAvailability?: Record<string, HorizonAvailabilityEntry> | null;
+}
 export type CalibrationAdjustmentType = 'SIGNAL_TYPE' | 'SCORE_BUCKET' | 'REGIME' | 'SECTOR' | 'SMART_MONEY' | 'DATA_QUALITY' | 'NOISE';
 export type CalibrationConfidenceLevel = SignalConfidence | 'INSUFFICIENT_SAMPLE';
 export type CalibrationEvidenceStatus = 'SUFFICIENT' | 'LOW_SAMPLE' | 'INSUFFICIENT' | 'MISSING';

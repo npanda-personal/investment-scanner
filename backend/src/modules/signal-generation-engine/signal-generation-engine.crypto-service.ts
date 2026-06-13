@@ -1,6 +1,7 @@
 import { MarketDataFoundationService } from '../market-data-foundation';
 import { SignalGenerationEngineService } from './signal-generation-engine.service';
 import type { SignalPricePoint } from './signal-generation-engine.types';
+import { resolveSignalScoringConfig } from './signal-scoring.config';
 import {
   CryptoSignalGenerationRepository,
   cryptoSignalGenerationRepository,
@@ -22,6 +23,11 @@ const CRYPTO_SIGNAL_RULESET_VERSION = 'crypto-ruleset-v1';
 const CRYPTO_PRICE_WINDOW = 520;
 const MIN_BARS_FOR_SIGNAL = 15; // enough for RSI(14); fewer → skip (insufficient history)
 const NEUTRAL_FUNDAMENTAL_SCORE = 0.5; // crypto has no fundamentals → neutral contribution
+
+// Crypto scoring config: capability-driven (no fundamentals/delivery), with the
+// unused fundamental weight redistributed across technical/momentum so crypto
+// scores can use the full conviction range (see signal-scoring.config.ts).
+const CRYPTO_SCORING_CONFIG = resolveSignalScoringConfig({ assetType: 'CRYPTO' });
 
 export interface CryptoSignalGenerationSummary {
   runId: string;
@@ -112,8 +118,8 @@ export class CryptoSignalGenerationService {
           continue;
         }
 
-        const technical = this.compute.evaluateTechnical(prices);
-        const momentum = this.compute.evaluateMomentum(prices, null);
+        const technical = this.compute.evaluateTechnical(prices, CRYPTO_SCORING_CONFIG);
+        const momentum = this.compute.evaluateMomentum(prices, null, CRYPTO_SCORING_CONFIG);
         const score = this.compute.compositeScore(
           technical.score,
           momentum.score,
@@ -124,6 +130,7 @@ export class CryptoSignalGenerationService {
           momentum.negativeSignals.length,
           0,
           0,
+          CRYPTO_SCORING_CONFIG,
         );
         const direction = this.compute.directionForScore(score);
         const triggeredSignals = [...technical.signals, ...momentum.signals];

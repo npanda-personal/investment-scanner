@@ -1,5 +1,7 @@
 # Hard Constraints
 
+> Quick sheet. The full constitution lives in [AGENTS.md](../AGENTS.md) (index) and [docs/agents/](agents/) topic files — see [mission-and-constraints.md](agents/mission-and-constraints.md) for the complete constraint text.
+
 - This application is for personal/local usage first. Do not optimize toward paid SaaS infrastructure, enterprise deployment, or hosted services.
 - Use 100% free/open-source or already-local tools only.
 - Do not add paid UI libraries, paid charting libraries, paid market-data providers, paid AI services, or paid testing services.

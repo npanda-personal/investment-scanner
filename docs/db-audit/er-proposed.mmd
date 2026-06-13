@@ -1,0 +1,476 @@
+%%{init: {"theme":"neutral","themeVariables":{"fontSize":"15px"},"er":{"layoutDirection":"LR","entityPadding":10}}}%%
+erDiagram
+  %% =====================================================================
+  %% PROPOSED SCHEMA
+  %%  - Postgres schema-per-domain (reference/market_data/intelligence/
+  %%    trading/identity/ops/crypto)
+  %%  - REGION = isolation axis: regionCode (NOT NULL, FK -> Market) on every
+  %%    region-scoped table + Row-Level Security + LIST partition by region.
+  %%    Select "IN" -> session GUC app.current_region='IN' -> RLS filters ALL
+  %%    region-scoped tables to IN automatically (see region-isolation doc).
+  %%  - One Instrument hub (stocks + crypto). Enums + FKs enforced. Decimal money.
+  %% =====================================================================
+
+  %% ---------- schema: reference (NEW, global) ----------
+  Market {
+    string regionCode PK "IN US EU UK CN GLOBAL"
+    string name
+    string currency
+    string timezone
+    boolean isActive
+  }
+  AssetClass {
+    string code PK "STOCK CRYPTO FUT OPT"
+    string name
+  }
+  Exchange {
+    string code PK
+    string regionCode FK
+    string name
+  }
+  Sector {
+    string code PK
+    string name
+  }
+
+  %% ---------- schema: market_data (region-scoped) ----------
+  Instrument {
+    string id PK
+    string symbol
+    string regionCode FK "NOT NULL"
+    string assetClassCode FK
+    string exchangeCode FK
+    string sectorCode FK
+    string isin
+    boolean isActive
+  }
+  CryptoMetadata {
+    string instrumentId PK "1:1 extends Instrument"
+    decimal circulatingSupply
+    json contractAddresses
+  }
+  InstrumentExchangeIdentity {
+    string id PK
+    string instrumentId FK
+    string sourceFileImportId FK
+  }
+  Fundamental {
+    string id PK
+    string instrumentId FK
+    datetime periodEndDate
+    decimal eps
+  }
+  CorporateAction {
+    string id PK
+    string instrumentId FK
+    string naturalKey UK
+  }
+  PriceBar {
+    string instrumentId PK "natural key part"
+    datetime tradingDate PK
+    string regionCode FK "PARTITION BY LIST(region), RANGE(date)"
+    decimal close
+    string sourceFileImportId FK
+  }
+  LatestPrice {
+    string instrumentId PK
+    string regionCode FK
+    decimal price
+  }
+  DeliverySnapshot {
+    string id PK
+    string instrumentId FK
+    datetime tradingDate
+  }
+  FxRate {
+    string id PK "global, no region"
+    string pair UK
+    decimal rate
+  }
+  SourceFileImport {
+    string id PK
+    string regionCode FK
+    string fileHash
+  }
+  MarketDataSyncState {
+    string id PK
+    string regionCode FK
+    datetime tradingDate
+  }
+  MarketDataRepairState {
+    string id PK
+    string instrumentId FK
+  }
+  MarketDataRepairRun {
+    string id PK
+    string regionCode FK
+  }
+
+  %% ---------- schema: intelligence (region-scoped) ----------
+  SignalGenerationRun {
+    string id PK
+    string regionCode FK
+    string assetClassCode FK
+    datetime generatedDate
+  }
+  SignalResult {
+    string id PK
+    string instrumentId FK
+    string generationRunId FK
+    string regionCode FK "NEW denormalized for partition/RLS"
+    decimal score
+  }
+  SignalOutcome {
+    string id PK
+    string signalResultId FK
+    string horizon
+    decimal forwardReturnPercent "Decimal"
+  }
+  SignalCalibration {
+    string id PK
+    string signalResultId FK "now enforced"
+    decimal calibratedScore
+  }
+  DataQualityEvaluation {
+    string id PK
+    string instrumentId FK
+  }
+  InstrumentEligibility {
+    string id PK
+    string instrumentId FK
+    string regionCode FK
+    datetime tradingDate "single source of eligibility truth"
+  }
+  DailyInstrumentSnapshot {
+    string id PK
+    string instrumentId FK
+    string regionCode FK "PARTITION + retention"
+    datetime tradingDate
+    int snapshotVersion
+  }
+  SnapshotWatermark {
+    string id PK
+    string regionCode FK
+    datetime tradingDate
+  }
+  WorkbenchSnapshot {
+    string instrumentId PK "cache"
+    int schemaVersion "NEW"
+    datetime expiresAt "NEW TTL"
+    json payloadJson
+  }
+  ResearchOverviewSnapshot {
+    string id PK
+    string regionCode FK
+    int schemaVersion
+    json overviewJson
+  }
+  MarketScanSnapshot {
+    string id PK
+    string regionCode FK
+    string scanType
+    int rank
+  }
+  EarningsIntelligenceSnapshot {
+    string id PK
+    string instrumentId FK
+    string regionCode FK
+  }
+  StockInterestSnapshot {
+    string id PK
+    string instrumentId FK
+    string regionCode FK
+  }
+  SmartMoneyContextSnapshot {
+    string id PK
+    string instrumentId FK
+    string regionCode FK
+  }
+  MarketContextSnapshot {
+    string id PK
+    string regionCode FK
+    datetime snapshotDate
+  }
+  MarketPulseSnapshot {
+    string id PK
+    string regionCode FK
+  }
+  SectorSnapshot {
+    string id PK
+    string regionCode FK
+    string sectorCode FK "merges old SectorContextSnapshot"
+  }
+  CountryContextSnapshot {
+    string id PK
+    string regionCode FK
+    string country
+  }
+
+  %% ---------- schema: trading (USER-scoped; may span regions) ----------
+  Portfolio {
+    string id PK
+    string userId FK
+    string baseCurrency
+  }
+  PortfolioHolding {
+    string id PK
+    string portfolioId FK
+    string instrumentId FK
+  }
+  PortfolioTransaction {
+    string id PK
+    string portfolioId FK
+    string instrumentId FK
+  }
+  PortfolioIntelligenceSnapshot {
+    string portfolioId PK
+    json payloadJson
+  }
+  Watchlist {
+    string id PK
+    string userId FK
+  }
+  WatchlistItem {
+    string id PK
+    string watchlistId FK
+    string instrumentId FK
+  }
+  AlertRule {
+    string id PK
+    string userId FK
+    string instrumentId FK
+    string portfolioId FK
+    string watchlistId FK
+  }
+  AlertEvent {
+    string id PK
+    string alertRuleId FK
+    string instrumentId FK
+  }
+  StrategyDefinition {
+    string id PK
+    string strategyCode
+    json supportedRegions
+  }
+  StrategyDecisionResult {
+    string id PK
+    string instrumentId FK
+    string strategyDefinitionId FK "now enforced"
+    string portfolioId FK "now enforced"
+    string regionCode FK
+  }
+  TradePlanResult {
+    string id PK
+    string instrumentId FK "now enforced"
+    string strategyDecisionId FK "now enforced"
+    string portfolioId FK
+    string regionCode FK
+    decimal rewardRiskRatio
+  }
+  StrategyPerformanceSummary {
+    string id PK
+    string strategyDefinitionId FK
+    string backtestRunId FK "now enforced"
+    string regionCode FK
+    decimal totalReturn "Decimal"
+  }
+  TodayReviewRun {
+    string id PK
+    string regionCode FK
+    datetime runDate
+  }
+  TodayReviewCandidate {
+    string id PK
+    string runId FK
+    string instrumentId FK
+  }
+  BacktestStrategy {
+    string id PK
+    string userId FK
+  }
+  BacktestRun {
+    string id PK
+    string userId FK
+    string strategyId FK
+  }
+  SignalPositionLedgerEntry {
+    string id PK
+    string instrumentId FK
+    string regionCode FK
+    decimal entryTriggerPrice "Decimal"
+  }
+  TradeJournalEntry {
+    string id PK
+    string userId FK
+    string instrumentId "soft OK (delisted)"
+  }
+
+  %% ---------- schema: identity (global, tenant=user) ----------
+  AppUser {
+    string id PK
+    string email UK
+  }
+  UserSubscription {
+    string id PK
+    string userId FK
+    string planCode FK "now enforced"
+  }
+  SubscriptionPlan {
+    string code PK
+  }
+  UsageCounter {
+    string id PK
+    string userId FK
+  }
+  NotificationPreference {
+    string userId PK
+  }
+  NotificationEvent {
+    string id PK
+    string userId FK
+  }
+
+  %% ---------- schema: ops (global orchestration) ----------
+  PipelineRun {
+    string id PK
+    string regionCode FK
+    string idempotencyKey UK
+  }
+  PipelineStageRun {
+    string id PK
+    string pipelineRunId FK
+    string leaseOwner
+  }
+
+  %% ---------- schema: crypto (GLOBAL region; isolated for VOLUME only) ----------
+  CryptoPriceBar {
+    string instrumentId PK "PARTITION by date"
+    datetime tradingDate PK
+    decimal close
+  }
+  CryptoLatestPrice {
+    string instrumentId PK
+    decimal price
+  }
+  CryptoFundamentalSnapshot {
+    string id PK
+    string instrumentId FK
+    datetime snapshotDate
+  }
+  CryptoEvent {
+    string id PK
+    string instrumentId FK
+    string externalId
+  }
+
+  %% ============================ RELATIONSHIPS ============================
+  %% Region isolation axis: Market -> everything region-scoped
+  Market ||--o{ Exchange : regionCode
+  Market ||--o{ Instrument : regionCode
+  Market ||--o{ PriceBar : regionCode
+  Market ||--o{ LatestPrice : regionCode
+  Market ||--o{ SourceFileImport : regionCode
+  Market ||--o{ MarketDataSyncState : regionCode
+  Market ||--o{ MarketDataRepairRun : regionCode
+  Market ||--o{ SignalGenerationRun : regionCode
+  Market ||--o{ SignalResult : regionCode
+  Market ||--o{ InstrumentEligibility : regionCode
+  Market ||--o{ DailyInstrumentSnapshot : regionCode
+  Market ||--o{ SnapshotWatermark : regionCode
+  Market ||--o{ ResearchOverviewSnapshot : regionCode
+  Market ||--o{ MarketScanSnapshot : regionCode
+  Market ||--o{ EarningsIntelligenceSnapshot : regionCode
+  Market ||--o{ StockInterestSnapshot : regionCode
+  Market ||--o{ SmartMoneyContextSnapshot : regionCode
+  Market ||--o{ MarketContextSnapshot : regionCode
+  Market ||--o{ MarketPulseSnapshot : regionCode
+  Market ||--o{ SectorSnapshot : regionCode
+  Market ||--o{ CountryContextSnapshot : regionCode
+  Market ||--o{ StrategyDecisionResult : regionCode
+  Market ||--o{ TradePlanResult : regionCode
+  Market ||--o{ StrategyPerformanceSummary : regionCode
+  Market ||--o{ TodayReviewRun : regionCode
+  Market ||--o{ SignalPositionLedgerEntry : regionCode
+  Market ||--o{ PipelineRun : regionCode
+
+  %% Reference -> Instrument
+  AssetClass ||--o{ Instrument : assetClassCode
+  Exchange ||--o{ Instrument : exchangeCode
+  Sector ||--o{ Instrument : sectorCode
+  Sector ||--o{ SectorSnapshot : sectorCode
+
+  %% Instrument hub (all enforced FKs)
+  Instrument ||--o| CryptoMetadata : instrumentId
+  Instrument ||--o{ InstrumentExchangeIdentity : instrumentId
+  Instrument ||--o{ Fundamental : instrumentId
+  Instrument ||--o{ CorporateAction : instrumentId
+  Instrument ||--o{ PriceBar : instrumentId
+  Instrument ||--o| LatestPrice : instrumentId
+  Instrument ||--o{ DeliverySnapshot : instrumentId
+  Instrument ||--o{ MarketDataRepairState : instrumentId
+  Instrument ||--o{ SignalResult : instrumentId
+  Instrument ||--o| DataQualityEvaluation : instrumentId
+  Instrument ||--o{ InstrumentEligibility : instrumentId
+  Instrument ||--o{ DailyInstrumentSnapshot : instrumentId
+  Instrument ||--o| WorkbenchSnapshot : instrumentId
+  Instrument ||--o{ EarningsIntelligenceSnapshot : instrumentId
+  Instrument ||--o{ StockInterestSnapshot : instrumentId
+  Instrument ||--o{ SmartMoneyContextSnapshot : instrumentId
+  Instrument ||--o{ PortfolioHolding : instrumentId
+  Instrument ||--o{ PortfolioTransaction : instrumentId
+  Instrument ||--o{ WatchlistItem : instrumentId
+  Instrument ||--o{ AlertRule : instrumentId
+  Instrument ||--o{ AlertEvent : instrumentId
+  Instrument ||--o{ StrategyDecisionResult : instrumentId
+  Instrument ||--o{ TradePlanResult : instrumentId
+  Instrument ||--o{ TodayReviewCandidate : instrumentId
+  Instrument ||--o{ SignalPositionLedgerEntry : instrumentId
+  Instrument ||--o| CryptoFundamentalSnapshot : instrumentId
+  Instrument ||--o{ CryptoEvent : instrumentId
+  Instrument ||--o| CryptoPriceBar : instrumentId
+  Instrument ||--o| CryptoLatestPrice : instrumentId
+
+  %% lineage
+  SourceFileImport ||--o{ PriceBar : sourceFileImportId
+  SourceFileImport ||--o{ InstrumentExchangeIdentity : sourceFileImportId
+
+  %% signals
+  SignalGenerationRun ||--o{ SignalResult : generationRunId
+  SignalResult ||--o{ SignalOutcome : signalResultId
+  SignalResult ||--o| SignalCalibration : signalResultId
+
+  %% strategy
+  StrategyDefinition ||--o{ StrategyDecisionResult : strategyDefinitionId
+  StrategyDefinition ||--o{ StrategyPerformanceSummary : strategyDefinitionId
+  StrategyDecisionResult ||--o{ TradePlanResult : strategyDecisionId
+  BacktestRun ||--o| StrategyPerformanceSummary : backtestRunId
+  TodayReviewRun ||--o{ TodayReviewCandidate : runId
+
+  %% trading
+  Portfolio ||--o{ PortfolioHolding : portfolioId
+  Portfolio ||--o{ PortfolioTransaction : portfolioId
+  Portfolio ||--o| PortfolioIntelligenceSnapshot : portfolioId
+  Portfolio ||--o{ StrategyDecisionResult : portfolioId
+  Portfolio ||--o{ TradePlanResult : portfolioId
+  Portfolio ||--o{ AlertRule : portfolioId
+  Portfolio ||--o{ AlertEvent : portfolioId
+  Watchlist ||--o{ WatchlistItem : watchlistId
+  Watchlist ||--o{ AlertRule : watchlistId
+  AlertRule ||--o{ AlertEvent : alertRuleId
+
+  %% identity
+  AppUser ||--o| UserSubscription : userId
+  AppUser ||--o{ UsageCounter : userId
+  AppUser ||--o{ Portfolio : userId
+  AppUser ||--o{ Watchlist : userId
+  AppUser ||--o{ AlertRule : userId
+  AppUser ||--o{ BacktestStrategy : userId
+  AppUser ||--o{ BacktestRun : userId
+  AppUser ||--o| NotificationPreference : userId
+  AppUser ||--o{ NotificationEvent : userId
+  AppUser ||--o{ TradeJournalEntry : userId
+  SubscriptionPlan ||--o{ UserSubscription : planCode
+  BacktestStrategy ||--o{ BacktestRun : strategyId
+
+  %% ops
+  PipelineRun ||--o{ PipelineStageRun : pipelineRunId

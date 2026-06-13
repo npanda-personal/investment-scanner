@@ -171,11 +171,6 @@ export class SignalCalibrationEngineRepository {
     return filters.length > 0 ? { AND: filters } : {};
   }
 
-  private confidenceFilter(query: CalibrationQuery): string | Prisma.StringFilter | undefined {
-    if (query.calibrationConfidence) return query.calibrationConfidence;
-    return undefined;
-  }
-
   private latestRowPerInstrument(rows: any[]): any[] {
     const seen = new Set<string>();
     const latestRows: any[] = [];
@@ -198,9 +193,7 @@ export class SignalCalibrationEngineRepository {
     if (query.sector && String(item.sector || '').toLowerCase() !== query.sector.toLowerCase()) return false;
     if (query.country && String(item.country || '').toLowerCase() !== query.country.toLowerCase()) return false;
     if (query.hasDataGaps !== undefined && (item.dataGaps.length > 0) !== query.hasDataGaps) return false;
-    const confidenceFilter = this.confidenceFilter(query);
-    if (typeof confidenceFilter === 'string' && item.calibratedConfidence !== confidenceFilter) return false;
-    if (typeof confidenceFilter === 'object' && 'in' in confidenceFilter && Array.isArray(confidenceFilter.in) && !confidenceFilter.in.includes(item.calibratedConfidence)) return false;
+    if (query.calibrationConfidence && item.calibratedConfidence !== query.calibrationConfidence) return false;
     return true;
   }
 

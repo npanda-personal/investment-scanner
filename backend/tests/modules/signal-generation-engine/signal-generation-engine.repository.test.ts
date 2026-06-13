@@ -350,6 +350,40 @@ describe('SignalGenerationEngineRepository', () => {
     expect(result.total).toBe(1);
   });
 
+  it('B1: latest-generated-date fast path makes total + direction counts trusted-consistent', async () => {
+    // Enter the fast path: findFirst present (guard), groupBy resolves the latest
+    // substantial date, findMany returns mixed trusted/untrusted rows for that date.
+    const generatedDate = new Date('2026-05-13T00:00:00.000Z');
+    const baseRow = (over: Record<string, unknown>) => ({
+      symbol: 'SYM', companyName: 'Co', sector: 'Technology', country: 'IN',
+      triggeredSignals: [], negativeSignals: [], explanation: 'x',
+      generatedAt: new Date('2026-05-13T00:00:00.000Z'), generatedDate,
+      modelVersion: 'signal-engine-v1', source: 'signal-generation-engine', dataStatus: 'COMPLETE',
+      ...over,
+    });
+    const rows = [
+      baseRow({ id: 's1', instrumentId: 'i1', score: 80, direction: 'BULLISH', confidence: 'HIGH', ...trustedReadRecord }),
+      baseRow({ id: 's2', instrumentId: 'i2', score: 50, direction: 'NEUTRAL', confidence: 'MEDIUM', ...trustedReadRecord }),
+      // untrusted: DQ ineligible → must be excluded from list, total AND counts
+      baseRow({
+        id: 's3', instrumentId: 'i3', score: 20, direction: 'BEARISH', confidence: 'LOW',
+        rulesetVersion: 'signal-engine-v1', scoringInputSummary: trustedReadRecord.scoringInputSummary,
+        dataQualityEligibilitySnapshot: { filterApplied: true, eligible: false, signalReadinessStatus: 'NOT_READY' },
+      }),
+    ];
+    const findFirst = jest.fn().mockResolvedValue(rows[0]);
+    const groupBy = jest.fn().mockResolvedValue([{ generatedDate, _count: { _all: 30 } }]);
+    const findMany = jest.fn().mockResolvedValue(rows);
+    const repository = new SignalGenerationEngineRepository({ signalResult: { findFirst, groupBy, findMany } } as any);
+
+    const list = await repository.latestSignals({ limit: 25, region: 'IN', assetType: 'STOCK' });
+    expect(list.signals.map((s) => s.symbol)).toEqual(['SYM', 'SYM']); // i1 + i2 only
+    expect(list.total).toBe(2); // untrusted i3 excluded from total
+
+    const counts = await repository.directionCounts({ limit: 25, region: 'IN', assetType: 'STOCK' });
+    expect(counts).toEqual({ BULLISH: 1, NEUTRAL: 1, BEARISH: 0 }); // bearish was untrusted → not counted
+  });
+
   it('excludes legacy and untrusted persisted rows from latest trusted read lists', async () => {
     const findMany = jest.fn().mockResolvedValue([{
       id: 'signal-trusted',

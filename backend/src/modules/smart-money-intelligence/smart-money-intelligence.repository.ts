@@ -1,34 +1,30 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 import prisma from '../../db/prisma';
-import type { SmartMoneyEvidenceReasonCode, SmartMoneyListQuery, SmartMoneyRange, SmartMoneyStockSummary, SectorSmartMoneySummary, SectorSmartMoneyStatus } from './smart-money-intelligence.types';
+import type { SmartMoneyEvidenceReasonCode, SmartMoneyListQuery, SmartMoneyRange, SmartMoneyStockSummary, SectorSmartMoneySummary } from './smart-money-intelligence.types';
 import { resolveMarketRegionFilter } from '../../shared/utils/market-scope';
+import { resolveSmartMoneyConfig } from './smart-money-intelligence.config';
+import { aggregateSectorSummaries } from './smart-money-intelligence.scoring';
+import { missingOwnership } from './smart-money-intelligence.constants';
+import {
+  buildEvidenceEnvelope,
+  computeFreshnessStatus,
+  freshnessReasonCode,
+  snapshotBoundary,
+  validDate,
+} from './smart-money-intelligence.evidence';
 
 export type SmartMoneySnapshotWriteAction = 'created' | 'updated' | 'unchanged';
 
-/**
- * Classify an average sector smart-money score into a 5-band status.
- * Bands are tuned to the observed NSE score spread (approx 41–59 as of 2026-06):
- *   >= 62  → STRONG_ACCUMULATION
- *   56–61  → ACCUMULATING
- *   48–55  → NEUTRAL
- *   38–47  → DISTRIBUTING
- *   < 38   → STRONG_DISTRIBUTION
- */
-function classifySectorScore(score: number): SectorSmartMoneyStatus {
-  if (score >= 62) return 'STRONG_ACCUMULATION';
-  if (score >= 56) return 'ACCUMULATING';
-  if (score >= 48) return 'NEUTRAL';
-  if (score >= 38) return 'DISTRIBUTING';
-  return 'STRONG_DISTRIBUTION';
-}
+type SnapshotWhere = Prisma.SmartMoneyContextSnapshotWhereInput;
 
 export class SmartMoneyIntelligenceRepository {
   constructor(private readonly db: PrismaClient = prisma) {}
 
   async latestSnapshots(query: SmartMoneyListQuery, isDistribution: boolean = false): Promise<{ results: SmartMoneyStockSummary[], total: number }> {
+    const config = resolveSmartMoneyConfig(query.region, query.assetType);
     const stockFilters = this.stockScopeFilters(query.region, query.assetType);
 
-    const baseWhere: any = {
+    const baseWhere: SnapshotWhere = {
       ...(stockFilters.length > 0 ? { stock: { AND: stockFilters } } : {}),
       range: query.range,
       ...(query.sector && { sector: query.sector }),
@@ -36,26 +32,21 @@ export class SmartMoneyIntelligenceRepository {
     const snapshotDate = await this.latestSnapshotDate(this.validSnapshotWhere(baseWhere));
     if (!snapshotDate) return { results: [], total: 0 };
 
-    const where: any = {
+    const eligibility = isDistribution
+      ? { OR: [{ status: 'DISTRIBUTION' }, { smartMoneyScore: { lte: config.distributionListScoreCeil } }] }
+      : { OR: [{ status: 'ACCUMULATION' }, { smartMoneyScore: { gte: config.accumulationListScoreFloor } }] };
+
+    const where: SnapshotWhere = {
       ...baseWhere,
       snapshotDate,
+      AND: [
+        ...(Array.isArray(baseWhere.AND) ? baseWhere.AND : baseWhere.AND ? [baseWhere.AND] : []),
+        { status: { not: 'INSUFFICIENT_DATA' } },
+        eligibility,
+      ],
     };
 
-    if (isDistribution) {
-      where.AND = [
-        ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
-        { status: { not: 'INSUFFICIENT_DATA' } },
-        { OR: [{ status: 'DISTRIBUTION' }, { smartMoneyScore: { lte: 40 } }] },
-      ];
-    } else {
-      where.AND = [
-        ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
-        { status: { not: 'INSUFFICIENT_DATA' } },
-        { OR: [{ status: 'ACCUMULATION' }, { smartMoneyScore: { gte: 60 } }] },
-      ];
-    }
-
-    const orderBy: any = [
+    const orderBy: Prisma.SmartMoneyContextSnapshotOrderByWithRelationInput[] = [
       { smartMoneyScore: isDistribution ? 'asc' : 'desc' },
       { symbol: 'asc' },
       { instrumentId: 'asc' },
@@ -134,55 +125,28 @@ export class SmartMoneyIntelligenceRepository {
   }
 
   async latestSectorSnapshots(range: SmartMoneyRange, query: Pick<SmartMoneyListQuery, 'region' | 'assetType'> = {}): Promise<SectorSmartMoneySummary[]> {
-     const stockFilters = this.stockScopeFilters(query.region, query.assetType);
-     const baseWhere: any = {
-       ...(stockFilters.length > 0 ? { stock: { AND: stockFilters } } : {}),
-       range,
-     };
-     const snapshotDate = await this.latestSnapshotDate(this.validSnapshotWhere(baseWhere));
-     if (!snapshotDate) return [];
+    const config = resolveSmartMoneyConfig(query.region, query.assetType);
+    const stockFilters = this.stockScopeFilters(query.region, query.assetType);
+    const baseWhere: SnapshotWhere = {
+      ...(stockFilters.length > 0 ? { stock: { AND: stockFilters } } : {}),
+      range,
+    };
+    const snapshotDate = await this.latestSnapshotDate(this.validSnapshotWhere(baseWhere));
+    if (!snapshotDate) return [];
 
-     const rows = await this.db.smartMoneyContextSnapshot.findMany({
-       where: {
-         ...baseWhere,
-         snapshotDate,
-         status: { not: 'INSUFFICIENT_DATA' },
-       }
-     });
+    const rows = await this.db.smartMoneyContextSnapshot.findMany({
+      where: {
+        ...baseWhere,
+        snapshotDate,
+        status: { not: 'INSUFFICIENT_DATA' },
+      }
+    });
 
-     // We aggregate on the fly from the daily snapshots.
-     // In a truly massive system, we'd persist SectorSmartMoneySummary as well,
-     // but aggregating 5,000 integers in memory takes <1ms and is fine for this scale,
-     // unlike fetching price bars and recalculating signals from scratch.
-     const groups = new Map<string, SmartMoneyStockSummary[]>();
-     rows.forEach(r => {
-       const summary = this.mapSnapshotToSummary(r);
-       const sector = summary.sector || 'Unknown';
-       groups.set(sector, [...(groups.get(sector) || []), summary]);
-     });
-
-     return [...groups.entries()].map(([sector, items]) => {
-       const average = Math.round(items.reduce((sum, item) => sum + item.smartMoneyScore, 0) / Math.max(1, items.length));
-       const sectorStatus: SectorSmartMoneyStatus = classifySectorScore(average);
-       const dataStatus: any = items.some((item) => item.dataStatus === 'PARTIAL' || item.dataStatus === 'ERROR') ? 'PARTIAL' : 'COMPLETE';
-       const updatedAt = items.map((item) => item.updatedAt).sort().at(-1) || new Date(0).toISOString();
-       // The DATA date (snapshotDate) is what the screen's "as of" badge should show — not
-       // updatedAt (the row's compute timestamp, which a no-op unchanged refresh leaves stale).
-       const dataThroughDate = items.map((item) => item.snapshotDate).filter(Boolean).sort().at(-1) || null;
-       return {
-         sector,
-         averageSmartMoneyScore: average,
-         accumulationCount: items.filter((item) => item.status === 'ACCUMULATION').length,
-         distributionCount: items.filter((item) => item.status === 'DISTRIBUTION').length,
-         unusualVolumeCount: items.filter((item) => item.signals.some((signal) => signal.type === 'UNUSUAL_VOLUME')).length,
-         instrumentCount: items.length,
-         sectorStatus,
-         dataStatus,
-         snapshotDate: dataThroughDate,
-         dataThroughDate,
-         updatedAt,
-       };
-     }).sort((a, b) => b.averageSmartMoneyScore - a.averageSmartMoneyScore);
+    // Aggregate on the fly from the daily snapshots via the SHARED aggregator (the same
+    // one the on-the-fly service path uses) so the two can never diverge — including the
+    // thin-universe softening that prevents a 1–2 stock "sector" carrying a STRONG_* verdict.
+    // Aggregating a few thousand integers in memory is <1ms, unlike refetching price bars.
+    return aggregateSectorSummaries(rows.map((r) => this.mapSnapshotToSummary(r)), config);
   }
 
   async saveSnapshot(summary: SmartMoneyStockSummary): Promise<SmartMoneySnapshotWriteAction> {
@@ -328,7 +292,7 @@ export class SmartMoneyIntelligenceRepository {
     return value;
   }
 
-  private assetTypeFilter(assetType?: string): any | null {
+  private assetTypeFilter(assetType?: string): Prisma.StockWhereInput | null {
     const normalized = assetType?.trim().toUpperCase();
     if (!normalized) return null;
     if (normalized === 'STOCK' || normalized === 'EQUITY') {
@@ -342,8 +306,8 @@ export class SmartMoneyIntelligenceRepository {
     return { assetType: { equals: normalized, mode: 'insensitive' } };
   }
 
-  private stockScopeFilters(region?: string, assetType?: string): any[] {
-    const stockFilters: any[] = [];
+  private stockScopeFilters(region?: string, assetType?: string): Prisma.StockWhereInput[] {
+    const stockFilters: Prisma.StockWhereInput[] = [];
     const regionFilter = resolveMarketRegionFilter(region);
     if (Object.keys(regionFilter).length > 0) stockFilters.push(regionFilter);
     const assetTypeFilter = this.assetTypeFilter(assetType);
@@ -351,14 +315,14 @@ export class SmartMoneyIntelligenceRepository {
     return stockFilters;
   }
 
-  private validSnapshotWhere(where: any): any {
+  private validSnapshotWhere(where: SnapshotWhere): SnapshotWhere {
     return {
       ...where,
       status: { not: 'INSUFFICIENT_DATA' },
     };
   }
 
-  private async latestSnapshotDate(where: any): Promise<Date | null> {
+  private async latestSnapshotDate(where: SnapshotWhere): Promise<Date | null> {
     const groups = await this.db.smartMoneyContextSnapshot.groupBy({
       by: ['snapshotDate'],
       where,
@@ -367,14 +331,11 @@ export class SmartMoneyIntelligenceRepository {
       orderBy: { snapshotDate: 'desc' },
     });
     if (!groups.length) return null;
-    // Among date-groups with SUBSTANTIAL coverage, pick the most-recently-computed one
-    // (latest _max.updatedAt; snapshotDate as a tiebreak). The substantial filter previously
-    // used `count >= maxCount` (the single ABSOLUTE-peak day) — so once one day had the most
-    // rows ever (e.g. 28 May, 2,660) every later day with slightly lower coverage (~2,324) was
-    // excluded and the reads got permanently stuck on that old peak day, even though fresh 6/5
-    // data existed. Now the floor is RELATIVE (>=50% of the peak): minor day-to-day coverage
-    // variance is accepted (so the freshest run wins on updatedAt) while a tiny partial/test-seed
-    // day is still skipped.
+    // Among date-groups with SUBSTANTIAL coverage, pick the most-recent DATA date.
+    // The substantial filter is RELATIVE (>=50% of the peak day's row count): minor
+    // day-to-day coverage variance is accepted (so the freshest run wins) while a tiny
+    // partial/test-seed day is skipped. (An absolute `count >= maxCount` floor previously
+    // stuck reads permanently on the single all-time-peak day.)
     const maxCount = Math.max(...groups.map((item: any) => Number(item._count?._all || 0)));
     const floor = maxCount * 0.5;
     const stableGroups = groups
@@ -382,8 +343,7 @@ export class SmartMoneyIntelligenceRepository {
       .sort((a: any, b: any) => {
         // Latest DATA date (snapshotDate) wins — that is what the screen's "as of" means.
         // updatedAt (compute time) is only a tiebreak for the SAME snapshotDate; it must NOT
-        // be the primary key, or re-computing/re-writing an OLDER date (e.g. an integration-test
-        // seed that touches 05-29 today) would shadow the genuinely latest data date (06-05).
+        // be the primary key, or re-computing an OLDER date would shadow the latest data date.
         const dateDelta = this.timeValue(b.snapshotDate) - this.timeValue(a.snapshotDate);
         if (dateDelta !== 0) return dateDelta;
         return this.timeValue(b._max?.updatedAt) - this.timeValue(a._max?.updatedAt);
@@ -399,15 +359,7 @@ export class SmartMoneyIntelligenceRepository {
 
   private mapSnapshotToSummary(row: any): SmartMoneyStockSummary {
     const snapshotDate = row.snapshotDate instanceof Date ? row.snapshotDate.toISOString().slice(0, 10) : null;
-    const ownership = (row.insiderOwnership as any) || {
-      insiderBuyCount: null,
-      insiderSellCount: null,
-      netInsiderActivity: null,
-      institutionalOwnershipPercent: null,
-      ownershipDataStatus: 'MISSING',
-      source: 'not-configured',
-      explanation: 'Free insider and institutional ownership provider is not configured for the MVP.',
-    };
+    const ownership = (row.insiderOwnership as any) || missingOwnership();
     const summary: SmartMoneyStockSummary = {
       instrumentId: row.instrumentId,
       symbol: row.symbol,
@@ -439,55 +391,30 @@ export class SmartMoneyIntelligenceRepository {
 
   private persistedEvidence(summary: SmartMoneyStockSummary, row: any): SmartMoneyStockSummary['evidence'] {
     const snapshotDate = summary.snapshotDate || null;
-    const updatedAt = row.updatedAt instanceof Date ? row.updatedAt : new Date(row.updatedAt);
-    const boundary = snapshotDate ? new Date(`${snapshotDate}T00:00:00.000Z`) : null;
-    const freshnessStatus = !boundary || !Number.isFinite(updatedAt.getTime())
-      ? 'UNKNOWN'
-      : updatedAt.getTime() + 1 < boundary.getTime()
-        ? 'STALE'
-        : 'CURRENT';
+    const freshnessStatus = computeFreshnessStatus(validDate(row.updatedAt), snapshotBoundary(snapshotDate));
     const ownershipMissing = summary.insiderOwnership.ownershipDataStatus === 'MISSING';
     const unavailable = summary.status === 'INSUFFICIENT_DATA' || summary.dataStatus === 'ERROR';
     const limited = ownershipMissing || freshnessStatus !== 'CURRENT' || summary.dataStatus !== 'COMPLETE';
-    const freshnessReason = freshnessStatus === 'STALE'
-      ? 'SNAPSHOT_STALE'
-      : freshnessStatus === 'CURRENT'
-        ? 'SNAPSHOT_CURRENT'
-        : null;
+    const freshnessReason = freshnessReasonCode(freshnessStatus);
     const reasonCodes: SmartMoneyEvidenceReasonCode[] = [
       'PERSISTED_SNAPSHOT_USED',
-      ...(freshnessReason ? [freshnessReason as SmartMoneyEvidenceReasonCode] : []),
+      ...(freshnessReason ? [freshnessReason] : []),
       'DATA_THROUGH_FROM_SNAPSHOT_DATE',
       'DOWNSTREAM_PERSISTED_ONLY',
       ...(ownershipMissing ? ['OWNERSHIP_PLACEHOLDER' as SmartMoneyEvidenceReasonCode] : []),
     ];
-    const provenanceSummary = 'Persisted smart-money snapshot was used.';
-    const ownershipSummary = ownershipMissing
-      ? 'Insider and institutional ownership evidence is unavailable; treat this as partial price-volume evidence.'
-      : 'Ownership evidence is present.';
-    return {
-      evidenceStatus: unavailable ? 'UNAVAILABLE' : limited ? 'LIMITED' : 'USABLE',
+    return buildEvidenceEnvelope({
+      source: 'PERSISTED_SNAPSHOT',
+      downstreamSafe: true,
+      persistedAvailableAtRequestStart: true,
+      requestedRange: summary.range,
+      snapshotDate,
+      dataThroughDate: snapshotDate,
+      dataThroughBasis: 'SNAPSHOT_DATE',
       freshnessStatus,
-      provenance: {
-        source: 'PERSISTED_SNAPSHOT',
-        persistedSnapshotAvailableAtRequestStart: true,
-        downstreamSafe: true,
-        reasonSummary: provenanceSummary,
-      },
-      coverage: {
-        requestedRange: summary.range,
-        snapshotDate,
-        dataThroughDate: snapshotDate,
-        dataThroughBasis: 'SNAPSHOT_DATE',
-        rangeLabel: `${summary.range} price-volume window`,
-      },
-      ownershipTrust: {
-        status: ownershipMissing ? 'PARTIAL_OWNERSHIP_GAP' : 'COMPLETE',
-        ownershipDataStatus: summary.insiderOwnership.ownershipDataStatus,
-        reasonSummary: ownershipSummary,
-      },
-      reasonCodes: [...new Set(reasonCodes)],
-      reasonSummary: `${provenanceSummary} ${ownershipSummary}`,
-    };
+      ownershipDataStatus: summary.insiderOwnership.ownershipDataStatus,
+      evidenceStatus: unavailable ? 'UNAVAILABLE' : limited ? 'LIMITED' : 'USABLE',
+      reasonCodes,
+    });
   }
 }

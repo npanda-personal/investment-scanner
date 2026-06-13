@@ -9,11 +9,10 @@ import type {
   DataQualityUseCaseTiers,
 } from './data-quality-engine.types';
 import { resolveRelatedMarketRegionFilter } from '../../shared/utils/market-scope';
-
-const PHASE0_AUTOMATION_NOT_AUTHORIZED = 'PHASE0_AUTOMATION_NOT_AUTHORIZED';
-const TIER_REASON_TRUST_CONTEXT_MISSING = 'TRUST_CONTEXT_MISSING';
-const TIER_REASON_TRUSTED_BASELINE_HISTORY_INCOMPLETE = 'TRUSTED_BASELINE_HISTORY_INCOMPLETE';
-const TIER_REASON_LISTING_DATE_CONFIDENCE_MISSING = 'LISTING_DATE_CONFIDENCE_MISSING';
+import { TIER_REASON_LISTING_DATE_CONFIDENCE_MISSING } from './data-quality-engine.constants';
+import { deriveUseCaseTiers } from './data-quality-engine.use-case-tiers';
+import { recommendedFixes } from './data-quality-engine.recommended-fixes';
+import { jsonStringArray } from './data-quality-engine.utils';
 
 export class DataQualityEngineRepository {
   constructor(private readonly db = prisma) {}
@@ -110,7 +109,7 @@ export class DataQualityEngineRepository {
         where: this.where(base),
       }),
     ]);
-    const hasGap = (needle: string) => all.filter((item) => this.jsonArray(item.dataGaps).some((gap) => gap.includes(needle))).length;
+    const hasGap = (needle: string) => all.filter((item) => jsonStringArray(item.dataGaps).some((gap) => gap.includes(needle))).length;
     return {
       totalInstruments,
       goodCoverageCount: good,
@@ -125,7 +124,7 @@ export class DataQualityEngineRepository {
       missingIndustryCount: hasGap('Industry metadata is missing'),
       missingCountryCount: hasGap('Country metadata is missing'),
       lowLiquidityCount: all.filter((item) => ['THIN', 'ILLIQUID'].includes(item.liquidityStatus)).length,
-      missingVolumeCount: all.filter((item) => item.liquidityStatus === 'UNKNOWN' || this.jsonArray(item.dataGaps).some((gap) => gap.includes('Volume data is missing'))).length,
+      missingVolumeCount: all.filter((item) => item.liquidityStatus === 'UNKNOWN' || jsonStringArray(item.dataGaps).some((gap) => gap.includes('Volume data is missing'))).length,
       latestEvaluationAt: latest?.evaluatedAt.toISOString() ?? null,
       dataStatus: all.length === 0 ? 'MISSING' : all.length < totalInstruments ? 'PARTIAL' : 'COMPLETE',
     };
@@ -209,10 +208,10 @@ export class DataQualityEngineRepository {
   }
 
   private toDto(record: any): DataQualityEvaluationDto {
-    const dataGaps = this.jsonArray(record.dataGaps);
-    const warnings = this.jsonArray(record.warnings);
-    const readinessReasons = this.jsonArray(record.readinessReasons);
-    const readinessBlockers = this.jsonArray(record.readinessBlockers);
+    const dataGaps = jsonStringArray(record.dataGaps);
+    const warnings = jsonStringArray(record.warnings);
+    const readinessReasons = jsonStringArray(record.readinessReasons);
+    const readinessBlockers = jsonStringArray(record.readinessBlockers);
     const tierEvidence = this.tierEvidence(readinessBlockers);
     const useCaseTiers = this.useCaseTiers(record, dataGaps, readinessReasons, readinessBlockers, tierEvidence);
     return {
@@ -237,28 +236,12 @@ export class DataQualityEngineRepository {
       warnings,
       readinessReasons,
       readinessBlockers,
-      recommendedFixes: this.recommendedFixes(dataGaps, readinessBlockers),
+      recommendedFixes: recommendedFixes(dataGaps, readinessBlockers),
       useCaseTiers,
       tierEvidence,
       lastEvaluatedAt: record.evaluatedAt.toISOString(),
       researchUrl: `/research/stocks/${record.instrumentId}`,
     };
-  }
-
-  private jsonArray(value: unknown): string[] {
-    return Array.isArray(value) ? value.map(String) : [];
-  }
-
-  private recommendedFixes(gaps: string[], blockers: string[]): string[] {
-    const text = [...gaps, ...blockers].join(' ');
-    const fixes = new Set<string>();
-    if (text.includes('price history') || text.includes('SMA200') || text.includes('backtesting')) fixes.add('Sync more historical price data.');
-    if (text.includes('latest price')) fixes.add('Refresh latest price data.');
-    if (text.includes('Sector') || text.includes('Industry')) fixes.add('Add sector/industry metadata.');
-    if (text.includes('Country')) fixes.add('Add country metadata.');
-    if (text.includes('Fundamentals')) fixes.add('Sync or add fundamentals.');
-    if (text.includes('Volume')) fixes.add('Refresh price history with volume data.');
-    return [...fixes];
   }
 
   private tierEvidence(readinessBlockers: string[]): DataQualityTierEvidence {
@@ -280,6 +263,16 @@ export class DataQualityEngineRepository {
     };
   }
 
+  /**
+   * Reconstruct use-case tiers for a persisted row.
+   *
+   * Freshly-evaluated rows carry the engine's tier decisions as tagged strings
+   * (e.g. `DAILYREVIEW_LIMITED: …`) inside readinessReasons/readinessBlockers;
+   * `taggedTierReasons` replays those exactly. For legacy rows without tags, the
+   * SAME shared `deriveUseCaseTiers` engine the service uses is fed input
+   * reconstructed from the persisted columns + parsed trust evidence — so the
+   * read path and the evaluate path can never derive tiers by different rules.
+   */
   private useCaseTiers(
     record: any,
     dataGaps: string[],
@@ -289,66 +282,24 @@ export class DataQualityEngineRepository {
   ): DataQualityUseCaseTiers {
     const tagged = this.taggedTierReasons([...readinessReasons, ...readinessBlockers]);
     const stale = dataGaps.some((gap) => gap.toLowerCase().includes('latest price is stale'));
-    const trustContextMissing = !tierEvidence.requiredHistoryStatus && !readinessBlockers.some((blocker) => blocker.includes(TIER_REASON_TRUSTED_BASELINE_HISTORY_INCOMPLETE));
-    const historyIncomplete = tierEvidence.requiredHistoryStatus ? tierEvidence.requiredHistoryStatus !== 'COMPLETE' : readinessBlockers.some((blocker) => blocker.includes(TIER_REASON_TRUSTED_BASELINE_HISTORY_INCOMPLETE));
-    const listingDateConfidenceMissing = !tierEvidence.listingDateStatus
-      || tierEvidence.listingDateStatus === 'MISSING_USED_15_YEAR_TARGET'
-      || readinessBlockers.some((blocker) => blocker.includes(TIER_REASON_LISTING_DATE_CONFIDENCE_MISSING));
-
-    const fallbackDailyReview: DataQualityUseCaseTier = stale
-      ? { status: 'BLOCKED', reasons: ['STALE_PRICE_DATA'] }
-      : record.coverageStatus === 'UNUSABLE'
-        ? { status: 'BLOCKED', reasons: ['UNUSABLE_COVERAGE'] }
-        : trustContextMissing || historyIncomplete || listingDateConfidenceMissing || record.signalReadinessStatus !== 'READY'
-          ? { status: 'LIMITED', reasons: [
-            ...(trustContextMissing ? [TIER_REASON_TRUST_CONTEXT_MISSING] : []),
-            ...(historyIncomplete ? [TIER_REASON_TRUSTED_BASELINE_HISTORY_INCOMPLETE] : []),
-            ...(listingDateConfidenceMissing ? [TIER_REASON_LISTING_DATE_CONFIDENCE_MISSING] : []),
-            ...(record.signalReadinessStatus === 'LIMITED' ? ['SIGNAL_LIMITED'] : []),
-            ...(record.signalReadinessStatus === 'NOT_READY' ? ['SIGNAL_NOT_READY'] : []),
-          ] }
-          : { status: 'READY', reasons: [] };
-
-    const signalLimitedReasons: string[] = [];
-    if (trustContextMissing) signalLimitedReasons.push(TIER_REASON_TRUST_CONTEXT_MISSING);
-    if (historyIncomplete) signalLimitedReasons.push(TIER_REASON_TRUSTED_BASELINE_HISTORY_INCOMPLETE);
-    if (listingDateConfidenceMissing) signalLimitedReasons.push(TIER_REASON_LISTING_DATE_CONFIDENCE_MISSING);
-    if (record.signalReadinessStatus === 'LIMITED') signalLimitedReasons.push('SIGNAL_LIMITED');
-    if (!record.eligibleForSignals) signalLimitedReasons.push('LEGACY_SIGNAL_EVIDENCE_INELIGIBLE');
-    const fallbackSignal: DataQualityUseCaseTier = record.signalReadinessStatus === 'NOT_READY' || stale
-      ? { status: 'BLOCKED', reasons: [stale ? 'STALE_PRICE_DATA' : 'SIGNAL_NOT_READY'] }
-      : signalLimitedReasons.length > 0
-        ? { status: 'LIMITED', reasons: signalLimitedReasons }
-        : { status: 'READY', reasons: [] };
-
-    const fallbackBacktest: DataQualityUseCaseTier = trustContextMissing || historyIncomplete || listingDateConfidenceMissing || !record.eligibleForBacktesting
-      ? { status: 'BLOCKED', reasons: [
-        ...(trustContextMissing ? [TIER_REASON_TRUST_CONTEXT_MISSING] : []),
-        ...(historyIncomplete ? [TIER_REASON_TRUSTED_BASELINE_HISTORY_INCOMPLETE] : []),
-        ...(listingDateConfidenceMissing ? [TIER_REASON_LISTING_DATE_CONFIDENCE_MISSING] : []),
-        ...(!record.eligibleForBacktesting ? ['LEGACY_BACKTEST_EVIDENCE_INELIGIBLE'] : []),
-      ] }
-      : fallbackSignal.status === 'LIMITED'
-        ? { status: 'LIMITED', reasons: ['SIGNAL_LIMITED'] }
-        : { status: 'READY', reasons: [] };
-
-    const fallbackCalibration: DataQualityUseCaseTier = trustContextMissing || historyIncomplete || listingDateConfidenceMissing || !record.eligibleForCalibration
-      ? { status: 'BLOCKED', reasons: [
-        ...(trustContextMissing ? [TIER_REASON_TRUST_CONTEXT_MISSING] : []),
-        ...(historyIncomplete ? [TIER_REASON_TRUSTED_BASELINE_HISTORY_INCOMPLETE] : []),
-        ...(listingDateConfidenceMissing ? [TIER_REASON_LISTING_DATE_CONFIDENCE_MISSING] : []),
-        ...(!record.eligibleForCalibration ? ['LEGACY_CALIBRATION_EVIDENCE_INELIGIBLE'] : []),
-      ] }
-      : fallbackSignal.status === 'LIMITED'
-        ? { status: 'LIMITED', reasons: ['SIGNAL_LIMITED'] }
-        : { status: 'READY', reasons: [] };
+    const fallback = deriveUseCaseTiers({
+      stale,
+      coverageStatus: record.coverageStatus,
+      signalReadinessStatus: record.signalReadinessStatus,
+      liquidityStatus: record.liquidityStatus,
+      eligibleForSignals: record.eligibleForSignals,
+      eligibleForBacktesting: record.eligibleForBacktesting,
+      eligibleForCalibration: record.eligibleForCalibration,
+      requiredHistoryStatus: tierEvidence.requiredHistoryStatus ?? null,
+      listingDateStatus: tierEvidence.listingDateStatus ?? null,
+    });
 
     return {
-      dailyReview: tagged.dailyReview ?? fallbackDailyReview,
-      signal: tagged.signal ?? fallbackSignal,
-      backtest: tagged.backtest ?? fallbackBacktest,
-      calibration: tagged.calibration ?? fallbackCalibration,
-      automation: tagged.automation ?? { status: 'BLOCKED', reasons: [PHASE0_AUTOMATION_NOT_AUTHORIZED] },
+      dailyReview: tagged.dailyReview ?? fallback.dailyReview,
+      signal: tagged.signal ?? fallback.signal,
+      backtest: tagged.backtest ?? fallback.backtest,
+      calibration: tagged.calibration ?? fallback.calibration,
+      automation: tagged.automation ?? fallback.automation,
     };
   }
 

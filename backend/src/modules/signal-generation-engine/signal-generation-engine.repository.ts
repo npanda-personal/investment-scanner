@@ -2,6 +2,8 @@ import { Prisma } from '@prisma/client';
 import prisma from '../../db/prisma';
 import type { ReliabilityTier, SignalGenerationRunAudit, SignalHistoryQuery, SignalLifecycleState, SignalQuery, SignalResultDto, SignalWriteResult, SignalWriteStatus } from './signal-generation-engine.types';
 import { resolveMarketRegionFilter } from '../../shared/utils/market-scope';
+import { isTrustedReadSignal } from './signal-read-policy';
+import { normalizeUtcDay } from './signal-math';
 
 export interface SignalFunnelDiagnosticsQuery {
   region?: string;
@@ -369,9 +371,26 @@ export class SignalGenerationEngineRepository {
     );
   }
 
+  /**
+   * B1 (trusted-read consistency): load every row for the latest generated date that
+   * matches `where`, map to DTOs and keep only TRUSTED rows via the shared predicate.
+   *
+   * The served page, its `total` and the direction counts are all derived from THIS
+   * one trusted set, so the header counts can never disagree with the rendered list.
+   * A DB-level filter is intentionally avoided: the trusted predicate inspects the
+   * `signalReadinessStatus` field inside the dataQualityEligibilitySnapshot JSON, and
+   * applying it as the in-memory source of truth guarantees parity with the read path.
+   * One date's universe is far smaller than the slow path's distinct-over-all-history
+   * scan, so this stays the fast path.
+   */
+  private async trustedRowsForLatestDate(where: Prisma.SignalResultWhereInput, orderBy: Prisma.SignalResultOrderByWithRelationInput[]): Promise<SignalResultDto[]> {
+    const rows = await this.db.signalResult.findMany({ where, orderBy });
+    return rows.map((item) => this.toDto(item)).filter((result) => this.isTrustedReadSignal(result));
+  }
+
   private async latestSignalsFromLatestGeneratedDate(query: SignalQuery): Promise<{ signals: SignalResultDto[]; total: number } | null> {
     if (!this.canUseLatestGeneratedDateFastPath(query)) return null;
-    if (typeof this.db.signalResult.findFirst !== 'function' || typeof this.db.signalResult.count !== 'function') return null;
+    if (typeof this.db.signalResult.findFirst !== 'function' || typeof this.db.signalResult.findMany !== 'function') return null;
 
     const generatedDate = await this.latestGeneratedDateFor(query);
     if (!generatedDate) return null;
@@ -382,54 +401,43 @@ export class SignalGenerationEngineRepository {
       ...this.buildWhere(query as SignalQuery & SignalFunnelDiagnosticsQuery),
       generatedDate,
     };
-    const [rows, total] = await Promise.all([
-      this.db.signalResult.findMany({
-        where,
-        orderBy: this.orderByForLatestSignals(query),
-        take: Math.min(500, Math.max(limit + 1, limit * 4 + 1)),
-        skip: offset,
-      }),
-      this.db.signalResult.count({ where }),
-    ]);
-    const signals = rows.map((item) => this.toDto(item)).filter((result) => this.isTrustedReadSignal(result)).slice(0, limit);
-    return { signals, total };
+    const trusted = await this.trustedRowsForLatestDate(where, this.orderByForLatestSignals(query));
+    return { signals: trusted.slice(offset, offset + limit), total: trusted.length };
   }
 
   private async latestSignalUniverseCountFromLatestGeneratedDate(query: Omit<SignalQuery, 'limit'>): Promise<number | null> {
     if (!this.canUseLatestGeneratedDateFastPath(query as SignalQuery)) return null;
-    if (typeof this.db.signalResult.findFirst !== 'function' || typeof this.db.signalResult.count !== 'function') return null;
+    if (typeof this.db.signalResult.findFirst !== 'function' || typeof this.db.signalResult.findMany !== 'function') return null;
     const generatedDate = await this.latestGeneratedDateFor(query as SignalQuery);
     if (!generatedDate) return null;
-    return this.db.signalResult.count({
-      where: {
-        ...this.buildWhere(query as SignalQuery & SignalFunnelDiagnosticsQuery),
-        generatedDate,
-      },
-    });
+    const where = {
+      ...this.buildWhere(query as SignalQuery & SignalFunnelDiagnosticsQuery),
+      generatedDate,
+    };
+    const trusted = await this.trustedRowsForLatestDate(where, this.orderByForLatestSignals(query as SignalQuery));
+    return trusted.length;
   }
 
   private async directionCountsFromLatestGeneratedDate(query: SignalQuery): Promise<Record<'BULLISH' | 'NEUTRAL' | 'BEARISH', number> | null> {
     if (!this.canUseLatestGeneratedDateFastPath({ ...query, direction: undefined })) return null;
-    if (typeof this.db.signalResult.findFirst !== 'function' || typeof this.db.signalResult.groupBy !== 'function') return null;
+    if (typeof this.db.signalResult.findFirst !== 'function' || typeof this.db.signalResult.findMany !== 'function') return null;
     const generatedDate = await this.latestGeneratedDateFor({ ...query, direction: undefined });
     if (!generatedDate) return null;
-    const rows = await this.db.signalResult.groupBy({
-      by: ['direction'],
-      where: {
-        ...this.buildWhere({
-          ...query,
-          direction: undefined,
-          confidence: undefined,
-          minScore: undefined,
-        } as SignalQuery & SignalFunnelDiagnosticsQuery),
-        generatedDate,
-      },
-      _count: { _all: true },
-    });
-    return rows.reduce<Record<'BULLISH' | 'NEUTRAL' | 'BEARISH', number>>((acc, item: any) => {
-      if (item.direction === 'BULLISH' || item.direction === 'NEUTRAL' || item.direction === 'BEARISH') {
-        const direction = item.direction as 'BULLISH' | 'NEUTRAL' | 'BEARISH';
-        acc[direction] = Number(item._count?._all || 0);
+    // Count over the same TRUSTED set the list is served from (direction/confidence/
+    // minScore stripped so all three buckets are represented), grouped by direction.
+    const where = {
+      ...this.buildWhere({
+        ...query,
+        direction: undefined,
+        confidence: undefined,
+        minScore: undefined,
+      } as SignalQuery & SignalFunnelDiagnosticsQuery),
+      generatedDate,
+    };
+    const trusted = await this.trustedRowsForLatestDate(where, this.orderByForLatestSignals(query));
+    return trusted.reduce<Record<'BULLISH' | 'NEUTRAL' | 'BEARISH', number>>((acc, signal) => {
+      if (signal.direction === 'BULLISH' || signal.direction === 'NEUTRAL' || signal.direction === 'BEARISH') {
+        acc[signal.direction] += 1;
       }
       return acc;
     }, { BULLISH: 0, NEUTRAL: 0, BEARISH: 0 });
@@ -560,17 +568,11 @@ export class SignalGenerationEngineRepository {
   }
 
   private isTrustedReadSignal(result: SignalResultDto): boolean {
-    const dataQuality = result.dataQualityEligibility;
-    return result.auditStatus === 'CURRENT'
-      && dataQuality?.filterApplied === true
-      && dataQuality.eligible === true
-      && dataQuality.signalReadinessStatus === 'READY';
+    return isTrustedReadSignal(result);
   }
 
   private normalizeUtcDay(value: Date): Date {
-    const date = new Date(value);
-    date.setUTCHours(0, 0, 0, 0);
-    return date;
+    return normalizeUtcDay(value);
   }
 
   private writeStatus(existing: any, data: Record<string, unknown>): SignalWriteStatus {

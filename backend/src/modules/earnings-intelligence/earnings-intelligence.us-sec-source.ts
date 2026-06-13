@@ -123,22 +123,6 @@ export function findMostRecentFilingDate(facts: CompanyFacts): string | null {
 }
 
 // ---------------------------------------------------------------------------
-// Legacy export kept for any callers that still reference it
-// (it is no longer used by UsEarningsDateAdapter.ingest but may be referenced
-//  in tests or other modules; retaining avoids breaking changes).
-// ---------------------------------------------------------------------------
-
-/** @deprecated Use findMostRecentFilingDate instead. */
-export function findFilingDateForPeriodEnd(
-  facts: CompanyFacts,
-  _periodEndDate: Date
-): string | null {
-  // Delegate to the new period-end-independent implementation so that any
-  // residual callers still get a meaningful result.
-  return findMostRecentFilingDate(facts);
-}
-
-// ---------------------------------------------------------------------------
 // Main service class
 // ---------------------------------------------------------------------------
 

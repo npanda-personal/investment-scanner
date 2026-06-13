@@ -18,6 +18,12 @@ export interface SnapshotProvenance {
   decision: ProvenanceStatus;
   tradePlan: ProvenanceStatus;
   context: ProvenanceStatus;
+  /**
+   * Sector relative-strength provenance.  Tracked separately from `context`
+   * because sector RS comes from a different source row (sectorContextSnapshot)
+   * than the regime/breadth fields, and can be present or absent independently.
+   */
+  sector: ProvenanceStatus;
   derivatives: ProvenanceStatus;
   earnings: ProvenanceStatus;
   smartMoney: ProvenanceStatus;
@@ -209,4 +215,27 @@ export interface AssembleSummary {
   snapshotVersion: number;
   provenanceCounts: Record<keyof SnapshotProvenance, ProvenanceCounts>;
   warnings: string[];
+}
+
+// ── Alerts port ──────────────────────────────────────────────────────────────
+
+/**
+ * The narrow slice of the alerts-monitoring service that the post-assembly hook
+ * depends on.  Declaring it here (instead of reaching into
+ * `(alertsService as any).repository.enabledRules`) inverts the dependency: the
+ * assembler owns the contract, AlertsMonitoringService merely satisfies it
+ * structurally.  A rename on the alerts side now surfaces as a compile error
+ * here rather than silently disabling alert evaluation at runtime.
+ */
+export interface EnabledAlertRule {
+  userId: string | null;
+  /** Optional region scope on the rule, when the rule is region-bound. */
+  region?: string | null;
+}
+
+export interface AlertsEvaluationPort {
+  /** Evaluate enabled alert rules; undefined userId = default/global rules. */
+  evaluate(userId?: string): Promise<unknown>;
+  /** List enabled rules so evaluation can be fanned out per distinct userId. */
+  listEnabledRules(): Promise<EnabledAlertRule[]>;
 }

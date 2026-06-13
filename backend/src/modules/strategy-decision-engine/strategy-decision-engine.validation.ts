@@ -67,6 +67,9 @@ export async function parseEvaluateRequest(
   return {
     strategy,
     instrumentId: typeof body?.instrumentId === 'string' ? body.instrumentId.trim() || undefined : undefined,
+    // SF-1: accept an explicit instrument set so the documented scheduled-pipeline
+    // bulk path works over HTTP, not only for in-process callers.
+    instrumentIds: parseInstrumentIds(body?.instrumentIds),
     symbol: typeof body?.symbol === 'string' ? body.symbol.trim().toUpperCase() || undefined : undefined,
     portfolioId: typeof body?.portfolioId === 'string' ? body.portfolioId.trim() || undefined : undefined,
     watchlistId: typeof body?.watchlistId === 'string' ? body.watchlistId.trim() || undefined : undefined,
@@ -113,6 +116,12 @@ function normalizeBoolean(value: unknown): boolean | undefined {
   if (str === 'true') return true;
   if (str === 'false') return false;
   return undefined;
+}
+
+function parseInstrumentIds(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const ids = [...new Set(value.map((id) => String(id ?? '').trim()).filter((id) => id.length > 0))];
+  return ids.length > 0 ? ids : undefined;
 }
 
 function normalizeStringList(value: unknown): string[] | undefined {

@@ -20,6 +20,7 @@ import {
 } from '../../shared/types/signal.types';
 export { DIRECTION_BULLISH_THRESHOLD, DIRECTION_BEARISH_THRESHOLD };
 import { SignalGenerationEngineRepository } from './signal-generation-engine.repository';
+import { isTrustedReadSignal } from './signal-read-policy';
 import type {
   PaginatedSignalResponse,
   ReliabilityTier,
@@ -36,10 +37,9 @@ import type {
   SignalStrategyMatchSummary,
   SignalDataQualityEligibility,
   SignalScoringInputSummary,
-  SignalTriggerContractDto,
   SignalTriggerPriceEvidence,
-  SignalTriggerType,
 } from './signal-generation-engine.types';
+import { withTriggerContract } from './signal-trigger-contract';
 import {
   classifyLifecycle,
   DEFAULT_LIFECYCLE_THRESHOLDS,
@@ -50,115 +50,24 @@ import {
   signal_generation_engine_provider_throttle_ms,
   signal_generation_engine_workers_count,
 } from './signal-generation-engine.config';
+import * as Indicators from './signal-indicators';
+import * as Scoring from './signal-scoring';
+import { average, stddev, optionalNumber as toOptionalNumber, clampInt as clampIntHelper, normalizeUtcDay as normalizeUtcDayHelper } from './signal-math';
+import {
+  DEFAULT_SIGNAL_SCORING_CONFIG,
+  resolveSignalScoringConfig,
+  SIGNAL_ENGINE_MODEL_VERSION,
+  SIGNAL_GENERATION_PRICE_WINDOW,
+  type SignalScoringConfig,
+} from './signal-scoring.config';
 
-const TECHNICAL_WEIGHT = 0.4;
-const MOMENTUM_WEIGHT = 0.35;
-const FUNDAMENTAL_WEIGHT = 0.25;
-const MODEL_VERSION = 'signal-engine-v3';
+const MODEL_VERSION = SIGNAL_ENGINE_MODEL_VERSION;
 
-// ── Regime Gate Toggle ────────────────────────────────────────────────────────
-//
-// When true, bearish/short signals are gated by the current market regime:
-//   - RISK_ON  → tradable bearish_trigger suppressed → forced to risk_warning
-//   - RISK_OFF / contextualShortsOnly → bearish_trigger preserved (F&O eligible names only)
-//   - null gate (no persisted snapshot) → no gating; signal passes through unchanged
-//
-// Empirical motivation: 5D short win-rate was 3.6 %/13 % during the 2024–25 bull run
-// but 86 %/90 % in the late-2025 weak tape.  Set to false to disable entirely.
-const REGIME_GATE_SHORTS_ENABLED = true;
-const SIGNAL_GENERATION_PRICE_WINDOW = 520;
-
-// Momentum thresholds — minimum return required to vote bullish/bearish.
-// Returns in-between produce NO momentum signal (neutral band).
-const MOMENTUM_BULL_THRESHOLD_1M = 0.02;  // +2% for 1-month
-const MOMENTUM_BEAR_THRESHOLD_1M = -0.03; // -3% for 1-month
-const MOMENTUM_BULL_THRESHOLD_3M = 0.05;  // +5% for 3-month
-const MOMENTUM_BEAR_THRESHOLD_3M = -0.07; // -7% for 3-month
-
-// ── v3 Conviction-Gradient Scoring Constants ─────────────────────────────────
-//
-// CATEGORY_SCORE_ALPHA: Laplace add-smoothing for per-category Bayesian fraction.
-//   alpha=1 (reduced from v2's alpha=2) lets a category move further from 0.5 when
-//   real evidence is present while still damping thin-evidence setups.
-//   Formula: (positive + alpha*0.5) / (total + alpha)
-//   Examples (alpha=1): 1/0 → 0.75, 5/0 → 0.917, 0/5 → 0.083
-const CATEGORY_SCORE_ALPHA = 1;
-
-// SPREAD_GAIN: Amplifier applied after evidence scaling so a fully aligned,
-//   maxed-out setup lands in the 88-95 range and a maxed bearish lands 5-12.
-//   Tuned analytically: with all 15 signals aligned (tech6/mom5/fund4) the
-//   max rawLean ≈ 0.917; displacement ≈ 0.417; evidenceFactor → 1.0;
-//   score ≈ 50 + 0.417 * 100 * 1.8 * 1.0 ≈ 50 + 75 = 125 → clamped to 100.
-//   In practice top realistic setup (tech4/mom3/fund2) lands ≈ 88-92.
-const SCORE_SPREAD_GAIN = 1.8;
-
-// EVIDENCE_SATURATION_COUNT: Number of total confirming (same-direction) signals
-//   at which the count component of evidenceFactor saturates (diminishing returns).
-//   At this count, count contribution reaches ~0.865 (1 - 1/e^2).
-const EVIDENCE_SATURATION_COUNT = 7;
-
-// EVIDENCE_AGREEMENT_WEIGHT / EVIDENCE_COUNT_WEIGHT: How much of evidenceFactor
-//   comes from cross-category agreement vs raw count.
-//   Chosen so thin single-signal stays ~55/45 and strong multi-category setups
-//   get amplified by the agreement bonus.
-const EVIDENCE_AGREEMENT_WEIGHT = 0.45;
-const EVIDENCE_COUNT_WEIGHT = 0.55;
-
-// EVIDENCE_MIXED_FLOOR: Minimum cross-category agreement contribution when categories
-//   conflict (e.g. one strongly bullish, one bearish).
-//   Set to 0 so genuinely-conflicting setups (one category strongly bullish, one
-//   strongly bearish) are allowed to compress toward 50 (NEUTRAL) rather than being
-//   artificially held up at ~0.4.  True conflict should yield NEUTRAL, not a
-//   watered-down directional signal.
-const EVIDENCE_MIXED_FLOOR = 0;
-
-// FUNDAMENTAL_PUBLIC_LAG_DAYS: Conservative filing-date lag for NSE results.
-// NSE companies are required to file within 45 days of quarter-end (60 days for
-// the annual result). We use 45 days as the conservative floor so that, in the
-// absence of an explicit officialResultDate, a quarterly result is only made
-// visible to historical (as-of) signal generation once it would plausibly have
-// been public — preventing look-ahead into future filings.
-const FUNDAMENTAL_PUBLIC_LAG_DAYS = 45;
-
-// OUTPERFORMING_PEERS_MIN_RELATIVE: Minimum relative-to-peer return (fractional)
-// required to cast a bullish peer vote.  Requires at least +2% outperformance
-// (not just >= 0) to reduce false positives when the stock barely keeps up.
-const OUTPERFORMING_PEERS_MIN_RELATIVE = 0.02;
-
-// Direction cut-points (v3): sourced from shared/types/signal.types.ts
-
-// ── v3 Overextension / Mean-Reversion Guards ─────────────────────────────────
-//
-// Empirical finding: the top score bucket (80-100) is anti-predictive at short
-// horizons (1D -2.13%, 5D -0.42%/49.8% win) because extreme technical+momentum
-// signals preferentially surface over-extended / overbought names that mean-revert.
-// These guards push NEGATIVE signals through the existing categoryScore mechanism
-// so over-extended names get demoted — no ad-hoc penalty; the category proportion
-// lowers the composite score in the same way any other negative signal does.
-//
-// All thresholds are standard / textbook TA values; none are fit to any sample.
-// Each guard is independently toggle-able; all ON by default.
-//
-// Guard 1 — Overbought RSI (TECHNICAL):
-//   RSI(14) >= 70 is the textbook overbought threshold (Wilder, 1978).
-//   An extreme level at >= 80 adds a second, stronger demotion.
-const GUARD_OVERBOUGHT_RSI_ENABLED = true;
-const RSI_OVERBOUGHT = 70;          // textbook: above 70 = overbought
-const RSI_EXTREME_OVERBOUGHT = 80;  // extreme: above 80 = strongly overbought
-
-// Guard 2 — Extended above SMA50 (TECHNICAL):
-//   Price more than 15% above SMA50 signals a parabolic stretch from the medium-
-//   term trend line. Textbook "channel deviation" studies use 10-20% as the
-//   danger zone; 15% is the midpoint of that range.
-const GUARD_SMA50_STRETCH_ENABLED = true;
-const SMA50_STRETCH_PCT = 0.15;     // 15% above SMA50 = over-extended
-
-// Guard 3 — Parabolic short-term run-up (MOMENTUM):
-//   A 20%+ gain over 10 trading days (~2 calendar weeks) is a parabolic spike
-//   well beyond normal momentum. Textbook short-squeeze / blow-off tops
-//   are typically identified by 15-25% 10-day moves; 20% is the centre.
-const GUARD_PARABOLIC_RUNUP_ENABLED = true;
-const PARABOLIC_RUNUP_PCT = 0.20;   // 20% 10-day run = parabolic
+// Regime-gate + fundamentals-lag policy now live in signal-scoring.config.ts and are
+// resolved per market scope; these module-level aliases preserve the prior defaults
+// for the run/regime/fundamentals paths until they consume the per-scope config.
+const REGIME_GATE_SHORTS_ENABLED = DEFAULT_SIGNAL_SCORING_CONFIG.regimeGateShortsEnabled;
+const FUNDAMENTAL_PUBLIC_LAG_DAYS = DEFAULT_SIGNAL_SCORING_CONFIG.fundamentalPublicLagDays;
 
 type SignalGenerationBatchContext = {
   instrumentsById: Map<string, any>;
@@ -581,6 +490,11 @@ export class SignalGenerationEngineService {
     const effectiveResearchContextMode = asOfDate ? 'LIGHTWEIGHT' : options.researchContextMode;
     const useFullResearchContext = effectiveResearchContextMode !== 'LIGHTWEIGHT';
     const marketScope = { region: options.region, assetType: options.assetType };
+    // Resolve the per-scope scoring config (weights, guards, delivery capability,
+    // fundamentals-filing lag).  Region falls back to IN when the run is unscoped /
+    // GLOBAL, preserving the prior India-default behaviour byte-for-byte; an explicit
+    // US/EU/crypto scope gets market-appropriate parameters.
+    const scoringConfig = resolveSignalScoringConfig({ region: this.canonicalRegion(options.region), assetType: options.assetType });
     const priceEndDate = asOfDate ?? undefined;
     const [instrument, pricesResponse, fundamentalsResponse, research] = await Promise.all([
       options.batchContext?.instrumentsById.has(instrumentId)
@@ -591,7 +505,7 @@ export class SignalGenerationEngineService {
         : this.marketDataService.listPricesByInstrumentId(instrumentId, SIGNAL_GENERATION_PRICE_WINDOW, undefined, priceEndDate, marketScope),
       options.batchContext?.fundamentalsByInstrumentId.has(instrumentId)
         ? Promise.resolve(options.batchContext.fundamentalsByInstrumentId.get(instrumentId))
-        : this.getFundamentalsForGeneration(instrumentId, marketScope, useFullResearchContext, asOfDate ?? undefined),
+        : this.getFundamentalsForGeneration(instrumentId, marketScope, useFullResearchContext, asOfDate ?? undefined, scoringConfig.fundamentalPublicLagDays),
       useFullResearchContext ? this.researchService.workbench(instrumentId, '3M') : Promise.resolve(null),
     ]);
 
@@ -608,34 +522,36 @@ export class SignalGenerationEngineService {
       : null;
 
     // ── Delivery% evidence (NR-1) ─────────────────────────────────────────────
-    // listPricesByInstrumentId now returns delivery_percent (latest NSE delivery snapshot).
-    // We attach it as evidence/conviction context; it does NOT alter the composite score —
-    // conviction text is additive and honest (no overfitting).
-    // High delivery (>= 40%): positional / institutional interest → adds conviction note.
-    // Low delivery (< 20%): intraday churn → adds caution note.
-    // 20-40%: moderate, no annotation (avoid noise).
-    // absent (null): no annotation (BSE-only or data gap — never fabricate).
+    // Delivery% is an NSE-only data source.  It is gated on the resolved market
+    // capability (config.hasDelivery) so non-NSE scopes (US/EU/crypto) never read or
+    // annotate it.  It is additive evidence/conviction context only — it does NOT
+    // alter the composite score (no overfitting).
+    //   High delivery (>= 40%): positional / institutional interest → conviction note.
+    //   Low delivery (< 20%): intraday churn → caution note.
+    //   20-40%: moderate, no annotation (avoid noise).
+    //   absent (null): no annotation (BSE-only or data gap — never fabricate).
     const deliveryPercent: number | null =
-      typeof (pricesResponse as any)?.delivery_percent === 'number'
+      scoringConfig.hasDelivery && typeof (pricesResponse as any)?.delivery_percent === 'number'
         ? (pricesResponse as any).delivery_percent
         : null;
     const deliveryEvidence = this.buildDeliveryEvidence(deliveryPercent);
 
-    const technical = this.evaluateTechnical(prices);
-    const momentum = this.evaluateMomentum(prices, relativeToPeers);
-    const fundamentals = this.evaluateFundamentals(latestFundamental, peerAveragePe, peerAverageYield);
-    
+    const technical = this.evaluateTechnical(prices, scoringConfig);
+    const momentum = this.evaluateMomentum(prices, relativeToPeers, scoringConfig);
+    const fundamentals = this.evaluateFundamentals(latestFundamental, peerAveragePe, peerAverageYield, scoringConfig);
+
     const triggeredSignals = [...technical.signals, ...momentum.signals, ...fundamentals.signals];
     const negativeSignals = [...technical.negativeSignals, ...momentum.negativeSignals, ...fundamentals.negativeSignals];
     const totalEvaluated = triggeredSignals.length + negativeSignals.length;
 
-    // Thread per-category signal counts so compositeScore can compute evidenceFactor.
-    // file: signal-generation-engine.service.ts, generateForInstrument ~line 474
+    // Thread per-category signal counts + the resolved config so compositeScore can
+    // compute evidenceFactor and apply market-appropriate category weights.
     const score = this.compositeScore(
       technical.score, momentum.score, fundamentals.score,
       technical.signals.length, technical.negativeSignals.length,
       momentum.signals.length, momentum.negativeSignals.length,
       fundamentals.signals.length, fundamentals.negativeSignals.length,
+      scoringConfig,
     );
     const direction = this.directionForScore(score);
     const rawConfidence = this.confidenceFor(prices, latestFundamental, totalEvaluated, asOfDate ?? undefined);
@@ -914,209 +830,20 @@ export class SignalGenerationEngineService {
     return enriched[0];
   }
 
-  evaluateTechnical(prices: SignalPricePoint[]) {
-    const signals: SignalItem[] = [];
-    const negativeSignals: SignalItem[] = [];
-    const latest = prices[0];
-    const previous = prices[1];
-    const sma50 = this.sma(prices, 50);
-    const sma200 = this.sma(prices, 200);
-    const high52 = this.periodHigh(prices, 252);
-    const low52 = this.periodLow(prices, 252);
-    const rsiNow = this.rsi(prices, 14);
-    const rsiPrev = this.rsi(prices.slice(1), 14);
-    const currentAtr = this.atr(prices, 14);
-    const currentClosePos = this.closePosition(latest);
-    const currentAdx = this.adx(prices, 14);
-    const obvTrendingUp = this.isObvTrendingUp(prices, 10);
-    const obvTrendingDown = this.isObvTrendingDown(prices, 10);
-
-    const isRangeBound = currentAdx !== null && currentAdx < 20;
-
-    if (latest && sma50 !== null) {
-      if (isRangeBound) {
-        // Mute SMA signals in range-bound markets (noise)
-      } else {
-        (latest.adjusted_close >= sma50 ? signals : negativeSignals).push(this.signal(
-          latest.adjusted_close >= sma50 ? 'PRICE_ABOVE_SMA50' : 'PRICE_BELOW_SMA50',
-          latest.adjusted_close >= sma50 ? 'price is above SMA50' : 'price is below SMA50',
-          'TECHNICAL'
-        ));
-      }
-    }
-    if (sma50 !== null && sma200 !== null) {
-      if (isRangeBound) {
-        // Mute SMA crossover signals in range-bound markets
-      } else {
-        (sma50 >= sma200 ? signals : negativeSignals).push(this.signal(
-          sma50 >= sma200 ? 'SMA50_ABOVE_SMA200' : 'SMA50_BELOW_SMA200',
-          sma50 >= sma200 ? 'SMA50 is above SMA200' : 'SMA50 is below SMA200',
-          'TECHNICAL'
-        ));
-      }
-    }
-    
-    // Candlestick Rejection & Breakouts
-    if (latest && high52 !== null && latest.adjusted_close >= high52 * 0.97) {
-      if (currentClosePos !== null && currentClosePos < 0.3) {
-         negativeSignals.push(this.signal('FALSE_BREAKOUT_REJECTION', 'price tagged 52-week high but closed in the bottom 30% of the daily range (Trap)', 'TECHNICAL'));
-      } else {
-         signals.push(this.signal('NEAR_52_WEEK_HIGH', 'price is near a 52-week high', 'TECHNICAL'));
-      }
-    }
-    if (latest && low52 !== null && latest.adjusted_close <= low52 * 1.03) {
-      if (currentClosePos !== null && currentClosePos > 0.7) {
-         signals.push(this.signal('FALSE_BREAKDOWN_REJECTION', 'price tagged 52-week low but closed in the top 30% of the daily range (Trap)', 'TECHNICAL'));
-      }
-      // NEAR_52_WEEK_LOW removed: proximity to 52w-low is mean-reverting on NSE — anti-predictive as a bearish vote
-    }
-
-    // Mean Reversion is stronger in range-bound markets
-    if (rsiNow !== null && rsiPrev !== null && rsiPrev < 30 && rsiNow > rsiPrev) {
-      signals.push(this.signal(isRangeBound ? 'STRONG_RSI_RECOVERY' : 'RSI_RECOVERING', 'RSI is recovering from oversold levels', 'TECHNICAL'));
-    }
-    // Require a meaningful RSI drop (>2 points) to avoid voting bearish on single-bar noise in strong trends
-    if (rsiNow !== null && rsiPrev !== null && rsiPrev > 70 && rsiNow < rsiPrev - 2) {
-      negativeSignals.push(this.signal(isRangeBound ? 'STRONG_RSI_REVERSAL' : 'RSI_OVERBOUGHT_REVERSAL', 'RSI is reversing from overbought levels', 'TECHNICAL'));
-    }
-
-    // ── Guard 1: Overbought RSI ───────────────────────────────────────────────
-    // Demote over-extended names where RSI(14) is in overbought territory.
-    // Standard textbook levels: 70 = overbought, 80 = extreme overbought.
-    // Fires independently of the reversal check above (that fires only after RSI
-    // has already turned down; this fires while RSI is still elevated).
-    // Explainability: these signals appear in negative_signals / triggerContract
-    // failed_conditions so the user sees WHY a name was demoted.
-    if (GUARD_OVERBOUGHT_RSI_ENABLED && rsiNow !== null) {
-      if (rsiNow >= RSI_EXTREME_OVERBOUGHT) {
-        negativeSignals.push(this.signal('RSI_EXTREME_OVERBOUGHT', `RSI(14) is ${rsiNow.toFixed(1)} — extremely overbought (>=${RSI_EXTREME_OVERBOUGHT}); mean-reversion risk is elevated`, 'TECHNICAL'));
-      } else if (rsiNow >= RSI_OVERBOUGHT) {
-        negativeSignals.push(this.signal('RSI_OVERBOUGHT', `RSI(14) is ${rsiNow.toFixed(1)} — overbought (>=${RSI_OVERBOUGHT}); upside momentum is stretched`, 'TECHNICAL'));
-      }
-    }
-
-    // ── Guard 2: Extended above SMA50 ─────────────────────────────────────────
-    // Demote names that are trading more than SMA50_STRETCH_PCT (15%) above their
-    // 50-day moving average — a parabolic stretch from the medium-term trend line.
-    // Skipped cleanly if SMA50 is unavailable (insufficient data).
-    if (GUARD_SMA50_STRETCH_ENABLED && latest && sma50 !== null && sma50 > 0) {
-      const stretchPct = (latest.adjusted_close - sma50) / sma50;
-      if (stretchPct >= SMA50_STRETCH_PCT) {
-        negativeSignals.push(this.signal('EXTENDED_ABOVE_SMA50', `price is ${(stretchPct * 100).toFixed(1)}% above SMA50 — over-extended from trend (threshold: ${(SMA50_STRETCH_PCT * 100).toFixed(0)}%)`, 'TECHNICAL'));
-      }
-    }
-    
-    // Volatility-Adjusted Volume Breakout with Institutional Footprint (OBV)
-    const averageVolume = this.average(prices.slice(1, 21).map((price) => price.volume).filter((value): value is number => typeof value === 'number'));
-    if (latest?.volume && averageVolume && latest.volume >= averageVolume * 1.5) {
-      const priceMove = previous ? Math.abs(latest.adjusted_close - previous.adjusted_close) : 0;
-      
-      if (currentAtr !== null && priceMove > (currentAtr * 1.5)) {
-        if (previous && latest.adjusted_close < previous.adjusted_close) {
-          if (obvTrendingDown) {
-            negativeSignals.push(this.signal('CONFIRMED_DOWN_VOLUME_SELLOFF', 'heavy selloff exceeding 1.5x ATR with institutional distribution (OBV)', 'TECHNICAL'));
-          } else {
-            negativeSignals.push(this.signal('DOWN_VOLUME_SELLOFF', 'heavy down-volume selloff exceeding 1.5x ATR', 'TECHNICAL'));
-          }
-        } else {
-          if (obvTrendingUp) {
-            signals.push(this.signal('CONFIRMED_VOLUME_BREAKOUT', 'volume breakout exceeding 1.5x ATR with institutional accumulation (OBV)', 'TECHNICAL'));
-          } else {
-            signals.push(this.signal('VOLUME_BREAKOUT', 'volume breakout confirms the move exceeding 1.5x ATR', 'TECHNICAL'));
-          }
-        }
-      } else if (currentAtr === null) {
-        // Fallback if ATR is not available
-        (previous && latest.adjusted_close < previous.adjusted_close ? negativeSignals : signals).push(this.signal(
-          previous && latest.adjusted_close < previous.adjusted_close ? 'DOWN_VOLUME_SELLOFF' : 'VOLUME_BREAKOUT',
-          previous && latest.adjusted_close < previous.adjusted_close ? 'heavy down-volume selloff' : 'volume breakout confirms the move',
-          'TECHNICAL'
-        ));
-      }
-    }
-
-    return { score: this.categoryScore(signals.length, negativeSignals.length), signals, negativeSignals };
+  // Category evaluators delegate to the pure, config-driven scoring engine
+  // (signal-scoring.ts).  Config defaults to the India-equity profile so existing
+  // callers (incl. the crypto lane via this.compute) are byte-compatible; the
+  // generation path passes a per-scope config for market-appropriate behaviour.
+  evaluateTechnical(prices: SignalPricePoint[], config: SignalScoringConfig = DEFAULT_SIGNAL_SCORING_CONFIG) {
+    return Scoring.evaluateTechnical(prices, config);
   }
 
-  evaluateMomentum(prices: SignalPricePoint[], relativeToPeers: number | null) {
-    const signals: SignalItem[] = [];
-    const negativeSignals: SignalItem[] = [];
-    const oneMonth = this.returnAtOffset(prices, 21);
-    const threeMonth = this.returnAtOffset(prices, 63);
-    const sixMonth = this.returnAtOffset(prices, 126);
-
-    this.pushReturnSignal(oneMonth, 'ONE_MONTH_MOMENTUM', '1M momentum is positive', '1M momentum is negative', signals, negativeSignals, MOMENTUM_BULL_THRESHOLD_1M, MOMENTUM_BEAR_THRESHOLD_1M);
-    this.pushReturnSignal(threeMonth, 'THREE_MONTH_MOMENTUM', '3M momentum is positive', '3M momentum is negative', signals, negativeSignals, MOMENTUM_BULL_THRESHOLD_3M, MOMENTUM_BEAR_THRESHOLD_3M);
-
-    // ── Guard 3: Parabolic short-term run-up ──────────────────────────────────
-    // Fix #11: A 20%+ gain is only parabolic if the move is spread over multiple
-    // trading days (not just one single-day earnings gap).  Require both the
-    // 10-day return AND the 5-day return to be >= PARABOLIC_RUNUP_PCT so that a
-    // legitimate single-day post-earnings gap (which then consolidates) doesn't
-    // get penalised — true parabolic runs sustain over at least the 5-day window.
-    if (GUARD_PARABOLIC_RUNUP_ENABLED) {
-      const tenDay = this.returnAtOffset(prices, 10);
-      const fiveDay = this.returnAtOffset(prices, 5);
-      if (tenDay !== null && fiveDay !== null && tenDay >= PARABOLIC_RUNUP_PCT && fiveDay >= PARABOLIC_RUNUP_PCT) {
-        negativeSignals.push(this.signal('PARABOLIC_RUNUP', `10-day return is ${(tenDay * 100).toFixed(1)}% and 5-day return is ${(fiveDay * 100).toFixed(1)}% — sustained parabolic spike (threshold: ${(PARABOLIC_RUNUP_PCT * 100).toFixed(0)}%); short-term mean-reversion risk`, 'MOMENTUM'));
-      }
-    }
-    // SIX_MONTH_ACCELERATION: only emit when both 1M and 3M already cleared their bullish thresholds,
-    // preventing a triple-count of the same trend (acceleration implies 1M+3M bullish already voted).
-    // Fix #9: use geometric comparison — annualised monthly rate vs actual monthly rate — so the
-    // arithmetic "1M > 3M/3" shortcut (which overstates acceleration when 3M is large) is replaced
-    // by the correct compounded-equivalent: 1M > (1 + 3M)^(1/3) - 1.
-    if (oneMonth !== null && threeMonth !== null && sixMonth !== null
-        && oneMonth >= MOMENTUM_BULL_THRESHOLD_1M && threeMonth >= MOMENTUM_BULL_THRESHOLD_3M
-        && oneMonth > Math.pow(1 + threeMonth, 1 / 3) - 1 && threeMonth > sixMonth / 2) {
-      // Don't add if both 1M and 3M momentum signals are already pushed — emit only the acceleration.
-      // Remove the individual month signals to avoid triple-counting when acceleration fires.
-      const oneMonthIdx = signals.findIndex(s => s.code === 'ONE_MONTH_MOMENTUM');
-      const threeMonthIdx = signals.findIndex(s => s.code === 'THREE_MONTH_MOMENTUM');
-      if (oneMonthIdx !== -1) signals.splice(oneMonthIdx, 1);
-      if (threeMonthIdx !== -1) {
-        // after first removal, index may have shifted
-        const recalcIdx = signals.findIndex(s => s.code === 'THREE_MONTH_MOMENTUM');
-        if (recalcIdx !== -1) signals.splice(recalcIdx, 1);
-      }
-      signals.push(this.signal('SIX_MONTH_ACCELERATION', '6M trend is accelerating', 'MOMENTUM'));
-    }
-    // Fix #10: require >= OUTPERFORMING_PEERS_MIN_RELATIVE (+2%) to vote bullish —
-    // a stock that merely keeps pace with peers (0-2%) does not deserve a bullish vote.
-    if (relativeToPeers !== null) {
-      if (relativeToPeers >= OUTPERFORMING_PEERS_MIN_RELATIVE) {
-        signals.push(this.signal('OUTPERFORMING_PEERS', `stock is outperforming peer average by ${(relativeToPeers * 100).toFixed(1)}%`, 'MOMENTUM'));
-      } else if (relativeToPeers < 0) {
-        negativeSignals.push(this.signal('UNDERPERFORMING_PEERS', 'stock is underperforming peer average', 'MOMENTUM'));
-      }
-      // 0 <= relativeToPeers < OUTPERFORMING_PEERS_MIN_RELATIVE: neutral band — no vote
-    }
-
-    return { score: this.categoryScore(signals.length, negativeSignals.length), signals, negativeSignals };
+  evaluateMomentum(prices: SignalPricePoint[], relativeToPeers: number | null, config: SignalScoringConfig = DEFAULT_SIGNAL_SCORING_CONFIG) {
+    return Scoring.evaluateMomentum(prices, relativeToPeers, config);
   }
 
-  evaluateFundamentals(fundamental: any, peerAveragePe: number | null, peerAverageYield: number | null) {
-    const signals: SignalItem[] = [];
-    const negativeSignals: SignalItem[] = [];
-    const eps = this.optionalNumber(fundamental?.eps);
-    const peRatio = this.optionalNumber(fundamental?.pe_ratio);
-    const dividendYield = this.optionalNumber(fundamental?.dividend_yield);
-
-    // EPS is the canonical profitability vote; net income is the same fact — net_income dropped to avoid double-counting
-    if (eps !== null) (eps > 0 ? signals : negativeSignals).push(this.signal(eps > 0 ? 'POSITIVE_EPS' : 'NEGATIVE_EPS', eps > 0 ? 'EPS is positive' : 'EPS is negative', 'FUNDAMENTAL'));
-    if (peRatio !== null && peerAveragePe !== null && peRatio > 0) {
-      // PE_ABOVE_PEERS is anti-predictive for growth names; only vote bullish (below peers), not bearish
-      if (peRatio <= peerAveragePe) signals.push(this.signal('PE_BELOW_PEERS', 'P/E is below peer average', 'FUNDAMENTAL'));
-      // PE_ABOVE_PEERS: context-only, no bearish vote
-    }
-    if (dividendYield !== null && peerAverageYield !== null) {
-      // YIELD_BELOW_PEERS is anti-predictive; only vote bullish (above peers), not bearish
-      if (dividendYield >= peerAverageYield) signals.push(this.signal('YIELD_ABOVE_PEERS', 'dividend yield is above peer average', 'FUNDAMENTAL'));
-      // YIELD_BELOW_PEERS: context-only, no bearish vote
-    }
-    // FUNDAMENTALS_AVAILABLE removed: firing a positive signal merely for having data inflates all bullish scores universally
-
-    return { score: this.categoryScore(signals.length, negativeSignals.length), signals, negativeSignals };
+  evaluateFundamentals(fundamental: any, peerAveragePe: number | null, peerAverageYield: number | null, config: SignalScoringConfig = DEFAULT_SIGNAL_SCORING_CONFIG) {
+    return Scoring.evaluateFundamentals(fundamental, peerAveragePe, peerAverageYield, config);
   }
 
   private shouldAttachStrategyMatches(options: Pick<SignalQuery, 'strategyCode' | 'includeStrategyMatches' | 'onlyStrategyEligible' | 'excludeNoiseFiltered' | 'hasStrategyMatch' | 'hasBlockedStrategies' | 'frameworkBackedDecisionAvailable'>) {
@@ -1180,127 +907,9 @@ export class SignalGenerationEngineService {
     };
   }
 
+  // Trigger-contract projection lives in the pure signal-trigger-contract module.
   private withTriggerContract(signal: SignalResultDto, instrument?: any): SignalResultDto {
-    return {
-      ...signal,
-      triggerContract: this.triggerContractFor(signal, instrument),
-    };
-  }
-
-  private triggerContractFor(signal: SignalResultDto, instrument?: any): SignalTriggerContractDto {
-    const unavailable = new Set<string>();
-    const incompleteReasons: string[] = [];
-    const primaryStrategy = signal.strategyMatches?.[0] || (signal.blockedStrategies?.length === 1 ? signal.blockedStrategies[0] : null);
-    const assetClass = this.stringOrNull(instrument?.assetType ?? instrument?.asset_type);
-    const region = this.stringOrNull(instrument?.region);
-    const strategyId = primaryStrategy?.strategyCode ?? null;
-    const strategyVersion = primaryStrategy?.strategyVersion ?? null;
-    const sourceProvenPriceEvidence = primaryStrategy?.triggerPriceEvidence?.status === 'SOURCE_PROVEN'
-      ? primaryStrategy.triggerPriceEvidence
-      : null;
-    const attemptedPriceEvidence = primaryStrategy?.triggerPriceEvidence ?? null;
-    const triggerTimestamp = primaryStrategy
-      ? sourceProvenPriceEvidence?.triggerTimestamp ?? null
-      : signal.sourcePriceDate ?? signal.sourceDataDate ?? null;
-    const dataQualityStatus = signal.dataQualityEligibility?.signalReadinessStatus ?? null;
-    const entryRuleId = sourceProvenPriceEvidence?.entryRuleIds[0] ?? null;
-    const timeframe = sourceProvenPriceEvidence?.timeframe ?? primaryStrategy?.timeframe ?? null;
-
-    const mark = (field: string, reason: string) => {
-      unavailable.add(field);
-      incompleteReasons.push(`${field}: ${reason}`);
-    };
-
-    if (!signal.id) mark('signal_id', 'persisted signal id is unavailable in this DTO.');
-    if (!assetClass) mark('asset_class', 'instrument asset class is unavailable from the current signal record.');
-    if (!region) mark('region', 'instrument market region is unavailable from the current signal record.');
-    if (!strategyId) mark('strategy_id', 'no Strategy Framework match is attached to this signal.');
-    if (!strategyVersion) mark('strategy_version', 'no Strategy Framework version is attached to this signal.');
-    if (!sourceProvenPriceEvidence) {
-      mark('trigger_price', primaryStrategy?.triggerPriceEvidence?.unavailableReason || 'source-proven rule-trigger price is unavailable from attached Strategy Framework context.');
-    }
-    if (!triggerTimestamp) {
-      mark('trigger_timestamp', attemptedPriceEvidence?.unavailableReason || 'source-proven trigger timestamp is unavailable from attached Strategy Framework context.');
-    }
-    if (!timeframe) mark('timeframe', 'rule timeframe is unavailable from attached Strategy Framework context.');
-    if (!entryRuleId) mark('entry_rule_id', 'source-proven entry rule id is unavailable from attached Strategy Framework context.');
-    mark('exit_rule_id', 'exit rule id is not persisted in the current signal record.');
-    mark('invalidation_rule_id', 'invalidation rule id is not persisted in the current signal record.');
-    if (!dataQualityStatus) mark('data_quality_status', 'Data Quality readiness snapshot is unavailable from the current signal record.');
-    mark('lifecycle_status', 'trigger lifecycle state is not persisted in the current signal record.');
-    mark('created_at', 'persistence created timestamp is not exposed by the current signal record.');
-    mark('updated_at', 'persistence updated timestamp is not exposed by the current signal record.');
-
-    const contractStatus = signal.auditStatus === 'LEGACY_MISSING'
-      ? 'LEGACY_INCOMPLETE'
-      : (unavailable.size > 0 ? 'CONTRACT_INCOMPLETE' : 'COMPLETE');
-
-    return {
-      contractVersion: 'TriggerObjectV1',
-      contractStatus,
-      signal_id: signal.id ?? null,
-      instrument_id: signal.instrument_id,
-      symbol: signal.symbol,
-      asset_class: assetClass,
-      region,
-      strategy_id: strategyId,
-      strategy_version: strategyVersion,
-      trigger_type: this.triggerTypeFor(signal.direction, instrument?.derivatives_eligible ?? instrument?.derivativesEligible, signal.regimeGateSuppressed),
-      trigger_price: sourceProvenPriceEvidence?.triggerPrice ?? null,
-      trigger_timestamp: triggerTimestamp,
-      timeframe,
-      entry_rule_id: entryRuleId,
-      exit_rule_id: null,
-      invalidation_rule_id: null,
-      reason_summary: signal.explanation,
-      passed_conditions: signal.triggered_signals.map((item) => ({ code: item.code, label: item.label, category: item.category })),
-      failed_conditions: signal.negative_signals.map((item) => ({ code: item.code, label: item.label, category: item.category })),
-      data_quality_status: dataQualityStatus,
-      lifecycle_status: null,
-      created_at: null,
-      updated_at: null,
-      audit: {
-        auditStatus: signal.auditStatus,
-        generationRunId: signal.generationRunId ?? null,
-        modelVersion: signal.modelVersion ?? null,
-        rulesetVersion: signal.rulesetVersion ?? null,
-      },
-      trigger_price_evidence: this.toTriggerPriceEvidenceDto(sourceProvenPriceEvidence, attemptedPriceEvidence),
-      unavailable_fields: Array.from(unavailable),
-      incomplete_reasons: incompleteReasons,
-    };
-  }
-
-  private triggerTypeFor(direction: SignalDirection, derivativesEligible?: boolean | null, regimeGateSuppressed?: boolean): SignalTriggerType {
-    if (direction === 'BULLISH') return 'bullish_entry_trigger';
-    if (direction === 'BEARISH') {
-      // Short entries require F&O eligibility; cash-only stocks cannot be shorted — classify as risk_warning.
-      // Additionally: when the regime gate suppressed this short (RISK_ON regime), force risk_warning
-      // even for F&O-eligible names — tradable short is not appropriate contra-trend.
-      if (regimeGateSuppressed === true) return 'risk_warning';
-      return derivativesEligible === true ? 'bearish_trigger' : 'risk_warning';
-    }
-    return 'risk_warning';
-  }
-
-  private toTriggerPriceEvidenceDto(sourceProven: SignalTriggerPriceEvidence | null, attempted: SignalTriggerPriceEvidence | null) {
-    const evidence = sourceProven ?? attempted;
-    return {
-      status: evidence?.status ?? 'UNAVAILABLE',
-      source_module: evidence?.status === 'SOURCE_PROVEN' ? evidence.sourceModule : null,
-      source_field: evidence?.status === 'SOURCE_PROVEN' ? evidence.sourceField : null,
-      source_timestamp: evidence?.status === 'SOURCE_PROVEN' ? evidence.triggerTimestamp : null,
-      strategy_id: evidence?.strategyCode ?? null,
-      strategy_version: evidence?.strategyVersion ?? null,
-      timeframe: evidence?.timeframe ?? null,
-      entry_rule_ids: evidence?.entryRuleIds ?? [],
-      compatibility_only: evidence?.compatibilityOnly ?? true,
-      unavailable_reason: evidence?.status === 'UNAVAILABLE' ? evidence.unavailableReason : undefined,
-    };
-  }
-
-  private stringOrNull(value: unknown): string | null {
-    return typeof value === 'string' && value.trim().length > 0 ? value : null;
+    return withTriggerContract(signal, instrument);
   }
 
   private async attachStrategyMatches(
@@ -1768,336 +1377,60 @@ export class SignalGenerationEngineService {
     };
   }
 
+  // Technical indicators delegate to the pure signal-indicators module.  Kept as
+  // public instance methods so strategy-context building and the crypto lane keep
+  // calling them unchanged.
   sma(prices: SignalPricePoint[], period: number): number | null {
-    if (prices.length < period) return null;
-    return this.average(prices.slice(0, period).map((price) => price.adjusted_close));
+    return Indicators.sma(prices, period);
   }
 
   rsi(prices: SignalPricePoint[], period: number): number | null {
-    if (prices.length <= period) return null;
-
-    // Fix #1 (RSI severely under-smoothed): Wilder's EMA requires a long warm-up
-    // period to converge.  The previous cap of period*2+1 (29 bars for RSI-14) was
-    // far too short — the EMA never stabilises, producing systematically biased RSI
-    // values.  Extend the window to min(prices.length, period*10) which gives ~140
-    // bars of warm-up for RSI-14, matching professional implementations.
-    // RSI still returns null when there is genuinely insufficient history (< period+1).
-    const windowSize = Math.min(prices.length, period * 10);
-    const chronological = [...prices].slice(0, windowSize).reverse();
-    if (chronological.length < period + 1) return null;
-
-    let avgGain = 0;
-    let avgLoss = 0;
-
-    // Initial average
-    for (let i = 1; i <= period; i++) {
-      const change = chronological[i].adjusted_close - chronological[i - 1].adjusted_close;
-      if (change >= 0) avgGain += change;
-      else avgLoss += Math.abs(change);
-    }
-    avgGain /= period;
-    avgLoss /= period;
-
-    // Smoothing
-    for (let i = period + 1; i < chronological.length; i++) {
-      const change = chronological[i].adjusted_close - chronological[i - 1].adjusted_close;
-      const currentGain = change >= 0 ? change : 0;
-      const currentLoss = change < 0 ? Math.abs(change) : 0;
-      
-      avgGain = (avgGain * (period - 1) + currentGain) / period;
-      avgLoss = (avgLoss * (period - 1) + currentLoss) / period;
-    }
-
-    if (avgLoss === 0) return 100;
-    const rs = avgGain / avgLoss;
-    return 100 - (100 / (1 + rs));
+    return Indicators.rsi(prices, period);
   }
 
   adx(prices: SignalPricePoint[], period: number): number | null {
-    // CB-11: Wilder ADX needs ~3×period bars to converge (mirrors the RSI fix at ~140 bars).
-    // Previous cap of period*2+1 (=29 for period=14) was too short for stable DX smoothing.
-    // Use min(prices.length, period*3) so we consume all available history up to the
-    // 3× warm-up target; the null-guard below ensures we still bail on thin history.
-    const warmupSize = Math.min(prices.length, period * 3);
-    if (prices.length <= period * 2) return null;
-    const chronological = [...prices].slice(0, warmupSize).reverse();
-
-    let trueRanges: number[] = [];
-    let plusDM: number[] = [];
-    let minusDM: number[] = [];
-
-    for (let i = 1; i < chronological.length; i++) {
-      const current = chronological[i];
-      const previous = chronological[i - 1];
-
-      // CB-1: use adjusted high/low (with safe fallback to raw) so TR/DM are on the
-      // same price scale as adjusted_close after a split or bonus issue.
-      const curHigh  = current.adjusted_high  ?? current.high;
-      const curLow   = current.adjusted_low   ?? current.low;
-      const prevHigh = previous.adjusted_high ?? previous.high;
-      const prevLow  = previous.adjusted_low  ?? previous.low;
-
-      if (curHigh === null || curLow === null || prevHigh === null || prevLow === null) {
-        trueRanges.push(0);
-        plusDM.push(0);
-        minusDM.push(0);
-        continue;
-      }
-
-      const tr = Math.max(
-        curHigh - curLow,
-        Math.abs(curHigh - previous.adjusted_close),
-        Math.abs(curLow - previous.adjusted_close)
-      );
-      trueRanges.push(tr);
-
-      const upMove = curHigh - prevHigh;
-      const downMove = prevLow - curLow;
-
-      if (upMove > downMove && upMove > 0) {
-        plusDM.push(upMove);
-      } else {
-        plusDM.push(0);
-      }
-
-      if (downMove > upMove && downMove > 0) {
-        minusDM.push(downMove);
-      } else {
-        minusDM.push(0);
-      }
-    }
-
-    if (trueRanges.length < period * 2) return null;
-
-    let smoothedTR = trueRanges.slice(0, period).reduce((a, b) => a + b, 0);
-    let smoothedPlusDM = plusDM.slice(0, period).reduce((a, b) => a + b, 0);
-    let smoothedMinusDM = minusDM.slice(0, period).reduce((a, b) => a + b, 0);
-
-    let dxArray: number[] = [];
-
-    for (let i = period; i < trueRanges.length; i++) {
-      smoothedTR = smoothedTR - (smoothedTR / period) + trueRanges[i];
-      smoothedPlusDM = smoothedPlusDM - (smoothedPlusDM / period) + plusDM[i];
-      smoothedMinusDM = smoothedMinusDM - (smoothedMinusDM / period) + minusDM[i];
-
-      // Fix #4 (ADX divide-by-zero): when smoothedTR === 0 (circuit-locked / all-flat
-      // bars) plusDI and minusDI blow up to Infinity, dx becomes NaN, and the fallback
-      // `dx || 0` coerces NaN to 0 which (with adxVal then averaging toward 0) falsely
-      // signals range-bound and mutes all SMA/momentum signals.  Guard explicitly: if
-      // smoothedTR is 0 (or near-zero) push dx=0 and continue, which is the correct
-      // "no directional information available" result for a locked/flat bar.
-      if (smoothedTR === 0) {
-        dxArray.push(0);
-        continue;
-      }
-      const plusDI = (smoothedPlusDM / smoothedTR) * 100;
-      const minusDI = (smoothedMinusDM / smoothedTR) * 100;
-
-      const diSum = plusDI + minusDI;
-      const dx = diSum === 0 ? 0 : (Math.abs(plusDI - minusDI) / diSum) * 100;
-      dxArray.push(dx);
-    }
-
-    if (dxArray.length < period) return null;
-
-    let adxVal = dxArray.slice(0, period).reduce((a, b) => a + b, 0) / period;
-    for (let i = period; i < dxArray.length; i++) {
-      adxVal = (adxVal * (period - 1) + dxArray[i]) / period;
-    }
-
-    return adxVal;
+    return Indicators.adx(prices, period);
   }
 
   atr(prices: SignalPricePoint[], period: number): number | null {
-    if (prices.length <= period) return null;
-    const chronological = [...prices].slice(0, period * 2 + 1).reverse();
-    if (chronological.length < period + 1) return null;
-
-    let trueRanges: number[] = [];
-    for (let i = 1; i < chronological.length; i++) {
-      const current = chronological[i];
-      const previous = chronological[i - 1];
-      // CB-1: use adjusted high/low (safe fallback to raw) so ATR stays on the same
-      // price scale as adjusted_close after a corporate action (split / bonus).
-      // Mixing raw high/low with adjusted_close overstates TR on the ex-date bar.
-      const curHigh = current.adjusted_high  ?? current.high;
-      const curLow  = current.adjusted_low   ?? current.low;
-      if (curHigh === null || curLow === null) {
-        trueRanges.push(0);
-        continue;
-      }
-      const tr = Math.max(
-        curHigh - curLow,
-        Math.abs(curHigh - previous.adjusted_close),
-        Math.abs(curLow  - previous.adjusted_close)
-      );
-      trueRanges.push(tr);
-    }
-
-    if (trueRanges.length < period) return null;
-    
-    let atrVal = trueRanges.slice(0, period).reduce((sum, val) => sum + val, 0) / period;
-    for (let i = period; i < trueRanges.length; i++) {
-      atrVal = (atrVal * (period - 1) + trueRanges[i]) / period;
-    }
-
-    return atrVal;
+    return Indicators.atr(prices, period);
   }
 
   closePosition(price: SignalPricePoint | undefined): number | null {
-    // Fix #5 (52-week range adjusted/raw mismatch): periodHigh/periodLow use
-    // adjusted_close for their range calculation, so closePosition must also use
-    // adjusted_close rather than raw high/low.  For split stocks the raw intraday
-    // high/low reflect the pre-split price scale while adjusted_close is scaled down,
-    // making (adjusted_close - raw_low) / (raw_high - raw_low) ≈ -1 or > 1.
-    //
-    // We compute the daily close position using adjusted_close scaled to the
-    // adjusted high/low equivalents.  Since we don't store adjusted high/low
-    // in the price point, we derive them by scaling raw high/low by the same
-    // adjustment ratio used for close: adj_factor = adjusted_close / close.
-    // If close is 0 (or adjusted_close equals close) we fall back to raw ratio.
-    //
-    // Choice: prefer adjusted throughout for consistency with periodHigh/Low.
-    if (!price) return null;
-    const rawClose = price.close;
-    const adjClose = price.adjusted_close;
-    const rawHigh = price.high;
-    const rawLow = price.low;
-    if (rawHigh === null || rawLow === null) return null;
-
-    let adjHigh: number;
-    let adjLow: number;
-    if (rawClose > 0 && Number.isFinite(rawClose) && Number.isFinite(adjClose)) {
-      const adjFactor = adjClose / rawClose;
-      adjHigh = rawHigh * adjFactor;
-      adjLow  = rawLow  * adjFactor;
-    } else {
-      adjHigh = rawHigh;
-      adjLow  = rawLow;
-    }
-
-    if (adjHigh === adjLow) return null;
-    return (adjClose - adjLow) / (adjHigh - adjLow);
+    return Indicators.closePosition(price);
   }
 
   periodHigh(prices: SignalPricePoint[], period: number): number | null {
-    const values = prices.slice(0, period).map((price) => price.adjusted_close);
-    return values.length > 0 ? Math.max(...values) : null;
+    return Indicators.periodHigh(prices, period);
   }
 
   periodLow(prices: SignalPricePoint[], period: number): number | null {
-    const values = prices.slice(0, period).map((price) => price.adjusted_close);
-    return values.length > 0 ? Math.min(...values) : null;
+    return Indicators.periodLow(prices, period);
   }
 
-  /**
-   * v3 Evidence-Scaled Conviction Gradient
-   *
-   * Replaces the plain weighted-average-×100 formula that compressed all scores into
-   * a 27-76 band with no dynamic range. The new formula:
-   *
-   *   rawLean     = weighted average of category scores in [0,1]
-   *   displacement = rawLean - 0.5   ∈ [-0.5, +0.5]
-   *   evidenceFactor = EVIDENCE_COUNT_WEIGHT  * (1 - exp(-totalAligningSignals / EVIDENCE_SATURATION_COUNT))
-   *                  + EVIDENCE_AGREEMENT_WEIGHT * agreementFraction
-   *   score = clamp(round(50 + displacement × 100 × SPREAD_GAIN × evidenceFactor), 0, 100)
-   *
-   * evidenceFactor components:
-   *   Count component: saturates with diminishing returns around EVIDENCE_SATURATION_COUNT total
-   *     signals that are aligned with the dominant direction (bullish or bearish).
-   *   Agreement component: rewards cross-category alignment. All three categories leaning
-   *     the same way → near 1.0; two of three → ~0.7; categories split/conflicting → EVIDENCE_MIXED_FLOOR.
-   *
-   * Thin-evidence anti-inflation is preserved: a single signal in one category only raises
-   * the category score to 0.75 (alpha=1), displacement stays small, and evidenceFactor
-   * stays low (~0.37), so the final score only moves ~5-6 pts from 50.
-   *
-   * Optional params (techPos … fundNeg) can be omitted by legacy callers (defaults to 0)
-   * — they will receive the old unscaled result (all-zero counts → evidenceFactor=0 → score=50).
-   * Direct callers (generateForInstrument) always pass all counts.
-   */
+  // Composite score, direction cut-points, explanation and the delivery% phrase
+  // delegate to the pure scoring engine.  compositeScore takes an optional config
+  // (defaults to IN-equity) so the crypto lane can pass its redistributed weights.
   compositeScore(
     technical: number, momentum: number, fundamentals: number,
     techPos = 0, techNeg = 0,
     momPos  = 0, momNeg  = 0,
     fundPos = 0, fundNeg = 0,
+    config: SignalScoringConfig = DEFAULT_SIGNAL_SCORING_CONFIG,
   ): number {
-    // Step 1: raw weighted lean in [0,1]
-    const rawLean = technical * TECHNICAL_WEIGHT + momentum * MOMENTUM_WEIGHT + fundamentals * FUNDAMENTAL_WEIGHT;
-    const displacement = rawLean - 0.5; // ∈ [-0.5, +0.5]
-
-    // Step 2: determine dominant direction and count aligning signals
-    const bullish = displacement >= 0;
-    const techAlign  = bullish ? techPos  : techNeg;
-    const momAlign   = bullish ? momPos   : momNeg;
-    const fundAlign  = bullish ? fundPos  : fundNeg;
-    const totalAligning = techAlign + momAlign + fundAlign;
-
-    // Count component: exponential saturation
-    const countComponent = 1 - Math.exp(-totalAligning / EVIDENCE_SATURATION_COUNT);
-
-    // Agreement component: fraction of the three categories that are leaning the same way
-    // A category is "leaning" the dominant direction if its raw score > 0.5 (bull) or < 0.5 (bear)
-    const techLeans  = bullish ? technical  > 0.5 : technical  < 0.5;
-    const momLeans   = bullish ? momentum   > 0.5 : momentum   < 0.5;
-    const fundLeans  = bullish ? fundamentals > 0.5 : fundamentals < 0.5;
-    const agreeing   = (techLeans ? 1 : 0) + (momLeans ? 1 : 0) + (fundLeans ? 1 : 0);
-    // 3/3 → 1.0, 2/3 → ~0.67, 1/3 or 0/3 → EVIDENCE_MIXED_FLOOR
-    const rawAgreement = agreeing / 3;
-    const agreementFraction = rawAgreement < (EVIDENCE_MIXED_FLOOR) ? EVIDENCE_MIXED_FLOOR : rawAgreement;
-
-    // evidenceFactor ∈ [~0, 1]
-    const evidenceFactor =
-      EVIDENCE_COUNT_WEIGHT  * countComponent +
-      EVIDENCE_AGREEMENT_WEIGHT * agreementFraction;
-
-    // Step 3: scale displacement and add back to 50
-    const raw = 50 + displacement * 100 * SCORE_SPREAD_GAIN * evidenceFactor;
-    return Math.min(100, Math.max(0, Math.round(raw)));
+    return Scoring.compositeScore(technical, momentum, fundamentals, techPos, techNeg, momPos, momNeg, fundPos, fundNeg, config);
   }
 
   directionForScore(score: number): SignalDirection {
-    // v3 cuts: deadband [41-59] keeps NEUTRAL meaningful given the wider spread.
-    // BULLISH if score >= 60, BEARISH if score <= 40, else NEUTRAL.
-    // Rationale: synthetic distribution shows single-category-lean setups cluster
-    // in 45-59 (NEUTRAL), multi-category-aligned bullish starts at ~62-65,
-    // multi-category-aligned bearish ends at ~35-38. A 20-pt deadband (41-59)
-    // avoids flip-flopping on thin mixed evidence.
-    if (score >= DIRECTION_BULLISH_THRESHOLD) return 'BULLISH';
-    if (score <= DIRECTION_BEARISH_THRESHOLD) return 'BEARISH';
-    return 'NEUTRAL';
+    return Scoring.directionForScore(score);
   }
 
   explain(direction: SignalDirection, triggeredSignals: SignalItem[], negativeSignals: SignalItem[], deliveryEvidence?: string | null): string {
-    const primary = direction === 'BEARISH' ? negativeSignals : triggeredSignals;
-    const fallback = direction === 'BEARISH' ? triggeredSignals : negativeSignals;
-    const reasons = (primary.length > 0 ? primary : fallback).slice(0, 4).map((signal) => signal.label);
-    const base = reasons.length === 0
-      ? `${direction} because there is not enough market data for a strong signal.`
-      : `${direction.charAt(0)}${direction.slice(1).toLowerCase()} because ${this.joinReasons(reasons)}.`;
-    // Append delivery evidence phrase when present (e.g. "Delivery 62% (high conviction).")
-    if (deliveryEvidence) return `${base} ${deliveryEvidence}`;
-    return base;
+    return Scoring.explain(direction, triggeredSignals, negativeSignals, deliveryEvidence);
   }
 
-  /**
-   * Build a short delivery% evidence phrase for the signal explanation.
-   * Returns null when delivery data is absent (never fabricate).
-   *
-   * Thresholds are intentionally coarse / conservative:
-   *   >= 60%  → "high conviction" (strong positional/institutional demand)
-   *   >= 40%  → "above-average delivery" (meaningful real interest)
-   *   < 20%   → "intraday churn" (volume dominated by day traders, weaker signal)
-   *   20–39%  → no annotation (moderate; avoid noise)
-   *   null    → no annotation (data absent)
-   */
   buildDeliveryEvidence(deliveryPercent: number | null): string | null {
-    if (deliveryPercent === null || deliveryPercent === undefined) return null;
-    const pct = Math.round(deliveryPercent);
-    if (pct >= 60) return `Delivery ${pct}% (high conviction).`;
-    if (pct >= 40) return `Delivery ${pct}% (above-average delivery).`;
-    if (pct < 20) return `Delivery ${pct}% (intraday churn, lower conviction).`;
-    return null; // 20–39%: moderate, skip annotation
+    return Scoring.buildDeliveryEvidence(deliveryPercent);
   }
 
   private async resolveRunUniverse(request: SignalRunRequest, batchSize: number, offset: number): Promise<{ instrumentIds: string[]; totalCount: number }> {
@@ -2134,9 +1467,7 @@ export class SignalGenerationEngineService {
   }
 
   private normalizeUtcDay(value: Date): Date {
-    const date = new Date(value);
-    date.setUTCHours(0, 0, 0, 0);
-    return date;
+    return normalizeUtcDayHelper(value);
   }
 
   private async generateBatchWithConcurrency(
@@ -2212,7 +1543,7 @@ export class SignalGenerationEngineService {
     };
   }
 
-  private async getFundamentalsForGeneration(instrumentId: string, marketScope: Pick<SignalRunRequest, 'region' | 'assetType'>, useFullResearchContext: boolean, asOf?: Date) {
+  private async getFundamentalsForGeneration(instrumentId: string, marketScope: Pick<SignalRunRequest, 'region' | 'assetType'>, useFullResearchContext: boolean, asOf?: Date, publicLagDays: number = FUNDAMENTAL_PUBLIC_LAG_DAYS) {
     let response: { records?: any[] } | null;
     if (useFullResearchContext || typeof (this.marketDataService as any).storedFundamentalsByInstrumentId !== 'function') {
       response = await this.marketDataService.fundamentalsByInstrumentId(instrumentId, marketScope);
@@ -2222,18 +1553,19 @@ export class SignalGenerationEngineService {
     if (!asOf || !response?.records) return response;
 
     // Fix #2 (Fundamentals point-in-time look-ahead):
-    // NSE results are typically filed 45-60 days after period-end.  Simply filtering by
-    // periodEndDate <= asOf exposes fundamentals before they were public (e.g. a Q1 result
-    // with periodEnd=2023-06-30 is not public until late August 2023).
+    // Results are typically filed weeks after period-end (NSE 45-60 days; US 10-Q ≈ 40).
+    // Simply filtering by periodEndDate <= asOf exposes fundamentals before they were
+    // public (e.g. a Q1 result with periodEnd=2023-06-30 is not public until late Aug 2023).
     //
     // Priority:
-    //   1. If the record has an officialResultDate (populated by the board-meeting ingest,
-    //      task #36), use it directly — it's the actual announcement date.
-    //   2. Otherwise apply a conservative lag: periodEndDate + FUNDAMENTAL_PUBLIC_LAG_DAYS.
+    //   1. If the record has an officialResultDate (populated by the board-meeting ingest),
+    //      use it directly — it's the actual announcement date.
+    //   2. Otherwise apply a conservative, per-market lag: periodEndDate + publicLagDays
+    //      (resolved from the scope's MarketProfile filing regime).
     //
     // Live runs (asOf undefined) are unchanged — they always see the latest filings.
     const asOfMs = asOf.getTime();
-    const lagMs = FUNDAMENTAL_PUBLIC_LAG_DAYS * 24 * 60 * 60 * 1000;
+    const lagMs = publicLagDays * 24 * 60 * 60 * 1000;
     const filtered = response.records.filter((record: any) => {
       // Prefer explicit officialResultDate when available
       if (record.officialResultDate) {
@@ -2401,11 +1733,7 @@ export class SignalGenerationEngineService {
   }
 
   private isTrustedReadSignal(signal: SignalResultDto): boolean {
-    const dataQuality = signal.dataQualityEligibility;
-    return signal.auditStatus === 'CURRENT'
-      && dataQuality?.filterApplied === true
-      && dataQuality.eligible === true
-      && dataQuality.signalReadinessStatus === 'READY';
+    return isTrustedReadSignal(signal);
   }
 
   /** Returns true if the instrument belongs to the NSE SME segment. */
@@ -2429,23 +1757,11 @@ export class SignalGenerationEngineService {
   }
 
   private clampInt(value: unknown, fallback: number, min: number, max: number) {
-    const numeric = Number(value);
-    if (!Number.isFinite(numeric)) return fallback;
-    return Math.min(max, Math.max(min, Math.floor(numeric)));
+    return clampIntHelper(value, fallback, min, max);
   }
 
   private sleep(ms: number) {
     return new Promise((resolve) => setTimeout(resolve, ms));
-  }
-
-  private categoryScore(positive: number, negative: number): number {
-    const total = positive + negative;
-    if (total === 0) return 0.5;
-    // Laplace add-smoothing with CATEGORY_SCORE_ALPHA=1 (reduced from v2's alpha=2).
-    // alpha=1 lets a category move further from 0.5 when real evidence is present
-    // while still damping thin-evidence setups toward neutral.
-    // Examples (alpha=1): 1/0 → 0.75, 5/0 → 0.917, 0/5 → 0.083, 3/1 → 0.75
-    return (positive + CATEGORY_SCORE_ALPHA * 0.5) / (total + CATEGORY_SCORE_ALPHA);
   }
 
   private confidenceFor(prices: SignalPricePoint[], fundamental: any, signalCount: number, asOf?: Date): SignalConfidence {
@@ -2463,28 +1779,14 @@ export class SignalGenerationEngineService {
     return 'LOW';
   }
 
-  private pushReturnSignal(value: number | null, code: string, positiveLabel: string, negativeLabel: string, signals: SignalItem[], negativeSignals: SignalItem[], bullThreshold: number, bearThreshold: number) {
-    if (value === null) return;
-    if (value >= bullThreshold) {
-      signals.push(this.signal(code, positiveLabel, 'MOMENTUM'));
-    } else if (value <= bearThreshold) {
-      negativeSignals.push(this.signal(`${code}_NEGATIVE`, negativeLabel, 'MOMENTUM'));
-    }
-    // values in the neutral band (bearThreshold < value < bullThreshold) produce no signal
-  }
-
   private returnAtOffset(prices: SignalPricePoint[], offset: number): number | null {
-    if (prices.length <= offset) return null;
-    const oldValue = prices[offset].adjusted_close;
-    if (oldValue <= 0) return null;
-    return (prices[0].adjusted_close - oldValue) / oldValue;
+    return Indicators.returnAtOffset(prices, offset);
   }
 
   private toPricePoints(prices: any[]): SignalPricePoint[] {
     return prices
-      // Fix #12 (adjustedClose null substitution): filter out bars where
-      // adjusted_close is null/undefined/non-numeric BEFORE the map step, so
-      // we never silently fall back to raw close inside an adjusted series.
+      // Filter out bars where adjusted_close is null/undefined/non-numeric BEFORE the
+      // map step, so we never silently fall back to raw close inside an adjusted series.
       // A mixed series (some bars adjusted, some raw) corrupts all indicators.
       .filter((price) => {
         const ac = price.adjusted_close;
@@ -2492,88 +1794,42 @@ export class SignalGenerationEngineService {
       })
       .map((price) => ({
         date: typeof price.date === 'string' ? price.date : new Date(price.date).toISOString(),
-        open: this.optionalNumber(price.open),
-        high: this.optionalNumber(price.high),
-        low: this.optionalNumber(price.low),
+        open: toOptionalNumber(price.open),
+        high: toOptionalNumber(price.high),
+        low: toOptionalNumber(price.low),
         close: Number(price.close),
         adjusted_close: Number(price.adjusted_close),
         volume: price.volume !== null && price.volume !== undefined ? Number(price.volume) : null,
-        // CB-1: pass through adjusted OHLCV from the price read layer when present.
-        // Indicators use `adjusted_high ?? high`, `adjusted_low ?? low`, `adjusted_volume ?? volume`
-        // so existing callers (no adjusted_h/l/v) degrade gracefully to raw values.
-        adjusted_high: this.optionalNumber(price.adjusted_high),
-        adjusted_low: this.optionalNumber(price.adjusted_low),
+        // Pass through adjusted OHLCV from the price read layer when present.  Indicators
+        // use `adjusted_high ?? high`, `adjusted_low ?? low`, `adjusted_volume ?? volume`
+        // so callers without adjusted_h/l/v degrade gracefully to raw values.
+        adjusted_high: toOptionalNumber(price.adjusted_high),
+        adjusted_low: toOptionalNumber(price.adjusted_low),
         adjusted_volume: price.adjusted_volume !== null && price.adjusted_volume !== undefined
-          ? this.optionalNumber(price.adjusted_volume)
+          ? toOptionalNumber(price.adjusted_volume)
           : null,
       }))
       .filter((price) => Number.isFinite(price.adjusted_close))
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }
 
-  private optionalNumber(value: unknown): number | null {
-    const numeric = Number(value);
-    return Number.isFinite(numeric) ? numeric : null;
-  }
-
-  private signal(code: string, label: string, category: SignalItem['category']): SignalItem {
-    return { code, label, category };
-  }
-
-  private joinReasons(reasons: string[]): string {
-    if (reasons.length === 1) return reasons[0];
-    return `${reasons.slice(0, -1).join(', ')}, and ${reasons[reasons.length - 1]}`;
-  }
-
   private average(values: number[]): number | null {
-    if (values.length === 0) return null;
-    return values.reduce((sum, value) => sum + value, 0) / values.length;
+    return average(values);
   }
 
   private stddev(values: number[]): number | null {
-    if (values.length < 2) return null;
-    const avg = this.average(values) ?? 0;
-    return Math.sqrt(values.reduce((sum, value) => sum + Math.pow(value - avg, 2), 0) / (values.length - 1));
+    return stddev(values);
   }
 
   obv(prices: SignalPricePoint[]): number[] {
-    if (prices.length === 0) return [];
-    const chronological = [...prices].reverse();
-    let currentOBV = 0;
-    const obvArray: number[] = [currentOBV];
-
-    for (let i = 1; i < chronological.length; i++) {
-      const current = chronological[i];
-      const previous = chronological[i - 1];
-      // CB-1: use adjusted_volume (split-factor applied) with safe fallback to raw volume.
-      // After a split the raw volume reflects the post-split share count on old bars, so
-      // adjusted_volume normalises the series to a comparable unit across all bars.
-      const vol = current.adjusted_volume ?? current.volume;
-      if (vol === null) {
-        obvArray.push(currentOBV);
-        continue;
-      }
-
-      if (current.adjusted_close > previous.adjusted_close) {
-        currentOBV += vol;
-      } else if (current.adjusted_close < previous.adjusted_close) {
-        currentOBV -= vol;
-      }
-      obvArray.push(currentOBV);
-    }
-    
-    return obvArray.reverse();
+    return Indicators.obv(prices);
   }
 
   isObvTrendingUp(prices: SignalPricePoint[], period: number = 10): boolean {
-    const obvArray = this.obv(prices);
-    if (obvArray.length < period) return false;
-    return obvArray[0] > obvArray[period - 1];
+    return Indicators.isObvTrendingUp(prices, period);
   }
 
   isObvTrendingDown(prices: SignalPricePoint[], period: number = 10): boolean {
-    const obvArray = this.obv(prices);
-    if (obvArray.length < period) return false;
-    return obvArray[0] < obvArray[period - 1];
+    return Indicators.isObvTrendingDown(prices, period);
   }
 }

@@ -1,5 +1,6 @@
 import type { CalibrationQuery, CalibrationRunRequest } from './signal-calibration-engine.types';
 import type { SignalDirection } from '../signal-generation-engine';
+import { DEFAULT_ASSET_TYPE, DEFAULT_REGION } from './signal-calibration-engine.config';
 
 const DIRECTIONS: SignalDirection[] = ['BULLISH', 'NEUTRAL', 'BEARISH'];
 const CONFIDENCES = ['HIGH', 'MEDIUM', 'LOW'] as const;
@@ -36,8 +37,8 @@ export function parseCalibrationQuery(query: Record<string, unknown>): Calibrati
     offset: Number.isFinite(offset) ? Math.max(0, Math.floor(offset)) : 0,
     sector: typeof first(query.sector) === 'string' ? String(first(query.sector)).trim() || undefined : undefined,
     country: typeof first(query.country) === 'string' ? String(first(query.country)).trim() || undefined : undefined,
-    region: typeof first(query.region) === 'string' ? String(first(query.region)).trim().toUpperCase() || undefined : 'IN',
-    assetType: typeof first(query.assetType) === 'string' ? String(first(query.assetType)).trim().toUpperCase() || undefined : 'STOCK',
+    region: typeof first(query.region) === 'string' ? String(first(query.region)).trim().toUpperCase() || undefined : DEFAULT_REGION,
+    assetType: typeof first(query.assetType) === 'string' ? String(first(query.assetType)).trim().toUpperCase() || undefined : DEFAULT_ASSET_TYPE,
     sortBy: SORT_FIELDS.has(sortBy) ? sortBy : 'calibratedScore',
     sortDirection,
     confidence,
@@ -60,8 +61,8 @@ export function parseCalibrationRunRequest(body: any): CalibrationRunRequest {
     direction: normalizeCalibrationDirection(body?.direction),
     sector: typeof body?.sector === 'string' ? body.sector.trim() || undefined : undefined,
     country: typeof body?.country === 'string' ? body.country.trim() || undefined : undefined,
-    region: typeof body?.region === 'string' ? body.region.trim().toUpperCase() || undefined : 'IN',
-    assetType: typeof body?.assetType === 'string' ? body.assetType.trim().toUpperCase() || undefined : 'STOCK',
+    region: typeof body?.region === 'string' ? body.region.trim().toUpperCase() || undefined : DEFAULT_REGION,
+    assetType: typeof body?.assetType === 'string' ? body.assetType.trim().toUpperCase() || undefined : DEFAULT_ASSET_TYPE,
     horizon: typeof body?.horizon === 'string' ? body.horizon.trim().toUpperCase() || undefined : undefined,
   };
 }

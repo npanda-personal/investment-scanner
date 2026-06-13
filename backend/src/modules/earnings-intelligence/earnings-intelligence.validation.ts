@@ -1,29 +1,31 @@
 import type { EarningsIntelligenceCategory, EarningsIntelligenceQuery } from './earnings-intelligence.types';
+import {
+  EARNINGS_INTELLIGENCE_CATEGORIES,
+  isEarningsIntelligenceCategory,
+} from './earnings-intelligence.categories';
+import {
+  DEFAULT_EARNINGS_REGION,
+  getEarningsRegionConfig,
+  normalizeRegionCode,
+} from './earnings-intelligence.region-config';
 
 const DEFAULT_LIMIT = 25;
 const MAX_LIMIT = 100;
 
-export const EARNINGS_INTELLIGENCE_CATEGORIES: EarningsIntelligenceCategory[] = [
-  'UPCOMING_RESULTS',
-  'PRE_RESULT_INTEREST',
-  'RESULT_WINNERS',
-  'RESULT_DISAPPOINTMENTS',
-  'RESULT_REACTION_HISTORY',
-  'EARNINGS_WATCHLIST',
-];
+// Re-exported from the single category source of truth so existing importers
+// (`from '.../earnings-intelligence.validation'`) keep working unchanged.
+export { EARNINGS_INTELLIGENCE_CATEGORIES, isEarningsIntelligenceCategory };
 
 export function parseEarningsIntelligenceQuery(query: Record<string, unknown>): EarningsIntelligenceQuery {
   const category = parseCategory(first(query.category));
+  const region = normalizeRegionCode(normalizeText(first(query.region), DEFAULT_EARNINGS_REGION));
+  const assetType = normalizeText(first(query.assetType), getEarningsRegionConfig(region).defaultAssetType).toUpperCase();
   return {
-    region: normalizeText(first(query.region), 'IN').toUpperCase(),
-    assetType: normalizeText(first(query.assetType), 'STOCK').toUpperCase(),
+    region,
+    assetType,
     limit: parseLimit(first(query.limit)),
     ...(category ? { category } : {}),
   };
-}
-
-export function isEarningsIntelligenceCategory(value: string): value is EarningsIntelligenceCategory {
-  return EARNINGS_INTELLIGENCE_CATEGORIES.includes(value as EarningsIntelligenceCategory);
 }
 
 function first(value: unknown): unknown {
@@ -52,4 +54,3 @@ function parseCategory(value: unknown): EarningsIntelligenceCategory | undefined
   }
   return category;
 }
-

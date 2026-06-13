@@ -3,6 +3,15 @@ import prisma from '../../db/prisma';
 import type { StrategyDecisionDto, StrategyQuery } from './strategy-decision-engine.types';
 import { resolveMarketRegionFilter } from '../../shared/utils/market-scope';
 
+/**
+ * Sentinel instrument id used by the single-row `create()` upsert key for a
+ * decision that has no instrument (rare/global rows). The bulk `replaceMany()`
+ * path persists a NULL column instead (FK-safe for `createMany`). Both are
+ * normalised back to `undefined` in `toDto` (audit BL-2), so the divergence is
+ * invisible at the API boundary.
+ */
+const GLOBAL_INSTRUMENT_KEY = 'GLOBAL';
+
 export interface StrategyDecisionFunnelDiagnosticsQuery {
   region?: string;
   assetType?: string;
@@ -18,10 +27,51 @@ export interface StrategyDecisionFunnelDiagnosticsQuery {
 export class StrategyDecisionEngineRepository {
   constructor(private readonly db = prisma) {}
 
+  /**
+   * Mutable decision columns shared by the single-row upsert (`update` + `create`)
+   * and the bulk `createMany` rows (audit R-2 — this payload was previously
+   * hand-duplicated three times). Identity/immutable columns (instrumentId,
+   * strategy, modelVersion, generatedDate, portfolioId, holdingId, symbol) are
+   * added by each caller.
+   */
+  private mutableDecisionColumns(data: StrategyDecisionDto) {
+    return {
+      decision: data.decision,
+      action: data.action,
+      decisionScore: data.decisionScore,
+      scoreBreakdown: (data.scoreBreakdown as any) || Prisma.JsonNull,
+      confidence: data.confidence,
+      marketCondition: data.marketCondition,
+      marketGate: data.marketGate,
+      entryZone: this.serializeEntryZone(data.entryZone),
+      riskPlan: (data.riskPlan as any) || Prisma.JsonNull,
+      reasons: data.reasons as any,
+      blockers: data.blockers as any,
+      warnings: data.warnings as any,
+      dataGaps: data.dataGaps as any,
+      strategyVersion: data.strategyVersion || null,
+      frameworkBacked: Boolean(data.frameworkBacked),
+      frameworkDecision: data.frameworkDecision || null,
+      frameworkAction: data.frameworkAction || null,
+      entryRulesPassed: (data.entryRulesPassed as any) || Prisma.JsonNull,
+      exitRulesTriggered: (data.exitRulesTriggered as any) || Prisma.JsonNull,
+      invalidationRulesTriggered: (data.invalidationRulesTriggered as any) || Prisma.JsonNull,
+      noiseFiltersTriggered: (data.noiseFiltersTriggered as any) || Prisma.JsonNull,
+      strategyRating: (data.strategyRating as any) || Prisma.JsonNull,
+      readinessLabel: data.readinessLabel || null,
+      strategyName: data.strategyName || null,
+      strategyDefinitionSource: data.strategyDefinitionSource || null,
+      strategyDefinitionDrift: (data.strategyDefinitionDrift as any) || Prisma.JsonNull,
+      generatedAt: new Date(data.generatedAt),
+      country: data.country || null,
+      exchange: data.exchange || null,
+    };
+  }
+
   async create(data: StrategyDecisionDto): Promise<StrategyDecisionDto> {
     const generatedDate = this.normalizeUtcDay(data.generatedAt);
-    const instrumentId = data.instrumentId || 'GLOBAL';
-    const entryZone = this.serializeEntryZone(data.entryZone);
+    const instrumentId = data.instrumentId || GLOBAL_INSTRUMENT_KEY;
+    const mutable = this.mutableDecisionColumns(data);
     const record = await (this.db.strategyDecisionResult as any).upsert({
       where: {
         instrumentId_strategy_modelVersion_generatedDate: {
@@ -31,73 +81,17 @@ export class StrategyDecisionEngineRepository {
           generatedDate,
         },
       },
-      update: {
-        decision: data.decision,
-        action: data.action,
-        decisionScore: data.decisionScore,
-        scoreBreakdown: (data.scoreBreakdown as any) || Prisma.JsonNull,
-        confidence: data.confidence,
-        marketCondition: data.marketCondition,
-        marketGate: data.marketGate,
-        entryZone,
-        riskPlan: (data.riskPlan as any) || Prisma.JsonNull,
-        reasons: data.reasons as any,
-        blockers: data.blockers as any,
-        warnings: data.warnings as any,
-        dataGaps: data.dataGaps as any,
-        strategyVersion: data.strategyVersion || null,
-        frameworkBacked: Boolean(data.frameworkBacked),
-        frameworkDecision: data.frameworkDecision || null,
-        frameworkAction: data.frameworkAction || null,
-        entryRulesPassed: (data.entryRulesPassed as any) || Prisma.JsonNull,
-        exitRulesTriggered: (data.exitRulesTriggered as any) || Prisma.JsonNull,
-        invalidationRulesTriggered: (data.invalidationRulesTriggered as any) || Prisma.JsonNull,
-        noiseFiltersTriggered: (data.noiseFiltersTriggered as any) || Prisma.JsonNull,
-        strategyRating: (data.strategyRating as any) || Prisma.JsonNull,
-        readinessLabel: data.readinessLabel || null,
-        strategyName: data.strategyName || null,
-        strategyDefinitionSource: data.strategyDefinitionSource || null,
-        strategyDefinitionDrift: (data.strategyDefinitionDrift as any) || Prisma.JsonNull,
-        generatedAt: new Date(data.generatedAt),
-        country: data.country || null,
-        exchange: data.exchange || null,
-      },
+      update: mutable,
       create: {
+        ...mutable,
         portfolioId: data.portfolioId,
         holdingId: data.holdingId,
         symbol: data.symbol,
-        country: data.country || null,
-        exchange: data.exchange || null,
-        strategyName: data.strategyName || null,
         strategy: data.strategy,
-        decision: data.decision,
-        action: data.action,
-        decisionScore: data.decisionScore,
-        scoreBreakdown: (data.scoreBreakdown as any) || Prisma.JsonNull,
-        confidence: data.confidence,
-        marketCondition: data.marketCondition,
-        marketGate: data.marketGate,
-        entryZone,
-        riskPlan: (data.riskPlan as any) || Prisma.JsonNull,
-        reasons: data.reasons as any,
-        blockers: data.blockers as any,
-        warnings: data.warnings as any,
-        dataGaps: data.dataGaps as any,
-        strategyVersion: data.strategyVersion || null,
-        frameworkBacked: Boolean(data.frameworkBacked),
-        frameworkDecision: data.frameworkDecision || null,
-        frameworkAction: data.frameworkAction || null,
-        entryRulesPassed: (data.entryRulesPassed as any) || Prisma.JsonNull,
-        exitRulesTriggered: (data.exitRulesTriggered as any) || Prisma.JsonNull,
-        invalidationRulesTriggered: (data.invalidationRulesTriggered as any) || Prisma.JsonNull,
-        noiseFiltersTriggered: (data.noiseFiltersTriggered as any) || Prisma.JsonNull,
-        strategyRating: (data.strategyRating as any) || Prisma.JsonNull,
-        readinessLabel: data.readinessLabel || null,
-        strategyDefinitionSource: data.strategyDefinitionSource || null,
-        strategyDefinitionDrift: (data.strategyDefinitionDrift as any) || Prisma.JsonNull,
         modelVersion: data.modelVersion,
-        generatedAt: new Date(data.generatedAt),
         generatedDate,
+        // Relation is connected explicitly; instrumentId is never written as a
+        // bare column on the create path (it would bypass the FK relation).
         ...(data.instrumentId ? { stock: { connect: { id: data.instrumentId } } } : {}),
       },
     });
@@ -106,47 +100,18 @@ export class StrategyDecisionEngineRepository {
 
   async replaceMany(items: StrategyDecisionDto[]): Promise<StrategyDecisionDto[]> {
     if (items.length === 0) return [];
-    const rows: any[] = items.map((data) => {
-      const generatedDate = this.normalizeUtcDay(data.generatedAt);
-      return {
-        instrumentId: data.instrumentId || null,
-        portfolioId: data.portfolioId || null,
-        holdingId: data.holdingId || null,
-        symbol: data.symbol || null,
-        country: data.country || null,
-        exchange: data.exchange || null,
-        strategyName: data.strategyName || null,
-        strategy: data.strategy,
-        decision: data.decision,
-        action: data.action,
-        decisionScore: data.decisionScore,
-        scoreBreakdown: (data.scoreBreakdown as any) || Prisma.JsonNull,
-        confidence: data.confidence,
-        marketCondition: data.marketCondition,
-        marketGate: data.marketGate,
-        entryZone: this.serializeEntryZone(data.entryZone),
-        riskPlan: (data.riskPlan as any) || Prisma.JsonNull,
-        reasons: data.reasons as any,
-        blockers: data.blockers as any,
-        warnings: data.warnings as any,
-        dataGaps: data.dataGaps as any,
-        strategyVersion: data.strategyVersion || null,
-        frameworkBacked: Boolean(data.frameworkBacked),
-        frameworkDecision: data.frameworkDecision || null,
-        frameworkAction: data.frameworkAction || null,
-        entryRulesPassed: (data.entryRulesPassed as any) || Prisma.JsonNull,
-        exitRulesTriggered: (data.exitRulesTriggered as any) || Prisma.JsonNull,
-        invalidationRulesTriggered: (data.invalidationRulesTriggered as any) || Prisma.JsonNull,
-        noiseFiltersTriggered: (data.noiseFiltersTriggered as any) || Prisma.JsonNull,
-        strategyRating: (data.strategyRating as any) || Prisma.JsonNull,
-        readinessLabel: data.readinessLabel || null,
-        strategyDefinitionSource: data.strategyDefinitionSource || null,
-        strategyDefinitionDrift: (data.strategyDefinitionDrift as any) || Prisma.JsonNull,
-        modelVersion: data.modelVersion,
-        generatedAt: new Date(data.generatedAt),
-        generatedDate,
-      };
-    });
+    const rows: any[] = items.map((data) => ({
+      // Bulk createMany writes the FK column directly; a missing instrument
+      // persists as NULL (FK-safe). See GLOBAL_INSTRUMENT_KEY note (BL-2).
+      instrumentId: data.instrumentId || null,
+      portfolioId: data.portfolioId || null,
+      holdingId: data.holdingId || null,
+      symbol: data.symbol || null,
+      strategy: data.strategy,
+      modelVersion: data.modelVersion,
+      generatedDate: this.normalizeUtcDay(data.generatedAt),
+      ...this.mutableDecisionColumns(data),
+    }));
 
     await this.db.$transaction([
       this.db.strategyDecisionResult.deleteMany({
@@ -281,7 +246,10 @@ export class StrategyDecisionEngineRepository {
   private toDto(record: any): StrategyDecisionDto {
     return {
       id: record.id,
-      instrumentId: record.instrumentId === 'GLOBAL' ? undefined : record.instrumentId,
+      // BL-2: normalise BOTH the single-row sentinel ('GLOBAL') and the bulk-path
+      // NULL/empty to `undefined`, so global decisions look identical via the API
+      // regardless of which write path persisted them.
+      instrumentId: !record.instrumentId || record.instrumentId === GLOBAL_INSTRUMENT_KEY ? undefined : record.instrumentId,
       portfolioId: record.portfolioId,
       holdingId: record.holdingId,
       symbol: record.symbol,

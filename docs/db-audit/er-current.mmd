@@ -1,0 +1,510 @@
+%%{init: {"theme":"neutral","themeVariables":{"fontSize":"15px"},"er":{"layoutDirection":"LR","entityPadding":10}}}%%
+erDiagram
+  %% =====================================================================
+  %% CURRENT SCHEMA — all 71 tables. Solid line = enforced FK.
+  %% "(soft)" label = string join, NO database foreign key.
+  %% Region/scope columns are free-text String (no enum, no FK) -> see audit.
+  %% =====================================================================
+
+  %% ---------- MARKET DATA FOUNDATION ----------
+  Stock {
+    string id PK
+    string symbol UK
+    string region "free text: IN/US/EU/UK/CN"
+    string assetType
+    string exchange
+    boolean isActive
+    boolean isDelisted
+  }
+  SourceFileImport {
+    string id PK
+    string source
+    string segment
+    datetime tradingDate
+    string fileHash
+  }
+  PriceTick {
+    string id PK "cuid (anti-pattern on TS table)"
+    string symbol "soft link to Stock"
+    string region "nullable"
+    datetime timestamp
+    string sourceFileImportId FK
+  }
+  LatestPrice {
+    string symbol PK "region NOT in PK -> collision"
+    string region
+    decimal price
+  }
+  Fundamental {
+    string id PK
+    string stockId FK
+    string periodType
+    datetime periodEndDate
+  }
+  CorporateAction {
+    string id PK
+    string stockId FK
+    string naturalKey UK
+    string actionType
+  }
+  InstrumentExchangeIdentity {
+    string id PK
+    string stockId FK
+    string exchange
+    string sourceFileImportId FK
+  }
+  MarketDeliverySnapshot {
+    string id PK
+    string stockId FK
+    string exchange
+    datetime tradingDate
+    string sourceFileImportId FK
+  }
+  FxRate {
+    string id PK
+    string pair UK
+    decimal rate
+  }
+  MarketDataRepairAttempt {
+    string id PK
+    string stockId FK
+    string region
+    string assetType
+  }
+  MarketDataRepairState {
+    string id PK
+    string stockId FK
+    string region
+    string assetType
+  }
+  MarketDataRepairRun {
+    string id PK
+    string region "scope only, no FK"
+    string assetType
+  }
+  MarketDataSyncState {
+    string id PK
+    string region "scope only, no FK"
+    string assetType
+    datetime tradingDate
+  }
+
+  %% ---------- DATA QUALITY ----------
+  DataQualityEvaluation {
+    string id PK
+    string instrumentId FK "unique 1:1"
+  }
+  InstrumentEligibility {
+    string id PK
+    string instrumentId FK
+    datetime tradingDate
+  }
+  DataQualitySnapshot {
+    string id PK
+    string instrumentId "soft, no FK"
+    datetime snapshotDate
+  }
+
+  %% ---------- SIGNALS / CALIBRATION / LEDGER ----------
+  SignalGenerationRun {
+    string id PK
+    string region
+    string assetType
+    datetime generatedDate
+  }
+  SignalResult {
+    string id PK
+    string instrumentId FK
+    string generationRunId FK
+    string country "no region col -> needs join"
+    float score
+  }
+  SignalOutcome {
+    string id PK
+    string signalResultId FK
+    string horizon
+    float forwardReturnPercent
+  }
+  SignalCalibrationResult {
+    string id PK
+    string signalResultId "soft, no FK"
+    float calibratedScore
+  }
+  SignalPositionLedgerEntry {
+    string id PK
+    string instrumentId FK
+    string scopeRegion
+    string scopeAssetType
+    string entrySignalId "soft"
+    float entryTriggerPrice "Float money"
+  }
+
+  %% ---------- STRATEGY / TRADE PLAN / REVIEW ----------
+  StrategyDefinition {
+    string id PK
+    string strategyCode
+    string strategyVersion
+    json supportedRegions
+  }
+  StrategyDecisionResult {
+    string id PK
+    string instrumentId FK
+    string portfolioId "soft"
+    string holdingId "soft"
+    string strategy
+    datetime generatedDate
+  }
+  TradePlanResult {
+    string id PK
+    string instrumentId "soft, no FK"
+    string strategyDecisionId "soft"
+    string portfolioId "soft"
+    string region
+    string assetType
+    float rewardRiskRatio "Float"
+  }
+  StrategyPerformanceSummary {
+    string id PK
+    string strategyCode
+    string region
+    string assetType
+    string backtestRunId "soft"
+    float totalReturn "Float money"
+  }
+  TodayReviewRun {
+    string id PK
+    datetime runDate
+    string region
+    string assetType
+  }
+  TodayReviewCandidate {
+    string id PK
+    string runId FK
+    string instrumentId "soft"
+    int rank
+  }
+
+  %% ---------- PORTFOLIO / WATCHLIST / ALERTS ----------
+  Portfolio {
+    string id PK
+    string userId FK "nullable"
+    string baseCurrency
+  }
+  PortfolioHolding {
+    string id PK
+    string portfolioId FK
+    string instrumentId FK
+  }
+  PortfolioTransaction {
+    string id PK
+    string portfolioId FK
+    string instrumentId FK "nullable"
+  }
+  PortfolioIntelligenceSnapshot {
+    string id PK
+    string portfolioId FK "unique 1:1"
+    json payloadJson
+  }
+  Watchlist {
+    string id PK
+    string userId FK "nullable"
+  }
+  WatchlistItem {
+    string id PK
+    string watchlistId FK
+    string instrumentId FK
+  }
+  AlertRule {
+    string id PK
+    string userId FK "nullable"
+    string instrumentId FK "nullable"
+    string portfolioId FK "nullable"
+    string watchlistId FK "nullable"
+  }
+  AlertEvent {
+    string id PK
+    string alertRuleId FK
+    string instrumentId FK "nullable"
+    string portfolioId FK "nullable"
+    string watchlistId FK "nullable"
+  }
+
+  %% ---------- INTELLIGENCE SNAPSHOTS (read cache) ----------
+  DailyInstrumentSnapshot {
+    string id PK
+    string instrumentId FK
+    datetime tradingDate
+    int snapshotVersion "unbounded, no retention"
+    string region
+    string assetType
+    json provenance
+  }
+  SnapshotWatermark {
+    string id PK
+    string region "scope only"
+    string assetType
+    datetime tradingDate
+  }
+  WorkbenchSnapshot {
+    string id PK
+    string instrumentId FK "unique 1:1"
+    json payloadJson
+  }
+  EarningsIntelligenceSnapshot {
+    string id PK
+    string stockId FK
+    string scopeRegion
+    string scopeAssetType
+    datetime snapshotDate
+  }
+  StockInterestSnapshot {
+    string id PK
+    string stockId FK
+    string scopeRegion
+    string scopeAssetType
+  }
+  SmartMoneyContextSnapshot {
+    string id PK
+    string instrumentId FK
+    string range
+    datetime snapshotDate
+  }
+  MarketContextSnapshot {
+    string id PK
+    string region "scope only"
+    datetime snapshotDate
+  }
+  MarketPulseSnapshot {
+    string id PK
+    string region "scope only"
+    string assetType
+    json payloadJson
+  }
+  SectorContextSnapshot {
+    string id PK
+    string region "scope only"
+    string sector
+  }
+  SectorSnapshot {
+    string id PK
+    string scopeRegion "scope only"
+    string scopeAssetType
+    string sector
+  }
+  CountryContextSnapshot {
+    string id PK
+    string region "scope only"
+    string country
+  }
+  ResearchOverviewSnapshot {
+    string id PK
+    string region "scope only"
+    string assetType
+    json overviewJson
+  }
+  MarketScanSnapshot {
+    string id PK
+    string scanType
+    string region "scope only"
+    string assetType
+    int rank
+  }
+
+  %% ---------- PIPELINE LEDGER ----------
+  PipelineRun {
+    string id PK
+    string pipelineKey
+    string scopeRegion
+    string scopeAssetType
+    string idempotencyKey UK
+  }
+  PipelineStageRun {
+    string id PK
+    string pipelineRunId FK
+    string stageKey
+    string leaseOwner "DB-as-lock"
+  }
+
+  %% ---------- IDENTITY / BILLING ----------
+  AppUser {
+    string id PK
+    string email UK
+  }
+  UserSubscription {
+    string id PK
+    string userId FK "unique 1:1"
+    string planCode "soft -> SubscriptionPlan"
+  }
+  SubscriptionPlan {
+    string id PK
+    string code UK
+  }
+  UsageCounter {
+    string id PK
+    string userId FK
+    string key
+  }
+  NotificationPreference {
+    string id PK
+    string userId FK "unique 1:1"
+  }
+  NotificationEvent {
+    string id PK
+    string userId FK
+  }
+  TradeJournalEntry {
+    string id PK
+    string userId FK
+    string instrumentId "soft, no FK (delisted)"
+    string sourceSignalId "soft"
+  }
+
+  %% ---------- CRYPTO (physically isolated crypto_* family) ----------
+  CryptoAsset {
+    string id PK
+    string symbol UK
+    string region "default GLOBAL"
+    string assetType "default CRYPTO"
+  }
+  CryptoPriceTick {
+    string id PK
+    string symbol "soft link"
+    datetime timestamp
+  }
+  CryptoLatestPrice {
+    string symbol PK
+  }
+  CryptoFundamentalSnapshot {
+    string id PK
+    string instrumentId FK
+    datetime snapshotDate
+  }
+  CryptoEvent {
+    string id PK
+    string instrumentId FK "nullable"
+    string externalId
+  }
+  CryptoSignalGenerationRun {
+    string id PK
+    string region
+    string assetType
+  }
+  CryptoSignalResult {
+    string id PK
+    string instrumentId FK
+    string generationRunId FK
+  }
+  CryptoSignalOutcome {
+    string id PK
+    string signalResultId FK "RESERVED no writer"
+  }
+  CryptoSignalCalibrationResult {
+    string id PK
+    string signalResultId "RESERVED soft"
+  }
+  CryptoDataQualityEvaluation {
+    string id PK
+    string instrumentId FK "RESERVED unique"
+  }
+  CryptoInterestSnapshot {
+    string id PK
+    string instrumentId FK "RESERVED"
+  }
+  CryptoMarketScanSnapshot {
+    string id PK
+    string scanType
+    string region "scope only"
+  }
+
+  %% ============================ RELATIONSHIPS ============================
+  %% Stock hub (enforced FKs)
+  Stock ||--o{ Fundamental : stockId
+  Stock ||--o{ CorporateAction : stockId
+  Stock ||--o{ InstrumentExchangeIdentity : stockId
+  Stock ||--o{ MarketDeliverySnapshot : stockId
+  Stock ||--o{ SignalResult : instrumentId
+  Stock ||--o| DataQualityEvaluation : instrumentId
+  Stock ||--o{ InstrumentEligibility : instrumentId
+  Stock ||--o{ DailyInstrumentSnapshot : instrumentId
+  Stock ||--o{ SmartMoneyContextSnapshot : instrumentId
+  Stock ||--o{ StockInterestSnapshot : stockId
+  Stock ||--o{ EarningsIntelligenceSnapshot : stockId
+  Stock ||--o| WorkbenchSnapshot : instrumentId
+  Stock ||--o{ PortfolioHolding : instrumentId
+  Stock ||--o{ PortfolioTransaction : instrumentId
+  Stock ||--o{ WatchlistItem : instrumentId
+  Stock ||--o{ AlertRule : instrumentId
+  Stock ||--o{ AlertEvent : instrumentId
+  Stock ||--o{ StrategyDecisionResult : instrumentId
+  Stock ||--o{ SignalPositionLedgerEntry : instrumentId
+  Stock ||--o{ MarketDataRepairAttempt : stockId
+  Stock ||--o{ MarketDataRepairState : stockId
+
+  %% SourceFileImport lineage
+  SourceFileImport ||--o{ PriceTick : sourceFileImportId
+  SourceFileImport ||--o{ InstrumentExchangeIdentity : sourceFileImportId
+  SourceFileImport ||--o{ MarketDeliverySnapshot : sourceFileImportId
+
+  %% Signals
+  SignalGenerationRun ||--o{ SignalResult : generationRunId
+  SignalResult ||--o{ SignalOutcome : signalResultId
+
+  %% Strategy / review
+  TodayReviewRun ||--o{ TodayReviewCandidate : runId
+
+  %% Portfolio / watchlist / alerts
+  Portfolio ||--o{ PortfolioHolding : portfolioId
+  Portfolio ||--o{ PortfolioTransaction : portfolioId
+  Portfolio ||--o{ AlertRule : portfolioId
+  Portfolio ||--o{ AlertEvent : portfolioId
+  Portfolio ||--o| PortfolioIntelligenceSnapshot : portfolioId
+  Watchlist ||--o{ WatchlistItem : watchlistId
+  Watchlist ||--o{ AlertRule : watchlistId
+  Watchlist ||--o{ AlertEvent : watchlistId
+  AlertRule ||--o{ AlertEvent : alertRuleId
+
+  %% Identity / billing
+  AppUser ||--o| UserSubscription : userId
+  AppUser ||--o{ UsageCounter : userId
+  AppUser ||--o{ Portfolio : userId
+  AppUser ||--o{ Watchlist : userId
+  AppUser ||--o{ AlertRule : userId
+  AppUser ||--o{ BacktestStrategy : userId
+  AppUser ||--o{ BacktestRun : userId
+  AppUser ||--o| NotificationPreference : userId
+  AppUser ||--o{ NotificationEvent : userId
+  AppUser ||--o{ TradeJournalEntry : userId
+
+  %% Backtest
+  BacktestStrategy ||--o{ BacktestRun : strategyId
+
+  %% Pipeline
+  PipelineRun ||--o{ PipelineStageRun : pipelineRunId
+
+  %% Crypto (FKs into crypto_assets only)
+  CryptoAsset ||--o{ CryptoSignalResult : instrumentId
+  CryptoAsset ||--o| CryptoDataQualityEvaluation : instrumentId
+  CryptoAsset ||--o{ CryptoInterestSnapshot : instrumentId
+  CryptoAsset ||--o{ CryptoFundamentalSnapshot : instrumentId
+  CryptoAsset ||--o{ CryptoEvent : instrumentId
+  CryptoSignalGenerationRun ||--o{ CryptoSignalResult : generationRunId
+  CryptoSignalResult ||--o{ CryptoSignalOutcome : signalResultId
+
+  %% ---- SOFT (string) joins: NO database foreign key ----
+  Stock ||..o{ PriceTick : "symbol (soft)"
+  Stock ||..o| LatestPrice : "symbol (soft)"
+  Stock ||..o{ TradePlanResult : "instrumentId (soft)"
+  Stock ||..o{ DataQualitySnapshot : "instrumentId (soft)"
+  Stock ||..o{ TradeJournalEntry : "instrumentId (soft)"
+  SignalResult ||..o{ SignalCalibrationResult : "signalResultId (soft)"
+  SignalResult ||..o{ SignalPositionLedgerEntry : "entrySignalId (soft)"
+  StrategyDecisionResult ||..o{ TradePlanResult : "strategyDecisionId (soft)"
+  Portfolio ||..o{ TradePlanResult : "portfolioId (soft)"
+  Portfolio ||..o{ StrategyDecisionResult : "portfolioId (soft)"
+  StrategyDefinition ||..o{ StrategyDecisionResult : "strategyCode (soft)"
+  StrategyDefinition ||..o{ StrategyPerformanceSummary : "strategyCode (soft)"
+  BacktestRun ||..o| StrategyPerformanceSummary : "backtestRunId (soft)"
+  SubscriptionPlan ||..o{ UserSubscription : "planCode (soft)"
+  CryptoAsset ||..o{ CryptoPriceTick : "symbol (soft)"
+  CryptoAsset ||..o| CryptoLatestPrice : "symbol (soft)"
+  CryptoSignalResult ||..o{ CryptoSignalCalibrationResult : "signalResultId (soft)"

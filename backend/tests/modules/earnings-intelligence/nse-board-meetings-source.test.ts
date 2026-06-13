@@ -571,10 +571,11 @@ describe('earnings-intelligence service — officialResultDate flow', () => {
     expect(snapshot.warnings).toEqual([]);
   });
 
-  it('categories remain ESTIMATED when officialResultDate is absent (behavior unchanged)', () => {
+  it('result date is DATE_TBA (no fabricated date) when officialResultDate is absent', () => {
     const svc = new EarningsIntelligenceService({} as any);
 
-    // Upcoming estimated — 30 days until expected result
+    // No official date → the engine must NOT fabricate a forward date; it reports
+    // DATE_TBA and keeps the row out of the official-only result categories.
     const snapshot = svc.calculateSnapshot({
       stockId: 'stock-3',
       symbol: 'NOOFFICIAL',
@@ -590,8 +591,10 @@ describe('earnings-intelligence service — officialResultDate flow', () => {
       deliverySnapshots: [],
     });
 
-    expect(snapshot.resultDateSource).toBe('ESTIMATED_FROM_PERIOD_CADENCE');
-    expect(snapshot.warnings).toContain('OFFICIAL_CALENDAR_NOT_AVAILABLE');
+    expect(snapshot.resultDateSource).toBe('DATE_TBA');
+    expect(snapshot.resultDate).toBeNull();
+    expect(snapshot.resultDateLabel).toBe('TBA');
+    expect(snapshot.warnings).toContain('RESULT_DATE_NOT_ANNOUNCED');
     expect(snapshot.categories).not.toContain('RESULT_WINNERS');
     expect(snapshot.categories).not.toContain('RESULT_DISAPPOINTMENTS');
     expect(snapshot.categories).not.toContain('RESULT_REACTION_HISTORY');

@@ -1,0 +1,11 @@
+{
+  "cookies": [],
+  "origins": [
+    {
+      "origin": "http://localhost:5173",
+      "localStorage": [
+        { "name": "investment_scanner_auth_token", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbXEwMGpnNzEwMDAwdzUwMGZ1aXJ2NHRwIiwiZW1haWwiOiJ0ZXN0QGV4YW1wbGUuY29tIiwiaWF0IjoxNzgxMjU2NzAyLCJleHAiOjE3ODEyODU1MDJ9.haqX0rH5ajnk7sU3XCLAe3PzCVZ9Fj9TlWUfEJ6Ob8Y" }
+      ]
+    }
+  ]
+}

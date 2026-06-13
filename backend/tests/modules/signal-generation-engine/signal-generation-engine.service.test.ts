@@ -1,5 +1,8 @@
 /// <reference types="@types/jest" />
 import { SignalGenerationEngineService } from '../../../src/modules/signal-generation-engine';
+// categoryScore + pushReturnSignal moved from private service helpers to the pure
+// scoring module during the engine refactor; these tests now target their new home.
+import { categoryScore, pushReturnSignal } from '../../../src/modules/signal-generation-engine/signal-scoring';
 import { StrategyFrameworkRegistry, StrategyFrameworkService } from '../../../src/modules/strategy-framework';
 import type { StrategyDefinition } from '../../../src/modules/strategy-framework';
 
@@ -1744,80 +1747,70 @@ describe('SignalGenerationEngineService v2 accuracy fixes', () => {
   // ── Fix 2 (v3): categoryScore smoothing (alpha=1) ────────────────────────
   // v3 reduces alpha from 2 to 1 to widen the spread while still damping thin evidence.
   it('fix2: categoryScore with 1 positive/0 negative is 0.75 (alpha=1)', () => {
-    const service = svc();
     // alpha=1: (1 + 0.5) / (1 + 1) = 1.5/2 = 0.75
-    const score = (service as any).categoryScore(1, 0);
+    const score = categoryScore(1, 0);
     expect(score).toBeCloseTo(0.75, 5);
   });
 
   it('fix2: categoryScore with 5 positive/0 negative is ~0.917 (alpha=1)', () => {
-    const service = svc();
     // alpha=1: (5 + 0.5) / (5 + 1) = 5.5/6 ≈ 0.9167
-    const score = (service as any).categoryScore(5, 0);
+    const score = categoryScore(5, 0);
     expect(score).toBeCloseTo(5.5 / 6, 5);
   });
 
   it('fix2: categoryScore with 0 total returns 0.5 (unchanged)', () => {
-    const service = svc();
-    expect((service as any).categoryScore(0, 0)).toBe(0.5);
+    expect(categoryScore(0, 0)).toBe(0.5);
   });
 
   it('fix2: categoryScore with 0 positive / 5 negative is ~0.083 (symmetric bearish)', () => {
-    const service = svc();
     // alpha=1: (0 + 0.5) / (5 + 1) = 0.5/6 ≈ 0.0833
-    const score = (service as any).categoryScore(0, 5);
+    const score = categoryScore(0, 5);
     expect(score).toBeCloseTo(0.5 / 6, 5);
   });
 
   it('fix2: categoryScore with 3 positive / 1 negative is 0.75 (mixed, alpha=1)', () => {
-    const service = svc();
     // alpha=1: (3 + 0.5) / (4 + 1) = 3.5/5 = 0.7
-    const score = (service as any).categoryScore(3, 1);
+    const score = categoryScore(3, 1);
     expect(score).toBeCloseTo(3.5 / 5, 5);
   });
 
   // ── Fix 3: momentum thresholds (neutral band) ────────────────────────────
   it('fix3: 1M return of +1% (below +2% threshold) produces no momentum signal', () => {
-    const service = svc();
     const signals: any[] = [];
     const negativeSignals: any[] = [];
-    (service as any).pushReturnSignal(0.01, 'ONE_MONTH_MOMENTUM', 'pos', 'neg', signals, negativeSignals, 0.02, -0.03);
+    pushReturnSignal(0.01, 'ONE_MONTH_MOMENTUM', 'pos', 'neg', signals, negativeSignals, 0.02, -0.03);
     expect(signals).toHaveLength(0);
     expect(negativeSignals).toHaveLength(0);
   });
 
   it('fix3: 1M return of +2% (at threshold) fires bullish momentum', () => {
-    const service = svc();
     const signals: any[] = [];
     const negativeSignals: any[] = [];
-    (service as any).pushReturnSignal(0.02, 'ONE_MONTH_MOMENTUM', '1M momentum is positive', '1M momentum is negative', signals, negativeSignals, 0.02, -0.03);
+    pushReturnSignal(0.02, 'ONE_MONTH_MOMENTUM', '1M momentum is positive', '1M momentum is negative', signals, negativeSignals, 0.02, -0.03);
     expect(signals).toHaveLength(1);
     expect(signals[0].code).toBe('ONE_MONTH_MOMENTUM');
   });
 
   it('fix3: 1M return of -2% (in neutral band) produces no momentum signal', () => {
-    const service = svc();
     const signals: any[] = [];
     const negativeSignals: any[] = [];
-    (service as any).pushReturnSignal(-0.02, 'ONE_MONTH_MOMENTUM', 'pos', 'neg', signals, negativeSignals, 0.02, -0.03);
+    pushReturnSignal(-0.02, 'ONE_MONTH_MOMENTUM', 'pos', 'neg', signals, negativeSignals, 0.02, -0.03);
     expect(signals).toHaveLength(0);
     expect(negativeSignals).toHaveLength(0);
   });
 
   it('fix3: 1M return of -3% (at bear threshold) fires bearish momentum', () => {
-    const service = svc();
     const signals: any[] = [];
     const negativeSignals: any[] = [];
-    (service as any).pushReturnSignal(-0.03, 'ONE_MONTH_MOMENTUM', '1M momentum is positive', '1M momentum is negative', signals, negativeSignals, 0.02, -0.03);
+    pushReturnSignal(-0.03, 'ONE_MONTH_MOMENTUM', '1M momentum is positive', '1M momentum is negative', signals, negativeSignals, 0.02, -0.03);
     expect(negativeSignals).toHaveLength(1);
     expect(negativeSignals[0].code).toBe('ONE_MONTH_MOMENTUM_NEGATIVE');
   });
 
   it('fix3: 3M return of +4% (below +5% threshold) produces no signal', () => {
-    const service = svc();
     const signals: any[] = [];
     const negativeSignals: any[] = [];
-    (service as any).pushReturnSignal(0.04, 'THREE_MONTH_MOMENTUM', 'pos', 'neg', signals, negativeSignals, 0.05, -0.07);
+    pushReturnSignal(0.04, 'THREE_MONTH_MOMENTUM', 'pos', 'neg', signals, negativeSignals, 0.05, -0.07);
     expect(signals).toHaveLength(0);
     expect(negativeSignals).toHaveLength(0);
   });

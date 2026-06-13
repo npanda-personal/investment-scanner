@@ -1,4 +1,13 @@
 import prisma from '../../db/prisma';
+import { CALCULATION_VERSION } from './earnings-intelligence.constants';
+import { isEarningsIntelligenceCategory } from './earnings-intelligence.categories';
+import { getEarningsRegionConfig } from './earnings-intelligence.region-config';
+import {
+  isTbaSource,
+  remapLegacySource,
+  remapLegacyWarnings,
+  resultDateLabelFor,
+} from './earnings-intelligence.presentation';
 import type {
   EarningsDeliveryInput,
   EarningsFundamentalInput,
@@ -11,6 +20,7 @@ import type {
 } from './earnings-intelligence.types';
 
 const MAX_API_ROWS = 5000;
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 export class EarningsIntelligenceRepository {
   constructor(private readonly db = prisma as any) {}
@@ -43,10 +53,12 @@ export class EarningsIntelligenceRepository {
     });
     if (stocks.length === 0) return [];
 
+    // Region-configured data-load windows.
+    const config = getEarningsRegionConfig(query.region);
     const stockIds = stocks.map((stock: any) => stock.id);
     const symbols = stocks.map((stock: any) => stock.symbol);
-    const priceCutoff = new Date(query.snapshotDate.getTime() - 420 * 24 * 60 * 60 * 1000);
-    const deliveryCutoff = new Date(query.snapshotDate.getTime() - 120 * 24 * 60 * 60 * 1000);
+    const priceCutoff = new Date(query.snapshotDate.getTime() - config.priceHistoryLookbackDays * MS_PER_DAY);
+    const deliveryCutoff = new Date(query.snapshotDate.getTime() - config.deliveryLookbackDays * MS_PER_DAY);
     const [fundamentals, priceTicks, latestPrices, deliverySnapshots] = await Promise.all([
       this.db.fundamental.findMany({
         where: { stockId: { in: stockIds } },
@@ -55,7 +67,9 @@ export class EarningsIntelligenceRepository {
       this.db.priceTick.findMany({
         where: {
           symbol: { in: symbols },
-          timestamp: { gte: priceCutoff },
+          // Upper-bounded at the snapshot date so a backdated snapshot never reads
+          // prices that postdate it (no look-ahead bias on historical backfills).
+          timestamp: { gte: priceCutoff, lte: query.snapshotDate },
         },
         orderBy: [{ symbol: 'asc' }, { timestamp: 'desc' }],
       }),
@@ -65,7 +79,7 @@ export class EarningsIntelligenceRepository {
       this.db.marketDeliverySnapshot.findMany({
         where: {
           stockId: { in: stockIds },
-          tradingDate: { gte: deliveryCutoff },
+          tradingDate: { gte: deliveryCutoff, lte: query.snapshotDate },
         },
         orderBy: [{ stockId: 'asc' }, { tradingDate: 'desc' }],
       }),
@@ -81,7 +95,9 @@ export class EarningsIntelligenceRepository {
         adjustedClose: Number(row.price),
         volume: null,
       } as EarningsPricePointInput)),
-    ];
+    ]
+      // Guard the merged latestPrice rows against the same look-ahead bound.
+      .filter((row) => row.timestamp.getTime() <= query.snapshotDate.getTime());
     const deliveryRows: EarningsDeliveryInput[] = deliverySnapshots.map((row: any) => this.toDelivery(row));
     const fundamentalsByStockId = groupBy(fundamentalRows, (row) => row.stockId);
     const pricesBySymbol = groupBy(priceRows, (row) => row.symbol);
@@ -101,9 +117,10 @@ export class EarningsIntelligenceRepository {
   }
 
   async upsertSnapshots(rows: EarningsSnapshotUpsertInput[]): Promise<EarningsSnapshotDto[]> {
-    const saved: EarningsSnapshotDto[] = [];
-    for (const row of rows) {
-      const record = await this.db.earningsIntelligenceSnapshot.upsert({
+    if (rows.length === 0) return [];
+    // One atomic batch instead of N sequential round-trips.
+    const operations = rows.map((row) =>
+      this.db.earningsIntelligenceSnapshot.upsert({
         where: {
           snapshotDate_scopeRegion_scopeAssetType_symbol: {
             snapshotDate: row.snapshotDate,
@@ -112,55 +129,12 @@ export class EarningsIntelligenceRepository {
             symbol: row.symbol,
           },
         },
-        create: {
-          snapshotDate: row.snapshotDate,
-          dataThroughDate: row.dataThroughDate,
-          stockId: row.stockId,
-          symbol: row.symbol,
-          scopeRegion: row.scopeRegion,
-          scopeAssetType: row.scopeAssetType,
-          resultDate: row.resultDate,
-          resultDateSource: row.resultDateSource,
-          periodEndDate: row.periodEndDate,
-          validatedAt: row.validatedAt,
-          daysToResult: row.daysToResult,
-          revenueGrowth: row.revenueGrowth,
-          profitGrowth: row.profitGrowth,
-          epsGrowth: row.epsGrowth,
-          marginTrend: row.marginTrend,
-          consistencyScore: row.consistencyScore,
-          accelerationScore: row.accelerationScore,
-          reasonTags: row.reasonTags,
-          riskTags: row.riskTags,
-          warnings: row.warnings,
-          freshness: row.freshness,
-          categories: row.categories,
-        },
-        update: {
-          dataThroughDate: row.dataThroughDate,
-          stockId: row.stockId,
-          resultDate: row.resultDate,
-          resultDateSource: row.resultDateSource,
-          periodEndDate: row.periodEndDate,
-          validatedAt: row.validatedAt,
-          daysToResult: row.daysToResult,
-          revenueGrowth: row.revenueGrowth,
-          profitGrowth: row.profitGrowth,
-          epsGrowth: row.epsGrowth,
-          marginTrend: row.marginTrend,
-          consistencyScore: row.consistencyScore,
-          accelerationScore: row.accelerationScore,
-          reasonTags: row.reasonTags,
-          riskTags: row.riskTags,
-          warnings: row.warnings,
-          freshness: row.freshness,
-          categories: row.categories,
-          calculationVersion: 'earnings-intelligence-v1',
-        },
-      });
-      saved.push(this.toDto(record));
-    }
-    return saved;
+        create: this.snapshotWriteData(row, true),
+        update: this.snapshotWriteData(row, false),
+      })
+    );
+    const records = await this.db.$transaction(operations);
+    return records.map((record: any) => this.toDto(record));
   }
 
   async latestSnapshot(query: EarningsIntelligenceQuery): Promise<{
@@ -203,6 +177,39 @@ export class EarningsIntelligenceRepository {
     };
   }
 
+  /** Shared create/update payload — keeps calculationVersion stamped on both. */
+  private snapshotWriteData(row: EarningsSnapshotUpsertInput, includeKeys: boolean) {
+    return {
+      ...(includeKeys
+        ? {
+            snapshotDate: row.snapshotDate,
+            symbol: row.symbol,
+            scopeRegion: row.scopeRegion,
+            scopeAssetType: row.scopeAssetType,
+          }
+        : {}),
+      dataThroughDate: row.dataThroughDate,
+      stockId: row.stockId,
+      resultDate: row.resultDate,
+      resultDateSource: row.resultDateSource,
+      periodEndDate: row.periodEndDate,
+      validatedAt: row.validatedAt,
+      daysToResult: row.daysToResult,
+      revenueGrowth: row.revenueGrowth,
+      profitGrowth: row.profitGrowth,
+      epsGrowth: row.epsGrowth,
+      marginTrend: row.marginTrend,
+      consistencyScore: row.consistencyScore,
+      accelerationScore: row.accelerationScore,
+      reasonTags: row.reasonTags,
+      riskTags: row.riskTags,
+      warnings: row.warnings,
+      freshness: row.freshness,
+      categories: row.categories,
+      calculationVersion: CALCULATION_VERSION,
+    };
+  }
+
   private stockWhere(query: { region: string; assetType: string; instrumentIds?: string[] }) {
     return {
       region: query.region,
@@ -223,9 +230,9 @@ export class EarningsIntelligenceRepository {
       periodType: row.periodType,
       periodEndDate: row.periodEndDate,
       // Read officialResultDate from the DB row — populated by the
-      // ingest-nse-earnings-dates script. When present (non-null), the
-      // earnings-intelligence service resolves resultDateSource='OFFICIAL_CALENDAR',
-      // unlocking RESULT_WINNERS, RESULT_DISAPPOINTMENTS, and RESULT_REACTION_HISTORY.
+      // ingest-nse-earnings-dates script (IN) / seed-us-earnings (US). When
+      // present, the service resolves resultDateSource='OFFICIAL_CALENDAR',
+      // unlocking RESULT_WINNERS, RESULT_DISAPPOINTMENTS, RESULT_REACTION_HISTORY.
       officialResultDate: row.officialResultDate ?? null,
       source: row.source,
       validatedAt: row.validatedAt ?? null,
@@ -269,36 +276,13 @@ export class EarningsIntelligenceRepository {
   }
 
   private toDto(record: any): EarningsSnapshotDto {
-    const rawSource: string = record.resultDateSource || 'UNKNOWN';
+    // Read-time backward-compat: legacy ESTIMATED_FROM_PERIOD_CADENCE rows surface
+    // as DATE_TBA so the honesty fix applies to already-persisted snapshots.
+    const resultDateSource: string = remapLegacySource(record.resultDateSource || 'UNKNOWN');
+    const resultDateLabel = resultDateLabelFor(resultDateSource);
+    const isTba = isTbaSource(resultDateSource);
 
-    // Read-time backward-compat mapping:
-    // Legacy persisted rows with ESTIMATED_FROM_PERIOD_CADENCE are treated as
-    // DATE_TBA at read time so the fix takes effect for existing snapshots
-    // without requiring a re-materialisation.  New snapshots will already
-    // have DATE_TBA written by the service.
-    const isLegacyEstimated = rawSource === 'ESTIMATED_FROM_PERIOD_CADENCE';
-    const resultDateSource: string = isLegacyEstimated ? 'DATE_TBA' : rawSource;
-
-    const resultDateLabel: EarningsSnapshotDto['resultDateLabel'] =
-      resultDateSource === 'OFFICIAL_CALENDAR' ? 'Official'
-      : resultDateSource === 'DATE_TBA' ? 'TBA'
-      : null;
-
-    // For DATE_TBA rows (including legacy estimated): suppress the fake date and
-    // daysToResult so the UI renders "—" instead of a fabricated date.
-    const isTba = resultDateSource === 'DATE_TBA';
-
-    // Also replace RESULT_DATE_ESTIMATED_FROM_PERIOD_CADENCE warning with
-    // RESULT_DATE_NOT_ANNOUNCED for legacy rows; drop OFFICIAL_CALENDAR_NOT_AVAILABLE
-    // per-row spam.
-    const warnings = stringArray(record.warnings)
-      .map((w) =>
-        w === 'RESULT_DATE_ESTIMATED_FROM_PERIOD_CADENCE' ? 'RESULT_DATE_NOT_ANNOUNCED'
-        : w === 'OFFICIAL_CALENDAR_NOT_AVAILABLE' ? null
-        : w
-      )
-      .filter((w): w is string => w !== null);
-    // Ensure DATE_TBA / legacy rows have the canonical warning.
+    const warnings = remapLegacyWarnings(stringArray(record.warnings));
     if (isTba && !warnings.includes('RESULT_DATE_NOT_ANNOUNCED')) {
       warnings.push('RESULT_DATE_NOT_ANNOUNCED');
     }
@@ -308,6 +292,8 @@ export class EarningsIntelligenceRepository {
       snapshotDate: this.iso(record.snapshotDate) ?? '',
       dataThroughDate: this.iso(record.dataThroughDate),
       symbol: record.symbol,
+      // For DATE_TBA rows (incl. legacy estimated): suppress the fabricated date
+      // and daysToResult so the UI renders "—".
       resultDate: isTba ? null : this.iso(record.resultDate),
       resultDateLabel,
       resultDateSource,
@@ -324,7 +310,7 @@ export class EarningsIntelligenceRepository {
       riskTags: stringArray(record.riskTags),
       warnings,
       freshness: record.freshness,
-      categories: stringArray(record.categories).filter(isKnownCategory) as EarningsIntelligenceCategory[],
+      categories: stringArray(record.categories).filter(isEarningsIntelligenceCategory) as EarningsIntelligenceCategory[],
     };
   }
 
@@ -356,15 +342,4 @@ function nullableNumber(value: unknown): number | null {
 
 function stringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.map(String) : [];
-}
-
-function isKnownCategory(value: string): value is EarningsIntelligenceCategory {
-  return [
-    'UPCOMING_RESULTS',
-    'PRE_RESULT_INTEREST',
-    'RESULT_WINNERS',
-    'RESULT_DISAPPOINTMENTS',
-    'RESULT_REACTION_HISTORY',
-    'EARNINGS_WATCHLIST',
-  ].includes(value);
 }

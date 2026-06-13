@@ -1,0 +1,21 @@
+﻿{
+    "instrument_id":  "cmowuxiqk00hhw52gridxe629",
+    "symbol":  "20MICRONS",
+    "latest":  {
+                   "date":  "2026-06-12T00:00:00.000Z",
+                   "open":  180.55,
+                   "high":  185.1,
+                   "low":  180.5,
+                   "close":  182.37,
+                   "adjusted_close":  182.37,
+                   "volume":  136089,
+                   "source":  "NSE_UDIFF_CM_BHAVCOPY",
+                   "ingestion_timestamp":  "2026-06-12T13:47:31.664Z",
+                   "last_updated_timestamp":  "2026-06-12T13:47:31.664Z",
+                   "data_status":  "COMPLETE"
+               },
+    "source":  "NSE_UDIFF_CM_BHAVCOPY",
+    "ingestion_timestamp":  "2026-06-12T13:47:31.664Z",
+    "last_updated_timestamp":  "2026-06-12T13:47:31.664Z",
+    "data_status":  "COMPLETE"
+}

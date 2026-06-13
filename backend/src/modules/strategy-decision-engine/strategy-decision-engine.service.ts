@@ -21,6 +21,22 @@ import type {
 } from '../strategy-framework';
 import type { SignalResultDto } from '../signal-generation-engine';
 import { StrategyDecisionEngineRepository } from './strategy-decision-engine.repository';
+import {
+  resolveDecisionConfig,
+  defaultMarketRegion,
+  defaultAssetType,
+  DEFAULT_EVALUATION_WORKER_CONCURRENCY,
+  MAX_EVALUATION_WORKER_CONCURRENCY,
+  type RegionDecisionConfig,
+} from './strategy-decision-engine.config';
+import {
+  calculateSma,
+  calculateRsi,
+  volatility,
+  average,
+  toPricePoints,
+} from './strategy-decision-engine.indicators';
+import { deriveMarketGate, canBuildMarketGate } from './strategy-decision-engine.market-gate';
 import type {
   AllowedAction,
   DecisionAction,
@@ -39,19 +55,12 @@ import type {
 } from './strategy-decision-engine.types';
 
 const MODEL_VERSION = 'strategy-decision-v1';
-const DEFAULT_EVALUATION_WORKER_CONCURRENCY = 5;
-const MAX_EVALUATION_WORKER_CONCURRENCY = 8;
 const REVIEW_STRATEGY_CATEGORIES = new Set(['ENTRY', 'EXIT']);
 
-/**
- * CB-45: minimum framework score to retain TRADE_CANDIDATE in the SELECTIVE regime.
- * Indian strategies typically score 70–80 under normal NSE conditions. A gate of 85
- * blocked almost every candidate. 75 equals the framework's own minScore for top-tier
- * long strategies — admits strong-but-not-perfect setups while remaining stricter than
- * the OPEN gate (which admits anything ≥ minScore = 70).
- */
-// eslint-disable-next-line @typescript-eslint/no-inferrable-types
-const SELECTIVE_MIN_SCORE: number = 75;
+// Active-path decision thresholds (SELECTIVE downgrade boundary, legacy bands,
+// model display bands) and the deployment default region now live in
+// strategy-decision-engine.config.ts (audit CFG-1 / CFG-2) so they are
+// region-tunable via configuration rather than hard-coded NSE constants.
 
 type StrategyEvaluationBatchContext = {
   pricesByInstrumentId: Map<string, any[]>;
@@ -63,6 +72,14 @@ type StrategyEvaluationBatchContext = {
 type StrategyDecisionFrameworkService = Pick<StrategyFrameworkService, 'list' | 'evaluateContextWithDefinitions' | 'performance'>;
 
 export class StrategyDecisionEngineService {
+  /**
+   * Deployment-default decision config (audit CFG-1/CFG-2). Used by the legacy
+   * heuristic evaluators and as the fallback when an evaluation context carries
+   * no resolvable region. Per-context evaluation resolves a region-specific
+   * config via `decisionConfigForContext`.
+   */
+  private readonly decisionConfig: RegionDecisionConfig = resolveDecisionConfig(defaultMarketRegion());
+
   constructor(
     private readonly repository = new StrategyDecisionEngineRepository(),
     private readonly marketDataService = new MarketDataFoundationService(),
@@ -115,65 +132,17 @@ export class StrategyDecisionEngineService {
 
   /**
    * Derives MarketGate from a market summary, regime, and breadth snapshot.
-   *
-   * Thresholds are imported from capital-posture.types.ts (Capital Posture is the
-   * single source of truth for regime/breadth gate thresholds).  Both modules now
-   * share BREADTH_WEAK_THRESHOLD (RISK_ON → NEUTRAL downgrade boundary) and
-   * BREADTH_VERY_WEAK_THRESHOLD (NEUTRAL → RISK_OFF downgrade boundary) so that
-   * tuning Capital Posture constants automatically propagates here.
-   *
-   * Gate mapping (mirrors Capital Posture posture derivation):
-   *   OPEN      ← RISK_ON regime AND breadth ≥ BREADTH_WEAK_THRESHOLD (0.40)
-   *   CLOSED    ← RISK_OFF regime OR breadth < BREADTH_VERY_WEAK_THRESHOLD (0.25)
-   *   SELECTIVE ← everything else (NEUTRAL / weak-breadth RISK_ON)
+   * Thin delegate to the pure `deriveMarketGate` helper (see
+   * strategy-decision-engine.market-gate.ts) which owns the Capital-Posture
+   * threshold mapping and the BL-1 UNKNOWN-on-missing-evidence guard. Kept as an
+   * instance method so existing call sites and tests remain unchanged.
    */
   private marketGateFromSummary(summary: any, regime: any, breadth: any): MarketGateResponse {
-    const reasons: string[] = [];
-    const blockers: string[] = [];
-    let marketCondition: MarketCondition = 'UNKNOWN';
-    let marketGate: MarketGate = 'UNKNOWN';
-    let allowedActions: AllowedAction[] = ['MANAGE_EXISTING_POSITIONS_ONLY'];
-    const score = regime?.score ?? 0;
-    const isRiskOn = regime?.regime === 'RISK_ON';
-    const isRiskOff = regime?.regime === 'RISK_OFF';
-    // breadthAbove50 is a fraction in [0, 1]; use Capital Posture constants for thresholds.
-    const breadthAbove50 = breadth?.percentAboveSma50 ?? 0;
-
-    if (isRiskOn && breadthAbove50 >= BREADTH_WEAK_THRESHOLD) {
-      // Capital Posture: RISK_ON posture requires regime RISK_ON AND breadth ≥ BREADTH_WEAK_THRESHOLD.
-      marketCondition = 'HEALTHY';
-      marketGate = 'OPEN';
-      allowedActions = ['NEW_LONG_TRADES_ALLOWED', 'ONLY_HIGH_QUALITY_SETUPS'];
-      reasons.push('Market regime is Risk-On and breadth is healthy.');
-    } else if (isRiskOff || breadthAbove50 < BREADTH_VERY_WEAK_THRESHOLD) {
-      // Capital Posture: RISK_OFF posture is triggered by RISK_OFF regime OR breadth below BREADTH_VERY_WEAK_THRESHOLD.
-      marketCondition = 'BAD';
-      marketGate = 'CLOSED';
-      allowedActions = ['MANAGE_EXISTING_POSITIONS_ONLY'];
-      blockers.push('Market regime is Risk-Off or breadth is weak.');
-      if (isRiskOff) reasons.push('High bearish risk detected.');
-    } else {
-      // Capital Posture: NEUTRAL posture — selective deployment.
-      marketCondition = 'MIXED';
-      marketGate = 'SELECTIVE';
-      allowedActions = ['ONLY_HIGH_QUALITY_SETUPS', 'MANAGE_EXISTING_POSITIONS_ONLY'];
-      reasons.push('Market conditions are mixed; selectivity is required.');
-    }
-
-    return {
-      marketCondition,
-      marketGate,
-      allowedActions,
-      marketScore: score,
-      reasons,
-      blockers,
-      dataStatus: summary?.dataStatus || 'MISSING',
-      updatedAt: new Date().toISOString(),
-    };
+    return deriveMarketGate(summary, regime, breadth);
   }
 
   private canBuildMarketGateFromSummary(summary: any): boolean {
-    return Boolean(summary && summary.dataStatus !== 'MISSING' && summary.regime && summary.breadth);
+    return canBuildMarketGate(summary);
   }
 
   private evaluationWorkerConcurrency(request: StrategyEvaluateRequest): number {
@@ -311,8 +280,8 @@ export class StrategyDecisionEngineService {
         strategyDefinitionDrift: strategy.definitionDrift ?? [],
         thresholds: {
           tradeCandidate: Number(strategy.parameters.minScore ?? 70),
-          watch: 50,
-          wait: 40,
+          watch: this.decisionConfig.modelThresholds.watch,
+          wait: this.decisionConfig.modelThresholds.wait,
         },
         weights: Object.fromEntries([
           ...strategy.entryRules,
@@ -349,20 +318,7 @@ export class StrategyDecisionEngineService {
     const frameworkDecision = await this.evaluateWithStrategyFramework(strategyName, context).catch(() => null);
     if (frameworkDecision) return frameworkDecision;
 
-    // Fix #6: Legacy evaluators fire as fallback — label results clearly.
-    if (strategyName === 'TREND_MOMENTUM') {
-      const result = this.evaluateTrendMomentum(context);
-      result.warnings = ['[LEGACY-EVALUATOR] Result produced by legacy heuristic evaluator, not the Strategy Framework.', ...(result.warnings ?? [])];
-      return result;
-    }
-    if (strategyName === 'PULLBACK_IN_UPTREND') {
-      const result = this.evaluatePullback(context);
-      result.warnings = ['[LEGACY-EVALUATOR] Result produced by legacy heuristic evaluator, not the Strategy Framework.', ...(result.warnings ?? [])];
-      return result;
-    }
-    if (strategyName === 'DEFENSIVE_EXIT') return this.evaluateDefensiveExit(context);
-
-    return null;
+    return this.dispatchLegacyEvaluator(strategyName, context);
   }
 
   async latestForInstrument(instrumentId: string, strategy?: string, region?: string): Promise<StrategyDecisionDto | null> {
@@ -407,20 +363,30 @@ export class StrategyDecisionEngineService {
     const frameworkDecision = await this.evaluateWithStrategyFramework(strategyName, context, strategyRatings).catch(() => null);
     if (frameworkDecision) return frameworkDecision;
 
-    // Fix #6: Legacy evaluators fire as fallback — label results clearly so callers can distinguish
-    // framework-backed decisions from the older heuristic path.
+    return this.dispatchLegacyEvaluator(strategyName, context);
+  }
+
+  /**
+   * Fallback dispatch for the legacy heuristic evaluators (audit R-1: this block
+   * was previously duplicated verbatim in `evaluateInstrumentStrategy` and
+   * `evaluateStrategyWithContext`). Fires only when the Strategy Framework cannot
+   * produce a decision for the given code. TREND/PULLBACK results are tagged with
+   * a clear [LEGACY-EVALUATOR] warning so consumers can distinguish them from
+   * framework-backed decisions.
+   */
+  private dispatchLegacyEvaluator(strategyName: StrategyName, context: any): StrategyDecisionDto | null {
+    const legacyLabel = '[LEGACY-EVALUATOR] Result produced by legacy heuristic evaluator, not the Strategy Framework.';
     if (strategyName === 'TREND_MOMENTUM') {
       const result = this.evaluateTrendMomentum(context);
-      result.warnings = ['[LEGACY-EVALUATOR] Result produced by legacy heuristic evaluator, not the Strategy Framework.', ...(result.warnings ?? [])];
+      result.warnings = [legacyLabel, ...(result.warnings ?? [])];
       return result;
     }
     if (strategyName === 'PULLBACK_IN_UPTREND') {
       const result = this.evaluatePullback(context);
-      result.warnings = ['[LEGACY-EVALUATOR] Result produced by legacy heuristic evaluator, not the Strategy Framework.', ...(result.warnings ?? [])];
+      result.warnings = [legacyLabel, ...(result.warnings ?? [])];
       return result;
     }
     if (strategyName === 'DEFENSIVE_EXIT') return this.evaluateDefensiveExit(context);
-
     return null;
   }
 
@@ -454,12 +420,12 @@ export class StrategyDecisionEngineService {
 
     if (!instrument) return null;
 
-    const pricePoints = this.toPricePoints(pricesRes?.prices || []);
+    const pricePoints = toPricePoints(pricesRes?.prices || []);
     const closes = pricePoints.map((price) => price.adjusted_close);
     const latestPrice = closes[0] ?? null;
-    const sma50 = this.calculateSma(closes, 50);
-    const sma200 = this.calculateSma(closes, 200);
-    const rsi = this.calculateRsi(closes, 14);
+    const sma50 = calculateSma(closes, 50);
+    const sma200 = calculateSma(closes, 200);
+    const rsi = calculateRsi(closes, 14);
     const sectorContexts = [
       ...(Array.isArray((marketSummary as any)?.topSectors) ? (marketSummary as any).topSectors : []),
       ...(Array.isArray((marketSummary as any)?.weakSectors) ? (marketSummary as any).weakSectors : []),
@@ -507,8 +473,8 @@ export class StrategyDecisionEngineService {
     if (!evaluation) return null;
     const rating = await this.latestStrategyRating(
       evaluation.definition,
-      strategyContext.region || 'IN',
-      strategyContext.assetType || 'STOCK',
+      strategyContext.region || defaultMarketRegion(),
+      strategyContext.assetType || defaultAssetType(),
       strategyRatings
     );
     return this.adaptFrameworkResult(ctx, evaluation.result, evaluation.definition, rating);
@@ -594,8 +560,10 @@ export class StrategyDecisionEngineService {
       sector: ctx.instrument.sector ?? null,
       industry: ctx.instrument.industry ?? null,
       currency: ctx.instrument.currency ?? null,
-      assetType: ctx.instrument.asset_type || ctx.instrument.assetType || 'STOCK',
-      region: ctx.instrument.region || ctx.instrument.country || 'IN',
+      assetType: ctx.instrument.asset_type || ctx.instrument.assetType || defaultAssetType(),
+      // CFG-1: missing instrument region falls back to the configured deployment
+      // default (env STRATEGY_DECISION_DEFAULT_REGION), not a hard-coded 'IN'.
+      region: ctx.instrument.region || ctx.instrument.country || defaultMarketRegion(),
       latestPrice: ctx.latestPrice,
       previousClose: closes[1] ?? null,
       prices: ctx.pricePoints,
@@ -606,8 +574,8 @@ export class StrategyDecisionEngineService {
       return20d: closes.length > 20 && closes[20] > 0 ? (closes[0] - closes[20]) / closes[20] : null,
       high52Week: closes.length > 0 ? Math.max(...closes.slice(0, 252)) : null,
       low52Week: closes.length > 0 ? Math.min(...closes.slice(0, 252)) : null,
-      volatility: this.volatility(closes.slice(0, 63)),
-      averageVolume20: this.average(ctx.pricePoints.slice(0, 20).map((price: any) => price.volume).filter((value: unknown): value is number => typeof value === 'number')),
+      volatility: volatility(closes.slice(0, 63)),
+      averageVolume20: average(ctx.pricePoints.slice(0, 20).map((price: any) => price.volume).filter((value: unknown): value is number => typeof value === 'number')),
       rawSignal: ctx.rawSignal,
       calibratedSignal: ctx.calibrated ? {
         calibratedScore: ctx.calibrated.calibratedScore,
@@ -630,6 +598,16 @@ export class StrategyDecisionEngineService {
     };
   }
 
+  /**
+   * Resolve the region-specific decision config for an evaluation context
+   * (audit CFG-2). Region is taken from the instrument; unknown/missing regions
+   * fall back to the deployment default config.
+   */
+  private decisionConfigForContext(ctx: any): RegionDecisionConfig {
+    const region = ctx?.instrument?.region || ctx?.instrument?.country || this.decisionConfig.region;
+    return resolveDecisionConfig(region);
+  }
+
   private adaptFrameworkResult(
     ctx: any,
     result: StrategySignalOutput,
@@ -637,6 +615,7 @@ export class StrategyDecisionEngineService {
     rating: StrategyDecisionDto['strategyRating']
   ): StrategyDecisionDto {
     const mapped = this.mapFrameworkDecision(result);
+    const config = this.decisionConfigForContext(ctx);
     const dataGaps = [...new Set([...(ctx.dataGaps || []), ...result.dataGaps])];
     const warnings = [...result.warnings];
     const blockers = [...result.blockers];
@@ -653,7 +632,7 @@ export class StrategyDecisionEngineService {
       mapped.action = 'AVOID_NEW_ENTRY';
     } else if (ctx.gate.marketGate === 'SELECTIVE' && result.strategyCode !== 'DEFENSIVE_EXIT') {
       warnings.push('Market is selective; only high-quality setups should be reviewed.');
-      if (mapped.decision === 'TRADE_CANDIDATE' && result.score < SELECTIVE_MIN_SCORE) {
+      if (mapped.decision === 'TRADE_CANDIDATE' && result.score < config.selectiveMinScore) {
         mapped.decision = 'WATCH';
         mapped.action = 'WAIT_FOR_CONFIRMATION';
       }
@@ -665,6 +644,11 @@ export class StrategyDecisionEngineService {
       }
     }
 
+    // BL-4: this breakdown is a DISPLAY APPROXIMATION reconstructed from the
+    // framework's final score and rule counts — it is NOT the framework's true
+    // per-factor contribution (the Strategy Framework owns the real weighting).
+    // `total`/`frameworkScore` are authoritative; the per-factor splits are
+    // indicative only and must not be used for decision logic.
     const scoreBreakdown = {
       marketContext: ctx.gate.marketGate === 'OPEN' ? 20 : ctx.gate.marketGate === 'SELECTIVE' ? 10 : 0,
       signalStrength: Math.min(30, Math.round(result.score * 0.3)),
@@ -874,7 +858,7 @@ export class StrategyDecisionEngineService {
     
     // Multi-Timeframe Alignment (MTFA) Check
     // A daily breakout is dangerous if the weekly trend (represented by SMA200 slope and price vs SMA200) is bearish.
-    const sma200_20daysAgo = this.calculateSma(ctx.prices.slice(20), 200);
+    const sma200_20daysAgo = calculateSma(ctx.prices.slice(20), 200);
     const isMacroUptrend = isAbove200 && (ctx.sma200 > (sma200_20daysAgo ?? 0));
 
     if (isAbove50 && isMacroUptrend) {
@@ -946,14 +930,15 @@ export class StrategyDecisionEngineService {
     let decision: StrategyDecision = 'WAIT';
     let action: DecisionAction = 'NO_ACTION';
 
-    // Thresholds
+    // Thresholds (legacy heuristic bands — region-tunable via config CFG-2).
+    const trendBands = this.decisionConfig.legacyBands.trend;
     if (blockers.length > 0) {
       decision = 'AVOID';
       action = 'AVOID_NEW_ENTRY';
-    } else if (totalScore >= 80) {
+    } else if (totalScore >= trendBands.tradeCandidate) {
       decision = 'TRADE_CANDIDATE';
       action = 'CONSIDER_ENTRY';
-    } else if (totalScore >= 60) {
+    } else if (totalScore >= trendBands.watch) {
       decision = 'WATCH';
       action = 'WAIT_FOR_CONFIRMATION';
     } else {
@@ -1039,7 +1024,7 @@ export class StrategyDecisionEngineService {
     if (blockers.length > 0) {
       decision = 'AVOID';
       action = 'AVOID_NEW_ENTRY';
-    } else if (totalScore >= 75) {
+    } else if (totalScore >= this.decisionConfig.legacyBands.pullback.tradeCandidate) {
       decision = 'TRADE_CANDIDATE';
       action = 'CONSIDER_ENTRY';
     } else {
@@ -1096,8 +1081,11 @@ export class StrategyDecisionEngineService {
     // score rather than phantom-inject a constant.
     //
     // If no holding data is available at all (no portfolioId, or the holding was not found in
-    // the portfolio), we zero the weight and renormalize: the remaining four dimensions still
-    // sum correctly to reflect exit urgency without injecting phantom points.
+    // the portfolio), we ZERO this 0–15 sub-weight (we do NOT renormalise the other four
+    // dimensions — BL-3). Consequently a holdings-less exit evaluation is capped at 85/100,
+    // which still clears the EXIT_CANDIDATE band (≥ exitBands.exitCandidate) on strong
+    // technical/market evidence. This is deliberate: absence of portfolio context must not
+    // phantom-inject exit urgency, and the data gap is recorded below.
     const holding = ctx.holding ?? null;
     if (holding !== null) {
       let rawPnl   = typeof holding.unrealizedPnLPercent === 'number' && Number.isFinite(holding.unrealizedPnLPercent)
@@ -1175,13 +1163,14 @@ export class StrategyDecisionEngineService {
     let decision: StrategyDecision = 'HOLD';
     let action: DecisionAction = 'HOLD_POSITION';
 
-    if (totalScore >= 75) {
+    const exitBands = this.decisionConfig.legacyBands.exit;
+    if (totalScore >= exitBands.exitCandidate) {
       decision = 'EXIT_CANDIDATE';
       action = 'REVIEW_EXIT';
-    } else if (totalScore >= 45) {
+    } else if (totalScore >= exitBands.reduceRisk) {
       decision = 'REDUCE_RISK';
       action = 'REDUCE_EXPOSURE';
-    } else if (totalScore >= 25) {
+    } else if (totalScore >= exitBands.watch) {
       decision = 'WATCH';
       action = 'NO_ACTION';
     }
@@ -1385,50 +1374,6 @@ export class StrategyDecisionEngineService {
     };
   }
 
-  private calculateSma(prices: number[], period: number): number | null {
-    if (prices.length < period) return null;
-    return prices.slice(0, period).reduce((a, b) => a + b, 0) / period;
-  }
-
-  private calculateRsi(prices: number[], period: number): number | null {
-    if (prices.length <= period) return null;
-    let gains = 0;
-    let losses = 0;
-    for (let i = 0; i < period; i++) {
-      const diff = prices[i] - prices[i + 1];
-      if (diff >= 0) gains += diff;
-      else losses += Math.abs(diff);
-    }
-    if (losses === 0) return 100;
-    const rs = (gains / period) / (losses / period);
-    return 100 - (100 / (1 + rs));
-  }
-
-  private toPricePoints(prices: any[]) {
-    return prices.map((price) => ({
-      date: typeof price.date === 'string' ? price.date : new Date(price.date).toISOString(),
-      open: this.optionalNumber(price.open),
-      high: this.optionalNumber(price.high),
-      low: this.optionalNumber(price.low),
-      close: Number(price.close),
-      adjusted_close: Number(price.adjusted_close ?? price.close),
-      volume: this.optionalNumber(price.volume),
-    })).filter((price) => Number.isFinite(price.adjusted_close)).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }
-
-  private volatility(values: number[]) {
-    const returns = values.slice(1).map((value, index) => value > 0 ? (values[index] - value) / value : 0);
-    if (returns.length < 2) return null;
-    const avg = this.average(returns) ?? 0;
-    return Math.sqrt(returns.reduce((sum, value) => sum + Math.pow(value - avg, 2), 0) / (returns.length - 1)) * Math.sqrt(252);
-  }
-
-  private average(values: number[]) {
-    return values.length > 0 ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
-  }
-
-  private optionalNumber(value: unknown) {
-    const numeric = Number(value);
-    return Number.isFinite(numeric) ? numeric : null;
-  }
+  // Technical-indicator and price-normalisation helpers now live in
+  // strategy-decision-engine.indicators.ts (audit R-3) and are imported above.
 }

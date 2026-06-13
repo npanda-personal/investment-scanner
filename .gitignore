@@ -143,3 +143,6 @@ frontend/playwright-results*/
 frontend/tmp-*
 test-results/
 frontend/tests/ui/support/.auth-state.json
+
+# Claude Code session marker (Post-Work Protocol hook)
+.claude/.pending-wrapup

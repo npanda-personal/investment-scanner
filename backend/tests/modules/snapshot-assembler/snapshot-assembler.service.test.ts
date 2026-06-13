@@ -9,6 +9,7 @@
  */
 
 import { composeSnapshotRow, SnapshotAssemblerService } from '../../../src/modules/snapshot-assembler/snapshot-assembler.service';
+import { DEFAULT_SNAPSHOT_ASSEMBLER_CONFIG } from '../../../src/modules/snapshot-assembler/snapshot-assembler.config';
 import type { InstrumentSources } from '../../../src/modules/snapshot-assembler/snapshot-assembler.types';
 
 // ── Test fixtures ──────────────────────────────────────────────────────────
@@ -371,6 +372,79 @@ describe('composeSnapshotRow', () => {
     expect(row.oiBuildup).toBeNull();
     expect(row.participantPositioning).toBeNull();
   });
+
+  // ── A4: a legitimate 0 price must be preserved, not coerced to null ──────
+  it('preserves a stopLoss/target price of 0 (does not drop it to null)', () => {
+    const sources = buildSources({
+      tradePlan: {
+        instrumentId: INSTRUMENT_ID,
+        planStatus: 'READY',
+        stopLoss: { price: 0 },
+        target: { price: 0 },
+        rewardRiskRatio: 1,
+        generatedDate: TRADING_DATE,
+      },
+    });
+    const row = composeSnapshotRow(sources, 1, ASSEMBLED_AT);
+    expect(row.stopLoss).toBe(0);
+    expect(row.target).toBe(0);
+  });
+
+  it('parses a raw numeric stopLoss and rejects garbage', () => {
+    const make = (sl: unknown) =>
+      composeSnapshotRow(
+        buildSources({
+          tradePlan: {
+            instrumentId: INSTRUMENT_ID,
+            planStatus: 'READY',
+            stopLoss: sl as any,
+            target: null,
+            rewardRiskRatio: 1,
+            generatedDate: TRADING_DATE,
+          },
+        }),
+        1,
+        ASSEMBLED_AT,
+      );
+    expect(make(150.5).stopLoss).toBe(150.5);
+    expect(make('not-a-number').stopLoss).toBeNull();
+    expect(make({ note: 'x' }).stopLoss).toBeNull();
+  });
+
+  // ── A5: sector has its own provenance, independent of context ────────────
+  it('marks sector STALE when the sector snapshot is from a prior day', () => {
+    const priorDate = new Date('2026-06-09T00:00:00.000Z');
+    const row = composeSnapshotRow(
+      buildSources({
+        sectorForInstrument: {
+          sector: 'IT',
+          snapshotDate: priorDate,
+          relativeStrengthScore: 1.1,
+        },
+      }),
+      1,
+      ASSEMBLED_AT,
+    );
+    expect(row.provenance.sector).toBe('STALE');
+    expect(row.sectorRelativeStrength).toBe(1.1);
+  });
+
+  it('marks sector N_A when no sector row is present', () => {
+    const row = composeSnapshotRow(buildSources({ sectorForInstrument: null }), 1, ASSEMBLED_AT);
+    expect(row.provenance.sector).toBe('N_A');
+    expect(row.sectorRelativeStrength).toBeNull();
+  });
+
+  it('keeps sector OK even when the context section failed (decoupled sources)', () => {
+    const row = composeSnapshotRow(
+      buildSources({ contextBulkFailed: true }),
+      1,
+      ASSEMBLED_AT,
+    );
+    expect(row.provenance.context).toBe('FAILED');
+    expect(row.provenance.sector).toBe('OK');
+    expect(row.sectorRelativeStrength).toBe(1.2);
+  });
 });
 
 // ── SnapshotAssemblerService.assemble tests ─────────────────────────────────
@@ -382,6 +456,7 @@ function makeRepository(overrides: Partial<ReturnType<typeof buildMockRepository
 function buildMockRepository() {
   return {
     eligibleInstrumentIdsForDate: jest.fn().mockResolvedValue(['inst-1', 'inst-2']),
+    filterInstrumentIdsByScope: jest.fn((ids: string[]) => Promise.resolve(ids)),
     bulkEligibility: jest.fn().mockResolvedValue([
       {
         instrumentId: 'inst-1',
@@ -417,92 +492,82 @@ function buildMockRepository() {
     bulkEarnings: jest.fn().mockResolvedValue([]),
     bulkSmartMoney: jest.fn().mockResolvedValue([]),
     instrumentSectors: jest.fn().mockResolvedValue(new Map()),
-    maxSnapshotVersions: jest.fn().mockResolvedValue(new Map()),
-    createSnapshotRows: jest.fn().mockResolvedValue(2),
-    upsertWatermark: jest.fn().mockResolvedValue(undefined),
+    // Atomic commit assigns the batch-wide version and writes rows + watermark.
+    // Default mock echoes back rowCount = number of composed rows, version 1.
+    commitAssembly: jest.fn(
+      async ({ composedRows }: { composedRows: unknown[] }) => ({
+        rowCount: composedRows.length,
+        snapshotVersion: 1,
+      }),
+    ),
   };
 }
 
-function makeAlertsMock() {
+function makeAlertsMock(rules: Array<{ userId: string | null; region?: string | null }> = []) {
   return {
-    evaluate: jest.fn().mockResolvedValue({ evaluated: 0, created: 0, skippedDuplicates: 0, errors: [], events: [], evaluatedAt: '' }),
-    repository: {
-      enabledRules: jest.fn().mockResolvedValue([]),
-    },
+    evaluate: jest.fn().mockResolvedValue(undefined),
+    listEnabledRules: jest.fn().mockResolvedValue(rules),
   };
+}
+
+/** Pull the composedRows passed to the (single) commitAssembly call. */
+function committedRows(repo: ReturnType<typeof buildMockRepository>): any[] {
+  return repo.commitAssembly.mock.calls[0][0].composedRows;
 }
 
 describe('SnapshotAssemblerService.assemble', () => {
-  it('writes a row for each resolved instrument', async () => {
+  it('composes a row for each resolved instrument and commits once', async () => {
     const repo = makeRepository();
-    const alerts = makeAlertsMock();
-    const svc = new SnapshotAssemblerService(repo as any, alerts as any);
+    const svc = new SnapshotAssemblerService(repo as any, makeAlertsMock() as any);
 
     const summary = await svc.assemble({ tradingDate: '2026-06-10', region: 'IN', assetType: 'STOCK' });
 
-    expect(repo.createSnapshotRows).toHaveBeenCalledTimes(1);
-    const rows = repo.createSnapshotRows.mock.calls[0][0];
+    expect(repo.commitAssembly).toHaveBeenCalledTimes(1);
+    const rows = committedRows(repo);
     expect(rows).toHaveLength(2);
     expect(rows[0].instrumentId).toBe('inst-1');
     expect(rows[1].instrumentId).toBe('inst-2');
     expect(summary.rowCount).toBe(2);
   });
 
-  it('uses version 1 on first assembly (no prior versions)', async () => {
+  it('reports the snapshotVersion returned by the atomic commit', async () => {
     const repo = makeRepository({
-      maxSnapshotVersions: jest.fn().mockResolvedValue(new Map()),
+      commitAssembly: jest.fn().mockResolvedValue({ rowCount: 2, snapshotVersion: 1 }),
     });
-    const alerts = makeAlertsMock();
-    const svc = new SnapshotAssemblerService(repo as any, alerts as any);
+    const svc = new SnapshotAssemblerService(repo as any, makeAlertsMock() as any);
 
     const summary = await svc.assemble({ tradingDate: '2026-06-10', region: 'IN', assetType: 'STOCK' });
-
     expect(summary.snapshotVersion).toBe(1);
-    const rows = repo.createSnapshotRows.mock.calls[0][0];
-    expect(rows[0].snapshotVersion).toBe(1);
-    expect(rows[1].snapshotVersion).toBe(1);
   });
 
-  it('writes version 2 on second assembly', async () => {
-    const existingVersions = new Map([['inst-1', 1], ['inst-2', 1]]);
+  it('passes a higher commit version (e.g. re-assembly) straight through', async () => {
     const repo = makeRepository({
-      maxSnapshotVersions: jest.fn().mockResolvedValue(existingVersions),
+      commitAssembly: jest.fn().mockResolvedValue({ rowCount: 2, snapshotVersion: 2 }),
     });
-    const alerts = makeAlertsMock();
-    const svc = new SnapshotAssemblerService(repo as any, alerts as any);
+    const svc = new SnapshotAssemblerService(repo as any, makeAlertsMock() as any);
 
     const summary = await svc.assemble({ tradingDate: '2026-06-10', region: 'IN', assetType: 'STOCK' });
-
     expect(summary.snapshotVersion).toBe(2);
-    const rows = repo.createSnapshotRows.mock.calls[0][0];
-    expect(rows[0].snapshotVersion).toBe(2);
-    expect(rows[1].snapshotVersion).toBe(2);
   });
 
-  it('upserts watermark with correct version and rowCount', async () => {
+  it('commits with the correct scope and instrument set', async () => {
     const repo = makeRepository();
-    const alerts = makeAlertsMock();
-    const svc = new SnapshotAssemblerService(repo as any, alerts as any);
+    const svc = new SnapshotAssemblerService(repo as any, makeAlertsMock() as any);
 
     await svc.assemble({ tradingDate: '2026-06-10', region: 'IN', assetType: 'STOCK' });
 
-    expect(repo.upsertWatermark).toHaveBeenCalledWith(
+    expect(repo.commitAssembly).toHaveBeenCalledWith(
       expect.objectContaining({
         region: 'IN',
         assetType: 'STOCK',
-        snapshotVersion: 1,
-        rowCount: 2,
+        instrumentIds: ['inst-1', 'inst-2'],
       }),
     );
   });
 
   it('uses provided instrumentIds instead of resolving from eligibility', async () => {
-    const repo = makeRepository({
-      bulkEligibility: jest.fn().mockResolvedValue([]),
-      createSnapshotRows: jest.fn().mockResolvedValue(1),
-    });
-    const alerts = makeAlertsMock();
-    const svc = new SnapshotAssemblerService(repo as any, alerts as any);
+    const repo = makeRepository({ bulkEligibility: jest.fn().mockResolvedValue([]) });
+    const svc = new SnapshotAssemblerService(repo as any, makeAlertsMock() as any);
 
     await svc.assemble({
       tradingDate: '2026-06-10',
@@ -511,74 +576,112 @@ describe('SnapshotAssemblerService.assemble', () => {
       instrumentIds: ['explicit-id-1'],
     });
 
-    // eligibleInstrumentIdsForDate should NOT be called
     expect(repo.eligibleInstrumentIdsForDate).not.toHaveBeenCalled();
-    const rows = repo.createSnapshotRows.mock.calls[0][0];
-    expect(rows[0].instrumentId).toBe('explicit-id-1');
+    // Default config does NOT enforce scope filtering on explicit ids.
+    expect(repo.filterInstrumentIdsByScope).not.toHaveBeenCalled();
+    expect(committedRows(repo)[0].instrumentId).toBe('explicit-id-1');
   });
 
   it('returns empty summary with warning when no instruments resolved', async () => {
     const repo = makeRepository({
       eligibleInstrumentIdsForDate: jest.fn().mockResolvedValue([]),
     });
-    const alerts = makeAlertsMock();
-    const svc = new SnapshotAssemblerService(repo as any, alerts as any);
+    const svc = new SnapshotAssemblerService(repo as any, makeAlertsMock() as any);
 
     const summary = await svc.assemble({ tradingDate: '2026-06-10', region: 'IN', assetType: 'STOCK' });
 
     expect(summary.rowCount).toBe(0);
     expect(summary.warnings.some((w) => w.includes('No instruments'))).toBe(true);
-    expect(repo.createSnapshotRows).not.toHaveBeenCalled();
+    expect(repo.commitAssembly).not.toHaveBeenCalled();
   });
 
   it('continues and records a warning when a bulk source query fails', async () => {
     const repo = makeRepository({
       bulkSignals: jest.fn().mockRejectedValue(new Error('DB timeout')),
     });
-    const alerts = makeAlertsMock();
-    const svc = new SnapshotAssemblerService(repo as any, alerts as any);
+    const svc = new SnapshotAssemblerService(repo as any, makeAlertsMock() as any);
 
     const summary = await svc.assemble({ tradingDate: '2026-06-10', region: 'IN', assetType: 'STOCK' });
 
-    // Still writes rows
     expect(summary.rowCount).toBe(2);
-    // Warning recorded
     expect(summary.warnings.some((w) => w.includes('signals bulk read failed'))).toBe(true);
-    // Rows have FAILED provenance for signals
-    const rows = repo.createSnapshotRows.mock.calls[0][0];
-    expect(rows[0].provenance.signals).toBe('FAILED');
+    expect(committedRows(repo)[0].provenance.signals).toBe('FAILED');
   });
 
   it('records a warning but does not throw when alerts evaluation fails', async () => {
     const repo = makeRepository();
     const alerts = {
       evaluate: jest.fn().mockRejectedValue(new Error('alert DB error')),
-      repository: {
-        enabledRules: jest.fn().mockResolvedValue([{ userId: 'user-1' }]),
-      },
+      listEnabledRules: jest.fn().mockResolvedValue([{ userId: 'user-1', region: null }]),
     };
     const svc = new SnapshotAssemblerService(repo as any, alerts as any);
 
     const summary = await svc.assemble({ tradingDate: '2026-06-10', region: 'IN', assetType: 'STOCK' });
 
-    // Rows still written
     expect(summary.rowCount).toBe(2);
-    // Warning about alerts failure
     expect(summary.warnings.some((w) => w.includes('alerts evaluation failed'))).toBe(true);
+  });
+
+  it('evaluates alerts only for rules matching the run region (region-agnostic always run)', async () => {
+    const repo = makeRepository();
+    const alerts = makeAlertsMock([
+      { userId: 'user-in', region: 'IN' },
+      { userId: 'user-us', region: 'US' },
+      { userId: 'user-global', region: null },
+    ]);
+    const svc = new SnapshotAssemblerService(repo as any, alerts as any);
+
+    await svc.assemble({ tradingDate: '2026-06-10', region: 'IN', assetType: 'STOCK' });
+
+    const evaluatedUsers = alerts.evaluate.mock.calls.map((c: any[]) => c[0]);
+    expect(evaluatedUsers).toContain('user-in');
+    expect(evaluatedUsers).toContain('user-global');
+    expect(evaluatedUsers).not.toContain('user-us');
   });
 
   it('includes provenance counts in summary', async () => {
     const repo = makeRepository();
-    const alerts = makeAlertsMock();
-    const svc = new SnapshotAssemblerService(repo as any, alerts as any);
+    const svc = new SnapshotAssemblerService(repo as any, makeAlertsMock() as any);
 
     const summary = await svc.assemble({ tradingDate: '2026-06-10', region: 'IN', assetType: 'STOCK' });
 
-    // With eligibility rows present (OK) and all other sections null (N_A)
     expect(summary.provenanceCounts.eligibility.OK).toBe(2);
-    // Signals has no rows → N_A for both instruments
     expect(summary.provenanceCounts.signals.N_A).toBe(2);
-    // derivatives is always N_A
     expect(summary.provenanceCounts.derivatives.N_A).toBe(2);
+    // Sector key is present and tallied.
+    expect(summary.provenanceCounts.sector.N_A).toBe(2);
+  });
+
+  // ── B2/B3: scope guard ────────────────────────────────────────────────────
+  it('rejects an unsupported scope when supportedScopes is configured', async () => {
+    const repo = makeRepository();
+    const config = { ...DEFAULT_SNAPSHOT_ASSEMBLER_CONFIG, supportedScopes: [{ region: 'IN', assetType: 'STOCK' }] };
+    const svc = new SnapshotAssemblerService(repo as any, makeAlertsMock() as any, config);
+
+    const summary = await svc.assemble({ tradingDate: '2026-06-10', region: 'ZZ', assetType: 'STOCK' });
+
+    expect(summary.rowCount).toBe(0);
+    expect(summary.warnings.some((w) => w.includes('Scope not supported'))).toBe(true);
+    expect(repo.commitAssembly).not.toHaveBeenCalled();
+  });
+
+  // ── B1: opt-in explicit-id scope enforcement ────────────────────────────────
+  it('filters out-of-scope explicit ids and warns when enforceExplicitIdScope is on', async () => {
+    const repo = makeRepository({
+      filterInstrumentIdsByScope: jest.fn().mockResolvedValue(['in-scope-1']),
+    });
+    const config = { ...DEFAULT_SNAPSHOT_ASSEMBLER_CONFIG, enforceExplicitIdScope: true };
+    const svc = new SnapshotAssemblerService(repo as any, makeAlertsMock() as any, config);
+
+    const summary = await svc.assemble({
+      tradingDate: '2026-06-10',
+      region: 'IN',
+      assetType: 'STOCK',
+      instrumentIds: ['in-scope-1', 'out-of-scope-2'],
+    });
+
+    expect(repo.filterInstrumentIdsByScope).toHaveBeenCalled();
+    expect(committedRows(repo).map((r) => r.instrumentId)).toEqual(['in-scope-1']);
+    expect(summary.warnings.some((w) => w.includes('excluded'))).toBe(true);
   });
 });

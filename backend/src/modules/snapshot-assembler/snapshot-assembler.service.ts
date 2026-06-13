@@ -7,41 +7,121 @@
  *  - BULK reads only — zero per-instrument queries.
  *  - Missing source NEVER blocks a row.
  *  - Per-section provenance: OK / STALE / FAILED / N_A.
- *  - Versioning: max+1 per (instrument, tradingDate); createMany never overwrites.
- *  - Post-assembly: alerts evaluation per distinct userId (try/catch → warnings).
+ *  - Versioning: ONE batch-wide snapshotVersion per assembly run, computed as
+ *    (global max existing version for the batch) + 1.  All rows written by a
+ *    single assemble() call share that version.  Version assignment + row writes
+ *    + watermark upsert are atomic (see repository.commitAssembly), with retry
+ *    on the unique-key race so concurrent runs don't collide or orphan rows.
+ *  - Post-assembly: alerts evaluation per distinct userId (try/catch → warnings),
+ *    region-scoped when rule region data is available.
  *  - OI buildup: fo_oi_buildup is keyed by underlying symbol (NOT instrumentId),
  *    so a join would require a per-instrument symbol lookup.  Per the design rule
  *    (no N+1 loops), derivatives section is N_A for this implementation.
- *    To add it: add a bulk symbol→instrumentId join query in the repository and
- *    plumb through getLatestOiBuildup (already exists in derivatives-intelligence).
  */
 
-import { AlertsMonitoringService } from '../alerts-monitoring';
 import { SnapshotAssemblerRepository } from './snapshot-assembler.repository';
+import { AlertsMonitoringEvaluationAdapter } from './snapshot-assembler.alerts-adapter';
+import {
+  DEFAULT_SNAPSHOT_ASSEMBLER_CONFIG,
+  isScopeSupported,
+  type SnapshotAssemblerConfig,
+} from './snapshot-assembler.config';
 import type {
+  AlertsEvaluationPort,
   AssembleRequest,
   AssembleSummary,
-  CalibrationSourceRow,
   ComposedSnapshotRow,
-  DecisionSourceRow,
-  EarningsSourceRow,
-  EligibilitySourceRow,
+  ContextSourceRow,
   InstrumentSources,
   ProvenanceCounts,
   ProvenanceStatus,
+  SectorContextSourceRow,
   SignalSourceRow,
+  CalibrationSourceRow,
+  DecisionSourceRow,
+  EarningsSourceRow,
+  EligibilitySourceRow,
   SmartMoneySourceRow,
-  SnapshotProvenance,
   TradePlanSourceRow,
+  SnapshotProvenance,
 } from './snapshot-assembler.types';
+
+// ── Pure helpers (module-scoped: allocated once, not per-instrument) ─────────
+
+/** YYYY-MM-DD slice of a Date in UTC (lexicographically comparable). */
+function dayKey(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * True when the source row's date is strictly before the trading date
+ * (the data was computed for a prior day — STALE but usable).
+ */
+function isStale(rowDate: Date, tradingDate: Date): boolean {
+  return dayKey(rowDate) < dayKey(tradingDate);
+}
+
+/**
+ * Resolve a section's provenance from the three signals every section shares:
+ * whether its bulk query failed, whether a row was found, and (when found) the
+ * row's as-of date.  Replaces nine copy-pasted FAILED/N_A/STALE/OK ladders.
+ */
+function resolveStatus(
+  bulkFailed: boolean,
+  row: unknown | null,
+  rowDate: Date | null,
+  tradingDate: Date,
+): ProvenanceStatus {
+  if (bulkFailed) return 'FAILED';
+  if (row === null || row === undefined) return 'N_A';
+  if (rowDate !== null && isStale(rowDate, tradingDate)) return 'STALE';
+  return 'OK';
+}
+
+/**
+ * Extract a numeric price from a Json stopLoss/target field.  The trade plan
+ * stores these as JSON objects like { price: 150.5 } or occasionally a raw
+ * number.  Returns null only when genuinely unparseable — a legitimate 0 is
+ * preserved (do NOT use `Number(x) || null`, which drops 0).
+ */
+function extractJsonPrice(json: unknown): number | null {
+  if (json === null || json === undefined) return null;
+  if (typeof json === 'number') return Number.isFinite(json) ? json : null;
+  if (typeof json === 'object') {
+    const obj = json as Record<string, unknown>;
+    const price = obj['price'] ?? obj['value'] ?? obj['level'];
+    if (price === undefined || price === null) return null;
+    const n = Number(price);
+    return Number.isFinite(n) ? n : null;
+  }
+  const n = Number(json);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** Extract fired rule names from a strategy decision Json field array. */
+function extractRuleNames(...jsonFields: unknown[]): string[] {
+  const names: string[] = [];
+  for (const field of jsonFields) {
+    if (!Array.isArray(field)) continue;
+    for (const item of field) {
+      if (typeof item === 'string') {
+        names.push(item);
+      } else if (typeof item === 'object' && item !== null) {
+        const obj = item as Record<string, unknown>;
+        const name = obj['name'] ?? obj['rule'] ?? obj['key'];
+        if (typeof name === 'string') names.push(name);
+      }
+    }
+  }
+  return names;
+}
 
 // ── Pure compose function (exported for unit testing) ──────────────────────
 
 /**
  * Compose one snapshot row from the resolved source data for a single
  * instrument.  This function is PURE — it reads from `sources` only and
- * returns a row with provenance attached.  All date-comparison logic for
- * STALE detection lives here.
+ * returns a row with provenance attached.
  *
  * @param sources    Resolved source data for this instrument.
  * @param version    The snapshotVersion to write (1 on first assembly).
@@ -54,55 +134,7 @@ export function composeSnapshotRow(
 ): ComposedSnapshotRow {
   const { instrumentId, tradingDate, region, assetType } = sources;
 
-  // ── helpers ────────────────────────────────────────────────────────────────
-
-  /**
-   * True when the source row's date is strictly before the trading date
-   * (i.e. the data was computed for a prior day — it is STALE but usable).
-   */
-  function isStale(rowDate: Date): boolean {
-    const rowDay = rowDate.toISOString().slice(0, 10);
-    const targetDay = tradingDate.toISOString().slice(0, 10);
-    return rowDay < targetDay;
-  }
-
-  /** Extract a numeric price from a Json stopLoss/target field.
-   * The trade plan stores these as JSON objects like { price: 150.5 } or
-   * occasionally as a raw number.  Returns null when unparseable. */
-  function extractJsonPrice(json: unknown): number | null {
-    if (json === null || json === undefined) return null;
-    if (typeof json === 'number') return json;
-    if (typeof json === 'object') {
-      const obj = json as Record<string, unknown>;
-      const price = obj['price'] ?? obj['value'] ?? obj['level'];
-      return price !== undefined ? Number(price) || null : null;
-    }
-    const n = Number(json);
-    return Number.isFinite(n) ? n : null;
-  }
-
-  /** Extract fired rule names from a strategy decision Json field array. */
-  function extractRuleNames(
-    ...jsonFields: unknown[]
-  ): string[] {
-    const names: string[] = [];
-    for (const field of jsonFields) {
-      if (!Array.isArray(field)) continue;
-      for (const item of field) {
-        if (typeof item === 'string') {
-          names.push(item);
-        } else if (typeof item === 'object' && item !== null) {
-          const obj = item as Record<string, unknown>;
-          const name = obj['name'] ?? obj['rule'] ?? obj['key'];
-          if (typeof name === 'string') names.push(name);
-        }
-      }
-    }
-    return names;
-  }
-
-  // ── ELIGIBILITY ────────────────────────────────────────────────────────────
-  let eligibilityProvenance: ProvenanceStatus;
+  // ── ELIGIBILITY (exact-date match; never a bulk-FAILED section) ─────────────
   let signalEligible = false;
   let reviewEligible = false;
   let backtestEligible = false;
@@ -112,14 +144,13 @@ export function composeSnapshotRow(
   let readinessScore = 0;
   let readinessStatus = 'NOT_READY';
 
+  let eligibilityProvenance: ProvenanceStatus;
   const elig = sources.eligibility;
   if (elig === null) {
-    // Eligibility row is required for a meaningful row — still write with N_A.
     eligibilityProvenance = 'N_A';
   } else {
-    const eligDate = elig.tradingDate.toISOString().slice(0, 10);
-    const targetDate = tradingDate.toISOString().slice(0, 10);
-    eligibilityProvenance = eligDate === targetDate ? 'OK' : 'STALE';
+    eligibilityProvenance =
+      dayKey(elig.tradingDate) === dayKey(tradingDate) ? 'OK' : 'STALE';
     signalEligible = elig.signalEligible;
     reviewEligible = elig.reviewEligible;
     backtestEligible = elig.backtestEligible;
@@ -131,155 +162,85 @@ export function composeSnapshotRow(
   }
 
   // ── SIGNALS ────────────────────────────────────────────────────────────────
-  let signalsProvenance: ProvenanceStatus;
-  let signalScore: number | null = null;
-  let signalDirection: string | null = null;
-  let signalModelVersion: string | null = null;
+  const sig = sources.signal;
+  const signalsProvenance = resolveStatus(
+    sources.signalBulkFailed, sig, sig?.generatedDate ?? null, tradingDate,
+  );
+  const signalScore = signalsProvenance !== 'FAILED' && sig ? sig.score : null;
+  const signalDirection = signalsProvenance !== 'FAILED' && sig ? sig.direction : null;
+  const signalModelVersion = signalsProvenance !== 'FAILED' && sig ? sig.modelVersion : null;
 
-  if (sources.signalBulkFailed) {
-    signalsProvenance = 'FAILED';
-  } else {
-    const sig = sources.signal;
-    if (sig === null) {
-      signalsProvenance = 'N_A';
-    } else {
-      signalsProvenance = isStale(sig.generatedDate) ? 'STALE' : 'OK';
-      signalScore = sig.score;
-      signalDirection = sig.direction;
-      signalModelVersion = sig.modelVersion;
-    }
-  }
+  // ── CALIBRATION ──────────────────────────────────────────────────────────────
+  const cal = sources.calibration;
+  const calibrationProvenance = resolveStatus(
+    sources.calibrationBulkFailed, cal, cal?.generatedAt ?? null, tradingDate,
+  );
+  const calibratedScore = calibrationProvenance !== 'FAILED' && cal ? cal.calibratedScore : null;
+  const calibrationAuthority = calibrationProvenance !== 'FAILED' && cal ? cal.calibrationModelVersion : null;
 
-  // ── CALIBRATION ────────────────────────────────────────────────────────────
-  let calibrationProvenance: ProvenanceStatus;
-  let calibratedScore: number | null = null;
-  let calibrationAuthority: string | null = null;
-
-  if (sources.calibrationBulkFailed) {
-    calibrationProvenance = 'FAILED';
-  } else {
-    const cal = sources.calibration;
-    if (cal === null) {
-      calibrationProvenance = 'N_A';
-    } else {
-      calibrationProvenance = isStale(cal.generatedAt) ? 'STALE' : 'OK';
-      calibratedScore = cal.calibratedScore;
-      calibrationAuthority = cal.calibrationModelVersion;
-    }
-  }
-
-  // ── DECISION ────────────────────────────────────────────────────────────────
-  let decisionProvenance: ProvenanceStatus;
-  let strategyDecision: string | null = null;
-  let rulesFired: string[] = [];
-
-  if (sources.decisionBulkFailed) {
-    decisionProvenance = 'FAILED';
-  } else {
-    const dec = sources.decision;
-    if (dec === null) {
-      decisionProvenance = 'N_A';
-    } else {
-      decisionProvenance = isStale(dec.generatedDate) ? 'STALE' : 'OK';
-      strategyDecision = dec.decision;
-      rulesFired = extractRuleNames(
+  // ── DECISION ──────────────────────────────────────────────────────────────────
+  const dec = sources.decision;
+  const decisionProvenance = resolveStatus(
+    sources.decisionBulkFailed, dec, dec?.generatedDate ?? null, tradingDate,
+  );
+  const strategyDecision = decisionProvenance !== 'FAILED' && dec ? dec.decision : null;
+  const rulesFired = decisionProvenance !== 'FAILED' && dec
+    ? extractRuleNames(
         dec.entryRulesPassed,
         dec.exitRulesTriggered,
         dec.invalidationRulesTriggered,
         dec.noiseFiltersTriggered,
-      );
-    }
-  }
+      )
+    : [];
 
   // ── TRADE PLAN ──────────────────────────────────────────────────────────────
-  let tradePlanProvenance: ProvenanceStatus;
-  let stopLoss: number | null = null;
-  let target: number | null = null;
-  let rrRatio: number | null = null;
-  let planStatus: string | null = null;
+  const tp = sources.tradePlan;
+  const tradePlanProvenance = resolveStatus(
+    sources.tradePlanBulkFailed, tp, tp?.generatedDate ?? null, tradingDate,
+  );
+  const stopLoss = tradePlanProvenance !== 'FAILED' && tp ? extractJsonPrice(tp.stopLoss) : null;
+  const target = tradePlanProvenance !== 'FAILED' && tp ? extractJsonPrice(tp.target) : null;
+  const rrRatio = tradePlanProvenance !== 'FAILED' && tp && Number.isFinite(tp.rewardRiskRatio)
+    ? tp.rewardRiskRatio
+    : null;
+  const planStatus = tradePlanProvenance !== 'FAILED' && tp ? tp.planStatus : null;
 
-  if (sources.tradePlanBulkFailed) {
-    tradePlanProvenance = 'FAILED';
-  } else {
-    const tp = sources.tradePlan;
-    if (tp === null) {
-      tradePlanProvenance = 'N_A';
-    } else {
-      tradePlanProvenance = isStale(tp.generatedDate) ? 'STALE' : 'OK';
-      stopLoss = extractJsonPrice(tp.stopLoss);
-      target = extractJsonPrice(tp.target);
-      rrRatio = Number.isFinite(tp.rewardRiskRatio) ? tp.rewardRiskRatio : null;
-      planStatus = tp.planStatus;
-    }
-  }
+  // ── CONTEXT (regime / breadth) ───────────────────────────────────────────────
+  const ctx = sources.context;
+  const contextProvenance = resolveStatus(
+    sources.contextBulkFailed, ctx, ctx?.snapshotDate ?? null, tradingDate,
+  );
+  const marketRegime = contextProvenance !== 'FAILED' && ctx ? ctx.regime : null;
+  const breadthPct = contextProvenance !== 'FAILED' && ctx ? ctx.breadthPercentAboveSma50 : null;
 
-  // ── CONTEXT ─────────────────────────────────────────────────────────────────
-  let contextProvenance: ProvenanceStatus;
-  let marketRegime: string | null = null;
-  let breadthPct: number | null = null;
-  let sectorRelativeStrength: number | null = null;
+  // ── SECTOR (relative strength — independent source, own provenance) ──────────
+  const sec = sources.sectorForInstrument;
+  // Sector RS has no bulk-failure flag in the current design (a sector read
+  // failure only warns), so it is OK / STALE / N_A.
+  const sectorProvenance: ProvenanceStatus =
+    sec === null ? 'N_A' : isStale(sec.snapshotDate, tradingDate) ? 'STALE' : 'OK';
+  const sectorRelativeStrength = sec !== null ? sec.relativeStrengthScore : null;
 
-  if (sources.contextBulkFailed) {
-    contextProvenance = 'FAILED';
-  } else {
-    const ctx = sources.context;
-    if (ctx === null) {
-      contextProvenance = 'N_A';
-    } else {
-      contextProvenance = isStale(ctx.snapshotDate) ? 'STALE' : 'OK';
-      marketRegime = ctx.regime;
-      breadthPct = ctx.breadthPercentAboveSma50;
-    }
-    // Sector RS: cheap join — no bulk query failure possible (same context batch)
-    const sec = sources.sectorForInstrument;
-    if (sec !== null) {
-      sectorRelativeStrength = sec.relativeStrengthScore;
-    }
-  }
-
-  // ── DERIVATIVES ─────────────────────────────────────────────────────────────
-  // OI buildup table (fo_oi_buildup) is keyed by `underlying` (symbol string),
-  // not instrumentId.  A bulk join requires resolving symbol→instrumentId for
-  // all instruments, which is a second query across the full instrument set.
-  // This is implementable but deferred: for now, set derivatives to N_A and
-  // document the reason so a future PR can add it without structural changes.
+  // ── DERIVATIVES (always N_A — OI keyed by symbol, not instrumentId) ──────────
   const derivativesProvenance: ProvenanceStatus = 'N_A';
   const oiBuildup: string | null = null;
   const participantPositioning: string | null = null;
 
   // ── EARNINGS ─────────────────────────────────────────────────────────────────
-  let earningsProvenance: ProvenanceStatus;
-  let earningsProximityDays: number | null = null;
-
-  if (sources.earningsBulkFailed) {
-    earningsProvenance = 'FAILED';
-  } else {
-    const earn = sources.earnings;
-    if (earn === null) {
-      earningsProvenance = 'N_A';
-    } else {
-      earningsProvenance = isStale(earn.snapshotDate) ? 'STALE' : 'OK';
-      earningsProximityDays = earn.daysToResult !== null ? earn.daysToResult : null;
-    }
-  }
+  const earn = sources.earnings;
+  const earningsProvenance = resolveStatus(
+    sources.earningsBulkFailed, earn, earn?.snapshotDate ?? null, tradingDate,
+  );
+  const earningsProximityDays = earningsProvenance !== 'FAILED' && earn ? earn.daysToResult : null;
 
   // ── SMART MONEY ──────────────────────────────────────────────────────────────
-  let smartMoneyProvenance: ProvenanceStatus;
-  let smartMoneyCode: string | null = null;
-  let smartMoneyScoreOut: number | null = null;
-
-  if (sources.smartMoneyBulkFailed) {
-    smartMoneyProvenance = 'FAILED';
-  } else {
-    const sm = sources.smartMoney;
-    if (sm === null) {
-      smartMoneyProvenance = 'N_A';
-    } else {
-      smartMoneyProvenance = isStale(sm.snapshotDate) ? 'STALE' : 'OK';
-      smartMoneyCode = sm.status;    // status field holds the code (ACCUMULATION/DISTRIBUTION/etc.)
-      smartMoneyScoreOut = sm.smartMoneyScore;
-    }
-  }
+  const sm = sources.smartMoney;
+  const smartMoneyProvenance = resolveStatus(
+    sources.smartMoneyBulkFailed, sm, sm?.snapshotDate ?? null, tradingDate,
+  );
+  // status field holds the code (ACCUMULATION/DISTRIBUTION/etc.)
+  const smartMoneyCode = smartMoneyProvenance !== 'FAILED' && sm ? sm.status : null;
+  const smartMoneyScore = smartMoneyProvenance !== 'FAILED' && sm ? sm.smartMoneyScore : null;
 
   const provenance: SnapshotProvenance = {
     eligibility: eligibilityProvenance,
@@ -288,6 +249,7 @@ export function composeSnapshotRow(
     decision: decisionProvenance,
     tradePlan: tradePlanProvenance,
     context: contextProvenance,
+    sector: sectorProvenance,
     derivatives: derivativesProvenance,
     earnings: earningsProvenance,
     smartMoney: smartMoneyProvenance,
@@ -325,7 +287,7 @@ export function composeSnapshotRow(
     participantPositioning,
     earningsProximityDays,
     smartMoneyCode,
-    smartMoneyScore: smartMoneyScoreOut,
+    smartMoneyScore,
     provenance,
     assembledAt,
   };
@@ -341,22 +303,25 @@ const PROVENANCE_KEYS: ProvenanceKey[] = [
   'decision',
   'tradePlan',
   'context',
+  'sector',
   'derivatives',
   'earnings',
   'smartMoney',
 ];
 
+function emptyCounts(): Record<ProvenanceKey, ProvenanceCounts> {
+  return Object.fromEntries(
+    PROVENANCE_KEYS.map((k) => [k, { OK: 0, STALE: 0, FAILED: 0, N_A: 0 }]),
+  ) as Record<ProvenanceKey, ProvenanceCounts>;
+}
+
 function tallyCounts(
   rows: ComposedSnapshotRow[],
 ): Record<ProvenanceKey, ProvenanceCounts> {
-  const counts = {} as Record<ProvenanceKey, ProvenanceCounts>;
-  for (const key of PROVENANCE_KEYS) {
-    counts[key] = { OK: 0, STALE: 0, FAILED: 0, N_A: 0 };
-  }
+  const counts = emptyCounts();
   for (const row of rows) {
     for (const key of PROVENANCE_KEYS) {
-      const status = row.provenance[key];
-      counts[key][status] += 1;
+      counts[key][row.provenance[key]] += 1;
     }
   }
   return counts;
@@ -365,19 +330,55 @@ function tallyCounts(
 // ── Service ───────────────────────────────────────────────────────────────────
 
 export class SnapshotAssemblerService {
+  private readonly repository: SnapshotAssemblerRepository;
+  private readonly alerts: AlertsEvaluationPort;
+  private readonly config: SnapshotAssemblerConfig;
+
   constructor(
-    private readonly repository = new SnapshotAssemblerRepository(),
-    private readonly alertsService = new AlertsMonitoringService(),
-  ) {}
+    repository?: SnapshotAssemblerRepository,
+    alerts?: AlertsEvaluationPort,
+    config: SnapshotAssemblerConfig = DEFAULT_SNAPSHOT_ASSEMBLER_CONFIG,
+  ) {
+    this.config = config;
+    // Pass undefined for db so the repository applies its own default client,
+    // while still threading the (possibly overridden) config through.
+    this.repository = repository ?? new SnapshotAssemblerRepository(undefined, config);
+    this.alerts = alerts ?? new AlertsMonitoringEvaluationAdapter();
+  }
 
   async assemble(req: AssembleRequest): Promise<AssembleSummary> {
     const warnings: string[] = [];
     const tradingDate = new Date(`${req.tradingDate}T00:00:00.000Z`);
 
+    // ── 0. Scope guard ──────────────────────────────────────────────────────
+    if (!isScopeSupported(this.config, req.region, req.assetType)) {
+      return {
+        rowCount: 0,
+        snapshotVersion: 1,
+        provenanceCounts: emptyCounts(),
+        warnings: [`Scope not supported: ${req.region}/${req.assetType}.`],
+      };
+    }
+
     // ── 1. Resolve instruments ─────────────────────────────────────────────
     let instrumentIds: string[];
     if (req.instrumentIds && req.instrumentIds.length > 0) {
-      instrumentIds = [...new Set(req.instrumentIds.filter(Boolean))];
+      const requested = [...new Set(req.instrumentIds.filter(Boolean))];
+      if (this.config.enforceExplicitIdScope) {
+        instrumentIds = await this.repository.filterInstrumentIdsByScope(
+          requested,
+          req.region,
+          req.assetType,
+        );
+        const dropped = requested.length - instrumentIds.length;
+        if (dropped > 0) {
+          warnings.push(
+            `${dropped} instrument id(s) excluded — not in scope ${req.region}/${req.assetType}.`,
+          );
+        }
+      } else {
+        instrumentIds = requested;
+      }
     } else {
       instrumentIds = await this.repository.eligibleInstrumentIdsForDate(
         tradingDate,
@@ -390,26 +391,22 @@ export class SnapshotAssemblerService {
       return {
         rowCount: 0,
         snapshotVersion: 1,
-        provenanceCounts: Object.fromEntries(
-          PROVENANCE_KEYS.map((k) => [k, { OK: 0, STALE: 0, FAILED: 0, N_A: 0 }]),
-        ) as Record<ProvenanceKey, ProvenanceCounts>,
-        warnings: ['No instruments resolved for assembly.'],
+        provenanceCounts: emptyCounts(),
+        warnings: [...warnings, 'No instruments resolved for assembly.'],
       };
     }
 
-    // ── 2. Bulk reads — one query per source ──────────────────────────────
-
-    // Track which bulk queries failed so compose can mark sections FAILED.
+    // ── 2. Bulk reads — one query per source, fault-isolated ─────────────────
     let eligibilityRows: EligibilitySourceRow[] = [];
     let signalRows: SignalSourceRow[] = [];
     let calibrationRows: CalibrationSourceRow[] = [];
     let decisionRows: DecisionSourceRow[] = [];
     let tradePlanRows: TradePlanSourceRow[] = [];
-    let contextRow: { snapshotDate: Date; regime: string; breadthPercentAboveSma50: number | null } | null = null;
-    let sectorRows: Array<{ sector: string; snapshotDate: Date; relativeStrengthScore: number }> = [];
+    let contextRow: ContextSourceRow | null = null;
+    let sectorRows: SectorContextSourceRow[] = [];
     let earningsRows: EarningsSourceRow[] = [];
     let smartMoneyRows: SmartMoneySourceRow[] = [];
-    let instrumentSectors: Map<string, string> = new Map();
+    let instrumentSectors = new Map<string, string>();
 
     let signalBulkFailed = false;
     let calibrationBulkFailed = false;
@@ -419,8 +416,6 @@ export class SnapshotAssemblerService {
     let earningsBulkFailed = false;
     let smartMoneyBulkFailed = false;
 
-    // Run all bulk reads in parallel; catch individually so a single source
-    // failure does not block other sections.
     const [
       eligResult,
       sigResult,
@@ -445,72 +440,38 @@ export class SnapshotAssemblerService {
       this.repository.instrumentSectors(instrumentIds),
     ]);
 
-    if (eligResult.status === 'fulfilled') {
-      eligibilityRows = eligResult.value;
-    } else {
-      warnings.push(`eligibility bulk read failed: ${eligResult.reason?.message ?? String(eligResult.reason)}`);
-    }
+    const reason = (r: PromiseRejectedResult): string =>
+      r.reason?.message ?? String(r.reason);
 
-    if (sigResult.status === 'fulfilled') {
-      signalRows = sigResult.value;
-    } else {
-      signalBulkFailed = true;
-      warnings.push(`signals bulk read failed: ${sigResult.reason?.message ?? String(sigResult.reason)}`);
-    }
+    if (eligResult.status === 'fulfilled') eligibilityRows = eligResult.value;
+    else warnings.push(`eligibility bulk read failed: ${reason(eligResult)}`);
 
-    if (calResult.status === 'fulfilled') {
-      calibrationRows = calResult.value;
-    } else {
-      calibrationBulkFailed = true;
-      warnings.push(`calibration bulk read failed: ${calResult.reason?.message ?? String(calResult.reason)}`);
-    }
+    if (sigResult.status === 'fulfilled') signalRows = sigResult.value;
+    else { signalBulkFailed = true; warnings.push(`signals bulk read failed: ${reason(sigResult)}`); }
 
-    if (decResult.status === 'fulfilled') {
-      decisionRows = decResult.value;
-    } else {
-      decisionBulkFailed = true;
-      warnings.push(`decisions bulk read failed: ${decResult.reason?.message ?? String(decResult.reason)}`);
-    }
+    if (calResult.status === 'fulfilled') calibrationRows = calResult.value;
+    else { calibrationBulkFailed = true; warnings.push(`calibration bulk read failed: ${reason(calResult)}`); }
 
-    if (tpResult.status === 'fulfilled') {
-      tradePlanRows = tpResult.value;
-    } else {
-      tradePlanBulkFailed = true;
-      warnings.push(`trade-plans bulk read failed: ${tpResult.reason?.message ?? String(tpResult.reason)}`);
-    }
+    if (decResult.status === 'fulfilled') decisionRows = decResult.value;
+    else { decisionBulkFailed = true; warnings.push(`decisions bulk read failed: ${reason(decResult)}`); }
 
-    if (ctxResult.status === 'fulfilled') {
-      contextRow = ctxResult.value;
-    } else {
-      contextBulkFailed = true;
-      warnings.push(`market-context read failed: ${ctxResult.reason?.message ?? String(ctxResult.reason)}`);
-    }
+    if (tpResult.status === 'fulfilled') tradePlanRows = tpResult.value;
+    else { tradePlanBulkFailed = true; warnings.push(`trade-plans bulk read failed: ${reason(tpResult)}`); }
 
-    if (secResult.status === 'fulfilled') {
-      sectorRows = secResult.value;
-    } else {
-      warnings.push(`sector-context read failed: ${secResult.reason?.message ?? String(secResult.reason)}`);
-    }
+    if (ctxResult.status === 'fulfilled') contextRow = ctxResult.value;
+    else { contextBulkFailed = true; warnings.push(`market-context read failed: ${reason(ctxResult)}`); }
 
-    if (earnResult.status === 'fulfilled') {
-      earningsRows = earnResult.value;
-    } else {
-      earningsBulkFailed = true;
-      warnings.push(`earnings bulk read failed: ${earnResult.reason?.message ?? String(earnResult.reason)}`);
-    }
+    if (secResult.status === 'fulfilled') sectorRows = secResult.value;
+    else warnings.push(`sector-context read failed: ${reason(secResult)}`);
 
-    if (smResult.status === 'fulfilled') {
-      smartMoneyRows = smResult.value;
-    } else {
-      smartMoneyBulkFailed = true;
-      warnings.push(`smart-money bulk read failed: ${smResult.reason?.message ?? String(smResult.reason)}`);
-    }
+    if (earnResult.status === 'fulfilled') earningsRows = earnResult.value;
+    else { earningsBulkFailed = true; warnings.push(`earnings bulk read failed: ${reason(earnResult)}`); }
 
-    if (secMapResult.status === 'fulfilled') {
-      instrumentSectors = secMapResult.value;
-    } else {
-      warnings.push(`instrument-sector map read failed: ${secMapResult.reason?.message ?? String(secMapResult.reason)}`);
-    }
+    if (smResult.status === 'fulfilled') smartMoneyRows = smResult.value;
+    else { smartMoneyBulkFailed = true; warnings.push(`smart-money bulk read failed: ${reason(smResult)}`); }
+
+    if (secMapResult.status === 'fulfilled') instrumentSectors = secMapResult.value;
+    else warnings.push(`instrument-sector map read failed: ${reason(secMapResult)}`);
 
     // Build lookup maps (O(n) build, O(1) lookup per instrument).
     const eligibilityByInstrument = new Map(eligibilityRows.map((r) => [r.instrumentId, r]));
@@ -522,22 +483,13 @@ export class SnapshotAssemblerService {
     const smartMoneyByInstrument = new Map(smartMoneyRows.map((r) => [r.instrumentId, r]));
     const sectorByName = new Map(sectorRows.map((r) => [r.sector, r]));
 
-    // ── 3. Versioning — max version per instrument ──────────────────────────
-    const maxVersions = await this.repository.maxSnapshotVersions(instrumentIds, tradingDate);
-
-    // ── 4. Compose rows ─────────────────────────────────────────────────────
+    // ── 3. Compose rows (version is assigned atomically at commit time) ─────
     const assembledAt = new Date();
-    // Use the global max existing version + 1 as the new version for all rows
-    // in this batch (consistent versioning: all rows in one assembly run share
-    // the same snapshotVersion).
-    const globalMaxVersion = maxVersions.size > 0
-      ? Math.max(...maxVersions.values())
-      : 0;
-    const newVersion = globalMaxVersion + 1;
+    const PLACEHOLDER_VERSION = 1;
 
     const composedRows: ComposedSnapshotRow[] = instrumentIds.map((instrumentId) => {
-      const sector = instrumentSectors.get(instrumentId);
-      const sectorContext = sector ? (sectorByName.get(sector) ?? null) : null;
+      const sectorName = instrumentSectors.get(instrumentId);
+      const sectorContext = sectorName ? (sectorByName.get(sectorName) ?? null) : null;
 
       const sources: InstrumentSources = {
         instrumentId,
@@ -550,11 +502,13 @@ export class SnapshotAssemblerService {
         decision: decisionByInstrument.get(instrumentId) ?? null,
         tradePlan: tradePlanByInstrument.get(instrumentId) ?? null,
         context: contextRow,
-        sectorForInstrument: sectorContext ? {
-          sector: sectorContext.sector,
-          snapshotDate: sectorContext.snapshotDate,
-          relativeStrengthScore: sectorContext.relativeStrengthScore,
-        } : null,
+        sectorForInstrument: sectorContext
+          ? {
+              sector: sectorContext.sector,
+              snapshotDate: sectorContext.snapshotDate,
+              relativeStrengthScore: sectorContext.relativeStrengthScore,
+            }
+          : null,
         earnings: earningsByInstrument.get(instrumentId) ?? null,
         smartMoney: smartMoneyByInstrument.get(instrumentId) ?? null,
         signalBulkFailed,
@@ -566,63 +520,65 @@ export class SnapshotAssemblerService {
         smartMoneyBulkFailed,
       };
 
-      return composeSnapshotRow(sources, newVersion, assembledAt);
+      return composeSnapshotRow(sources, PLACEHOLDER_VERSION, assembledAt);
     });
 
-    // ── 5. Write snapshot rows ───────────────────────────────────────────────
-    const rowCount = await this.repository.createSnapshotRows(composedRows);
-
-    // ── 6. Upsert watermark ─────────────────────────────────────────────────
-    await this.repository.upsertWatermark({
+    // ── 4. Atomic commit: version + rows + watermark in one transaction ─────
+    const { rowCount, snapshotVersion } = await this.repository.commitAssembly({
+      composedRows,
+      instrumentIds,
       region: req.region,
       assetType: req.assetType,
       tradingDate,
-      snapshotVersion: newVersion,
-      rowCount,
       assembledAt,
     });
 
-    // ── 7. Post-assembly alerts evaluation ──────────────────────────────────
-    // Evaluate all enabled alert rules (userId=undefined → global pass).
-    // alertsService.evaluate(userId?) iterates every enabled rule for that user,
-    // or all enabled rules when called with no userId.  We use the repository
-    // enabledRules query to get distinct userIds so each user's rules run in
-    // their proper auth context; the global (null-userId) pass runs last.
-    // All failures become warnings only — never errors.
-    try {
-      const alertRepo = (this.alertsService as any).repository;
-      const allRules: Array<{ userId: string | null }> = typeof alertRepo?.enabledRules === 'function'
-        ? await alertRepo.enabledRules()
-        : [];
-      const userIds = [...new Set(allRules.map((r) => r.userId).filter((id): id is string => !!id))];
-      for (const userId of userIds) {
-        try {
-          await this.alertsService.evaluate(userId);
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          warnings.push(`alerts evaluation failed for user ${userId}: ${msg}`);
-        }
-      }
-      // Evaluate rules with null userId (default-user / global rules)
-      try {
-        await this.alertsService.evaluate(undefined);
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        warnings.push(`alerts evaluation failed for default rules: ${msg}`);
-      }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      warnings.push(`alerts post-assembly hook failed: ${msg}`);
-    }
+    // ── 5. Post-assembly alerts evaluation (failures → warnings only) ───────
+    await this.evaluateAlerts(req.region, warnings);
 
-    // ── 8. Build summary ──────────────────────────────────────────────────────
-    const provenanceCounts = tallyCounts(composedRows);
-
+    // ── 6. Build summary ──────────────────────────────────────────────────────
     return {
       rowCount,
-      snapshotVersion: newVersion,
-      provenanceCounts,
+      snapshotVersion,
+      provenanceCounts: tallyCounts(composedRows),
       warnings,
     };
   }
+
+  /**
+   * Evaluate enabled alert rules after assembly.  Region-scoped when rule region
+   * data is available (region-agnostic rules always run); a single failure
+   * becomes a warning and never aborts the run.
+   */
+  private async evaluateAlerts(region: string, warnings: string[]): Promise<void> {
+    try {
+      const rules = await this.alerts.listEnabledRules();
+      // Keep rules that are region-agnostic (region == null) or match this run.
+      const relevant = rules.filter((r) => r.region == null || r.region === region);
+
+      const userIds = [
+        ...new Set(relevant.map((r) => r.userId).filter((id): id is string => !!id)),
+      ];
+      for (const userId of userIds) {
+        try {
+          await this.alerts.evaluate(userId);
+        } catch (err) {
+          warnings.push(`alerts evaluation failed for user ${userId}: ${errMsg(err)}`);
+        }
+      }
+
+      // Default/global (null-userId) rules pass.
+      try {
+        await this.alerts.evaluate(undefined);
+      } catch (err) {
+        warnings.push(`alerts evaluation failed for default rules: ${errMsg(err)}`);
+      }
+    } catch (err) {
+      warnings.push(`alerts post-assembly hook failed: ${errMsg(err)}`);
+    }
+  }
+}
+
+function errMsg(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
 }

@@ -161,10 +161,14 @@ describe('SmartMoneyIntelligenceService', () => {
      */
     const classifyViaAggregate = (score: number) => {
       const service = new SmartMoneyIntelligenceService({} as any, {} as any);
-      // Craft two stocks that average to exactly `score`
-      const stockA = { ...service.calculateStockSummary(instrument, bars('accumulation')), smartMoneyScore: score, status: 'NEUTRAL' as const };
-      const stockB = { ...service.calculateStockSummary({ ...instrument, id: 'stock-2', symbol: 'BBB' }, bars('distribution')), smartMoneyScore: score, status: 'NEUTRAL' as const };
-      return service.aggregateSectors([stockA, stockB])[0].sectorStatus;
+      // Craft THREE stocks that average to exactly `score`. Three (>= minUniverseForStrong)
+      // keeps the thin-universe softening from masking the raw band thresholds we test here.
+      const mk = (id: string, symbol: string) => ({
+        ...service.calculateStockSummary({ ...instrument, id, symbol }, bars('accumulation')),
+        smartMoneyScore: score,
+        status: 'NEUTRAL' as const,
+      });
+      return service.aggregateSectors([mk('stock-1', 'AAA'), mk('stock-2', 'BBB'), mk('stock-3', 'CCC')])[0].sectorStatus;
     };
 
     it('classifies score 63 as non-NEUTRAL (STRONG_ACCUMULATION per 5-band thresholds)', () => {
@@ -203,6 +207,32 @@ describe('SmartMoneyIntelligenceService', () => {
 
     it('classifies score 37 as STRONG_DISTRIBUTION', () => {
       expect(classifyViaAggregate(37)).toBe('STRONG_DISTRIBUTION');
+    });
+  });
+
+  describe('thin-universe verdict softening', () => {
+    // A 1–2 stock "sector" cannot honestly be called STRONG_*; the extreme verdict is
+    // softened to its non-extreme neighbour below minUniverseForStrongVerdict (3).
+    const softenedStatus = (score: number, stockCount: number) => {
+      const service = new SmartMoneyIntelligenceService({} as any, {} as any);
+      const summaries = Array.from({ length: stockCount }, (_item, index) => ({
+        ...service.calculateStockSummary({ ...instrument, id: `stock-${index}`, symbol: `S${index}` }, bars('accumulation')),
+        smartMoneyScore: score,
+        status: 'NEUTRAL' as const,
+      }));
+      return service.aggregateSectors(summaries)[0].sectorStatus;
+    };
+
+    it('softens STRONG_ACCUMULATION to ACCUMULATING for a 2-stock sector', () => {
+      expect(softenedStatus(70, 2)).toBe('ACCUMULATING');
+    });
+
+    it('softens STRONG_DISTRIBUTION to DISTRIBUTING for a 1-stock sector', () => {
+      expect(softenedStatus(20, 1)).toBe('DISTRIBUTING');
+    });
+
+    it('keeps STRONG_ACCUMULATION once the sector has >= 3 stocks', () => {
+      expect(softenedStatus(70, 3)).toBe('STRONG_ACCUMULATION');
     });
   });
 
@@ -289,6 +319,27 @@ describe('SmartMoneyIntelligenceService', () => {
     expect(result.hasMore).toBe(true);
     expect(result.generatedCount).toBe(6);
     expect(repository.saveSnapshot).toHaveBeenCalledTimes(6);
+  });
+
+  it('snaps a non-page-aligned offset down to its page boundary so the cursor stays consistent', async () => {
+    const repository = { saveSnapshot: jest.fn(async () => 'created') };
+    const marketDataService = {
+      listInstruments: jest.fn(async () => ({
+        instruments: [instrument],
+        pagination: { page: 2, pageSize: 2, total: 10, totalPages: 5 },
+      })),
+      listPricesByInstrumentId: jest.fn(async () => ({ prices: priceRows(181) })),
+    };
+    const dataQualityService = { diagnostics: jest.fn(async () => readyQuality) };
+    const service = new SmartMoneyIntelligenceService(repository as any, marketDataService as any, {} as any, dataQualityService as any);
+
+    // offset 3 with pageSize 2 is not page-aligned → snaps to page 2 (offset 2).
+    const result = await service.run(2, { region: 'IN', assetType: 'STOCK', offset: 3 });
+
+    expect(marketDataService.listInstruments).toHaveBeenCalledWith({ page: 2, pageSize: 2, region: 'IN', assetType: 'STOCK' });
+    expect(result.offset).toBe(2);
+    expect(result.nextOffset).toBe(3); // offset(2) + processedCount(1)
+    expect(result.hasMore).toBe(true);
   });
 
   it('refreshes explicit instrument ids without region-wide pagination', async () => {

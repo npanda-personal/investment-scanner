@@ -21,8 +21,11 @@
  */
 
 import https from 'https';
-import { Prisma } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 import prisma from '../../db/prisma';
+
+/** Minimal DB surface these helpers need — lets callers inject a client for testing. */
+type FnoBanDb = Pick<PrismaClient, '$executeRaw' | '$queryRaw'>;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -142,8 +145,8 @@ export function parseBanCsv(text: string): { banDate: string | null; symbols: st
 // DB helpers
 // ---------------------------------------------------------------------------
 
-async function ensureTable(): Promise<void> {
-  await prisma.$executeRaw(Prisma.sql`
+async function ensureTable(db: FnoBanDb): Promise<void> {
+  await db.$executeRaw(Prisma.sql`
     CREATE TABLE IF NOT EXISTS fno_ban_list (
       id         TEXT        NOT NULL DEFAULT gen_random_uuid()::text,
       ban_date   DATE        NOT NULL,
@@ -155,27 +158,34 @@ async function ensureTable(): Promise<void> {
   `);
 }
 
-async function upsertBanList(banDate: string, symbols: string[], fetchedAt: Date): Promise<void> {
+async function upsertBanList(db: FnoBanDb, banDate: string, symbols: string[], fetchedAt: Date): Promise<void> {
+  // De-dupe within the batch: a single multi-row INSERT ... ON CONFLICT DO UPDATE
+  // errors ("cannot affect row a second time") if the same (ban_date, symbol) appears
+  // twice in one statement, so collapse duplicates before composing the VALUES list.
+  const uniqueSymbols = [...new Set(symbols)];
+  if (uniqueSymbols.length === 0) return;
   const date = new Date(`${banDate}T00:00:00.000Z`);
-  for (const symbol of symbols) {
-    await prisma.$executeRaw(Prisma.sql`
-      INSERT INTO fno_ban_list (id, ban_date, symbol, source, fetched_at)
-      VALUES (gen_random_uuid()::text, ${date}, ${symbol}, 'nsearchives-fo-secban-csv', ${fetchedAt})
-      ON CONFLICT (ban_date, symbol) DO UPDATE SET
-        fetched_at = EXCLUDED.fetched_at
-    `);
-  }
+  // Single multi-row upsert (one round-trip) instead of one INSERT per symbol.
+  const rows = uniqueSymbols.map(
+    (symbol) => Prisma.sql`(gen_random_uuid()::text, ${date}, ${symbol}, 'nsearchives-fo-secban-csv', ${fetchedAt})`,
+  );
+  await db.$executeRaw(Prisma.sql`
+    INSERT INTO fno_ban_list (id, ban_date, symbol, source, fetched_at)
+    VALUES ${Prisma.join(rows)}
+    ON CONFLICT (ban_date, symbol) DO UPDATE SET
+      fetched_at = EXCLUDED.fetched_at
+  `);
 }
 
-async function loadLatestBanList(): Promise<{ banDate: string; symbols: string[] } | null> {
+async function loadLatestBanList(db: FnoBanDb): Promise<{ banDate: string; symbols: string[] } | null> {
   // Determine the latest ban date in the table
-  const dateRows = await prisma.$queryRaw<Array<{ ban_date: Date }>>(Prisma.sql`
+  const dateRows = await db.$queryRaw<Array<{ ban_date: Date }>>(Prisma.sql`
     SELECT ban_date FROM fno_ban_list ORDER BY ban_date DESC LIMIT 1
   `);
   if (dateRows.length === 0) return null;
 
   const latestDate = dateRows[0].ban_date;
-  const symbolRows = await prisma.$queryRaw<Array<{ symbol: string }>>(Prisma.sql`
+  const symbolRows = await db.$queryRaw<Array<{ symbol: string }>>(Prisma.sql`
     SELECT symbol FROM fno_ban_list
     WHERE ban_date = ${latestDate}
     ORDER BY symbol ASC
@@ -195,9 +205,9 @@ async function loadLatestBanList(): Promise<{ banDate: string; symbols: string[]
  * Ingest the latest F&O ban list from NSE archives and persist it.
  * Safe to call repeatedly (idempotent upsert on ban_date+symbol).
  */
-export async function ingestFnoBanList(): Promise<{ status: string; banDate: string | null; symbolsUpserted: number; message?: string }> {
+export async function ingestFnoBanList(db: FnoBanDb = prisma): Promise<{ status: string; banDate: string | null; symbolsUpserted: number; message?: string }> {
   try {
-    await ensureTable();
+    await ensureTable(db);
     const csvText = await fetchCsvText(NSE_BAN_CSV_URL);
     const { banDate, symbols } = parseBanCsv(csvText);
 
@@ -210,7 +220,7 @@ export async function ingestFnoBanList(): Promise<{ status: string; banDate: str
       return { status: 'success', banDate, symbolsUpserted: 0, message: 'NSE F&O ban list is empty for this date (no securities in ban period)' };
     }
 
-    await upsertBanList(banDate, symbols, new Date());
+    await upsertBanList(db, banDate, symbols, new Date());
     return { status: 'success', banDate, symbolsUpserted: symbols.length };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -222,11 +232,11 @@ export async function ingestFnoBanList(): Promise<{ status: string; banDate: str
  * Return the latest persisted F&O ban list.
  * If the table does not exist yet, returns a missing result (never throws).
  */
-export async function getLatestFnoBanList(): Promise<FnoBanListResponse> {
+export async function getLatestFnoBanList(db: FnoBanDb = prisma): Promise<FnoBanListResponse> {
   const fetchedAt = new Date().toISOString();
   try {
-    await ensureTable();
-    const data = await loadLatestBanList();
+    await ensureTable(db);
+    const data = await loadLatestBanList(db);
     if (!data) {
       return {
         status: 'missing',

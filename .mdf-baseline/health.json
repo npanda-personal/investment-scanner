@@ -1,0 +1,13 @@
+﻿{
+    "status":  "ok",
+    "module":  "market-data-foundation",
+    "instrumentCount":  2937,
+    "latestDataTimestamp":  "2026-06-12T00:00:00.000Z",
+    "source":  "database",
+    "ingestion_timestamp":  "2026-06-12T13:55:44.122Z",
+    "last_updated_timestamp":  "2026-06-12T00:00:00.000Z",
+    "data_status":  "COMPLETE",
+    "timestamp":  "2026-06-12T13:55:44.122Z",
+    "region":  "IN",
+    "assetType":  "STOCK"
+}

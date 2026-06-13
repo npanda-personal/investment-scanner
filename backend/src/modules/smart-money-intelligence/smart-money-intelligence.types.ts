@@ -6,20 +6,19 @@ export type SmartMoneySignalDirection = 'ACCUMULATION' | 'DISTRIBUTION' | 'NEUTR
 /**
  * Sector-level Smart Money classification status.
  *
- * Primary rule — count-based (used when classified stocks >= 3):
- *   netAccShare = accumulationCount / (accumulationCount + distributionCount)
- *   netAccShare >= 0.65 → STRONG_ACCUMULATION
- *   netAccShare >= 0.55 → ACCUMULATING
- *   netAccShare >= 0.45 → NEUTRAL
- *   netAccShare >= 0.35 → DISTRIBUTING
- *                else   → STRONG_DISTRIBUTION
- *
- * Score-based fallback (when classified < 3):
+ * Classified from the sector's AVERAGE smart-money score using market-calibrated
+ * bands (see `smart-money-intelligence.config.ts`; the India-equity baseline below
+ * is tuned to the observed NSE 41–59 spread). Both the persisted-read and on-the-fly
+ * paths share one implementation (`aggregateSectorSummaries`):
  *   averageSmartMoneyScore >= 62 → STRONG_ACCUMULATION
  *   averageSmartMoneyScore >= 56 → ACCUMULATING
  *   averageSmartMoneyScore >= 48 → NEUTRAL
  *   averageSmartMoneyScore >= 38 → DISTRIBUTING
  *                             else → STRONG_DISTRIBUTION
+ *
+ * Thin-universe softening: a sector with fewer than `minUniverseForStrongVerdict`
+ * (default 3) classified stocks cannot carry an extreme STRONG_* verdict — it is
+ * softened to the adjacent ACCUMULATING / DISTRIBUTING band.
  */
 export type SectorSmartMoneyStatus =
   | 'STRONG_ACCUMULATION'
