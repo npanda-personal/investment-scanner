@@ -11,17 +11,17 @@ export {
 } from './market-data-foundation.router';
 export { MarketDataFoundationController } from './market-data-foundation.controller';
 export { MarketDataFoundationService, StockService } from './market-data-foundation.service';
-export type { MarketDataReadApi } from './market-data-read.api';
-export { isWatermarkGateEnabled, getWatermarkDate, evictWatermarkCache } from './market-data-read.api';
+export type { MarketDataReadApi } from './analytics/market-data-read.api';
+export { isWatermarkGateEnabled, getWatermarkDate, evictWatermarkCache } from './analytics/market-data-read.api';
 export { MarketDataFoundationRepository } from './market-data-foundation.repository';
 export {
   enqueueIngestionJob,
   ingestionQueue,
   ingestionWorker,
-} from './market-data-foundation.queue';
+} from './ingestion/market-data-foundation.queue';
 export {
   StockSyncWorker,
-} from './market-data-foundation.worker';
+} from './ingestion/market-data-foundation.worker';
 export {
   MarketDataFoundationScheduler,
   getMarketDataFoundationScheduler,
@@ -29,7 +29,7 @@ export {
   startMarketDataFoundationScheduler,
   startMarketDataStartupLoads,
   startMarketDataStartupPriceBackfill,
-} from './market-data-foundation.scheduler';
+} from './ingestion/market-data-foundation.scheduler';
 export {
   addTradingSessions,
   expectedLatestTradingDate,
@@ -39,18 +39,18 @@ export {
   shouldRunMarketDataSync,
   tradingDateForRegion,
   tradingSessionsBetween,
-} from './market-data-foundation.market-session';
-export type { TradingCalendarOptions } from './market-data-foundation.market-session';
+} from './ingestion/market-data-foundation.market-session';
+export type { TradingCalendarOptions } from './ingestion/market-data-foundation.market-session';
 export {
   partitionHistoricalPrices,
   validateHistoricalPrice,
   validateInstrumentInput,
   validateRequiredString,
-} from './market-data-foundation.validation';
+} from './ingestion/market-data-foundation.validation';
 export {
   classifyInstrumentUniverseReadiness,
   isFreshLatestPrice,
-} from './market-data-foundation.universe';
+} from './ingestion/market-data-foundation.universe';
 export {
   MANUAL_VERIFIED_FUNDAMENTALS_EXPORT_HEADERS,
   NSE_XBRL_FACT_NAME_ALIASES,
@@ -64,7 +64,7 @@ export {
   parseNseXbrlFundamentalFacts,
   selectPreferredNseFinancialResults,
   toManualVerifiedFundamentalsCsv,
-} from './market-data-foundation.nse-xbrl-fundamentals-exporter';
+} from './ingestion/india/market-data-foundation.nse-xbrl-fundamentals-exporter';
 export type {
   ManualVerifiedFundamentalsCsvPeriodType,
   ManualVerifiedFundamentalsCsvRow,
@@ -79,7 +79,7 @@ export type {
   NseXbrlFundamentalsExportResult,
   NseXbrlParsedFact,
   NseXbrlParsedFacts,
-} from './market-data-foundation.nse-xbrl-fundamentals-exporter';
+} from './ingestion/india/market-data-foundation.nse-xbrl-fundamentals-exporter';
 export {
   parseNseCorporateActions,
   parseNseSubject,
@@ -87,23 +87,23 @@ export {
   buildCorporateActionNaturalKey,
   buildNseCorporateActionsUrl,
   NSE_CORPORATE_ACTIONS_SOURCE,
-} from './market-data-foundation.corporate-actions-source';
+} from './ingestion/india/market-data-foundation.corporate-actions-source';
 export type {
   NseCorporateActionRow,
   ParsedCorporateAction,
   ParseNseCorporateActionsOptions,
   ParseNseCorporateActionsResult,
-} from './market-data-foundation.corporate-actions-source';
+} from './ingestion/india/market-data-foundation.corporate-actions-source';
 export {
   computeAdjustedCloses,
-} from './market-data-foundation.corporate-adjustment';
+} from './ingestion/india/market-data-foundation.corporate-adjustment';
 export type {
   AdjustmentAction,
   AdjustmentActionType,
   AdjustedBar,
   RawBar,
   ComputeAdjustedClosesResult,
-} from './market-data-foundation.corporate-adjustment';
+} from './ingestion/india/market-data-foundation.corporate-adjustment';
 export type {
   CorporateAction,
   CorporateActionType,

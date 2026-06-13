@@ -143,6 +143,24 @@ Backend module files are intentionally flat. Do not recreate nested `routes/`, `
   - Public batch lookup methods: `getInstrumentsByIds` and `getLatestPricesBySymbols`.
 - `market-data-foundation.repository.ts`
   - Prisma access for `Stock`, `PriceTick`, `LatestPrice`, `Fundamental`, `CorporateAction`, and `FxRate`, plus price coverage checks and normalized fundamentals upserts.
+  - Now a thin **composition facade**: `MarketDataFoundationRepository` keeps its exact public surface (class name, `constructor(prisma)`, and every public method signature) but delegates each call one-for-one to a per-concern sub-repository. External consumers are unaffected — keep importing `MarketDataFoundationRepository` from `index.ts`.
+  - Per-concern sub-repositories (Prisma access only, same one-responsibility-per-file rule):
+    - `market-data-foundation.repository.source-imports.ts` (`SourceImportsRepository`) — source-file import ledger.
+    - `market-data-foundation.repository.catalog.ts` (`CatalogRepository`) — stock CRUD, catalog upsert/identity, company master data, load timestamps.
+    - `market-data-foundation.repository.catalog-queries.ts` (`CatalogQueriesRepository`) — listing/search, sync-task and exchange-identity queries.
+    - `market-data-foundation.repository.price.ts` (`PriceRepository`) — historical write pipeline (serialized via a static write chain) and write helpers.
+    - `market-data-foundation.repository.price-reads.ts` (`PriceReadsRepository`) — price reads, latest-price, delivery snapshots, canonical-symbol reassignment.
+    - `market-data-foundation.repository.price-readiness.ts` (`PriceReadinessRepository`) — universe readiness stats and price-history projections.
+    - `market-data-foundation.repository.corporate-actions.ts` (`CorporateActionsRepository`) — corporate-action upsert/dedupe and adjusted-close recompute.
+    - `market-data-foundation.repository.fundamentals.ts` (`FundamentalsRepository`) — fundamentals upserts and ingestion queues.
+    - `market-data-foundation.repository.fx.ts` (`FxRepository`) — FX-rate persistence and reads.
+    - `market-data-foundation.repository.scans.ts` / `.scans-screener.ts` / `.scans-movers.ts` (`ScanQueryRepository`, `ScreenerRepository`, `MarketMoverRepository`) — persisted-read market scans.
+    - `market-data-foundation.repository.repair-state.ts` / `.repair-queries.ts` (`RepairStateRepository`, `RepairQueriesRepository`) — repair-run/sync-state persistence and repair-candidate selectors.
+    - `market-data-foundation.repository.provider-cleanup.ts` (`ProviderCleanupRepository`) — provider-data cleanup and latest-price rebuild.
+  - Shared, instance-free building blocks used across sub-repositories:
+    - `market-data-foundation.repository.query-scope.ts` — pure scope/where/sort builders (`scopedStockSqlWhere`, `stockWhere`, `assetTypeWhere`, etc.).
+    - `market-data-foundation.repository.helpers.ts` — pure numeric/date/compare/assign leaf helpers (`normalizeUtcDay`, `toNumber`, `sameDecimal`, `assignIfChanged`, etc.).
+    - `market-data-foundation.repository.constants.ts` — shared provider/exchange source lists and market-mover thresholds.
 - `market-data-foundation.validation.ts`
   - Required-field validation, instrument validation, OHLCV validation, duplicate-bar checks, malformed row partitioning, and abnormal spike checks.
 - `market-data-foundation.types.ts`

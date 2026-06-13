@@ -1,7 +1,7 @@
 import type { Request, Response } from 'express';
 import { MarketDataFoundationService } from './market-data-foundation.service';
 import { normalizeMarketRegion } from '../../shared/utils/market-scope';
-import { getMarketDataFoundationScheduler } from './market-data-foundation.scheduler';
+import { getMarketDataFoundationScheduler } from './ingestion/market-data-foundation.scheduler';
 
 export class MarketDataFoundationController {
   constructor(private readonly service = new MarketDataFoundationService()) {}
