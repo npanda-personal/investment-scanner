@@ -607,7 +607,7 @@ const MarketDataFoundationPage: React.FC = () => {
       setSuccess(run.message ? `${summary} ${run.message}` : summary);
     }
     await loadInstruments();
-  }, [loadInstruments, normalizedMarket]);
+  }, [loadInstruments, normalizedMarket, scope.region, scope.assetType]);
 
   const buildCatalogSyncRequest = (run?: MarketDataCatalogSyncRunResponse | null) => ({
     ...CATALOG_SYNC_DEFAULTS,
@@ -1113,7 +1113,7 @@ const MarketDataFoundationPage: React.FC = () => {
   // their own sources (or an empty state) rather than India's NSE/BSE sources.
   const scopedSourceRegion = String(scope.region || '').toUpperCase();
   const availableCatalogSources = (catalogSources.length > 0 ? catalogSources : fallbackCatalogSources)
-    .filter((source) => !scopedSourceRegion || scopedSourceRegion === 'ALL'
+    .filter((source) => !scopedSourceRegion
       || String(source.region || '').toUpperCase() === scopedSourceRegion);
   const selectedCatalogSource = availableCatalogSources.find((source) => source.catalogSource === importSource);
   const importAvailable = importMode === 'MANUAL_CSV' && catalogCsv.trim().length > 0

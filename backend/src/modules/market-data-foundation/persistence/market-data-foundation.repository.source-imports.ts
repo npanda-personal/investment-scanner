@@ -149,6 +149,10 @@ export class SourceImportsRepository {
     // provider (Yahoo) and produce NO exchange files. Map region -> allowed sources so
     // a non-IN admin scope honestly returns an empty list instead of India's bhavcopy.
     const regionKey = String(input.region || '').trim().toUpperCase();
+    // MANUAL_VERIFIED is attributed to IN today because all manual fundamentals are
+    // India-context. If/when non-IN manual imports become real, this map must gain a
+    // region column on the row (or per-region MANUAL_VERIFIED sources) — until then US/EU
+    // manual rows would be wrongly hidden from their scope. Tracked as a follow-up.
     const REGION_FILE_SOURCES: Record<string, string[]> = { IN: ['NSE', 'BSE', 'MANUAL_VERIFIED'] };
     if (regionKey && regionKey !== 'GLOBAL') {
       where.source = { in: REGION_FILE_SOURCES[regionKey] ?? [] };
