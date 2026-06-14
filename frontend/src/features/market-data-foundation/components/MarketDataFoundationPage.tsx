@@ -19,16 +19,13 @@ import {
 import AddIcon from '@mui/icons-material/Add';
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import {
-  backfillCatalogMetadata,
   cancelCatalogSyncRun,
   fetchCatalogSyncRunStatus,
-  fetchCatalogSources,
   fetchInstruments,
   fetchMarketDataSchedulerStatus,
   fetchSourceFileImports,
   fetchExchangeHistoricalBackfillRun,
   importManualVerifiedFundamental,
-  importCatalog,
   runExchangeHistoricalBackfill,
   resumeExchangeHistoricalBackfillRun,
   retryFailedExchangeHistoricalBackfillRun,
@@ -40,7 +37,6 @@ import {
   type MarketDataSchedulerStatus,
   type MarketDataSourceFileImportRecord,
   type ExchangeHistoricalBackfillResponse,
-  type CatalogSourceInfo,
   type V1Instrument,
 } from '../api/marketDataFoundationService';
 import MarketDataStatusPanel from './MarketDataStatusPanel';
@@ -55,7 +51,6 @@ const formatDateOnly = (date?: string | null) => date ? new Date(`${date.slice(0
 const dataThroughDate = (instrument: V1Instrument) => instrument.stored_data_through_date || instrument.latest_price_date || null;
 const formatMarketCap = (value: number | null) => value === null ? 'N/A' : new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(value);
 const formatAssetType = (value: string) => value === 'EQUITY' ? 'STOCK' : value;
-const formatBytes = (value?: number) => value === undefined ? 'n/a' : `${(value / 1024).toFixed(1)} KB`;
 const formatCatalogSource = (value?: string | null) => {
   if (!value || value.toLowerCase() === 'database' || value === 'LEGACY_DATABASE') return 'Legacy/Database';
   if (value === 'LEGACY_NIFTY500') return 'Legacy NIFTY 500';
@@ -69,131 +64,11 @@ const subtleCellText = {
   whiteSpace: 'nowrap',
 };
 
-type BatchProgressState = {
-  label: string;
-  processed: number;
-  total: number | null;
-};
-
 type CatalogTab = 'catalog' | 'import' | 'health';
 type BackfillInputMode = 'DATE_RANGE' | 'YEAR';
 type ManualFundamentalField = 'revenue' | 'eps' | 'netIncome' | 'peRatio' | 'marketCap';
 type SourceFileImportSortBy = 'importedAt' | 'tradingDate';
 type SourceFileImportSortDirection = 'asc' | 'desc';
-
-const formatBatchProgressLabel = (progress: BatchProgressState) => {
-  const total = progress.total && progress.total > 0 ? progress.total : null;
-  return `${progress.label}: ${progress.processed}${total ? ` / ${total}` : ''}`;
-};
-const fallbackCatalogSources: CatalogSourceInfo[] = [
-  {
-    catalogSource: 'NSE_EQUITY_SECURITIES',
-    displayName: 'NSE Equity Securities',
-    enabled: true,
-    region: 'IN',
-    assetType: 'STOCK',
-    segmentClass: 'CASH',
-    fileType: 'CSV',
-    parserType: 'NSE_EQUITY_SECURITIES',
-    importModes: ['CONFIGURED_URL', 'MANUAL_CSV'],
-    urlConfigured: true,
-    urlSource: 'DEFAULT',
-    setupHint: 'Uses the built-in public NSE equity security list by default.',
-    supportsManualCsv: true,
-    supportsConfiguredUrl: true,
-    supportsInternalSeed: false,
-    lastImportedAt: null,
-  },
-  {
-    catalogSource: 'NSE_INDEX_SECURITIES',
-    displayName: 'NSE Indices',
-    enabled: true,
-    region: 'IN',
-    assetType: 'INDEX',
-    segmentClass: 'INDEX',
-    fileType: 'JSON',
-    parserType: 'NSE_ALL_INDICES_JSON',
-    importModes: ['CONFIGURED_URL'],
-    urlConfigured: true,
-    urlSource: 'DEFAULT',
-    setupHint: 'Uses the built-in public NSE all-indices JSON endpoint by default.',
-    supportsManualCsv: false,
-    supportsConfiguredUrl: true,
-    supportsInternalSeed: false,
-    lastImportedAt: null,
-  },
-  {
-    catalogSource: 'BSE_INDEX_SECURITIES',
-    displayName: 'BSE Indices',
-    enabled: true,
-    region: 'IN',
-    assetType: 'INDEX',
-    segmentClass: 'INDEX',
-    fileType: 'HTML',
-    parserType: 'BSE_INDICES_HTML',
-    importModes: ['CONFIGURED_URL'],
-    urlConfigured: true,
-    urlSource: 'DEFAULT',
-    setupHint: 'Uses the built-in public BSE mobile index-watch page by default.',
-    supportsManualCsv: false,
-    supportsConfiguredUrl: true,
-    supportsInternalSeed: false,
-    lastImportedAt: null,
-  },
-  {
-    catalogSource: 'NSE_INDEX_SEED',
-    displayName: 'NSE/BSE Index Seed',
-    enabled: true,
-    region: 'IN',
-    assetType: 'INDEX',
-    segmentClass: 'INDEX',
-    fileType: 'CSV',
-    parserType: 'NSE_INDEX_SEED',
-    importModes: ['INTERNAL_SEED'],
-    urlConfigured: false,
-    urlSource: 'INTERNAL_SEED',
-    setupHint: 'Uses the small built-in fallback index seed. For broader catalogs, import NSE Indices and BSE Indices.',
-    supportsManualCsv: false,
-    supportsConfiguredUrl: false,
-    supportsInternalSeed: true,
-    lastImportedAt: null,
-  },
-  {
-    catalogSource: 'NSE_ETF_SECURITIES',
-    displayName: 'NSE ETF Securities',
-    enabled: true,
-    region: 'IN',
-    assetType: 'ETF',
-    segmentClass: 'ETF',
-    fileType: 'CSV',
-    parserType: 'NSE_ETF_SECURITIES',
-    importModes: ['CONFIGURED_URL', 'MANUAL_CSV'],
-    urlConfigured: true,
-    urlSource: 'DEFAULT',
-    setupHint: 'Uses the built-in public NSE ETF security list by default.',
-    supportsManualCsv: true,
-    supportsConfiguredUrl: true,
-    supportsInternalSeed: false,
-    lastImportedAt: null,
-  },
-  {
-    catalogSource: 'NSE_EQUITY_DERIVATIVES_UNDERLYINGS',
-    displayName: 'NSE F&O Underlyings',
-    enabled: true,
-    region: 'IN',
-    segmentClass: 'CASH',
-    fileType: 'CSV',
-    parserType: 'NSE_EQUITY_DERIVATIVES_UNDERLYINGS',
-    importModes: ['MANUAL_CSV'],
-    urlConfigured: false,
-    urlSource: 'NONE',
-    setupHint: 'Set MARKET_DATA_CATALOG_NSE_FO_UNDERLYINGS_URL or use Manual CSV. Underlyings do not create futures contracts.',
-    supportsManualCsv: true,
-    supportsConfiguredUrl: false,
-    supportsInternalSeed: false,
-    lastImportedAt: null,
-  },
-];
 
 const buildCandleStatusMessage = (status?: MarketDataSchedulerRegionStatus) => {
   if (!status) return '';
@@ -284,12 +159,6 @@ const MarketDataFoundationPage: React.FC = () => {
   const [dataStatus, setDataStatus] = useState('');
   const [catalogSource, setCatalogSource] = useState('');
   const [derivativesEligible, setDerivativesEligible] = useState('');
-  const [importSource, setImportSource] = useState('NSE_EQUITY_SECURITIES');
-  const [importMode, setImportMode] = useState<'CONFIGURED_URL' | 'MANUAL_CSV' | 'INTERNAL_SEED'>('CONFIGURED_URL');
-  const [catalogSources, setCatalogSources] = useState<CatalogSourceInfo[]>([]);
-  const [catalogCsv, setCatalogCsv] = useState('');
-  const [importingCatalog, setImportingCatalog] = useState(false);
-  const [backfillingCatalog, setBackfillingCatalog] = useState(false);
   const [historicalBackfillInputMode, setHistoricalBackfillInputMode] = useState<BackfillInputMode>('DATE_RANGE');
   const [historicalStartDate, setHistoricalStartDate] = useState('');
   const [historicalEndDate, setHistoricalEndDate] = useState('');
@@ -330,7 +199,6 @@ const MarketDataFoundationPage: React.FC = () => {
   const [schedulerStatus, setSchedulerStatus] = useState<MarketDataSchedulerStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [batchProgress, setBatchProgress] = useState<BatchProgressState | null>(null);
   const previousHistoricalBackfillStatusRef = useRef<string | null>(null);
   const normalizedMarket = normalizeMarketForApi(scope.region);
   const latestSelectableBackfillDate = useMemo(() => new Date().toISOString().slice(0, 10), []);
@@ -421,12 +289,6 @@ const MarketDataFoundationPage: React.FC = () => {
   useEffect(() => {
     loadInstruments();
   }, [loadInstruments]);
-
-  useEffect(() => {
-    fetchCatalogSources()
-      .then((result) => setCatalogSources(result.sources))
-      .catch(() => setCatalogSources([]));
-  }, []);
 
   const refreshBackgroundServices = useCallback(async () => {
     const [scheduler] = await Promise.all([
@@ -561,16 +423,6 @@ const MarketDataFoundationPage: React.FC = () => {
   }, [historicalBackfillResult?.runId, historicalBackfillResult?.status, loadHistoricalBackfillRun]);
 
   useEffect(() => {
-    const source = catalogSources.find((item) => item.catalogSource === importSource);
-    if (!source) return;
-    if (!source.importModes.includes(importMode)) {
-      if (source.supportsConfiguredUrl) setImportMode('CONFIGURED_URL');
-      else if (source.supportsInternalSeed) setImportMode('INTERNAL_SEED');
-      else setImportMode('MANUAL_CSV');
-    }
-  }, [catalogSources, importMode, importSource]);
-
-  useEffect(() => {
     // Reset page when global scope changes
     setPage(0);
   }, [scope.region, scope.assetType]);
@@ -692,135 +544,6 @@ const MarketDataFoundationPage: React.FC = () => {
       window.clearTimeout(timeoutId);
     };
   }, [catalogSyncRun, catalogSyncStarting, refreshCatalogAfterTerminalSync]);
-
-  const handleCatalogImport = async () => {
-    if (operatorBackgroundActive) {
-      setError('A background market-data load is already running. Wait for it to finish before importing catalog data.');
-      return;
-    }
-    setImportingCatalog(true);
-    setError(null);
-    setSuccess(null);
-    setBatchProgress(null);
-    try {
-      const aggregate = {
-        inserted: 0,
-        updated: 0,
-        noOp: 0,
-        invalid: 0,
-        processed: 0,
-        total: 0,
-        downloadedBytes: 0,
-        tempCleanupFailed: false,
-      };
-      let offset = 0;
-      let hasMore = true;
-      const batchSize = 100;
-      while (hasMore) {
-        const result = await importCatalog({
-          catalogSource: importSource,
-          importMode,
-          csvText: importMode === 'MANUAL_CSV' ? catalogCsv : undefined,
-          batchSize,
-          offset,
-        });
-        if (!result.success) {
-          throw new Error(result.message || 'Catalog import failed');
-        }
-        aggregate.inserted += result.insertedCount ?? result.inserted ?? 0;
-        aggregate.updated += result.updatedCount ?? result.updated ?? 0;
-        aggregate.noOp += result.noOpCount ?? result.noOp ?? 0;
-        aggregate.invalid += result.invalidCount ?? result.invalid ?? 0;
-        aggregate.processed += result.processedCount ?? 0;
-        aggregate.total = result.totalCount ?? result.sourceRows ?? aggregate.total;
-        aggregate.downloadedBytes += result.fileSizeBytes ?? 0;
-        aggregate.tempCleanupFailed = aggregate.tempCleanupFailed || result.tempFileDeleted === false && result.downloaded === true;
-        setBatchProgress({
-          label: 'Importing catalog',
-          processed: Math.min(aggregate.processed, aggregate.total || aggregate.processed),
-          total: aggregate.total || null,
-        });
-        hasMore = result.hasMore === true && result.nextOffset !== null && result.nextOffset !== undefined;
-        offset = result.nextOffset ?? 0;
-      }
-      const download = aggregate.downloadedBytes > 0 ? ` Downloaded ${formatBytes(aggregate.downloadedBytes)} across batches; temp cleanup: ${aggregate.tempCleanupFailed ? 'check server logs' : 'ok'}.` : '';
-      setSuccess(`${importSource}: ${aggregate.inserted} inserted, ${aggregate.updated} updated, ${aggregate.noOp} no-op, ${aggregate.invalid} invalid. Processed ${aggregate.processed}/${aggregate.total || aggregate.processed}.${download}`);
-      await loadInstruments();
-    } catch (err: any) {
-      setError(err.response?.data?.message || err.message || 'Catalog import failed');
-    } finally {
-      setImportingCatalog(false);
-      setBatchProgress(null);
-    }
-  };
-
-  const handleImportSourceChange = (nextSource: string) => {
-    setImportSource(nextSource);
-    const source = (catalogSources.length > 0 ? catalogSources : fallbackCatalogSources).find((item) => item.catalogSource === nextSource);
-    if (!source) return;
-    if (source.supportsConfiguredUrl) setImportMode('CONFIGURED_URL');
-    else if (source.supportsInternalSeed) setImportMode('INTERNAL_SEED');
-    else setImportMode('MANUAL_CSV');
-  };
-
-  const handleCatalogBackfill = async () => {
-    if (operatorBackgroundActive) {
-      setError('A background market-data load is already running. Wait for it to finish before backfilling metadata.');
-      return;
-    }
-    setBackfillingCatalog(true);
-    setError(null);
-    setSuccess(null);
-    setBatchProgress(null);
-    try {
-      const aggregate = {
-        processed: 0,
-        total: 0,
-        updated: 0,
-        noOp: 0,
-        skipped: 0,
-        validated: 0,
-        warningCount: 0,
-      };
-      let offset = 0;
-      let hasMore = true;
-      const batchSize = 100;
-      const backfillSource = selectedCatalogSource;
-      while (hasMore) {
-        const result = await backfillCatalogMetadata({
-          region: backfillSource?.region || scope.region,
-          assetType: backfillSource?.assetType || assetType.trim() || undefined,
-          catalogSource: importSource,
-          batchSize,
-          offset,
-        });
-        if (!result.success) {
-          throw new Error(result.message || 'Catalog metadata backfill failed');
-        }
-        aggregate.processed += result.processedCount ?? 0;
-        aggregate.total = result.totalCount ?? aggregate.total;
-        aggregate.updated += result.updated ?? 0;
-        aggregate.noOp += result.noOp ?? 0;
-        aggregate.skipped += result.skipped ?? 0;
-        aggregate.validated += result.validated ?? 0;
-        aggregate.warningCount += result.warnings?.length ?? 0;
-        setBatchProgress({
-          label: 'Backfilling metadata',
-          processed: Math.min(aggregate.processed, aggregate.total || aggregate.processed),
-          total: aggregate.total || null,
-        });
-        hasMore = result.hasMore === true && result.nextOffset !== null && result.nextOffset !== undefined;
-        offset = result.nextOffset ?? 0;
-      }
-      setSuccess(`Backfill processed ${aggregate.processed}/${aggregate.total || aggregate.processed}: ${aggregate.updated} updated, ${aggregate.noOp} no-op, ${aggregate.skipped} skipped.${aggregate.warningCount ? ` ${aggregate.warningCount} warnings.` : ''}`);
-      await loadInstruments();
-    } catch (err: any) {
-      setError(err.response?.data?.message || err.message || 'Catalog metadata backfill failed');
-    } finally {
-      setBackfillingCatalog(false);
-      setBatchProgress(null);
-    }
-  };
 
   const handleHistoricalBackfill = async () => {
     if (!selectedHistoricalBackfillRange.startDate || !selectedHistoricalBackfillRange.endDate) {
@@ -1041,24 +764,11 @@ const MarketDataFoundationPage: React.FC = () => {
     isIndiaEquity && catalogSource.trim() === 'NSE_SME_EQUITY_SECURITIES' ? 'SME only' : isIndiaEquity && catalogSource.trim() === 'NSE_EQUITY_SECURITIES' ? 'Main Board only' : null,
   ].filter((item): item is string => Boolean(item));
   const hasLocalFilters = activeFilters.length > 0;
-  // Region isolation: only show catalog sources for the selected market. The IN-only
-  // fallback is therefore used solely when IN is selected; US/EU/Crypto honestly show
-  // their own sources (or an empty state) rather than India's NSE/BSE sources.
-  const scopedSourceRegion = scopeRegionUpper;
-  const availableCatalogSources = (catalogSources.length > 0 ? catalogSources : fallbackCatalogSources)
-    .filter((source) => !scopedSourceRegion
-      || String(source.region || '').toUpperCase() === scopedSourceRegion);
-  const selectedCatalogSource = availableCatalogSources.find((source) => source.catalogSource === importSource);
-  const importAvailable = importMode === 'MANUAL_CSV' && catalogCsv.trim().length > 0
-    || (importMode === 'CONFIGURED_URL' && selectedCatalogSource?.supportsConfiguredUrl === true)
-    || (importMode === 'INTERNAL_SEED' && selectedCatalogSource?.supportsInternalSeed === true);
-  const hasCatalogSources = scopedSourceRegion === 'IN' && availableCatalogSources.length > 0; // catalog-file import/backfill is NSE/BSE-only machinery
   const hasManualFundamentals = !isCryptoScope;
-  const hasAnyIngestionControl = hasCatalogSources || hasExchangeFiles || hasManualFundamentals;
+  const hasAnyIngestionControl = hasExchangeFiles || hasManualFundamentals;
   const ingestionCapability = {
     region: scopeRegionUpper,
     isCryptoScope,
-    hasCatalogSources,
     hasExchangeFiles,
     hasManualFundamentals,
     hasAnyIngestionControl,
@@ -1112,17 +822,6 @@ const MarketDataFoundationPage: React.FC = () => {
       </Paper>
 
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>{error}</Alert>}
-      {batchProgress && (
-        <Alert severity="info" sx={{ mb: 2 }}>
-          <Stack spacing={1}>
-            <Typography variant="body2">{formatBatchProgressLabel(batchProgress)}</Typography>
-            <LinearProgress
-              variant={batchProgress.total && batchProgress.total > 0 ? 'determinate' : 'indeterminate'}
-              value={batchProgress.total && batchProgress.total > 0 ? Math.min(100, (batchProgress.processed / batchProgress.total) * 100) : undefined}
-            />
-          </Stack>
-        </Alert>
-      )}
       {catalogSyncRun && (
         <Alert
           severity={catalogSyncRun.status === 'FAILED' ? 'error' : showCatalogSyncContinue ? 'warning' : isCatalogSyncTerminal(catalogSyncRun.status) ? 'success' : 'info'}
@@ -1216,19 +915,7 @@ const MarketDataFoundationPage: React.FC = () => {
       {activeTab === 'import' && (
         <MarketDataImportPanel
           capability={ingestionCapability}
-          availableCatalogSources={availableCatalogSources}
-          selectedCatalogSource={selectedCatalogSource}
-          importMode={importMode}
-          catalogCsv={catalogCsv}
-          importAvailable={importAvailable}
-          importingCatalog={importingCatalog}
-          backfillingCatalog={backfillingCatalog}
           operatorBackgroundActive={operatorBackgroundActive}
-          onImportModeChange={setImportMode}
-          onImportSourceChange={handleImportSourceChange}
-          onCatalogCsvChange={setCatalogCsv}
-          onImportCatalog={handleCatalogImport}
-          onBackfillCatalog={handleCatalogBackfill}
           historicalBackfillInputMode={historicalBackfillInputMode}
           historicalStartDate={historicalStartDate}
           historicalEndDate={historicalEndDate}

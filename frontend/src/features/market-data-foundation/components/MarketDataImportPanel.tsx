@@ -22,13 +22,11 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import SyncIcon from '@mui/icons-material/Sync';
 import { HistoricalBackfillRunEvidence, SourceFileImportEvidence } from './MarketDataOpsEvidence';
 import type {
-  CatalogSourceInfo,
   ExchangeHistoricalBackfillResponse,
   MarketDataSourceFileImportRecord,
 } from '../api/marketDataFoundationService';
 
 type BackfillInputMode = 'DATE_RANGE' | 'YEAR';
-type ImportMode = 'CONFIGURED_URL' | 'MANUAL_CSV' | 'INTERNAL_SEED';
 type SourceFileImportSortBy = 'importedAt' | 'tradingDate';
 type SourceFileImportSortDirection = 'asc' | 'desc';
 
@@ -55,7 +53,6 @@ type ManualFundamentalState = {
 export interface IngestionCapability {
   region: string;
   isCryptoScope: boolean;
-  hasCatalogSources: boolean;
   hasExchangeFiles: boolean;
   hasManualFundamentals: boolean;
   hasAnyIngestionControl: boolean;
@@ -63,20 +60,7 @@ export interface IngestionCapability {
 
 export interface MarketDataImportPanelProps {
   capability: IngestionCapability;
-  // Catalog import / source selection
-  availableCatalogSources: CatalogSourceInfo[];
-  selectedCatalogSource?: CatalogSourceInfo;
-  importMode: ImportMode;
-  catalogCsv: string;
-  importAvailable: boolean;
-  importingCatalog: boolean;
-  backfillingCatalog: boolean;
   operatorBackgroundActive: boolean;
-  onImportModeChange: (mode: ImportMode) => void;
-  onImportSourceChange: (source: string) => void;
-  onCatalogCsvChange: (value: string) => void;
-  onImportCatalog: () => void;
-  onBackfillCatalog: () => void;
   // Historical exchange candle backfill
   historicalBackfillInputMode: BackfillInputMode;
   historicalStartDate: string;
@@ -114,19 +98,7 @@ export interface MarketDataImportPanelProps {
 
 const MarketDataImportPanel: React.FC<MarketDataImportPanelProps> = ({
   capability,
-  availableCatalogSources,
-  selectedCatalogSource,
-  importMode,
-  catalogCsv,
-  importAvailable,
-  importingCatalog,
-  backfillingCatalog,
   operatorBackgroundActive,
-  onImportModeChange,
-  onImportSourceChange,
-  onCatalogCsvChange,
-  onImportCatalog,
-  onBackfillCatalog,
   historicalBackfillInputMode,
   historicalStartDate,
   historicalEndDate,
@@ -161,7 +133,6 @@ const MarketDataImportPanel: React.FC<MarketDataImportPanelProps> = ({
   const {
     region,
     isCryptoScope,
-    hasCatalogSources,
     hasExchangeFiles,
     hasManualFundamentals,
     hasAnyIngestionControl,
@@ -188,96 +159,13 @@ const MarketDataImportPanel: React.FC<MarketDataImportPanelProps> = ({
           </Alert>
         )}
 
-        {hasCatalogSources && (
-          <>
-            <Box
-              sx={{
-                display: 'grid',
-                gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))', lg: 'repeat(3, minmax(180px, 1fr)) auto' },
-                gap: 1.5,
-                alignItems: 'center',
-                maxWidth: '100%',
-                '& .MuiTextField-root': { minWidth: 0 },
-              }}
-            >
-              <TextField select size="small" label="Import Mode" value={importMode} onChange={(event) => onImportModeChange(event.target.value as ImportMode)}>
-                {(!selectedCatalogSource || selectedCatalogSource.supportsConfiguredUrl) && <MenuItem value="CONFIGURED_URL">Configured URL</MenuItem>}
-                {selectedCatalogSource?.supportsInternalSeed && <MenuItem value="INTERNAL_SEED">Internal Seed</MenuItem>}
-                {(!selectedCatalogSource || selectedCatalogSource.supportsManualCsv) && <MenuItem value="MANUAL_CSV">Manual CSV</MenuItem>}
-              </TextField>
-              <TextField select size="small" label="Catalog Source" value={selectedCatalogSource?.catalogSource ?? ''} onChange={(event) => onImportSourceChange(event.target.value)}>
-                {availableCatalogSources.map((item) => <MenuItem key={item.catalogSource} value={item.catalogSource}>{item.displayName || item.catalogSource}</MenuItem>)}
-              </TextField>
-              <Stack
-                direction={{ xs: 'column', sm: 'row' }}
-                spacing={1}
-                useFlexGap
-                flexWrap="wrap"
-                sx={{ justifySelf: { xs: 'stretch', lg: 'end' }, minWidth: 0 }}
-              >
-                <Button
-                  variant="outlined"
-                  startIcon={importingCatalog ? <CircularProgress size={18} /> : <SyncIcon />}
-                  onClick={onImportCatalog}
-                  disabled={operatorBackgroundActive || importingCatalog || backfillingCatalog || !importAvailable}
-                  sx={{ flex: { xs: '1 1 auto', sm: '0 1 auto' }, whiteSpace: 'nowrap' }}
-                >
-                  {importingCatalog ? 'Importing...' : 'Import Catalog'}
-                </Button>
-                <Button
-                  variant="outlined"
-                  startIcon={backfillingCatalog ? <CircularProgress size={18} /> : <SyncIcon />}
-                  onClick={onBackfillCatalog}
-                  disabled={operatorBackgroundActive || backfillingCatalog || importingCatalog}
-                  sx={{ flex: { xs: '1 1 auto', sm: '0 1 auto' }, whiteSpace: 'nowrap' }}
-                >
-                  {backfillingCatalog ? 'Backfilling...' : 'Backfill Metadata'}
-                </Button>
-              </Stack>
-            </Box>
-            {selectedCatalogSource && (
-              <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-                <Chip size="small" label={selectedCatalogSource.region} />
-                {selectedCatalogSource.assetType && <Chip size="small" label={selectedCatalogSource.assetType} />}
-                {selectedCatalogSource.segmentClass && <Chip size="small" label={selectedCatalogSource.segmentClass} />}
-                {selectedCatalogSource.supportsInternalSeed ? (
-                  <Chip size="small" color="success" label="Uses built-in seed list" />
-                ) : importMode === 'MANUAL_CSV' && !selectedCatalogSource.urlConfigured ? (
-                  <Chip size="small" color="warning" label="Manual CSV required" />
-                ) : (
-                  <Chip size="small" color={selectedCatalogSource.urlConfigured ? 'success' : 'warning'} label={`URL configured: ${selectedCatalogSource.urlConfigured ? 'Yes' : 'No'}`} />
-                )}
-                <Chip size="small" label={`Source: ${selectedCatalogSource.urlSource === 'ENV' ? 'Env' : selectedCatalogSource.urlSource === 'DEFAULT' ? 'Default' : selectedCatalogSource.urlSource === 'INTERNAL_SEED' ? 'Internal Seed' : 'Manual setup'}`} />
-              </Stack>
-            )}
-            {importMode === 'CONFIGURED_URL' && selectedCatalogSource && !selectedCatalogSource.urlConfigured && (
-              <Alert severity="warning">{selectedCatalogSource.setupHint || 'No configured URL for this source. Use Manual CSV or configure the source URL.'}</Alert>
-            )}
-            {importMode === 'MANUAL_CSV' && selectedCatalogSource && !selectedCatalogSource.urlConfigured && selectedCatalogSource.setupHint && (
-              <Alert severity="info">{selectedCatalogSource.setupHint}</Alert>
-            )}
-            {importMode === 'INTERNAL_SEED' && selectedCatalogSource && (
-              <Alert severity="info">{selectedCatalogSource.setupHint || 'Uses a built-in seed list. No URL is required.'}</Alert>
-            )}
-            {importMode === 'MANUAL_CSV' && (
-              <TextField
-                multiline
-                minRows={3}
-                size="small"
-                label="Catalog CSV"
-                value={catalogCsv}
-                onChange={(event) => onCatalogCsvChange(event.target.value)}
-                placeholder={`Paste ${selectedCatalogSource?.displayName || 'catalog'} CSV here. Index seed import does not require CSV.`}
-              />
-            )}
-          </>
-        )}
-
         {hasExchangeFiles && (
           <>
-            {hasCatalogSources && <Divider />}
             <Box>
               <Typography variant="subtitle2" gutterBottom>Historical Exchange Candle Backfill</Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                Load backdated/historical exchange candles for a date range. Daily ingestion is automated by the pipeline — use this only to sync past sessions.
+              </Typography>
               <Stack spacing={1.25}>
                 <FormControl>
                   <FormLabel id="market-data-historical-backfill-mode-label">Backfill mode</FormLabel>
@@ -365,7 +253,7 @@ const MarketDataImportPanel: React.FC<MarketDataImportPanelProps> = ({
 
         {hasManualFundamentals && (
           <>
-            {(hasCatalogSources || hasExchangeFiles) && <Divider />}
+            {hasExchangeFiles && <Divider />}
             <Box>
               <Typography variant="subtitle2" gutterBottom>Manual Verified Fundamentals</Typography>
               <Stack
