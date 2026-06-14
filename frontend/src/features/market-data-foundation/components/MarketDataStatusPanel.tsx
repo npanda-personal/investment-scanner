@@ -51,6 +51,10 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
   const [schedulerRegion, setSchedulerRegion] = useState<MarketDataSchedulerRegionStatus | null>(null);
   const [sourceImports, setSourceImports] = useState<MarketDataSourceFileImportRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  // The /market-data/health query can be slow under shared-DB contention (tens of seconds);
+  // it gets its own flag so the Stored-Market-Data card shows a spinner instead of a
+  // misleading "0 instruments", and — critically — does NOT block the rest of the panel.
+  const [healthLoading, setHealthLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const loadReviewReadiness = async () => {
@@ -66,30 +70,28 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
     }
   };
 
-  const load = async () => {
+  const load = () => {
     setLoading(true);
+    setHealthLoading(true);
     setError(null);
-    try {
-      const [healthResult, universeResult, trustedResult, schedulerResult, sourceResult] = await Promise.all([
-        fetchMarketDataHealth({ region, assetType }),
-        fetchMarketDataUniverseHealth({ region, assetType }),
-        fetchTrustedReviewUniverseHealth({ region, assetType }).catch(() => null),
-        fetchMarketDataSchedulerStatus({ region, assetType }).catch(() => null),
-        fetchSourceFileImports({ region, assetType, limit: 10 }).catch(() => ({ count: 0, imports: [] })),
-      ]);
-      const normalizedRegion = normalizeMarketForApi(region);
-      setHealth(healthResult);
-      setUniverseHealth(universeResult);
-      setTrustedUniverse(trustedResult);
-      setScheduler(schedulerResult);
-      setSchedulerRegion(schedulerResult?.regionStatuses.find((item) => item.region === normalizedRegion) ?? null);
-      setSourceImports(sourceResult.imports);
-    } catch (err: any) {
-      setError(err.response?.data?.error || err.message || 'Market data health failed');
-    } finally {
-      setLoading(false);
-    }
-    // Fire review readiness independently — it can be slow (~24s)
+    const normalizedRegion = normalizeMarketForApi(region);
+    // Fire each panel's fetch INDEPENDENTLY so a single slow endpoint (health can take tens
+    // of seconds under DB contention) never blocks the whole tab — every card fills in as
+    // soon as its own data arrives, instead of all waiting on the slowest call.
+    const tasks: Promise<unknown>[] = [
+      fetchMarketDataHealth({ region, assetType })
+        .then(setHealth)
+        .catch((err: any) => setError((prev) => prev || err?.response?.data?.error || err?.message || 'Market data health failed'))
+        .finally(() => setHealthLoading(false)),
+      fetchMarketDataUniverseHealth({ region, assetType }).then(setUniverseHealth).catch(() => undefined),
+      fetchTrustedReviewUniverseHealth({ region, assetType }).then(setTrustedUniverse).catch(() => setTrustedUniverse(null)),
+      fetchMarketDataSchedulerStatus({ region, assetType })
+        .then((result) => { setScheduler(result); setSchedulerRegion(result?.regionStatuses.find((item) => item.region === normalizedRegion) ?? null); })
+        .catch(() => { setScheduler(null); setSchedulerRegion(null); }),
+      fetchSourceFileImports({ region, assetType, limit: 10 }).then((result) => setSourceImports(result.imports)).catch(() => setSourceImports([])),
+    ];
+    void Promise.allSettled(tasks).finally(() => setLoading(false));
+    // Review readiness is independently lazy — it can be slow (~24s)
     void loadReviewReadiness();
   };
 
@@ -135,12 +137,21 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(3, minmax(0, 1fr))' }, gap: 2 }}>
         <Paper variant="outlined" sx={{ p: 2 }}>
           <Typography variant="overline" color="text.secondary">Stored Market Data</Typography>
-          <Typography variant="h6">
-            {health?.instrumentCount ? formatCount(health.instrumentCount) : '0'} instruments
-            {scopeDimensionLabel && (
-              <Typography component="span" variant="body2" color="text.secondary" sx={{ ml: 1 }}>
-                — {scopeDimensionLabel}
-              </Typography>
+          <Typography variant="h6" component="div">
+            {healthLoading && !health ? (
+              <Stack direction="row" spacing={1} alignItems="center">
+                <CircularProgress size={16} />
+                <Typography variant="body2" color="text.secondary">Loading…</Typography>
+              </Stack>
+            ) : (
+              <>
+                {health?.instrumentCount ? formatCount(health.instrumentCount) : '0'} instruments
+                {scopeDimensionLabel && (
+                  <Typography component="span" variant="body2" color="text.secondary" sx={{ ml: 1 }}>
+                    — {scopeDimensionLabel}
+                  </Typography>
+                )}
+              </>
             )}
           </Typography>
           <Typography variant="body2" color="text.secondary">Latest timestamp: {formatTimestamp(health?.latestDataTimestamp)}</Typography>
