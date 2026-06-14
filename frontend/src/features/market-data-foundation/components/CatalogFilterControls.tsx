@@ -16,12 +16,14 @@ export interface CatalogScopeCapability {
   region: string;
 }
 
-/** Known exchanges per region (mirrors the backend region→exchange resolution). Currency is
- *  intentionally NOT a filter — it is fully determined by the region (IN→INR, US→USD, EU→EUR),
- *  so a free-text currency box added no value. */
+/** Known exchanges per region that actually carry instruments (verified against the data).
+ *  Currency is intentionally NOT a filter — it is fully determined by the region. Segment/Class
+ *  is also NOT a filter: the global header owns the asset class, so within (e.g.) STOCK every
+ *  non-CASH segment returns zero — the F&O-eligible and SME filters cover the real STOCK
+ *  sub-distinctions. */
 const EXCHANGES_BY_REGION: Record<string, string[]> = {
   IN: ['NSE', 'BSE'],
-  US: ['NASDAQ', 'NYSE', 'AMEX'],
+  US: ['NASDAQ', 'NYSE', 'AMEX', 'ARCA', 'BATS'],
   EU: ['LSE', 'XETRA', 'EURONEXT', 'BME'],
 };
 
@@ -29,14 +31,12 @@ export interface CatalogFilterControlsProps {
   capability: CatalogScopeCapability;
   search: string;
   exchange: string;
-  instrumentSegment: string;
   derivativesEligible: string;
   catalogSource: string;
   loading: boolean;
   hasLocalFilters: boolean;
   onSearchChange: (value: string) => void;
   onExchangeChange: (value: string) => void;
-  onInstrumentSegmentChange: (value: string) => void;
   onDerivativesEligibleChange: (value: string) => void;
   onCatalogSourceChange: (value: string) => void;
   onResetPage: () => void;
@@ -48,14 +48,12 @@ const CatalogFilterControls: React.FC<CatalogFilterControlsProps> = ({
   capability,
   search,
   exchange,
-  instrumentSegment,
   derivativesEligible,
   catalogSource,
   loading,
   hasLocalFilters,
   onSearchChange,
   onExchangeChange,
-  onInstrumentSegmentChange,
   onDerivativesEligibleChange,
   onCatalogSourceChange,
   onResetPage,
@@ -95,20 +93,6 @@ const CatalogFilterControls: React.FC<CatalogFilterControlsProps> = ({
         >
           <MenuItem value="">All</MenuItem>
           {exchangeOptions.map((item) => <MenuItem key={item} value={item}>{item}</MenuItem>)}
-        </TextField>
-      )}
-      {isIndiaEquity && (
-        <TextField
-          select
-          size="small"
-          label="Segment/Class"
-          value={instrumentSegment}
-          onChange={(event) => { onInstrumentSegmentChange(event.target.value); onResetPage(); }}
-        >
-          <MenuItem value="">All</MenuItem>
-          {['CASH', 'FUTURES', 'INDEX', 'ETF', 'CURRENCY', 'COMMODITY', 'CRYPTO', 'FUND', 'OTHER', 'UNKNOWN'].map((item) => (
-            <MenuItem key={item} value={item}>{item}</MenuItem>
-          ))}
         </TextField>
       )}
       {isIndiaEquity && (

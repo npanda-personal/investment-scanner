@@ -488,7 +488,7 @@ const MarketDataFoundationPage: React.FC = () => {
         if (canceled) return;
         if (shouldStoreHistoricalBackfillRun(result.status)) {
           setHistoricalBackfillResult(result);
-          setActiveTab('import');
+          if (isHistoricalBackfillActive(result.status)) setActiveTab('import'); // only jump tabs for a genuinely in-progress backfill, not a stored terminal/partial run
         } else {
           clearStoredHistoricalBackfillRunId(historicalBackfillStorageKey);
         }
@@ -1269,14 +1269,12 @@ const MarketDataFoundationPage: React.FC = () => {
           capability={{ isIndiaEquity, isCryptoScope, region: scopeRegionUpper }}
           search={search}
           exchange={exchange}
-          instrumentSegment={instrumentSegment}
           derivativesEligible={derivativesEligible}
           catalogSource={catalogSource}
           loading={loading}
           hasLocalFilters={hasLocalFilters}
           onSearchChange={setSearch}
           onExchangeChange={setExchange}
-          onInstrumentSegmentChange={setInstrumentSegment}
           onDerivativesEligibleChange={setDerivativesEligible}
           onCatalogSourceChange={setCatalogSource}
           onResetPage={() => setPage(0)}
