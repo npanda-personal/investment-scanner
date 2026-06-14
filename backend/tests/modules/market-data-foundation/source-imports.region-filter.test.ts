@@ -43,13 +43,15 @@ describe('SourceImportsRepository.listSourceFileImports — region scoping', () 
     expect(whereOf(findMany).source).toEqual({ in: [] });
   });
 
-  it('GLOBAL scope is not region-restricted — keeps the default TEST_ exclusion', async () => {
+  it('GLOBAL scope (crypto plane) returns an empty allow-list — no India exchange-file leak', async () => {
     const { repo, findMany } = makeRepo();
     await repo.listSourceFileImports({ region: 'GLOBAL' });
-    expect(whereOf(findMany).source).toEqual({ not: { startsWith: 'TEST_' } });
+    // Crypto selects region GLOBAL; the 24/7 lane produces no exchange files → zero rows,
+    // NOT an unscoped "show all" that would surface India's NSE/BSE bhavcopy.
+    expect(whereOf(findMany).source).toEqual({ in: [] });
   });
 
-  it('no region (undefined) keeps the default TEST_ exclusion', async () => {
+  it('only a region-less (internal/unscoped) caller stays unrestricted with the TEST_ exclusion', async () => {
     const { repo, findMany } = makeRepo();
     await repo.listSourceFileImports({});
     expect(whereOf(findMany).source).toEqual({ not: { startsWith: 'TEST_' } });

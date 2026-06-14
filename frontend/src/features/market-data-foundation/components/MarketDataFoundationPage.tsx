@@ -5,31 +5,18 @@ import {
   Box,
   Button,
   Chip,
-  CircularProgress,
   Divider,
   Drawer,
-  FormControl,
-  FormControlLabel,
-  FormLabel,
   IconButton,
-  InputAdornment,
   LinearProgress,
-  MenuItem,
   Paper,
-  Radio,
-  RadioGroup,
   Stack,
   Tab,
   Tabs,
-  TextField,
   Tooltip,
   Typography,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
-import FactCheckIcon from '@mui/icons-material/FactCheck';
-import RefreshIcon from '@mui/icons-material/Refresh';
-import SearchIcon from '@mui/icons-material/Search';
-import SyncIcon from '@mui/icons-material/Sync';
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import {
   backfillCatalogMetadata,
@@ -57,8 +44,8 @@ import {
   type V1Instrument,
 } from '../api/marketDataFoundationService';
 import MarketDataStatusPanel from './MarketDataStatusPanel';
-import { HistoricalBackfillRunEvidence, SourceFileImportEvidence } from './MarketDataOpsEvidence';
-import { DataTable, FilterBar, PageHeader, StatusBadge, statusColor, type DataTableColumn, type SortDirection } from '@/shared/components';
+import CatalogFilterControls from './CatalogFilterControls'; import MarketDataImportPanel from './MarketDataImportPanel';
+import { DataTable, PageHeader, StatusBadge, statusColor, type DataTableColumn, type SortDirection } from '@/shared/components';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
 import { normalizeAssetTypeForMarketDataApi, normalizeMarketForApi } from '../api/marketScopeApi';
 import { humanizeCode } from '@/shared/format/enumLabels';
@@ -93,14 +80,6 @@ type BackfillInputMode = 'DATE_RANGE' | 'YEAR';
 type ManualFundamentalField = 'revenue' | 'eps' | 'netIncome' | 'peRatio' | 'marketCap';
 type SourceFileImportSortBy = 'importedAt' | 'tradingDate';
 type SourceFileImportSortDirection = 'asc' | 'desc';
-
-type FilterPreset = {
-  id: string;
-  label: string;
-  description: string;
-  value: 'all' | 'stocks' | 'fno' | 'indices' | 'etfs';
-  apply: () => void;
-};
 
 const formatBatchProgressLabel = (progress: BatchProgressState) => {
   const total = progress.total && progress.total > 0 ? progress.total : null;
@@ -406,28 +385,28 @@ const MarketDataFoundationPage: React.FC = () => {
     setError(null);
     try {
       if (import.meta.env.DEV) {
-        console.debug('[MarketDataFoundation] selected global market', {
-          selectedGlobalMarket: scope.region,
-          normalizedMarketValue: normalizedMarket || 'GLOBAL',
-          selectedAssetType: scope.assetType,
-        });
+        console.debug('[MarketDataFoundation] scope', { region: scope.region, normalized: normalizedMarket || 'GLOBAL', assetType: scope.assetType });
       }
-      
+      // Catalog list is locked to the GLOBAL header scope (region + assetType). IN-stock
+      // refinements are sent only for Indian equity; otherwise omitted so US/EU/crypto
+      // never inherit India's filters.
+      const scopeIsCrypto = String(scope.assetType || '').toUpperCase() === 'CRYPTO';
+      const scopeIsIndiaEquity = String(scope.region || '').toUpperCase() === 'IN' && String(scope.assetType || '').toUpperCase() === 'STOCK';
       const response = await fetchInstruments({
         page: page + 1,
         pageSize,
         sortBy,
         sortOrder: sortDirection,
         region: scope.region,
-        exchange: exchange.trim() || undefined,
-        assetType: assetType.trim() || undefined,
-        instrumentSegment: instrumentSegment.trim() || undefined,
+        assetType: scope.assetType,
+        exchange: scopeIsCrypto ? undefined : (exchange.trim() || undefined),
+        instrumentSegment: scopeIsIndiaEquity ? (instrumentSegment.trim() || undefined) : undefined,
         currency: currency.trim() || undefined,
         sector: sector.trim() || undefined,
         industry: industry.trim() || undefined,
         dataStatus: dataStatus.trim() || undefined,
-        catalogSource: catalogSource.trim() || undefined,
-        derivativesEligible: derivativesEligible === '' ? undefined : derivativesEligible === 'true',
+        catalogSource: scopeIsIndiaEquity ? (catalogSource.trim() || undefined) : undefined,
+        derivativesEligible: scopeIsIndiaEquity && derivativesEligible !== '' ? derivativesEligible === 'true' : undefined,
         search: search.trim() || undefined,
       });
       setInstruments(response.instruments);
@@ -437,7 +416,7 @@ const MarketDataFoundationPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [assetType, catalogSource, currency, dataStatus, derivativesEligible, exchange, industry, instrumentSegment, page, pageSize, search, sector, sortBy, sortDirection, scope.region, normalizedMarket]);
+  }, [catalogSource, currency, dataStatus, derivativesEligible, exchange, industry, instrumentSegment, page, pageSize, search, sector, sortBy, sortDirection, scope.region, scope.assetType, normalizedMarket]);
 
   useEffect(() => {
     loadInstruments();
@@ -965,38 +944,32 @@ const MarketDataFoundationPage: React.FC = () => {
     }
   };
 
+  const scopeAssetType = String(scope.assetType || '').toUpperCase();
+  const scopeRegionUpper = String(scope.region || '').toUpperCase();
+  const isCryptoScope = scopeAssetType === 'CRYPTO';
+  const isIndiaEquity = scopeRegionUpper === 'IN' && scopeAssetType === 'STOCK';
+  const hasExchangeFiles = scopeRegionUpper === 'IN';
+  const showIsinColumn = !isCryptoScope;
   const columns: DataTableColumn<V1Instrument>[] = [
     {
-      id: 'symbol',
-      label: 'Symbol',
-      sortable: true,
+      id: 'symbol', label: 'Symbol', sortable: true,
       render: (instrument) => (
         <Stack direction="row" spacing={0.5} alignItems="center">
-          <Tooltip title={instrument.symbol !== formatDisplaySymbol(instrument) ? `Stored symbol: ${instrument.symbol}` : ''} arrow>
-            <Typography fontWeight={700} fontSize={13}>{formatDisplaySymbol(instrument)}</Typography>
-          </Tooltip>
+          <Tooltip title={instrument.symbol !== formatDisplaySymbol(instrument) ? `Stored symbol: ${instrument.symbol}` : ''} arrow><Typography fontWeight={700} fontSize={13}>{formatDisplaySymbol(instrument)}</Typography></Tooltip>
           {instrument.catalog_source === 'NSE_SME_EQUITY_SECURITIES' && (
-            <Tooltip title="NSE SME segment" arrow>
-              <Chip size="small" label="SME" color="warning" sx={{ height: 18, fontSize: 11, fontWeight: 700, cursor: 'default' }} />
-            </Tooltip>
+            <Tooltip title="NSE SME segment" arrow><Chip size="small" label="SME" color="warning" sx={{ height: 18, fontSize: 11, fontWeight: 700, cursor: 'default' }} /></Tooltip>
           )}
         </Stack>
       ),
     },
     { id: 'name', label: 'Company', sortable: true, render: (instrument) => instrument.company_name },
-    {
-      id: 'isin',
-      label: 'ISIN',
-      render: (instrument) => (
-        <Typography sx={{ ...subtleCellText, fontFamily: 'monospace', fontSize: 12 }}>
-          {instrument.isin || '—'}
-        </Typography>
-      ),
-    },
+    ...(showIsinColumn ? [{ id: 'isin', label: 'ISIN', render: (instrument: V1Instrument) => (
+      <Typography sx={{ ...subtleCellText, fontFamily: 'monospace', fontSize: 12 }}>{instrument.isin || '—'}</Typography>
+    ) } as DataTableColumn<V1Instrument>] : []),
     { id: 'exchange', label: 'Exchange', sortable: true, render: (instrument) => <Typography sx={subtleCellText}>{instrument.exchange || 'UNKNOWN'}</Typography> },
     { id: 'assetType', label: 'Asset Type', sortable: true, render: (instrument) => <Typography sx={subtleCellText}>{formatAssetType(instrument.asset_type)}</Typography> },
     { id: 'instrumentSegment', label: 'Segment/Class', render: (instrument) => <Typography sx={subtleCellText}>{instrument.instrument_segment || 'UNKNOWN'}</Typography> },
-    { id: 'derivativesEligible', label: 'F&O Eligible', render: (instrument) => <Typography sx={subtleCellText}>{instrument.derivatives_eligible ? 'YES' : 'NO'}</Typography> },
+    ...(isIndiaEquity ? [{ id: 'derivativesEligible', label: 'F&O Eligible', render: (instrument: V1Instrument) => <Typography sx={subtleCellText}>{instrument.derivatives_eligible ? 'YES' : 'NO'}</Typography> } as DataTableColumn<V1Instrument>] : []),
     {
       id: 'dataHealth',
       label: 'Data Health',
@@ -1059,59 +1032,19 @@ const MarketDataFoundationPage: React.FC = () => {
     setPage(0);
   };
 
-  const applyPreset = (preset: 'all' | 'stocks' | 'fno' | 'indices' | 'etfs') => {
-    resetFilters();
-    if (preset === 'stocks') {
-      setAssetType('STOCK');
-      setInstrumentSegment('CASH');
-    }
-    if (preset === 'fno') {
-      setAssetType('STOCK');
-      setInstrumentSegment('CASH');
-      setDerivativesEligible('true');
-    }
-    if (preset === 'indices') {
-      setAssetType('INDEX');
-      setInstrumentSegment('INDEX');
-    }
-    if (preset === 'etfs') {
-      setAssetType('ETF');
-      setInstrumentSegment('ETF');
-    }
-    setPage(0);
-  };
-
-  const filterPresets: FilterPreset[] = [
-    { id: 'all', value: 'all', label: 'All', description: 'All instruments in the current market scope.', apply: () => applyPreset('all') },
-    { id: 'stocks', value: 'stocks', label: 'Stocks', description: 'Indian cash equity rows.', apply: () => applyPreset('stocks') },
-    { id: 'fno', value: 'fno', label: 'F&O Eligible', description: 'Cash stocks that are known F&O underlyings.', apply: () => applyPreset('fno') },
-    { id: 'indices', value: 'indices', label: 'Indices', description: 'Index catalog rows.', apply: () => applyPreset('indices') },
-    { id: 'etfs', value: 'etfs', label: 'ETFs', description: 'ETF catalog rows.', apply: () => applyPreset('etfs') },
-  ];
-
-  const activePresetValue = (() => {
-    if (!assetType && !instrumentSegment && !derivativesEligible) return 'all';
-    if (assetType === 'STOCK' && instrumentSegment === 'CASH' && derivativesEligible === 'true') return 'fno';
-    if (assetType === 'STOCK' && instrumentSegment === 'CASH' && !derivativesEligible) return 'stocks';
-    if (assetType === 'INDEX' && instrumentSegment === 'INDEX') return 'indices';
-    if (assetType === 'ETF' && instrumentSegment === 'ETF') return 'etfs';
-    return false;
-  })();
-
   const activeFilters = [
     search.trim() ? `Search = ${search.trim()}` : null,
-    exchange.trim() ? `Exchange = ${exchange.trim().toUpperCase()}` : null,
-    assetType.trim() ? `Asset Type = ${assetType.trim().toUpperCase()}` : null,
-    instrumentSegment.trim() ? `Segment = ${instrumentSegment.trim().toUpperCase()}` : null,
+    !isCryptoScope && exchange.trim() ? `Exchange = ${exchange.trim().toUpperCase()}` : null,
+    isIndiaEquity && instrumentSegment.trim() ? `Segment = ${instrumentSegment.trim().toUpperCase()}` : null,
     currency.trim() ? `Currency = ${currency.trim().toUpperCase()}` : null,
-    derivativesEligible ? `F&O Eligible = ${derivativesEligible === 'true' ? 'YES' : 'NO'}` : null,
-    catalogSource.trim() === 'NSE_SME_EQUITY_SECURITIES' ? 'SME only' : catalogSource.trim() === 'NSE_EQUITY_SECURITIES' ? 'Main Board only' : null,
+    isIndiaEquity && derivativesEligible ? `F&O Eligible = ${derivativesEligible === 'true' ? 'YES' : 'NO'}` : null,
+    isIndiaEquity && catalogSource.trim() === 'NSE_SME_EQUITY_SECURITIES' ? 'SME only' : isIndiaEquity && catalogSource.trim() === 'NSE_EQUITY_SECURITIES' ? 'Main Board only' : null,
   ].filter((item): item is string => Boolean(item));
   const hasLocalFilters = activeFilters.length > 0;
   // Region isolation: only show catalog sources for the selected market. The IN-only
   // fallback is therefore used solely when IN is selected; US/EU/Crypto honestly show
   // their own sources (or an empty state) rather than India's NSE/BSE sources.
-  const scopedSourceRegion = String(scope.region || '').toUpperCase();
+  const scopedSourceRegion = scopeRegionUpper;
   const availableCatalogSources = (catalogSources.length > 0 ? catalogSources : fallbackCatalogSources)
     .filter((source) => !scopedSourceRegion
       || String(source.region || '').toUpperCase() === scopedSourceRegion);
@@ -1119,7 +1052,18 @@ const MarketDataFoundationPage: React.FC = () => {
   const importAvailable = importMode === 'MANUAL_CSV' && catalogCsv.trim().length > 0
     || (importMode === 'CONFIGURED_URL' && selectedCatalogSource?.supportsConfiguredUrl === true)
     || (importMode === 'INTERNAL_SEED' && selectedCatalogSource?.supportsInternalSeed === true);
-  const scopeLabel = `${scope.region === 'GLOBAL' ? 'Global / All' : scope.region} / All asset types`;
+  const hasCatalogSources = availableCatalogSources.length > 0;
+  const hasManualFundamentals = !isCryptoScope;
+  const hasAnyIngestionControl = hasCatalogSources || hasExchangeFiles || hasManualFundamentals;
+  const ingestionCapability = {
+    region: scopeRegionUpper,
+    isCryptoScope,
+    hasCatalogSources,
+    hasExchangeFiles,
+    hasManualFundamentals,
+    hasAnyIngestionControl,
+  };
+  const scopeLabel = `${scope.region === 'GLOBAL' ? 'Global' : scope.region} / ${scope.assetType}`;
   const emptyMessage = hasLocalFilters
     ? `No instruments match ${activeFilters.join(', ')} in ${scopeLabel}.`
     : `No instruments found for ${scopeLabel}.`;
@@ -1270,348 +1214,77 @@ const MarketDataFoundationPage: React.FC = () => {
       )}
 
       {activeTab === 'import' && (
-      <Paper
-        variant="outlined"
-        sx={{
-          p: 2,
-          mb: 2,
-          width: '100%',
-          boxSizing: 'border-box',
-          overflow: 'visible',
-        }}
-      >
-        <Stack spacing={1.5}>
-          {availableCatalogSources.length === 0 && (
-            <Alert severity="info">
-              No exchange-file catalog sources for {scope.region || 'this market'}.{' '}
-              {scopedSourceRegion === 'GLOBAL'
-                ? 'Crypto is managed by the 24/7 ingestion lane.'
-                : 'This market ingests prices via the provider (Yahoo); its catalog is maintained by its seed script, not exchange-file import.'}
-            </Alert>
-          )}
-          <Box
-            sx={{
-              display: 'grid',
-              gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))', lg: 'repeat(3, minmax(180px, 1fr)) auto' },
-              gap: 1.5,
-              alignItems: 'center',
-              maxWidth: '100%',
-              '& .MuiTextField-root': { minWidth: 0 },
-            }}
-          >
-            <TextField select size="small" label="Import Mode" value={importMode} onChange={(event) => setImportMode(event.target.value as 'CONFIGURED_URL' | 'MANUAL_CSV' | 'INTERNAL_SEED')}>
-              {(!selectedCatalogSource || selectedCatalogSource.supportsConfiguredUrl) && <MenuItem value="CONFIGURED_URL">Configured URL</MenuItem>}
-              {selectedCatalogSource?.supportsInternalSeed && <MenuItem value="INTERNAL_SEED">Internal Seed</MenuItem>}
-              {(!selectedCatalogSource || selectedCatalogSource.supportsManualCsv) && <MenuItem value="MANUAL_CSV">Manual CSV</MenuItem>}
-            </TextField>
-            <TextField select size="small" label="Catalog Source" value={importSource} onChange={(event) => handleImportSourceChange(event.target.value)}>
-              {availableCatalogSources.map((item) => <MenuItem key={item.catalogSource} value={item.catalogSource}>{item.displayName || item.catalogSource}</MenuItem>)}
-            </TextField>
-            <Stack
-              direction={{ xs: 'column', sm: 'row' }}
-              spacing={1}
-              useFlexGap
-              flexWrap="wrap"
-              sx={{ justifySelf: { xs: 'stretch', lg: 'end' }, minWidth: 0 }}
-            >
-              <Button
-                variant="outlined"
-                startIcon={importingCatalog ? <CircularProgress size={18} /> : <SyncIcon />}
-                onClick={handleCatalogImport}
-                disabled={operatorBackgroundActive || importingCatalog || backfillingCatalog || !importAvailable}
-                sx={{ flex: { xs: '1 1 auto', sm: '0 1 auto' }, whiteSpace: 'nowrap' }}
-              >
-                {importingCatalog ? 'Importing...' : 'Import Catalog'}
-              </Button>
-              <Button
-                variant="outlined"
-                startIcon={backfillingCatalog ? <CircularProgress size={18} /> : <SyncIcon />}
-                onClick={handleCatalogBackfill}
-                disabled={operatorBackgroundActive || backfillingCatalog || importingCatalog}
-                sx={{ flex: { xs: '1 1 auto', sm: '0 1 auto' }, whiteSpace: 'nowrap' }}
-              >
-                {backfillingCatalog ? 'Backfilling...' : 'Backfill Metadata'}
-              </Button>
-            </Stack>
-          </Box>
-          {selectedCatalogSource && (
-            <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-              <Chip size="small" label={selectedCatalogSource.region} />
-              {selectedCatalogSource.assetType && <Chip size="small" label={selectedCatalogSource.assetType} />}
-              {selectedCatalogSource.segmentClass && <Chip size="small" label={selectedCatalogSource.segmentClass} />}
-              {selectedCatalogSource.supportsInternalSeed ? (
-                <Chip size="small" color="success" label="Uses built-in seed list" />
-              ) : importMode === 'MANUAL_CSV' && !selectedCatalogSource.urlConfigured ? (
-                <Chip size="small" color="warning" label="Manual CSV required" />
-              ) : (
-                <Chip size="small" color={selectedCatalogSource.urlConfigured ? 'success' : 'warning'} label={`URL configured: ${selectedCatalogSource.urlConfigured ? 'Yes' : 'No'}`} />
-              )}
-              <Chip size="small" label={`Source: ${selectedCatalogSource.urlSource === 'ENV' ? 'Env' : selectedCatalogSource.urlSource === 'DEFAULT' ? 'Default' : selectedCatalogSource.urlSource === 'INTERNAL_SEED' ? 'Internal Seed' : 'Manual setup'}`} />
-            </Stack>
-          )}
-          {importMode === 'CONFIGURED_URL' && selectedCatalogSource && !selectedCatalogSource.urlConfigured && (
-            <Alert severity="warning">{selectedCatalogSource.setupHint || 'No configured URL for this source. Use Manual CSV or configure the source URL.'}</Alert>
-          )}
-          {importMode === 'MANUAL_CSV' && selectedCatalogSource && !selectedCatalogSource.urlConfigured && selectedCatalogSource.setupHint && (
-            <Alert severity="info">{selectedCatalogSource.setupHint}</Alert>
-          )}
-          {importMode === 'INTERNAL_SEED' && selectedCatalogSource && (
-            <Alert severity="info">{selectedCatalogSource.setupHint || 'Uses a built-in seed list. No URL is required.'}</Alert>
-          )}
-          {importMode === 'MANUAL_CSV' && (
-            <TextField
-              multiline
-              minRows={3}
-              size="small"
-              label="Catalog CSV"
-              value={catalogCsv}
-              onChange={(event) => setCatalogCsv(event.target.value)}
-              placeholder="Paste NSE securities or F&O underlyings CSV here. Index seed import does not require CSV."
-            />
-          )}
-          <Divider />
-          <Box>
-            <Typography variant="subtitle2" gutterBottom>Historical Exchange Candle Backfill</Typography>
-            <Stack spacing={1.25}>
-              <FormControl>
-                <FormLabel id="market-data-historical-backfill-mode-label">Backfill mode</FormLabel>
-                <RadioGroup
-                  row
-                  aria-labelledby="market-data-historical-backfill-mode-label"
-                  value={historicalBackfillInputMode}
-                  onChange={(event) => setHistoricalBackfillInputMode(event.target.value as BackfillInputMode)}
-                >
-                  <FormControlLabel value="DATE_RANGE" control={<Radio size="small" />} label="Date range" />
-                  <FormControlLabel value="YEAR" control={<Radio size="small" />} label="By year" />
-                </RadioGroup>
-              </FormControl>
-              <Box
-                sx={{
-                  display: 'grid',
-                  gridTemplateColumns: {
-                    xs: '1fr',
-                    md: historicalBackfillInputMode === 'YEAR'
-                      ? 'minmax(160px, 220px) minmax(160px, 220px) auto'
-                      : 'minmax(180px, 240px) minmax(180px, 240px) auto',
-                  },
-                  gap: 1,
-                  alignItems: 'center',
-                }}
-              >
-                {historicalBackfillInputMode === 'YEAR' ? (
-                  <>
-                    <TextField
-                      select
-                      size="small"
-                      label="From year"
-                      value={historicalBackfillStartYear}
-                      onChange={(event) => handleHistoricalBackfillStartYearChange(event.target.value)}
-                      fullWidth
-                    >
-                      {historicalBackfillYearOptions.map((year) => (
-                        <MenuItem key={year} value={year}>{year}</MenuItem>
-                      ))}
-                    </TextField>
-                    <TextField
-                      select
-                      size="small"
-                      label="To year"
-                      value={historicalBackfillEndYear}
-                      onChange={(event) => handleHistoricalBackfillEndYearChange(event.target.value)}
-                      fullWidth
-                    >
-                      {historicalBackfillYearOptions.map((year) => (
-                        <MenuItem key={year} value={year}>{year}</MenuItem>
-                      ))}
-                    </TextField>
-                  </>
-                ) : (
-                  <>
-                    <TextField size="small" type="date" label="Start Date" value={historicalStartDate} onChange={(event) => setHistoricalStartDate(event.target.value)} InputLabelProps={{ shrink: true }} inputProps={{ max: latestSelectableBackfillDate }} fullWidth />
-                    <TextField size="small" type="date" label="End Date" value={historicalEndDate} onChange={(event) => setHistoricalEndDate(event.target.value)} InputLabelProps={{ shrink: true }} inputProps={{ max: latestSelectableBackfillDate }} fullWidth />
-                  </>
-                )}
-                <Button
-                  variant="contained"
-                  startIcon={historicalBackfillRunning ? <CircularProgress size={18} /> : <SyncIcon />}
-                  onClick={() => void handleHistoricalBackfill()}
-                  disabled={operatorBackgroundActive || historicalBackfillRunning || !selectedHistoricalBackfillRange.startDate || !selectedHistoricalBackfillRange.endDate}
-                  sx={{ height: 40, whiteSpace: 'nowrap', width: 'fit-content', justifySelf: 'start', minWidth: 132 }}
-                >
-                  {historicalBackfillRunning ? 'Starting...' : 'Run Backfill'}
-                </Button>
-              </Box>
-            </Stack>
-            {historicalBackfillResult && (
-              <Box sx={{ mt: 1.5 }}>
-                <HistoricalBackfillRunEvidence
-                  run={historicalBackfillResult}
-                  loading={historicalBackfillRunning}
-                  onResume={() => void handleResumeHistoricalBackfill()}
-                  onRetry={() => void handleRetryHistoricalBackfill()}
-                  onCancel={() => void handleCancelHistoricalBackfill()}
-                />
-              </Box>
-            )}
-          </Box>
-          <Divider />
-          <Box>
-            <Typography variant="subtitle2" gutterBottom>Manual Verified Fundamentals</Typography>
-            <Stack
-              direction={{ xs: 'column', md: 'row' }}
-              spacing={1}
-              alignItems={{ xs: 'stretch', md: 'center' }}
-              useFlexGap
-              flexWrap="wrap"
-            >
-              <TextField size="small" label="Stock ID" value={manualFundamental.stockId} onChange={(event) => updateManualFundamentalField('stockId', event.target.value)} />
-              <TextField select size="small" label="Period" value={manualFundamental.periodType} onChange={(event) => updateManualFundamentalField('periodType', event.target.value)} sx={{ maxWidth: { md: 140 } }}>
-                <MenuItem value="ANNUAL">Annual</MenuItem>
-                <MenuItem value="QUARTERLY">Quarterly</MenuItem>
-                <MenuItem value="TTM">TTM</MenuItem>
-              </TextField>
-              <TextField size="small" type="date" label="Period End" value={manualFundamental.periodEndDate} onChange={(event) => updateManualFundamentalField('periodEndDate', event.target.value)} InputLabelProps={{ shrink: true }} />
-              <TextField size="small" label="EPS" value={manualFundamental.eps} onChange={(event) => updateManualFundamentalField('eps', event.target.value)} sx={{ maxWidth: { md: 120 } }} />
-              <TextField size="small" label="P/E" value={manualFundamental.peRatio} onChange={(event) => updateManualFundamentalField('peRatio', event.target.value)} sx={{ maxWidth: { md: 120 } }} />
-              <TextField size="small" label="Market Cap" value={manualFundamental.marketCap} onChange={(event) => updateManualFundamentalField('marketCap', event.target.value)} sx={{ maxWidth: { md: 150 } }} />
-              <TextField size="small" label="Source Note" value={manualFundamental.sourceNote} onChange={(event) => updateManualFundamentalField('sourceNote', event.target.value)} />
-              <TextField size="small" label="Source URL" value={manualFundamental.sourceUrl} onChange={(event) => updateManualFundamentalField('sourceUrl', event.target.value)} />
-              <TextField size="small" label="Validated By" value={manualFundamental.validatedBy} onChange={(event) => updateManualFundamentalField('validatedBy', event.target.value)} sx={{ maxWidth: { md: 180 } }} />
-              <Button
-                variant="contained"
-                startIcon={manualFundamentalRunning ? <CircularProgress size={18} /> : <FactCheckIcon />}
-                onClick={() => void handleManualFundamentalImport()}
-                disabled={operatorBackgroundActive || manualFundamentalRunning}
-              >
-                {manualFundamentalRunning ? 'Importing...' : 'Import Fundamentals'}
-              </Button>
-            </Stack>
-          </Box>
-          <Divider />
-          <Box>
-            <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
-              <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0 }}>
-                <Typography variant="subtitle2">Source File Evidence</Typography>
-                <Chip size="small" label="Latest 10" variant="outlined" />
-              </Stack>
-              <Button size="small" startIcon={sourceImportsLoading ? <CircularProgress size={16} /> : <RefreshIcon />} onClick={() => void loadSourceImports()} disabled={sourceImportsLoading}>
-                Refresh Evidence
-              </Button>
-            </Stack>
-            {sourceImportsLoaded ? (
-              <SourceFileImportEvidence
-                imports={sourceImports}
-                sortBy={sourceImportSortBy}
-                sortDirection={sourceImportSortDirection}
-                onSortChange={handleSourceImportSortChange}
-              />
-            ) : (
-              <Paper variant="outlined" sx={{ p: 1.5 }}>
-                <Typography variant="body2" color="text.secondary">Refresh Evidence loads the latest SourceFileImport records.</Typography>
-              </Paper>
-            )}
-          </Box>
-        </Stack>
-      </Paper>
+        <MarketDataImportPanel
+          capability={ingestionCapability}
+          availableCatalogSources={availableCatalogSources}
+          selectedCatalogSource={selectedCatalogSource}
+          importMode={importMode}
+          catalogCsv={catalogCsv}
+          importAvailable={importAvailable}
+          importingCatalog={importingCatalog}
+          backfillingCatalog={backfillingCatalog}
+          operatorBackgroundActive={operatorBackgroundActive}
+          onImportModeChange={setImportMode}
+          onImportSourceChange={handleImportSourceChange}
+          onCatalogCsvChange={setCatalogCsv}
+          onImportCatalog={handleCatalogImport}
+          onBackfillCatalog={handleCatalogBackfill}
+          historicalBackfillInputMode={historicalBackfillInputMode}
+          historicalStartDate={historicalStartDate}
+          historicalEndDate={historicalEndDate}
+          historicalBackfillStartYear={historicalBackfillStartYear}
+          historicalBackfillEndYear={historicalBackfillEndYear}
+          historicalBackfillYearOptions={historicalBackfillYearOptions}
+          latestSelectableBackfillDate={latestSelectableBackfillDate}
+          selectedHistoricalBackfillRange={selectedHistoricalBackfillRange}
+          historicalBackfillRunning={historicalBackfillRunning}
+          historicalBackfillResult={historicalBackfillResult}
+          onHistoricalBackfillInputModeChange={setHistoricalBackfillInputMode}
+          onHistoricalStartDateChange={setHistoricalStartDate}
+          onHistoricalEndDateChange={setHistoricalEndDate}
+          onHistoricalBackfillStartYearChange={handleHistoricalBackfillStartYearChange}
+          onHistoricalBackfillEndYearChange={handleHistoricalBackfillEndYearChange}
+          onRunHistoricalBackfill={() => void handleHistoricalBackfill()}
+          onResumeHistoricalBackfill={() => void handleResumeHistoricalBackfill()}
+          onRetryHistoricalBackfill={() => void handleRetryHistoricalBackfill()}
+          onCancelHistoricalBackfill={() => void handleCancelHistoricalBackfill()}
+          manualFundamental={manualFundamental}
+          manualFundamentalRunning={manualFundamentalRunning}
+          onManualFundamentalFieldChange={updateManualFundamentalField}
+          onManualFundamentalImport={() => void handleManualFundamentalImport()}
+          sourceImports={sourceImports}
+          sourceImportsLoaded={sourceImportsLoaded}
+          sourceImportsLoading={sourceImportsLoading}
+          sourceImportSortBy={sourceImportSortBy}
+          sourceImportSortDirection={sourceImportSortDirection}
+          onLoadSourceImports={() => void loadSourceImports()}
+          onSourceImportSortChange={handleSourceImportSortChange}
+        />
       )}
 
       {activeTab === 'catalog' && (
         <>
       <Box sx={{ mb: 2, width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
-        <Paper
-          variant="outlined"
-          sx={{
-            mb: 1.5,
-            px: 1,
-            bgcolor: 'background.paper',
-            borderColor: 'divider',
-            overflow: 'hidden',
-          }}
-        >
-          <Stack direction={{ xs: 'column', md: 'row' }} alignItems={{ xs: 'stretch', md: 'center' }} spacing={{ xs: 0.5, md: 1 }}>
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              sx={{ px: 1, pt: { xs: 1, md: 0 }, flexShrink: 0, fontWeight: 600 }}
-            >
-              Catalog Views
-            </Typography>
-            <Tabs
-              value={activePresetValue}
-              onChange={(_event, nextValue) => {
-                const preset = filterPresets.find((item) => item.value === nextValue);
-                preset?.apply();
-              }}
-              variant="scrollable"
-              scrollButtons="auto"
-              allowScrollButtonsMobile
-              sx={{
-                minHeight: 48,
-                '& .MuiTabs-indicator': { height: 3, borderRadius: 3 },
-                '& .MuiTab-root': {
-                  minHeight: 48,
-                  px: 2,
-                  textTransform: 'none',
-                  fontWeight: 700,
-                  fontSize: 13,
-                },
-              }}
-            >
-              {filterPresets.map((preset) => (
-                <Tab key={preset.id} value={preset.value} label={preset.label} title={preset.description} />
-              ))}
-            </Tabs>
-          </Stack>
-        </Paper>
-        <FilterBar onReset={resetFilters} showReset={hasLocalFilters}>
-          <TextField
-            sx={{ flexBasis: { xs: '100%', md: 320 }, flexGrow: { md: 2 } }}
-            size="small"
-            label="Search by symbol or company"
-            value={search}
-            onChange={(event) => {
-              setSearch(event.target.value);
-              setPage(0);
-            }}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon />
-                </InputAdornment>
-              ),
-            }}
-          />
-          <TextField size="small" label="Exchange" value={exchange} onChange={(event) => { setExchange(event.target.value.toUpperCase()); setPage(0); }} />
-          <TextField select size="small" label="Asset Type" value={assetType} onChange={(event) => { setAssetType(event.target.value); setPage(0); }}>
-            <MenuItem value="">All</MenuItem>
-            {['STOCK', 'ETF', 'INDEX', 'FUTURE', 'FOREX', 'COMMODITY', 'CRYPTO', 'FUND', 'OTHER', 'UNKNOWN'].map((item) => <MenuItem key={item} value={item}>{item}</MenuItem>)}
-          </TextField>
-          <TextField select size="small" label="Segment/Class" value={instrumentSegment} onChange={(event) => { setInstrumentSegment(event.target.value); setPage(0); }}>
-            <MenuItem value="">All</MenuItem>
-            {['CASH', 'FUTURES', 'INDEX', 'ETF', 'CURRENCY', 'COMMODITY', 'CRYPTO', 'FUND', 'OTHER', 'UNKNOWN'].map((item) => <MenuItem key={item} value={item}>{item}</MenuItem>)}
-          </TextField>
-          <TextField size="small" label="Currency" value={currency} onChange={(event) => { setCurrency(event.target.value.toUpperCase()); setPage(0); }} />
-          <TextField select size="small" label="F&O Eligible" value={derivativesEligible} onChange={(event) => { setDerivativesEligible(event.target.value); setPage(0); }}>
-            <MenuItem value="">All</MenuItem>
-            <MenuItem value="true">Yes</MenuItem>
-            <MenuItem value="false">No</MenuItem>
-          </TextField>
-          <TextField select size="small" label="SME / Segment" value={catalogSource} onChange={(event) => { setCatalogSource(event.target.value); setPage(0); }}
-            title="Filter by NSE segment classification (Main Board vs SME)."
-          >
-            <MenuItem value="">All</MenuItem>
-            <MenuItem value="NSE_EQUITY_SECURITIES">NSE Main Board (EQ)</MenuItem>
-            <MenuItem value="NSE_SME_EQUITY_SECURITIES">NSE SME only</MenuItem>
-          </TextField>
-          <Button
-            variant="outlined"
-            startIcon={loading ? <CircularProgress size={18} /> : <RefreshIcon />}
-            onClick={loadInstruments}
-            disabled={loading}
-          >
-            Refresh
-          </Button>
-        </FilterBar>
+        <CatalogFilterControls
+          capability={{ isIndiaEquity, isCryptoScope }}
+          search={search}
+          exchange={exchange}
+          instrumentSegment={instrumentSegment}
+          currency={currency}
+          derivativesEligible={derivativesEligible}
+          catalogSource={catalogSource}
+          loading={loading}
+          hasLocalFilters={hasLocalFilters}
+          onSearchChange={setSearch}
+          onExchangeChange={setExchange}
+          onInstrumentSegmentChange={setInstrumentSegment}
+          onCurrencyChange={setCurrency}
+          onDerivativesEligibleChange={setDerivativesEligible}
+          onCatalogSourceChange={setCatalogSource}
+          onResetPage={() => setPage(0)}
+          onReset={resetFilters}
+          onRefresh={loadInstruments}
+        />
       </Box>
 
       {hasLocalFilters && (
@@ -1664,7 +1337,7 @@ const MarketDataFoundationPage: React.FC = () => {
             <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
               <StatusBadge label={formatAssetType(selectedInstrument.asset_type)} />
               <StatusBadge label={selectedInstrument.instrument_segment || 'UNKNOWN'} />
-              <StatusBadge label={selectedInstrument.derivatives_eligible ? 'F&O YES' : 'F&O NO'} />
+              {isIndiaEquity && <StatusBadge label={selectedInstrument.derivatives_eligible ? 'F&O YES' : 'F&O NO'} />}
             </Stack>
             <Box>
               <Typography variant="subtitle2" gutterBottom>Identity</Typography>
@@ -1672,10 +1345,9 @@ const MarketDataFoundationPage: React.FC = () => {
                 <Typography variant="body2"><strong>Stored symbol:</strong> {selectedInstrument.symbol}</Typography>
                 <Typography variant="body2"><strong>Display symbol:</strong> {selectedInstrument.display_symbol || formatDisplaySymbol(selectedInstrument)}</Typography>
                 <Typography variant="body2"><strong>Source symbol:</strong> {selectedInstrument.source_symbol || 'Missing'}</Typography>
-                <Typography variant="body2">
-                  <strong>ISIN:</strong>{' '}
-                  <span style={{ fontFamily: 'monospace' }}>{selectedInstrument.isin || '—'}</span>
-                </Typography>
+                {showIsinColumn && (
+                  <Typography variant="body2"><strong>ISIN:</strong>{' '}<span style={{ fontFamily: 'monospace' }}>{selectedInstrument.isin || '—'}</span></Typography>
+                )}
                 {selectedInstrument.catalog_source === 'NSE_SME_EQUITY_SECURITIES' && (
                   <Stack direction="row" spacing={0.5} alignItems="center">
                     <Chip size="small" label="SME" color="warning" />

@@ -99,9 +99,14 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
   }, [region, assetType]);
 
   const latestEvidence = latestSourceEvidence(sourceImports);
-  // Build a scope dimension label for the stored-data count card
+  // Exchange-file panels (Latest Exchange Evidence, Recent Source Files) only apply to
+  // India (NSE/BSE). US/EU ingest via provider; crypto via the 24/7 lane — neither
+  // produces exchange source files.
+  const isIndia = normalizeMarketForApi(region) === 'IN';
+  // Build a scope dimension label for the stored-data count card. Crypto (region GLOBAL,
+  // assetType CRYPTO) reads as "Global / CRYPTO" rather than dropping the region.
   const scopeDimensionLabel = [
-    region && region !== 'GLOBAL' ? region : null,
+    region ? (region === 'GLOBAL' ? 'Global' : region) : null,
     assetType ? (assetType === 'EQUITY' ? 'STOCK' : assetType) : null,
   ].filter(Boolean).join(' / ') || null;
 
@@ -151,16 +156,18 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
           </Stack>
         </Paper>
 
-        <Paper variant="outlined" sx={{ p: 2 }}>
-          <Typography variant="overline" color="text.secondary">Latest Exchange Evidence</Typography>
-          <Typography variant="h6">{latestEvidence?.tradingDate || 'No completed import'}</Typography>
-          <Typography variant="body2" color="text.secondary">{latestEvidence?.fileName || 'Run an NSE/BSE exchange import to create evidence.'}</Typography>
-          <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" sx={{ mt: 1 }}>
-            <Chip size="small" label={latestEvidence ? `${latestEvidence.source} ${latestEvidence.segment}` : 'N/A'} />
-            <Chip size="small" label={`Accepted ${formatCount(latestEvidence?.rowsAccepted)}`} />
-            <Chip size="small" label={`Rejected ${formatCount(latestEvidence?.rowsRejected)}`} />
-          </Stack>
-        </Paper>
+        {isIndia && (
+          <Paper variant="outlined" sx={{ p: 2 }}>
+            <Typography variant="overline" color="text.secondary">Latest Exchange Evidence</Typography>
+            <Typography variant="h6">{latestEvidence?.tradingDate || 'No completed import'}</Typography>
+            <Typography variant="body2" color="text.secondary">{latestEvidence?.fileName || 'Run an NSE/BSE exchange import to create evidence.'}</Typography>
+            <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" sx={{ mt: 1 }}>
+              <Chip size="small" label={latestEvidence ? `${latestEvidence.source} ${latestEvidence.segment}` : 'N/A'} />
+              <Chip size="small" label={`Accepted ${formatCount(latestEvidence?.rowsAccepted)}`} />
+              <Chip size="small" label={`Rejected ${formatCount(latestEvidence?.rowsRejected)}`} />
+            </Stack>
+          </Paper>
+        )}
 
         <Paper variant="outlined" sx={{ p: 2 }}>
           <Typography variant="overline" color="text.secondary">Scheduler</Typography>
@@ -241,35 +248,35 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
         )}
       </Paper>
 
-      <Paper variant="outlined" sx={{ p: 2 }}>
-        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
-          <Typography variant="subtitle2">Recent Source Files</Typography>
-          <RegionBadge region={region} />
-        </Stack>
-        <Stack spacing={1}>
-          {sourceImports.length === 0 && (
-            <Typography variant="body2" color="text.secondary">
-              {region && region !== 'GLOBAL' && normalizeMarketForApi(region) !== 'IN'
-                ? `${region} ingests prices via the provider (Yahoo) — it produces no exchange source files.`
-                : 'No source-file imports recorded yet.'}
-            </Typography>
-          )}
-          {sourceImports.map((item) => (
-            <Stack key={item.id} direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={1}>
-              <Box>
-                <Typography variant="body2" fontWeight={700}>{item.source} {item.segment} - {item.tradingDate || 'unknown date'}</Typography>
-                <Typography variant="caption" color="text.secondary">{item.fileName}</Typography>
-              </Box>
-              <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-                <Chip size="small" label={item.status} color={statusColor(item.status)} />
-                <Chip size="small" label={`Raw ${formatCount(item.rowsRaw)}`} />
-                <Chip size="small" label={`Accepted ${formatCount(item.rowsAccepted)}`} />
-                <Chip size="small" label={`Rejected ${formatCount(item.rowsRejected)}`} />
+      {isIndia && (
+        <Paper variant="outlined" sx={{ p: 2 }}>
+          <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+            <Typography variant="subtitle2">Recent Source Files</Typography>
+            <RegionBadge region={region} />
+          </Stack>
+          <Stack spacing={1}>
+            {sourceImports.length === 0 && (
+              <Typography variant="body2" color="text.secondary">
+                No source-file imports recorded yet.
+              </Typography>
+            )}
+            {sourceImports.map((item) => (
+              <Stack key={item.id} direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={1}>
+                <Box>
+                  <Typography variant="body2" fontWeight={700}>{item.source} {item.segment} - {item.tradingDate || 'unknown date'}</Typography>
+                  <Typography variant="caption" color="text.secondary">{item.fileName}</Typography>
+                </Box>
+                <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+                  <Chip size="small" label={item.status} color={statusColor(item.status)} />
+                  <Chip size="small" label={`Raw ${formatCount(item.rowsRaw)}`} />
+                  <Chip size="small" label={`Accepted ${formatCount(item.rowsAccepted)}`} />
+                  <Chip size="small" label={`Rejected ${formatCount(item.rowsRejected)}`} />
+                </Stack>
               </Stack>
-            </Stack>
-          ))}
-        </Stack>
-      </Paper>
+            ))}
+          </Stack>
+        </Paper>
+      )}
     </Stack>
   );
 };

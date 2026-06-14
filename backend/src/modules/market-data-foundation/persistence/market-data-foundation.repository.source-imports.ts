@@ -154,7 +154,11 @@ export class SourceImportsRepository {
     // region column on the row (or per-region MANUAL_VERIFIED sources) — until then US/EU
     // manual rows would be wrongly hidden from their scope. Tracked as a follow-up.
     const REGION_FILE_SOURCES: Record<string, string[]> = { IN: ['NSE', 'BSE', 'MANUAL_VERIFIED'] };
-    if (regionKey && regionKey !== 'GLOBAL') {
+    if (regionKey) {
+      // Any concrete admin scope: only India's NSE/BSE/manual pipeline produces exchange
+      // source files. US/EU (provider/Yahoo) and GLOBAL/crypto (24/7 lane) have none, so
+      // their allow-list is empty → zero rows instead of leaking India's bhavcopy. Only a
+      // region-less (internal / unscoped) caller stays unrestricted.
       where.source = { in: REGION_FILE_SOURCES[regionKey] ?? [] };
     }
     if (input.source) where.source = input.source.trim().toUpperCase();

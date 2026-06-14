@@ -40,7 +40,7 @@ import type {
   V1LatestPriceResponse,
   V1PricesResponse,
 } from '../types';
-import { logMarketDataApi, normalizeAssetTypeForMarketDataApi, normalizeMarketForApi } from './marketScopeApi';
+import { logMarketDataApi, normalizeAssetTypeForMarketDataApi, normalizeMarketForApi, scopedRegionForApi } from './marketScopeApi';
 
 const API_BASE = '/api';
 
@@ -307,7 +307,7 @@ export async function fetchSourceFileImports(options: {
   const { region, assetType, ...rest } = options;
   const response = await axios.get<MarketDataSourceFileImportsResponse>(
     `${API_BASE}/v1/market-data/source-file-imports`,
-    { params: { ...rest, ...buildScopedQuery({ region, assetType }) } }
+    { params: { ...rest, region: scopedRegionForApi(region), assetType: normalizeAssetTypeForMarketDataApi(assetType) } }
   );
   return response.data;
 }
