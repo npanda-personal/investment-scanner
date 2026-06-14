@@ -17,8 +17,7 @@ import {
   coverageStatus,
   calculateLiquidity,
   fundamentalsCoverageTierFor as computeFundamentalsTier,
-  readinessScore,
-  readinessStatus,
+  readinessScore, readinessStatus, computeVolumeFacts,
 } from './data-quality-engine.scoring';
 import { computeStaleness } from './data-quality-engine.staleness';
 import { deriveUseCaseTiers } from './data-quality-engine.use-case-tiers';
@@ -82,7 +81,7 @@ export class DataQualityEngineService {
   }
 
   async summary(query: Partial<DataQualityQuery> = {}) {
-    const total = await this.instrumentCount(query);
+    const total = await this.repository.countInstrumentsInScope(query);
     return this.repository.summary(total, query);
   }
 
@@ -394,11 +393,9 @@ export class DataQualityEngineService {
       const verdicts = this.computeEligibilityVerdicts(facts, instrument, readinessScoreValue);
       await this.upsertInstrumentEligibility(instrument.id, instrument, facts, verdicts, readinessScoreValue, readinessStatusValue);
     } catch (_err: unknown) {
-      // Eligibility write failure must not surface to callers — the legacy
-      // DataQualityEvaluation row is already written; log only in debug builds.
-      if (process.env.NODE_ENV === 'development') {
-        console.warn(`[DQE] eligibility upsert failed for ${instrument?.id}: ${(_err as Error)?.message}`);
-      }
+      // Non-silent: the legacy DataQualityEvaluation row is already written, but a
+      // failed eligibility write leaves the verdict row MISSING — always surface it.
+      console.warn(`[DQE] eligibility upsert failed for ${instrument?.id}: ${(_err as Error)?.message}`);
     }
   }
 
@@ -436,7 +433,7 @@ export class DataQualityEngineService {
     const tierEvidence = this.tierEvidence(norm, hasSignal);
     const priceCount = prices.length;
     const latestDate = latestPrice?.date ? new Date(latestPrice.date) : prices[0]?.date ? new Date(prices[0].date) : null;
-    const stale = computeStaleness(latestDate, config).isStale;
+    const staleness = computeStaleness(latestDate, config), stale = staleness.isStale;
     const volumeValues = prices.map((price) => optionalNumber(price.volume)).filter((value): value is number => value !== null);
     const adjustedFallbackCount = prices.filter((price) => price.adjusted_close === null || price.adjusted_close === undefined).length;
 
@@ -476,16 +473,16 @@ export class DataQualityEngineService {
 
     const coverage = coverageScore({ sector, industry, country, currency }, priceCount, latestPrice, stale, fundamentals.length, corporateActions.length, volumeValues.length, adjustedFallbackCount, config);
     const signalReadinessScoreValue = readinessScore(priceCount, stale, volumeValues.length, { sector, country }, liquidity.score, config);
-    const eligibleForSignals = signalReadinessScoreValue >= config.signalMinReadinessScore && !stale;
     const coverageStatusValue = coverageStatus(coverage, config);
     const signalReadinessStatusValue = readinessStatus(signalReadinessScoreValue, config);
-    const eligibleForBacktesting = priceCount >= config.backtestMinBars && !stale;
-    // Calibration readiness is driven by price-history depth. The previous
-    // `hasSignal && …` gate depended on a signal service that is never injected
-    // (it would form a module cycle), leaving calibration permanently false in
-    // production and disagreeing with the instrument_eligibility verdict. Both
-    // now use the same price-bars rule. `hasSignal` remains informational only.
-    const eligibleForCalibration = priceCount >= config.calibrationMinBars;
+    // Legacy eligibility booleans ARE the instrument_eligibility verdicts now (single
+    // authority): verdicts add the mainboard-fundamentals and illiquid gates the old
+    // `score>=70 && !stale` rule skipped, so column and verdict can never disagree.
+    const facts = this.computeEligibilityFacts(instrument, prices, latestPrice, fundamentals, staleness.staleSessions, liquidity.score);
+    const verdicts = this.computeEligibilityVerdicts(facts, instrument, signalReadinessScoreValue);
+    const eligibleForSignals = verdicts.signalEligible;
+    const eligibleForBacktesting = verdicts.backtestEligible;
+    const eligibleForCalibration = verdicts.calibrationEligible;
     const useCaseTiers = deriveUseCaseTiers({
       stale,
       coverageStatus: coverageStatusValue,
@@ -559,16 +556,6 @@ export class DataQualityEngineService {
       instruments: result.instruments,
       totalCount: Number.isFinite(result.pagination?.total) ? result.pagination.total : result.instruments.length,
     };
-  }
-
-  private async instrumentCount(query: Partial<DataQualityQuery> = {}): Promise<number> {
-    const result = await this.marketDataService.listInstruments({
-      page: 1,
-      pageSize: 1,
-      region: query.region,
-      assetType: query.assetType
-    });
-    return result.pagination.total;
   }
 
   /**
@@ -657,13 +644,7 @@ export class DataQualityEngineService {
 
   // ── Eligibility authority ─────────────────────────────────────────────────
 
-  /**
-   * Compute EligibilityFacts from data that the DQE evaluation ALREADY loads.
-   *
-   * volumeCoveragePct and maxGapDays are persisted as 0 here: deriving them needs
-   * extra passes over the price series that don't belong on the hot evaluation
-   * path. They are filled when the DQE pipeline moves to its dedicated DAG stage.
-   */
+  /** Compute EligibilityFacts from data the DQE evaluation ALREADY loads. */
   computeEligibilityFacts(
     instrument: any,
     prices: PriceForQuality[],
@@ -682,8 +663,7 @@ export class DataQualityEngineService {
       priceBars: prices.length,
       lastPriceDate,
       staleSessions: staleSessionCount,
-      volumeCoveragePct: 0,
-      maxGapDays: 0,
+      ...computeVolumeFacts(prices),
       liquidityScore,
       hasFundamentals: fundamentals.length > 0,
       hasSector: Boolean(optionalText(instrument?.sector)),
@@ -715,13 +695,12 @@ export class DataQualityEngineService {
     if (facts.liquidityScore < config.signalIlliquidLiquidityScore) signalReasons.push('ILLIQUID');
     const signalEligible = signalReasons.length === 0;
 
-    // ── review ───────────────────────────────────────────────────────────────
-    // Mirrors MDF trusted-universe semantics: minPriceBars + fresh price
-    // (staleSessions === 0) + recent volume present (liquidityScore > 0).
+    // ── review ── MDF trusted-universe semantics: minPriceBars + fresh price + recent volume.
     const reviewReasons: EligibilityReasonCode[] = [];
     if (facts.priceBars < policy.review.minPriceBars) reviewReasons.push('INSUFFICIENT_BARS');
     if (facts.staleSessions > 0) reviewReasons.push('STALE_PRICE');
     if (facts.liquidityScore === 0) reviewReasons.push('NO_RECENT_VOLUME');
+    if (facts.volumeCoveragePct < config.reviewMinVolumeCoveragePct) reviewReasons.push('LOW_VOLUME_COVERAGE');
     const reviewEligible = reviewReasons.length === 0;
 
     // ── backtest ─────────────────────────────────────────────────────────────
@@ -855,9 +834,10 @@ export class DataQualityEngineService {
     for (const instrumentId of instrumentIds) {
       const row = byId.get(instrumentId);
       if (!row) {
-        // No persisted row — exclude conservatively
+        // No persisted eligibility verdict — exclude with an honest reason (not
+        // NO_LATEST_PRICE, which would imply a price-data problem).
         excludedInstrumentIds.push(instrumentId);
-        reasonsByInstrumentId[instrumentId] = ['NO_LATEST_PRICE'];
+        reasonsByInstrumentId[instrumentId] = ['ELIGIBILITY_NOT_COMPUTED'];
         continue;
       }
       const eligible = row.verdicts[`${verdict}Eligible` as keyof EligibilityVerdicts] as boolean;

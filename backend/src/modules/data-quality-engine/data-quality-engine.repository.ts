@@ -93,6 +93,21 @@ export class DataQualityEngineRepository {
     return this.db.dataQualityEvaluation.count({ where: this.where(query) });
   }
 
+  /**
+   * Count the instruments that fall in this region/asset scope, using the SAME
+   * Stock-relation predicate the evaluation list/count uses. This is the summary
+   * denominator: previously it came from a DIFFERENT engine (MarketDataFoundation
+   * listInstruments), so the universe total and the per-status counts could be
+   * scoped differently and disagree (e.g. US 6843 vs 6826). One predicate now
+   * backs both, so totalInstruments and dataStatus are internally consistent.
+   */
+  async countInstrumentsInScope(query: Partial<DataQualityQuery> = {}): Promise<number> {
+    const stockFilter = this.scopeStockWhere(query);
+    return this.db.stock.count({
+      where: Object.keys(stockFilter).length > 0 ? stockFilter : undefined,
+    });
+  }
+
   async summary(totalInstruments: number, query: Partial<DataQualityQuery> = {}): Promise<DataQualitySummary> {
     const base = { region: query.region, assetType: query.assetType };
     const [good, partial, poor, unusable, ready, latest, all] = await Promise.all([
@@ -130,12 +145,21 @@ export class DataQualityEngineRepository {
     };
   }
 
-  private where(query: Partial<DataQualityQuery>): any {
+  /**
+   * The region + asset-type Stock predicate. Single source of truth for scope so
+   * the evaluation list/count and the universe count (countInstrumentsInScope)
+   * always select the same population.
+   */
+  private scopeStockWhere(query: Partial<DataQualityQuery>): Prisma.StockWhereInput {
     const regionStockFilter = resolveRelatedMarketRegionFilter(query.region).stock as Prisma.StockWhereInput | undefined;
     const assetStockFilter = this.assetTypeWhere(query.assetType);
     const stockFilters = [regionStockFilter, assetStockFilter].filter((item): item is Prisma.StockWhereInput => Boolean(item && Object.keys(item).length > 0));
-    const stockFilter: Prisma.StockWhereInput = stockFilters.length > 1 ? { AND: stockFilters } : stockFilters[0] || {};
-    
+    return stockFilters.length > 1 ? { AND: stockFilters } : stockFilters[0] || {};
+  }
+
+  private where(query: Partial<DataQualityQuery>): any {
+    const stockFilter = this.scopeStockWhere(query);
+
     return {
       stock: Object.keys(stockFilter).length > 0 ? stockFilter : undefined,
       OR: query.search ? [

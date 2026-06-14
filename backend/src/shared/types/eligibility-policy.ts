@@ -48,7 +48,10 @@ export type EligibilityReasonCode =
   | 'ILLIQUID'
   | 'COVERAGE_UNUSABLE'
   | 'SCORE_BELOW_THRESHOLD'
-  | 'NO_LATEST_PRICE';
+  | 'NO_LATEST_PRICE'
+  // An evaluation exists but its eligibility verdict was never persisted (e.g. the
+  // verdict write failed). Distinct from NO_LATEST_PRICE so the cause is honest.
+  | 'ELIGIBILITY_NOT_COMPUTED';
 
 export const ELIGIBILITY_REASON_CODES: EligibilityReasonCode[] = [
   'INSUFFICIENT_BARS',
@@ -62,6 +65,7 @@ export const ELIGIBILITY_REASON_CODES: EligibilityReasonCode[] = [
   'COVERAGE_UNUSABLE',
   'SCORE_BELOW_THRESHOLD',
   'NO_LATEST_PRICE',
+  'ELIGIBILITY_NOT_COMPUTED',
 ];
 
 export interface EligibilityVerdicts {

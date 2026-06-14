@@ -71,6 +71,38 @@ export function readinessScore(
   return Math.round(Math.min(100, score));
 }
 
+export interface VolumeFacts {
+  /** Share of bars carrying a positive volume, as a percentage (0–100, 1 dp). */
+  volumeCoveragePct: number;
+  /** Largest calendar-day gap between consecutive bars in the window. */
+  maxGapDays: number;
+}
+
+/**
+ * Derive real volume-coverage and max-gap facts in one pass over the price
+ * window. Replaces the placeholder zeros the engine used to persist, so
+ * instrument_eligibility.volumeCoveragePct / maxGapDays stop being a stored
+ * falsehood. Pure — order-independent (sorts a copy for the gap calc).
+ */
+export function computeVolumeFacts(prices: PriceForQuality[]): VolumeFacts {
+  if (prices.length === 0) return { volumeCoveragePct: 0, maxGapDays: 0 };
+  const withVolume = prices.filter((price) => {
+    const value = optionalNumber(price.volume);
+    return value !== null && value > 0;
+  }).length;
+  const volumeCoveragePct = Math.round((withVolume / prices.length) * 1000) / 10;
+  const times = prices
+    .map((price) => new Date(price.date as unknown as string).getTime())
+    .filter((time) => Number.isFinite(time))
+    .sort((a, b) => a - b);
+  let maxGapDays = 0;
+  for (let index = 1; index < times.length; index += 1) {
+    const gapDays = Math.floor((times[index] - times[index - 1]) / 86_400_000);
+    if (gapDays > maxGapDays) maxGapDays = gapDays;
+  }
+  return { volumeCoveragePct, maxGapDays };
+}
+
 export function coverageStatus(score: number, config: DataQualityConfig): CoverageStatus {
   const c = config.coverageStatus;
   if (score >= c.good) return 'GOOD';

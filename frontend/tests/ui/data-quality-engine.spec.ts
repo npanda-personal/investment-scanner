@@ -30,7 +30,7 @@ test.describe('Data Quality Engine UI', () => {
     await expect(page.getByText('Calibration Tier').first()).toBeVisible();
     await expect(page.getByText('Automation Tier').first()).toBeVisible();
     await expect(page.getByText('Review Readiness Summary')).toBeVisible();
-    await expect(page.getByText('Mode: LIMITED_REVIEW')).toBeVisible();
+    await expect(page.getByText('Mode: Limited Review')).toBeVisible();
     await expect(page.getByText('Next bounded action: Validate unknown providers')).toBeVisible();
 
     await page.getByText('INFY').first().click();
@@ -97,7 +97,7 @@ test.describe('Data Quality Engine UI', () => {
     await visitModule(page, '/data-quality', 'Data Quality Engine');
 
     const indicator = page.getByTestId('data-quality-pipeline-status-strip');
-    await expect(indicator.getByText('NO_RUN_EVIDENCE')).toBeVisible();
+    await expect(indicator.getByText('No Run Evidence', { exact: true })).toBeVisible();
     await expect(indicator.getByText('No run evidence is available yet for the current scope.')).toBeVisible();
     await expect(indicator.locator('.MuiLinearProgress-determinate')).toBeVisible();
     await expect(indicator.locator('.MuiLinearProgress-indeterminate')).toHaveCount(0);
@@ -115,7 +115,7 @@ test.describe('Data Quality Engine UI', () => {
 
     const indicator = page.getByTestId('data-quality-pipeline-status-strip');
     await expect(indicator.getByText('Progress: Loading pipeline snapshot...')).toBeVisible();
-    await expect(indicator.getByText('NO_RUN_EVIDENCE')).toHaveCount(0);
+    await expect(indicator.getByText('No Run Evidence')).toHaveCount(0);
     await expect(indicator.getByText('No run evidence is available yet for the current scope.')).toHaveCount(0);
     await expect(indicator.getByText('RUNNING')).toBeVisible();
   });
@@ -129,7 +129,7 @@ test.describe('Data Quality Engine UI', () => {
 
     const indicator = page.getByTestId('data-quality-pipeline-status-strip');
     await expect(indicator.getByText(/Pipeline status unavailable:/)).toBeVisible();
-    await expect(indicator.getByText('NO_RUN_EVIDENCE')).toHaveCount(0);
+    await expect(indicator.getByText('No Run Evidence')).toHaveCount(0);
     await expect(indicator.getByText('No run evidence is available yet for the current scope.')).toHaveCount(0);
   });
 });

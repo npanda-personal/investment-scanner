@@ -113,6 +113,12 @@ export interface DataQualityConfig {
   signalMinReadinessScore: number;
   /** Liquidity score below which an instrument counts as illiquid for signals. */
   signalIlliquidLiquidityScore: number;
+  /**
+   * Volume-coverage % below which an instrument is flagged LOW_VOLUME_COVERAGE
+   * for the review verdict. Default 0 = inert (never fires); region profiles can
+   * raise it once per-market volume-coverage expectations are calibrated.
+   */
+  reviewMinVolumeCoveragePct: number;
 
   /**
    * Whether this instrument must have fundamentals to be signal-eligible.
@@ -192,6 +198,7 @@ const DEFAULT_CONFIG: DataQualityConfig = {
   reviewMinBars: ELIGIBILITY_POLICY.review.minPriceBars, // 120
   signalMinReadinessScore: ELIGIBILITY_POLICY.signal.minReadinessScore, // 70
   signalIlliquidLiquidityScore: 40,
+  reviewMinVolumeCoveragePct: 0, // inert by default; see interface note
 
   requiresFundamentals: isNseMainboard,
 };

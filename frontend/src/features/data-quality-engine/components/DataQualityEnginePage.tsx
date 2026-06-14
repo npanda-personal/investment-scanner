@@ -418,7 +418,7 @@ const DataQualityEnginePage: React.FC = () => {
         rows={items}
         getRowId={(item) => item.instrumentId}
         loading={loading}
-        emptyMessage={activeFilters.length > 0 ? `No evaluations match ${activeFilters.join(', ')}.` : 'No data quality evaluations found. Use Pipeline Ops to run scope evaluation and refresh this page.'}
+        emptyMessage={scope.assetType === 'CRYPTO' ? 'Data quality evaluation is not yet available for crypto. Crypto assets are tracked separately and are not part of the Data Quality Engine universe.' : activeFilters.length > 0 ? `No evaluations match ${activeFilters.join(', ')}.` : 'No data quality evaluations found. Use Pipeline Ops to run scope evaluation and refresh this page.'}
         page={page}
         pageSize={pageSize}
         totalCount={total}
