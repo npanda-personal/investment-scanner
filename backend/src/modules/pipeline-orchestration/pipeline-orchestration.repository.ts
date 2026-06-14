@@ -18,7 +18,7 @@ const ACTIVE_STATUSES = ['PENDING', 'RUNNING'];
 // Only genuine runs (real work completed) — excludes ABANDONED (reaped/interrupted), SKIPPED, and
 // BLOCKED so that a stale-lease reaped run never becomes the headline "last run" on the Pipeline
 // Ops header.
-const MEANINGFUL_RUN_STATUSES = ['COMPLETED', 'PARTIAL', 'FAILED', 'ABANDONED'];
+const MEANINGFUL_RUN_STATUSES = ['COMPLETED', 'PARTIAL', 'FAILED']; // exclude ABANDONED/reaped so an interrupted run never headlines
 
 export class PipelineOrchestrationRepository {
   constructor(private readonly db = prisma) {}
@@ -419,12 +419,12 @@ export class PipelineOrchestrationRepository {
         // with real data work headline the Pipeline Ops header.
         status: { in: MEANINGFUL_RUN_STATUSES },
       },
-      // "Last run" must mean the most-recently EXECUTED run (what an operator expects),
-      // NOT the run covering the freshest data — otherwise a backfill that processed an
-      // older data date but completed later, or an earlier run that happened to carry the
-      // freshest date, could headline the panel and make it read as stale/wrong. Order by
-      // execution recency (startedAt, always set), then completedAt, then dataThroughDate.
-      orderBy: [{ startedAt: 'desc' }, { completedAt: { sort: 'desc', nulls: 'last' } }, { dataThroughDate: { sort: 'desc', nulls: 'last' } }],
+      // "Last run" = most-recently EXECUTED run. Order by completedAt (system-set finish time)
+      // FIRST — the reliable execution-recency signal. startedAt is NOT trustworthy here: a
+      // recording path can stamp it with a (sometimes future) target trading date, and one
+      // future-dated startedAt would otherwise headline forever, masking every real run.
+      // completedAt -> startedAt -> dataThroughDate keeps it robust to that corruption.
+      orderBy: [{ completedAt: { sort: 'desc', nulls: 'last' } }, { startedAt: 'desc' }, { dataThroughDate: { sort: 'desc', nulls: 'last' } }],
     });
     return row ? this.toRunRecord(row) : null;
   }

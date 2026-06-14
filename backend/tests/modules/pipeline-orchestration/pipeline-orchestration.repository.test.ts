@@ -363,8 +363,15 @@ describe('PipelineOrchestrationRepository', () => {
     }));
     expect(db.pipelineRun.findFirst).toHaveBeenNthCalledWith(2, expect.objectContaining({
       where: expect.objectContaining({
-        status: { in: ['COMPLETED', 'PARTIAL', 'FAILED', 'ABANDONED'] },
+        // ABANDONED (reaped/interrupted) is excluded so an interrupted run never headlines.
+        status: { in: ['COMPLETED', 'PARTIAL', 'FAILED'] },
       }),
+      // Ordered by completedAt FIRST (reliable finish time) — robust to a corrupt future startedAt.
+      orderBy: [
+        { completedAt: { sort: 'desc', nulls: 'last' } },
+        { startedAt: 'desc' },
+        { dataThroughDate: { sort: 'desc', nulls: 'last' } },
+      ],
     }));
     expect(db.pipelineStageRun.findMany).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({
