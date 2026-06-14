@@ -13,14 +13,23 @@ import { FilterBar } from '@/shared/components';
 export interface CatalogScopeCapability {
   isIndiaEquity: boolean;
   isCryptoScope: boolean;
+  region: string;
 }
+
+/** Known exchanges per region (mirrors the backend region→exchange resolution). Currency is
+ *  intentionally NOT a filter — it is fully determined by the region (IN→INR, US→USD, EU→EUR),
+ *  so a free-text currency box added no value. */
+const EXCHANGES_BY_REGION: Record<string, string[]> = {
+  IN: ['NSE', 'BSE'],
+  US: ['NASDAQ', 'NYSE', 'AMEX'],
+  EU: ['LSE', 'XETRA', 'EURONEXT', 'BME'],
+};
 
 export interface CatalogFilterControlsProps {
   capability: CatalogScopeCapability;
   search: string;
   exchange: string;
   instrumentSegment: string;
-  currency: string;
   derivativesEligible: string;
   catalogSource: string;
   loading: boolean;
@@ -28,7 +37,6 @@ export interface CatalogFilterControlsProps {
   onSearchChange: (value: string) => void;
   onExchangeChange: (value: string) => void;
   onInstrumentSegmentChange: (value: string) => void;
-  onCurrencyChange: (value: string) => void;
   onDerivativesEligibleChange: (value: string) => void;
   onCatalogSourceChange: (value: string) => void;
   onResetPage: () => void;
@@ -41,7 +49,6 @@ const CatalogFilterControls: React.FC<CatalogFilterControlsProps> = ({
   search,
   exchange,
   instrumentSegment,
-  currency,
   derivativesEligible,
   catalogSource,
   loading,
@@ -49,14 +56,14 @@ const CatalogFilterControls: React.FC<CatalogFilterControlsProps> = ({
   onSearchChange,
   onExchangeChange,
   onInstrumentSegmentChange,
-  onCurrencyChange,
   onDerivativesEligibleChange,
   onCatalogSourceChange,
   onResetPage,
   onReset,
   onRefresh,
 }) => {
-  const { isIndiaEquity, isCryptoScope } = capability;
+  const { isIndiaEquity, isCryptoScope, region } = capability;
+  const exchangeOptions = EXCHANGES_BY_REGION[String(region || '').toUpperCase()] ?? [];
 
   return (
     <FilterBar onReset={onReset} showReset={hasLocalFilters}>
@@ -77,13 +84,18 @@ const CatalogFilterControls: React.FC<CatalogFilterControlsProps> = ({
           ),
         }}
       />
-      {!isCryptoScope && (
+      {!isCryptoScope && exchangeOptions.length > 0 && (
         <TextField
+          select
           size="small"
           label="Exchange"
           value={exchange}
-          onChange={(event) => { onExchangeChange(event.target.value.toUpperCase()); onResetPage(); }}
-        />
+          onChange={(event) => { onExchangeChange(event.target.value); onResetPage(); }}
+          sx={{ minWidth: 140 }}
+        >
+          <MenuItem value="">All</MenuItem>
+          {exchangeOptions.map((item) => <MenuItem key={item} value={item}>{item}</MenuItem>)}
+        </TextField>
       )}
       {isIndiaEquity && (
         <TextField
@@ -99,12 +111,6 @@ const CatalogFilterControls: React.FC<CatalogFilterControlsProps> = ({
           ))}
         </TextField>
       )}
-      <TextField
-        size="small"
-        label="Currency"
-        value={currency}
-        onChange={(event) => { onCurrencyChange(event.target.value.toUpperCase()); onResetPage(); }}
-      />
       {isIndiaEquity && (
         <TextField
           select

@@ -1052,7 +1052,7 @@ const MarketDataFoundationPage: React.FC = () => {
   const importAvailable = importMode === 'MANUAL_CSV' && catalogCsv.trim().length > 0
     || (importMode === 'CONFIGURED_URL' && selectedCatalogSource?.supportsConfiguredUrl === true)
     || (importMode === 'INTERNAL_SEED' && selectedCatalogSource?.supportsInternalSeed === true);
-  const hasCatalogSources = availableCatalogSources.length > 0;
+  const hasCatalogSources = scopedSourceRegion === 'IN' && availableCatalogSources.length > 0; // catalog-file import/backfill is NSE/BSE-only machinery
   const hasManualFundamentals = !isCryptoScope;
   const hasAnyIngestionControl = hasCatalogSources || hasExchangeFiles || hasManualFundamentals;
   const ingestionCapability = {
@@ -1266,11 +1266,10 @@ const MarketDataFoundationPage: React.FC = () => {
         <>
       <Box sx={{ mb: 2, width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
         <CatalogFilterControls
-          capability={{ isIndiaEquity, isCryptoScope }}
+          capability={{ isIndiaEquity, isCryptoScope, region: scopeRegionUpper }}
           search={search}
           exchange={exchange}
           instrumentSegment={instrumentSegment}
-          currency={currency}
           derivativesEligible={derivativesEligible}
           catalogSource={catalogSource}
           loading={loading}
@@ -1278,7 +1277,6 @@ const MarketDataFoundationPage: React.FC = () => {
           onSearchChange={setSearch}
           onExchangeChange={setExchange}
           onInstrumentSegmentChange={setInstrumentSegment}
-          onCurrencyChange={setCurrency}
           onDerivativesEligibleChange={setDerivativesEligible}
           onCatalogSourceChange={setCatalogSource}
           onResetPage={() => setPage(0)}
