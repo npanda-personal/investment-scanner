@@ -129,6 +129,7 @@ export class MarketDataFoundationController {
   listSourceFileImports = async (req: Request, res: Response) => {
     try {
       return res.json(await this.service.listSourceFileImports({
+        region: typeof req.query.region === 'string' ? req.query.region : undefined,
         source: typeof req.query.source === 'string' ? req.query.source : undefined,
         segment: typeof req.query.segment === 'string' ? req.query.segment : undefined,
         status: typeof req.query.status === 'string' ? req.query.status : undefined,

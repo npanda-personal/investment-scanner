@@ -44,6 +44,19 @@ import { logMarketDataApi, normalizeAssetTypeForMarketDataApi, normalizeMarketFo
 
 const API_BASE = '/api';
 
+/**
+ * Single source of truth for region+assetType scoping of admin MDF calls. Every
+ * panel builds its query through this so the screen is region-consistent — and it
+ * deliberately does NOT default to 'IN'/'STOCK' (that masking is the region-mixing
+ * bug). GLOBAL normalizes to undefined and the backend treats it as all-markets.
+ */
+export function buildScopedQuery(options: { region?: string | null; assetType?: string | null } = {}): { region?: string; assetType?: string } {
+  return {
+    region: normalizeMarketForApi(options.region ?? undefined),
+    assetType: normalizeAssetTypeForMarketDataApi(options.assetType ?? undefined),
+  };
+}
+
 export type {
   CreateStockRequest,
   CatalogSourceInfo,
@@ -218,30 +231,19 @@ export async function fetchMarketDataHealth(options: MarketScopedApiOptions = {}
 }
 
 export async function fetchMarketDataUniverseHealth(options: MarketScopedApiOptions = {}): Promise<MarketDataUniverseHealth> {
-  const params = {
-    region: normalizeMarketForApi(options.region) || 'IN',
-    assetType: normalizeAssetTypeForMarketDataApi(options.assetType) || 'STOCK',
-  };
-  logMarketDataApi(options.region || 'IN', params.region, params, 'universe-health');
+  const params = buildScopedQuery(options);
+  logMarketDataApi(options.region || 'GLOBAL', params.region, params, 'universe-health');
   const response = await axios.get<MarketDataUniverseHealth>(`${API_BASE}/v1/market-data/universe/health`, { params });
   return response.data;
 }
 
 export async function fetchTrustedReviewUniverseHealth(options: MarketScopedApiOptions = {}): Promise<TrustedReviewUniverseHealth> {
-  const params = {
-    region: normalizeMarketForApi(options.region) || 'IN',
-    assetType: normalizeAssetTypeForMarketDataApi(options.assetType) || 'STOCK',
-  };
-  const response = await axios.get<TrustedReviewUniverseHealth>(`${API_BASE}/v1/market-data/review-universe`, { params });
+  const response = await axios.get<TrustedReviewUniverseHealth>(`${API_BASE}/v1/market-data/review-universe`, { params: buildScopedQuery(options) });
   return response.data;
 }
 
 export async function fetchReviewReadinessSummary(options: MarketScopedApiOptions = {}): Promise<ReviewReadinessSummary> {
-  const params = {
-    region: normalizeMarketForApi(options.region) || 'IN',
-    assetType: normalizeAssetTypeForMarketDataApi(options.assetType) || 'STOCK',
-  };
-  const response = await axios.get<ReviewReadinessSummary>(`${API_BASE}/v1/market-data/review-readiness-summary`, { params });
+  const response = await axios.get<ReviewReadinessSummary>(`${API_BASE}/v1/market-data/review-readiness-summary`, { params: buildScopedQuery(options) });
   return response.data;
 }
 
@@ -291,6 +293,8 @@ export async function fetchManualMetadataTemplate(options: MarketScopedApiOption
 }
 
 export async function fetchSourceFileImports(options: {
+  region?: string;
+  assetType?: string;
   source?: string;
   segment?: string;
   status?: string;
@@ -300,9 +304,10 @@ export async function fetchSourceFileImports(options: {
   sortBy?: 'importedAt' | 'tradingDate';
   sortDirection?: 'asc' | 'desc';
 } = {}): Promise<MarketDataSourceFileImportsResponse> {
+  const { region, assetType, ...rest } = options;
   const response = await axios.get<MarketDataSourceFileImportsResponse>(
     `${API_BASE}/v1/market-data/source-file-imports`,
-    { params: options }
+    { params: { ...rest, ...buildScopedQuery({ region, assetType }) } }
   );
   return response.data;
 }
@@ -412,8 +417,10 @@ export async function enrichMarketDataMetadata(data: MarketDataRepairRequest): P
   return response.data;
 }
 
-export async function fetchMarketDataSchedulerStatus(): Promise<MarketDataSchedulerStatus> {
-  const response = await axios.get<MarketDataSchedulerStatus>(`${API_BASE}/v1/market-data/scheduler/status`);
+export async function fetchMarketDataSchedulerStatus(options: MarketScopedApiOptions = {}): Promise<MarketDataSchedulerStatus> {
+  const response = await axios.get<MarketDataSchedulerStatus>(`${API_BASE}/v1/market-data/scheduler/status`, {
+    params: buildScopedQuery(options),
+  });
   return response.data;
 }
 

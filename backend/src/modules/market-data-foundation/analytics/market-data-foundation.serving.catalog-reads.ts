@@ -36,6 +36,7 @@ export class CatalogReadsService {
   }
 
   async listSourceFileImports(input: {
+    region?: string;
     source?: string;
     segment?: string;
     status?: string;
@@ -48,6 +49,7 @@ export class CatalogReadsService {
     const sortBy = input.sortBy === 'tradingDate' ? 'tradingDate' : 'importedAt';
     const sortDirection = String(input.sortDirection || 'desc').toLowerCase() === 'asc' ? 'asc' : 'desc';
     const rows = await this.host.repository.listSourceFileImports({
+      region: input.region,
       source: input.source,
       segment: input.segment,
       status: input.status,

@@ -451,15 +451,17 @@ const MarketDataFoundationPage: React.FC = () => {
 
   const refreshBackgroundServices = useCallback(async () => {
     const [scheduler] = await Promise.all([
-      fetchMarketDataSchedulerStatus().catch(() => undefined),
+      fetchMarketDataSchedulerStatus({ region: scope.region, assetType: scope.assetType }).catch(() => undefined),
     ]);
     if (scheduler !== undefined) setSchedulerStatus(scheduler);
-  }, []);
+  }, [scope.region, scope.assetType]);
 
   const loadSourceImports = useCallback(async () => {
     setSourceImportsLoading(true);
     try {
       const result = await fetchSourceFileImports({
+        region: scope.region,
+        assetType: scope.assetType,
         limit: 10,
         sortBy: sourceImportSortBy,
         sortDirection: sourceImportSortDirection,
@@ -471,7 +473,7 @@ const MarketDataFoundationPage: React.FC = () => {
       setSourceImportsLoaded(true);
       setSourceImportsLoading(false);
     }
-  }, [sourceImportSortBy, sourceImportSortDirection]);
+  }, [scope.region, scope.assetType, sourceImportSortBy, sourceImportSortDirection]);
 
   const handleSourceImportSortChange = useCallback((nextSortBy: SourceFileImportSortBy) => {
     if (sourceImportSortBy === nextSortBy) {
@@ -595,7 +597,7 @@ const MarketDataFoundationPage: React.FC = () => {
   }, [scope.region, scope.assetType]);
 
   const refreshCatalogAfterTerminalSync = useCallback(async (run: MarketDataCatalogSyncRunResponse) => {
-    const schedulerStatus = await fetchMarketDataSchedulerStatus().catch(() => null);
+    const schedulerStatus = await fetchMarketDataSchedulerStatus({ region: run.region || scope.region, assetType: scope.assetType }).catch(() => null);
     const regionStatus = schedulerStatus?.regionStatuses.find((item) => item.region === run.region || item.region === normalizedMarket);
     const candleStatusMessage = buildCandleStatusMessage(regionStatus);
     const summary = `${formatCatalogSyncSummary(run)}${candleStatusMessage}`;
@@ -974,7 +976,7 @@ const MarketDataFoundationPage: React.FC = () => {
             <Typography fontWeight={700} fontSize={13}>{formatDisplaySymbol(instrument)}</Typography>
           </Tooltip>
           {instrument.catalog_source === 'NSE_SME_EQUITY_SECURITIES' && (
-            <Tooltip title="NSE SME platform — limited liquidity; verify tradability before acting" arrow>
+            <Tooltip title="NSE SME segment" arrow>
               <Chip size="small" label="SME" color="warning" sx={{ height: 18, fontSize: 11, fontWeight: 700, cursor: 'default' }} />
             </Tooltip>
           )}
@@ -1033,8 +1035,8 @@ const MarketDataFoundationPage: React.FC = () => {
       align: 'right',
       render: (instrument) => (
         <Stack direction="row" spacing={0.5} justifyContent="flex-end" onClick={(event) => event.stopPropagation()}>
-          <Tooltip title="View Instrument Details" arrow>
-            <IconButton size="small" onClick={() => navigate(`/stocks/${instrument.id}`)}>
+          <Tooltip title="Inspect instrument metadata" arrow>
+            <IconButton size="small" onClick={() => setSelectedInstrument(instrument)}>
               <VisibilityOutlinedIcon fontSize="small" />
             </IconButton>
           </Tooltip>
@@ -1106,7 +1108,13 @@ const MarketDataFoundationPage: React.FC = () => {
     catalogSource.trim() === 'NSE_SME_EQUITY_SECURITIES' ? 'SME only' : catalogSource.trim() === 'NSE_EQUITY_SECURITIES' ? 'Main Board only' : null,
   ].filter((item): item is string => Boolean(item));
   const hasLocalFilters = activeFilters.length > 0;
-  const availableCatalogSources = catalogSources.length > 0 ? catalogSources : fallbackCatalogSources;
+  // Region isolation: only show catalog sources for the selected market. The IN-only
+  // fallback is therefore used solely when IN is selected; US/EU/Crypto honestly show
+  // their own sources (or an empty state) rather than India's NSE/BSE sources.
+  const scopedSourceRegion = String(scope.region || '').toUpperCase();
+  const availableCatalogSources = (catalogSources.length > 0 ? catalogSources : fallbackCatalogSources)
+    .filter((source) => !scopedSourceRegion || scopedSourceRegion === 'ALL'
+      || String(source.region || '').toUpperCase() === scopedSourceRegion);
   const selectedCatalogSource = availableCatalogSources.find((source) => source.catalogSource === importSource);
   const importAvailable = importMode === 'MANUAL_CSV' && catalogCsv.trim().length > 0
     || (importMode === 'CONFIGURED_URL' && selectedCatalogSource?.supportsConfiguredUrl === true)
@@ -1131,7 +1139,7 @@ const MarketDataFoundationPage: React.FC = () => {
     <Box className="page-container page-container--workspace" sx={{ minWidth: 0 }}>
       <PageHeader
         title="Market Data Foundation"
-        subtitle="Explore instruments, exchange-file evidence, recorded prices, fundamentals, corporate actions, and data health."
+        subtitle="Admin & maintenance: catalog management, ingestion control, backfill, source-file evidence, and data-health monitoring."
         primaryAction={
           <Button variant="contained" startIcon={<AddIcon />} onClick={() => navigate('/admin/market-data-foundation/add')}>
             Add Instrument
@@ -1273,6 +1281,14 @@ const MarketDataFoundationPage: React.FC = () => {
         }}
       >
         <Stack spacing={1.5}>
+          {availableCatalogSources.length === 0 && (
+            <Alert severity="info">
+              No exchange-file catalog sources for {scope.region || 'this market'}.{' '}
+              {scopedSourceRegion === 'GLOBAL'
+                ? 'Crypto is managed by the 24/7 ingestion lane.'
+                : 'This market ingests prices via the provider (Yahoo); its catalog is maintained by its seed script, not exchange-file import.'}
+            </Alert>
+          )}
           <Box
             sx={{
               display: 'grid',
@@ -1581,7 +1597,7 @@ const MarketDataFoundationPage: React.FC = () => {
             <MenuItem value="false">No</MenuItem>
           </TextField>
           <TextField select size="small" label="SME / Segment" value={catalogSource} onChange={(event) => { setCatalogSource(event.target.value); setPage(0); }}
-            title="Filter by NSE segment. SME stocks have limited liquidity — verify tradability before acting."
+            title="Filter by NSE segment classification (Main Board vs SME)."
           >
             <MenuItem value="">All</MenuItem>
             <MenuItem value="NSE_EQUITY_SECURITIES">NSE Main Board (EQ)</MenuItem>
@@ -1663,7 +1679,7 @@ const MarketDataFoundationPage: React.FC = () => {
                 {selectedInstrument.catalog_source === 'NSE_SME_EQUITY_SECURITIES' && (
                   <Stack direction="row" spacing={0.5} alignItems="center">
                     <Chip size="small" label="SME" color="warning" />
-                    <Typography variant="caption" color="text.secondary">NSE SME platform — limited liquidity; verify tradability before acting</Typography>
+                    <Typography variant="caption" color="text.secondary">NSE SME segment</Typography>
                   </Stack>
                 )}
               </Stack>
@@ -1702,10 +1718,6 @@ const MarketDataFoundationPage: React.FC = () => {
                 <Typography variant="body2"><strong>Catalog row updated:</strong> {formatTimestamp(selectedInstrument.last_updated_timestamp)}</Typography>
               </Stack>
             </Box>
-            <Divider />
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
-              <Button variant="outlined" onClick={() => navigate(`/stocks/${selectedInstrument.id}`)}>Open Workspace</Button>
-            </Stack>
           </Stack>
         )}
       </Drawer>

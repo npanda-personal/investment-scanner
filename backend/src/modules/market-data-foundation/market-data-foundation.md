@@ -4,6 +4,219 @@ Market Data Foundation owns the application's baseline market data capabilities.
 
 The module is implemented as a flat backend module and a dedicated frontend feature. It remains locally runnable and uses free/open-source tooling only.
 
+## Data Points — Business Logic & Sources
+
+This section catalogues every data point the module owns: what it represents, the business logic governing it, and where the data originates. Each source is labelled EXTERNAL (third-party API or file the module fetches at runtime) or INTERNAL (derived, computed, or persisted entirely from our own tables and code).
+
+### 1. Instrument catalog (`stocks` table)
+
+**Business logic.** The `stocks` table is the tradable-universe master. One row per instrument, carrying identity (symbol, name, ISIN, exchange, region, currency), classification (assetType, instrumentSegment, catalogSource), provider support status, F&O eligibility flag, and active/delisted status. All downstream modules — signals, scans, Data Quality, Smart Money — filter from this table. Catalog-source ingestion is additive and null-preserving; existing non-null values are not overwritten by a later null from a provider or catalog file.
+
+**Sources by region:**
+
+| Region | Asset class | Source | Label |
+| --- | --- | --- | --- |
+| IN | Equity / STOCK | NSE equity security master (`EQUITY_L.csv` from `archives.nseindia.com`). Ingested via `catalogSource=NSE_EQUITY_SECURITIES`. | EXTERNAL |
+| IN | Equity / STOCK | BSE security master (reserved; `BSE_EQUITY_SECURITIES` catalogSource). | EXTERNAL |
+| IN | F&O underlyings | NSE F&O underlyings list; sets `derivativesEligible=true` on matched stocks/indices. `catalogSource=NSE_EQUITY_DERIVATIVES_UNDERLYINGS`. | EXTERNAL |
+| IN | Indices | NSE all-indices JSON (`www.nseindia.com/api/allIndices`), `catalogSource=NSE_INDEX_SECURITIES`; BSE index-watch page (`m.bseindia.com`), `catalogSource=BSE_INDEX_SECURITIES`; built-in seed (`NSE_INDEX_SEED`) for `^NSEI`, `^NSEBANK`, `^BSESN`. | EXTERNAL / INTERNAL (seed) |
+| IN | ETFs | NSE ETF security list (`nsearchives.nseindia.com/content/equities/eq_etfseclist.csv`), `catalogSource=NSE_ETF_SECURITIES`. | EXTERNAL |
+| US | Equity + ETF | NASDAQ Trader symbol directory: `nasdaqlisted.txt` (NASDAQ-listed) and `otherlisted.txt` (NYSE/AMEX/ARCA/BATS/IEX). Pipe-delimited, keyless. Parsed in `ingestion/us/market-data-foundation.us-catalog-source.ts`. | EXTERNAL |
+| EU | Equity (EUR) | Curated static list of ~297 EUR-denominated large/mid-cap constituents across XETRA, Euronext Paris/Amsterdam/Brussels/Lisbon/Dublin, Borsa Italiana, BME, Vienna, Helsinki. Defined in `ingestion/eu/market-data-foundation.eu-catalog-source.ts`. No free NASDAQ-Trader-style directory exists for the eurozone; the list was live-validated against the keyless Yahoo chart API before inclusion. | INTERNAL (curated) |
+| GLOBAL | Crypto | `crypto_assets` table populated from CoinPaprika ranked tickers (default) or CoinGecko (opt-in fallback), joined with Binance spot-pair availability to confirm tradability. Isolated from equity `stocks`. | EXTERNAL |
+
+Key fields: `symbol`, `region`, `exchange`, `assetType`, `instrumentSegment`, `catalogSource`, `isActive`, `isDelisted`, `derivativesEligible`, `providerSupportStatus`, `isin`, `ipoDate`.
+
+Source files: `ingestion/market-data-foundation.catalog-sources.ts`, `ingestion/us/market-data-foundation.us-catalog-source.ts`, `ingestion/eu/market-data-foundation.eu-catalog-source.ts`, `ingestion/crypto/market-data-foundation.crypto-provider.ts`.
+Endpoint registry: `ingestion/market-data-foundation.endpoints.ts`.
+
+---
+
+### 2. EOD OHLCV prices (`price_ticks` table)
+
+**Business logic.** One row per instrument per trading date, storing open, high, low, close, adjusted close (when supplied), volume, source label, and optional `sourceFileImportId` provenance pointing to the exact exchange-file import. Price timestamps are normalised to UTC midnight. Duplicate bars within a batch are flagged `invalid`. Abnormal spikes exceeding `MARKET_DATA_SPIKE_THRESHOLD` (default 0.5, i.e. 50%) are flagged `invalid`. Upsert key is `symbol + normalised daily timestamp`, making all writes idempotent.
+
+**Sources by region:**
+
+| Region | Asset class | Source | Label |
+| --- | --- | --- | --- |
+| IN | Stocks / Indices | NSE CM UDiFF bhavcopy ZIP (`nsearchives.nseindia.com/content/cm/…`), NSE full security bhavdata CSV (`archives.nseindia.com/products/content/…`), and legacy CM bhavcopy archive as historical fallback. Source preference is UDiFF → bhavdata → legacy. | EXTERNAL |
+| IN | Indices | NSE all-index close-all CSV (`archives.nseindia.com/content/indices/ind_close_all_DDMMYYYY.csv`). | EXTERNAL |
+| IN | Stocks (fill) | BSE CM rows imported only when an explicit `InstrumentExchangeIdentity` maps the row and no NSE primary candle exists for that stock/date. | EXTERNAL |
+| US / EU | Stocks / ETFs / Indices | Yahoo Finance keyless chart API (`query1.finance.yahoo.com`). No API key required. | EXTERNAL |
+| GLOBAL | Crypto | Binance public klines REST endpoint (`api.binance.com/api/v3/klines`). Keyless, generous rate limits. Stored in isolated `crypto_price_ticks` table. | EXTERNAL |
+
+Each stored candle carries a `source` field stamped with the ingestion origin (e.g. `NSE_CM_UDIFF`, `NSE_INDEX_EOD`, `BSE_CM`, `YAHOO`, `BINANCE_KLINES`). Exchange-file candles additionally carry `sourceFileImportId`.
+
+Source files: `ingestion/india/market-data-foundation.india-exchange-ingestion.cm-udiff.ts`, `ingestion/india/market-data-foundation.india-exchange-ingestion.cm-official.ts`, `ingestion/india/market-data-foundation.india-exchange-ingestion.index.ts`, `ingestion/market-data-foundation.yahoo-eod-provider.ts`, `ingestion/crypto/market-data-foundation.crypto-provider.ts`.
+
+---
+
+### 3. Latest price snapshot (`latest_prices` table)
+
+**Business logic.** A single row per instrument (keyed by symbol) holding the most-recent close, adjusted close, volume, and candle date. Upserted on every successful OHLCV write so downstream reads (movers, scans, Universe Readiness) can query a single flat table rather than a `MAX(date)` aggregation. When the `LatestPrice` table is rebuilt after a backfill, a set-based SQL upsert is used instead of per-symbol Prisma loops for performance. Crypto latest prices are stored in the isolated `crypto_latest_prices` table.
+
+**Source:** INTERNAL — derived from `price_ticks` (or `crypto_price_ticks`) on each store operation.
+
+---
+
+### 4. Corporate actions (`corporate_actions` table)
+
+**Business logic.** Dividends, splits, reverse splits, bonus issues, rights issues, mergers, demergers, and spin-offs. Each row carries effective date, declared date, payment date, amount (for dividends), split ratio (for splits/bonus/rights), currency, source, and a `naturalKey` that prevents same-date provider duplicates while preserving distinct same-day actions with different amounts. Ratios follow the convention `splitRatio = newShares / oldShares`. The adjustment engine uses these rows to recompute adjusted-close history.
+
+**Sources by region:**
+
+| Region | Source | Label |
+| --- | --- | --- |
+| IN | NSE corporate-actions API (`www.nseindia.com/api/corporates-corporateActions`). The endpoint is bot-protected; the module provides the parser/mapper; the caller handles cookie priming. Parsed in `ingestion/india/market-data-foundation.corporate-actions-source.ts`. | EXTERNAL |
+| US / EU | Yahoo Finance `quoteSummary` / chart events (dividends and splits returned alongside OHLCV from the keyless chart API). | EXTERNAL |
+
+Source files: `ingestion/india/market-data-foundation.corporate-actions-source.ts`, `ingestion/india/market-data-foundation.india-corporate-actions.ts`, `ingestion/market-data-foundation.yahoo-eod-provider.ts`.
+
+---
+
+### 5. Fundamentals (`fundamentals` table)
+
+**Business logic.** Period-level financial snapshots: revenue, EPS, net income, PE ratio, dividend yield, shares outstanding, market cap, currency, period type (quarterly/annual), normalised period-end date, and source label. The unique constraint is `[stockId, periodType, source]`, making upserts idempotent. Sector, industry, and market cap are also backfilled onto the `stocks` row from this ingestion path.
+
+**Sources by region:**
+
+| Region | Source | Label |
+| --- | --- | --- |
+| US | SEC EDGAR XBRL company facts API (`data.sec.gov/api/xbrl/companyfacts/{CIK}.json`). Free, official, keyless. Sector is derived from SIC code ranges (a hand-rolled mapping in `ingestion/us/market-data-foundation.sec-companyfacts.service.ts`; not licensed GICS). | EXTERNAL |
+| IN | NSE XBRL filings fetched by the bounded operator script `backend/scripts/export-nse-xbrl-fundamentals-csv.ts` (NSE Integrated Filing / Corporate Filings APIs), then imported via `POST /api/v1/market-data/fundamentals/manual-verified-bulk-import`. | EXTERNAL (fetch) + INTERNAL (operator-reviewed import) |
+| IN / All | Manual verified entry via `POST /api/v1/market-data/fundamentals/manual-verified-import` or bulk CSV import. `source=MANUAL_VERIFIED`. Requires explicit `validatedBy`, `validatedAt`, `sourceNote`, `sourceUrl`. | INTERNAL (operator-curated) |
+| EU | Yahoo Finance `quoteSummary` (keyless; handled by `ingestion/market-data-foundation.yahoo-fundamentals.service.ts`). Yahoo's own sector taxonomy, not licensed GICS. EU has no SEC EDGAR analog and the official ESEF XBRL repository excludes Germany and Ireland. | EXTERNAL |
+
+Source files: `ingestion/us/market-data-foundation.sec-companyfacts.service.ts`, `ingestion/us/market-data-foundation.sec-edgar-client.ts`, `ingestion/india/market-data-foundation.nse-xbrl-fundamentals-exporter.ts`, `ingestion/market-data-foundation.yahoo-fundamentals.service.ts`.
+
+---
+
+### 6. Source-file import ledger (`source_file_imports` table)
+
+**Business logic.** An audit ledger recording every completed exchange-file or manual-verified import. Each row carries `source` (e.g. `NSE`, `BSE`, `MANUAL_VERIFIED`), `segment` (e.g. `STOCK`, `INDEX`, `DELIVERY`, `FUNDAMENTALS`), `tradingDate`, and `fileHash`. A completed import with matching `(source, segment, tradingDate, fileHash)` is skipped on re-import, making all file-based ingestion idempotent. Delivery backfill and historical candle backfill use this ledger to skip already-completed dates before downloading files.
+
+**Source:** INTERNAL — the ledger is written entirely by the module's own ingestion code.
+
+**Important scope note.** This ledger is inherently exchange-file-centric, which today means IN (NSE/BSE) and MANUAL_VERIFIED imports. US, EU, and Crypto ingestion flows ingest via provider APIs and do not produce exchange files, so they generate no `source_file_imports` rows. The `GET /api/v1/market-data/source-file-imports` list endpoint therefore reflects exchange-file and manual-import evidence only.
+
+---
+
+### 7. Sync state watermark (`market_data_sync_states` table)
+
+**Business logic.** One row per `(region, assetType, tradingDate)` recording the scheduler's ingestion watermark. Statuses are `PENDING`, `SYNCED`, `FINAL_CONFIRMED`, and `FAILED`. After a post-close sync stores the day's candle, a later no-op confirmation run (where `rowsInserted=0`, `rowsUpdated=0`, `rowsNoOp>0`) advances the status to `FINAL_CONFIRMED`, causing subsequent scheduler ticks to skip that market until the next trading day. This prevents repeated provider calls after the final daily candle is confirmed.
+
+**Source:** INTERNAL — written exclusively by the scheduler (`ingestion/market-data-foundation.scheduler.ts`) and the candle confirmation logic in `market-data-foundation.service.ts`. Never populated by trader-page requests.
+
+---
+
+### 8. Instrument coverage (`instrument_coverage` table)
+
+**Business logic.** The curated TRACKED universe — the subset of `stocks` that receives active price sync and is fed to downstream modules (signals, scans, Data Quality). Curation ranks instruments by trailing average daily turnover (`close × volume` over a configurable lookback window, default 90 bars). Top-ranked instruments are assigned `trackingTier=STANDARD`; indices and ETFs pinned by `catalogSource` or operator instruction receive `trackingTier=CORE`. The `reason` column records `INDEX`, `ETF`, `LIQUIDITY`, or `MANUAL`. After a coverage run, `Stock.isActive` is derived from this table: instruments not in the tracked set are marked inactive and stop flowing to downstream modules. For US the approximate target is the top ~1 500 instruments by trailing liquidity plus pinned indices and ETFs.
+
+**Source:** INTERNAL / derived — computed from `price_ticks` and `stocks` by the coverage-curation service (`persistence/market-data-foundation.repository.coverage.ts`). No external fetch.
+
+---
+
+### 9. Scheduler status & market-session decision
+
+**Business logic.** The per-region scheduler evaluates the current wall-clock time against configured market-session windows to decide whether a sync run is useful. Decisions: `BEFORE_MARKET_OPEN`, `MARKET_OPEN`, `POST_CLOSE_FINALIZATION_WINDOW`, `FINAL_CANDLE_CONFIRMED`, `MARKET_CLOSED_NO_SYNC`, `WEEKEND_OR_HOLIDAY`, `MISSING_FINAL_CANDLE_RETRY`. The IN session is `09:15–15:30 Asia/Kolkata`, Monday–Friday, with a 120-minute post-close window and a 15-minute finalization grace period. The US and EU sessions use documented approximate weekday windows.
+
+Holiday sources by region:
+
+| Region | Holiday source | Label |
+| --- | --- | --- |
+| IN | Live NSE holiday API (`www.nseindia.com/api/holiday-master?type=trading&year={year}`) populated into an in-process cache on first scheduler tick. Static fallback list (`ingestion/india/market-data-foundation.nse-holidays.ts`) covers confirmed past dates and selected fixed public holidays when the live API is unreachable. | EXTERNAL (live) + INTERNAL (static fallback) |
+| US | Static list of NYSE full-day closures maintained in `ingestion/us/market-data-foundation.us-holidays.ts`. Half-days intentionally omitted (an early-close day still produces a valid EOD bar). | INTERNAL (static) |
+| EU | Static list of common eurozone closures (shared across XETRA / Euronext / Borsa Italiana / BME / Vienna / Helsinki) in `ingestion/eu/market-data-foundation.eu-holidays.ts`. Venue-specific national holidays are intentionally omitted; unexpected single-day gaps are treated as data-uncertain rather than errors. | INTERNAL (static) |
+
+**Source:** INTERNAL / computed — the scheduler computes these decisions from configured parameters and the holiday lists. The `GET /api/v1/market-data/scheduler/status` endpoint exposes the current decision and candle-freshness fields.
+
+---
+
+### 10. Universe readiness & review readiness
+
+**Business logic.** Per-instrument readiness is computed from the `stocks` and `price_ticks` tables without any external fetch. Readiness states:
+
+- `CATALOG_ONLY` — row exists but provider support is `UNKNOWN`.
+- `UNSUPPORTED` — provider validation failed or data is unusable.
+- `STALE_OR_INCOMPLETE` — provider exists but price freshness, history depth, or volume is insufficient.
+- `PRICE_READY` — at least 252 bars, latest EOD at or after the expected trading date, rolling window sufficiently complete, no large date gaps, recent volume present.
+- `CONTEXT_READY` — `PRICE_READY` plus sector, industry, country, currency, and (for IN/STOCK) ISIN and listing date.
+- `REVIEW_READY` — `CONTEXT_READY`, active, not delisted, provider-supported, no critical blockers.
+- `DELISTED_OR_INACTIVE` — excluded from current review.
+
+Trusted Review Universe (Lite) relaxes the bar requirement to 120+ OHLCV bars and does not require Yahoo/legacy provider validation for IN/STOCK when NSE/BSE exchange-file evidence is present. Missing metadata is a context gap, not a hard blocker.
+
+**Source:** INTERNAL / computed — derived by `ingestion/market-data-foundation.universe.ts` from persisted `stocks` and `price_ticks` data. Exposed by `GET /api/v1/market-data/universe/health`, `GET /api/v1/market-data/review-universe`, and `GET /api/v1/market-data/review-readiness-summary`.
+
+---
+
+### 11. Market scans (52-week high/low, movers, volume spike, delivery spike)
+
+**Business logic.** All scan results are computed from persisted `price_ticks` and `market_scan_snapshot` rows. No live provider fetch occurs on the read endpoints. Scan families:
+
+- **52-week high/low proximity** — instruments within a configurable percentage of their 252-session adjusted-close high or low. Lookback: 365 calendar days.
+- **Market movers (gainers/losers)** — price-change ranking over 1D, 1W, 1M, 3M, 6M, 1Y timeframes. Latest candle is anchored to the latest stored trading date; stale instruments and instruments with mismatched price-source families are excluded. Return caps are applied per range to filter data-quality outliers.
+- **Volume spike** — instruments with abnormal volume relative to their rolling average.
+- **Delivery spike** (IN only) — instruments with elevated delivery-to-traded ratio from `MarketDeliverySnapshot` rows.
+- **Market map** — sector-grouped daily price-movement envelope for Market Intelligence pages.
+
+Scan snapshots are written once per day by the `MARKET_SCAN_REFRESH` pipeline step (`ingestion/market-data-foundation.ingestion.scan-snapshots.ts`). Crypto scans are computed from `crypto_price_ticks`.
+
+**Source:** INTERNAL — all computation is against our own persisted price data. No external call at scan-read time.
+
+---
+
+### 12. Crypto plane (`crypto_*` tables)
+
+**Business logic.** Crypto data is fully isolated from equity tables. The plane owns:
+
+- `crypto_assets` — asset master, populated from CoinPaprika (or CoinGecko opt-in fallback) joined with Binance spot-pair availability.
+- `crypto_price_ticks` — daily OHLCV from Binance klines; references `crypto_assets` by symbol string (no DB-level FK; enforced in code).
+- `crypto_latest_prices` — fast latest-close snapshot upserted on each OHLCV write.
+- `crypto_signal_outcomes`, `crypto_signal_calibration_results`, `crypto_quality_evaluations`, `crypto_interest_snapshots` — reserved tables defined for future outcome/calibration/data-quality/interest features; no writer exists yet.
+
+Every crypto write hard-codes `region='GLOBAL'` and `assetType='CRYPTO'` and only touches `crypto_*` tables to prevent collision with equity rows. Market context is persisted under `region='CRYPTO'` in `market_context_snapshots`. Stablecoins and pegged assets are excluded from trend-based scans using a tag-check + known-symbol set (`persistence/market-data-foundation.repository.coverage.ts` and `ingestion/crypto/market-data-foundation.crypto-repository.ts`).
+
+**Sources:**
+
+| Data | Source | Label |
+| --- | --- | --- |
+| Asset catalog / ranking | CoinPaprika free API (`api.coinpaprika.com/v1/tickers`), commercial-use allowed, keyless, ~20k calls/month. CoinGecko available as opt-in fallback (`CRYPTO_UNIVERSE_SOURCE=coingecko`). | EXTERNAL |
+| OHLCV prices | Binance public klines REST (`api.binance.com/api/v3/klines`), keyless, generous rate limits. | EXTERNAL |
+
+Source files: `ingestion/crypto/market-data-foundation.crypto-provider.ts`, `ingestion/crypto/market-data-foundation.crypto-ingestion.adapter.ts`, `ingestion/crypto/market-data-foundation.crypto-repository.ts`.
+
+---
+
+### 13. External endpoint registry
+
+All external data-source base hosts the module contacts are consolidated in a single file:
+
+**`ingestion/market-data-foundation.endpoints.ts`**
+
+This registry was introduced in commit `cc0a06a` (config audit Phase 1) to replace ~10 scattered string literals with env-overridable, provenance-tagged base-URL builders. Covered sources:
+
+| Key | Default base | Region |
+| --- | --- | --- |
+| `nseWww` | `https://www.nseindia.com` | IN |
+| `nseArchives` | `https://nsearchives.nseindia.com` | IN |
+| `nseLegacyArchives` | `https://archives.nseindia.com` | IN |
+| `bseMobile` | `https://m.bseindia.com` | IN |
+| `nasdaqTrader` | `https://www.nasdaqtrader.com` | US |
+| `yahooChart` | `https://query1.finance.yahoo.com` | US / EU |
+| `secData` | `https://data.sec.gov` | US |
+| `secWww` | `https://www.sec.gov` | US |
+| `coingecko` | `https://api.coingecko.com/api/v3` | GLOBAL |
+| `binance` | `https://api.binance.com/api/v3` | GLOBAL |
+| `coinpaprika` | `https://api.coinpaprika.com/v1` | GLOBAL |
+| `defillama` | `https://api.llama.fi` | GLOBAL |
+
+Every base is overridable via a documented environment variable. Security controls reject `http://`, `localhost`, loopback, private IPv4 ranges, and common local IPv6 ranges. No paid providers are wired here.
+
+---
+
 ## NSE/BSE-Only Data Foundation Direction
 
 Current Product Owner direction is NSE/BSE-only for active market-data foundation work.

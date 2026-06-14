@@ -17,6 +17,7 @@ import {
   type TrustedReviewUniverseHealth,
 } from '../api/marketDataFoundationService';
 import { normalizeMarketForApi } from '../api/marketScopeApi';
+import RegionBadge from './RegionBadge';
 
 interface MarketDataStatusPanelProps {
   region?: string;
@@ -73,8 +74,8 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
         fetchMarketDataHealth({ region, assetType }),
         fetchMarketDataUniverseHealth({ region, assetType }),
         fetchTrustedReviewUniverseHealth({ region, assetType }).catch(() => null),
-        fetchMarketDataSchedulerStatus().catch(() => null),
-        fetchSourceFileImports({ limit: 10 }).catch(() => ({ count: 0, imports: [] })),
+        fetchMarketDataSchedulerStatus({ region, assetType }).catch(() => null),
+        fetchSourceFileImports({ region, assetType, limit: 10 }).catch(() => ({ count: 0, imports: [] })),
       ]);
       const normalizedRegion = normalizeMarketForApi(region);
       setHealth(healthResult);
@@ -109,9 +110,12 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
       <Paper variant="outlined" sx={{ p: 2 }}>
         <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={1}>
           <Box>
-            <Typography variant="h6">Exchange Data Health</Typography>
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Typography variant="h6">Data Health</Typography>
+              <RegionBadge region={region} />
+            </Stack>
             <Typography variant="body2" color="text.secondary">
-              NSE/BSE-only market-data status. Provider validation and provider backfill are disabled.
+              Ingestion + storage status for the selected market. Every panel below is scoped to this region.
             </Typography>
           </Box>
           <Button startIcon={loading ? <CircularProgress size={16} /> : <RefreshIcon />} onClick={() => void load()} disabled={loading}>
@@ -168,15 +172,23 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
               Keeping them as separate lines avoids reading a valid data date as
               a stale run. */}
           <Typography variant="body2" color="text.secondary">Last checked: {formatTimestamp(scheduler?.lastRunAt)}</Typography>
-          <Typography variant="body2" color="text.secondary">Data through: {schedulerRegion?.latestStoredTradingDate || 'none'}</Typography>
-          {scheduler?.nextSuggestedRunAt && (
-            <Typography variant="body2" color="text.secondary">
-              Next run: {formatTimestamp(scheduler.nextSuggestedRunAt)}
+          {schedulerRegion ? (
+            <>
+              <Typography variant="body2" color="text.secondary">Data through: {schedulerRegion.latestStoredTradingDate || 'none'}</Typography>
+              {scheduler?.nextSuggestedRunAt && (
+                <Typography variant="body2" color="text.secondary">Next run: {formatTimestamp(scheduler.nextSuggestedRunAt)}</Typography>
+              )}
+            </>
+          ) : (
+            <Typography variant="body2" color="warning.main">
+              {region && region !== 'GLOBAL'
+                ? `${region} is not in the scheduler's configured region set (MARKET_DATA_SCHEDULER_REGIONS).`
+                : 'Select a specific market to see its scheduler status.'}
             </Typography>
           )}
           <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" sx={{ mt: 1 }}>
             <Chip size="small" label={scheduler?.activeRun ? 'RUNNING' : 'IDLE'} color={scheduler?.activeRun ? 'warning' : 'default'} />
-            <Chip size="small" label={schedulerRegion?.candleSyncStatus || 'UNKNOWN'} color={statusColor(schedulerRegion?.candleSyncStatus)} />
+            {schedulerRegion && <Chip size="small" label={schedulerRegion.candleSyncStatus || 'UNKNOWN'} color={statusColor(schedulerRegion.candleSyncStatus)} />}
           </Stack>
         </Paper>
       </Box>
@@ -230,9 +242,18 @@ const MarketDataStatusPanel: React.FC<MarketDataStatusPanelProps> = ({ region, a
       </Paper>
 
       <Paper variant="outlined" sx={{ p: 2 }}>
-        <Typography variant="subtitle2" gutterBottom>Recent Source Files</Typography>
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+          <Typography variant="subtitle2">Recent Source Files</Typography>
+          <RegionBadge region={region} />
+        </Stack>
         <Stack spacing={1}>
-          {sourceImports.length === 0 && <Typography variant="body2" color="text.secondary">No source-file imports recorded yet.</Typography>}
+          {sourceImports.length === 0 && (
+            <Typography variant="body2" color="text.secondary">
+              {region && region !== 'GLOBAL' && normalizeMarketForApi(region) !== 'IN'
+                ? `${region} ingests prices via the provider (Yahoo) — it produces no exchange source files.`
+                : 'No source-file imports recorded yet.'}
+            </Typography>
+          )}
           {sourceImports.map((item) => (
             <Stack key={item.id} direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={1}>
               <Box>

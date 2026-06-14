@@ -130,6 +130,7 @@ export class SourceImportsRepository {
 
 
   async listSourceFileImports(input: {
+    region?: string;
     source?: string;
     segment?: string;
     status?: string;
@@ -143,6 +144,15 @@ export class SourceImportsRepository {
       // Exclude TEST_% fixture rows from the admin list by default
       source: { not: { startsWith: 'TEST_' } },
     };
+    // Region scoping: source_file_imports are exchange-file evidence with no region
+    // column. NSE/BSE/manual rows are India-context; US/EU/Crypto ingest via the
+    // provider (Yahoo) and produce NO exchange files. Map region -> allowed sources so
+    // a non-IN admin scope honestly returns an empty list instead of India's bhavcopy.
+    const regionKey = String(input.region || '').trim().toUpperCase();
+    const REGION_FILE_SOURCES: Record<string, string[]> = { IN: ['NSE', 'BSE', 'MANUAL_VERIFIED'] };
+    if (regionKey && regionKey !== 'GLOBAL') {
+      where.source = { in: REGION_FILE_SOURCES[regionKey] ?? [] };
+    }
     if (input.source) where.source = input.source.trim().toUpperCase();
     if (input.segment) where.segment = input.segment.trim().toUpperCase();
     if (input.status) where.status = input.status.trim().toUpperCase();
