@@ -391,6 +391,32 @@ export class RepairQueriesRepository {
     }
     const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
     const limit = Math.max(1, Math.min(Math.floor(input.limit || 5000), 10_000));
+
+    // Crypto lives in the isolated crypto_ plane (crypto_assets / crypto_latest_prices), NOT
+    // stocks/latest_prices/price_ticks — so the equity queries below always return empty for
+    // crypto and the pipeline aborts ("eligible-universe resolver returned empty"). Resolve the
+    // daily-refresh universe from the crypto plane: active crypto assets priced on the date.
+    if (String(input.assetType || '').trim().toUpperCase() === 'CRYPTO') {
+      const pricedSymbols = await this.prisma.cryptoLatestPrice.findMany({
+        where: { timestamp: { gte: start, lt: end } },
+        select: { symbol: true },
+        take: limit,
+      });
+      const cryptoIds = pricedSymbols.length === 0 ? [] : (await this.prisma.cryptoAsset.findMany({
+        where: { symbol: { in: pricedSymbols.map((p) => p.symbol) }, isActive: true },
+        select: { id: true },
+        take: limit,
+      })).map((a) => a.id);
+      return {
+        region: input.region,
+        assetType: input.assetType,
+        dataThroughDate: dateText,
+        source: cryptoIds.length > 0 ? 'LATEST_PRICE' : 'NONE',
+        instrumentIds: cryptoIds,
+        instrumentCount: cryptoIds.length,
+      };
+    }
+
     const limitFilter = Prisma.sql`LIMIT ${limit}`;
     const scope = { region: input.region, assetType: input.assetType };
 
