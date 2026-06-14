@@ -298,7 +298,7 @@ describe('SignalGenerationEngineService', () => {
     };
     const service = new SignalGenerationEngineService(repository as any, marketDataService as any, researchService as any);
 
-    const result = await service.generateForInstrument('stock-del', { researchContextMode: 'LIGHTWEIGHT' });
+    const result = await service.generateForInstrument('stock-del', { researchContextMode: 'LIGHTWEIGHT', region: 'IN' });
 
     expect(result?.deliveryPercent).toBe(62);
     expect(result?.deliveryEvidence).toBe('Delivery 62% (high conviction).');
@@ -330,7 +330,7 @@ describe('SignalGenerationEngineService', () => {
     const researchService = { workbench: jest.fn().mockResolvedValue(null) };
     const service = new SignalGenerationEngineService(repository as any, marketDataService as any, researchService as any);
 
-    const result = await service.generateForInstrument('stock-del2', { researchContextMode: 'LIGHTWEIGHT' });
+    const result = await service.generateForInstrument('stock-del2', { researchContextMode: 'LIGHTWEIGHT', region: 'IN' });
 
     expect(result?.deliveryPercent).toBe(14);
     expect(result?.deliveryEvidence).toBe('Delivery 14% (intraday churn, lower conviction).');
@@ -2089,30 +2089,30 @@ describe('SignalGenerationEngineService v2 accuracy fixes', () => {
   });
 
   it('fix9: triggerTypeFor — BEARISH + derivativesEligible=true → bearish_trigger', () => {
-    const service = svc();
-    expect((service as any).triggerTypeFor('BEARISH', true)).toBe('bearish_trigger');
+    const { triggerTypeFor } = require('../../../src/modules/signal-generation-engine/signal-trigger-contract');
+    expect(triggerTypeFor('BEARISH', true)).toBe('bearish_trigger');
   });
 
   it('fix9: triggerTypeFor — BEARISH + derivativesEligible=false → risk_warning', () => {
-    const service = svc();
-    expect((service as any).triggerTypeFor('BEARISH', false)).toBe('risk_warning');
+    const { triggerTypeFor } = require('../../../src/modules/signal-generation-engine/signal-trigger-contract');
+    expect(triggerTypeFor('BEARISH', false)).toBe('risk_warning');
   });
 
   it('fix9: triggerTypeFor — BEARISH + derivativesEligible=null → risk_warning (safe default)', () => {
-    const service = svc();
-    expect((service as any).triggerTypeFor('BEARISH', null)).toBe('risk_warning');
+    const { triggerTypeFor } = require('../../../src/modules/signal-generation-engine/signal-trigger-contract');
+    expect(triggerTypeFor('BEARISH', null)).toBe('risk_warning');
   });
 
   it('fix9: triggerTypeFor — BEARISH + derivativesEligible=undefined → risk_warning (safe default)', () => {
-    const service = svc();
-    expect((service as any).triggerTypeFor('BEARISH', undefined)).toBe('risk_warning');
+    const { triggerTypeFor } = require('../../../src/modules/signal-generation-engine/signal-trigger-contract');
+    expect(triggerTypeFor('BEARISH', undefined)).toBe('risk_warning');
   });
 
   it('fix9: triggerTypeFor — BULLISH is always bullish_entry_trigger regardless of F&O eligibility', () => {
-    const service = svc();
-    expect((service as any).triggerTypeFor('BULLISH', false)).toBe('bullish_entry_trigger');
-    expect((service as any).triggerTypeFor('BULLISH', true)).toBe('bullish_entry_trigger');
-    expect((service as any).triggerTypeFor('BULLISH', null)).toBe('bullish_entry_trigger');
+    const { triggerTypeFor } = require('../../../src/modules/signal-generation-engine/signal-trigger-contract');
+    expect(triggerTypeFor('BULLISH', false)).toBe('bullish_entry_trigger');
+    expect(triggerTypeFor('BULLISH', true)).toBe('bullish_entry_trigger');
+    expect(triggerTypeFor('BULLISH', null)).toBe('bullish_entry_trigger');
   });
 
   // ── Point-in-time (as-of date) support ──────────────────────────────────
@@ -2229,20 +2229,18 @@ describe('SignalGenerationEngineService v2 accuracy fixes', () => {
         ],
       }),
     };
-    const capturedFundamental: any[] = [];
     const service = new SignalGenerationEngineService(repository as any, marketDataService as any, { workbench: jest.fn().mockResolvedValue(null) } as any);
-    const origEvalFund = service.evaluateFundamentals.bind(service);
-    jest.spyOn(service, 'evaluateFundamentals').mockImplementation((fund, ...rest) => {
-      if (fund) capturedFundamental.push(fund);
-      return origEvalFund(fund, ...rest);
-    });
+    // Assert at the scoreInstrument seam (the asOf filter feeds the fundamental into scoring).
+    const scoringModule = require('../../../src/modules/signal-generation-engine/signal-scoring');
+    const spy = jest.spyOn(scoringModule, 'scoreInstrument');
 
     await service.generateForInstrument('stock-1', { asOfDate, researchContextMode: 'LIGHTWEIGHT' });
 
-    // The 2025 record must not have been used
-    expect(capturedFundamental.length).toBeGreaterThan(0);
-    const usedPe = capturedFundamental[0]?.pe_ratio;
-    expect(usedPe).toBe(10); // the 2018-09-30 record (most recent before asOfDate)
+    // The 2025 (future) record must not have been used; the 2018-09-30 one (pe 10) is.
+    expect(spy).toHaveBeenCalled();
+    const usedFundamental = (spy.mock.calls[0]?.[0] as any)?.fundamental;
+    expect(usedFundamental?.pe_ratio).toBe(10); // most recent record before asOfDate
+    spy.mockRestore();
   });
 
   it('asOf: LIGHTWEIGHT is forced even when researchContextMode is not specified', async () => {
@@ -2285,7 +2283,7 @@ describe('SignalGenerationEngineService v2 accuracy fixes', () => {
   });
 
   // ── Fix 10 (v3): MODEL_VERSION bumped to v3 ──────────────────────────────
-  it('fix10: MODEL_VERSION is signal-engine-v3', async () => {
+  it('SG-9: MODEL_VERSION is signal-engine-v4 (v4 is the active engine)', async () => {
     const repository = {
       createSignalResult: jest.fn(async (result: any) => ({ ...result, id: 'signal-v3' })),
     };
@@ -2297,8 +2295,8 @@ describe('SignalGenerationEngineService v2 accuracy fixes', () => {
     };
     const service = new SignalGenerationEngineService(repository as any, marketDataService as any, { workbench: jest.fn().mockResolvedValue(null) } as any);
     const result = await service.generateForInstrument('stock-v3', { researchContextMode: 'LIGHTWEIGHT' });
-    expect(result?.modelVersion).toBe('signal-engine-v3');
-    expect(result?.rulesetVersion).toBe('signal-engine-v3');
+    expect(result?.modelVersion).toBe('signal-engine-v4');
+    expect(result?.rulesetVersion).toBe('signal-engine-v4');
   });
 
   // ── v3 compositeScore: conviction gradient spread ─────────────────────────

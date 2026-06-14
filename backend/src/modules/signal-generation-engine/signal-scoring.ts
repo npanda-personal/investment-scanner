@@ -13,10 +13,6 @@
  */
 import type { SignalItem, SignalPricePoint, SignalDirection } from './signal-generation-engine.types';
 import {
-  DIRECTION_BULLISH_THRESHOLD,
-  DIRECTION_BEARISH_THRESHOLD,
-} from '../../shared/types/signal.types';
-import {
   sma,
   rsi,
   atr,
@@ -28,11 +24,15 @@ import {
   isObvTrendingUp,
   isObvTrendingDown,
 } from './signal-indicators';
-import { average } from './signal-math';
+import { average, stddev } from './signal-math';
 import {
   DEFAULT_SIGNAL_SCORING_CONFIG,
   type SignalScoringConfig,
 } from './signal-scoring.config';
+import { compositeV4, type V4Components } from './signal-evidence';
+export { peerAggregates } from './signal-peer-aggregates';
+export { attachRsPercentiles } from './signal-percentile';
+export { filterFundamentalsAsOf, isStaleAsOf, stalenessAnchor } from './signal-asof';
 
 export interface CategoryEvaluation {
   score: number;
@@ -178,6 +178,28 @@ export function evaluateTechnical(
   return { score: categoryScore(signals.length, negativeSignals.length, config), signals, negativeSignals };
 }
 
+/** Reference daily return volatility (~1.5%) the momentum thresholds were tuned against. */
+const REFERENCE_DAILY_VOL = 0.015;
+
+/**
+ * SG-3: scale factor for momentum thresholds based on the instrument's own trailing
+ * daily-return volatility, clamped to [0.5, 2.5].  A 2x-vol stock needs ~2x the move
+ * to vote bullish; a calm stock votes on a smaller move.  Falls back to 1 when there
+ * is insufficient history (so behaviour matches the fixed thresholds).
+ */
+export function volatilityScale(prices: SignalPricePoint[], lookback = 63, refVol = REFERENCE_DAILY_VOL): number {
+  const returns: number[] = [];
+  const n = Math.min(prices.length - 1, lookback);
+  for (let i = 0; i < n; i++) {
+    const today = prices[i].adjusted_close;
+    const prior = prices[i + 1].adjusted_close;
+    if (prior > 0) returns.push((today - prior) / prior);
+  }
+  const vol = stddev(returns);
+  if (vol === null || vol <= 0) return 1;
+  return Math.min(2.5, Math.max(0.5, vol / refVol));
+}
+
 export function evaluateMomentum(
   prices: SignalPricePoint[],
   relativeToPeers: number | null,
@@ -191,8 +213,12 @@ export function evaluateMomentum(
   const threeMonth = returnAtOffset(prices, 63);
   const sixMonth = returnAtOffset(prices, 126);
 
-  pushReturnSignal(oneMonth, 'ONE_MONTH_MOMENTUM', '1M momentum is positive', '1M momentum is negative', signals, negativeSignals, m.bull1m, m.bear1m);
-  pushReturnSignal(threeMonth, 'THREE_MONTH_MOMENTUM', '3M momentum is positive', '3M momentum is negative', signals, negativeSignals, m.bull3m, m.bear3m);
+  // SG-3 (v4 only): volatility-normalize the momentum thresholds so a high-beta name
+  // needs a proportionally larger move to vote bullish, and a low-vol name a smaller one
+  // (the fixed 2%/5% cuts over-fire on volatile stocks).  scale=1 on the v3 path.
+  const vScale = config.scoringEngineVersion === 'v4' ? volatilityScale(prices) : 1;
+  pushReturnSignal(oneMonth, 'ONE_MONTH_MOMENTUM', '1M momentum is positive', '1M momentum is negative', signals, negativeSignals, m.bull1m * vScale, m.bear1m * vScale);
+  pushReturnSignal(threeMonth, 'THREE_MONTH_MOMENTUM', '3M momentum is positive', '3M momentum is negative', signals, negativeSignals, m.bull3m * vScale, m.bear3m * vScale);
 
   // Guard 3: Parabolic short-term run-up — require BOTH 10-day and 5-day returns to
   // clear the threshold so a single-day post-earnings gap that then consolidates is
@@ -253,6 +279,20 @@ export function evaluateFundamentals(
     if (dividendYield >= peerAverageYield) signals.push(signal('YIELD_ABOVE_PEERS', 'dividend yield is above peer average', 'FUNDAMENTAL'));
   }
 
+  // SG-5 (v4 only): net-margin quality vote.  net_income & revenue are the only extra
+  // fundamentals actually ingested (ROE/debt/growth are not sourced yet — see module
+  // docs data-source table), so this is the one data-backed enrichment beyond EPS sign.
+  // Gated to v4 so the v3 vote set stays byte-identical for the crypto lane and legacy.
+  if (config.scoringEngineVersion === 'v4') {
+    const netIncome = numberOrNull(fundamental?.net_income);
+    const revenue = numberOrNull(fundamental?.revenue);
+    if (netIncome !== null && revenue !== null && revenue > 0) {
+      const margin = netIncome / revenue;
+      if (margin >= 0.10) signals.push(signal('HEALTHY_NET_MARGIN', `net margin is ${(margin * 100).toFixed(1)}% (healthy profitability)`, 'FUNDAMENTAL'));
+      else if (margin < 0) negativeSignals.push(signal('NEGATIVE_NET_MARGIN', 'net margin is negative (lossmaking)', 'FUNDAMENTAL'));
+    }
+  }
+
   return { score: categoryScore(signals.length, negativeSignals.length, config), signals, negativeSignals };
 }
 
@@ -305,9 +345,10 @@ export function compositeScore(
   return Math.min(100, Math.max(0, Math.round(raw)));
 }
 
-export function directionForScore(score: number): SignalDirection {
-  if (score >= DIRECTION_BULLISH_THRESHOLD) return 'BULLISH';
-  if (score <= DIRECTION_BEARISH_THRESHOLD) return 'BEARISH';
+export function directionForScore(score: number, config: SignalScoringConfig = DEFAULT_SIGNAL_SCORING_CONFIG): SignalDirection {
+  // SG-8: region-pluggable cut-points (default 60/40 via DEFAULT config / shared constants).
+  if (score >= config.directionThresholds.bullish) return 'BULLISH';
+  if (score <= config.directionThresholds.bearish) return 'BEARISH';
   return 'NEUTRAL';
 }
 
@@ -368,4 +409,76 @@ export function joinReasons(reasons: string[]): string {
 function numberOrNull(value: unknown): number | null {
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : null;
+}
+
+// ── Version-agnostic scoring entry point ───────────────────────────────────────
+// The single seam the generation path calls.  It runs the three category evaluators
+// once, then routes the composite through v3 (legacy count-based) or v4 (evidence
+// model) per `config.scoringEngineVersion`.  Returning the assembled signal lists +
+// direction here lets the caller collapse ~18 lines of inline orchestration into one
+// call (a step toward retiring the god-file service).
+
+export interface ScoreInstrumentInput {
+  prices: SignalPricePoint[];
+  relativeToPeers: number | null;
+  fundamental: unknown;
+  peerAveragePe: number | null;
+  peerAverageYield: number | null;
+}
+
+export interface ScoreInstrumentResult {
+  score: number;
+  direction: SignalDirection;
+  triggeredSignals: SignalItem[];
+  negativeSignals: SignalItem[];
+  totalEvaluated: number;
+  technicalScore: number;
+  momentumScore: number;
+  fundamentalScore: number;
+  engineVersion: 'v3' | 'v4';
+  /** v4 explainability breakdown (null on the v3 path). */
+  components: V4Components | null;
+}
+
+export function scoreInstrument(
+  input: ScoreInstrumentInput,
+  config: SignalScoringConfig = DEFAULT_SIGNAL_SCORING_CONFIG,
+): ScoreInstrumentResult {
+  const technical = evaluateTechnical(input.prices, config);
+  const momentum = evaluateMomentum(input.prices, input.relativeToPeers, config);
+  const fundamentals = evaluateFundamentals(input.fundamental, input.peerAveragePe, input.peerAverageYield, config);
+
+  const triggeredSignals = [...technical.signals, ...momentum.signals, ...fundamentals.signals];
+  const negativeSignals = [...technical.negativeSignals, ...momentum.negativeSignals, ...fundamentals.negativeSignals];
+  const totalEvaluated = triggeredSignals.length + negativeSignals.length;
+
+  const useV4 = config.scoringEngineVersion === 'v4';
+  let score: number;
+  let components: V4Components | null = null;
+  if (useV4) {
+    const result = compositeV4(technical, momentum, fundamentals, config);
+    score = result.score;
+    components = result.components;
+  } else {
+    score = compositeScore(
+      technical.score, momentum.score, fundamentals.score,
+      technical.signals.length, technical.negativeSignals.length,
+      momentum.signals.length, momentum.negativeSignals.length,
+      fundamentals.signals.length, fundamentals.negativeSignals.length,
+      config,
+    );
+  }
+
+  return {
+    score,
+    direction: directionForScore(score, config),
+    triggeredSignals,
+    negativeSignals,
+    totalEvaluated,
+    technicalScore: technical.score,
+    momentumScore: momentum.score,
+    fundamentalScore: fundamentals.score,
+    engineVersion: useV4 ? 'v4' : 'v3',
+    components,
+  };
 }

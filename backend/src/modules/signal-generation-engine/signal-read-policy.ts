@@ -29,3 +29,28 @@ export function isTrustedReadSignal(signal: TrustedReadCandidate): boolean {
     && dataQuality.eligible === true
     && dataQuality.signalReadinessStatus === 'READY';
 }
+
+import { SIGNAL_ENGINE_MODEL_VERSION_V4 } from './signal-scoring.config';
+
+/**
+ * Collapse a same-date row set to one row per instrument, preferring the ACTIVE model
+ * version.  After the v3→v4 modelVersion flip the persistence key is
+ * instrumentId+modelVersion+generatedDate, so a date that carries BOTH a legacy v3 row
+ * and a new v4 row for the same instrument would otherwise double-count it (and inflate
+ * direction counts) in the fast read path, which has no `distinct`.  Display order is
+ * preserved (first-seen position kept; the active-version row supersedes in place).
+ */
+export function dedupeTrustedRows<T extends { instrument_id: string; modelVersion?: string | null }>(
+  rows: T[],
+  activeModelVersion: string = SIGNAL_ENGINE_MODEL_VERSION_V4,
+): T[] {
+  const byInstrument = new Map<string, T>();
+  for (const row of rows) {
+    const existing = byInstrument.get(row.instrument_id);
+    if (!existing) { byInstrument.set(row.instrument_id, row); continue; }
+    if (existing.modelVersion !== activeModelVersion && row.modelVersion === activeModelVersion) {
+      byInstrument.set(row.instrument_id, row); // active version supersedes the legacy row
+    }
+  }
+  return [...byInstrument.values()];
+}

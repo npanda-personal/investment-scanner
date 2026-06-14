@@ -199,6 +199,10 @@ export interface SignalScoringInputSummary {
   hasVolume: boolean;
   fundamentalsAvailable: boolean;
   strategyContextLoaded: boolean;
+  /** v4 evidence-model breakdown (rawLean, displacement, evidenceFactor, effective
+   *  weights, aligned families). Null on the legacy v3 path. Persisted in JSON for
+   *  audit/explainability without a schema change. */
+  v4?: import('./signal-evidence').V4Components | null;
 }
 
 export interface SignalDataQualityEligibility {

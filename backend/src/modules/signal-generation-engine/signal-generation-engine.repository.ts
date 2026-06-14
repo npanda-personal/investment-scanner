@@ -2,7 +2,7 @@ import { Prisma } from '@prisma/client';
 import prisma from '../../db/prisma';
 import type { ReliabilityTier, SignalGenerationRunAudit, SignalHistoryQuery, SignalLifecycleState, SignalQuery, SignalResultDto, SignalWriteResult, SignalWriteStatus } from './signal-generation-engine.types';
 import { resolveMarketRegionFilter } from '../../shared/utils/market-scope';
-import { isTrustedReadSignal } from './signal-read-policy';
+import { isTrustedReadSignal, dedupeTrustedRows } from './signal-read-policy';
 import { normalizeUtcDay } from './signal-math';
 
 export interface SignalFunnelDiagnosticsQuery {
@@ -385,7 +385,7 @@ export class SignalGenerationEngineRepository {
    */
   private async trustedRowsForLatestDate(where: Prisma.SignalResultWhereInput, orderBy: Prisma.SignalResultOrderByWithRelationInput[]): Promise<SignalResultDto[]> {
     const rows = await this.db.signalResult.findMany({ where, orderBy });
-    return rows.map((item) => this.toDto(item)).filter((result) => this.isTrustedReadSignal(result));
+    return dedupeTrustedRows(rows.map((item) => this.toDto(item)).filter((result) => this.isTrustedReadSignal(result)));
   }
 
   private async latestSignalsFromLatestGeneratedDate(query: SignalQuery): Promise<{ signals: SignalResultDto[]; total: number } | null> {
@@ -659,9 +659,9 @@ export class SignalGenerationEngineRepository {
     topSectors: Array<{ sector: string; leadershipStatus: string; relativeStrengthScore: number }>;
     weakSectors: Array<{ sector: string; leadershipStatus: string; relativeStrengthScore: number }>;
   } | null> {
-    const effectiveRegion = region || 'IN';
+    if (!region) return null; // SG-1 region isolation: no IN fallback for absent/GLOBAL scope
     const market = await this.db.marketContextSnapshot.findFirst({
-      where: { region: effectiveRegion },
+      where: { region: region },
       orderBy: [{ snapshotDate: 'desc' }, { updatedAt: 'desc' }],
       select: { regime: true, regimeScore: true, breadthPercentAboveSma50: true, snapshotDate: true },
     }).catch(() => null);
@@ -669,7 +669,7 @@ export class SignalGenerationEngineRepository {
 
     const sectorRows = await this.db.sectorContextSnapshot.findMany({
       where: {
-        region: effectiveRegion,
+        region: region,
         snapshotDate: market.snapshotDate,
       },
       orderBy: { relativeStrengthScore: 'desc' },

@@ -69,6 +69,58 @@ Known limitations:
 - Backend batch offsets are expected to use the `nextOffset` returned by the previous response. Arbitrary non-batch-aligned offsets are not a supported user workflow.
 - The dashboard intentionally does not expose sorting by enriched price or daily-change fields because those values are calculated after the persisted signal page is selected. Server-backed sorting is limited to persisted signal fields such as score, symbol, direction, confidence, and generated time.
 
+## Business Logic & Data Sources (per data point)
+
+The table below describes every input the scoring engine consumes, what the engine does with it, and where it originates. "EXTERNAL" means the raw data is fetched from an outside provider; "INTERNAL" means the value is produced by another module in this codebase and arrives via a persisted read or a service call.
+
+| Input | Meaning & how it is used | Source type | Provider / module |
+|---|---|---|---|
+| Price history (OHLCV + adjusted_close / adjusted_high / adjusted_low / adjusted_volume) | Drives all technical and momentum factors: SMA-50, SMA-200, RSI-14, ADX-14, ATR-14, OBV trend, 52-week high/low, 1M/3M/6M return. 520 trailing bars are loaded per instrument (`SIGNAL_GENERATION_PRICE_WINDOW`). Adjusted fields are preferred over raw so corporate-action splits do not distort indicators. | EXTERNAL (raw) / INTERNAL (read) | Yahoo Finance (global prices, US equities); NSE EOD (India equities). Accessed via `market-data-foundation` price reads. |
+| Delivery % (NSE only) | Additive conviction annotation: high delivery (≥ 40 %) suggests institutional/positional interest; low delivery (< 20 %) flags intraday churn. **Does not alter the composite score** — surfaced only in the signal explanation text. Gated on `SignalScoringConfig.hasDelivery`; non-NSE scopes (US / EU / crypto) never read or annotate it. | EXTERNAL (raw) / INTERNAL (read) | NSE bhavcopy delivery data; accessed via `market-data-foundation`. India-only. |
+| Fundamentals — EPS (`eps`), P/E ratio (`pe_ratio`), dividend yield (`dividend_yield`), net income (`net_income`), revenue (`revenue`), market cap (`market_cap`) | The Prisma `Fundamental` model exposes exactly these six fields. Used for: positive/negative EPS vote (PROFITABILITY family); P/E vs peer-average vote (VALUATION family, v3+v4); yield vs peer-average vote (INCOME family, v3+v4); net-margin quality vote `net_income / revenue` (PROFITABILITY family, **v4 only** — SG-5). `market_cap` is used for reliability-tier classification, not scoring. **ROE, debt ratios, margins history, earnings-surprise, and revenue/earnings growth are not ingested** — the engine cannot vote on them. | EXTERNAL (raw) / INTERNAL (read) | NSE XBRL filings (India); SEC EDGAR filings (US). Accessed via `market-data-foundation` fundamentals reads. |
+| Peer averages (`peer_average_pe`, `peer_average_dividend_yield`, `relative_to_peer_average`) | Used for P/E vs peers, yield vs peers, and outperforming/underperforming peers momentum votes. Computed as the average of top peers in the same sector and region, ordered by market cap. **Available in FULL (single-symbol) mode only today.** Batch mode does not call the workbench aggregate, so these fields are null for all batch-generated signals (SG-4, pending). | INTERNAL | `stock-research-workbench` (same sector + region, top peers by market cap). FULL mode only (`researchContextMode=FULL`). |
+| Market regime / breadth / sector leadership | Regime gate: when `RISK_ON` and `regimeGateShortsEnabled` is true, bearish signals on non-derivatives instruments are downgraded to `risk_warning` and confidence is lowered. Breadth below `BREADTH_WEAK_THRESHOLD` is annotated; very weak breadth below `BREADTH_VERY_WEAK_THRESHOLD` suppresses longs additionally. Regime is region-scoped — an IN regime snapshot never bleeds into a US/EU signal run. | INTERNAL | `market-context-intelligence` persisted snapshots (region-scoped). |
+| Smart-money status / score | Surfaced as strategy-framework enrichment context (blockers / data-gaps) when strategy matching is requested. Never alters the raw composite score. Absent context is reported as a `dataGap`, not treated as healthy. | INTERNAL | `smart-money-intelligence` persisted snapshots; batch-fetched per instrument batch during strategy-aware enrichment. |
+| Data-quality eligibility verdict | Gates the instrument universe before generation when `useDataQualityFilter=true`. Instruments flagged NOT_READY or INELIGIBLE are excluded and counted in `excludedByDataQuality`. Strategy Framework also gates on the DQ verdict — a missing or ineligible verdict blocks a strategy match from reaching `SOURCE_PROVEN`. | INTERNAL | `data-quality-engine` (verdict persisted-read; `filterByVerdict()` call). |
+| Calibration overlay | Persisted-read overlay joining the latest `SignalCalibrationResult` per instrument to signal list responses. Never triggers a live recompute; absent when the reader is not injected. Exposes `calibratedScore` and `calibratedDirection` alongside the raw score. | INTERNAL | `signal-calibration-engine` persisted snapshots (persisted-read only; injected as `CalibrationPersistedReader`). |
+
+## Scoring engine versions (v3 to v4) & region isolation
+
+### Engine versions
+
+Two composite engines coexist and are selected by `SignalScoringConfig.scoringEngineVersion`:
+
+**v3 — legacy count-based composite** (`modelVersion: 'signal-engine-v3'`)
+
+The original scoring path. Composite is an evidence-scaled weighted average of three Laplace-smoothed Bayesian category fractions. Evidence scaling uses a raw aligning-signal count (not decorrelated) and a cross-category agreement fraction. Category weights are fixed regardless of which categories have evidence. Confidence is graded on data sufficiency alone (bars / fundamentals / signal count / staleness). The crypto lane and the `DEFAULT_SIGNAL_SCORING_CONFIG` both use v3. v3 scoring is reproduced byte-for-byte when the default config is supplied, so all existing India-equity scoring and crypto scoring are unchanged.
+
+**v4 — evidence model** (`modelVersion: 'signal-engine-v4'`)
+
+Activated by passing `engineVersion: 'v4'` to `resolveSignalScoringConfig`. Live manual generation uses v4; the crypto lane and DEFAULT config stay on v3. Persistence is keyed by `modelVersion`, so a v4 run produces distinct rows that do not overwrite v3 rows.
+
+v4 fixes identified in the evidence-model design:
+
+- **Per-instrument no-evidence weight redistribution (fix #2)**: a category that produces zero evidence for a given instrument has its weight dropped to zero and the remaining category weights are renormalized. Under v3, a category with no evidence is pinned at a neutral 0.5, dragging the composite toward NEUTRAL even when the other two categories are in strong agreement.
+- **Family-decorrelated conviction (fix #3)**: the count component of the evidence factor is driven by the number of distinct `FactorFamily` values that fired in the dominant direction (TREND, BREAKOUT_LEVEL, MEAN_REVERSION, OVEREXTENSION, VOLUME, MOMENTUM, RELATIVE_STRENGTH, PROFITABILITY, VALUATION, INCOME), not the raw count of collinear signals. Seven signals from one uptrend count as a small number of independent families, not seven separate confirmations. Defined in `signal-evidence.ts`.
+- **Graded per-factor strength (fix #4)**: each factor contributes a base strength in (0, 1] via `STRENGTH_BY_CODE` rather than a uniform binary vote. Confirmed or extreme factors (e.g. `CONFIRMED_VOLUME_BREAKOUT`, `RSI_EXTREME_OVERBOUGHT`, `SIX_MONTH_ACCELERATION`) carry higher weight than their bare counterparts.
+- **Monotonic composite (fix #7)**: `compositeV4` never removes a vote — adding a same-direction factor can only raise, never lower, the composite score.
+- **Vol-normalized momentum thresholds (SG-3)**: on the v4 path, `volatilityScale()` computes the instrument's own trailing 63-day daily-return volatility and scales the 1M/3M momentum bullish/bearish thresholds proportionally (clamped to [0.5, 2.5] × reference). A high-beta name therefore needs a proportionally larger move to cast a bullish momentum vote; a low-vol name can vote on a smaller move. Falls back to scale = 1 when history is insufficient (matches fixed v3 thresholds).
+- **Net-margin quality vote (SG-5)**: v4 adds a derived fundamental vote: `net_income / revenue ≥ 10 %` → `HEALTHY_NET_MARGIN` (PROFITABILITY family); `< 0` → `NEGATIVE_NET_MARGIN`. This is the only derived quality vote because `net_income` and `revenue` are the only extra fundamental fields actually ingested beyond EPS. ROE, debt ratios, and growth metrics are not sourced.
+- **Conviction-based confidence (SG-6)**: `signal-confidence.ts` (`resolveConfidence`) adds the v4 composite's `|displacement|` (how far the weighted lean sits from 0.5) to the confidence tier. Both data sufficiency **and** conviction must clear the bar — a score sitting at 51 on thin evidence no longer qualifies as HIGH confidence. The `dataComplete` flag is surfaced separately so the UI can distinguish thin data from low conviction.
+
+v4 explainability rides in `scoringInputSummary.v4` (a `V4Components` object: `rawLean`, `displacement`, `evidenceFactor`, `alignedFamilies`, `effectiveWeights`, `categoryHasEvidence`, `categoryScores`). This is stored as JSON in the existing `scoringInputSummary` column — no schema change is required.
+
+### Region isolation (SG-1)
+
+Region is resolved via `signal-scope.ts` before every read, generation step, and context lookup. The isolation contract is:
+
+- A **concrete region** (IN / US / EU) is applied strictly to every price read, fundamentals read, peer-set selection, market-context lookup, smart-money lookup, and cohort key. Selecting US or EU never surfaces Indian data, and vice versa.
+- **GLOBAL** is an explicit cross-region aggregate, never a silent default. It is never assigned to an absent or unknown region input.
+- An **unknown or absent region** resolves to GLOBAL (cross-region aggregate), not to IN. The legacy `canonicalRegion(value) || 'IN'` default and the repository's latestPersistedMarketContext IN fallback were both removed as part of SG-1.
+- **Crypto** routes to the isolated crypto plane (`isCryptoPlane = true`, `cohortKey = 'CRYPTO|GLOBAL'`); it never mixes with equity instrument rows.
+- The `cohortKey` (`<assetType>|<region>`, e.g. `STOCK|IN`, `STOCK|US`, `CRYPTO|GLOBAL`) is the isolation boundary for cross-sectional features such as vol-normalization, universe RS percentile, and peer aggregates (SG-2 / SG-3 / SG-4).
+- `concreteRegionOrNull()` is the guard callers use for context reads: it returns null for GLOBAL or crypto, and callers must skip region-specific context rather than defaulting to IN.
+
 ## Scoring and Signals
 Composite score (0-100) is calculated from Technical, Momentum, and Fundamental signals.
 

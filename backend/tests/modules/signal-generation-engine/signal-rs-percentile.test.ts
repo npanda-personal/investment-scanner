@@ -1,7 +1,9 @@
 /// <reference types="@types/jest" />
 /**
- * NR-6: relative-strength percentile ranking (withRsPercentiles).
- * Pure in-memory ranking of the served signal set by composite score — no DB.
+ * NR-6 / SG-3b: relative-strength percentile ranking (withRsPercentiles).
+ * Called on the bare prototype (no repository), so the cohort-universe read fails closed
+ * and the method falls back to ranking within the served set — exactly the cases below.
+ * Universe-scoped ranking is covered separately in signal-percentile.test.ts.
  */
 import { SignalGenerationEngineService } from '../../../src/modules/signal-generation-engine/signal-generation-engine.service';
 import type { SignalResultDto } from '../../../src/modules/signal-generation-engine/signal-generation-engine.types';
@@ -9,16 +11,16 @@ import type { SignalResultDto } from '../../../src/modules/signal-generation-eng
 const sig = (score: number, symbol: string): SignalResultDto =>
   ({ symbol, instrument_id: symbol, score } as unknown as SignalResultDto);
 
-// Access the private method without constructing the full dependency graph.
-const rank = (signals: SignalResultDto[]): SignalResultDto[] =>
+// Access the private (now async) method without constructing the full dependency graph.
+const rank = (signals: SignalResultDto[]): Promise<SignalResultDto[]> =>
   (SignalGenerationEngineService.prototype as any).withRsPercentiles.call(
     SignalGenerationEngineService.prototype,
     signals,
   );
 
-describe('NR-6 RS percentile ranking', () => {
-  it('maps weakest score → 0 and strongest → 100', () => {
-    const out = rank([sig(10, 'LOW'), sig(50, 'MID'), sig(90, 'HIGH')]);
+describe('NR-6 RS percentile ranking (served-set fallback)', () => {
+  it('maps weakest score → 0 and strongest → 100', async () => {
+    const out = await rank([sig(10, 'LOW'), sig(50, 'MID'), sig(90, 'HIGH')]);
     const by = Object.fromEntries(out.map((s) => [s.symbol, s.rsPercentile]));
     expect(by.LOW).toBe(0);
     expect(by.HIGH).toBe(100);
@@ -26,29 +28,29 @@ describe('NR-6 RS percentile ranking', () => {
     expect(by.MID).toBeLessThan(100);
   });
 
-  it('a 2-signal universe yields extremes 0 and 100', () => {
-    const out = rank([sig(30, 'A'), sig(70, 'B')]);
+  it('a 2-signal universe yields extremes 0 and 100', async () => {
+    const out = await rank([sig(30, 'A'), sig(70, 'B')]);
     const by = Object.fromEntries(out.map((s) => [s.symbol, s.rsPercentile]));
     expect(by.A).toBe(0);
     expect(by.B).toBe(100);
   });
 
-  it('a single signal gets null (no meaningful ranking)', () => {
-    const out = rank([sig(80, 'ONLY')]);
+  it('a single signal gets null (no meaningful ranking)', async () => {
+    const out = await rank([sig(80, 'ONLY')]);
     expect(out[0].rsPercentile).toBeNull();
     expect(out[0].relativeReturn).toBeNull();
   });
 
-  it('tied scores share the lower-bound rank', () => {
-    const out = rank([sig(50, 'A'), sig(50, 'B'), sig(90, 'C')]);
+  it('tied scores share the lower-bound rank', async () => {
+    const out = await rank([sig(50, 'A'), sig(50, 'B'), sig(90, 'C')]);
     const by = Object.fromEntries(out.map((s) => [s.symbol, s.rsPercentile]));
     expect(by.A).toBe(by.B); // ties identical
     expect(by.A).toBe(0); // both at the lowest score → rank 0
     expect(by.C).toBe(100);
   });
 
-  it('relativeReturn = (score-50)/50', () => {
-    const out = rank([sig(0, 'A'), sig(50, 'B'), sig(100, 'C')]);
+  it('relativeReturn = (score-50)/50', async () => {
+    const out = await rank([sig(0, 'A'), sig(50, 'B'), sig(100, 'C')]);
     const by = Object.fromEntries(out.map((s) => [s.symbol, s.relativeReturn]));
     expect(by.A).toBeCloseTo(-1);
     expect(by.B).toBeCloseTo(0);

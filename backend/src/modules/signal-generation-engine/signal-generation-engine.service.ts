@@ -56,12 +56,12 @@ import { average, stddev, optionalNumber as toOptionalNumber, clampInt as clampI
 import {
   DEFAULT_SIGNAL_SCORING_CONFIG,
   resolveSignalScoringConfig,
-  SIGNAL_ENGINE_MODEL_VERSION,
+  SIGNAL_ENGINE_MODEL_VERSION_V4,
   SIGNAL_GENERATION_PRICE_WINDOW,
   type SignalScoringConfig,
 } from './signal-scoring.config';
 
-const MODEL_VERSION = SIGNAL_ENGINE_MODEL_VERSION;
+const MODEL_VERSION = SIGNAL_ENGINE_MODEL_VERSION_V4; // SG-9: v4 is the active engine; persist + audit under v4
 
 // Regime-gate + fundamentals-lag policy now live in signal-scoring.config.ts and are
 // resolved per market scope; these module-level aliases preserve the prior defaults
@@ -491,10 +491,10 @@ export class SignalGenerationEngineService {
     const useFullResearchContext = effectiveResearchContextMode !== 'LIGHTWEIGHT';
     const marketScope = { region: options.region, assetType: options.assetType };
     // Resolve the per-scope scoring config (weights, guards, delivery capability,
-    // fundamentals-filing lag).  Region falls back to IN when the run is unscoped /
-    // GLOBAL, preserving the prior India-default behaviour byte-for-byte; an explicit
-    // US/EU/crypto scope gets market-appropriate parameters.
-    const scoringConfig = resolveSignalScoringConfig({ region: this.canonicalRegion(options.region), assetType: options.assetType });
+    // fundamentals-filing lag).  SG-1: an unscoped/GLOBAL run resolves to the GLOBAL
+    // profile (no NSE delivery / VIX / institutional flow — never assumes India); an
+    // explicit IN/US/EU/crypto scope gets market-appropriate parameters.
+    const scoringConfig = resolveSignalScoringConfig({ region: this.canonicalRegion(options.region), assetType: options.assetType, engineVersion: 'v4' });
     const priceEndDate = asOfDate ?? undefined;
     const [instrument, pricesResponse, fundamentalsResponse, research] = await Promise.all([
       options.batchContext?.instrumentsById.has(instrumentId)
@@ -513,13 +513,13 @@ export class SignalGenerationEngineService {
 
     const prices = this.toPricePoints(pricesResponse?.prices || []);
     const latestFundamental = fundamentalsResponse?.records?.[0] || null;
-    const peerAveragePe = typeof research?.valuation?.peer_average_pe === 'number' ? research.valuation.peer_average_pe : null;
-    const peerAverageYield = typeof research?.valuation?.peer_average_dividend_yield === 'number'
-      ? research.valuation.peer_average_dividend_yield
-      : null;
-    const relativeToPeers = typeof research?.relative_strength?.relative_to_peer_average === 'number'
-      ? research.relative_strength.relative_to_peer_average
-      : null;
+    // SG-4: in batch (LIGHTWEIGHT) mode research is null, so peer valuation/strength came
+    // back null and the peer votes never fired.  Fall back to region-scoped peer context
+    // derived from the in-memory batch context (no extra DB calls), restoring FULL parity.
+    const peerCtx = research ? null : Scoring.peerAggregates(options.batchContext, instrument);
+    const peerAveragePe = typeof research?.valuation?.peer_average_pe === 'number' ? research.valuation.peer_average_pe : (peerCtx?.peerAveragePe ?? null);
+    const peerAverageYield = typeof research?.valuation?.peer_average_dividend_yield === 'number' ? research.valuation.peer_average_dividend_yield : (peerCtx?.peerAverageYield ?? null);
+    const relativeToPeers = typeof research?.relative_strength?.relative_to_peer_average === 'number' ? research.relative_strength.relative_to_peer_average : (peerCtx?.relativeToPeers ?? null);
 
     // ── Delivery% evidence (NR-1) ─────────────────────────────────────────────
     // Delivery% is an NSE-only data source.  It is gated on the resolved market
@@ -536,25 +536,17 @@ export class SignalGenerationEngineService {
         : null;
     const deliveryEvidence = this.buildDeliveryEvidence(deliveryPercent);
 
-    const technical = this.evaluateTechnical(prices, scoringConfig);
-    const momentum = this.evaluateMomentum(prices, relativeToPeers, scoringConfig);
-    const fundamentals = this.evaluateFundamentals(latestFundamental, peerAveragePe, peerAverageYield, scoringConfig);
-
-    const triggeredSignals = [...technical.signals, ...momentum.signals, ...fundamentals.signals];
-    const negativeSignals = [...technical.negativeSignals, ...momentum.negativeSignals, ...fundamentals.negativeSignals];
-    const totalEvaluated = triggeredSignals.length + negativeSignals.length;
-
-    // Thread per-category signal counts + the resolved config so compositeScore can
-    // compute evidenceFactor and apply market-appropriate category weights.
-    const score = this.compositeScore(
-      technical.score, momentum.score, fundamentals.score,
-      technical.signals.length, technical.negativeSignals.length,
-      momentum.signals.length, momentum.negativeSignals.length,
-      fundamentals.signals.length, fundamentals.negativeSignals.length,
+    // Version-agnostic scoring seam (signal-scoring.scoreInstrument): runs the three
+    // category evaluators once, then routes the composite through v3 (legacy count) or
+    // v4 (evidence model) per scoringConfig.scoringEngineVersion.  NOTE: when v4 is
+    // activated, scoreOutcome.components must be threaded into scoringInputSummary
+    // (the audit JSON) before flip — not yet persisted while default is v3.
+    const scoreOutcome = Scoring.scoreInstrument(
+      { prices, relativeToPeers, fundamental: latestFundamental, peerAveragePe, peerAverageYield },
       scoringConfig,
     );
-    const direction = this.directionForScore(score);
-    const rawConfidence = this.confidenceFor(prices, latestFundamental, totalEvaluated, asOfDate ?? undefined);
+    const { score, direction, triggeredSignals, negativeSignals, totalEvaluated } = scoreOutcome;
+    const rawConfidence = this.confidenceFor(prices, latestFundamental, totalEvaluated, asOfDate ?? undefined, scoreOutcome.components?.displacement ?? null);
 
     // ── Regime gate (bearish/short suppression) ────────────────────────────────
     // Consult the current market regime before surfacing bearish signals.
@@ -576,11 +568,8 @@ export class SignalGenerationEngineService {
 
     const warnings: string[] = [];
     const latestDate = prices[0]?.date ? new Date(prices[0].date) : null;
-    // Staleness is measured relative to asOfDate when provided; otherwise relative to now
-    const stalenessAnchor = asOfDate ?? new Date();
-    const fiveDaysAgo = new Date(stalenessAnchor);
-    fiveDaysAgo.setDate(fiveDaysAgo.getDate() - 5);
-    if (latestDate && latestDate < fiveDaysAgo) {
+    // SG-7: staleness measured relative to asOfDate (backfill) or now, via the shared seam.
+    if (latestDate && Scoring.isStaleAsOf(latestDate, asOfDate)) {
       warnings.push(`Market data is stale (last update: ${latestDate.toISOString().split('T')[0]})`);
     }
     if (prices.length < 50) {
@@ -622,7 +611,7 @@ export class SignalGenerationEngineService {
       generatedDate,
       sourceDataDate: latestDate?.toISOString() ?? null,
       sourcePriceDate: latestDate?.toISOString() ?? null,
-      scoringInputSummary: this.scoringInputSummary(prices, latestFundamental, useFullResearchContext || Boolean(options.includeStrategyMatches)),
+      scoringInputSummary: this.scoringInputSummary(prices, latestFundamental, useFullResearchContext || Boolean(options.includeStrategyMatches), scoreOutcome.components),
       dataQualityEligibility: this.dataQualityEligibilityFor(instrumentId, options),
       regimeGateNote: regimeGateResult.regimeGateNote ?? undefined,
       regimeGateSuppressed: regimeGateResult.regimeGateSuppressed || undefined,
@@ -778,7 +767,7 @@ export class SignalGenerationEngineService {
         result = await this.attachStrategyMatches(result, prices, instrument, options, ratingCache);
         return this.withTriggerContract(result, instrument);
       }));
-      return this.withRsPercentiles(enriched.filter((signal) => this.signalPassesStrategyFilters(signal, options)));
+      return this.withRsPercentiles(enriched.filter((signal) => this.signalPassesStrategyFilters(signal, options)), { region: options.region, assetType: options.assetType });
     } catch (error) {
       console.error('Signal enrichment failed:', error);
       return this.withRsPercentiles(signals.map(signal => ({
@@ -788,41 +777,24 @@ export class SignalGenerationEngineService {
         dailyChange: null,
         dailyChangePercent: null,
         priceTimestamp: null,
-      })).map((signal) => this.withTriggerContract(signal)).filter((signal) => this.signalPassesStrategyFilters(signal, options)));
+      })).map((signal) => this.withTriggerContract(signal)).filter((signal) => this.signalPassesStrategyFilters(signal, options)), { region: options.region, assetType: options.assetType });
     }
   }
 
   /**
-   * NR-6: assign each signal a relative-strength percentile (0–100) by ranking its
-   * composite `score` ascending within the SERVED set (weakest→0, strongest→100).
-   * Ties take the lower-bound rank. A served set of < 2 leaves rsPercentile/relativeReturn
-   * null (no meaningful ranking). Pure in-memory over the already-served signals — no
-   * extra DB or price reads, so it adds no look-ahead or pool pressure.
+   * SG-3b: assign each served signal a relative-strength percentile (0–100) ranked
+   * against the COHORT UNIVERSE (region/asset-scoped latest trusted scores) so it is
+   * stable regardless of the page's limit/filters.  The universe read is already
+   * region-isolated (SG-1) and trusted-filtered.  Falls back to ranking within the served
+   * set when the universe read is empty/too small (attachRsPercentiles handles that).
    */
-  private withRsPercentiles(signals: SignalResultDto[]): SignalResultDto[] {
-    const n = signals.length;
-    if (n < 2) {
-      return signals.map((s) => ({ ...s, rsPercentile: null, relativeReturn: null }));
-    }
-    const scoreOf = (s: SignalResultDto): number => (typeof s.score === 'number' ? s.score : 0);
-    const sortedScores = signals.map(scoreOf).sort((a, b) => a - b);
-    // lower-bound rank: first index where sortedScores[i] >= score (ties share lowest rank)
-    const lowerBoundRank = (score: number): number => {
-      let lo = 0;
-      let hi = sortedScores.length;
-      while (lo < hi) {
-        const mid = (lo + hi) >> 1;
-        if (sortedScores[mid] < score) lo = mid + 1;
-        else hi = mid;
-      }
-      return lo;
-    };
-    return signals.map((s) => {
-      const score = scoreOf(s);
-      const rsPercentile = Math.round((lowerBoundRank(score) / (n - 1)) * 100);
-      const relativeReturn = (score - 50) / 50;
-      return { ...s, rsPercentile, relativeReturn };
-    });
+  private async withRsPercentiles(signals: SignalResultDto[], scope: { region?: string; assetType?: string } = {}): Promise<SignalResultDto[]> {
+    let universeScores: number[] = [];
+    try {
+      const cohort = await this.repository.latestSignalUniverse({ region: scope.region, assetType: scope.assetType, limit: 100000, offset: 0 } as SignalQuery);
+      universeScores = cohort.map((c) => (typeof c.score === 'number' ? c.score : 0));
+    } catch { /* fall back to served-set ranking */ }
+    return Scoring.attachRsPercentiles(signals, universeScores);
   }
 
   async enrichSignal(signal: SignalResultDto): Promise<SignalResultDto> {
@@ -1551,35 +1523,9 @@ export class SignalGenerationEngineService {
       response = await (this.marketDataService as any).storedFundamentalsByInstrumentId(instrumentId, marketScope);
     }
     if (!asOf || !response?.records) return response;
-
-    // Fix #2 (Fundamentals point-in-time look-ahead):
-    // Results are typically filed weeks after period-end (NSE 45-60 days; US 10-Q ≈ 40).
-    // Simply filtering by periodEndDate <= asOf exposes fundamentals before they were
-    // public (e.g. a Q1 result with periodEnd=2023-06-30 is not public until late Aug 2023).
-    //
-    // Priority:
-    //   1. If the record has an officialResultDate (populated by the board-meeting ingest),
-    //      use it directly — it's the actual announcement date.
-    //   2. Otherwise apply a conservative, per-market lag: periodEndDate + publicLagDays
-    //      (resolved from the scope's MarketProfile filing regime).
-    //
-    // Live runs (asOf undefined) are unchanged — they always see the latest filings.
-    const asOfMs = asOf.getTime();
-    const lagMs = publicLagDays * 24 * 60 * 60 * 1000;
-    const filtered = response.records.filter((record: any) => {
-      // Prefer explicit officialResultDate when available
-      if (record.officialResultDate) {
-        const officialDate = new Date(record.officialResultDate);
-        if (Number.isFinite(officialDate.getTime())) {
-          return officialDate.getTime() <= asOfMs;
-        }
-      }
-      // Fall back to periodEndDate + conservative lag
-      const periodEndDate = record.periodEndDate ? new Date(record.periodEndDate) : null;
-      if (periodEndDate === null || !Number.isFinite(periodEndDate.getTime())) return false;
-      return periodEndDate.getTime() + lagMs <= asOfMs;
-    });
-    return { ...response, records: filtered };
+    // SG-7: point-in-time fundamentals visibility is centralized in signal-asof.ts
+    // (Fix #2). Live runs (asOf undefined) returned above — they see the latest filings.
+    return { ...response, records: Scoring.filterFundamentalsAsOf(response.records, asOf, publicLagDays) };
   }
 
   /**
@@ -1669,7 +1615,7 @@ export class SignalGenerationEngineService {
     return `Signal verdict excluded this instrument (${reasons.join(', ')}).`;
   }
 
-  private scoringInputSummary(prices: SignalPricePoint[], latestFundamental: any, strategyContextLoaded: boolean): SignalScoringInputSummary {
+  private scoringInputSummary(prices: SignalPricePoint[], latestFundamental: any, strategyContextLoaded: boolean, v4: SignalScoringInputSummary['v4'] = null): SignalScoringInputSummary {
     return {
       priceBarsUsed: prices.length,
       latestCloseDate: prices[0]?.date ?? null,
@@ -1677,7 +1623,7 @@ export class SignalGenerationEngineService {
       hasSma200: this.sma(prices, 200) !== null,
       hasVolume: prices.some((price) => typeof price.volume === 'number'),
       fundamentalsAvailable: Boolean(latestFundamental),
-      strategyContextLoaded,
+      strategyContextLoaded, v4,
     };
   }
 
@@ -1691,7 +1637,7 @@ export class SignalGenerationEngineService {
   }
 
   private canonicalRegion(value?: string | null) {
-    return normalizeMarketRegion(value) || 'IN';
+    return normalizeMarketRegion(value) || 'GLOBAL'; // SG-1: never default unknown region to IN (isolation)
   }
 
   private filtersApplied(query: SignalQuery): Record<string, unknown> {
@@ -1764,19 +1710,14 @@ export class SignalGenerationEngineService {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
-  private confidenceFor(prices: SignalPricePoint[], fundamental: any, signalCount: number, asOf?: Date): SignalConfidence {
-    // Check if the data is stale (more than 5 calendar days old relative to asOf or now)
+  private confidenceFor(prices: SignalPricePoint[], fundamental: any, signalCount: number, asOf?: Date, displacement?: number | null): SignalConfidence {
+    // Staleness anchor: 5 calendar days relative to asOf (or now). SG-6 then folds the
+    // v4 conviction (displacement) into the tier via resolveConfidence; when displacement
+    // is null (v3) it reproduces the legacy data-sufficiency tiers exactly.
     const latestDate = prices[0]?.date ? new Date(prices[0].date) : null;
-    const anchor = asOf ?? new Date();
-    const fiveDaysAgo = new Date(anchor);
-    fiveDaysAgo.setDate(fiveDaysAgo.getDate() - 5); // 5 cal days for safety margin on weekends
-    const isStale = latestDate ? latestDate < fiveDaysAgo : true;
-
-    if (prices.length >= 200 && fundamental && signalCount >= 6 && !isStale) return 'HIGH';
-    // Fix #6: add !isStale guard to MEDIUM tier (mirrors HIGH tier) so stale data
-    // does not receive a falsely confident MEDIUM rating.
-    if (prices.length >= 50 && signalCount >= 3 && !isStale) return 'MEDIUM';
-    return 'LOW';
+    const isStale = Scoring.isStaleAsOf(latestDate, asOf); // SG-7 shared staleness seam
+    const { resolveConfidence } = require('./signal-confidence');
+    return resolveConfidence({ priceBars: prices.length, hasFundamental: Boolean(fundamental), signalCount, isStale, displacement }).confidence;
   }
 
   private returnAtOffset(prices: SignalPricePoint[], offset: number): number | null {
