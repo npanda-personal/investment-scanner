@@ -186,12 +186,19 @@ export class PriceReadsRepository {
 
 
   async latestDataTimestamp(options: Pick<PaginationOptions, 'region' | 'assetType'> = {}) {
+    // Read freshness from latest_prices (one row per symbol, ~16K rows) instead of scanning
+    // the price_ticks hypertable (~39M rows). latest_prices is the canonical "newest price per
+    // symbol" the ingestion pipeline rebuilds after every load, so MAX(timestamp) over it is
+    // exactly the freshness signal this metric needs — ~30ms vs the prior 14–80s scan that made
+    // the Data Health tab appear stuck under shared-DB contention. TEST symbols are excluded to
+    // preserve the original query's intent (latest_prices has no source column).
     const rows = await this.prisma.$queryRaw<Array<{ timestamp: Date | null }>>(Prisma.sql`
-      SELECT MAX(price_ticks.timestamp) AS timestamp
-      FROM price_ticks
-      INNER JOIN stocks ON stocks.symbol = price_ticks.symbol
+      SELECT MAX(latest_prices.timestamp) AS timestamp
+      FROM latest_prices
+      INNER JOIN stocks ON stocks.symbol = latest_prices.symbol
       WHERE ${scopedStockSqlWhere(options)}
-        AND UPPER(COALESCE(price_ticks.source, '')) NOT LIKE 'TEST\\_%'
+        AND UPPER(latest_prices.symbol) NOT LIKE 'TEST\\_%'
+        AND latest_prices.timestamp <= NOW()
     `);
 
     return rows[0]?.timestamp ?? null;

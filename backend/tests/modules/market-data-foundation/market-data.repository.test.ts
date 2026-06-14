@@ -983,8 +983,8 @@ describe('MarketDataFoundationRepository', () => {
     expect(prisma.priceTick.findFirst).not.toHaveBeenCalled();
     expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
     const query = prisma.$queryRaw.mock.calls[0][0];
-    expect(query.text).toContain('MAX(price_ticks.timestamp)');
-    expect(query.text).toContain('INNER JOIN stocks ON stocks.symbol = price_ticks.symbol');
+    expect(query.text).toContain('MAX(latest_prices.timestamp)');
+    expect(query.text).toContain('INNER JOIN stocks ON stocks.symbol = latest_prices.symbol');
     expect(query.text).toContain('UPPER(stocks."assetType") IN');
     expect(query.text).toContain('stocks."assetType" IS NULL');
     expect(query.text).toContain('stocks."instrumentSegment"');
