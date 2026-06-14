@@ -39,6 +39,18 @@ Research-support market intelligence app (localhost-first, zero-incremental-cost
 - Keep default FE (5173) / BE (3000) / Docker UP: start them if down, never shut them down or restart them. Kill only extra processes YOU spawned.
 - The working tree carries unstaged changes from PARALLEL agents. NEVER `git reset --hard`, `git checkout -- <path>`, `git restore`, or stash files you didn't change in this session. (Deny rules enforce the destructive forms.)
 
+## Process Hygiene — NON-NEGOTIABLE
+
+Un-cleaned agent processes pile up and spike RAM until the whole machine crawls. This is a HARD requirement, not optional housekeeping — it is part of "done", and "done" is not reached until it is verified. Applies to you AND every sub-agent you spawn.
+
+- **Kill every process you (or your sub-agents) start, before you finish.** The ONLY processes you may leave running are the shared defaults — **BE :3000, FE :5173, Docker/Postgres :5432**. Never kill those; never start a duplicate of them.
+- **Temp servers** (any BE/FE you boot on a NON-default port to verify something): kill by port the instant you're done, and delete any temp boot script you wrote —
+  `Get-NetTCPConnection -LocalPort <port> -State Listen | %{ Stop-Process -Id $_.OwningProcess -Force }`
+- **Playwright**: run ONE spec file per invocation with `--workers=1`; when it finishes, confirm no browsers remain and kill any that do —
+  `Get-CimInstance Win32_Process | ? { $_.Name -match 'headless_shell' -or $_.ExecutablePath -match 'ms-playwright' } | % { Stop-Process -Id $_.ProcessId -Force }`
+- **jest**: use `--runInBand` for scoped checks so no `jest-worker` processes linger; never leave `--watch` running. An interrupted run leaves orphaned `jest-worker` node processes (each 0.5–0.8 GB) — find and kill them.
+- **Verify, don't assert.** Before declaring done, RUN a process check and SHOW its output proving the processes you started are gone. "I cleaned up" without a verification command does not count.
+
 ## Working Agreement
 
 - Plan first for multi-file changes; respect module boundaries (one module = controller/service/repository/types/validation/index).
