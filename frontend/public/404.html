@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Investment Scanner</title>
+    <!--
+      SPA fallback for GitHub Pages (rafgraph/spa-github-pages technique).
+      Pages serves this for any unknown path (e.g. a deep-link reload like
+      /investment-scanner/screener). It encodes the requested path into a query
+      string and redirects to the app root; the decoder in index.html restores
+      the real URL into history before React Router boots.
+
+      pathSegmentsToKeep = 1 keeps the project base segment (/investment-scanner/).
+    -->
+    <script type="text/javascript">
+      var pathSegmentsToKeep = 1;
+      var l = window.location;
+      l.replace(
+        l.protocol + '//' + l.hostname + (l.port ? ':' + l.port : '') +
+        l.pathname.split('/').slice(0, 1 + pathSegmentsToKeep).join('/') + '/?/' +
+        l.pathname.slice(1).split('/').slice(pathSegmentsToKeep).join('/').replace(/&/g, '~and~') +
+        (l.search ? '&' + l.search.slice(1).replace(/&/g, '~and~') : '') +
+        l.hash
+      );
+    </script>
+  </head>
+  <body></body>
+</html>

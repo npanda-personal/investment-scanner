@@ -4,6 +4,9 @@ import { fileURLToPath, URL } from 'node:url'
 
 // https://vite.dev/config/
 export default defineConfig({
+  // Demo build (GitHub Pages) is served from a repo subpath; normal dev/prod stays at root.
+  // VITE_DEMO is set only by the Pages workflow and the local demo-build command.
+  base: process.env.VITE_DEMO ? '/investment-scanner/' : '/',
   plugins: [react()],
   resolve: {
     alias: {
