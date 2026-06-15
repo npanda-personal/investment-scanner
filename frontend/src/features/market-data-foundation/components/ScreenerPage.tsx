@@ -25,7 +25,6 @@ import {
   Typography,
 } from '@mui/material';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link as RouterLink } from 'react-router-dom';
 import { PageHeader } from '@/shared/components';
 import { NotApplicableForAssetClass } from '@/shared/components/NotApplicableForAssetClass';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
@@ -33,50 +32,18 @@ import { compactByProfile, money } from '@/shared/format/money';
 import { screenerSubtitle as buildScreenerSubtitle } from '@/shared/format/exchangeLabels';
 import type { ScreenerFilters, ScreenerRow, ScreenerCapBand, ScreenerSignalDirection } from '../types';
 import { fetchScreener } from '../api/screenerService';
-
-// ---------------------------------------------------------------------------
-// Small display helpers
-// ---------------------------------------------------------------------------
-
-function SymbolLink({ instrumentId, symbol }: { instrumentId: string; symbol: string }) {
-  return (
-    <Typography
-      component={RouterLink}
-      to={`/stocks/${instrumentId}`}
-      variant="body2"
-      sx={{ fontWeight: 600, textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
-      color="primary"
-    >
-      {symbol}
-    </Typography>
-  );
-}
-
-function SignalChip({ direction, score }: { direction: 'BULLISH' | 'BEARISH' | 'NEUTRAL' | null; score: number | null }) {
-  if (!direction) return <Typography variant="body2" color="text.disabled">—</Typography>;
-  const color = direction === 'BULLISH' ? 'success' : direction === 'BEARISH' ? 'error' : 'default';
-  const label = score != null ? `${direction} ${Math.round(score)}` : direction;
-  return (
-    <Tooltip title={`Signal: ${direction}${score != null ? ` (score ${Math.round(score)})` : ''}`}>
-      <Chip label={label} size="small" color={color} sx={{ fontSize: '0.7rem', fontWeight: 600 }} />
-    </Tooltip>
-  );
-}
-
-function CapBandChip({ capBand }: { capBand: ScreenerCapBand | null }) {
-  if (!capBand) return <Typography variant="body2" color="text.disabled">—</Typography>;
-  const color: Record<ScreenerCapBand, 'primary' | 'secondary' | 'default'> = {
-    LARGE: 'primary',
-    MID: 'secondary',
-    SMALL: 'default',
-  };
-  return <Chip label={capBand} size="small" color={color[capBand]} variant="outlined" sx={{ fontSize: '0.7rem' }} />;
-}
-
-function NullableNum({ value, suffix = '' }: { value: number | null; suffix?: string }) {
-  if (value == null) return <Typography variant="body2" color="text.disabled">—</Typography>;
-  return <Typography variant="body2">{value.toFixed(1)}{suffix}</Typography>;
-}
+import {
+  SymbolLink,
+  SignalChip,
+  CapBandChip,
+  NullableNum,
+  RsRatingCell,
+  ScoreDeltaCell,
+  FactorBreakdownCell,
+  PriceSparklineCell,
+  FnoScreenerHeaderCells,
+  FnoScreenerBodyCells,
+} from './screener/ScreenerCells';
 
 // ---------------------------------------------------------------------------
 // Known NSE sectors for the sector dropdown
@@ -351,6 +318,21 @@ export default function ScreenerPage() {
                 control={
                   <Checkbox
                     size="small"
+                    checked={filters.onlyDerivativesEligible ?? false}
+                    onChange={(e) => {
+                      if (e.target.checked) setFilter('onlyDerivativesEligible', true);
+                      else clearFilter('onlyDerivativesEligible');
+                    }}
+                  />
+                }
+                label={<Typography variant="body2">F&amp;O eligible only (rank by readiness)</Typography>}
+              />
+              )}
+              {hasDelivery && (
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    size="small"
                     checked={filters.excludeFnoBan ?? false}
                     onChange={(e) => {
                       if (e.target.checked) setFilter('excludeFnoBan', true);
@@ -411,12 +393,16 @@ export default function ScreenerPage() {
                 <TableCell align="right">Price</TableCell>
                 <TableCell>Signal</TableCell>
                 <TableCell align="right">Score</TableCell>
-                <TableCell align="right">RS %ile</TableCell>
+                <TableCell align="center">Move</TableCell>
+                <TableCell align="right">RS Rating</TableCell>
+                <TableCell>Factors</TableCell>
+                <TableCell align="center">Trend</TableCell>
                 <TableCell>Sector</TableCell>
                 <TableCell>Cap Band</TableCell>
                 {hasDelivery && <TableCell align="right">Delivery %</TableCell>}
                 <TableCell align="right">52W Pos %</TableCell>
                 {hasDelivery && <TableCell>F&O Ban</TableCell>}
+                {hasDelivery && <FnoScreenerHeaderCells />}
               </TableRow>
             </TableHead>
             <TableBody>
@@ -443,8 +429,17 @@ export default function ScreenerPage() {
                   <TableCell align="right">
                     <NullableNum value={row.signalScore} />
                   </TableCell>
+                  <TableCell align="center">
+                    <ScoreDeltaCell delta={row.scoreDeltaPrev} isNew={row.isNewEntry} />
+                  </TableCell>
                   <TableCell align="right">
-                    <NullableNum value={row.rsPercentile} />
+                    <RsRatingCell percentile={row.rsPercentile} />
+                  </TableCell>
+                  <TableCell>
+                    <FactorBreakdownCell families={row.factorFamilies} />
+                  </TableCell>
+                  <TableCell align="center">
+                    <PriceSparklineCell closes={row.sparkline} />
                   </TableCell>
                   <TableCell>
                     {row.sector
@@ -471,6 +466,7 @@ export default function ScreenerPage() {
                     }
                   </TableCell>
                   )}
+                  {hasDelivery && <FnoScreenerBodyCells row={row} />}
                 </TableRow>
               ))}
             </TableBody>

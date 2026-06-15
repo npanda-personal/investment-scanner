@@ -1506,7 +1506,18 @@ export interface ScreenerFilters {
   minDeliveryPct?: number;
   min52wPositionPct?: number;
   excludeFnoBan?: boolean;
+  /** Restrict the universe to F&O-eligible underlyings (powers the Top F&O view). */
+  onlyDerivativesEligible?: boolean;
   limit?: number;
+}
+
+/** Per-factor sub-scores (0–100) behind the F&O readiness composite. */
+export interface FnoReadinessComponents {
+  signal: number;
+  relativeStrength: number;
+  derivativesPositioning: number;
+  delivery: number;
+  trend: number;
 }
 
 export interface ScreenerRow {
@@ -1522,6 +1533,26 @@ export interface ScreenerRow {
   deliveryPct: number | null;
   range52wPositionPct: number | null;
   inFnoBan: boolean;
+  /** Latest F&O OI build-up label for the underlying (LONG_BUILDUP, SHORT_COVERING, …). */
+  buildupLabel: string | null;
+  /** Latest aggregate OI change % for the underlying. */
+  oiChangePct: number | null;
+  /** Latest near-expiry put/call OI ratio for the underlying. */
+  pcrOi: number | null;
+  /** F&O readiness composite (0–100) blending signal score with persisted F&O/technical factors. */
+  fnoReadinessScore: number | null;
+  /** A/B/C grade derived from the readiness score. */
+  fnoGrade: string | null;
+  /** Transparent per-factor breakdown behind the readiness composite. */
+  fnoComponents: FnoReadinessComponents | null;
+  /** Score change vs the immediately prior persisted run (null when none on record). */
+  scoreDeltaPrev: number | null;
+  /** True when no prior run is on record for this instrument (first appearance). */
+  isNewEntry: boolean;
+  /** Count of positive-evidence signals per independent factor family (TREND/MOMENTUM/…). */
+  factorFamilies: Record<string, number> | null;
+  /** Recent closes (chronological) for an inline price sparkline. */
+  sparkline: number[] | null;
   currency: string;
   region?: string;
 }

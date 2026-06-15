@@ -14,6 +14,7 @@ import { Box, Container, Grid, Stack, Typography } from '@mui/material';
 import OiBuildupWidget from './OiBuildupWidget';
 import OptionMetricsWidget from './OptionMetricsWidget';
 import ParticipantOiWidget from './ParticipantOiWidget';
+import TopFnoReadinessWidget from './TopFnoReadinessWidget';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
 import { NotApplicableForAssetClass } from '@/shared/components/NotApplicableForAssetClass';
 
@@ -48,6 +49,9 @@ export const DerivativesIntelligencePage: React.FC = () => {
       </Stack>
 
       <Grid container spacing={2}>
+        <Grid item xs={12}>
+          <TopFnoReadinessWidget />
+        </Grid>
         <Grid item xs={12} lg={6}>
           <OiBuildupWidget />
         </Grid>

@@ -1,5 +1,10 @@
 import { Prisma, PrismaClient } from '@prisma/client';
 import { normalizeMarketRegion } from '../../../shared/utils/market-scope';
+// Import the factor-family helper from the PURE leaf (documented dependency-free, cycle-safe),
+// NOT the signal-generation-engine barrel: the barrel re-exports the engine service, which
+// itself imports MarketDataFoundationService — importing it here would close a runtime init
+// cycle (ScreenerRepository "is not a constructor"). The leaf imports only types.
+import { familyForCode } from '../../signal-generation-engine/signal-evidence';
 
 export class ScreenerRepository {
   constructor(private readonly prisma: PrismaClient) {}
@@ -30,6 +35,7 @@ export class ScreenerRepository {
     minDeliveryPct?: number;
     min52wPositionPct?: number;
     excludeFnoBan?: boolean;
+    onlyDerivativesEligible?: boolean;
     limit?: number;
   }): Promise<Array<{
     instrumentId: string;
@@ -44,6 +50,12 @@ export class ScreenerRepository {
     deliveryPct: number | null;
     range52wPositionPct: number | null;
     inFnoBan: boolean;
+    buildupLabel: string | null;
+    oiChangePct: number | null;
+    pcrOi: number | null;
+    scoreDeltaPrev: number | null;
+    isNewEntry: boolean;
+    factorFamilies: Record<string, number> | null;
   }>> {
     const rowLimit = Math.max(1, Math.min(options.limit ?? 50, 500));
     const LARGE_CAP_THRESHOLD = 2e11; // 20 000 Cr in INR
@@ -98,10 +110,41 @@ export class ScreenerRepository {
     if (options.excludeFnoBan) {
       filters.push(Prisma.sql`COALESCE(fno."inBan", FALSE) = FALSE`);
     }
+    if (options.onlyDerivativesEligible) {
+      // Restrict the universe to F&O-eligible underlyings (the "Top F&O" view).
+      filters.push(Prisma.sql`s."derivativesEligible" = TRUE`);
+    }
 
     // rs percentile filter applied post-query in service layer (it's relative within the result set)
 
     const whereClause = Prisma.join(filters, ' AND ');
+
+    // Normalized cash symbol for joining the F&O read-model tables (fo_oi_buildup /
+    // fo_option_metrics key on the bare NSE symbol, e.g. RELIANCE). Mirrors the
+    // price_symbol derivation used for price_ticks.
+    const foJoinSymbol = Prisma.sql`UPPER(regexp_replace(
+      COALESCE(NULLIF(s."sourceSymbol", ''), NULLIF(s.symbol, ''), NULLIF(s."providerSymbol", '')),
+      '\\.(NS|BO)$', '', 'i'
+    ))`;
+
+    // Latest-date F&O positioning + option-sentiment read models (one row per
+    // underlying; near-expiry PCR first). Used by the F&O readiness composite.
+    const foCtes = Prisma.sql`
+      fo_oi AS (
+        SELECT DISTINCT ON (b.underlying)
+          b.underlying, b.buildup_label AS "buildupLabel", b.oi_change_pct AS "oiChangePct"
+        FROM fo_oi_buildup b
+        WHERE b.trading_date = (SELECT MAX(trading_date) FROM fo_oi_buildup)
+        ORDER BY b.underlying, b.instrument_type
+      ),
+      fo_opt AS (
+        SELECT DISTINCT ON (m.underlying)
+          m.underlying, m.pcr_oi AS "pcrOi"
+        FROM fo_option_metrics m
+        WHERE m.trading_date = (SELECT MAX(trading_date) FROM fo_option_metrics)
+          AND m.is_market_aggregate = FALSE
+        ORDER BY m.underlying, m.expiry_date ASC
+      )`;
 
     type ScreenerRow = {
       instrumentId: string;
@@ -110,11 +153,16 @@ export class ScreenerRepository {
       price: Prisma.Decimal | null;
       signalDirection: string | null;
       signalScore: Prisma.Decimal | null;
+      priorScore: Prisma.Decimal | null;
+      triggeredSignals: unknown;
       sector: string | null;
       marketCap: Prisma.Decimal | null;
       deliveryPct: Prisma.Decimal | null;
       range52wPositionPct: Prisma.Decimal | null;
       inFnoBan: boolean;
+      buildupLabel: string | null;
+      oiChangePct: Prisma.Decimal | null;
+      pcrOi: Prisma.Decimal | null;
     };
 
     // FAST PATH (no min52wPositionPct filter — the common case incl. the default no-filter load):
@@ -126,7 +174,8 @@ export class ScreenerRepository {
     const fastQuery = Prisma.sql`
       WITH latest_signal AS MATERIALIZED (
         SELECT DISTINCT ON (sr."instrumentId")
-          sr."instrumentId", sr.direction AS "signalDirection", sr.score AS "signalScore"
+          sr."instrumentId", sr.direction AS "signalDirection", sr.score AS "signalScore",
+          sr."priorScore" AS "priorScore", sr."triggeredSignals" AS "triggeredSignals"
         FROM signal_results sr
         WHERE sr."generatedDate" IS NOT NULL
         ORDER BY sr."instrumentId", sr."generatedDate" DESC
@@ -142,6 +191,7 @@ export class ScreenerRepository {
         FROM fno_ban_list fbl
         WHERE fbl.ban_date = (SELECT MAX(ban_date) FROM fno_ban_list)
       ),
+      ${foCtes},
       ranked AS (
         SELECT
           s.id AS "instrumentId", s.symbol, COALESCE(s.name, s.symbol) AS "companyName",
@@ -149,25 +199,29 @@ export class ScreenerRepository {
             COALESCE(NULLIF(s."sourceSymbol", ''), NULLIF(s.symbol, ''), NULLIF(s."providerSymbol", '')),
             '\\.(NS|BO)$', '', 'i'
           ) AS price_symbol,
-          ls."signalDirection", ls."signalScore", s.sector, s."marketCap",
-          ld."deliveryPct", COALESCE(fno."inBan", FALSE) AS "inFnoBan"
+          ls."signalDirection", ls."signalScore", ls."priorScore", ls."triggeredSignals", s.sector, s."marketCap",
+          ld."deliveryPct", COALESCE(fno."inBan", FALSE) AS "inFnoBan",
+          foi."buildupLabel", foi."oiChangePct", fopt."pcrOi"
         FROM stocks s
         LEFT JOIN latest_signal ls ON ls."instrumentId" = s.id
         LEFT JOIN latest_delivery ld ON ld.symbol = s.symbol
         LEFT JOIN fno_ban fno ON fno.symbol = s.symbol
+        LEFT JOIN fo_oi foi ON foi.underlying = ${foJoinSymbol}
+        LEFT JOIN fo_opt fopt ON fopt.underlying = ${foJoinSymbol}
         WHERE ${whereClause}
         ORDER BY COALESCE(ls."signalScore", 0) DESC
         LIMIT ${rowLimit}
       )
       SELECT
         r."instrumentId", r.symbol, r."companyName",
-        lp.price AS price, r."signalDirection", r."signalScore", r.sector, r."marketCap", r."deliveryPct",
+        lp.price AS price, r."signalDirection", r."signalScore", r."priorScore", r."triggeredSignals",
+        r.sector, r."marketCap", r."deliveryPct",
         CASE
           WHEN rng."high52w" > rng."low52w"
           THEN ((lp.price - rng."low52w") / NULLIF(rng."high52w" - rng."low52w", 0) * 100)
           ELSE NULL
         END AS "range52wPositionPct",
-        r."inFnoBan"
+        r."inFnoBan", r."buildupLabel", r."oiChangePct", r."pcrOi"
       FROM ranked r
       LEFT JOIN LATERAL (
         SELECT COALESCE(pt."adjustedClose", pt.close) AS price, pt.timestamp AS price_ts
@@ -202,7 +256,9 @@ export class ScreenerRepository {
         SELECT DISTINCT ON (sr."instrumentId")
           sr."instrumentId",
           sr.direction AS "signalDirection",
-          sr.score     AS "signalScore"
+          sr.score     AS "signalScore",
+          sr."priorScore" AS "priorScore",
+          sr."triggeredSignals" AS "triggeredSignals"
         FROM signal_results sr
         WHERE sr."generatedDate" IS NOT NULL
         ORDER BY sr."instrumentId", sr."generatedDate" DESC
@@ -273,7 +329,8 @@ export class ScreenerRepository {
           TRUE AS "inBan"
         FROM fno_ban_list fbl
         WHERE fbl.ban_date = (SELECT MAX(ban_date) FROM fno_ban_list)
-      )
+      ),
+      ${foCtes}
       SELECT
         s.id            AS "instrumentId",
         s.symbol,
@@ -281,17 +338,22 @@ export class ScreenerRepository {
         lp.price        AS price,
         ls."signalDirection",
         ls."signalScore",
+        ls."priorScore",
+        ls."triggeredSignals",
         s.sector,
         s."marketCap",
         ld."deliveryPct",
         pr."range52wPositionPct",
-        COALESCE(fno."inBan", FALSE) AS "inFnoBan"
+        COALESCE(fno."inBan", FALSE) AS "inFnoBan",
+        foi."buildupLabel", foi."oiChangePct", fopt."pcrOi"
       FROM stocks s
       LEFT JOIN latest_signal ls ON ls."instrumentId" = s.id
       LEFT JOIN latest_price lp ON lp."instrumentId" = s.id
       LEFT JOIN price_range pr ON pr."instrumentId" = s.id
       LEFT JOIN latest_delivery ld ON ld.symbol = s.symbol
       LEFT JOIN fno_ban fno ON fno.symbol = s.symbol
+      LEFT JOIN fo_oi foi ON foi.underlying = ${foJoinSymbol}
+      LEFT JOIN fo_opt fopt ON fopt.underlying = ${foJoinSymbol}
       WHERE ${whereClause}
       ORDER BY COALESCE(ls."signalScore", 0) DESC
       LIMIT ${rowLimit}
@@ -310,20 +372,53 @@ export class ScreenerRepository {
         else if (mc >= MID_CAP_THRESHOLD) capBand = 'MID';
         else capBand = 'SMALL';
       }
+      const signalScore = row.signalScore != null ? Number(row.signalScore) : null;
+      const priorScore = row.priorScore != null ? Number(row.priorScore) : null;
+      // Score movement vs the immediately prior persisted run for this instrument.
+      // priorScore is null only when no earlier run is on record → genuine first appearance.
+      const scoreDeltaPrev =
+        signalScore != null && priorScore != null
+          ? Math.round((signalScore - priorScore) * 10) / 10
+          : null;
+      const isNewEntry = signalScore != null && priorScore == null;
       return {
         instrumentId: row.instrumentId,
         symbol: row.symbol,
         companyName: row.companyName,
         price: row.price != null ? Number(row.price) : null,
         signalDirection: row.signalDirection ?? null,
-        signalScore: row.signalScore != null ? Number(row.signalScore) : null,
+        signalScore,
         rsPercentile: null, // computed in service layer
         sector: row.sector ?? null,
         capBand,
         deliveryPct: row.deliveryPct != null ? Number(row.deliveryPct) : null,
         range52wPositionPct: row.range52wPositionPct != null ? Number(row.range52wPositionPct) : null,
         inFnoBan: Boolean(row.inFnoBan),
+        buildupLabel: row.buildupLabel ?? null,
+        oiChangePct: row.oiChangePct != null ? Number(row.oiChangePct) : null,
+        pcrOi: row.pcrOi != null ? Number(row.pcrOi) : null,
+        scoreDeltaPrev,
+        isNewEntry,
+        factorFamilies: this.summarizeFactorFamilies(row.triggeredSignals),
       };
     });
+  }
+
+  /**
+   * Decompose the persisted `triggeredSignals` (positive-evidence factor codes) into a
+   * count per independent factor family (TREND / MOMENTUM / VOLUME / RELATIVE_STRENGTH …)
+   * so the screener can show WHY a name scores, not just the single composite score.
+   * Reuses `familyForCode` from the signal-generation-engine public surface (no recompute).
+   */
+  private summarizeFactorFamilies(raw: unknown): Record<string, number> | null {
+    if (!Array.isArray(raw) || raw.length === 0) return null;
+    const counts: Record<string, number> = {};
+    for (const item of raw) {
+      const code = item && typeof item === 'object' ? (item as { code?: unknown }).code : null;
+      if (typeof code !== 'string' || code.length === 0) continue;
+      const family = familyForCode(code);
+      counts[family] = (counts[family] ?? 0) + 1;
+    }
+    return Object.keys(counts).length > 0 ? counts : null;
   }
 }

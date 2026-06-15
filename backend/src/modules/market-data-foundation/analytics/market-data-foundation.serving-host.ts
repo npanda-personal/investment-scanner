@@ -55,6 +55,16 @@ export interface MarketDataServingHost {
   // preserve a typed `.prices` field instead of collapsing to `any`.
   listCryptoPricesByInstrumentId(instrumentId: string, limit?: number): Promise<{ prices: any[]; [key: string]: any } | null>;
 
+  // listRecentPriceWindowsByInstrumentIds (PriceReads) is reused by ScanReads to attach a short
+  // price sparkline to each screener row. Routed via the host so the service delegator stays the
+  // single seam (the service already exposes this public method).
+  listRecentPriceWindowsByInstrumentIds(
+    instrumentIds: string[],
+    limit?: number,
+    options?: { region?: string; assetType?: string },
+    endDate?: Date,
+  ): Promise<Map<string, any[]>>;
+
   // health (CatalogReads) dispatches the crypto branch to the crypto-reads owner; routed via the
   // host so the service `cryptoHealth` delegator (also called by `universeHealth`) stays the seam.
   cryptoHealth(): Promise<{

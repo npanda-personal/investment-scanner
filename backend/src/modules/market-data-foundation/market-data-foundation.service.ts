@@ -2189,6 +2189,7 @@ export class MarketDataFoundationService implements MarketDataReadApi, IndiaHist
     minDeliveryPct?: number;
     min52wPositionPct?: number;
     excludeFnoBan?: boolean;
+    onlyDerivativesEligible?: boolean;
     limit?: number;
   } = {}): Promise<{
     generatedAt: string;
@@ -2206,6 +2207,18 @@ export class MarketDataFoundationService implements MarketDataReadApi, IndiaHist
       deliveryPct: number | null;
       range52wPositionPct: number | null;
       inFnoBan: boolean;
+      buildupLabel: string | null;
+      oiChangePct: number | null;
+      pcrOi: number | null;
+      fnoReadinessScore: number | null;
+      fnoGrade: string | null;
+      fnoComponents: {
+        signal: number;
+        relativeStrength: number;
+        derivativesPositioning: number;
+        delivery: number;
+        trend: number;
+      } | null;
       currency: string;
       region?: string;
     }>;

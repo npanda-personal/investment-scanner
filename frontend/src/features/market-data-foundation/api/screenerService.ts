@@ -13,6 +13,7 @@ export async function fetchScreener(filters: ScreenerFilters = {}): Promise<Scre
   if (filters.minDeliveryPct != null) params.minDeliveryPct = filters.minDeliveryPct;
   if (filters.min52wPositionPct != null) params.min52wPositionPct = filters.min52wPositionPct;
   if (filters.excludeFnoBan != null) params.excludeFnoBan = filters.excludeFnoBan;
+  if (filters.onlyDerivativesEligible != null) params.onlyDerivativesEligible = filters.onlyDerivativesEligible;
   if (filters.limit != null) params.limit = filters.limit;
 
   const response = await axios.get<ScreenerResult>(API_BASE, { params });

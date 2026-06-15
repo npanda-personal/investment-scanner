@@ -75,9 +75,15 @@ Un-cleaned agent processes pile up and spike RAM until the whole machine crawls.
 - No speculative abstraction: build for current usage. Extract a shared abstraction only once there are two or three real uses — no factories, interfaces, or layers for single-caller code.
 - Explicit dependencies over shared state: pass dependencies in rather than reaching into globals/singletons, so modules stay independently testable.
 
+## Worktree Isolation (per session)
+
+Parallel sessions can touch the same files. To prevent collisions, **any task that will modify code starts in its own git worktree** — call `EnterWorktree` at task start, BEFORE the first edit (pure research / Q&A / config-discussion sessions stay put). New worktrees branch from the current HEAD (`worktree.baseRef = head`). This also keeps you out of the main checkout's unstaged parallel-agent changes entirely.
+
+Worktrees isolate files and git — NOT the shared runtime. So a worktree session that needs to verify its own changes runs a **dedicated FE+BE for the session** on offset ports (see `/stack-up` worktree mode), never the shared `:3000/:5173` stack (which runs other code). Docker/Postgres stays the single shared instance. Tear the dedicated servers down at `/wrap-up` (they're processes you spawned).
+
 ## Pre-Work Protocol (before first edit)
 
-Read the matching topic file BEFORE touching that area:
+If the task will edit code, `EnterWorktree` first (above). Then read the matching topic file BEFORE touching that area:
 
 | Touching… | Read first |
 |---|---|

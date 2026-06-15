@@ -5,4 +5,5 @@ export { default as MarketDataStatusPanel } from './components/MarketDataStatusP
 export { marketDataFoundationRoutes, marketScansRoutes, screenerRoutes } from './routes';
 export * from './api/marketDataFoundationService';
 export * from './api/priceDataService';
+export * from './api/screenerService';
 export type * from './types';

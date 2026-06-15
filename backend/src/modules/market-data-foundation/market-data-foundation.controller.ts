@@ -733,6 +733,7 @@ export class MarketDataFoundationController {
         minDeliveryPct: this.numberParam(req, 'minDeliveryPct'),
         min52wPositionPct: this.numberParam(req, 'min52wPositionPct'),
         excludeFnoBan: this.parseOptionalBoolean(req.query.excludeFnoBan),
+        onlyDerivativesEligible: this.parseOptionalBoolean(req.query.onlyDerivativesEligible),
         limit: this.numberParam(req, 'limit'),
       }));
     } catch (error) {

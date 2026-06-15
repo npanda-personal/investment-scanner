@@ -37,6 +37,8 @@ import type {
 } from '../market-data-foundation.types';
 import { isCryptoScope } from '../../../shared/data-access/market-repository-router';
 import { resolveMarketProfile } from '../../../shared/utils/market-profile';
+import type { FnoReadinessComponents } from './fno-readiness-score';
+import { rankScreenerRowsByReadiness } from './market-data-foundation.serving.fno-readiness-reads';
 
 const MARKET_MOVER_LOOKBACK_DAYS: Record<MarketMoverRange, number> = {
   '1D': 1,
@@ -394,6 +396,7 @@ export class ScanReadsService {
     minDeliveryPct?: number;
     min52wPositionPct?: number;
     excludeFnoBan?: boolean;
+    onlyDerivativesEligible?: boolean;
     limit?: number;
   } = {}): Promise<{
     generatedAt: string;
@@ -411,6 +414,16 @@ export class ScanReadsService {
       deliveryPct: number | null;
       range52wPositionPct: number | null;
       inFnoBan: boolean;
+      buildupLabel: string | null;
+      oiChangePct: number | null;
+      pcrOi: number | null;
+      fnoReadinessScore: number | null;
+      fnoGrade: string | null;
+      fnoComponents: FnoReadinessComponents | null;
+      scoreDeltaPrev: number | null;
+      isNewEntry: boolean;
+      factorFamilies: Record<string, number> | null;
+      sparkline: number[] | null;
       currency: string;
       region?: string;
     }>;
@@ -431,37 +444,49 @@ export class ScanReadsService {
       assetType: options.assetType?.trim().toUpperCase() || 'STOCK',
     };
     const screenerCurrency = resolveMarketProfile(screenerScope).currency;
-    const rows = await this.host.repository.screener(options);
 
-    // Compute rs percentile in-memory from the score distribution in the result set
-    const scores = rows.map((r: any) => r.signalScore ?? 0);
-    const n = scores.length;
-    const withRs = rows.map((r: any) => {
-      if (n < 2) return { ...r, rsPercentile: null, currency: screenerCurrency, region: screenerScope.region };
-      const score = r.signalScore ?? 0;
-      const sortedScores = [...scores].sort((a, b) => a - b);
-      let lo = 0, hi = sortedScores.length;
-      while (lo < hi) {
-        const mid = (lo + hi) >> 1;
-        if (sortedScores[mid] < score) lo = mid + 1; else hi = mid;
-      }
-      return { ...r, rsPercentile: Math.round((lo / (n - 1)) * 100), currency: screenerCurrency, region: screenerScope.region };
+    // For the "Top F&O" view we rank by the readiness composite (which blends in
+    // OI/PCR), so the repo must hand back the FULL F&O-eligible candidate pool — not
+    // a signal-score-ordered LIMIT slice — before we re-sort. (~218 eligible < 500 cap.)
+    const repoOptions = options.onlyDerivativesEligible ? { ...options, limit: 500 } : options;
+    const rows = await this.host.repository.screener(repoOptions);
+
+    // RS-percentile + F&O readiness composite + Top-F&O ranking — pure read-time
+    // derivation, extracted to its own file to keep this serving module under the cap.
+    const results = rankScreenerRowsByReadiness(rows, options, {
+      currency: screenerCurrency,
+      region: screenerScope.region,
     });
 
-    // Apply minRsPercentile post-query filter
-    const results = options.minRsPercentile != null
-      ? withRs.filter((r: any) => r.rsPercentile != null && r.rsPercentile >= options.minRsPercentile!)
-      : withRs;
+    // Attach a short price sparkline (recent closes, chronological) for each result row.
+    // One batched persisted read for the ≤limit rows — no per-row or live fetch.
+    const SPARKLINE_BARS = 30;
+    const priceWindows = results.length > 0
+      ? await this.host.listRecentPriceWindowsByInstrumentIds(
+          results.map((r: any) => r.instrumentId),
+          SPARKLINE_BARS,
+          { region: screenerScope.region, assetType: screenerScope.assetType },
+        )
+      : new Map<string, any[]>();
+    const resultsWithSparkline = results.map((r: any) => {
+      const bars = priceWindows.get(r.instrumentId) ?? [];
+      const closes = bars
+        .slice()
+        .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime())
+        .map((b: any) => (b.adjusted_close != null ? Number(b.adjusted_close) : Number(b.close)))
+        .filter((v: number) => Number.isFinite(v));
+      return { ...r, sparkline: closes.length >= 2 ? closes : null };
+    });
 
     const warnings: string[] = [];
-    if (results.length === 0) {
+    if (resultsWithSparkline.length === 0) {
       warnings.push('No stocks match the current filter combination. Try relaxing one or more criteria.');
     }
 
     return {
       generatedAt: new Date().toISOString(),
-      count: results.length,
-      results,
+      count: resultsWithSparkline.length,
+      results: resultsWithSparkline,
       warnings,
     };
   }
