@@ -867,6 +867,8 @@ test.describe('Market Intelligence persisted read-model pages', () => {
     // accordion list rendered after the table.
     await page.getByRole('button', { name: 'Expand OMEGA detail' }).click();
     await expect(page.getByText('Portfolio: Core Portfolio').first()).toBeVisible();
+    // The overlay loads after first paint and merges in — including the explainability sentence.
+    await expect(page.getByText('Personal overlay: Portfolio: Core Portfolio.').first()).toBeVisible();
     await page.getByRole('button', { name: 'Expand GAMMA detail' }).click();
     await expect(page.getByText('Watchlist: Breakout Watchlist').first()).toBeVisible();
     await expect(page.getByText('Selected from persisted Today Review groups in source rank order.').first()).toBeVisible();

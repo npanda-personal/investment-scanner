@@ -2,11 +2,6 @@ import type { MarketScope } from '@/contexts/MarketScopeContext';
 import { fetchDataQualitySummary } from '@/features/data-quality-engine';
 import type { DataQualitySummary } from '@/features/data-quality-engine';
 import {
-  fetchPortfolios,
-  fetchPortfolioSummary,
-  type PortfolioSummary,
-} from '@/features/portfolio-management';
-import {
   fetchSignalPositionLedgerActiveRows,
   type SignalPositionLedgerActiveRow,
 } from '@/features/signal-position-ledger';
@@ -15,11 +10,6 @@ import {
   type TodayReviewCandidate,
   type TodayReviewResponse,
 } from '@/features/today-trade-review';
-import {
-  fetchWatchlistDetail,
-  fetchWatchlists,
-  type WatchlistDetail,
-} from '@/features/watchlist-management';
 import {
   fetchEarningsIntelligenceSnapshot,
   fetchMarketPulseSnapshot,
@@ -145,7 +135,7 @@ type ReviewReadinessResponse = {
   }>;
 };
 
-type OverlayMaps = {
+export type OverlayMaps = {
   portfolioNamesBySymbol: Map<string, string[]>;
   watchlistNamesBySymbol: Map<string, string[]>;
 };
@@ -203,7 +193,6 @@ async function loadSources(scope: MarketScope): Promise<SourceBundle> {
       sortBy: 'entryTriggerTimestamp',
       sortDirection: 'desc',
     }),
-    loadPortfolioAndWatchlistOverlays(),
   ]);
 
   const sourceErrors: string[] = [];
@@ -213,7 +202,8 @@ async function loadSources(scope: MarketScope): Promise<SourceBundle> {
   const earnings = settledValue(settled[3], 'Fundamentals / Earnings', sourceErrors);
   const dataQualitySummary = settledValue(settled[4], 'Data Quality', sourceErrors);
   const activeLedger = settledValue(settled[5], 'Active Positions', sourceErrors);
-  const overlays = settledValue(settled[6], 'Portfolio / Watchlist overlays', sourceErrors) ?? emptyOverlays();
+  // Overlay loaded separately after first paint (slow N+1 branch) — see dailyReviewShortlistOverlays.ts.
+  const overlays = emptyOverlays();
 
   // Review-readiness is read from the PERSISTED today-review run snapshot (the daily-review
   // pipeline already computed and stored it). We deliberately do NOT call the live
@@ -266,64 +256,6 @@ function mapReviewReadiness(body: ReviewReadinessResponse | null): DailyReviewSh
       nextActionLabel: blocker.nextActionLabel ?? 'Review source module.',
     })),
   };
-}
-
-async function loadPortfolioAndWatchlistOverlays(): Promise<OverlayMaps> {
-  const [portfoliosSettled, watchlistsSettled] = await Promise.allSettled([
-    loadPortfolioOverlays(),
-    loadWatchlistOverlays(),
-  ]);
-
-  return {
-    portfolioNamesBySymbol: portfoliosSettled.status === 'fulfilled' ? portfoliosSettled.value : new Map(),
-    watchlistNamesBySymbol: watchlistsSettled.status === 'fulfilled' ? watchlistsSettled.value : new Map(),
-  };
-}
-
-async function loadPortfolioOverlays(): Promise<Map<string, string[]>> {
-  const portfolios = await fetchPortfolios();
-  const summaries = await Promise.allSettled(portfolios.map((portfolio) => fetchPortfolioSummary(portfolio.id)));
-  const map = new Map<string, string[]>();
-
-  summaries.forEach((summary) => {
-    if (summary.status !== 'fulfilled') return;
-    addPortfolioSummaryToMap(map, summary.value);
-  });
-
-  return map;
-}
-
-function addPortfolioSummaryToMap(map: Map<string, string[]>, summary: PortfolioSummary) {
-  summary.holdings.forEach((holding) => {
-    const symbol = normalizeSymbol(holding.symbol);
-    if (!symbol) return;
-    const names = map.get(symbol) ?? [];
-    if (!names.includes(summary.portfolio.name)) names.push(summary.portfolio.name);
-    map.set(symbol, names);
-  });
-}
-
-async function loadWatchlistOverlays(): Promise<Map<string, string[]>> {
-  const watchlists = await fetchWatchlists();
-  const details = await Promise.allSettled(watchlists.map((watchlist) => fetchWatchlistDetail(watchlist.id)));
-  const map = new Map<string, string[]>();
-
-  details.forEach((detail) => {
-    if (detail.status !== 'fulfilled') return;
-    addWatchlistDetailToMap(map, detail.value);
-  });
-
-  return map;
-}
-
-function addWatchlistDetailToMap(map: Map<string, string[]>, detail: WatchlistDetail) {
-  detail.items.forEach((item) => {
-    const symbol = normalizeSymbol(item.symbol);
-    if (!symbol) return;
-    const names = map.get(symbol) ?? [];
-    if (!names.includes(detail.watchlist.name)) names.push(detail.watchlist.name);
-    map.set(symbol, names);
-  });
 }
 
 function buildShortlistRows(scope: MarketScope, bundle: SourceBundle) {

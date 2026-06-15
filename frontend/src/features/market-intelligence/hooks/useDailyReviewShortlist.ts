@@ -4,6 +4,10 @@ import {
   fetchDailyReviewShortlist,
   type DailyReviewShortlistResult,
 } from '../api/dailyReviewShortlistService';
+import {
+  applyOverlaysToShortlist,
+  fetchDailyReviewOverlays,
+} from '../api/dailyReviewShortlistOverlays';
 
 export function useDailyReviewShortlist() {
   const { scope } = useMarketScope();
@@ -20,7 +24,18 @@ export function useDailyReviewShortlist() {
 
     fetchDailyReviewShortlist(scope)
       .then((next) => {
-        if (requestRef.current === requestId) setData(next);
+        if (requestRef.current !== requestId) return;
+        setData(next);
+        // The personal Portfolio / Watchlist overlay is the slowest (N+1) branch, so it is loaded
+        // AFTER the table has painted and merged into the rows when ready — never blocking first paint.
+        fetchDailyReviewOverlays()
+          .then((overlays) => {
+            if (requestRef.current !== requestId) return;
+            setData((prev) => (prev ? applyOverlaysToShortlist(prev, overlays) : prev));
+          })
+          .catch(() => {
+            /* Overlay is best-effort enrichment; its failure must not break the shortlist. */
+          });
       })
       .catch((caught) => {
         if (requestRef.current !== requestId) return;
