@@ -39,6 +39,7 @@ import { isCryptoScope } from '../../../shared/data-access/market-repository-rou
 import { resolveMarketProfile } from '../../../shared/utils/market-profile';
 import type { FnoReadinessComponents } from './fno-readiness-score';
 import { rankScreenerRowsByReadiness } from './market-data-foundation.serving.fno-readiness-reads';
+import { MARKET_MOVERS_SNAPSHOT_COUNT } from '../persistence/market-data-foundation.repository.constants';
 
 const MARKET_MOVER_LOOKBACK_DAYS: Record<MarketMoverRange, number> = {
   '1D': 1,
@@ -79,7 +80,7 @@ export class ScanReadsService {
       region: options.region?.trim().toUpperCase() || 'IN',
       assetType: options.assetType?.trim().toUpperCase() || 'STOCK',
     };
-    const limit = Math.max(1, Math.min(options.limit ?? 10, 20));
+    const limit = Math.max(1, Math.min(options.limit ?? MARKET_MOVERS_SNAPSHOT_COUNT, 20));
     const requestedRange = this.marketMoverRange(options.range);
     const requestedRanges = requestedRange
       ? [requestedRange]
