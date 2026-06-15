@@ -79,6 +79,14 @@
     "file": "api-v1-market-data-screener.json",
     "status": 200
   },
+  "/api/v1/market-data/screener/conviction": {
+    "file": "api-v1-market-data-screener-conviction.json",
+    "status": 200
+  },
+  "/api/v1/market-data/movers": {
+    "file": "api-v1-market-data-movers.json",
+    "status": 200
+  },
   "/api/v1/market-data/scans/52w-high": {
     "file": "api-v1-market-data-scans-52w-high.json",
     "status": 200
