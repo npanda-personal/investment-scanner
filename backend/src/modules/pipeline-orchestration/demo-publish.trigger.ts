@@ -54,6 +54,9 @@ export function triggerDemoPublishIfEnabled(summary: DagAlertSummary): void {
 
   const timer = setTimeout(() => {
     console.error('[DemoPublish] timed out — killing publish script');
+    // Reset the guard directly: if the child somehow zombies and never emits
+    // 'close', this prevents auto-publish from being permanently disabled.
+    isPublishing = false;
     child.kill('SIGKILL');
   }, PUBLISH_TIMEOUT_MS);
 

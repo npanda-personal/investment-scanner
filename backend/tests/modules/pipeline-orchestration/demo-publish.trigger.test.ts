@@ -90,4 +90,27 @@ describe('triggerDemoPublishIfEnabled', () => {
     trigger(summary()); // child never "closes", so guard is still set
     expect(spawnMock).toHaveBeenCalledTimes(1);
   });
+
+  it('resets the in-flight guard if spawn throws (so a later run can publish)', () => {
+    process.env.DEMO_AUTO_PUBLISH = 'true';
+    spawnMock.mockImplementationOnce(() => {
+      throw new Error('spawn boom');
+    });
+    const trigger = load();
+    trigger(summary()); // spawn throws -> caught, guard reset
+    trigger(summary()); // guard was reset -> this one spawns
+    expect(spawnMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('kills the child and resets the guard on timeout', () => {
+    process.env.DEMO_AUTO_PUBLISH = 'true';
+    const trigger = load();
+    trigger(summary());
+    const child = spawnMock.mock.results[0].value;
+    jest.advanceTimersByTime(5 * 60 * 1000 + 1);
+    expect(child.kill).toHaveBeenCalledWith('SIGKILL');
+    // guard reset -> a subsequent run can publish again
+    trigger(summary());
+    expect(spawnMock).toHaveBeenCalledTimes(2);
+  });
 });
