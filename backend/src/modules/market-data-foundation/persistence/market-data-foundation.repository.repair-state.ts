@@ -1,5 +1,6 @@
 import { Prisma, PrismaClient } from '@prisma/client';
 import type { MarketDataRepairRunStatus, MarketDataRepairStateStatus, MarketDataRepairType, MarketDataSyncScopeType, MarketDataSyncStateDto, MarketDataSyncStateStatus, PaginationOptions, ScheduledRegionSyncSummary, SyncSummary } from '../market-data-foundation.types';
+import { tradingDateForRegion } from '../ingestion/market-data-foundation.market-session';
 
 export class RepairStateRepository {
   constructor(private readonly prisma: PrismaClient) {}
@@ -213,6 +214,12 @@ export class RepairStateRepository {
     const scopeKey = input.scopeKey || input.region;
     const timeframe = input.timeframe || '1D';
     const lastCheckedAt = input.lastCheckedAt || new Date();
+    // Guard: never persist a sync-state marker for a future session — a trading date beyond
+    // "today" in the region's timezone is a zombie (the session has not occurred). Clamp it down
+    // to today-in-region so look-ahead/timezone-rollover bugs cannot create future-dated rows.
+    const todayInRegion = tradingDateForRegion(input.region, lastCheckedAt);
+    const tradingDate = todayInRegion && input.tradingDate > todayInRegion ? todayInRegion : input.tradingDate;
+    if (tradingDate !== input.tradingDate) console.warn(`[upsertSyncState] clamped future tradingDate ${input.tradingDate} -> ${tradingDate} (${input.region}/${input.assetType})`);
     const row = await (this.prisma as any).marketDataSyncState.upsert({
       where: {
         region_assetType_scopeType_scopeKey_timeframe_tradingDate: {
@@ -221,7 +228,7 @@ export class RepairStateRepository {
           scopeType,
           scopeKey,
           timeframe,
-          tradingDate: new Date(`${input.tradingDate}T00:00:00.000Z`),
+          tradingDate: new Date(`${tradingDate}T00:00:00.000Z`),
         },
       },
       create: {
@@ -230,7 +237,7 @@ export class RepairStateRepository {
         scopeType,
         scopeKey,
         timeframe,
-        tradingDate: new Date(`${input.tradingDate}T00:00:00.000Z`),
+        tradingDate: new Date(`${tradingDate}T00:00:00.000Z`),
         status: input.status,
         lastCheckedAt,
         lastProviderFetchAt: input.lastProviderFetchAt,
@@ -269,9 +276,15 @@ export class RepairStateRepository {
    * scopeType), so they never read or overwrite these rows. Read back via latestReviewReadinessSnapshot.
    */
   async upsertReviewReadinessSnapshot(region: string, assetType: string, tradingDate: string, summary: unknown): Promise<void> {
-    const dateText = String(tradingDate).slice(0, 10);
-    const tradingDateValue = new Date(`${dateText}T00:00:00.000Z`);
     const now = new Date();
+    const dateText = String(tradingDate).slice(0, 10);
+    // Guard: never persist a future-session snapshot (same rationale as upsertSyncState). A trading
+    // date beyond "today" in the region is a zombie that latestReviewReadinessSnapshot would serve
+    // as the freshest summary — clamp it down to today-in-region.
+    const todayInRegion = tradingDateForRegion(region, now);
+    const safeDate = todayInRegion && dateText > todayInRegion ? todayInRegion : dateText;
+    if (safeDate !== dateText) console.warn(`[upsertReviewReadinessSnapshot] clamped future tradingDate ${dateText} -> ${safeDate} (${region}/${assetType})`);
+    const tradingDateValue = new Date(`${safeDate}T00:00:00.000Z`);
     await (this.prisma as any).marketDataSyncState.upsert({
       where: {
         region_assetType_scopeType_scopeKey_timeframe_tradingDate: {

@@ -412,22 +412,22 @@ export class PipelineOrchestrationService {
   }
 
   async status(query: PipelineStatusQuery, now = new Date()): Promise<PipelineStatusSnapshot> {
-    const [activeRun, lastRun, stages] = await Promise.all([
+    const [activeRun, lastRun, stages, stored] = await Promise.all([
       this.repository.findActiveRun(query),
       this.repository.findLastRun(query),
       this.repository.latestStages(query),
+      this.marketDataService.latestStoredCandleInfo(query.region, query.assetType, now).catch(() => null),
     ]);
+    const groups = this.groupStages(stages, now);
+    // Reconcile MARKET_DATA "data through" against the authoritative stored-candle ledger (latest_prices).
+    const md = stored?.latestTradingDate ? groups.find((g) => g.stageKey === 'MARKET_DATA') : null;
+    if (md) { const t = String(stored!.latestTradingDate).slice(0, 10); [md.activeStage, md.lastStage].forEach((s) => { if (s) Object.assign(s, { storedDataThroughDate: t, storedDataFinalConfirmed: !!stored?.finalConfirmed, stageTrackingStale: !s.dataThroughDate || t > String(s.dataThroughDate).slice(0, 10) }); }); }
     return {
-      scope: {
-        region: query.region,
-        assetType: query.assetType,
-        timeframe: query.timeframe,
-        pipelineKey: query.pipelineKey,
-      },
+      scope: { region: query.region, assetType: query.assetType, timeframe: query.timeframe, pipelineKey: query.pipelineKey },
       generatedAt: now.toISOString(),
       activeRun: activeRun && !this.isStaleActiveRun(activeRun, now) ? this.toRunStatus(activeRun) : null,
       lastRun: lastRun ? this.toRunStatus(lastRun) : null,
-      stages: this.groupStages(stages, now),
+      stages: groups,
     };
   }
 
@@ -1828,7 +1828,7 @@ export class PipelineOrchestrationService {
       startedAt,
       completedAt: null,
       leaseOwner: marketDataLeaseOwner,
-      leaseMs: DEFAULT_LEASE_MS,
+      leaseMs: DEFAULT_LEASE_MS * 9, // ~90m: hold the lease across the full sync+downstream DAG so the reaper can't abandon an active run
       warnings: [],
       errors: [],
       metadata: {
@@ -1858,7 +1858,7 @@ export class PipelineOrchestrationService {
       const downstreamInstrumentIds = this.normalizeInstrumentIds(
         summary.downstreamInstrumentIds?.length ? summary.downstreamInstrumentIds : summary.changedInstrumentIds
       );
-      const tradingDate = (summary.dataThroughDate || summary.tradingDate || '').slice(0, 10);
+      const tradingDate = (summary.dataThroughDate || '').slice(0, 10); // only the has-data (clamped) date; never the raw calendar date, so the DAG is never invoked for a no-data/future date
       const stageStatus = this.marketDataPipelineStageStatus(summary);
       const totalCount = this.marketDataPipelineTotalCount(summary);
       const providerSkippedCount = Math.max(0, Number(summary.providerFetchSkippedCount || summary.skippedBeforeFetchCount || 0));
@@ -2724,7 +2724,7 @@ export class PipelineOrchestrationService {
     const changedInstrumentIds = this.normalizeInstrumentIds(request.changedInstrumentIds);
     const downstreamInstrumentIds = this.normalizeInstrumentIds(request.downstreamInstrumentIds?.length ? request.downstreamInstrumentIds : request.changedInstrumentIds);
     const changedInstrumentCount = changedInstrumentIds.length;
-    const startedAt = this.parseOptionalDate(request.startedAt) || now;
+    const startedAt = ((d: Date) => (d > now ? now : d))(this.parseOptionalDate(request.startedAt) || now); // clamp: never persist a future startedAt
     const completedAt = this.parseOptionalDate(request.completedAt) || (terminal ? now : null);
     const succeededCount = request.succeededCount ?? Math.max(0, request.processedCount - request.failedCount - request.skippedCount);
     const unchangedCount = request.unchangedCount ?? 0;
@@ -2947,12 +2947,11 @@ export class PipelineOrchestrationService {
       };
       current.stageOrder = Math.min(current.stageOrder, stage.stageOrder);
       if (!current.activeStage && ACTIVE_STATUSES.has(stage.status) && !this.isStaleActiveStage(stage, now)) current.activeStage = this.toStageStatus(stage);
-      // lastStage = the terminal run covering the FRESHEST data (latest dataThroughDate, then
-      // latest startedAt) â€” NOT simply the most-recently-started run. Otherwise an out-of-order
-      // or tiny/partial write (e.g. a 3-instrument integration-test seed for an old date, or a
-      // backfill of an older date) started after the real daily run would shadow it and make the
-      // pipeline-status card report a stale "data through" date.
-      if (TERMINAL_STATUSES.has(stage.status) && (!current.lastStageRecord || this.terminalStageIsFresher(stage, current.lastStageRecord))) {
+      // lastStage = the GENUINE terminal run (COMPLETED/PARTIAL/FAILED) covering the freshest
+      // dataThroughDate, then latest startedAt. A reaped ABANDONED/SKIPPED/BLOCKED run is chosen
+      // only as a last resort, and never shadows a real run, a fresher data date, or (via the
+      // startedAt clamp) is outranked by a future-dated startedAt zombie.
+      if (TERMINAL_STATUSES.has(stage.status) && (!current.lastStageRecord || this.terminalStageIsFresher(stage, current.lastStageRecord, now))) {
         current.lastStageRecord = stage;
         current.lastStage = this.toStageStatus(stage);
       }
@@ -2964,17 +2963,17 @@ export class PipelineOrchestrationService {
   }
 
   /**
-   * A terminal stage is "fresher" than another if it covers a later data date
-   * (dataThroughDate), breaking ties by the later start time. This makes the
-   * pipeline-status "last run" reflect the run covering the most recent DATA, not
-   * merely the most-recently-written record (which could be a backfill of an old
-   * date or a tiny integration-test seed).
+   * A terminal stage is "fresher" if it is genuine (COMPLETED/PARTIAL/FAILED) while the other is a
+   * reaped/non-genuine run; else if it covers a later dataThroughDate; else later startedAt clamped
+   * to now (so a future-dated startedAt cannot win). Keeps "last run" on the run covering the most
+   * recent DATA, not a reaped/interrupted row, a backfill of an old date, or a tiny test seed.
    */
-  private terminalStageIsFresher(candidate: PipelineStageRunRecord, incumbent: PipelineStageRunRecord): boolean {
-    const cThrough = this.parseDateMs(candidate.dataThroughDate);
-    const iThrough = this.parseDateMs(incumbent.dataThroughDate);
-    if (cThrough !== iThrough) return cThrough > iThrough;
-    return this.parseDateMs(candidate.startedAt) > this.parseDateMs(incumbent.startedAt);
+  private terminalStageIsFresher(c: PipelineStageRunRecord, i: PipelineStageRunRecord, now = new Date()): boolean {
+    const real = (s: string) => s === 'COMPLETED' || s === 'PARTIAL' || s === 'FAILED';
+    if (real(c.status) !== real(i.status)) return real(c.status);
+    const cT = this.parseDateMs(c.dataThroughDate), iT = this.parseDateMs(i.dataThroughDate), n = now.getTime();
+    if (cT !== iT) return cT > iT;
+    return Math.min(this.parseDateMs(c.startedAt), n) > Math.min(this.parseDateMs(i.startedAt), n);
   }
 
   private parseDateMs(value: string | null | undefined): number {

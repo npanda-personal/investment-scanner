@@ -27,7 +27,7 @@ import type {
   PipelineStatusStage,
   PipelineStatusStageGroup,
 } from '../types';
-import { formatDateTime } from './PipelineStatusStrip';
+import { formatDateTime, formatDate } from './PipelineStatusStrip';
 
 type OperationDefinition = {
   stageKey: string;
@@ -160,6 +160,12 @@ export function PipelineOpsTable({
         <TableBody>
           {rows.map((row) => {
             const stage = row.activeStage || row.lastStage;
+            // Prefer the authoritative stored-candle coverage (MARKET_DATA); fall back to the
+            // stage record's own date. When tracking is stale, surface a gentle "catching up" note.
+            const dataThrough = stage?.storedDataThroughDate ?? stage?.dataThroughDate ?? null;
+            const trackingNote = stage?.stageTrackingStale
+              ? `Latest stored candle ${stage?.storedDataThroughDate ? formatDate(stage.storedDataThroughDate) : 'N/A'}; pipeline stage last recorded ${stage?.dataThroughDate ? formatDate(stage.dataThroughDate) : 'not yet'}.`
+              : '';
             const isExpanded = expandedRows.has(row.stageKey);
             // A row is "phantom" if it has no run evidence AND is flagged as not yet active
             const isPhantom = !stage && NOT_YET_ACTIVE_STAGE_KEYS.has(row.stageKey);
@@ -199,7 +205,11 @@ export function PipelineOpsTable({
                   <TableCell><ProgressCell stage={stage} /></TableCell>
                   <TableCell>
                     <Typography variant="body2" noWrap sx={clippedTextSx}>{formatDateTime(stage?.completedAt || stage?.startedAt || stage?.updatedAt)}</Typography>
-                    <Typography variant="caption" color="text.secondary" noWrap sx={clippedTextSx}>Data through {stage?.dataThroughDate ? formatDateTime(stage.dataThroughDate) : 'N/A'}</Typography>
+                    <Tooltip title={trackingNote} disableHoverListener={!trackingNote}>
+                      <Typography variant="caption" color={stage?.stageTrackingStale ? 'warning.main' : 'text.secondary'} noWrap sx={clippedTextSx}>
+                        Data through {dataThrough ? formatDate(dataThrough) : 'N/A'}{stage?.stageTrackingStale ? ' · stage catching up' : ''}
+                      </Typography>
+                    </Tooltip>
                   </TableCell>
                   <TableCell>
                     <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
