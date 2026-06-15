@@ -381,67 +381,43 @@ export interface CryptoLaneResult {
   lane: 'CRYPTO';
   ingest: unknown;
   signals: unknown;
+  /** Per-stage DAG outcome when the lane drives the crypto pipeline (tracked in pipeline-ops). */
+  dag?: unknown;
 }
 
 export type CryptoLaneRunner = (now: Date) => Promise<CryptoLaneResult | null>;
 
 /**
- * Tracks the last UTC day the crypto universe was refreshed so the 24/7 lane
- * re-fetches the Binance-tradable catalog at most once per day (cheap: one
- * CoinPaprika call) rather than on every 15-minute tick.  Resets on process
- * restart (so a fresh boot also refreshes).
- */
-let lastCryptoUniverseRefreshUtcDay: string | null = null;
-
-/**
- * Production crypto lane runner: incremental OHLCV ingest for active crypto assets,
- * then a crypto signal refresh.  The two services are lazy-required to avoid a
- * STATIC upstream→downstream module cycle (market-data-foundation is upstream of
- * signal-generation-engine) — the lazy-require cycle-avoidance pattern used
- * elsewhere in the repo.
+ * Production crypto lane runner: drives the CRYPTO daily pipeline through
+ * pipeline-orchestration so every stage (universe → prices → fundamentals/futures →
+ * signals/scans/context → daily-metrics) is recorded in pipeline_runs /
+ * pipeline_stage_runs and visible in /admin/pipeline-ops — the single source of
+ * truth for crypto persistence (no more ad-hoc service calls here).
+ *
+ * pipeline-orchestration is lazy-required to avoid a STATIC upstream→downstream
+ * module cycle (market-data-foundation is upstream of pipeline-orchestration) —
+ * the lazy-require cycle-avoidance pattern used elsewhere in the repo.
  */
 export const defaultCryptoLaneRunner: CryptoLaneRunner = async (now: Date) => {
+  const tradingDate = now.toISOString().slice(0, 10);
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { cryptoIngestionService } = require('./crypto/market-data-foundation.crypto-ingestion.service');
-  // Refresh the Binance-tradable universe at most once per UTC day so coins newly
-  // listed on Binance are added to crypto_assets (incremental backfill then gives
-  // them a full history on the next tick). Cheap: a single CoinPaprika /tickers call.
-  const utcDay = now.toISOString().slice(0, 10);
-  if (lastCryptoUniverseRefreshUtcDay !== utcDay) {
-    try {
-      await cryptoIngestionService.ingestUniverse({ limit: 500 });
-      lastCryptoUniverseRefreshUtcDay = utcDay;
-    } catch (error) {
-      console.error('[CryptoLane] universe refresh failed', error);
-    }
-  }
-  // Incremental per-symbol ingest (resumes from the latest stored candle); a small
-  // lookback floor handles 24/7 boundary/overlap. Free-API friendly; provider throttles internally.
-  const ingest = await cryptoIngestionService.backfillPrices({ incremental: true, minLookbackDays: 2 });
-  // Surface lane outcome (was previously silent — per-symbol failures never logged).
-  console.log('[CryptoLane] backfill', {
-    symbolsProcessed: ingest.symbolsProcessed,
-    inserted: ingest.barsInserted,
-    updated: ingest.barsUpdated,
-    failed: ingest.symbolsFailed,
-    droppedBadOhlc: ingest.barsDropped,
-    aborted: ingest.aborted,
-    warnings: ingest.warnings.length,
+  const { PipelineOrchestrationService } = require('../../pipeline-orchestration');
+  const service = new PipelineOrchestrationService();
+  const dag = await service.executeCryptoDagPipeline({ tradingDate, trigger: 'scheduled' });
+  const stages = dag?.stages ?? {};
+  console.log('[CryptoLane] pipeline', {
+    runStatus: dag?.runStatus,
+    durationMs: dag?.durationMs,
+    stages: Object.fromEntries(
+      Object.entries(stages).map(([k, v]: [string, any]) => [k, v?.status]),
+    ),
   });
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { cryptoSignalGenerationService } = require('../../signal-generation-engine/signal-generation-engine.crypto-service');
-  const signals = await cryptoSignalGenerationService.generateAll({ asOf: now });
-  // Refresh crypto market scans (52w high/low, volume spike, movers, market-map) from fresh prices+signals.
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { marketDataFoundationCryptoRepository } = require('./crypto/market-data-foundation.crypto-repository');
-  await marketDataFoundationCryptoRepository.refreshMarketScans();
-  // Crypto-native market context (breadth + regime + BTC dominance), persisted under region='CRYPTO'.
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { MarketContextIntelligenceService } = require('../../market-context-intelligence/market-context-intelligence.service');
-  await new MarketContextIntelligenceService().runCryptoContextAsOf(now).catch((error: unknown) => {
-    console.error('[CryptoLane] crypto market-context refresh failed', error);
-  });
-  return { lane: 'CRYPTO' as const, ingest, signals };
+  return {
+    lane: 'CRYPTO' as const,
+    ingest: stages['CRYPTO_PRICE_BACKFILL'] ?? null,
+    signals: stages['CRYPTO_SIGNALS'] ?? null,
+    dag,
+  };
 };
 
 const singletonScheduler = new MarketDataFoundationScheduler(

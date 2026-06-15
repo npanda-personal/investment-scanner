@@ -99,8 +99,8 @@ export class ScanSnapshotWriterService {
           latestDateEnd,
         });
         const ordered = rows.filter((r) => Number.isFinite(r.returnPercent));
-        const gainers = ordered.filter((r) => r.returnPercent > 0).sort((a, b) => b.returnPercent - a.returnPercent).slice(0, 5);
-        const losers = ordered.filter((r) => r.returnPercent < 0).sort((a, b) => a.returnPercent - b.returnPercent).slice(0, 5);
+        const gainers = ordered.filter((r) => r.returnPercent > 0).sort((a, b) => b.returnPercent - a.returnPercent).slice(0, 10);
+        const losers = ordered.filter((r) => r.returnPercent < 0).sort((a, b) => a.returnPercent - b.returnPercent).slice(0, 10);
         gainers.forEach((r, i) => allRows.push({ scanType: 'MOVERS_GAINERS', scanRange: range, ...scope, tradingDate, rank: i + 1, payloadJson: r as unknown as object, computedAt: now }));
         losers.forEach((r, i) => allRows.push({ scanType: 'MOVERS_LOSERS', scanRange: range, ...scope, tradingDate, rank: i + 1, payloadJson: r as unknown as object, computedAt: now }));
 

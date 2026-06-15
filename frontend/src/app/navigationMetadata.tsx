@@ -21,6 +21,8 @@ export type NavItem = {
   matchPrefixes?: string[];
   aliases?: string[];
   operatorOnly?: boolean;
+  /** Hide this item when the active market scope is crypto (equity-only surface). */
+  hiddenForCrypto?: boolean;
 };
 
 export type NavGroup = {
@@ -56,9 +58,9 @@ export const navGroups: NavGroup[] = [
     group: 'Discover',
     items: [
       { path: '/screener', label: 'Screener', icon: <FilterAltIcon />, aliases: ['/market-scans', '/stock-interest-radar', '/index-constituents'] },
-      { path: '/research', label: 'Research Hub', icon: <WorkspacesIcon /> },
-      { path: '/earnings-intelligence', label: 'Earnings', icon: <CalendarMonthIcon /> },
-      { path: '/derivatives', label: 'Derivatives / F&O', icon: <ShowChartIcon /> },
+      { path: '/research', label: 'Research Hub', icon: <WorkspacesIcon />, hiddenForCrypto: true },
+      { path: '/earnings-intelligence', label: 'Earnings', icon: <CalendarMonthIcon />, hiddenForCrypto: true },
+      { path: '/derivatives', label: 'Derivatives / F&O', icon: <ShowChartIcon />, hiddenForCrypto: true },
     ],
   },
   {

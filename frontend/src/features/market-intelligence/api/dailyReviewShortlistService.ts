@@ -417,7 +417,7 @@ function buildShortlistRows(scope: MarketScope, bundle: SourceBundle) {
         companyName: row.company,
         source: 'Stock Interest',
         reason: firstMeaningful([...(row.riskTags ?? []), ...(row.warnings ?? []), ...(row.reasonTags ?? [])]) || 'Risk avoid row from Stock Interest.',
-        severity: warningSeverity(row.category, row.warnings ?? [], row.riskTags ?? []),
+        severity: warningSeverity(row.category, [], [...(row.warnings ?? []), ...(row.riskTags ?? [])]),
       });
     });
 
@@ -449,7 +449,9 @@ function activeLedgerToShortlistRow(
     overlayLabel(bundle.overlays, row.symbol),
   ]);
   const warnings = [...row.displayWarnings, row.exitReasonSummary].filter(Boolean) as string[];
-  const severity = row.healthState === 'EXIT_TRIGGERED' ? 'High' : warningSeverity(row.healthState, warnings, []);
+  // Severity comes from the structured ledger health state (seed), not the warning copy — pass the
+  // warnings into the warnings slot, NOT the blockers slot (which would force every warned row to Blocker).
+  const severity = row.healthState === 'EXIT_TRIGGERED' ? 'High' : warningSeverity(row.healthState, [], warnings);
   const marketPulseContext = marketContextForRow(marketPulse, sector);
   const fundamentalsContext = fundamentalsForRow(earnings);
   const portfolioNames = overlayNames(bundle.overlays.portfolioNamesBySymbol, row.symbol);
@@ -596,7 +598,7 @@ function stockInterestToShortlistRow(
       overlaySentence(portfolioNames, watchlistNames),
       `Scope: ${scope.region} / ${scope.assetType}.`,
     ]),
-    warningSeverity: warningSeverity(row.category, row.warnings ?? [], row.riskTags ?? []),
+    warningSeverity: warningSeverity(row.category, [], [...(row.warnings ?? []), ...(row.riskTags ?? [])]),
     warnings: [...(row.warnings ?? []), ...(row.riskTags ?? [])],
     blockers: [],
     dataQualityStatus: 'Not provided by Stock Interest row',
@@ -646,11 +648,15 @@ function sourceContributions(rows: DailyReviewShortlistRow[], bundle: SourceBund
 }
 
 function warningSeverity(seed: string | null | undefined, blockers: string[] = [], warnings: string[] = []): DailyReviewShortlistWarningSeverity {
-  const text = [seed, ...blockers, ...warnings].filter(Boolean).join(' ').toLowerCase();
-  if (blockers.length > 0 || /blocked|invalidated|unusable|outside trusted|hard blocker|avoid/.test(text)) return 'Blocker';
-  if (/exit_triggered|exit triggered|risk_warning|risk warning|stale|failed|missing latest|not trustworthy/.test(text)) return 'High';
-  if (/partial|limited|thin|weak|low liquidity|missing|warning|risk/.test(text)) return 'Watch';
-  if (text.length > 0) return 'Info';
+  // Blocker/High come from STRUCTURED signals only — the `seed` (state/health/category enum)
+  // plus real `blockers[]`. Free-text `warnings`/risk-tag copy must NOT escalate: scanning it
+  // for "avoid"/"blocked" previously flagged every ordinary row Blocker. Text only sets Watch/Info.
+  const seedText = (seed ?? '').toLowerCase();
+  if (blockers.length > 0 || /blocked|invalidated|risk_avoid/.test(seedText)) return 'Blocker';
+  if (/exit_triggered|risk_warning/.test(seedText)) return 'High';
+  const warningText = warnings.filter(Boolean).join(' ').toLowerCase();
+  if (/watch|limited/.test(seedText) || /partial|limited|thin|weak|low liquidity|missing|warning|risk|stale|failed|not trustworthy/.test(warningText)) return 'Watch';
+  if (seedText.length > 0 || warningText.length > 0) return 'Info';
   return 'None';
 }
 

@@ -380,7 +380,7 @@ export class MarketDataFoundationService implements MarketDataReadApi, IndiaHist
 
   // Serving-read collaborators (Phase 5a). Each constructed once with `this` as the
   // MarketDataServingHost; the public read methods on this service delegate to them.
-  private readonly cryptoReads: CryptoReadsService = new CryptoReadsService(this);
+  public readonly cryptoReads: CryptoReadsService = new CryptoReadsService(this);
   private readonly priceReads: PriceReadsService = new PriceReadsService(this);
   private readonly fundamentalsReads: FundamentalsReadsService = new FundamentalsReadsService(this);
   private readonly scanReads: ScanReadsService = new ScanReadsService(this);

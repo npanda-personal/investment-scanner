@@ -619,6 +619,24 @@ test.describe('Market Intelligence persisted read-model pages', () => {
             warnings: [],
           },
           {
+            // Non-avoid category (so it enters the shortlist) but its risk-tag copy contains the
+            // word "avoid". Regression guard: the old fuzzy warningSeverity() matched /avoid/ on
+            // free text and wrongly flagged this row "Blocker". It must now classify softly.
+            snapshotDate: '2026-06-02',
+            dataThroughDate: '2026-06-01',
+            generatedAt: '2026-06-02T06:00:00.000Z',
+            score: 55,
+            symbol: 'SOFTROW',
+            company: 'Soft Wording Ltd',
+            sector: 'Energy',
+            category: 'TODAY_TOP_INTEREST',
+            direction: 'Review',
+            reasonTags: ['momentum-leader'],
+            riskTags: ['avoid chasing the extended move'],
+            freshness: 'FRESH',
+            warnings: [],
+          },
+          {
             snapshotDate: '2026-06-02',
             dataThroughDate: '2026-06-01',
             generatedAt: '2026-06-02T06:00:00.000Z',
@@ -826,23 +844,38 @@ test.describe('Market Intelligence persisted read-model pages', () => {
     await page.getByRole('tab', { name: 'Shortlist' }).click();
 
     await expect(page.getByRole('heading', { name: 'Daily Review Shortlist' })).toBeVisible();
-    await expect(page.getByText('3 / 10')).toBeVisible();
+    await expect(page.getByText('4 / 10')).toBeVisible();
     await expect(page.getByText('Active Ledger').first()).toBeVisible();
     await expect(page.getByText('1 selected').first()).toBeVisible();
     await expect(page.getByText('Today Review').first()).toBeVisible();
     await expect(page.getByText('Stock Interest').first()).toBeVisible();
-    const rows = page.locator('tbody tr');
+    // Each shortlist item is now a single expandable table row; the collapsible detail lives in a
+    // sibling row, so target only the data rows (those carrying the expand control).
+    const rows = page.locator('tbody tr').filter({ has: page.locator('button[aria-label*="detail"]') });
     await expect(rows.nth(0)).toContainText('WARNROW');
     await expect(rows.nth(1)).toContainText('OMEGA');
     await expect(rows.nth(2)).toContainText('GAMMA');
-    // Portfolio / Watchlist overlay is inside each accordion — expand to verify associations.
-    await page.locator('.MuiAccordionSummary-root').filter({ hasText: 'OMEGA' }).click();
+    await expect(rows.nth(3)).toContainText('SOFTROW');
+
+    // Warning column is driven by STRUCTURED severity, not free-text. An active RISK_WARNING row is
+    // High; a stock-interest row whose risk tag merely contains "avoid" must NOT be Blocker anymore.
+    await expect(rows.nth(0)).toContainText('High');
+    await expect(rows.nth(3)).toContainText('Info');
+    await expect(rows.nth(3)).not.toContainText('Blocker');
+
+    // Detail (overlays + explainability) now expands in place via each row's chevron — no separate
+    // accordion list rendered after the table.
+    await page.getByRole('button', { name: 'Expand OMEGA detail' }).click();
     await expect(page.getByText('Portfolio: Core Portfolio').first()).toBeVisible();
-    await page.locator('.MuiAccordionSummary-root').filter({ hasText: 'GAMMA' }).click();
+    await page.getByRole('button', { name: 'Expand GAMMA detail' }).click();
     await expect(page.getByText('Watchlist: Breakout Watchlist').first()).toBeVisible();
     await expect(page.getByText('Selected from persisted Today Review groups in source rank order.').first()).toBeVisible();
     await expect(page.getByText('Selected from persisted Stock Interest backend order only after Today Review and active-risk rows.').first()).toBeVisible();
     await expect(page.getByText('Normal active ledger row excluded from new-review shortlist.').first()).toBeVisible();
+
+    // Genuinely blocked / risk-avoid evidence still surfaces as Blocker in the warning-heavy section.
+    await expect(page.getByText('Today Review / Blocker').first()).toBeVisible();
+    await expect(page.getByText('Stock Interest / Blocker').first()).toBeVisible();
     await expect(page.getByText('RISKROW').first()).toBeVisible();
     await expect(page.getByText('BLOCKED').first()).toBeVisible();
     await expect(page.getByText('No fake rows are shown.')).toHaveCount(0);

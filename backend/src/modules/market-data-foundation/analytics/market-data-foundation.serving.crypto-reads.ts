@@ -10,6 +10,10 @@
 
 import type { MarketDataServingHost } from './market-data-foundation.serving-host';
 import type { MarketDataUniverseHealth } from '../market-data-foundation.types';
+import {
+  cryptoSnapshotsRepository,
+  type CryptoDailyMetricBoardOptions,
+} from '../ingestion/crypto/market-data-foundation.crypto-snapshots-repository';
 
 export class CryptoReadsService {
   constructor(private readonly host: MarketDataServingHost) {}
@@ -64,6 +68,20 @@ export class CryptoReadsService {
         data_status: price.dataStatus || 'COMPLETE',
       })),
     };
+  }
+
+  /**
+   * Latest persisted crypto daily-metric board (crypto_daily_metric_snapshots).
+   * Pure persisted-read: all metrics are computed by the CRYPTO_DAILY_METRICS
+   * pipeline stage and stored; this only selects/filters/orders.
+   */
+  getCryptoDailyMetricBoard(opts: CryptoDailyMetricBoardOptions = {}) {
+    return cryptoSnapshotsRepository.getDailyMetricBoard(opts);
+  }
+
+  /** Joined detail for one crypto instrument (catalog + latest metric/fundamental/futures/signal). */
+  getCryptoAssetDetail(instrumentId: string) {
+    return cryptoSnapshotsRepository.getCryptoAssetDetail(instrumentId);
   }
 
   async cryptoHealth() {

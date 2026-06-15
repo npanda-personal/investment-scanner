@@ -128,7 +128,9 @@ export default function NavigationLayout() {
                 {group.operatorOnly && <Chip size="small" label="Admin" color="warning" variant="outlined" sx={{ height: 20 }} />}
               </Stack>
             )}
-            {group.items.map((item) => {
+            {group.items
+              .filter((item) => !(profile.isCrypto && item.hiddenForCrypto))
+              .map((item) => {
               const isActive = isNavItemActive(location.pathname, item);
               const isAlertsItem = item.path === '/alerts';
               return (

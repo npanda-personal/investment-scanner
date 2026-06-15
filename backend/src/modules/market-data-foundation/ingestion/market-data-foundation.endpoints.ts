@@ -185,15 +185,21 @@ export const getSecEndpoints = (): SecEndpoints => ({
 export interface CryptoEndpoints {
   readonly coingeckoBase: ResolvedEndpoint;
   readonly binanceBase: ResolvedEndpoint;
+  readonly binanceFuturesBase: ResolvedEndpoint;
   readonly coinpaprikaBase: ResolvedEndpoint;
   readonly defillamaBase: ResolvedEndpoint;
+  readonly fearGreedBase: ResolvedEndpoint;
 }
 
 export const getCryptoEndpoints = (): CryptoEndpoints => ({
   coingeckoBase: resolveBase('COINGECKO_API_BASE', 'https://api.coingecko.com/api/v3'),
   binanceBase: resolveBase('BINANCE_API_BASE', 'https://api.binance.com/api/v3'),
+  // USDⓈ-M perpetual futures REST (funding rate + open interest). Keyless, free.
+  binanceFuturesBase: resolveBase('BINANCE_FUTURES_API_BASE', 'https://fapi.binance.com/fapi/v1'),
   coinpaprikaBase: resolveBase('COINPAPRIKA_API_BASE', 'https://api.coinpaprika.com/v1'),
   defillamaBase: resolveBase('DEFILLAMA_API_BASE', 'https://api.llama.fi'),
+  // alternative.me Crypto Fear & Greed Index. Keyless, free.
+  fearGreedBase: resolveBase('CRYPTO_FEARGREED_API_BASE', 'https://api.alternative.me'),
 });
 
 // ---------------------------------------------------------------------------

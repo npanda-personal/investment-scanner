@@ -37,6 +37,13 @@ export type {
   SignalWriteStatus,
 } from './signal-generation-engine.types';
 export {
+  sma,
+  rsi,
+  macd,
+  bollingerPercentB,
+} from './signal-indicators';
+export type { MacdResult } from './signal-indicators';
+export {
   classifyLifecycle,
   DEFAULT_LIFECYCLE_THRESHOLDS,
 } from './signal-lifecycle';

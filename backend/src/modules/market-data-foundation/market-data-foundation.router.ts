@@ -1,5 +1,6 @@
 import express from 'express';
 import { MarketDataFoundationController } from './market-data-foundation.controller';
+import { MarketDataFoundationCryptoBoardController } from './market-data-foundation.crypto-board.controller';
 
 export const createMarketDataFoundationRouter = (
   controller = new MarketDataFoundationController()
@@ -49,9 +50,14 @@ export const createMarketDataDataRouter = (
 };
 
 export const createMarketDataV1Router = (
-  controller = new MarketDataFoundationController()
+  controller = new MarketDataFoundationController(),
+  cryptoBoardController = new MarketDataFoundationCryptoBoardController()
 ) => {
   const router = express.Router();
+
+  // Crypto persisted-read board + asset detail (CRYPTO_DAILY_METRICS stage output).
+  router.get('/market-data/crypto/board', cryptoBoardController.board);
+  router.get('/market-data/crypto/assets/:id/detail', cryptoBoardController.assetDetail);
 
   router.get('/market-data/scheduler/status', controller.schedulerStatus);
   router.get('/market-data/health', controller.health);

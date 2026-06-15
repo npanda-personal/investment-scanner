@@ -185,6 +185,10 @@ export interface MarketContextSummary {
   explanation: string[];
   updatedAt: string;
   dataStatus: MarketDataStatus;
+  // Crypto Fear & Greed (alternative.me, free). Populated for region=CRYPTO only; null otherwise.
+  // Contrarian sentiment gauge surfaced on the crypto dashboard.
+  fearGreedIndex?: number | null;
+  fearGreedLabel?: string | null;
 }
 
 // ─── NR-104: Breadth Internals time series ───────────────────────────────────

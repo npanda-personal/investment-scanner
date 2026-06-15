@@ -259,3 +259,69 @@ export function isObvTrendingDown(prices: SignalPricePoint[], period = 10): bool
   if (obvArray.length < period) return false;
   return obvArray[0] < obvArray[period - 1];
 }
+
+/** Exponential moving average over a chronological (oldest-first) close series. */
+function emaSeries(closes: number[], period: number): number[] {
+  if (closes.length === 0) return [];
+  const k = 2 / (period + 1);
+  const out: number[] = [closes[0]];
+  for (let i = 1; i < closes.length; i++) {
+    out.push(closes[i] * k + out[i - 1] * (1 - k));
+  }
+  return out;
+}
+
+export interface MacdResult {
+  macd: number;
+  signal: number;
+  histogram: number;
+}
+
+/**
+ * MACD over a newest-first SignalPricePoint[] using adjusted_close.
+ * Standard (12, 26, 9). Returns null until there are enough bars for the slow
+ * EMA plus the signal warm-up. macd = EMA(fast) - EMA(slow); signal = EMA(macd, 9).
+ */
+export function macd(
+  prices: SignalPricePoint[],
+  fastPeriod = 12,
+  slowPeriod = 26,
+  signalPeriod = 9,
+): MacdResult | null {
+  if (prices.length < slowPeriod + signalPeriod) return null;
+  // Chronological (oldest-first) close series.
+  const closes = [...prices].reverse().map((p) => p.adjusted_close);
+  const fast = emaSeries(closes, fastPeriod);
+  const slow = emaSeries(closes, slowPeriod);
+  const macdLine = closes.map((_, i) => fast[i] - slow[i]);
+  const signalLine = emaSeries(macdLine, signalPeriod);
+  const lastMacd = macdLine[macdLine.length - 1];
+  const lastSignal = signalLine[signalLine.length - 1];
+  if (!Number.isFinite(lastMacd) || !Number.isFinite(lastSignal)) return null;
+  return { macd: lastMacd, signal: lastSignal, histogram: lastMacd - lastSignal };
+}
+
+/**
+ * Bollinger %B over a newest-first SignalPricePoint[] using adjusted_close.
+ * %B = (close - lower) / (upper - lower), where bands = SMA(period) ± mult·stddev.
+ * 0 = at lower band, 1 = at upper band, >1 = above upper (overbought). Null below
+ * `period` bars or when the band collapses (zero volatility).
+ */
+export function bollingerPercentB(
+  prices: SignalPricePoint[],
+  period = 20,
+  mult = 2,
+): number | null {
+  if (prices.length < period) return null;
+  const window = prices.slice(0, period).map((p) => p.adjusted_close);
+  const mean = average(window);
+  if (mean === null) return null;
+  const variance = average(window.map((v) => (v - mean) ** 2));
+  if (variance === null) return null;
+  const stddev = Math.sqrt(variance);
+  if (stddev === 0) return null;
+  const upper = mean + mult * stddev;
+  const lower = mean - mult * stddev;
+  if (upper === lower) return null;
+  return (prices[0].adjusted_close - lower) / (upper - lower);
+}

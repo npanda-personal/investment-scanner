@@ -19,6 +19,7 @@ import { StockInterestSnapshotService } from '../market-intelligence';
 import { WorkbenchRefreshService } from '../stock-research-workbench';
 import { PipelineOrchestrationRepository } from './pipeline-orchestration.repository';
 import { buildPipelineDagAdapters } from './pipeline-dag-registry';
+import { buildCryptoPipelineDagAdapters } from './pipeline-dag-stages-crypto';
 import { PipelineDagRunner } from './pipeline-dag-runner';
 import { RepositoryDagPersistence } from './pipeline-dag-persistence';
 import type { DagAlertSummary } from './pipeline-dag-runner';
@@ -296,6 +297,59 @@ export class PipelineOrchestrationService {
       timeframe: params.timeframe,
       trigger: params.trigger,
       instrumentScope,
+      fromStage: params.fromStage,
+      sourceFingerprint: params.sourceFingerprint,
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // CRYPTO DAG runner — a SEPARATE adapter set (crypto universe, no equity
+  // instrument-eligibility gating) executed through the SAME runner + persistence
+  // so crypto stages are tracked in pipeline_runs / pipeline_stage_runs and appear
+  // in /admin/pipeline-ops. Built lazily once per service instance.
+  // ---------------------------------------------------------------------------
+  private _cryptoDagRunner: PipelineDagRunner | null = null;
+
+  private getCryptoDagRunner(): PipelineDagRunner {
+    if (!this._cryptoDagRunner) {
+      const persistence = new RepositoryDagPersistence(this.repository);
+      const adapters = buildCryptoPipelineDagAdapters();
+      const alertFn = (summary: DagAlertSummary): void => {
+        this.firePipelineRunAlert(
+          summary.runStatus,
+          summary.region,
+          summary.assetType,
+          summary.dataThroughDate,
+          summary.durationMs,
+          summary.stagesSummary,
+          summary.firstError ?? null
+        );
+      };
+      this._cryptoDagRunner = new PipelineDagRunner(adapters, { persistence, alert: alertFn }, { maxConcurrency: 3 });
+    }
+    return this._cryptoDagRunner;
+  }
+
+  /**
+   * Execute the daily CRYPTO pipeline via the DAG runner. Crypto stages operate on
+   * the whole active crypto universe (no per-instrument scope), so instrumentScope
+   * is always null — the equity eligibility resolver in executeDagPipeline does not
+   * apply to crypto.
+   */
+  async executeCryptoDagPipeline(params: {
+    tradingDate: string;
+    trigger: 'scheduled' | 'manual' | 'retry';
+    fromStage?: string;
+    sourceFingerprint?: string;
+  }): Promise<DagRunResult> {
+    const runner = this.getCryptoDagRunner();
+    return runner.execute({
+      tradingDate: params.tradingDate,
+      region: 'GLOBAL',
+      assetType: 'CRYPTO',
+      timeframe: '1d',
+      trigger: params.trigger,
+      instrumentScope: null,
       fromStage: params.fromStage,
       sourceFingerprint: params.sourceFingerprint,
     });

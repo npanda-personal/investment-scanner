@@ -29,6 +29,7 @@ import type { InstrumentOutcomeAggregate, SignalHistoryRow } from '@/features/ma
 import { useMarketScope } from '@/contexts/MarketScopeContext';
 import { exchangeLabel } from '@/shared/format/exchangeLabels';
 import { fetchInstruments, fetchInstrument } from '../api/marketDataFoundationService';
+import CryptoInstrumentDetail from './CryptoInstrumentDetail';
 
 const tabs = [
   { value: 'overview', label: 'Overview' },
@@ -138,6 +139,16 @@ function directionColor(direction: string): 'success' | 'error' | 'default' {
 }
 
 function SignalsHistoryTab({ instrumentId }: { instrumentId?: string }) {
+  const { profile } = useMarketScope();
+  // Crypto gets a persisted-read crypto layout (signal evidence + indicators +
+  // catalog + DeFi + futures) sourced from GET /crypto/assets/:id/detail.
+  if (profile.isCrypto) {
+    return <CryptoInstrumentDetail instrumentId={instrumentId} />;
+  }
+  return <EquitySignalsHistoryTab instrumentId={instrumentId} />;
+}
+
+function EquitySignalsHistoryTab({ instrumentId }: { instrumentId?: string }) {
   const [history, setHistory] = useState<SignalHistoryRow[]>([]);
   const [aggregate, setAggregate] = useState<InstrumentOutcomeAggregate | null>(null);
   const [loading, setLoading] = useState(!!instrumentId);

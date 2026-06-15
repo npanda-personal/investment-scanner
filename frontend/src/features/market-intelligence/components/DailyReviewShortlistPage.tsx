@@ -1,14 +1,12 @@
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import {
-  Accordion,
-  AccordionDetails,
-  AccordionSummary,
   Alert,
   Box,
   Button,
   Chip,
   Collapse,
+  IconButton,
   LinearProgress,
   Paper,
   Skeleton,
@@ -182,12 +180,13 @@ function ShortlistTable({ rows, targetCount }: { rows: DailyReviewShortlistRow[]
   return (
     <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
       <Stack spacing={1.25} sx={{ p: 2, pb: 0 }}>
-        <SectionTitle title="Today's 10 Review Names" subtitle={`Showing ${rows.length} of ${targetCount} review slots.`} />
+        <SectionTitle title="Today's 10 Review Names" subtitle={`Showing ${rows.length} of ${targetCount} review slots. Expand a row to see why it qualifies.`} />
       </Stack>
       <TableContainer>
         <Table size="small" aria-label="Daily Review Shortlist table">
           <TableHead>
             <TableRow>
+              <TableCell sx={{ width: 48 }} aria-label="Expand" />
               <TableCell>Rank</TableCell>
               <TableCell>Name</TableCell>
               <TableCell>Lane</TableCell>
@@ -199,106 +198,87 @@ function ShortlistTable({ rows, targetCount }: { rows: DailyReviewShortlistRow[]
             </TableRow>
           </TableHead>
           <TableBody>
-            {rows.map((row) => (
-              <TableRow key={row.id} hover>
-                <TableCell>{row.rank}</TableCell>
-                <TableCell>
-                  <Stack spacing={0.25}>
-                    <Typography fontWeight={800}>{row.symbol}</Typography>
-                    <Typography variant="caption" color="text.secondary">{row.companyName || 'Not available'}</Typography>
-                    <Typography variant="caption" color="text.secondary">{row.sector || 'Not available'}</Typography>
-                  </Stack>
-                </TableCell>
-                <TableCell>{row.lane}</TableCell>
-                <TableCell><ChipList values={row.sourceContributions} size="small" /></TableCell>
-                <TableCell><Chip label={row.warningSeverity} color={warningColor(row.warningSeverity)} variant="outlined" size="small" /></TableCell>
-                <TableCell>
-                  <Stack spacing={0.25}>
-                    <Typography variant="body2">{formatEnum(row.dataQualityStatus)}</Typography>
-                    <Typography variant="caption" color="text.secondary">{firstOrFallback(row.dataQualityReasons, 'Not available')}</Typography>
-                  </Stack>
-                </TableCell>
-                <TableCell sx={{ minWidth: 260 }}>
-                  <Typography variant="body2">{row.reasonSummary}</Typography>
-                </TableCell>
-                <TableCell>
-                  <Button
-                    component={RouterLink}
-                    to={row.detailPath}
-                    size="small"
-                    endIcon={<OpenInNewIcon fontSize="small" />}
-                  >
-                    Open
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
+            {rows.map((row) => <ShortlistRow key={row.id} row={row} />)}
           </TableBody>
         </Table>
       </TableContainer>
-      <AccordionStack rows={rows} />
     </Paper>
   );
 }
 
-const ACCORDION_PAGE_SIZE = 10;
-
-function AccordionStack({ rows }: { rows: DailyReviewShortlistRow[] }) {
-  const [expanded, setExpanded] = useState(false);
-  const visible = expanded ? rows : rows.slice(0, ACCORDION_PAGE_SIZE);
-  const hidden = rows.length - ACCORDION_PAGE_SIZE;
+function ShortlistRow({ row }: { row: DailyReviewShortlistRow }) {
+  const [open, setOpen] = useState(false);
 
   return (
-    <Box sx={{ px: 2, pb: 2 }}>
-      <Stack spacing={1}>
-        {visible.map((row) => <ExplainabilityAccordion key={`${row.id}:why`} row={row} />)}
-      </Stack>
-      {rows.length > ACCORDION_PAGE_SIZE && (
-        <Box sx={{ mt: 1 }}>
-          <Collapse in={!expanded} unmountOnExit>
-            <Button size="small" onClick={() => setExpanded(true)}>
-              Show all ({hidden} more)
-            </Button>
-          </Collapse>
-          <Collapse in={expanded} unmountOnExit>
-            <Button size="small" onClick={() => setExpanded(false)}>
-              Show fewer
-            </Button>
-          </Collapse>
-        </Box>
-      )}
-    </Box>
-  );
-}
-
-function ExplainabilityAccordion({ row }: { row: DailyReviewShortlistRow }) {
-  return (
-    <Accordion disableGutters variant="outlined">
-      <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap alignItems="center">
-          <Typography fontWeight={800}>{row.symbol}</Typography>
-          <Typography color="text.secondary">{row.sourceOrderLabel}</Typography>
-        </Stack>
-      </AccordionSummary>
-      <AccordionDetails>
-        <Stack spacing={1.25}>
-          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' }, gap: 1 }}>
-            <InlineFact label="Market Pulse" value={row.marketPulseContext} />
-            <InlineFact label="Fundamentals" value={row.fundamentalsContext} />
-            <InlineFact label="Portfolio / Watchlist" value={overlayText(row)} />
-          </Box>
-          <Stack spacing={0.75}>
-            {row.explainability.map((item) => <Typography key={item} variant="body2">{item}</Typography>)}
+    <>
+      <TableRow hover sx={{ '& > *': { borderBottom: open ? 'unset' : undefined } }}>
+        <TableCell>
+          <IconButton
+            size="small"
+            aria-label={open ? `Collapse ${row.symbol} detail` : `Expand ${row.symbol} detail`}
+            aria-expanded={open}
+            onClick={() => setOpen((prev) => !prev)}
+          >
+            <ExpandMoreIcon fontSize="small" sx={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+          </IconButton>
+        </TableCell>
+        <TableCell>{row.rank}</TableCell>
+        <TableCell>
+          <Stack spacing={0.25}>
+            <Typography fontWeight={800}>{row.symbol}</Typography>
+            <Typography variant="caption" color="text.secondary">{row.companyName || 'Not available'}</Typography>
+            <Typography variant="caption" color="text.secondary">{row.sector || 'Not available'}</Typography>
           </Stack>
-          {(row.warnings.length > 0 || row.blockers.length > 0) && (
-            <Stack spacing={0.75}>
-              {row.blockers.map((item) => <Alert key={item} severity="error">{item}</Alert>)}
-              {row.warnings.map((item) => <Alert key={item} severity="warning">{item}</Alert>)}
-            </Stack>
-          )}
-        </Stack>
-      </AccordionDetails>
-    </Accordion>
+        </TableCell>
+        <TableCell>{row.lane}</TableCell>
+        <TableCell><ChipList values={row.sourceContributions} size="small" /></TableCell>
+        <TableCell><Chip label={row.warningSeverity} color={warningColor(row.warningSeverity)} variant="outlined" size="small" /></TableCell>
+        <TableCell>
+          <Stack spacing={0.25}>
+            <Typography variant="body2">{formatEnum(row.dataQualityStatus)}</Typography>
+            <Typography variant="caption" color="text.secondary">{firstOrFallback(row.dataQualityReasons, 'Not available')}</Typography>
+          </Stack>
+        </TableCell>
+        <TableCell sx={{ minWidth: 260 }}>
+          <Typography variant="body2">{row.reasonSummary}</Typography>
+        </TableCell>
+        <TableCell>
+          <Button
+            component={RouterLink}
+            to={row.detailPath}
+            size="small"
+            endIcon={<OpenInNewIcon fontSize="small" />}
+          >
+            Open
+          </Button>
+        </TableCell>
+      </TableRow>
+      <TableRow>
+        <TableCell sx={{ py: 0, borderBottom: open ? undefined : 'none' }} colSpan={9}>
+          <Collapse in={open} unmountOnExit>
+            <Box sx={{ py: 2 }}>
+              <Stack spacing={1.25}>
+                <Typography variant="caption" color="text.secondary">{row.sourceOrderLabel}</Typography>
+                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' }, gap: 1 }}>
+                  <InlineFact label="Market Pulse" value={row.marketPulseContext} />
+                  <InlineFact label="Fundamentals" value={row.fundamentalsContext} />
+                  <InlineFact label="Portfolio / Watchlist" value={overlayText(row)} />
+                </Box>
+                <Stack spacing={0.75}>
+                  {row.explainability.map((item) => <Typography key={item} variant="body2">{item}</Typography>)}
+                </Stack>
+                {(row.warnings.length > 0 || row.blockers.length > 0) && (
+                  <Stack spacing={0.75}>
+                    {row.blockers.map((item) => <Alert key={item} severity="error">{item}</Alert>)}
+                    {row.warnings.map((item) => <Alert key={item} severity="warning">{item}</Alert>)}
+                  </Stack>
+                )}
+              </Stack>
+            </Box>
+          </Collapse>
+        </TableCell>
+      </TableRow>
+    </>
   );
 }
 

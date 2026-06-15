@@ -92,6 +92,9 @@ export interface MarketContextSummary {
   explanation: string[];
   updatedAt: string;
   dataStatus: DataStatus;
+  // Crypto Fear & Greed (alternative.me, free). Populated for region=CRYPTO only; null otherwise.
+  fearGreedIndex?: number | null;
+  fearGreedLabel?: string | null;
 }
 
 // ─── NR-104: Breadth Internals time series ───────────────────────────────────

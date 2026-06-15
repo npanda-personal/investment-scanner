@@ -264,11 +264,16 @@ export class MarketDataFoundationCryptoRepository {
 
   /** Ascending price history for a symbol (oldest first). */
   async getPriceHistory(symbol: string, limit?: number) {
-    return this.prisma.cryptoPriceTick.findMany({
+    // Return the MOST RECENT `limit` bars in ascending (oldest-first) order. Using
+    // `orderBy asc + take` would return the OLDEST N bars (stale ~genesis data) —
+    // callers (charts, indicator derivation) need the latest N. With no limit this
+    // returns the full ascending series, unchanged.
+    const rows = await this.prisma.cryptoPriceTick.findMany({
       where: { symbol },
-      orderBy: { timestamp: 'asc' },
+      orderBy: { timestamp: 'desc' },
       take: limit,
     });
+    return rows.reverse();
   }
 
   // ── Crypto market scans (52w-high / 52w-low / volume-spike) ─────────────────

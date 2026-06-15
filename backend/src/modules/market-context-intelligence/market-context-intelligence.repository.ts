@@ -382,11 +382,11 @@ export class MarketContextIntelligenceRepository {
       weakSectors: this.weakSectorSlice(mappedSectors),
       breadth,
       breadthByCapBand: Array.isArray(market.breadthByCapBand) ? (market.breadthByCapBand as any[]) : [],
-      countryStrength: mappedCountries.slice(0, 8),
-      macro,
+      countryStrength: mappedCountries.slice(0, 8), macro,
       explanation: [market.explanation || ''],
       updatedAt: market.updatedAt.toISOString(),
       dataStatus: market.dataStatus as any,
+      fearGreedIndex: market.fearGreedIndex ?? null, fearGreedLabel: market.fearGreedLabel ?? null,
     };
   }
 

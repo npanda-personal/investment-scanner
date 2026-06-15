@@ -183,11 +183,11 @@ export default function ScreenerPage() {
       <Box sx={{ p: 3 }}>
         <PageHeader
           title="Screener"
-          subtitle={screenerSubtitle}
+          subtitle="The equity Screener filters stocks by fundamentals, delivery, and F&O criteria that do not apply to crypto."
         />
         <NotApplicableForAssetClass
           feature="Screener"
-          detail="Crypto coverage in this release is available on Market Scans and the Instrument workspace. This view will support crypto in a later update."
+          detail="For crypto, use the Signal Board tab — it ranks coins by persisted bull/bear signals, momentum, and technicals."
         />
       </Box>
     );

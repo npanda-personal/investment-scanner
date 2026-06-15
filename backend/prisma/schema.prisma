@@ -108,9 +108,9 @@ model Stock {
   deliverySnapshots               MarketDeliverySnapshot[]
   stockInterestSnapshots          StockInterestSnapshot[]
   earningsIntelligenceSnapshots   EarningsIntelligenceSnapshot[]
-  workbenchSnapshots               WorkbenchSnapshot[]
-  instrumentEligibilityRecords     InstrumentEligibility[]
-  dailyInstrumentSnapshots         DailyInstrumentSnapshot[]
+  workbenchSnapshots              WorkbenchSnapshot[]
+  instrumentEligibilityRecords    InstrumentEligibility[]
+  dailyInstrumentSnapshots        DailyInstrumentSnapshot[]
 
   @@index([region, assetType, symbol], map: "stocks_region_assetType_symbol_idx")
   @@index([region, assetType, providerSupportStatus, isActive, isDelisted], map: "stocks_region_assetType_providerSupport_active_delisted_idx")
@@ -619,18 +619,18 @@ model FxRate {
 }
 
 model Portfolio {
-  id           String                 @id @default(cuid())
-  userId       String?
-  user         AppUser?               @relation(fields: [userId], references: [id], onDelete: SetNull)
-  name         String
-  baseCurrency String
-  description  String?
-  createdAt    DateTime               @default(now())
-  updatedAt    DateTime               @updatedAt
-  holdings     PortfolioHolding[]
-  transactions PortfolioTransaction[]
-  alertRules   AlertRule[]
-  alertEvents  AlertEvent[]
+  id                   String                         @id @default(cuid())
+  userId               String?
+  user                 AppUser?                       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  name                 String
+  baseCurrency         String
+  description          String?
+  createdAt            DateTime                       @default(now())
+  updatedAt            DateTime                       @updatedAt
+  holdings             PortfolioHolding[]
+  transactions         PortfolioTransaction[]
+  alertRules           AlertRule[]
+  alertEvents          AlertEvent[]
   intelligenceSnapshot PortfolioIntelligenceSnapshot?
 
   @@index([userId])
@@ -886,6 +886,10 @@ model MarketContextSnapshot {
   macroStatus               String?
   explanation               String?
   breadthByCapBand          Json?
+  // Crypto Fear & Greed (alternative.me, free). Populated for region=CRYPTO only;
+  // null for equity regions. Contrarian sentiment gauge surfaced on the crypto dashboard.
+  fearGreedIndex            Float?
+  fearGreedLabel            String?
   source                    String
   dataStatus                String
   createdAt                 DateTime @default(now())
@@ -1070,16 +1074,16 @@ model InstrumentEligibility {
   tradingDate  DateTime
 
   // ── FACTS (measured once per day) ────────────────────────────────────────
-  priceBars          Int
-  lastPriceDate      DateTime? // nullable — null when no price data at all
-  staleSessions      Int
-  volumeCoveragePct  Decimal
-  maxGapDays         Int
-  liquidityScore     Int
-  hasFundamentals    Boolean
-  hasSector          Boolean
-  hasIndustry        Boolean
-  hasCountry         Boolean
+  priceBars         Int
+  lastPriceDate     DateTime? // nullable — null when no price data at all
+  staleSessions     Int
+  volumeCoveragePct Decimal
+  maxGapDays        Int
+  liquidityScore    Int
+  hasFundamentals   Boolean
+  hasSector         Boolean
+  hasIndustry       Boolean
+  hasCountry        Boolean
 
   // ── VERDICTS (derived from facts by eligibility-policy.ts) ───────────────
   signalEligible      Boolean
@@ -1134,7 +1138,7 @@ model DailyInstrumentSnapshot {
   reviewReasons       String[]
   signalReasons       String[]
   readinessScore      Int
-  readinessStatus     String   // READY | LIMITED | NOT_READY
+  readinessStatus     String // READY | LIMITED | NOT_READY
 
   // ── SIGNALS ──────────────────────────────────────────────────────────────
   signalScore        Float?
@@ -1624,16 +1628,16 @@ model SignalPositionLedgerEntry {
 }
 
 model WorkbenchSnapshot {
-  id             String   @id @default(cuid())
-  instrumentId   String   @unique
-  stock          Stock    @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
-  symbol         String
-  computedAt     DateTime @default(now())
+  id              String    @id @default(cuid())
+  instrumentId    String    @unique
+  stock           Stock     @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+  symbol          String
+  computedAt      DateTime  @default(now())
   dataThroughDate DateTime?
   /// Full workbench payload: overview/chart/performance/fundamentals/valuation/peers/relative_strength/corporate_actions/trust/signalEvidence
-  payloadJson    Json
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  payloadJson     Json
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   @@index([instrumentId])
   @@index([computedAt])
@@ -1701,7 +1705,7 @@ model PortfolioIntelligenceSnapshot {
 
   // Denormalised top-level scalars for cheap status queries (no JSONB parse)
   healthScore Int
-  status      String   // HEALTHY | WATCH | AT_RISK
+  status      String // HEALTHY | WATCH | AT_RISK
 
   // Full payload stored as JSONB — shape matches PortfolioIntelligenceResponse
   payloadJson Json
@@ -1740,21 +1744,21 @@ model ResearchOverviewSnapshot {
 // Market Scan Snapshots — precomputed daily aggregates served by persisted-read GETs
 // ---------------------------------------------------------------------------
 model MarketScanSnapshot {
-  id           String   @id @default(cuid())
+  id          String   @id @default(cuid())
   /// One of: MOVERS_GAINERS | MOVERS_LOSERS | 52W_HIGH | 52W_LOW | DELIVERY_SPIKE | VOLUME_SPIKE
-  scanType     String
+  scanType    String
   /// e.g. '1D' | '1W' | '1M' | '3M' | '6M' | '1Y'  (NULL for non-mover scans)
-  scanRange    String?
-  region       String
-  assetType    String
-  tradingDate  DateTime
+  scanRange   String?
+  region      String
+  assetType   String
+  tradingDate DateTime
   /// 1-based rank within scanType+scanRange+region+assetType+tradingDate
-  rank         Int
+  rank        Int
   /// Full row payload as stored by the refresh pipeline; shape varies by scanType
-  payloadJson  Json
-  computedAt   DateTime @default(now())
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  payloadJson Json
+  computedAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@unique([scanType, scanRange, region, assetType, tradingDate, rank], map: "market_scan_snapshot_type_range_scope_date_rank_key")
   @@index([scanType, scanRange, region, assetType, tradingDate], map: "market_scan_snapshot_lookup_idx")
@@ -1823,6 +1827,8 @@ model CryptoAsset {
   interestSnapshots               CryptoInterestSnapshot[]
   fundamentalSnapshots            CryptoFundamentalSnapshot[]
   events                          CryptoEvent[]
+  futuresSnapshots                CryptoFuturesSnapshot[]
+  dailyMetricSnapshots            CryptoDailyMetricSnapshot[]
 
   @@index([region, assetType, symbol], map: "crypto_assets_region_assetType_symbol_idx")
   @@index([rank], map: "crypto_assets_rank_idx")
@@ -1860,6 +1866,81 @@ model CryptoFundamentalSnapshot {
   @@index([symbol, snapshotDate])
   @@index([snapshotDate])
   @@map("crypto_fundamental_snapshots")
+}
+
+// Perpetual-futures market structure (Binance USDⓈ-M futures, free/keyless): funding
+// rate (sentiment/positioning) + open interest. Per-asset daily snapshot. Only assets
+// with a tradable perp get a row; spot-only coins are simply absent.
+model CryptoFuturesSnapshot {
+  id              String      @id @default(cuid())
+  instrumentId    String
+  asset           CryptoAsset @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+  symbol          String // perp symbol, e.g. BTCUSDT
+  snapshotDate    DateTime // UTC day of the snapshot
+  fundingRatePct  Float? // last funding rate as a percent (e.g. 0.01 = 0.01%/8h)
+  openInterestUsd Decimal? // notional open interest in USD
+  source          String      @default("BINANCE_FUTURES")
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@unique([instrumentId, snapshotDate])
+  @@index([symbol, snapshotDate])
+  @@index([snapshotDate])
+  @@map("crypto_futures_snapshots")
+}
+
+// Denormalized per-asset daily bull/bear metrics — the single read source for the
+// crypto signal board and instrument workspace. Every value is COMPUTED BY THE PIPELINE
+// (CRYPTO_DAILY_METRICS stage) and stored here; the frontend does no runtime calculation.
+model CryptoDailyMetricSnapshot {
+  id                 String      @id @default(cuid())
+  instrumentId       String
+  asset              CryptoAsset @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+  symbol             String
+  name               String?
+  snapshotDate       DateTime // UTC day of the snapshot
+  dataThroughDate    DateTime? // latest price date the metrics were computed from
+  // Price / catalog
+  price              Decimal?
+  marketCap          Decimal?
+  rank               Int?
+  // Signal (mirrored from crypto_signal_results for single-query board reads)
+  signalScore        Float?
+  signalDirection    String? // BULLISH / NEUTRAL / BEARISH
+  signalConfidence   String? // HIGH / MEDIUM / LOW
+  // Bull/bear flags & momentum
+  volumeSpike        Boolean     @default(false)
+  pctChange1d        Float?
+  pctChange7d        Float?
+  pctChange30d       Float?
+  distanceFromAthPct Float? // negative = below ATH
+  near52wHigh        Boolean     @default(false)
+  near52wLow         Boolean     @default(false)
+  // Technical indicators (computed once here, persisted)
+  rsi14              Float?
+  macd               Float?
+  macdSignal         Float?
+  macdHist           Float?
+  bbPercentB         Float?
+  sma50              Float?
+  sma200             Float?
+  crossState         String? // GOLDEN / DEATH / NONE
+  rsVsBtcPct         Float? // relative strength vs BTC over the lookback
+  // Fundamentals / futures (mirrored for board columns; null when not covered)
+  tvlUsd             Decimal?
+  tvlChange7dPct     Float?
+  fundingRatePct     Float?
+  openInterestUsd    Decimal?
+  calculationVersion String      @default("crypto-metrics-v1")
+  dataStatus         String      @default("COMPLETE")
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+
+  @@unique([instrumentId, snapshotDate])
+  @@index([snapshotDate, signalDirection, signalScore])
+  @@index([snapshotDate, volumeSpike])
+  @@index([snapshotDate, rank])
+  @@map("crypto_daily_metric_snapshots")
 }
 
 // Upcoming/!past events (CoinMarketCal free tier): token unlocks, mainnet upgrades,
@@ -2006,31 +2087,31 @@ model CryptoSignalResult {
 // sweep; no application code writes to it today. Do NOT drop here (shared DB is drifted;
 // a removal needs a dedicated, controlled migration — see market-data-foundation.md).
 model CryptoSignalOutcome {
-  id                    String             @id @default(cuid())
-  signalResultId        String
-  signalResult          CryptoSignalResult @relation(fields: [signalResultId], references: [id], onDelete: Cascade)
-  instrumentId          String
-  symbol                String
-  direction             String
-  score                 Float
-  sector                String?
-  country               String?
-  modelVersion          String
-  signalGeneratedDate   DateTime
-  horizon               String
-  dataComplete          Boolean            @default(false)
-  priceAtSignal         Float?
-  futurePrice           Float?
-  windowEndDate         DateTime?
-  forwardReturnPercent  Float?
-  maxFavorableExcursion Float?
-  maxAdverseExcursion   Float?
-  maxDrawdownPercent    Float?
+  id                     String             @id @default(cuid())
+  signalResultId         String
+  signalResult           CryptoSignalResult @relation(fields: [signalResultId], references: [id], onDelete: Cascade)
+  instrumentId           String
+  symbol                 String
+  direction              String
+  score                  Float
+  sector                 String?
+  country                String?
+  modelVersion           String
+  signalGeneratedDate    DateTime
+  horizon                String
+  dataComplete           Boolean            @default(false)
+  priceAtSignal          Float?
+  futurePrice            Float?
+  windowEndDate          DateTime?
+  forwardReturnPercent   Float?
+  maxFavorableExcursion  Float?
+  maxAdverseExcursion    Float?
+  maxDrawdownPercent     Float?
   benchmarkReturnPercent Float?
-  alphaPercent          Float?
-  evaluatedAt           DateTime           @default(now())
-  createdAt             DateTime           @default(now())
-  updatedAt             DateTime           @updatedAt
+  alphaPercent           Float?
+  evaluatedAt            DateTime           @default(now())
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
 
   @@unique([signalResultId, horizon])
   @@index([instrumentId, horizon, signalGeneratedDate], map: "crypto_signal_outcomes_instrument_idx")
