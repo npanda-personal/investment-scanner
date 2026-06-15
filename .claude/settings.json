@@ -102,6 +102,10 @@
           {
             "type": "command",
             "command": "powershell -NoProfile -ExecutionPolicy Bypass -File .claude/hooks/cleanup-orphan-processes.ps1"
+          },
+          {
+            "type": "command",
+            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File .claude/hooks/guard-merged-worktrees.ps1"
           }
         ]
       }
