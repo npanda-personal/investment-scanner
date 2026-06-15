@@ -47,7 +47,7 @@ export class PipelineOrchestrationRepository {
         warnings: this.jsonArray(input.warnings),
         errors: this.jsonArray(input.errors),
         metadata: this.optionalJson(input.metadata),
-        startedAt: input.startedAt ?? new Date(),
+        startedAt: input.startedAt && input.startedAt > new Date() ? new Date() : (input.startedAt ?? new Date()),
       },
       update: {
         triggerType: input.triggerType,
@@ -183,7 +183,7 @@ export class PipelineOrchestrationRepository {
         leaseOwner: input.leaseOwner,
         leaseExpiresAt,
         attemptCount: { increment: 1 },
-        startedAt: stage.startedAt ?? now,
+        startedAt: stage.startedAt && stage.startedAt > now ? now : (stage.startedAt ?? now),
         completedAt: null,
       },
     });

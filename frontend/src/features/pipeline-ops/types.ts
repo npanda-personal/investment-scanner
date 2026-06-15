@@ -56,6 +56,12 @@ export interface PipelineStatusStage {
   errors: string[];
   metadata: Record<string, unknown> | null;
   updatedAt: string;
+  // MARKET_DATA-only reconciliation against the authoritative stored-candle ledger (latest_prices).
+  // `storedDataThroughDate` is the real coverage; `stageTrackingStale` flags when this stage's own
+  // bookkeeping (`dataThroughDate`) lags behind it (e.g. after an interrupted/reaped run).
+  storedDataThroughDate?: string | null;
+  storedDataFinalConfirmed?: boolean;
+  stageTrackingStale?: boolean;
 }
 
 export interface PipelineStatusStageGroup {
