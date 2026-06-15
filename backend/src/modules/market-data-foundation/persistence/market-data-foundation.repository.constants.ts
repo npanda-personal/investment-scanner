@@ -6,6 +6,11 @@
 export const MARKET_MOVER_BASE_WINDOW_DAYS = 14;
 export const MARKET_MOVER_MIN_PRICE = 10;
 export const MARKET_MOVER_MIN_RECENT_TURNOVER = 1_000_000;
+// Gainers/losers persisted per range (write) AND served by default (read). Single source of
+// truth so the snapshot-write count and the serving default can never silently drift apart —
+// historically the write slice was 5 while reads expected more, so each daily regeneration
+// reverted the page to 5. Equity scan-snapshots writer + serving reader both import this.
+export const MARKET_MOVERS_SNAPSHOT_COUNT = 10;
 export const PROVIDER_MARKET_DATA_SOURCES = [
   'yahoo',
   'yahoo_finance',

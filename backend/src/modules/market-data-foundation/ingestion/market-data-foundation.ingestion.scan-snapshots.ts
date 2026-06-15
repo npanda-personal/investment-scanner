@@ -10,6 +10,7 @@
 
 import type { MarketDataIngestionHost } from './market-data-foundation.ingestion-host';
 import type { MarketMoverRange } from '../market-data-foundation.types';
+import { MARKET_MOVERS_SNAPSHOT_COUNT } from '../persistence/market-data-foundation.repository.constants';
 
 const MARKET_MOVER_LOOKBACK_DAYS: Record<MarketMoverRange, number> = {
   '1D': 1,
@@ -99,8 +100,8 @@ export class ScanSnapshotWriterService {
           latestDateEnd,
         });
         const ordered = rows.filter((r) => Number.isFinite(r.returnPercent));
-        const gainers = ordered.filter((r) => r.returnPercent > 0).sort((a, b) => b.returnPercent - a.returnPercent).slice(0, 10);
-        const losers = ordered.filter((r) => r.returnPercent < 0).sort((a, b) => a.returnPercent - b.returnPercent).slice(0, 10);
+        const gainers = ordered.filter((r) => r.returnPercent > 0).sort((a, b) => b.returnPercent - a.returnPercent).slice(0, MARKET_MOVERS_SNAPSHOT_COUNT);
+        const losers = ordered.filter((r) => r.returnPercent < 0).sort((a, b) => a.returnPercent - b.returnPercent).slice(0, MARKET_MOVERS_SNAPSHOT_COUNT);
         gainers.forEach((r, i) => allRows.push({ scanType: 'MOVERS_GAINERS', scanRange: range, ...scope, tradingDate, rank: i + 1, payloadJson: r as unknown as object, computedAt: now }));
         losers.forEach((r, i) => allRows.push({ scanType: 'MOVERS_LOSERS', scanRange: range, ...scope, tradingDate, rank: i + 1, payloadJson: r as unknown as object, computedAt: now }));
 
