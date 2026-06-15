@@ -23,6 +23,7 @@ import { buildCryptoPipelineDagAdapters } from './pipeline-dag-stages-crypto';
 import { PipelineDagRunner } from './pipeline-dag-runner';
 import { RepositoryDagPersistence } from './pipeline-dag-persistence';
 import type { DagAlertSummary } from './pipeline-dag-runner';
+import { triggerDemoPublishIfEnabled } from './demo-publish.trigger';
 import type { DagRunResult } from './pipeline-dag.types';
 import type {
   PipelineCommandAvailability,
@@ -220,6 +221,8 @@ export class PipelineOrchestrationService {
           summary.stagesSummary,
           summary.firstError ?? null
         );
+        // Post-pipeline: refresh + publish the GitHub Pages demo (opt-in, best-effort).
+        triggerDemoPublishIfEnabled(summary);
       };
       this._dagRunner = new PipelineDagRunner(adapters, { persistence, alert: alertFn }, { maxConcurrency: 3 });
     }
