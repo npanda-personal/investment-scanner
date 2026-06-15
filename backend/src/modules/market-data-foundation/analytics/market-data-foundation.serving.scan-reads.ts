@@ -79,7 +79,7 @@ export class ScanReadsService {
       region: options.region?.trim().toUpperCase() || 'IN',
       assetType: options.assetType?.trim().toUpperCase() || 'STOCK',
     };
-    const limit = Math.max(1, Math.min(options.limit ?? 5, 20));
+    const limit = Math.max(1, Math.min(options.limit ?? 10, 20));
     const requestedRange = this.marketMoverRange(options.range);
     const requestedRanges = requestedRange
       ? [requestedRange]
