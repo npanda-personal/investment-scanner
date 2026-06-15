@@ -77,6 +77,23 @@ function prefixedAdminRoutes(routes: RouteObject[]): RouteObject[] {
   });
 }
 
+// Demo build (GitHub Pages, VITE_DEMO=1) is trader-only: admin/operator routes
+// are NOT registered, and a catch-all redirects /admin (and any operator deep
+// link) to home. Normal builds keep the full route tree unchanged.
+const isDemo = import.meta.env.VITE_DEMO === '1';
+
+const adminRoutes: RouteObject[] = isDemo
+  ? []
+  : [
+      { path: 'admin', element: <AdminHomePage /> },
+      ...prefixedAdminRoutes(operatorRoutes),
+      ...operatorRoutes,
+    ];
+
+const demoCatchAll: RouteObject[] = isDemo
+  ? [{ path: '*', element: <Navigate to="/" replace /> }]
+  : [];
+
 export const appRoutes: RouteObject[] = [
   ...publicAuthIdentityRoutes,
   {
@@ -106,9 +123,8 @@ export const appRoutes: RouteObject[] = [
           // /crypto route kept for URL stability; redirects to "/" while crypto scope is inactive.
           { path: 'crypto', element: <Navigate to="/" replace /> },
           ...protectedAuthIdentityRoutes,
-          { path: 'admin', element: <AdminHomePage /> },
-          ...prefixedAdminRoutes(operatorRoutes),
-          ...operatorRoutes,
+          ...adminRoutes,
+          ...demoCatchAll,
         ],
       },
     ],
