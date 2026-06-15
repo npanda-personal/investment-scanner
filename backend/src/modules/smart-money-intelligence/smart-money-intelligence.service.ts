@@ -116,11 +116,9 @@ export class SmartMoneyIntelligenceService {
     let unchanged = 0;
     const errors: string[] = [];
     const warnings: string[] = [];
-    const byRange: SmartMoneyRunResponse['byRange'] = {
-      '1M': { generated: 0, skipped: 0, unchanged: 0 },
-      '3M': { generated: 0, skipped: 0, unchanged: 0 },
-      '6M': { generated: 0, skipped: 0, unchanged: 0 },
-    };
+    const byRange = Object.fromEntries(
+      SMART_MONEY_REFRESH_RANGES.map((r) => [r, { generated: 0, skipped: 0, unchanged: 0 }]),
+    ) as SmartMoneyRunResponse['byRange'];
     const requestedCount = explicitIds.length ? explicitBatchIds.length : instruments.length;
     const missingInstrumentSkipped = explicitIds.length ? Math.max(0, requestedCount - instruments.length) : 0;
     if (missingInstrumentSkipped > 0) {

@@ -3,6 +3,7 @@ import { StockInterestRadarPage } from '@/features/market-intelligence/component
 import { IndexConstituentsPage } from '@/features/market-intelligence/components/IndexConstituentsPage';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
 import ScreenerPage from './ScreenerPage';
+import ConvictionPage from './ConvictionPage';
 import MarketScansPage from './MarketScansPage';
 import CryptoSignalBoard from './CryptoSignalBoard';
 
@@ -24,6 +25,7 @@ export function DiscoverWorkspacePage() {
       ]
     : [
         { label: 'Screener', render: () => <ScreenerPage /> },
+        { label: 'Conviction', render: () => <ConvictionPage /> },
         { label: 'Market Scans', render: () => <MarketScansPage /> },
         { label: 'Stock Interest', render: () => <StockInterestRadarPage /> },
         { label: 'Index Constituents', render: () => <IndexConstituentsPage /> },
