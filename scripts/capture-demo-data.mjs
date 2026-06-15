@@ -162,6 +162,8 @@ const STATIC_GETS = [
   ['/api/v1/today-review/runs', { limit: 10, offset: 0 }],
   // screener + scans + movers + signals
   ['/api/v1/market-data/screener', { limit: 50 }],
+  '/api/v1/market-data/screener/conviction',
+  ['/api/v1/market-data/movers', { limit: 20 }],
   ['/api/v1/market-data/scans/52w-high', { limit: 20 }],
   ['/api/v1/market-data/scans/52w-low', { limit: 20 }],
   ['/api/v1/market-data/scans/delivery-spike', { limit: 20 }],
