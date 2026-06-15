@@ -538,10 +538,10 @@ test.describe('Today Trade Review UI', () => {
     await page.getByRole('tab', { name: /Watch Only/ }).click();
     await expect(page.getByText('UNPROVEN.NS')).toBeVisible();
     await expect(page.getByRole('cell', { name: 'Unproven', exact: true })).toBeVisible();
-    // Conservative confidence score displayed in the score column for missing DQ tier context
-    await expect(page.getByText(/28 \(from 35\)/).first()).toBeVisible();
-    // CandidateTable shows an alert when any candidate has missing tier context
-    await expect(page.getByText(/Confidence scores are conservatively downgraded where data quality tier context is missing/).first()).toBeVisible();
+    // G-IN1: the raw per-stock score is shown (no fake "(from N)" downgrade) — UNPROVEN.NS keeps its 35
+    await expect(page.getByRole('row', { name: /UNPROVEN\.NS/ }).getByRole('cell', { name: '35', exact: true })).toBeVisible();
+    // CandidateTable surfaces the missing-tier-context caveat once as a banner, not as a per-row penalty
+    await expect(page.getByText(/missing data-quality tier context — read their confidence scores with that caveat/).first()).toBeVisible();
     await page.getByRole('tab', { name: /Blocked/ }).click();
     await expect(page.getByText('BLOCKED.NS')).toBeVisible();
     await expect(page.getByText('Invalidation level is inside or above the long entry zone; evidence is blocked until the invalidation level is below the planned entry floor.').first()).toBeVisible();
@@ -609,7 +609,7 @@ test.describe('Today Trade Review UI', () => {
 
     await visitAuthenticated(page, '/today-review');
 
-    await expect(page.getByLabel('Search rows')).toBeVisible();
+    await expect(page.getByLabel('Search symbol / company')).toBeVisible();
     await expect(page.getByText('Click any row to open detail. Hover clipped cells for full text.')).toBeVisible();
     // The reason cell renders the full text in the DOM (clipped by CSS); check it appears at least once
     await expect(page.getByText(/long clipped research-support reason/).first()).toBeVisible();
@@ -628,14 +628,24 @@ test.describe('Today Trade Review UI', () => {
     expect(header).not.toContain('Candidate URL');
     await expect(page.getByText('Exported 7 rows as CSV.')).toBeVisible();
 
-    await page.getByLabel('Search rows').fill('OMEGA');
+    await page.getByLabel('Search symbol / company').fill('OMEGA');
     await expect(page.getByText('Showing 1–1 of 1 candidates.')).toBeVisible();
     await expect(page.getByRole('link', { name: 'OMEGA.NS' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'ZETA.NS' })).toHaveCount(0);
 
     // Clear filters — the icon button may be overlapped in the grid layout, use keyboard or fill directly
-    await page.getByLabel('Search rows').fill('');
+    await page.getByLabel('Search symbol / company').fill('');
     await expect(page.getByText('Showing 1–7 of 7 candidates.')).toBeVisible();
+
+    // One-liner template controls: Direction/State dropdown + toggle switches (no free-text inputs besides search)
+    await expect(page.getByRole('combobox', { name: 'Direction / State' })).toBeVisible();
+    await expect(page.getByRole('checkbox', { name: 'Exclude F&O ban' })).toBeVisible();
+    await expect(page.getByRole('checkbox', { name: 'Smart-money accumulation' })).toBeVisible();
+    await expect(page.getByRole('checkbox', { name: 'Earnings soon' })).toBeVisible();
+    // No fixture row is on the F&O ban list, so excluding banned names keeps all 7
+    await page.getByRole('checkbox', { name: 'Exclude F&O ban' }).check();
+    await expect(page.getByText('Showing 1–7 of 7 candidates.')).toBeVisible();
+    await page.getByRole('checkbox', { name: 'Exclude F&O ban' }).uncheck();
 
     await page.getByLabel('Rows per page:').click();
     await page.getByRole('option', { name: '5', exact: true }).click();
