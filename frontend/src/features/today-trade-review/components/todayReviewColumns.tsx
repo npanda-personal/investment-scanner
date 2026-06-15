@@ -4,9 +4,7 @@ import { Link as RouterLink } from 'react-router-dom';
 import { humanizeCode, humanizeEmbedded } from '@/shared/format/enumLabels';
 import type { TodayReviewCandidate } from '../types';
 import {
-  EarningsProximityChip,
   EllipsisCell,
-  FnoBanChip,
   RangePositionIndicator,
   SectorCell,
   SmartMoneyChip,
@@ -38,8 +36,10 @@ import {
 /**
  * A3 + one-liner template: primary columns are answer-first and each render on a
  * single line. The Symbol cell is intentionally just the ticker + workspace link;
- * Company, Earnings, Smart money, F&O ban and 52w position are now their own
- * dedicated columns (previously stacked vertically inside the Symbol cell).
+ * Company, Smart money and 52w position are their own dedicated columns
+ * (previously stacked vertically inside the Symbol cell). Direction/State,
+ * Earnings and F&O ban are intentionally not shown as columns (the tabs already
+ * group by review state; earnings/F&O-ban remain available as filter toggles).
  */
 export function buildCandidateColumns(runRegime: string | null): CandidateColumn[] {
   return [
@@ -96,14 +96,6 @@ export function buildCandidateColumns(runRegime: string | null): CandidateColumn
       render: (candidate) => <EllipsisCell fullText={candidate.companyName || '—'} />,
     },
     {
-      id: 'state',
-      label: 'Direction / State',
-      width: 140,
-      primary: true,
-      value: (candidate) => stateLabel(candidate.state),
-      render: (candidate) => <EllipsisCell fullText={stateLabel(candidate.state)} />,
-    },
-    {
       id: 'confidence',
       label: 'Score',
       width: 84,
@@ -116,20 +108,6 @@ export function buildCandidateColumns(runRegime: string | null): CandidateColumn
       },
     },
     {
-      id: 'earnings',
-      label: 'Earnings',
-      width: 120,
-      primary: true,
-      value: (candidate) =>
-        candidate.earningsProximity && candidate.earningsProximity.daysToResult !== null
-          ? candidate.earningsProximity.daysToResult
-          : Number.MAX_SAFE_INTEGER,
-      render: (candidate) =>
-        candidate.earningsProximity && candidate.earningsProximity.daysToResult !== null
-          ? <EarningsProximityChip earningsProximity={candidate.earningsProximity} />
-          : <EllipsisCell fullText="—" />,
-    },
-    {
       id: 'smartMoney',
       label: 'Smart money',
       width: 150,
@@ -139,16 +117,6 @@ export function buildCandidateColumns(runRegime: string | null): CandidateColumn
         candidate.smartMoneyStatus
           ? <SmartMoneyChip status={candidate.smartMoneyStatus} score={candidate.smartMoneyScore} />
           : <EllipsisCell fullText="—" />,
-    },
-    {
-      id: 'fnoBan',
-      label: 'F&O ban',
-      width: 92,
-      align: 'center',
-      primary: true,
-      value: (candidate) => (candidate.inFnoBan ? 1 : 0),
-      render: (candidate) =>
-        candidate.inFnoBan ? <FnoBanChip inFnoBan /> : <EllipsisCell fullText="—" align="center" />,
     },
     {
       id: 'range52w',

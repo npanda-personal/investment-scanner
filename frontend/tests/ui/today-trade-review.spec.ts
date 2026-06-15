@@ -537,7 +537,6 @@ test.describe('Today Trade Review UI', () => {
     await expect(page.getByText('Special-case review candidate with Strategy Decision and Lite discovery overlap.').first()).toBeVisible();
     await page.getByRole('tab', { name: /Watch Only/ }).click();
     await expect(page.getByText('UNPROVEN.NS')).toBeVisible();
-    await expect(page.getByRole('cell', { name: 'Unproven', exact: true })).toBeVisible();
     // G-IN1: the raw per-stock score is shown (no fake "(from N)" downgrade) — UNPROVEN.NS keeps its 35
     await expect(page.getByRole('row', { name: /UNPROVEN\.NS/ }).getByRole('cell', { name: '35', exact: true })).toBeVisible();
     // CandidateTable surfaces the missing-tier-context caveat once as a banner, not as a per-row penalty
