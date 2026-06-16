@@ -263,7 +263,7 @@ describe('#3 enrichSignals historical price isolation', () => {
       ]),
       // P2 #124: bulk previous-close fetch — index [1] is previous close
       listRecentPriceWindowsByInstrumentIds: jest.fn().mockResolvedValue(
-        new Map([['inst-live', [{ adjusted_close: 500 }, { adjusted_close: 490 }]]])
+        new Map([['inst-live', [{ adjusted_close: 500, date: '2024-01-02' }, { adjusted_close: 490, date: '2024-01-01' }]]])
       ),
     };
 
@@ -273,6 +273,53 @@ describe('#3 enrichSignals historical price isolation', () => {
     expect(enriched.currentPrice).toBe(500);
     expect(enriched.previousClose).toBe(490);
     expect(enriched.dailyChange).toBe(10);
+  });
+
+  it('nulls the daily move when the previous bar is a stale (non-adjacent) session', async () => {
+    const todaySignal = {
+      id: 'sig-gap',
+      instrument_id: 'inst-gap',
+      symbol: 'GAP',
+      company_name: 'Gap Co',
+      sector: null,
+      country: 'IN',
+      currentPrice: null,
+      previousClose: null,
+      dailyChange: null,
+      dailyChangePercent: null,
+      currency: null,
+      priceTimestamp: null,
+      score: 65,
+      direction: 'BULLISH' as const,
+      confidence: 'MEDIUM' as const,
+      triggered_signals: [],
+      negative_signals: [],
+      explanation: 'Bullish.',
+      generated_at: new Date().toISOString(),
+      source: 'signal-generation-engine',
+      data_status: 'COMPLETE' as const,
+      auditStatus: 'CURRENT' as const,
+      dataQualityEligibility: { filterApplied: true, eligible: true, signalReadinessStatus: 'READY' },
+    };
+
+    const marketDataService = {
+      getInstrumentsByIds: jest.fn().mockResolvedValue([{ id: 'inst-gap', currency: 'INR' }]),
+      getLatestPricesBySymbols: jest.fn().mockResolvedValue([
+        { symbol: 'GAP', adjusted_close: 500, date: new Date().toISOString() },
+      ]),
+      // The window's two most-recent stored bars are ~1yr apart (the fixture-gap shape).
+      listRecentPriceWindowsByInstrumentIds: jest.fn().mockResolvedValue(
+        new Map([['inst-gap', [{ adjusted_close: 500, date: '2026-06-16' }, { adjusted_close: 760, date: '2025-05-30' }]]])
+      ),
+    };
+
+    const service = new SignalGenerationEngineService({} as any, marketDataService as any, {} as any);
+    const [enriched] = await service.enrichSignals([todaySignal]);
+
+    expect(enriched.currentPrice).toBe(500); // live price still surfaces
+    expect(enriched.previousClose).toBeNull(); // stale prior bar is suppressed
+    expect(enriched.dailyChange).toBeNull();
+    expect(enriched.dailyChangePercent).toBeNull();
   });
 });
 

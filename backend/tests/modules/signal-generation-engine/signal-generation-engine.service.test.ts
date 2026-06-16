@@ -453,7 +453,7 @@ describe('SignalGenerationEngineService', () => {
       latestPriceByInstrumentId: jest.fn().mockResolvedValue({ latest: { adjusted_close: 105, date: priceDate } }),
       // P2 #124: bulk previous-close fetch replaces per-instrument listPricesByInstrumentId(id, 2)
       listRecentPriceWindowsByInstrumentIds: jest.fn().mockResolvedValue(
-        new Map([['stock-1', [{ adjusted_close: 105 }, { adjusted_close: 100 }]]])
+        new Map([['stock-1', [{ adjusted_close: 105, date: '2026-04-28' }, { adjusted_close: 100, date: '2026-04-27' }]]])
       ),
     };
     const service = new SignalGenerationEngineService(repository as any, marketDataService as any, {} as any);

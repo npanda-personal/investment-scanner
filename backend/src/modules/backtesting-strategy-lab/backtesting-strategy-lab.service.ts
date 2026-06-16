@@ -3,7 +3,7 @@ import { SubscriptionBillingService } from '../subscription-billing';
 import { WatchlistManagementService } from '../watchlist-management';
 import { DataQualityEngineService } from '../data-quality-engine';
 import { StrategyFrameworkEvaluator, StrategyFrameworkRegistry, StrategyFrameworkService } from '../strategy-framework';
-
+import { areAdjacentSessions } from '../../shared/utils/daily-change';
 import { IN_STOCK_PROFILE, dailyRiskFreeRate, resolveMarketProfile } from '../../shared/utils/market-profile';
 import { ELIGIBILITY_POLICY, SIGNAL_HISTORY_MIN_BARS, PARTIAL_HISTORY_MIN_BARS } from '../../shared/types/eligibility-policy';
 
@@ -971,8 +971,8 @@ export class BacktestingStrategyLabService {
         country: null,
         currentPrice: latest?.close ?? null,
         previousClose: previous?.close ?? null,
-        dailyChange: latest && previous ? latest.close - previous.close : null,
-        dailyChangePercent: latest && previous && previous.close > 0 ? (latest.close - previous.close) / previous.close : null,
+        dailyChange: latest && previous && areAdjacentSessions(previous.date, latest.date) ? latest.close - previous.close : null,
+        dailyChangePercent: latest && previous && previous.close > 0 && areAdjacentSessions(previous.date, latest.date) ? (latest.close - previous.close) / previous.close : null,
         currency: null,
         priceTimestamp: latest?.date ?? null,
         score: signal.score,
