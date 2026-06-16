@@ -44,6 +44,36 @@ export function hasUsableVolumeHistory(
   return latestVolumeUsable && priorVolumeCount >= config.minPriorVolumeObservations;
 }
 
+// ── Daily change ──────────────────────────────────────────────────────────────
+
+/**
+ * Max calendar-day gap between two daily bars that still counts as consecutive trading
+ * sessions. Covers weekends plus holiday clusters (long weekends, Diwali-style multi-day
+ * breaks). A larger gap means missing history, so a "day-over-day" change across it is not
+ * a real daily move.
+ */
+export const MAX_ADJACENT_SESSION_GAP_DAYS = 7;
+
+/**
+ * Day-over-day change as a FRACTION (e.g. -0.012 = -1.2%; the UI multiplies by 100),
+ * computed ONLY when `previous` is the trading session immediately preceding `latest`.
+ * Returns null when there is no usable prior close, the bar dates are unparseable, or a
+ * data gap separates the two bars — so a stale prior bar (e.g. a year-old close from a
+ * gapped instrument) can never masquerade as a one-day move.
+ */
+export function dailyChangePercentBetweenSessions(
+  previous: SmartMoneyPriceBar | undefined,
+  latest: SmartMoneyPriceBar | undefined,
+): number | null {
+  if (!previous || !latest || !(previous.close > 0)) return null;
+  const prevMs = Date.parse(previous.date);
+  const latestMs = Date.parse(latest.date);
+  if (!Number.isFinite(prevMs) || !Number.isFinite(latestMs)) return null;
+  const gapDays = (latestMs - prevMs) / 86_400_000;
+  if (gapDays <= 0 || gapDays > MAX_ADJACENT_SESSION_GAP_DAYS) return null;
+  return (latest.close - previous.close) / previous.close;
+}
+
 // ── Score + status ──────────────────────────────────────────────────────────
 
 export function calculateScore(accumulationStrength: number, distributionStrength: number): number {
