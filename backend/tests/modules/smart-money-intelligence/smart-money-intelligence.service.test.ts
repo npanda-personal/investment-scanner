@@ -120,6 +120,27 @@ describe('SmartMoneyIntelligenceService', () => {
     expect(summary.insiderOwnership.ownershipDataStatus).toBe('MISSING');
   });
 
+  describe('daily change gap guard', () => {
+    const service = new SmartMoneyIntelligenceService({} as any, {} as any);
+
+    it('reports a real day-over-day change when the last two bars are consecutive sessions', () => {
+      const summary = service.calculateStockSummary(instrument, bars('accumulation'));
+      // Last two bars are consecutive days: prev close 120 -> latest close 125.
+      expect(summary.dailyChangePercent).toBeCloseTo((125 - 120) / 120, 6);
+    });
+
+    it('returns null daily change when a data gap separates the last two bars', () => {
+      const gapped = bars('distribution');
+      // TCS-style gap: the latest bar sits ~1 year after the prior trading session, so the
+      // raw ratio is a multi-month move, not a daily one — it must be suppressed (null),
+      // while the row is still fully scored (reached the main branch, not INSUFFICIENT_DATA).
+      gapped[gapped.length - 1] = { ...gapped[gapped.length - 1], date: '2026-12-31' };
+      const summary = service.calculateStockSummary(instrument, gapped);
+      expect(summary.status).not.toBe('INSUFFICIENT_DATA');
+      expect(summary.dailyChangePercent).toBeNull();
+    });
+  });
+
   it('handles insufficient data explicitly', () => {
     const service = new SmartMoneyIntelligenceService({} as any, {} as any);
     const summary = service.calculateStockSummary(instrument, bars('accumulation').slice(0, 5));

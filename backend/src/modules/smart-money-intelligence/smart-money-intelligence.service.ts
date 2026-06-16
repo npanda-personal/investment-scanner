@@ -18,7 +18,7 @@ import {
 } from './smart-money-intelligence.config';
 import {
   aggregateSectorSummaries,
-  averageVolume,
+  averageVolume, dailyChangePercentBetweenSessions,
   calculateScore,
   classifyStockStatus,
   detectRangeSignals,
@@ -293,7 +293,7 @@ export class SmartMoneyIntelligenceService {
     const latest = bars[bars.length - 1];
     const previous = bars[bars.length - 2];
     const avgVolume20 = averageVolume(bars.slice(-21, -1));
-    const dailyChangePercent = previous?.close > 0 ? (latest.close - previous.close) / previous.close : null;
+    const dailyChangePercent = dailyChangePercentBetweenSessions(previous, latest);
     const signals = [
       ...detectSignals(bars, avgVolume20, config),
       ...detectRangeSignals(bars, range, config),
