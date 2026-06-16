@@ -4,6 +4,7 @@ import { SignalGenerationEngineService } from '../signal-generation-engine';
 import { SubscriptionBillingService } from '../subscription-billing';
 import { WatchlistManagementService } from '../watchlist-management';
 import { AlertsMonitoringRepository } from './alerts-monitoring.repository';
+import { dailyChangeFractionBetweenSessions } from '../../shared/utils/daily-change';
 import type {
   AlertEvaluationCandidate,
   AlertEvaluationResult,
@@ -152,7 +153,8 @@ export class AlertsMonitoringService {
     const symbol = instrument?.symbol || signal?.symbol || rule.instrumentId;
     const currentPrice = this.number(latest?.latest?.adjusted_close ?? latest?.latest?.close);
     const previousClose = this.number(prices?.prices?.[1]?.adjusted_close ?? prices?.prices?.[1]?.close);
-    const dailyMove = currentPrice !== null && previousClose && previousClose > 0 ? (currentPrice - previousClose) / previousClose : null;
+    // Guard against a gapped instrument's stale prior bar firing a bogus DAILY_MOVE alert.
+    const dailyMove = dailyChangeFractionBetweenSessions(previousClose, prices?.prices?.[1]?.date, currentPrice, prices?.prices?.[0]?.date);
     const threshold = Number(rule.condition.threshold);
 
     if (rule.type === 'PRICE_ABOVE' && currentPrice !== null && currentPrice > threshold) return [this.event(rule, 'INFO', `${symbol} price is above ${threshold}`, `Current price is ${currentPrice}.`, { currentPrice, threshold })];

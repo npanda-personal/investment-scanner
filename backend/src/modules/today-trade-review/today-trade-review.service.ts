@@ -2207,9 +2207,9 @@ export class TodayTradeReviewService {
     if (n < 2) return absent;
     const latest = history[n - 1];
     const prev = history[n - 2];
-    const dailyChangePercent = prev.close > 0
-      ? Number((((latest.close - prev.close) / prev.close) * 100).toFixed(2))
-      : null;
+    const dailyGapDays = (Date.parse(latest.date) - Date.parse(prev.date)) / 86_400_000; // session-adjacency guard; see shared/utils/daily-change
+    const dailyChangePercent = prev.close > 0 && dailyGapDays > 0 && dailyGapDays <= 7
+      ? Number((((latest.close - prev.close) / prev.close) * 100).toFixed(2)) : null;
 
     // 3-day return: latest close vs close 3 bars ago (index n-4)
     const bar3DaysAgo = n >= 4 ? history[n - 4] : null;

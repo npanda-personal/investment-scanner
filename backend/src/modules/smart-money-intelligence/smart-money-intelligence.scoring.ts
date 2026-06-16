@@ -9,6 +9,7 @@ import {
 } from './smart-money-intelligence.constants';
 import type { SmartMoneyScoringConfig } from './smart-money-intelligence.config';
 import { DEFAULT_SMART_MONEY_CONFIG } from './smart-money-intelligence.config';
+import { dailyChangeFractionBetweenSessions } from '../../shared/utils/daily-change';
 import type {
   SectorSmartMoneyStatus,
   SectorSmartMoneySummary,
@@ -46,32 +47,21 @@ export function hasUsableVolumeHistory(
 
 // ── Daily change ──────────────────────────────────────────────────────────────
 
-/**
- * Max calendar-day gap between two daily bars that still counts as consecutive trading
- * sessions. Covers weekends plus holiday clusters (long weekends, Diwali-style multi-day
- * breaks). A larger gap means missing history, so a "day-over-day" change across it is not
- * a real daily move.
- */
-export const MAX_ADJACENT_SESSION_GAP_DAYS = 7;
+// Canonical adjacency guard lives in the shared util (also used by today-review,
+// stock-interest and alerts); re-exported here for backward compatibility.
+export { MAX_ADJACENT_SESSION_GAP_DAYS } from '../../shared/utils/daily-change';
 
 /**
  * Day-over-day change as a FRACTION (e.g. -0.012 = -1.2%; the UI multiplies by 100),
- * computed ONLY when `previous` is the trading session immediately preceding `latest`.
- * Returns null when there is no usable prior close, the bar dates are unparseable, or a
- * data gap separates the two bars — so a stale prior bar (e.g. a year-old close from a
- * gapped instrument) can never masquerade as a one-day move.
+ * computed ONLY when `previous` is the trading session immediately preceding `latest`,
+ * else null — so a stale prior bar (e.g. a year-old close from a gapped instrument) can
+ * never masquerade as a one-day move. Thin wrapper over the shared guard for this bar shape.
  */
 export function dailyChangePercentBetweenSessions(
   previous: SmartMoneyPriceBar | undefined,
   latest: SmartMoneyPriceBar | undefined,
 ): number | null {
-  if (!previous || !latest || !(previous.close > 0)) return null;
-  const prevMs = Date.parse(previous.date);
-  const latestMs = Date.parse(latest.date);
-  if (!Number.isFinite(prevMs) || !Number.isFinite(latestMs)) return null;
-  const gapDays = (latestMs - prevMs) / 86_400_000;
-  if (gapDays <= 0 || gapDays > MAX_ADJACENT_SESSION_GAP_DAYS) return null;
-  return (latest.close - previous.close) / previous.close;
+  return dailyChangeFractionBetweenSessions(previous?.close, previous?.date, latest?.close, latest?.date);
 }
 
 // ── Score + status ──────────────────────────────────────────────────────────

@@ -1,4 +1,5 @@
 import { StockInterestSnapshotRepository } from './stock-interest-snapshot.repository';
+import { dailyChangeFractionBetweenSessions } from '../../shared/utils/daily-change';
 import {
   normalizeStockInterestAssetType,
   normalizeStockInterestRegion,
@@ -190,9 +191,9 @@ export class StockInterestSnapshotService {
       const previousBar = bars.at(-2) || null;
       const latestClose = latestPrice?.price ?? latestBar?.close ?? null;
       const previousClose = previousBar?.close ?? null;
-      const dailyReturnPercent = latestClose !== null && previousClose && previousClose > 0
-        ? ((latestClose - previousClose) / previousClose) * 100
-        : null;
+      // Guard against a stale prior bar (gapped instrument) masquerading as a 1-day move.
+      const dailyReturnFraction = dailyChangeFractionBetweenSessions(previousClose, previousBar?.timestamp, latestClose, latestBar?.timestamp);
+      const dailyReturnPercent = dailyReturnFraction === null ? null : dailyReturnFraction * 100;
       const firstClose = bars[0]?.close ?? null;
       const rangeReturnPercent = latestClose !== null && firstClose && firstClose > 0
         ? ((latestClose - firstClose) / firstClose) * 100
