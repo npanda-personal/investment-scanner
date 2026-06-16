@@ -60,7 +60,7 @@ import {
   SIGNAL_GENERATION_PRICE_WINDOW,
   type SignalScoringConfig,
 } from './signal-scoring.config';
-
+import { areAdjacentSessions } from '../../shared/utils/daily-change';
 const MODEL_VERSION = SIGNAL_ENGINE_MODEL_VERSION_V4; // SG-9: v4 is the active engine; persist + audit under v4
 
 // Regime-gate + fundamentals-lag policy now live in signal-scoring.config.ts and are
@@ -736,7 +736,7 @@ export class SignalGenerationEngineService {
         let previousClose: number | null = null;
         if (latest && signalIsLive) {
           const prevWindow = prevCloseMap.get(signal.instrument_id);
-          previousClose = prevWindow?.[1]?.adjusted_close ?? null;
+          previousClose = areAdjacentSessions(prevWindow?.[1]?.date, prevWindow?.[0]?.date) ? (prevWindow?.[1]?.adjusted_close ?? null) : null;
         }
 
         const dailyChange = currentPrice !== null && previousClose !== null ? currentPrice - previousClose : null;
