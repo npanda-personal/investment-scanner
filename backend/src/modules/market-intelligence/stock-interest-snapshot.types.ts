@@ -7,6 +7,25 @@ export type StockInterestCategory =
   | 'BREAKOUTS'
   | 'RISK_AVOID';
 
+/**
+ * Canonical importance order for Stock Interest categories. The generation
+ * service ranks rows in this order (then score DESC, then symbol) and the read
+ * path (repository.latestSnapshots) must sort by the same order so persisted
+ * output matches the intended importance ranking — leading with
+ * TODAY_TOP_INTEREST, never an alphabetical category sort. Shared by both the
+ * service and the repository to avoid a repository -> service import (which
+ * would be a layering violation).
+ */
+export const CATEGORY_ORDER: StockInterestCategory[] = [
+  'TODAY_TOP_INTEREST',
+  'GROWTH_CONSISTENCY',
+  'GROWTH_ACCELERATION',
+  'SECTOR_LEADERS',
+  'ACCUMULATION',
+  'BREAKOUTS',
+  'RISK_AVOID',
+];
+
 export type StockInterestRefreshStatus = 'COMPLETED' | 'PARTIAL' | 'FAILED' | 'SKIPPED';
 export type StockInterestAvailability = 'READY' | 'EMPTY' | 'ERROR';
 
