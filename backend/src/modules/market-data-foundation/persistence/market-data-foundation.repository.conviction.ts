@@ -183,9 +183,14 @@ export class ConvictionRepository {
         WHERE sr."generatedDate" IS NOT NULL
         ORDER BY sr."instrumentId", sr."generatedDate" DESC
       ),
-      sm_1m AS (${latestSmByRange('1M')}),
-      sm_3m AS (${latestSmByRange('3M')}),
-      sm_6m AS (${latestSmByRange('6M')})
+      -- MATERIALIZED is REQUIRED here: this funnel has no LIMIT and LEFT-JOINs the
+      -- full universe, so without it the planner re-evaluates each DISTINCT-ON
+      -- smart-money CTE per row (nested-loop disk thrash → 18s+ on the grown tables).
+      -- Forcing one computation + hash join keeps it ~1s. (The sibling list query is
+      -- fine without it because its INNER JOIN + LIMIT 20 bails out early.)
+      sm_1m AS MATERIALIZED (${latestSmByRange('1M')}),
+      sm_3m AS MATERIALIZED (${latestSmByRange('3M')}),
+      sm_6m AS MATERIALIZED (${latestSmByRange('6M')})
       SELECT
         COUNT(*) AS "universe",
         COUNT(ls."instrumentId") AS "withRecentSignal",
