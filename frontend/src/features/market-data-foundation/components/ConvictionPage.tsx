@@ -22,7 +22,8 @@ import { Link as RouterLink } from 'react-router-dom';
 import { PageHeader } from '@/shared/components';
 import { NotApplicableForAssetClass } from '@/shared/components/NotApplicableForAssetClass';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
-import { fetchConviction, type ConvictionRow } from '../api/convictionService';
+import { fetchConviction, type ConvictionRow, type ConvictionFunnel } from '../api/convictionService';
+import { ConvictionFunnelPanel } from './ConvictionFunnelPanel';
 
 // ---------------------------------------------------------------------------
 // Small display helpers (self-contained — the screener cells are an in-flight refactor)
@@ -101,8 +102,9 @@ function sortRows(rows: ConvictionRow[], key: SortKey, dir: SortDir): Conviction
 // ---------------------------------------------------------------------------
 
 export default function ConvictionPage() {
-  const { profile } = useMarketScope();
+  const { profile, scope } = useMarketScope();
   const [rows, setRows] = useState<ConvictionRow[]>([]);
+  const [funnel, setFunnel] = useState<ConvictionFunnel | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
@@ -117,11 +119,13 @@ export default function ConvictionPage() {
     try {
       const result = await fetchConviction({ onlyFnoEligible: fnoOnly });
       setRows(result.results);
+      setFunnel(result.funnel ?? null);
       setWarnings(result.warnings);
       setGeneratedAt(result.generatedAt);
     } catch (err: any) {
       setError(err?.response?.data?.error || err?.message || 'Conviction screen failed to load');
       setRows([]);
+      setFunnel(null);
     } finally {
       setLoading(false);
     }
@@ -199,12 +203,17 @@ export default function ConvictionPage() {
 
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
+      {/* Gating funnel — explains WHY the set is this small (by-design strict confluence). */}
+      {!loading && !error && funnel && (
+        <ConvictionFunnelPanel funnel={funnel} region={scope.region} />
+      )}
+
       {!loading && rows.length === 0 && !error ? (
-        <Box sx={{ py: 8, textAlign: 'center' }}>
+        <Box sx={{ py: 6, textAlign: 'center' }}>
           <Typography color="text.secondary" sx={{ maxWidth: 560, mx: 'auto' }}>
-            No candidates currently meet the conviction bar (signal score ≥ 70 and smart-money score &gt; 70
-            across the 1M, 3M and 6M horizons). These thresholds are fixed by design — when signals and
-            smart-money next align strongly, candidates will appear here.
+            No stocks currently clear the full conviction bar shown above. These thresholds are fixed
+            by design — when the signal engine and smart-money accumulation next align strongly across
+            every horizon, candidates will appear here.
           </Typography>
         </Box>
       ) : (
