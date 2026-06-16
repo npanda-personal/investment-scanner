@@ -116,4 +116,105 @@ export class ConvictionRepository {
       sm6m: num(row.sm6m),
     }));
   }
+
+  /**
+   * Gating-funnel counts that EXPLAIN why the conviction list is as small as it is.
+   *
+   * Computed from the SAME base filters and the SAME latest-signal / latest-smart-money
+   * CTE logic the `conviction()` list query uses, so every stage is consistent with the
+   * rendered table:
+   *   - universe          : active + not-delisted + SUPPORTED (+region/+fno) stocks.
+   *   - withRecentSignal  : of universe, those with a latest signal_results row.
+   *   - signalQualified   : of those, latest signal score >= CONVICTION_MIN_SIGNAL_SCORE.
+   *   - smartMoneyQualified: of signalQualified, latest smart-money > CONVICTION_MIN_SMART_MONEY_SCORE
+   *                          in ALL THREE ranges (1M/3M/6M) — this equals the pre-LIMIT
+   *                          qualified count the list is then capped from.
+   *
+   * Single query / conditional aggregation: a LEFT JOIN keeps the full universe, and the
+   * smart-money ranges join in optionally so a stock can be counted at the signal stage even
+   * when it lacks smart-money rows. Persisted-read; no generation.
+   */
+  async convictionFunnel(options: {
+    region?: string;
+    onlyFnoEligible?: boolean;
+  } = {}): Promise<{
+    universe: number;
+    withRecentSignal: number;
+    signalQualified: number;
+    smartMoneyQualified: number;
+  }> {
+    const filters: Prisma.Sql[] = [
+      Prisma.sql`s."isActive" = TRUE`,
+      Prisma.sql`s."isDelisted" = FALSE`,
+      Prisma.sql`UPPER(COALESCE(s."providerSupportStatus", 'UNSUPPORTED')) = 'SUPPORTED'`,
+    ];
+
+    const normalizedRegion = normalizeMarketRegion(options.region);
+    if (normalizedRegion) {
+      filters.push(Prisma.sql`UPPER(COALESCE(s."region", '')) = ${normalizedRegion}`);
+    }
+    if (options.onlyFnoEligible) {
+      filters.push(Prisma.sql`s."derivativesEligible" = TRUE`);
+    }
+
+    const whereClause = Prisma.join(filters, ' AND ');
+
+    const latestSmByRange = (range: string) => Prisma.sql`
+      SELECT DISTINCT ON ("instrumentId") "instrumentId", "smartMoneyScore" AS s
+      FROM smart_money_context_snapshots
+      WHERE "range" = ${range}
+      ORDER BY "instrumentId", "snapshotDate" DESC
+    `;
+
+    type CountRow = {
+      universe: bigint | number;
+      withRecentSignal: bigint | number;
+      signalQualified: bigint | number;
+      smartMoneyQualified: bigint | number;
+    };
+
+    // LEFT JOINs preserve the whole universe; conditional COUNTs collapse each gating stage.
+    // The smart-money predicate mirrors the list query's strict ">" in all three ranges.
+    const query = Prisma.sql`
+      WITH latest_signal AS MATERIALIZED (
+        SELECT DISTINCT ON (sr."instrumentId")
+          sr."instrumentId", sr.score AS "signalScore"
+        FROM signal_results sr
+        WHERE sr."generatedDate" IS NOT NULL
+        ORDER BY sr."instrumentId", sr."generatedDate" DESC
+      ),
+      sm_1m AS (${latestSmByRange('1M')}),
+      sm_3m AS (${latestSmByRange('3M')}),
+      sm_6m AS (${latestSmByRange('6M')})
+      SELECT
+        COUNT(*) AS "universe",
+        COUNT(ls."instrumentId") AS "withRecentSignal",
+        COUNT(*) FILTER (
+          WHERE ls."signalScore" >= ${CONVICTION_MIN_SIGNAL_SCORE}
+        ) AS "signalQualified",
+        COUNT(*) FILTER (
+          WHERE ls."signalScore" >= ${CONVICTION_MIN_SIGNAL_SCORE}
+            AND sm_1m.s > ${CONVICTION_MIN_SMART_MONEY_SCORE}
+            AND sm_3m.s > ${CONVICTION_MIN_SMART_MONEY_SCORE}
+            AND sm_6m.s > ${CONVICTION_MIN_SMART_MONEY_SCORE}
+        ) AS "smartMoneyQualified"
+      FROM stocks s
+      LEFT JOIN latest_signal ls ON ls."instrumentId" = s.id
+      LEFT JOIN sm_1m ON sm_1m."instrumentId" = s.id
+      LEFT JOIN sm_3m ON sm_3m."instrumentId" = s.id
+      LEFT JOIN sm_6m ON sm_6m."instrumentId" = s.id
+      WHERE ${whereClause}
+    `;
+
+    const rows = await this.prisma.$queryRaw<Array<CountRow>>(query);
+    const row = rows[0];
+    const n = (v: bigint | number | null | undefined): number => (v != null ? Number(v) : 0);
+
+    return {
+      universe: n(row?.universe),
+      withRecentSignal: n(row?.withRecentSignal),
+      signalQualified: n(row?.signalQualified),
+      smartMoneyQualified: n(row?.smartMoneyQualified),
+    };
+  }
 }

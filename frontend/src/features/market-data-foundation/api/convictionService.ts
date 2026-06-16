@@ -21,10 +21,29 @@ export interface ConvictionRow {
   sm6m: number | null;
 }
 
+/**
+ * Gating-funnel breakdown explaining why the conviction set is as small as it is.
+ * Each stage is a count over the same region/F&O scope as `results`; `smartMoneyQualified`
+ * is the pre-cap qualified count from which the top-N list is taken.
+ */
+export interface ConvictionFunnel {
+  universe: number;
+  withRecentSignal: number;
+  signalQualified: number;
+  smartMoneyQualified: number;
+  thresholds: {
+    minSignalScore: number;
+    minSmartMoneyScore: number;
+    ranges: string[];
+    resultLimit: number;
+  };
+}
+
 export interface ConvictionResult {
   generatedAt: string;
   count: number;
   results: ConvictionRow[];
+  funnel: ConvictionFunnel;
   warnings: string[];
 }
 
