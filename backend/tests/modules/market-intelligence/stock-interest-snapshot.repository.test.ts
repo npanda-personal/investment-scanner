@@ -101,7 +101,6 @@ describe('StockInterestSnapshotRepository', () => {
     expect(findMany).toHaveBeenCalledWith(expect.objectContaining({
       where: { scopeRegion: 'IN', scopeAssetType: 'STOCK', timeframe: '1d', snapshotDate },
       orderBy: [
-        { category: 'asc' },
         { score: 'desc' },
         { symbol: 'asc' },
       ],

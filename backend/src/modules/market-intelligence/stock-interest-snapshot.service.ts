@@ -7,6 +7,7 @@ import {
   parseStockInterestBatchSize,
   parseStockInterestOffset,
 } from './stock-interest-snapshot.validation';
+import { CATEGORY_ORDER } from './stock-interest-snapshot.types';
 import type {
   StockInterestCalculationInput,
   StockInterestCategory,
@@ -23,15 +24,6 @@ import type {
 } from './stock-interest-snapshot.types';
 
 const STOCK_INTEREST_VERSION = 'stock-interest-v1';
-const CATEGORY_ORDER: StockInterestCategory[] = [
-  'TODAY_TOP_INTEREST',
-  'GROWTH_CONSISTENCY',
-  'GROWTH_ACCELERATION',
-  'SECTOR_LEADERS',
-  'ACCUMULATION',
-  'BREAKOUTS',
-  'RISK_AVOID',
-];
 
 type StockMetrics = {
   stock: StockInterestStockInput;

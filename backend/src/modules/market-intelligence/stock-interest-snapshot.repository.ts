@@ -1,4 +1,5 @@
 import prisma from '../../db/prisma';
+import { CATEGORY_ORDER } from './stock-interest-snapshot.types';
 import type {
   StockInterestCalculationInput,
   StockInterestDeliveryInput,
@@ -222,12 +223,31 @@ export class StockInterestSnapshotRepository {
     const rows = await this.db.stockInterestSnapshot.findMany({
       where: { scopeRegion: region, scopeAssetType: assetType, timeframe, snapshotDate: latest.snapshotDate },
       orderBy: [
-        { category: 'asc' },
         { score: 'desc' },
         { symbol: 'asc' },
       ],
     });
-    return rows.map((row: any) => this.toDto(row));
+    // Prisma cannot orderBy a custom enum array, so order by the service's
+    // canonical CATEGORY_ORDER (importance) in JS, then score DESC, then symbol.
+    // This matches the generation service's intended ranking and avoids the
+    // alphabetical category wall a `category: 'asc'` DB sort would produce.
+    return this.orderByCanonical(rows).map((row: any) => this.toDto(row));
+  }
+
+  private orderByCanonical(rows: any[]): any[] {
+    return [...rows].sort((a, b) => {
+      const categoryDelta = this.categoryRank(a.category) - this.categoryRank(b.category);
+      if (categoryDelta !== 0) return categoryDelta;
+      const scoreDelta = this.toNumber(b.score) - this.toNumber(a.score);
+      if (scoreDelta !== 0) return scoreDelta;
+      return String(a.symbol).localeCompare(String(b.symbol));
+    });
+  }
+
+  private categoryRank(category: unknown): number {
+    const index = CATEGORY_ORDER.indexOf(category as any);
+    // Unknown categories sort after all known ones, preserving deterministic order.
+    return index === -1 ? CATEGORY_ORDER.length : index;
   }
 
   private stockScopeWhere(region: string, assetType: string) {
