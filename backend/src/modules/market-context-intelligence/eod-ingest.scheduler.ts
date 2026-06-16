@@ -73,10 +73,33 @@ interface JobSpec {
   utcHour: number;
   /** UTC minute at which the job should fire (0–59). */
   utcMinute: number;
+  /**
+   * Optional UTC days-of-week the job may fire on (0 = Sunday … 6 = Saturday).
+   * Omitted/undefined = every day (the default for the daily NSE/US jobs).
+   * Set for heavier, lower-cadence jobs — e.g. the full-universe SEC Form 4
+   * scan and the quarterly 13F refresh run weekly, not daily.
+   */
+  daysOfWeekUtc?: number[];
   /** The async ingest function to call. */
   run: () => Promise<unknown>;
   /** ISO date string (YYYY-MM-DD UTC) of the last successful fire, or null. */
   lastFiredDate: string | null;
+}
+
+/**
+ * Pure decision: is `job` due to fire at `now`? Fires when the current UTC
+ * time-of-day has reached the job's scheduled time, the job hasn't already
+ * fired today (UTC-date guard), and — if `daysOfWeekUtc` is set — today is one
+ * of the allowed days. Exported so the gate is unit-testable without invoking
+ * the real (network) ingest functions.
+ */
+export function isJobDue(job: JobSpec, now: Date): boolean {
+  const nowUtcDateStr = utcDateString(now);
+  if (job.lastFiredDate === nowUtcDateStr) return false; // already fired today
+  if (job.daysOfWeekUtc && !job.daysOfWeekUtc.includes(now.getUTCDay())) return false;
+  const nowUtcMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
+  const jobUtcMinutes = job.utcHour * 60 + job.utcMinute;
+  return nowUtcMinutes >= jobUtcMinutes;
 }
 
 // ---------------------------------------------------------------------------
@@ -225,6 +248,62 @@ export class EodIngestScheduler {
       },
       lastFiredDate: null,
     },
+
+    // -----------------------------------------------------------------------
+    // US SEC SMART-MONEY DATA INGESTS — these FETCH from SEC EDGAR (not snapshot
+    // regens), so they run WEEKLY (Sunday), not daily: the full-universe Form 4
+    // scan is a long throttled crawl, and 13F is published only quarterly. Both
+    // upsert idempotently, so a missed/duplicate week self-heals. Scheduled
+    // after the snapshot jobs and on the weekend to avoid weekday-EOD contention.
+    // -----------------------------------------------------------------------
+    {
+      name: 'US Insider (Form 4) Refresh',
+      utcHour: 23,
+      utcMinute: 0,
+      daysOfWeekUtc: [0], // Sunday only — full-universe SEC scan is heavy; Form 4 has a 2-business-day filing deadline so weekly latency is acceptable for a research-support panel
+      run: async () => {
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const { usForm4Service } = require('../../modules/market-data-foundation/ingestion/us/market-data-foundation.sec-form4.service') as typeof import('../../modules/market-data-foundation/ingestion/us/market-data-foundation.sec-form4.service');
+          // Headroom above the curated active-US set (~1,500 by liquidity) so the
+          // weekly scan covers the WHOLE active universe — the service orders by
+          // symbol ASC + take:limit, so a limit at/just-below the active count
+          // would perpetually skip the alphabetical tail.
+          const limit = Number(process.env.US_FORM4_SCHEDULED_LIMIT || 5000);
+          return await usForm4Service.ingestForSymbols({ limit });
+        } catch (err) {
+          console.warn('[EodIngestScheduler] US Insider (Form 4) Refresh error (non-fatal):', err instanceof Error ? err.message : String(err));
+          return null;
+        }
+      },
+      lastFiredDate: null,
+    },
+    {
+      name: 'US Institutional (13F) Refresh',
+      utcHour: 23,
+      utcMinute: 30, // stagger after Form 4
+      daysOfWeekUtc: [0], // Sunday only — 13F is quarterly; the new-period gate below skips the ~400 MB download on weeks where the latest window is already stored
+      run: async () => {
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const { defaultMostRecent13fPeriod } = require('../../modules/market-data-foundation/ingestion/us/market-data-foundation.sec-13f.periods') as typeof import('../../modules/market-data-foundation/ingestion/us/market-data-foundation.sec-13f.periods');
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const { getLatestIngested13fPeriodKey } = require('../../modules/market-data-foundation/ingestion/us/market-data-foundation.us-institutional.repository') as typeof import('../../modules/market-data-foundation/ingestion/us/market-data-foundation.us-institutional.repository');
+          const latestAvailable = defaultMostRecent13fPeriod().key;
+          const latestIngested = await getLatestIngested13fPeriodKey();
+          if (latestIngested && latestIngested >= latestAvailable) {
+            return { skipped: true, reason: 'latest 13F window already ingested', period: latestIngested };
+          }
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const { usThirteenFService } = require('../../modules/market-data-foundation/ingestion/us/market-data-foundation.sec-13f.service') as typeof import('../../modules/market-data-foundation/ingestion/us/market-data-foundation.sec-13f.service');
+          return await usThirteenFService.ingestQuarter({});
+        } catch (err) {
+          console.warn('[EodIngestScheduler] US Institutional (13F) Refresh error (non-fatal):', err instanceof Error ? err.message : String(err));
+          return null;
+        }
+      },
+      lastFiredDate: null,
+    },
   ];
 
   constructor(tickIntervalMinutes = 5) {
@@ -265,16 +344,9 @@ export class EodIngestScheduler {
   /** Visible for tests. */
   tick(now: Date): void {
     const nowUtcDateStr = utcDateString(now);
-    const nowUtcMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
 
     for (const job of this.jobs) {
-      const jobUtcMinutes = job.utcHour * 60 + job.utcMinute;
-
-      // Already fired today → skip
-      if (job.lastFiredDate === nowUtcDateStr) continue;
-
-      // Not yet reached the scheduled time → skip
-      if (nowUtcMinutes < jobUtcMinutes) continue;
+      if (!isJobDue(job, now)) continue;
 
       // Mark fired before the async call so a slow response doesn't double-fire
       job.lastFiredDate = nowUtcDateStr;

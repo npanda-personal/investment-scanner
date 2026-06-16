@@ -159,6 +159,21 @@ export async function getLatestInstitutionalHolding(
 }
 
 /**
+ * The newest 13F period key (`quarter` column, sortable "YYYY-MM") already
+ * persisted, or null if the table is empty. Used by the freshness scheduler to
+ * decide whether the latest available SEC 13F window still needs ingesting —
+ * a cheap COUNT/MAX guard so the weekly job skips the ~400 MB download once the
+ * current window is stored. Persisted-read only.
+ */
+export async function getLatestIngested13fPeriodKey(): Promise<string | null> {
+  await ensureInstitutionalHoldingsTable();
+  const rows = await prisma.$queryRaw<Array<{ k: string | null }>>(
+    Prisma.sql`SELECT MAX(quarter) AS k FROM us_institutional_holdings`,
+  );
+  return rows[0]?.k ?? null;
+}
+
+/**
  * Compact US "smart money" aggregate for a symbol, shaped to align with the
  * India smart-money panel. Persisted-read only.
  *  - netInsiderBuys  = count of P (purchase) transactions
