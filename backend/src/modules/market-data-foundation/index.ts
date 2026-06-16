@@ -11,6 +11,12 @@ export {
 } from './market-data-foundation.router';
 export { MarketDataFoundationController } from './market-data-foundation.controller';
 export { MarketDataFoundationService } from './market-data-foundation.service';
+export { MarketDataFoundationUsSmartMoneyController } from './market-data-foundation.us-smart-money.controller';
+export { UsSmartMoneyService, usSmartMoneyService } from './market-data-foundation.us-smart-money.service';
+export type {
+  UsSmartMoneyPanel,
+  UsInstitutionalHoldingView,
+} from './market-data-foundation.us-smart-money.service';
 export type { MarketDataReadApi } from './analytics/market-data-read.api';
 export { isWatermarkGateEnabled, getWatermarkDate, evictWatermarkCache } from './analytics/market-data-read.api';
 export { MarketDataFoundationRepository } from './market-data-foundation.repository';

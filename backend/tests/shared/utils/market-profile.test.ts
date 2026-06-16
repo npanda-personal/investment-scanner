@@ -81,6 +81,13 @@ describe('market-profile', () => {
       // US-supported via free sources: CBOE ^VIX (Yahoo) + curated index constituents.
       expect(profile.capabilities.hasVix).toBe(true);
       expect(profile.capabilities.hasIndexConstituents).toBe(true);
+      // US-only free SEC "smart money": Form 4 insider + 13F institutional.
+      expect(profile.capabilities.hasSecSmartMoney).toBe(true);
+    });
+
+    it('India and EU do NOT expose SEC smart money (US-only)', () => {
+      expect(resolveMarketProfile({ assetType: 'STOCK', region: 'IN' }).capabilities.hasSecSmartMoney).toBe(false);
+      expect(resolveMarketProfile({ assetType: 'STOCK', region: 'EU' }).capabilities.hasSecSmartMoney).toBe(false);
     });
   });
 

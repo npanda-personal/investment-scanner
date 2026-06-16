@@ -137,7 +137,10 @@ export async function getLatestInstitutionalHolding(
     SELECT symbol, cusip, quarter, total_value, total_shares, holder_count, top_holders, source
     FROM us_institutional_holdings
     WHERE symbol = ${sym}
-    ORDER BY quarter DESC, ingested_at DESC
+    -- Several CUSIPs (options/other securities) can share a normalised issuer
+    -- name and map to one symbol; pick the largest aggregate in the latest
+    -- period — the genuine common-stock 13F line, not a $0 collision row.
+    ORDER BY quarter DESC, total_value DESC
     LIMIT 1
   `);
   if (rows.length === 0) return null;

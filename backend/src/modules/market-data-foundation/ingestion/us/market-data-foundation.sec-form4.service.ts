@@ -151,6 +151,16 @@ function normalizeDate(raw: string | null): string | null {
 }
 
 /**
+ * SEC lists a Form 4's `primaryDocument` as an XSL-rendered *view* path
+ * (e.g. "xslF345X06/form4.xml"), which serves a human-readable HTML page — NOT
+ * the ownership XML our parser needs. The raw XML always lives at the accession
+ * root, so strip a leading "xsl…/" segment to reach it. Exported for unit tests.
+ */
+export function rawForm4DocPath(primaryDocument: string): string {
+  return primaryDocument.replace(/^xsl[^/]*\//i, '');
+}
+
+/**
  * Parse a Form 4 ownership XML document into the reporting owner identity and
  * its non-derivative transactions. Dependency-free string/regex extraction —
  * robust for the well-structured SEC Form 4 schema. Exported for unit testing.
@@ -344,7 +354,7 @@ export class UsForm4Service {
 
         for (const filing of form4s) {
           try {
-            const url = archiveDocumentUrl(cik, filing.accessionNumber, filing.primaryDocument);
+            const url = archiveDocumentUrl(cik, filing.accessionNumber, rawForm4DocPath(filing.primaryDocument));
             const xml = await fetchText(url);
             await secSleep(SEC_EDGAR_THROTTLE_MS);
             const parsed = parseForm4Xml(xml);

@@ -30,6 +30,7 @@ import { useMarketScope } from '@/contexts/MarketScopeContext';
 import { exchangeLabel } from '@/shared/format/exchangeLabels';
 import { fetchInstruments, fetchInstrument } from '../api/marketDataFoundationService';
 import CryptoInstrumentDetail from './CryptoInstrumentDetail';
+import UsSmartMoneyPanel from './UsSmartMoneyPanel';
 
 const tabs = [
   { value: 'overview', label: 'Overview' },
@@ -45,13 +46,20 @@ export default function UnifiedStockPage() {
   const activeTab = searchParams.get('tab') || 'overview';
   const { scope } = useMarketScope();
 
-  // Fetch instrument record so we can pass derivativesEligible to the rail
+  // Fetch instrument record so we can pass derivativesEligible + symbol to the rail
   const [derivativesEligible, setDerivativesEligible] = useState<boolean | null>(null);
+  const [symbol, setSymbol] = useState<string | null>(null);
   useEffect(() => {
     if (!id) return;
     fetchInstrument(id, { region: scope.region, assetType: scope.assetType })
-      .then((inst) => setDerivativesEligible(inst.derivatives_eligible ?? null))
-      .catch(() => setDerivativesEligible(null));
+      .then((inst) => {
+        setDerivativesEligible(inst.derivatives_eligible ?? null);
+        setSymbol(inst.symbol ?? null);
+      })
+      .catch(() => {
+        setDerivativesEligible(null);
+        setSymbol(null);
+      });
   }, [id, scope.region, scope.assetType]);
 
   return (
@@ -87,7 +95,7 @@ export default function UnifiedStockPage() {
             <InstrumentDetailPage activeTab={activeTab} />
           </Grid>
           <Grid item xs={12} lg={4}>
-            <MarketContextRail instrumentId={id} derivativesEligible={derivativesEligible} />
+            <MarketContextRail instrumentId={id} symbol={symbol} derivativesEligible={derivativesEligible} />
           </Grid>
         </Grid>
       )}
@@ -431,9 +439,11 @@ function ContextRow({ label, value, color, sub, tooltip }: {
 
 function MarketContextRail({
   instrumentId,
+  symbol,
   derivativesEligible,
 }: {
   instrumentId?: string;
+  symbol?: string | null;
   derivativesEligible?: boolean | null;
 }) {
   const { scope, profile } = useMarketScope();
@@ -631,6 +641,9 @@ function MarketContextRail({
           )}
         </Stack>
       </Paper>
+
+      {/* US-only: SEC Form 4 (insider) + 13F (institutional) "smart money" panel. */}
+      {profile.capabilities.hasSecSmartMoney && <UsSmartMoneyPanel symbol={symbol} />}
 
       <Alert severity="info" sx={{ fontSize: '0.75rem' }}>
         Watchlists, Alerts, and Portfolios are personal tools. Context data updates via the daily pipeline.

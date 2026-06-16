@@ -13,6 +13,8 @@ export interface UiMarketCapabilities {
   hasFundamentals: boolean;
   hasDelivery: boolean;
   hasInstitutionalFlow: boolean;
+  /** SEC-filing "smart money": insider (Form 4) + institutional (13F) — US only. */
+  hasSecSmartMoney: boolean;
   hasDividends: boolean;
   hasSplits: boolean;
   hasSectors: boolean;
@@ -45,6 +47,7 @@ const EQUITY_CAPS_FULL: UiMarketCapabilities = {
   hasFundamentals: true,
   hasDelivery: true,
   hasInstitutionalFlow: true,
+  hasSecSmartMoney: false,
   hasDividends: true,
   hasSplits: true,
   hasSectors: true,
@@ -60,6 +63,7 @@ const CRYPTO_CAPS: UiMarketCapabilities = {
   hasFundamentals: false,
   hasDelivery: false,
   hasInstitutionalFlow: false,
+  hasSecSmartMoney: false,
   hasDividends: false,
   hasSplits: false,
   hasSectors: false,
@@ -88,6 +92,8 @@ export function resolveUiMarketProfile(scope: { region?: string | null; assetTyp
       ...EQUITY_CAPS_FULL,
       hasDelivery: isIndia,
       hasInstitutionalFlow: isIndia,
+      // US "smart money" from free SEC filings: Form 4 insider + 13F institutional.
+      hasSecSmartMoney: region === 'US',
       // US has curated S&P 500 / NASDAQ-100 constituents (backend index-constituents service).
       hasIndexConstituents: isIndia || region === 'US',
       // Volatility index: India VIX (NSE) for IN, CBOE ^VIX (Yahoo) for US.

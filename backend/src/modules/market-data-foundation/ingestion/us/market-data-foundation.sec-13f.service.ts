@@ -31,7 +31,16 @@
 import { inflateRawSync } from 'zlib';
 import { Prisma } from '@prisma/client';
 import prisma from '../../../../db/prisma';
-import { SEC_WWW, fetchBuffer } from './market-data-foundation.sec-edgar-client';
+import { fetchBuffer } from './market-data-foundation.sec-edgar-client';
+import {
+  defaultMostRecent13fPeriod,
+  parse13fPeriod,
+  thirteenFZipUrl,
+} from './market-data-foundation.sec-13f.periods';
+import {
+  extractZipEntryBuffer,
+  streamAggregateInfotable,
+} from './market-data-foundation.sec-13f.infotable-stream';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -69,8 +78,9 @@ export interface CusipAggregate {
 }
 
 export interface UsThirteenFIngestOptions {
-  /** Quarter in YYYYqQ form, e.g. '2025q1'. Defaults to the most recent
-   *  completed calendar quarter. */
+  /** 13F filing period: "YYYY-MM" (window end), a full SEC file stem
+   *  ("01mar2026-31may2026"), or legacy "YYYYqQ". Defaults to the most recent
+   *  completed rolling filing window. */
   quarter?: string;
   /** Optional cap on the number of CUSIP aggregates persisted (for smoke runs). */
   limit?: number;
@@ -96,23 +106,6 @@ interface HoldingRow {
   totalShares: number;
   holderCount: number;
   topHolders: TopHolder[];
-}
-
-// ---------------------------------------------------------------------------
-// Quarter helpers
-// ---------------------------------------------------------------------------
-
-/** Most recent COMPLETED calendar quarter as YYYYqQ (e.g. 2025q1). */
-export function defaultMostRecentQuarter(now: Date = new Date()): string {
-  const y = now.getUTCFullYear();
-  const q = Math.floor(now.getUTCMonth() / 3) + 1; // 1..4 for current quarter
-  // Step back one quarter (the current one is not yet filed/published).
-  if (q === 1) return `${y - 1}q4`;
-  return `${y}q${q - 1}`;
-}
-
-export function thirteenFZipUrl(quarter: string): string {
-  return `${SEC_WWW}/files/structureddata/data/form-13f-data-sets/${quarter}_form13f.zip`;
 }
 
 // ---------------------------------------------------------------------------
@@ -326,6 +319,10 @@ export function normalizeIssuerName(name: string): string {
     .toUpperCase()
     .replace(/&/g, ' AND ')
     .replace(/[.,'"]/g, '')
+    // Dashes → space: our US names are Nasdaq-style "Apple Inc. - Common Stock";
+    // collapsing the separator (and hyphens like COCA-COLA) lets them match the
+    // 13F "APPLE INC" form. Removing the dash entirely would fuse "COCACOLA".
+    .replace(/[-–—]/g, ' ')
     .replace(/\b(INC|INCORPORATED|CORP|CORPORATION|CO|COMPANY|LTD|LIMITED|PLC|LLC|LP|HLDGS|HOLDINGS|GROUP|THE|CLASS|CL|COM|COMMON|STOCK|NEW)\b/g, '')
     .replace(/\s+/g, ' ')
     .trim();
@@ -402,7 +399,20 @@ export class UsThirteenFService {
    * AND logged. Idempotent on (cusip|quarter).
    */
   async ingestQuarter(options: UsThirteenFIngestOptions = {}): Promise<UsThirteenFIngestSummary> {
-    const quarter = (options.quarter ?? defaultMostRecentQuarter()).toLowerCase();
+    const period = options.quarter ? parse13fPeriod(options.quarter) : defaultMostRecent13fPeriod();
+    if (!period) {
+      return {
+        source: SOURCE_TAG,
+        quarter: options.quarter ?? '',
+        issuersTotal: 0,
+        issuersMapped: 0,
+        issuersUnmapped: 0,
+        rowsUpserted: 0,
+        warnings: [`Unrecognised 13F period "${options.quarter}" (expected YYYY-MM, a SEC file stem, or YYYYqQ)`],
+      };
+    }
+    // Persist the sortable window-end key so `ORDER BY quarter DESC` finds the latest.
+    const quarter = period.key;
     const summary: UsThirteenFIngestSummary = {
       source: SOURCE_TAG,
       quarter,
@@ -415,21 +425,21 @@ export class UsThirteenFService {
 
     await ensureInstitutionalHoldingsTable();
 
-    // 1. Download + extract the structured-data zip.
-    const url = thirteenFZipUrl(quarter);
+    // 1. Download + extract the structured-data zip. INFOTABLE.tsv is huge
+    //    (~400 MB uncompressed), so keep it as an off-heap Buffer and
+    //    stream-aggregate it rather than materialising one giant JS string.
+    const url = thirteenFZipUrl(period);
     const zip = await fetchBuffer(url);
-    const entries = extractNamedEntriesFromZip(zip, ['INFOTABLE.tsv', 'COVERPAGE.tsv']);
-    const infotable = entries.get('infotable.tsv');
-    if (!infotable) {
+    const infotableBuf = extractZipEntryBuffer(zip, 'INFOTABLE.tsv');
+    if (!infotableBuf) {
       summary.warnings.push(`INFOTABLE.tsv not found in ${url}`);
       return summary;
     }
-    const coverpage = entries.get('coverpage.tsv') ?? '';
+    const coverpage = extractNamedEntriesFromZip(zip, ['COVERPAGE.tsv']).get('coverpage.tsv') ?? '';
 
-    // 2. Parse + aggregate.
+    // 2. Parse + aggregate (streaming; bounded memory for the ~400 MB INFOTABLE).
     const managerByAccession = parseCoverpageTsv(coverpage);
-    const infoRows = parseInfotableTsv(infotable);
-    let aggregates = aggregateByCusip(infoRows, managerByAccession);
+    let aggregates = streamAggregateInfotable(infotableBuf, managerByAccession);
     summary.issuersTotal = aggregates.length;
     if (options.limit && options.limit > 0) {
       // Keep the largest issuers by total value when limiting (no silent random truncation).
@@ -474,7 +484,7 @@ export class UsThirteenFService {
         : '0.0';
     // eslint-disable-next-line no-console
     console.log(
-      `[us-13f] quarter=${quarter} issuersTotal=${summary.issuersTotal} ` +
+      `[us-13f] period=${period.label} (key=${quarter}) issuersTotal=${summary.issuersTotal} ` +
         `persisted=${rows.length} mapped=${summary.issuersMapped} unmapped=${summary.issuersUnmapped} ` +
         `(name-match coverage ~${mapRate}% of persisted; unmapped rows kept with stock_id=NULL)`,
     );

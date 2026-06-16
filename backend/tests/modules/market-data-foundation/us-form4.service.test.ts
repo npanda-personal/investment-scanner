@@ -7,12 +7,13 @@
 import {
   parseForm4Xml,
   insiderTradeNaturalKey,
-} from '../../../src/modules/market-data-foundation/market-data-foundation.sec-form4.service';
+  rawForm4DocPath,
+} from '../../../src/modules/market-data-foundation/ingestion/us/market-data-foundation.sec-form4.service';
 import {
   parseRecentFilings,
   accessionNoDashes,
   archiveDocumentUrl,
-} from '../../../src/modules/market-data-foundation/market-data-foundation.sec-edgar-client';
+} from '../../../src/modules/market-data-foundation/ingestion/us/market-data-foundation.sec-edgar-client';
 
 const SAMPLE_FORM4_XML = `<?xml version="1.0"?>
 <ownershipDocument>
@@ -172,5 +173,18 @@ describe('parseRecentFilings + URL helpers', () => {
     expect(url).toBe(
       'https://www.sec.gov/Archives/edgar/data/320193/000032019326000050/xslF345X05/doc4.xml',
     );
+  });
+});
+
+describe('rawForm4DocPath', () => {
+  it('strips the SEC XSL-rendered HTML view prefix to reach the raw ownership XML', () => {
+    // The submissions feed lists the styled HTML view path; the raw XML is at the root.
+    expect(rawForm4DocPath('xslF345X06/form4.xml')).toBe('form4.xml');
+    expect(rawForm4DocPath('xslF345X05/doc4.xml')).toBe('doc4.xml');
+  });
+
+  it('leaves an already-raw document path untouched', () => {
+    expect(rawForm4DocPath('form4.xml')).toBe('form4.xml');
+    expect(rawForm4DocPath('ownership.xml')).toBe('ownership.xml');
   });
 });

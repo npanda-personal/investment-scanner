@@ -21,6 +21,8 @@ export interface MarketCapabilities {
   hasDelivery: boolean;
   /** Has institutional flow data (FII/DII, block/bulk deals). */
   hasInstitutionalFlow: boolean;
+  /** Has SEC-filing "smart money": insider (Form 4) + institutional (13F) — US only. */
+  hasSecSmartMoney: boolean;
   /** Pays dividends. */
   hasDividends: boolean;
   /** Subject to share splits / bonuses. */
@@ -116,6 +118,7 @@ const EQUITY_CAPABILITIES_FULL: MarketCapabilities = {
   hasFundamentals: true,
   hasDelivery: true,
   hasInstitutionalFlow: true,
+  hasSecSmartMoney: false,
   hasDividends: true,
   hasSplits: true,
   hasSectors: true,
@@ -131,6 +134,7 @@ const CRYPTO_CAPABILITIES: MarketCapabilities = {
   hasFundamentals: false,
   hasDelivery: false,
   hasInstitutionalFlow: false,
+  hasSecSmartMoney: false,
   hasDividends: false,
   hasSplits: false,
   hasSectors: false,
@@ -224,6 +228,8 @@ function makeEquityProfile(assetClass: AssetClass, region: MarketRegion): Market
       // India-specific data sources: delivery%, FII/DII.
       hasDelivery: isIndia,
       hasInstitutionalFlow: isIndia,
+      // US-specific "smart money" from free SEC filings: Form 4 insider + 13F institutional.
+      hasSecSmartMoney: region === 'US',
       // Index Constituents screen: available for IN (Nifty 50/Bank) and US (S&P 500/NASDAQ-100).
       hasIndexConstituents: isIndia || region === 'US',
       // Volatility index: India VIX (NSE) for IN, CBOE ^VIX (Yahoo) for US.

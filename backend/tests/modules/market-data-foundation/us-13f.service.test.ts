@@ -8,9 +8,8 @@ import {
   parseCoverpageTsv,
   aggregateByCusip,
   normalizeIssuerName,
-  defaultMostRecentQuarter,
-  thirteenFZipUrl,
-} from '../../../src/modules/market-data-foundation/market-data-foundation.sec-13f.service';
+} from '../../../src/modules/market-data-foundation/ingestion/us/market-data-foundation.sec-13f.service';
+import { streamAggregateInfotable } from '../../../src/modules/market-data-foundation/ingestion/us/market-data-foundation.sec-13f.infotable-stream';
 
 const COVERPAGE_TSV = [
   'ACCESSION_NUMBER\tFILINGMANAGER_NAME\tOTHER',
@@ -102,18 +101,34 @@ describe('normalizeIssuerName (best-effort CUSIP→stock fallback)', () => {
     expect(normalizeIssuerName('Alphabet Inc. Class A')).toBe('ALPHABET A');
     expect(normalizeIssuerName('JPMorgan Chase & Co.')).toBe('JPMORGAN CHASE AND');
   });
-});
 
-describe('quarter helpers', () => {
-  it('returns the prior completed quarter', () => {
-    expect(defaultMostRecentQuarter(new Date('2026-02-10T00:00:00Z'))).toBe('2025q4');
-    expect(defaultMostRecentQuarter(new Date('2026-05-10T00:00:00Z'))).toBe('2026q1');
-    expect(defaultMostRecentQuarter(new Date('2026-11-10T00:00:00Z'))).toBe('2026q3');
-  });
-
-  it('builds the structured-data-set zip URL', () => {
-    expect(thirteenFZipUrl('2025q1')).toBe(
-      'https://www.sec.gov/files/structureddata/data/form-13f-data-sets/2025q1_form13f.zip',
-    );
+  it('collapses the Nasdaq " - Common Stock" separator so it matches the 13F issuer form', () => {
+    // Our US Stock.name is Nasdaq-style; without dash handling this left "APPLE -".
+    expect(normalizeIssuerName('Apple Inc. - Common Stock')).toBe('APPLE');
+    expect(normalizeIssuerName('NVIDIA Corporation - Common Stock')).toBe('NVIDIA');
+    // ...but a hyphenated name still matches its spaced 13F form (not fused).
+    expect(normalizeIssuerName('Coca-Cola Co')).toBe(normalizeIssuerName('COCA COLA CO'));
   });
 });
+
+describe('streamAggregateInfotable (production streaming path)', () => {
+  it('matches aggregateByCusip exactly for the same fixture (semantics locked together)', () => {
+    const managers = parseCoverpageTsv(COVERPAGE_TSV);
+    const fromRows = aggregateByCusip(parseInfotableTsv(INFOTABLE_TSV), managers);
+    const fromStream = streamAggregateInfotable(Buffer.from(INFOTABLE_TSV, 'utf8'), managers);
+
+    const sortByCusip = <T extends { cusip: string }>(arr: T[]) =>
+      [...arr].sort((a, b) => a.cusip.localeCompare(b.cusip));
+    expect(sortByCusip(fromStream)).toEqual(sortByCusip(fromRows));
+  });
+
+  it('handles CRLF line endings and a trailing newline', () => {
+    const crlf = INFOTABLE_TSV.replace(/\n/g, '\r\n') + '\r\n';
+    const managers = parseCoverpageTsv(COVERPAGE_TSV);
+    const aggs = streamAggregateInfotable(Buffer.from(crlf, 'utf8'), managers);
+    const apple = aggs.find((a) => a.cusip === '037833100')!;
+    expect(apple.totalValue).toBe(4500000);
+    expect(apple.holderCount).toBe(3);
+  });
+});
+

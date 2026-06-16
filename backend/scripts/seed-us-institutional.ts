@@ -25,8 +25,8 @@
  * Research-support only: this is observed regulatory-filing data, not advice.
  */
 import prisma from '../src/db/prisma';
-import { usForm4Service } from '../src/modules/market-data-foundation/market-data-foundation.sec-form4.service';
-import { usThirteenFService } from '../src/modules/market-data-foundation/market-data-foundation.sec-13f.service';
+import { usForm4Service } from '../src/modules/market-data-foundation/ingestion/us/market-data-foundation.sec-form4.service';
+import { usThirteenFService } from '../src/modules/market-data-foundation/ingestion/us/market-data-foundation.sec-13f.service';
 
 interface CliArgs {
   symbols?: string[];
