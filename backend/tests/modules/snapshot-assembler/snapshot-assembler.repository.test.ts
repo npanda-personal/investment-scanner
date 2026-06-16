@@ -119,6 +119,23 @@ describe('SnapshotAssemblerRepository.commitAssembly', () => {
     expect(tx.snapshotWatermark.upsert).toHaveBeenCalledTimes(1);
   });
 
+  it('passes the configured commit timeout and maxWait to the transaction', async () => {
+    const tx = makeTx(null, 1);
+    const db = { $transaction: jest.fn(async (fn: any) => fn(tx)) };
+    const repo = new SnapshotAssemblerRepository(db as any, {
+      ...DEFAULT_SNAPSHOT_ASSEMBLER_CONFIG,
+      commitTimeoutMs: 90_000,
+      commitMaxWaitMs: 12_000,
+    });
+
+    await repo.commitAssembly(baseParams([sampleRow()]));
+
+    // The large IN/STOCK batch needs more than Prisma's 5s default; the options
+    // object (2nd arg) carries the headroom that keeps the commit from aborting.
+    const opts = (db.$transaction.mock.calls[0] as any[])[1];
+    expect(opts).toMatchObject({ timeout: 90_000, maxWait: 12_000 });
+  });
+
   it('assigns max+1 version inside the transaction', async () => {
     const tx = makeTx(4, 1);
     const db = { $transaction: jest.fn(async (fn: any) => fn(tx)) };

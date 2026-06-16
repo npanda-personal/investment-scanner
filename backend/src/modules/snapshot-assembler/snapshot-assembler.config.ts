@@ -27,6 +27,23 @@ export interface SnapshotAssemblerConfig {
   writeBatchSize: number;
 
   /**
+   * Interactive-transaction timeout (ms) for commitAssembly. Prisma's default is
+   * 5_000ms, which the large IN/STOCK batch (thousands of wide rows) blows past
+   * (~7s observed), aborting the run and leaving the region's snapshots stale.
+   * The version+rows+watermark write is deliberately one atomic transaction, so
+   * the fix is to give that transaction enough headroom rather than split it.
+   */
+  commitTimeoutMs: number;
+
+  /**
+   * Max time (ms) commitAssembly waits to acquire a pooled connection before the
+   * transaction starts (Prisma `maxWait`, default 2_000ms). Raised alongside
+   * commitTimeoutMs so a momentarily busy pool under a full pipeline run does not
+   * spuriously fail the commit before any work begins.
+   */
+  commitMaxWaitMs: number;
+
+  /**
    * Max attempts to (re)compute snapshotVersion when a concurrent assembly run
    * races on the (instrumentId, tradingDate, snapshotVersion) unique key.
    * 1 = no retry.
@@ -67,6 +84,8 @@ export const KNOWN_SNAPSHOT_SCOPES: ReadonlyArray<SnapshotScope> = [
 export const DEFAULT_SNAPSHOT_ASSEMBLER_CONFIG: SnapshotAssemblerConfig = {
   smartMoneyRange: '3M',
   writeBatchSize: 500,
+  commitTimeoutMs: 120_000,
+  commitMaxWaitMs: 15_000,
   maxCommitRetries: 3,
   supportedScopes: [], // permissive by default — see field doc
   enforceExplicitIdScope: false,

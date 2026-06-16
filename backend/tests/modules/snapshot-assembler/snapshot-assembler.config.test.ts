@@ -30,6 +30,13 @@ describe('resolveSnapshotAssemblerConfig', () => {
     expect(DEFAULT_SNAPSHOT_ASSEMBLER_CONFIG.enforceExplicitIdScope).toBe(false);
     expect(DEFAULT_SNAPSHOT_ASSEMBLER_CONFIG.smartMoneyRange).toBe('3M');
   });
+
+  it('default commit timeout/maxWait clear Prisma defaults (IN/STOCK batch ~7s)', () => {
+    // Prisma's interactive-tx defaults are timeout 5_000ms / maxWait 2_000ms,
+    // which the large IN batch exceeded; defaults must give real headroom.
+    expect(DEFAULT_SNAPSHOT_ASSEMBLER_CONFIG.commitTimeoutMs).toBeGreaterThan(5_000);
+    expect(DEFAULT_SNAPSHOT_ASSEMBLER_CONFIG.commitMaxWaitMs).toBeGreaterThan(2_000);
+  });
 });
 
 describe('isScopeSupported', () => {

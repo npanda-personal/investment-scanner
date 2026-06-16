@@ -602,7 +602,7 @@ export class SnapshotAssemblerRepository {
           });
 
           return { rowCount, snapshotVersion: version };
-        });
+        }, { maxWait: Math.max(1, this.config.commitMaxWaitMs), timeout: Math.max(1, this.config.commitTimeoutMs) });
       } catch (err) {
         if (isUniqueViolation(err) && attempt < maxRetries) {
           lastErr = err;
