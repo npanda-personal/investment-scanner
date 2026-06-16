@@ -581,12 +581,12 @@ function MarketPulseSnapshotView({
   /** Warnings already displayed at the envelope level — excluded here to avoid duplicates. */
   shownWarnings: string[];
 }) {
-  // Fix 1: Curate indices — prefer headline (Nifty 50, Bank Nifty, Sensex …) over
-  // obscure inverse/midsmall niche indices.  Fall back to whatever exists if fewer
-  // than 5 headline rows, but always prefer headline rows when available.
+  // Delivery participation is NSE/BSE-only — hide that panel for markets without it (US/EU/crypto).
+  const { profile } = useMarketScope();
+  // Fix 1: Curate indices — prefer headline rows (Nifty 50, Bank Nifty, Sensex …) over obscure
+  // niche indices; fall back to whatever exists if fewer than 5 headline rows.
   const headlineIndices = snapshot.topIndices.filter((row) => isHeadlineIndex(row.symbol));
   const displayIndices = (headlineIndices.length > 0 ? headlineIndices : snapshot.topIndices).slice(0, 5);
-
   const latestCompletedTradingDate = snapshot.sourceSummary?.latestCompletedTradingDate;
 
   // Fix 4: De-duplicate snapshot.warnings against warnings already shown at the
@@ -681,7 +681,7 @@ function MarketPulseSnapshotView({
             : <Stack direction="row" gap={0.75} flexWrap="wrap" useFlexGap>{snapshot.weakSectors.map((s) => <SectorDrillChip key={s} rawSector={s} tone="warning" />)}</Stack>}
         </SectionPanel>
         <SectionPanel title="Breadth Summary"><Typography>{snapshot.breadthSummary || 'Unavailable'}</Typography></SectionPanel>
-        <SectionPanel title="Delivery Participation Summary"><Typography>{snapshot.deliverySummary || 'Unavailable'}</Typography></SectionPanel>
+        {profile.capabilities.hasDelivery && <SectionPanel title="Delivery Participation Summary"><Typography>{snapshot.deliverySummary || 'Unavailable'}</Typography></SectionPanel>}
       </Box>
       {/* Fix 4: only show warnings not already displayed at the top (envelope) level */}
       {uniqSnapshotWarnings.length > 0 && (
@@ -694,15 +694,15 @@ function MarketPulseSnapshotView({
 }
 
 /**
- * NR-22: India VIX widget.
- * Renders "India VIX: 16.5 | 5D 14.9–16.7" with a color cue.
- * If VIX data is absent, renders "India VIX: —" honestly.
+ * NR-22: Volatility (VIX) widget.
+ * Renders "VIX: 16.5 | 5D 14.9–16.7" with a color cue (label "India VIX" for IN).
+ * If VIX data is absent, renders "<label>: —" honestly.
  */
 function VixWidget({ vix }: { vix: MarketPulseVixSummary | null | undefined }) {
-  const { scope } = useMarketScope();
-  // India VIX is an NSE-only construct in the Market Pulse model; it is not applicable
-  // to other markets (US/EU/crypto), so don't render an "India VIX" chip there.
-  if (scope.region !== 'IN') return null;
+  const { scope, profile } = useMarketScope();
+  // VIX surfaced where the region has a volatility index (IN: India VIX, US: ^VIX); hidden elsewhere (EU/crypto).
+  if (!profile.capabilities.hasVix) return null;
+  const vixLabel = scope.region === 'IN' ? 'India VIX' : 'VIX';
   const unavailable = !vix || vix.posture === 'UNAVAILABLE' || vix.latest === null;
 
   const postureColor = unavailable
@@ -722,8 +722,8 @@ function VixWidget({ vix }: { vix: MarketPulseVixSummary | null | undefined }) {
         : 'Calm';
 
   const vixText = unavailable
-    ? 'India VIX: —'
-    : `India VIX: ${vix!.latest!.toFixed(1)}`;
+    ? `${vixLabel}: —`
+    : `${vixLabel}: ${vix!.latest!.toFixed(1)}`;
 
   const rangeText = !unavailable && vix!.low5d !== null && vix!.high5d !== null
     ? ` | 5D ${vix!.low5d.toFixed(1)}–${vix!.high5d.toFixed(1)}`
@@ -731,7 +731,7 @@ function VixWidget({ vix }: { vix: MarketPulseVixSummary | null | undefined }) {
 
   return (
     <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" useFlexGap>
-      <Tooltip title={unavailable ? 'India VIX data is not available yet.' : `Posture: ${postureLabel}${vix?.asOf ? ` (as of ${vix.asOf})` : ''}`} arrow>
+      <Tooltip title={unavailable ? `${vixLabel} data is not available yet.` : `Posture: ${postureLabel}${vix?.asOf ? ` (as of ${vix.asOf})` : ''}`} arrow>
         <Chip
           label={`${vixText}${rangeText}`}
           color={postureColor as 'default' | 'error' | 'warning' | 'success'}

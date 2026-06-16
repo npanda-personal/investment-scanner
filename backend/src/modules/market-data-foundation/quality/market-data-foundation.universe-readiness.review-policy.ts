@@ -204,8 +204,15 @@ export class UniverseReviewPolicyService {
     if (!this.host.hasValidMetadataValue(stock.sector)) gaps.push('sector');
     if (!this.host.hasValidMetadataValue(stock.industry)) gaps.push('industry');
     if (!this.host.hasValidMarketCap(stock.marketCap)) gaps.push('marketCap');
-    if (this.host.isBlank(stock.isin)) gaps.push('isin');
-    if (!stock.ipoDate) gaps.push('listingDate');
+    // ISIN and listing date are reliably available only for NSE/BSE (India). Non-IN markets
+    // (e.g. US via the NASDAQ Trader catalog) don't carry them, so don't count their absence
+    // as a context gap — that would otherwise wrongly flag every US instrument. Treat a
+    // blank/unknown region as India (keeps the strict bar) so only an explicit non-IN region
+    // is relaxed, consistent with the region-gated approved-evidence predicate.
+    const region = String(stock?.region || '').trim().toUpperCase();
+    const isIndiaOrUnknownRegion = region === '' || region === 'IN' || region === 'INDIA';
+    if (isIndiaOrUnknownRegion && this.host.isBlank(stock.isin)) gaps.push('isin');
+    if (isIndiaOrUnknownRegion && !stock.ipoDate) gaps.push('listingDate');
     return gaps;
   }
 

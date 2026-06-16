@@ -23,6 +23,8 @@ export type NavItem = {
   operatorOnly?: boolean;
   /** Hide this item when the active market scope is crypto (equity-only surface). */
   hiddenForCrypto?: boolean;
+  /** Hide this item outside India (e.g. NSE F&O derivatives have no free non-IN feed in this release). */
+  hiddenForNonIndia?: boolean;
 };
 
 export type NavGroup = {
@@ -60,7 +62,7 @@ export const navGroups: NavGroup[] = [
       { path: '/screener', label: 'Screener', icon: <FilterAltIcon />, aliases: ['/market-scans', '/stock-interest-radar', '/index-constituents'] },
       { path: '/research', label: 'Research Hub', icon: <WorkspacesIcon />, hiddenForCrypto: true },
       { path: '/earnings-intelligence', label: 'Earnings', icon: <CalendarMonthIcon />, hiddenForCrypto: true },
-      { path: '/derivatives', label: 'Derivatives / F&O', icon: <ShowChartIcon />, hiddenForCrypto: true },
+      { path: '/derivatives', label: 'Derivatives / F&O', icon: <ShowChartIcon />, hiddenForCrypto: true, hiddenForNonIndia: true },
     ],
   },
   {

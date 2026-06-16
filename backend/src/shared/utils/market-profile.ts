@@ -221,12 +221,13 @@ function makeEquityProfile(assetClass: AssetClass, region: MarketRegion): Market
     },
     capabilities: {
       ...EQUITY_CAPABILITIES_FULL,
-      // India-specific data sources: delivery%, FII/DII, India VIX.
+      // India-specific data sources: delivery%, FII/DII.
       hasDelivery: isIndia,
       hasInstitutionalFlow: isIndia,
       // Index Constituents screen: available for IN (Nifty 50/Bank) and US (S&P 500/NASDAQ-100).
       hasIndexConstituents: isIndia || region === 'US',
-      hasVix: isIndia,
+      // Volatility index: India VIX (NSE) for IN, CBOE ^VIX (Yahoo) for US.
+      hasVix: isIndia || region === 'US',
     },
     // IN preserved byte-identical (0.065); US/EU use their own baselines.
     riskFreeRateAnnual: equityRiskFreeRate(region),

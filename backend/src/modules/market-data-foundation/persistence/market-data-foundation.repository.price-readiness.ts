@@ -1,7 +1,7 @@
 import { Prisma, PrismaClient } from '@prisma/client';
 import type { TrustedReviewUniversePriceRow } from '../market-data-foundation.types';
 import { STANDARD_REVIEW_MIN_BARS, type UniversePriceStats } from '../ingestion/market-data-foundation.universe';
-import { EXCHANGE_PRICE_SOURCES } from './market-data-foundation.repository.constants';
+import { EXCHANGE_PRICE_SOURCES, NON_INDIA_PROVIDER_EOD_SOURCE_UPPER } from './market-data-foundation.repository.constants';
 import { computeAdjustmentFactor, percent } from './market-data-foundation.repository.helpers';
 
 export class PriceReadinessRepository {
@@ -130,7 +130,26 @@ export class PriceReadinessRepository {
 
 
 
+  /**
+   * SQL predicate identifying a price_ticks row as approved/official EOD evidence:
+   * NSE/BSE exchange-file sources or any file-import (India), plus region-approved provider
+   * sources (e.g. Yahoo EOD for US) gated on the row's region. Region-aware so non-IN markets
+   * with a sanctioned free provider count as trusted evidence instead of being treated as "no
+   * official EOD". Mirrors how NSE/BSE bhavcopy is the approved evidence for India.
+   */
+  private approvedEvidencePredicate(): Prisma.Sql {
+    return Prisma.sql`(
+      UPPER(COALESCE(price_ticks.source, '')) IN (${Prisma.join(EXCHANGE_PRICE_SOURCES.map((source) => source.toUpperCase()))})
+      OR price_ticks."sourceFileImportId" IS NOT NULL
+      OR (
+        UPPER(COALESCE(price_ticks.region, '')) NOT IN ('IN', 'INDIA', '')
+        AND UPPER(COALESCE(price_ticks.source, '')) IN (${Prisma.join(NON_INDIA_PROVIDER_EOD_SOURCE_UPPER)})
+      )
+    )`;
+  }
+
   private async priceReadinessRowsForSymbols(symbols: string[]) {
+    const approvedEvidence = this.approvedEvidencePredicate();
     return this.prisma.$queryRaw<Array<{
       symbol: string;
       priceHistoryBars: number | bigint;
@@ -168,8 +187,7 @@ export class PriceReadinessRepository {
             COUNT(*)::int AS "priceHistoryBars",
             MIN(price_ticks.timestamp) AS "firstTimestamp",
             SUM(CASE
-              WHEN UPPER(COALESCE(price_ticks.source, '')) IN (${Prisma.join(EXCHANGE_PRICE_SOURCES.map((source) => source.toUpperCase()))})
-                OR price_ticks."sourceFileImportId" IS NOT NULL
+              WHEN ${approvedEvidence}
               THEN 1 ELSE 0
             END)::int AS "approvedExchangePriceRows",
             SUM(CASE WHEN price_ticks."sourceFileImportId" IS NOT NULL THEN 1 ELSE 0 END)::int AS "sourceFileImportPriceRows"
@@ -238,10 +256,7 @@ export class PriceReadinessRepository {
             price_ticks."sourceFileImportId"
           FROM price_ticks
           WHERE price_ticks.symbol = input_symbols.symbol
-            AND (
-              UPPER(COALESCE(price_ticks.source, '')) IN (${Prisma.join(EXCHANGE_PRICE_SOURCES.map((source) => source.toUpperCase()))})
-              OR price_ticks."sourceFileImportId" IS NOT NULL
-            )
+            AND ${approvedEvidence}
           ORDER BY price_ticks.timestamp DESC
           LIMIT 1
         ) latest_official ON TRUE

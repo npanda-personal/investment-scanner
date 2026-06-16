@@ -467,7 +467,7 @@ export class MarketContextIntelligenceService {
     return {
       regime,
       score,
-      explanation: `${regime.replace('_', '-').toLowerCase()} because ${this.formatPercent(above50)} of liquid-universe instruments are above SMA50, ${this.formatPercent(above200)} above SMA200, and the ${benchmarkLabel} index 63-bar trend score is ${indexTrendScore}.`,
+      explanation: `${regime.replace('_', '-').toLowerCase()} because ${this.formatPercent(above50)} of liquid-universe instruments are above SMA50, ${this.formatPercent(above200)} above SMA200, and the ${benchmarkLabel} index 63-bar trend score is ${Math.round(indexTrendScore)}.`,
       updatedAt: new Date().toISOString(),
       dataStatus: items.length > 0 ? 'PARTIAL' : 'MISSING',
     };

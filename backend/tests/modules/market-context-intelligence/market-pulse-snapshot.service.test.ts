@@ -219,6 +219,26 @@ describe('MarketPulseSnapshotService', () => {
     expect(snapshot.vixSummaryJson.latest).toBeNull();
   });
 
+  it('NR-22 (US): recognises the CBOE ^VIX for US, classifies posture, and keeps ^VIX out of headline indices', () => {
+    const service = new MarketPulseSnapshotService({} as any);
+    // US uses the Yahoo-sourced ^VIX symbol (not NSE_INDEX_INDIA_VIX); both are recognised region-agnostically.
+    const usData = baseData({
+      region: 'US',
+      indexPrices: [
+        ...priceSeries('^GSPC', 'YAHOO_EOD', 7400, 10, 90),
+        ...priceSeries('^VIX', 'YAHOO_EOD', 18, -0.4, 7),
+      ],
+    });
+    const snapshot = service.calculateSnapshot(usData, { generatedAt });
+
+    expect(snapshot.vixSummaryJson.latest).toBeCloseTo(18);
+    expect(snapshot.vixSummaryJson.posture).toBe('ELEVATED'); // 15 <= 18 <= 22
+    // ^VIX is a volatility index, never a headline price/trend index.
+    const headlineSymbols = (snapshot.topIndicesJson || []).map((row: { symbol: string }) => row.symbol);
+    expect(headlineSymbols).toContain('^GSPC');
+    expect(headlineSymbols).not.toContain('^VIX');
+  });
+
   it('NR-23: counts advances and declines from latest stock prices and computes A/D ratio', () => {
     const service = new MarketPulseSnapshotService({} as any);
     const snapshot = service.calculateSnapshot(baseData(), { generatedAt });

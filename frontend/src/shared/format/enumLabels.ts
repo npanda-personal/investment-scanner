@@ -93,6 +93,15 @@ const INDEX_LABELS: Record<string, string> = {
   '^CNXIT': 'Nifty IT',
   '^CNXFMCG': 'Nifty FMCG',
   '^CNXENERGY': 'Nifty Energy',
+  // US / global benchmark indices (Yahoo symbols). The market-pulse benchmark for US is ^GSPC;
+  // without an explicit label humanizeCode renders the raw symbol as "Gspc".
+  '^GSPC': 'S&P 500',
+  '^IXIC': 'Nasdaq Composite',
+  '^NDX': 'Nasdaq 100',
+  '^DJI': 'Dow Jones',
+  '^RUT': 'Russell 2000',
+  '^VIX': 'VIX',
+  '^STOXX': 'STOXX 600',
 };
 
 /** Display label for an NSE/BSE index symbol/code (falls back to humanizeCode). */

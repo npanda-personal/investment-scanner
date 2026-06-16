@@ -43,7 +43,7 @@ type ComponentResult<T> = {
 const REQUIRED_SOURCE_SEGMENTS = ['CM', 'INDEX', 'SECTOR_INDEX'] as const;
 const ALL_SOURCE_SEGMENTS = ['CM', 'INDEX', 'SECTOR_INDEX', 'DELIVERY'] as const;
 const HIGH_DELIVERY_THRESHOLD = 50;
-const VIX_SYMBOL = 'NSE_INDEX_INDIA_VIX';
+const VIX_SYMBOLS = new Set(['NSE_INDEX_INDIA_VIX', '^VIX']); // IN India VIX + US ^VIX (region-scoped)
 /** VIX above this threshold caps market posture at NEUTRAL (FRAGILE label). */
 const VIX_HIGH_THRESHOLD = 22;
 /** Friendly sector names for US SPDR sector ETF proxies (used in strong/weak sector labels). */
@@ -147,7 +147,7 @@ export class MarketPulseSnapshotService {
       ? this.calculateDelivery(data.deliverySnapshots)
       : { score: 0, summary: this.unavailableDeliverySummary(), warnings: [] as string[] };
     const candidateCount = this.calculateCandidateCount(data.stockUniverse, data.stockPrices, sectorStrength.rows || [], freshness.dataThroughDate);
-    // VIX: only meaningful for regions with capabilities.hasVix (India only currently).
+    // VIX: only meaningful for regions with capabilities.hasVix (IN: India VIX, US: ^VIX).
     const vixSummary = profile.capabilities.hasVix
       ? this.calculateVixSummary(data.indexPrices)
       : this.unavailableVixSummary();
@@ -403,9 +403,9 @@ export class MarketPulseSnapshotService {
     // including them in the momentum average corrupts the health score.
     // Also exclude the VIX — it is a volatility index, not a price trend index.
     const headlineRows = allRows.filter(
-      (row) => !MarketPulseSnapshotService.INDEX_NOISE.test(row.symbol) && row.symbol !== VIX_SYMBOL,
+      (row) => !MarketPulseSnapshotService.INDEX_NOISE.test(row.symbol) && !VIX_SYMBOLS.has(row.symbol),
     );
-    const scoringRows = headlineRows.length >= 3 ? headlineRows : allRows.filter((row) => row.symbol !== VIX_SYMBOL);
+    const scoringRows = headlineRows.length >= 3 ? headlineRows : allRows.filter((row) => !VIX_SYMBOLS.has(row.symbol));
 
     const priorityOf = (symbol: string) => {
       const idx = MarketPulseSnapshotService.INDEX_PRIORITY.indexOf(symbol);
@@ -564,12 +564,12 @@ export class MarketPulseSnapshotService {
   }
 
   /**
-   * NR-22: Extract India VIX from the index prices (source NSE_INDEX_EOD, symbol NSE_INDEX_INDIA_VIX).
+   * NR-22: Extract the region VIX from the index prices (IN: NSE_INDEX_INDIA_VIX, US: ^VIX).
    * Computes latest value + 5-day high/low range.
    */
   private calculateVixSummary(indexPrices: MarketPulsePricePoint[]): MarketPulseVixSummary {
     const series = indexPrices
-      .filter((p) => p.symbol === VIX_SYMBOL)
+      .filter((p) => VIX_SYMBOLS.has(p.symbol))
       .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
 
     if (series.length === 0) {

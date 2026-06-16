@@ -70,14 +70,17 @@ describe('market-profile', () => {
   });
 
   describe('resolveMarketProfile — non-IN equities (future US/EU seam)', () => {
-    it('US/STOCK uses the flat one-way cost and drops India-only capabilities', () => {
+    it('US/STOCK uses the flat one-way cost and drops India-only capabilities (keeps VIX/index-constituents)', () => {
       const profile = resolveMarketProfile({ assetType: 'STOCK', region: 'US' });
       expect(profile.region).toBe('US');
       expect(profile.currency).toBe('USD');
       expect(profile.oneWayTxnCostPercent).toBe(DEFAULT_ONE_WAY_COST_PERCENT);
+      // India-only data sources: delivery% and FII/DII institutional flow.
       expect(profile.capabilities.hasDelivery).toBe(false);
       expect(profile.capabilities.hasInstitutionalFlow).toBe(false);
-      expect(profile.capabilities.hasVix).toBe(false);
+      // US-supported via free sources: CBOE ^VIX (Yahoo) + curated index constituents.
+      expect(profile.capabilities.hasVix).toBe(true);
+      expect(profile.capabilities.hasIndexConstituents).toBe(true);
     });
   });
 

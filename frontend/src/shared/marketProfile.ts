@@ -90,7 +90,8 @@ export function resolveUiMarketProfile(scope: { region?: string | null; assetTyp
       hasInstitutionalFlow: isIndia,
       // US has curated S&P 500 / NASDAQ-100 constituents (backend index-constituents service).
       hasIndexConstituents: isIndia || region === 'US',
-      hasVix: isIndia,
+      // Volatility index: India VIX (NSE) for IN, CBOE ^VIX (Yahoo) for US.
+      hasVix: isIndia || region === 'US',
     },
   };
 }

@@ -129,7 +129,7 @@ export default function NavigationLayout() {
               </Stack>
             )}
             {group.items
-              .filter((item) => !(profile.isCrypto && item.hiddenForCrypto))
+              .filter((item) => !(profile.isCrypto && item.hiddenForCrypto) && !(scope.region !== 'IN' && item.hiddenForNonIndia))
               .map((item) => {
               const isActive = isNavItemActive(location.pathname, item);
               const isAlertsItem = item.path === '/alerts';

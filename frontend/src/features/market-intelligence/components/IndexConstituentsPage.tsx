@@ -33,11 +33,14 @@ import type { IndexConstituentRow, IndexConstituentsEnvelope, SupportedIndex } f
 
 // ─── Index options ───────────────────────────────────────────────────────────
 
-const INDEX_OPTIONS: Array<{ value: SupportedIndex; label: string; size: number; region: string }> = [
-  { value: 'NIFTY_50', label: 'Nifty 50', size: 50, region: 'IN' },
-  { value: 'NIFTY_BANK', label: 'Nifty Bank', size: 12, region: 'IN' },
-  { value: 'SP500', label: 'S&P 500', size: 50, region: 'US' },
-  { value: 'NDX100', label: 'NASDAQ 100', size: 30, region: 'US' },
+// Breadth totals come from the served envelope (breadth.total), never a hardcoded
+// member count — curated lists drift on reconstitution and a stale size skews the
+// breadth-bar percentages (e.g. S&P 500 rendered against a denominator of 50).
+const INDEX_OPTIONS: Array<{ value: SupportedIndex; label: string; region: string }> = [
+  { value: 'NIFTY_50', label: 'Nifty 50', region: 'IN' },
+  { value: 'NIFTY_BANK', label: 'Nifty Bank', region: 'IN' },
+  { value: 'SP500', label: 'S&P 500', region: 'US' },
+  { value: 'NDX100', label: 'NASDAQ 100', region: 'US' },
 ];
 
 // Index membership is curated per region: NSE for India, the exchange composite for US.
@@ -183,7 +186,6 @@ export function IndexConstituentsPage() {
     setPage(0);
   };
 
-  const indexOption = INDEX_OPTIONS.find((o) => o.value === selectedIndex);
   const rows = envelope ? sortedRows(envelope.constituents, sortKey, sortOrder) : [];
   const pagedRows = rows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
 
@@ -226,7 +228,7 @@ export function IndexConstituentsPage() {
       {/* Breadth summary */}
       {envelope && envelope.availability !== 'ERROR' && envelope.availability !== 'INVALID_PARAMS' && (
         <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
-          <BreadthBar breadth={envelope.breadth} total={indexOption?.size ?? envelope.count} />
+          <BreadthBar breadth={envelope.breadth} total={envelope.breadth.total} />
           {envelope.membershipSource === 'CURATED_STATIC' && (
             <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
               Membership: curated static list as of {envelope.membershipAsOf}.

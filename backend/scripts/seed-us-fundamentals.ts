@@ -8,7 +8,7 @@
  *   GEN... SEC_EDGAR_USER_AGENT="you@example.com" npx ts-node ... --limit=300
  */
 import prisma from '../src/db/prisma';
-import { secCompanyFactsService } from '../src/modules/market-data-foundation/market-data-foundation.sec-companyfacts.service';
+import { secCompanyFactsService } from '../src/modules/market-data-foundation/ingestion/us/market-data-foundation.sec-companyfacts.service';
 
 function parseArgs(argv: string[]) {
   const args = { symbols: undefined as string[] | undefined, limit: 200 };

@@ -22,9 +22,15 @@ const EMPTY_AD: MarketPulseAdvanceDeclineSummary = { advances: 0, declines: 0, r
 const PRICE_LOOKBACK_DAYS = 420;
 const DELIVERY_LOOKBACK_DAYS = 90;
 const PRICE_SYMBOL_BATCH_SIZE = 500;
-// IN-specific NSE index sources. Non-IN regions filter by benchmark symbol instead
-// (Yahoo tags all equities YAHOO_EOD, so source can't identify an index).
+// IN-specific NSE index sources. Non-IN regions filter by an explicit caret-prefixed
+// index allowlist instead (Yahoo tags all equities YAHOO_EOD, so source can't identify
+// an index — but a curated symbol allowlist never matches an equity).
 const INDEX_PRICE_SOURCES_IN = ['NSE_INDEX_EOD', 'NIFTY_SECTOR_INDEX'];
+// Non-IN index symbols surfaced on Market Pulse Key Indices (+ volatility). Symbols not
+// yet seeded simply return no rows — harmless. Falls back to the region benchmark.
+const NON_IN_INDEX_SYMBOLS_BY_REGION: Record<string, string[]> = {
+  US: ['^GSPC', '^IXIC', '^DJI', '^RUT', '^VIX'],
+};
 const SOURCE_SEGMENTS = ['CM', 'INDEX', 'SECTOR_INDEX', 'DELIVERY'];
 
 export class MarketPulseSnapshotRepository {
@@ -178,7 +184,7 @@ export class MarketPulseSnapshotRepository {
         },
         orderBy: [{ symbol: 'asc' }, { timestamp: 'desc' }],
       });
-      rows.push(...chunkRows);
+      for (const row of chunkRows) rows.push(row); // not push(...chunkRows): spread overflows the stack on large (US) chunks
     }
     return rows.map((row) => this.toPricePoint(row));
   }
@@ -192,10 +198,13 @@ export class MarketPulseSnapshotRepository {
     // IN uses index-specific source tags (NSE_INDEX_EOD/NIFTY_SECTOR_INDEX). Non-IN
     // providers (Yahoo) tag EVERY equity with the same source (YAHOO_EOD), so source
     // cannot distinguish an index from a stock — that would surface random stocks as
-    // "indices". Restrict non-IN to the region's benchmark symbol (e.g. US → ^GSPC).
+    // "indices". Restrict non-IN to a curated index-symbol allowlist (e.g. US → ^GSPC,
+    // ^IXIC, ^DJI, ^RUT, ^VIX), falling back to the region benchmark for other regions.
+    const nonInIndexSymbols = NON_IN_INDEX_SYMBOLS_BY_REGION[normalizedRegion]
+      ?? [resolveMarketProfile({ region }).benchmark.symbol];
     const where: Record<string, unknown> = normalizedRegion === 'IN'
       ? { region, source: { in: INDEX_PRICE_SOURCES_IN }, timestamp: { gte: since } }
-      : { region, symbol: resolveMarketProfile({ region }).benchmark.symbol, timestamp: { gte: since } };
+      : { region, symbol: { in: nonInIndexSymbols }, timestamp: { gte: since } };
     const rows = await (this.db as any).priceTick.findMany({
       where,
       select: {

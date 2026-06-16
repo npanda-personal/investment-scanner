@@ -39,3 +39,9 @@ export const EXCHANGE_PRICE_SOURCES = [
   'BSE_CM_BACKUP_BHAVCOPY',
   'BSE_UDIFF_CM_BHAVCOPY',
 ];
+// Provider EOD sources that count as approved/official evidence for NON-India markets.
+// US/EU/UK/CN equities are sourced from Yahoo EOD (the sanctioned free provider for those
+// markets), mirroring how NSE/BSE bhavcopy is the approved evidence for India. India uses the
+// exchange files above and never Yahoo EOD, so callers gate this on a non-IN region.
+export const NON_INDIA_PROVIDER_EOD_SOURCES = ['YAHOO_EOD'];
+export const NON_INDIA_PROVIDER_EOD_SOURCE_UPPER = NON_INDIA_PROVIDER_EOD_SOURCES.map((source) => source.toUpperCase());

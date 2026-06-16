@@ -330,8 +330,8 @@ export function MarketEventsPage() {
   const [blockPagination, setBlockPagination] = useState<TabPagination>(resetPagination());
   const [otherPagination, setOtherPagination] = useState<TabPagination>(resetPagination());
 
-  // Active tab (preserved across days reload)
-  const [activeTab, setActiveTab] = useState<EventTab>('BULK_DEAL');
+  // Active tab (preserved across days reload). Bulk/Block deals are NSE-only, so default to Other elsewhere.
+  const [activeTab, setActiveTab] = useState<EventTab>(profile.capabilities.hasInstitutionalFlow ? 'BULK_DEAL' : 'OTHER');
 
   // Other-events type filter
   const [otherFilter, setOtherFilter] = useState<OtherFilterType>('ALL_OTHER');
@@ -473,24 +473,22 @@ export function MarketEventsPage() {
               allowScrollButtonsMobile
               aria-label="Market events by category"
             >
-              <Tab
-                value="BULK_DEAL"
-                label={
-                  <Stack direction="row" spacing={0.75} alignItems="center">
-                    <span>Bulk Deals</span>
-                    <Chip label={bulkEvents.length} size="small" variant="outlined" sx={{ height: 18, fontSize: 10, pointerEvents: 'none' }} />
-                  </Stack>
-                }
-              />
-              <Tab
-                value="BLOCK_DEAL"
-                label={
-                  <Stack direction="row" spacing={0.75} alignItems="center">
-                    <span>Block Deals</span>
-                    <Chip label={blockEvents.length} size="small" variant="outlined" sx={{ height: 18, fontSize: 10, pointerEvents: 'none' }} />
-                  </Stack>
-                }
-              />
+              {/* Bulk & Block deals are sourced from the NSE feed (India only) — hide them elsewhere. */}
+              {profile.capabilities.hasInstitutionalFlow && [
+                { value: 'BULK_DEAL' as const, text: 'Bulk Deals', count: bulkEvents.length },
+                { value: 'BLOCK_DEAL' as const, text: 'Block Deals', count: blockEvents.length },
+              ].map((t) => (
+                <Tab
+                  key={t.value}
+                  value={t.value}
+                  label={
+                    <Stack direction="row" spacing={0.75} alignItems="center">
+                      <span>{t.text}</span>
+                      <Chip label={t.count} size="small" variant="outlined" sx={{ height: 18, fontSize: 10, pointerEvents: 'none' }} />
+                    </Stack>
+                  }
+                />
+              ))}
               <Tab
                 value="OTHER"
                 label={

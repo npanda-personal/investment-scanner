@@ -167,18 +167,21 @@ export default function ConvictionPage() {
 
       <Paper variant="outlined" sx={{ p: 2, mb: 3 }}>
         <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={1}>
-          <Tooltip title="Restrict to stocks that are eligible for F&O (derivatives) trading. This typically narrows the list considerably.">
-            <FormControlLabel
-              control={
-                <Checkbox
-                  size="small"
-                  checked={onlyFnoEligible}
-                  onChange={(e) => setOnlyFnoEligible(e.target.checked)}
-                />
-              }
-              label={<Typography variant="body2">F&amp;O eligible only</Typography>}
-            />
-          </Tooltip>
+          {/* F&O eligibility is an NSE-only construct; hide the filter where derivatives don't apply (US/EU). */}
+          {profile.capabilities.hasInstitutionalFlow ? (
+            <Tooltip title="Restrict to stocks that are eligible for F&O (derivatives) trading. This typically narrows the list considerably.">
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    size="small"
+                    checked={onlyFnoEligible}
+                    onChange={(e) => setOnlyFnoEligible(e.target.checked)}
+                  />
+                }
+                label={<Typography variant="body2">F&amp;O eligible only</Typography>}
+              />
+            </Tooltip>
+          ) : <span />}
           {!loading && (
             <Typography variant="caption" color="text.secondary">
               {rows.length} {rows.length === 1 ? 'candidate' : 'candidates'}
