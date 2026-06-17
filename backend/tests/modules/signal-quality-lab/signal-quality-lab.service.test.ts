@@ -102,6 +102,39 @@ describe('signal quality lab service', () => {
     expect(parsed.map((item) => item.code)).toEqual(['PRICE_ABOVE_SMA50', 'PE_ABOVE_PEERS']);
   });
 
+  it('per-instrument history/outcomes ignore a mismatched global market scope (region/assetType)', async () => {
+    // Regression: the frontend stamps the globally-selected region/assetType onto every request via
+    // the market-scope interceptor. A per-instrument lookup is keyed by a unique instrumentId, so that
+    // scope must NOT reach the signal query — otherwise a US instrument (MRVL) renders empty whenever
+    // the header scope is IN. Guards instrumentScopedQuery() in history()/outcomes().
+    const usSignal = baseSignal({ id: 'mrvl-1', instrument_id: 'us-mrvl', symbol: 'MRVL', country: 'US' });
+    const signalHistory = jest.fn().mockResolvedValue([usSignal]);
+    const service = new SignalQualityLabService(
+      { recalculate: jest.fn() } as any,
+      { signalHistory, signalHistoryCount: jest.fn().mockResolvedValue(1) } as any,
+      { listPricesByInstrumentId: jest.fn().mockResolvedValue({ prices: [] }) } as any,
+      { regimeForDate: jest.fn() } as any,
+      { getEvaluationsForInstruments: jest.fn().mockResolvedValue([]) } as any
+    );
+    const mismatchedScope = { region: 'IN', assetType: 'STOCK', horizon: '20D', limit: 20, minSampleSize: 0 } as any;
+
+    const history = await service.history('us-mrvl', mismatchedScope);
+    expect(history).toHaveLength(1);
+    expect(history[0].symbol).toBe('MRVL');
+
+    const outcomes = await service.outcomes('us-mrvl', mismatchedScope);
+    expect(outcomes).toHaveLength(1);
+    expect(outcomes[0].symbol).toBe('MRVL');
+
+    // Every signal lookup must carry the instrumentId but drop the global region/assetType scope.
+    expect(signalHistory.mock.calls.length).toBeGreaterThan(0);
+    for (const call of signalHistory.mock.calls) {
+      expect(call[0].instrumentId).toBe('us-mrvl');
+      expect(call[0].region).toBeUndefined();
+      expect(call[0].assetType).toBeUndefined();
+    }
+  });
+
   it('groups by persisted historical regime when available', async () => {
     const service = serviceWithSignals([baseSignal({ id: 's1' })]);
     const rows = await service.byRegime({ horizon: '5D', limit: 10, minSampleSize: 0 });
