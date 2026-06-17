@@ -186,7 +186,7 @@ export interface SignalTriggerContractDto {
   passed_conditions: SignalTriggerConditionEvidence[];
   failed_conditions: SignalTriggerConditionEvidence[];
   data_quality_status: string | null;
-  lifecycle_status: null;
+  lifecycle_status: SignalLifecycleState | null;
   created_at: string | null;
   updated_at: string | null;
   audit: {

@@ -88,7 +88,7 @@ export function buildTriggerContract(signal: SignalResultDto, instrument?: any):
   mark('exit_rule_id', 'exit rule id is not persisted in the current signal record.');
   mark('invalidation_rule_id', 'invalidation rule id is not persisted in the current signal record.');
   if (!dataQualityStatus) mark('data_quality_status', 'Data Quality readiness snapshot is unavailable from the current signal record.');
-  mark('lifecycle_status', 'trigger lifecycle state is not persisted in the current signal record.');
+  if (!signal.lifecycleState) mark('lifecycle_status', 'lifecycle state is not available on the current signal record.');
   mark('created_at', 'persistence created timestamp is not exposed by the current signal record.');
   mark('updated_at', 'persistence updated timestamp is not exposed by the current signal record.');
 
@@ -117,7 +117,7 @@ export function buildTriggerContract(signal: SignalResultDto, instrument?: any):
     passed_conditions: signal.triggered_signals.map((item) => ({ code: item.code, label: item.label, category: item.category })),
     failed_conditions: signal.negative_signals.map((item) => ({ code: item.code, label: item.label, category: item.category })),
     data_quality_status: dataQualityStatus,
-    lifecycle_status: null,
+    lifecycle_status: signal.lifecycleState ?? null,
     created_at: null,
     updated_at: null,
     audit: {
