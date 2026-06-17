@@ -538,9 +538,9 @@ export class SignalGenerationEngineService {
 
     // Version-agnostic scoring seam (signal-scoring.scoreInstrument): runs the three
     // category evaluators once, then routes the composite through v3 (legacy count) or
-    // v4 (evidence model) per scoringConfig.scoringEngineVersion.  NOTE: when v4 is
-    // activated, scoreOutcome.components must be threaded into scoringInputSummary
-    // (the audit JSON) before flip — not yet persisted while default is v3.
+    // v4 (evidence model) per scoringConfig.scoringEngineVersion.  Equity generation runs
+    // v4 (engineVersion:'v4' above) and scoreOutcome.components is persisted into
+    // scoringInputSummary.v4 (the audit JSON) below; the crypto lane / DEFAULT config stay v3.
     const scoreOutcome = Scoring.scoreInstrument(
       { prices, relativeToPeers, fundamental: latestFundamental, peerAveragePe, peerAverageYield },
       scoringConfig,
