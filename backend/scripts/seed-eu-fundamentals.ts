@@ -12,7 +12,7 @@
  *   npx ts-node --transpile-only scripts/seed-eu-fundamentals.ts --limit=50
  */
 import prisma from '../src/db/prisma';
-import { yahooFundamentalsService } from '../src/modules/market-data-foundation/market-data-foundation.yahoo-fundamentals.service';
+import { yahooFundamentalsService } from '../src/modules/market-data-foundation/ingestion/market-data-foundation.yahoo-fundamentals.service';
 
 function parseArgs(argv: string[]) {
   const args = { region: 'EU', symbols: undefined as string[] | undefined, limit: 1000 };

@@ -24,7 +24,7 @@ import { isRegionProviderEnabled } from '../src/modules/market-data-foundation/m
 import {
   fetchYahooHistoryWithEvents,
   YAHOO_PROVIDER_THROTTLE_MS,
-} from '../src/modules/market-data-foundation/market-data-foundation.yahoo-eod-provider';
+} from '../src/modules/market-data-foundation/ingestion/market-data-foundation.yahoo-eod-provider';
 import { loadEuUniverse, type EuUniverseCandidate } from '../src/modules/market-data-foundation/market-data-foundation.eu-catalog-source';
 
 function parseArgs(argv: string[]) {

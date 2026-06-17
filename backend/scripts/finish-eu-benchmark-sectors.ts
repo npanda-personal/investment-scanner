@@ -11,7 +11,7 @@
 import prisma from '../src/db/prisma';
 import { MarketDataFoundationRepository } from '../src/modules/market-data-foundation/market-data-foundation.repository';
 import { isRegionProviderEnabled } from '../src/modules/market-data-foundation/market-data-foundation.provider-registry';
-import { fetchYahooHistoryWithEvents, YAHOO_PROVIDER_THROTTLE_MS } from '../src/modules/market-data-foundation/market-data-foundation.yahoo-eod-provider';
+import { fetchYahooHistoryWithEvents, YAHOO_PROVIDER_THROTTLE_MS } from '../src/modules/market-data-foundation/ingestion/market-data-foundation.yahoo-eod-provider';
 import { MarketContextIntelligenceService } from '../src/modules/market-context-intelligence/market-context-intelligence.service';
 
 const BENCH_SYMBOL = '^STOXX';
