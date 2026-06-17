@@ -104,15 +104,28 @@ export class SignalQualityLabService {
   }
 
   async history(instrumentId: string, query: QualityQuery): Promise<SignalHistoryItem[]> {
-    const rawSignals = await this.signalService.signalHistory({ ...query, instrumentId });
-    const signals = await this.applyDataQualityFilters(rawSignals, query);
+    const scopedQuery = this.instrumentScopedQuery(query);
+    const rawSignals = await this.signalService.signalHistory({ ...scopedQuery, instrumentId });
+    const signals = await this.applyDataQualityFilters(rawSignals, scopedQuery);
     return signals.map((signal) => this.historyItem(signal));
   }
 
   async outcomes(instrumentId: string, query: QualityQuery): Promise<SignalOutcomeSet[]> {
-    const rawSignals = await this.signalService.signalHistory({ ...query, instrumentId });
-    const signals = await this.applyDataQualityFilters(rawSignals, query);
-    return this.outcomesForSignals(signals, query);
+    const scopedQuery = this.instrumentScopedQuery(query);
+    const rawSignals = await this.signalService.signalHistory({ ...scopedQuery, instrumentId });
+    const signals = await this.applyDataQualityFilters(rawSignals, scopedQuery);
+    return this.outcomesForSignals(signals, scopedQuery);
+  }
+
+  /**
+   * Per-instrument reads (history / outcomes) are keyed by a unique instrumentId, which already
+   * pins the instrument and its region/assetType. The global market-scope (region/assetType) that
+   * the frontend stamps on every request via the market-scope interceptor must NOT filter these —
+   * otherwise a US/EU/crypto instrument's Signals & History tab renders empty whenever the header
+   * scope is a different region than the instrument (e.g. IN selected while viewing US MRVL).
+   */
+  private instrumentScopedQuery(query: QualityQuery): QualityQuery {
+    return { ...query, region: undefined, assetType: undefined };
   }
 
   /**
