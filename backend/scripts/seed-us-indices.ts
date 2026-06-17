@@ -3,7 +3,8 @@
  * equity tables (region='US') using the existing Yahoo EOD provider.
  *
  * Seeded instruments:
- *   Indices  : ^GSPC (S&P 500), ^VIX (CBOE VIX)
+ *   Indices  : ^GSPC (S&P 500), ^IXIC (Nasdaq Composite), ^DJI (Dow Jones),
+ *              ^RUT (Russell 2000), ^VIX (CBOE VIX)
  *   Sector ETFs: XLK, XLF, XLV, XLE, XLY, XLP, XLI, XLB, XLRE, XLU, XLC (11 SPDR)
  *
  * Usage (from backend/):
@@ -28,8 +29,11 @@ import type { HistoricalPrice } from '../src/modules/market-data-foundation/mark
 
 /** Core US benchmark indices. assetType = INDEX. */
 const DEFAULT_INDEX_INSTRUMENTS: Array<{ symbol: string; name: string; assetType: 'INDEX' | 'ETF' }> = [
-  { symbol: '^GSPC', name: 'S&P 500 Index',       assetType: 'INDEX' },
-  { symbol: '^VIX',  name: 'CBOE Volatility Index', assetType: 'INDEX' },
+  { symbol: '^GSPC', name: 'S&P 500 Index',                assetType: 'INDEX' },
+  { symbol: '^IXIC', name: 'Nasdaq Composite',             assetType: 'INDEX' },
+  { symbol: '^DJI',  name: 'Dow Jones Industrial Average', assetType: 'INDEX' },
+  { symbol: '^RUT',  name: 'Russell 2000',                 assetType: 'INDEX' },
+  { symbol: '^VIX',  name: 'CBOE Volatility Index',        assetType: 'INDEX' },
 ];
 
 /** SPDR sector ETFs tracking S&P 500 sectors. assetType = ETF. */
