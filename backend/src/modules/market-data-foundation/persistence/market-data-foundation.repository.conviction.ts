@@ -80,9 +80,17 @@ export class ConvictionRepository {
         WHERE sr."generatedDate" IS NOT NULL
         ORDER BY sr."instrumentId", sr."generatedDate" DESC
       ),
-      sm_1m AS (${latestSmByRange('1M')}),
-      sm_3m AS (${latestSmByRange('3M')}),
-      sm_6m AS (${latestSmByRange('6M')})
+      -- MATERIALIZED is REQUIRED on all three ranges. The conviction bar is a narrow
+      -- funnel that, under a region scope, usually qualifies FEWER than LIMIT rows — so
+      -- the INNER JOIN + LIMIT can NOT short-circuit early, and without materialization
+      -- the planner re-evaluates each DISTINCT-ON smart-money CTE while scanning the whole
+      -- universe (merge/nested-loop over ~150k snapshot rows × 3 ranges → minutes+ on the
+      -- grown tables). Forcing one computation + hash join keeps it sub-second. (Mirrors
+      -- the convictionFunnel() fix; the "LIMIT 20 bails out early" assumption only holds
+      -- when >= LIMIT candidates qualify, which is NOT the common case for this tab.)
+      sm_1m AS MATERIALIZED (${latestSmByRange('1M')}),
+      sm_3m AS MATERIALIZED (${latestSmByRange('3M')}),
+      sm_6m AS MATERIALIZED (${latestSmByRange('6M')})
       SELECT
         s.id AS "instrumentId", s.symbol, COALESCE(s.name, s.symbol) AS "companyName",
         ls."signalDirection", ls."signalScore",
@@ -186,8 +194,9 @@ export class ConvictionRepository {
       -- MATERIALIZED is REQUIRED here: this funnel has no LIMIT and LEFT-JOINs the
       -- full universe, so without it the planner re-evaluates each DISTINCT-ON
       -- smart-money CTE per row (nested-loop disk thrash → 18s+ on the grown tables).
-      -- Forcing one computation + hash join keeps it ~1s. (The sibling list query is
-      -- fine without it because its INNER JOIN + LIMIT 20 bails out early.)
+      -- Forcing one computation + hash join keeps it ~1s. The sibling list query
+      -- materializes these CTEs too (the "LIMIT 20 bails out early" assumption does
+      -- NOT hold when fewer than LIMIT candidates qualify under a region scope).
       sm_1m AS MATERIALIZED (${latestSmByRange('1M')}),
       sm_3m AS MATERIALIZED (${latestSmByRange('3M')}),
       sm_6m AS MATERIALIZED (${latestSmByRange('6M')})
