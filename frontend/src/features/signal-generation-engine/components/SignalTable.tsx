@@ -198,6 +198,38 @@ export function SignalTable({ signals, totalCount, loading, page, pageSize, sort
         );
       },
     },
+    {
+      id: 'cohortWinRate',
+      label: 'Track Record',
+      align: 'right' as const,
+      render: (signal: SignalResult) => {
+        const wr = signal.cohortWinRate;
+        if (wr == null) {
+          return (
+            <Tooltip title="No matured outcomes yet for this signal's cohort (same direction & score band)." arrow>
+              <Typography variant="body2" color="text.disabled" sx={{ cursor: 'help' }}>—</Typography>
+            </Tooltip>
+          );
+        }
+        const pct = Math.round(wr * 100);
+        const n = signal.cohortDirectionalSampleSize ?? 0;
+        const conf = signal.cohortWinRateConfidence ?? 'LOW';
+        const horizon = signal.cohortMetricsHorizon ?? '20D';
+        const lowSample = conf === 'LOW';
+        const color = lowSample ? 'text.secondary' : pct >= 55 ? 'success.main' : pct >= 45 ? 'text.primary' : 'error.main';
+        return (
+          <Tooltip
+            title={`Historically, signals like this (same direction & score band) resolved in their signaled direction ${pct}% of the time over ${horizon} (n=${n} directional, ${conf} confidence). Past outcomes — not a forecast.`}
+            arrow
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, justifyContent: 'flex-end', cursor: 'help' }}>
+              <Typography variant="body2" sx={{ color, fontWeight: !lowSample && pct >= 55 ? 600 : 400 }}>{pct}%</Typography>
+              <Typography variant="caption" color="text.disabled">n={n}</Typography>
+            </Box>
+          </Tooltip>
+        );
+      },
+    },
     { id: 'direction', label: 'Raw Direction', sortable: true, render: (signal) => <StatusBadge label={signal.direction} /> },
     { id: 'confidence', label: 'Confidence', sortable: true, render: (signal) => <StatusBadge label={signal.confidence} /> },
     {
@@ -406,6 +438,35 @@ export function SignalTable({ signals, totalCount, loading, page, pageSize, sort
                     ? `Calibration ${selectedSignal.calibrationStatus.toLowerCase()} — raw score shown, no adjustment applied.`
                     : 'Calibration not yet available for this signal.'}
                 </Typography>
+              )}
+            </Box>
+
+            <Box>
+              <Typography variant="subtitle2" gutterBottom>Track Record (historical outcomes)</Typography>
+              {selectedSignal.cohortWinRate != null ? (
+                <Stack spacing={0.75}>
+                  <Typography variant="body2" color="text.secondary">
+                    Signals like this (same direction &amp; score band) resolved in their signaled direction{' '}
+                    <strong>{Math.round(selectedSignal.cohortWinRate * 100)}%</strong> of the time over{' '}
+                    {selectedSignal.cohortMetricsHorizon || '20D'} (n={selectedSignal.cohortDirectionalSampleSize ?? 0} directional).
+                  </Typography>
+                  <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" alignItems="center">
+                    {selectedSignal.cohortAvgReturnPercent != null && (
+                      <Typography variant="body2" color="text.secondary">Avg forward return: {selectedSignal.cohortAvgReturnPercent.toFixed(2)}%</Typography>
+                    )}
+                    {selectedSignal.cohortWinRateConfidence && (
+                      <Chip
+                        size="small"
+                        label={`${selectedSignal.cohortWinRateConfidence} confidence`}
+                        color={selectedSignal.cohortWinRateConfidence === 'HIGH' ? 'success' : selectedSignal.cohortWinRateConfidence === 'MEDIUM' ? 'default' : 'warning'}
+                        variant="outlined"
+                      />
+                    )}
+                  </Stack>
+                  <Typography variant="caption" color="text.disabled">Past matured outcomes for this cohort — context for the score, not a forecast.</Typography>
+                </Stack>
+              ) : (
+                <Typography variant="body2" color="text.secondary">No matured outcomes yet for this signal&apos;s cohort.</Typography>
               )}
             </Box>
 

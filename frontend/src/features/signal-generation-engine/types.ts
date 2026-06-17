@@ -57,6 +57,12 @@ export interface SignalResult {
   // Relative-strength universe percentile (NR-6)
   rsPercentile?: number | null;
   relativeReturn?: number | null;
+  // Historical cohort hit-rate (#2): how signals like this (direction × score-bucket) resolved.
+  cohortWinRate?: number | null;
+  cohortDirectionalSampleSize?: number | null;
+  cohortAvgReturnPercent?: number | null;
+  cohortMetricsHorizon?: string | null;
+  cohortWinRateConfidence?: 'HIGH' | 'MEDIUM' | 'LOW' | null;
 }
 
 export interface SignalScoringInputSummary {
