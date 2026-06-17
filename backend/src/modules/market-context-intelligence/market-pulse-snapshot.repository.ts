@@ -31,6 +31,22 @@ const INDEX_PRICE_SOURCES_IN = ['NSE_INDEX_EOD', 'NIFTY_SECTOR_INDEX'];
 const NON_IN_INDEX_SYMBOLS_BY_REGION: Record<string, string[]> = {
   US: ['^GSPC', '^IXIC', '^DJI', '^RUT', '^VIX'],
 };
+// Friendly display labels for index symbols. Yahoo-tagged caret symbols (^GSPC etc.)
+// carry no human-readable name in price_ticks, so without this map Market Pulse renders
+// the raw symbol (e.g. "Gspc"). Keyed by UPPERCASED symbol — lookups must upper-case
+// first. Exported so the snapshot service applies the same map when shaping served rows.
+export const INDEX_LABELS: Record<string, string> = {
+  '^GSPC': 'S&P 500',
+  '^IXIC': 'Nasdaq Composite',
+  '^DJI': 'Dow Jones',
+  '^RUT': 'Russell 2000',
+  '^VIX': 'VIX',
+};
+
+/** Friendly label for an index symbol, falling back to the raw symbol when unmapped. */
+export function indexLabelFor(symbol: string): string {
+  return INDEX_LABELS[String(symbol ?? '').toUpperCase()] ?? symbol;
+}
 const SOURCE_SEGMENTS = ['CM', 'INDEX', 'SECTOR_INDEX', 'DELIVERY'];
 
 export class MarketPulseSnapshotRepository {
@@ -338,7 +354,9 @@ export class MarketPulseSnapshotRepository {
   private toPricePoint(row: any): MarketPulsePricePoint {
     return {
       symbol: row.symbol,
-      label: row.symbol,
+      // Friendly index label when the symbol is a known caret index; otherwise the raw
+      // symbol (stocks/ETFs are unmapped and pass through unchanged).
+      label: indexLabelFor(row.symbol),
       source: row.source ?? null,
       timestamp: row.timestamp,
       close: Number(row.adjustedClose ?? row.close),

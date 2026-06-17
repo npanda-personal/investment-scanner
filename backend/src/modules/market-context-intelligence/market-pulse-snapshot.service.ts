@@ -1,5 +1,5 @@
 import { latestCompletedTradingDateForRegion } from '../market-data-foundation';
-import { MarketPulseSnapshotRepository } from './market-pulse-snapshot.repository';
+import { INDEX_LABELS, MarketPulseSnapshotRepository } from './market-pulse-snapshot.repository';
 import { resolveMarketProfile } from '../../shared/utils/market-profile';
 import type {
   MarketPulseAdvanceDeclineSummary,
@@ -387,7 +387,7 @@ export class MarketPulseSnapshotService {
       const score = this.seriesScore(series, returns);
       return {
         symbol,
-        label: series[0]?.label || symbol,
+        label: INDEX_LABELS[symbol.toUpperCase()] ?? series[0]?.label ?? symbol, // ^GSPC → "S&P 500"; else persisted label, else symbol
         value: series[0]?.close ?? null,
         changePercent: this.periodReturn(series, 1),
         return1W: returns.return1W,
