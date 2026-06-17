@@ -31,7 +31,7 @@ import {
 } from './signal-scoring.config';
 import { compositeV4, DEFAULT_V4_EVIDENCE, type V4Components } from './signal-evidence';
 import { extraTechnicalVotes } from './signal-extra-votes';
-export { peerAggregates } from './signal-peer-aggregates';
+export { peerAggregates, peerContextWarnings } from './signal-peer-aggregates';
 export { attachRsPercentiles } from './signal-percentile';
 export { filterFundamentalsAsOf, isStaleAsOf, stalenessAnchor } from './signal-asof';
 

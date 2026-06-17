@@ -55,6 +55,35 @@ function windowReturn(window: any[] | undefined, offset: number): number | null 
   return (latest - prior) / prior;
 }
 
+/** Count same-sector peers (excluding self) present in the batch context. */
+function sameSectorPeerCount(ctx: PeerBatchContextLike, instrument: any, sector: string): number {
+  let count = 0;
+  for (const peer of ctx.instrumentsById.values()) {
+    if (peer && peer.id !== instrument.id && sectorOf(peer) === sector) count += 1;
+  }
+  return count;
+}
+
+/**
+ * Batch peer-context dropout warning (#6).  In LIGHTWEIGHT batch generation, peer-relative
+ * votes (PE/yield/relative-strength) are derived only from instruments that happen to be in
+ * the SAME bounded batch.  When pagination splits a sector across batches an instrument can
+ * land with zero same-sector peers, silently skipping those votes — so the same stock can
+ * score differently depending on batch offset.  This surfaces that as an explicit warning so
+ * a peer-less batch row is visibly distinguished from one that genuinely had peers.
+ *
+ * Returns [] (no warning) outside batch mode (no ctx) or when >=1 same-sector peer was
+ * available.  Used to initialize the signal's warnings array (so it composes with the other
+ * warnings) without growing the at-cap service file.
+ */
+export function peerContextWarnings(ctx: PeerBatchContextLike | undefined, instrument: any): string[] {
+  if (!ctx || !instrument) return []; // FULL/single-symbol mode: peers come from the workbench.
+  const sector = sectorOf(instrument);
+  if (!sector) return []; // no sector → peer votes never applied; not a dropout.
+  if (sameSectorPeerCount(ctx, instrument, sector) > 0) return [];
+  return ['Peer context unavailable: no same-sector peers were in this generation batch, so peer-relative valuation and relative-strength votes were skipped for this instrument.'];
+}
+
 export function peerAggregates(ctx: PeerBatchContextLike | undefined, instrument: any): PeerContext {
   if (!ctx || !instrument) return EMPTY_PEER_CONTEXT;
   const sector = sectorOf(instrument);

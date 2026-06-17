@@ -566,7 +566,7 @@ export class SignalGenerationEngineService {
     );
     const confidence = regimeGateResult.adjustedConfidence;
 
-    const warnings: string[] = [];
+    const warnings: string[] = Scoring.peerContextWarnings(options.batchContext, instrument);
     const latestDate = prices[0]?.date ? new Date(prices[0].date) : null;
     // SG-7: staleness measured relative to asOfDate (backfill) or now, via the shared seam.
     if (latestDate && Scoring.isStaleAsOf(latestDate, asOfDate)) {
