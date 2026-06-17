@@ -127,6 +127,15 @@ export interface V4EvidenceConfig {
   agreementWeight: number;
   /** Floor for the agreement contribution when categories conflict. */
   mixedFloor: number;
+  /**
+   * Evidence-breadth gate (anti thin-evidence inflation): a BULLISH/BEARISH call requires
+   * evidence from at least this many analysis CATEGORIES (technical / momentum /
+   * fundamental).  When fewer categories carry evidence, the score is capped into the
+   * NEUTRAL deadband so a single dimension can never produce a directional call.  Category
+   * breadth — not intra-category factor-family count — is the independence unit, so a lone
+   * category cannot bypass the gate by firing several collinear families.
+   */
+  minBreadthCategories: number;
 }
 
 export const DEFAULT_V4_EVIDENCE: V4EvidenceConfig = {
@@ -136,6 +145,7 @@ export const DEFAULT_V4_EVIDENCE: V4EvidenceConfig = {
   countWeight: 0.55,
   agreementWeight: 0.45,
   mixedFloor: 0,
+  minBreadthCategories: 2,
 };
 
 /** The minimal shape of a category evaluation this module needs (matches signal-scoring's CategoryEvaluation). */
@@ -155,6 +165,12 @@ export interface V4Components {
   effectiveWeights: { technical: number; momentum: number; fundamental: number };
   categoryHasEvidence: { technical: boolean; momentum: boolean; fundamental: boolean };
   categoryScores: { technical: number; momentum: number; fundamental: number };
+  /** Number of categories that carried evidence for this instrument (the breadth measure). */
+  evidencedCategories: number;
+  /** True when the evidence-breadth gate capped a directional score into the NEUTRAL band. */
+  breadthDamped: boolean;
+  /** The conviction the gated score reflects (== displacement unless the gate capped it). */
+  effectiveDisplacement: number;
 }
 
 interface WeightedCategory {
@@ -230,7 +246,29 @@ export function compositeV4(
 
   const evidenceFactor = v4.countWeight * countComponent + v4.agreementWeight * agreement;
   const raw = 50 + displacement * 100 * v4.spreadGain * evidenceFactor;
-  const score = Math.min(100, Math.max(0, Math.round(raw)));
+  let score = Math.min(100, Math.max(0, Math.round(raw)));
+
+  // Evidence-breadth gate (anti thin-evidence inflation): v4's per-instrument weight
+  // redistribution (fix #2) plus agreement-over-evidenced-categories means a SINGLE
+  // evidenced category yields a renormalized weight of 1.0 AND agreement = 1.0 — so one
+  // dimension (e.g. a lone moving-average vote, or several collinear technical families)
+  // could reach a confident directional score that the v3 path keeps NEUTRAL.  A directional
+  // call must be confirmed across >= minBreadthCategories categories; otherwise cap the score
+  // into the NEUTRAL deadband (so a single dimension can never call BULLISH/BEARISH) and
+  // reduce the reported conviction proportionally.  Symmetric for longs and shorts.
+  const evidencedCategories = cats.length;
+  let effectiveDisplacement = displacement;
+  let breadthDamped = false;
+  if (evidencedCategories < v4.minBreadthCategories
+      && (score >= config.directionThresholds.bullish || score <= config.directionThresholds.bearish)) {
+    const capped = score >= config.directionThresholds.bullish
+      ? config.directionThresholds.bullish - 1
+      : config.directionThresholds.bearish + 1;
+    // raw !== 50 here (the score was directional), so the ratio is finite and same-signed.
+    effectiveDisplacement = displacement * ((capped - 50) / (raw - 50));
+    score = capped;
+    breadthDamped = true;
+  }
 
   return {
     score,
@@ -243,6 +281,9 @@ export function compositeV4(
       effectiveWeights: eff,
       categoryHasEvidence: { technical: t.hasEvidence, momentum: m.hasEvidence, fundamental: f.hasEvidence },
       categoryScores: { technical: t.score, momentum: m.score, fundamental: f.score },
+      evidencedCategories,
+      breadthDamped,
+      effectiveDisplacement,
     },
   };
 }

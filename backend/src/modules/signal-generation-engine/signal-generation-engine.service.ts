@@ -546,7 +546,7 @@ export class SignalGenerationEngineService {
       scoringConfig,
     );
     const { score, direction, triggeredSignals, negativeSignals, totalEvaluated } = scoreOutcome;
-    const rawConfidence = this.confidenceFor(prices, latestFundamental, totalEvaluated, asOfDate ?? undefined, scoreOutcome.components?.displacement ?? null);
+    const rawConfidence = this.confidenceFor(prices, latestFundamental, totalEvaluated, asOfDate ?? undefined, scoreOutcome.components?.effectiveDisplacement ?? scoreOutcome.components?.displacement ?? null);
 
     // ── Regime gate (bearish/short suppression) ────────────────────────────────
     // Consult the current market regime before surfacing bearish signals.
