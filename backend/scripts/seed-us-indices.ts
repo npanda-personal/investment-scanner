@@ -20,7 +20,7 @@
  */
 import prisma from '../src/db/prisma';
 import { MarketDataFoundationRepository } from '../src/modules/market-data-foundation/market-data-foundation.repository';
-import { fetchYahooHistory } from '../src/modules/market-data-foundation/market-data-foundation.yahoo-eod-provider';
+import { fetchYahooHistory } from '../src/modules/market-data-foundation/ingestion/market-data-foundation.yahoo-eod-provider';
 import type { HistoricalPrice } from '../src/modules/market-data-foundation/market-data-foundation.types';
 
 // ---------------------------------------------------------------------------

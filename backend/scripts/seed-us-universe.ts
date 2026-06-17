@@ -23,7 +23,7 @@
 import fs from 'fs';
 import path from 'path';
 import prisma from '../src/db/prisma';
-import { usEquityIngestionService } from '../src/modules/market-data-foundation/market-data-foundation.us-equity-ingestion.service';
+import { usEquityIngestionService } from '../src/modules/market-data-foundation/ingestion/us/market-data-foundation.us-equity-ingestion.service';
 
 const CHECKPOINT_PATH = path.resolve(__dirname, '..', 'tmp', 'us-backfill-checkpoint.log');
 
