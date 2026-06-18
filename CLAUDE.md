@@ -100,7 +100,9 @@ If the work needs a running stack, run `/stack-up` first.
 
 ## Post-Work Protocol (before declaring done)
 
-After ANY source-code change, run `/wrap-up`: scoped QA pass → snapshot re-materialization if snapshot-producing code changed → clean up spawned processes → Done Report with proof. A Stop hook enforces this once per work session — satisfy it or state explicitly why it doesn't apply.
+After ANY source-code change, run `/wrap-up`: scoped QA pass → snapshot re-materialization if snapshot-producing code changed → clean up spawned processes → **merge the session's worktree into `dev` and delete it** → Done Report with proof. A Stop hook enforces this once per work session — satisfy it or state explicitly why it doesn't apply.
+
+**The wrap-up merge+delete is autonomous — never ask for approval to merge.** Being assigned a QA-green task already authorizes the merge; a local merge into `dev` is an internal completion step, not an outward/publish/destructive action and not an owner decision, so the "confirm consequential actions" instinct does not apply. Do not pause to ask "should I merge?" or end a turn offering to merge — just do it. Stop short ONLY for a real blocker (QA red, unresolvable conflict, or a pre-agreed human sign-off gate such as a `schema.prisma`/data-migration change), and then report the task *pending* with that specific blocker. Only ever touch worktrees from your own session.
 
 ## Doc Index
 
