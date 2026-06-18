@@ -25,12 +25,16 @@ function responseMock() {
 // R1: signal latestForInstrument GET — must never call service.run()
 // ---------------------------------------------------------------------------
 describe('R1 guard — GET /signals/:instrumentId never calls run()', () => {
-  it('calls latestPersistedForInstruments and NOT run() when a persisted signal exists', async () => {
+  // The single-instrument GET reads through the ENRICHED service.latestForInstrument()
+  // (persisted-read; attaches the calibration overlay + live price). It must still never
+  // call run() — the no-live-generation guard is the invariant under test, independent of
+  // which persisted-read method the controller uses.
+  it('calls latestForInstrument and NOT run() when a persisted signal exists', async () => {
     const persistedSignal = { id: 'sig-1', instrument_id: 'RELIANCE', symbol: 'RELIANCE' };
     const service = {
-      latestPersistedForInstruments: jest.fn().mockResolvedValue([persistedSignal]),
+      latestForInstrument: jest.fn().mockResolvedValue(persistedSignal),
+      latestPersistedForInstruments: jest.fn(),
       run: jest.fn(),
-      latestForInstrument: jest.fn(),
     };
     const controller = new SignalGenerationEngineController(service as any);
     const req = { params: { instrumentId: 'RELIANCE' } } as unknown as Request;
@@ -38,17 +42,16 @@ describe('R1 guard — GET /signals/:instrumentId never calls run()', () => {
 
     await controller.latestForInstrument(req, res);
 
-    expect(service.latestPersistedForInstruments).toHaveBeenCalledWith(['RELIANCE']);
+    expect(service.latestForInstrument).toHaveBeenCalledWith('RELIANCE');
     expect(service.run).not.toHaveBeenCalled();
-    expect(service.latestForInstrument).not.toHaveBeenCalled();
     expect(res.json).toHaveBeenCalledWith(persistedSignal);
   });
 
   it('returns 404 and does NOT call run() when no persisted signal exists', async () => {
     const service = {
-      latestPersistedForInstruments: jest.fn().mockResolvedValue([]),
+      latestForInstrument: jest.fn().mockResolvedValue(null),
+      latestPersistedForInstruments: jest.fn(),
       run: jest.fn(),
-      latestForInstrument: jest.fn(),
     };
     const controller = new SignalGenerationEngineController(service as any);
     const req = { params: { instrumentId: 'UNKNOWN_NSE' } } as unknown as Request;
@@ -56,9 +59,8 @@ describe('R1 guard — GET /signals/:instrumentId never calls run()', () => {
 
     await controller.latestForInstrument(req, res);
 
-    expect(service.latestPersistedForInstruments).toHaveBeenCalledWith(['UNKNOWN_NSE']);
+    expect(service.latestForInstrument).toHaveBeenCalledWith('UNKNOWN_NSE');
     expect(service.run).not.toHaveBeenCalled();
-    expect(service.latestForInstrument).not.toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(404);
   });
 });

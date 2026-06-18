@@ -167,10 +167,12 @@ export class SignalGenerationEngineController {
         const priceBySymbol = await this.cryptoRepo.pricesForSymbols([row.symbol]);
         return res.json(mapCryptoSignalRow(row, priceBySymbol.get(row.symbol)));
       }
-      // latestPersistedForInstruments is a bulk reader that never calls run();
-      // returns [] when nothing is persisted yet — no fallback to .run().
-      const results = await this.service.latestPersistedForInstruments([instrumentId]);
-      const result = results[0] ?? null;
+      // Persisted-read only (never calls run()). Use the ENRICHED single-instrument read so the
+      // research-tab widget receives the calibration overlay (calibratedScore/calibrationStatus)
+      // and live price/dailyChange — the bulk latestPersistedForInstruments() path skips
+      // enrichSignals(), which is why the widget showed "calibration pending" + null price for
+      // every stock even when a calibration row existed. Returns null when nothing trusted is persisted.
+      const result = await this.service.latestForInstrument(instrumentId);
       if (!result) return res.status(404).json({ error: 'No persisted signal found for this instrument. Run signal generation via POST /signals/run to populate.' });
       // Cohort overlay is attached on the LIST endpoints (table/drawer) only; the single-instrument
       // read stays a verbatim persisted-read. SignalWidget/SignalCard cohort display is a follow-up.

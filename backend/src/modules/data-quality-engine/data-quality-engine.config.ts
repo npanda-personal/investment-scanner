@@ -122,14 +122,15 @@ export interface DataQualityConfig {
 
   /**
    * Whether this instrument must have fundamentals to be signal-eligible.
-   * Default (IN) mirrors the legacy mainboard gate (NSE_EQUITY_SECURITIES).
-   * Other markets can supply their own predicate.
+   * As of elig policy review (2026-06): NO market hard-gates signal eligibility on
+   * fundamentals — missing fundamentals already downgrades reliability to PARTIAL in
+   * scoring; it should not exclude an otherwise-ready, liquid stock from having a signal
+   * at all. Previously NSE mainboard (NSE_EQUITY_SECURITIES) required fundamentals, which
+   * silently froze ~121 liquid IN names (e.g. STARHEALTH) out of daily generation.
+   * Other markets can still supply their own predicate.
    */
   requiresFundamentals: (instrument: { catalogSource?: unknown; catalog_source?: unknown }) => boolean;
 }
-
-const isNseMainboard = (instrument: { catalogSource?: unknown; catalog_source?: unknown }): boolean =>
-  instrument?.catalogSource === 'NSE_EQUITY_SECURITIES' || instrument?.catalog_source === 'NSE_EQUITY_SECURITIES';
 
 /**
  * The historical (IN/STOCK) defaults. Every literal here matches the value the
@@ -200,7 +201,10 @@ const DEFAULT_CONFIG: DataQualityConfig = {
   signalIlliquidLiquidityScore: 40,
   reviewMinVolumeCoveragePct: 0, // inert by default; see interface note
 
-  requiresFundamentals: isNseMainboard,
+  // Fundamentals never hard-gate signal eligibility (see interface note). Missing
+  // fundamentals is surfaced via reliabilityTier=PARTIAL in scoring, not exclusion.
+  // US/EU/CRYPTO already set this; making it the default aligns IN/NSE with them.
+  requiresFundamentals: () => false,
 };
 
 /**

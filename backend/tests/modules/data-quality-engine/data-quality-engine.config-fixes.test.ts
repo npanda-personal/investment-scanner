@@ -38,12 +38,14 @@ const constantVolumePrices = (count: number, volume: number) =>
   Array.from({ length: count }).map(() => ({ date: new Date().toISOString(), close: 100, volume }));
 
 describe('DataQualityConfig resolution', () => {
-  it('defaults to IN/STOCK behavior (sessions calendar, NSE mainboard fundamentals gate)', () => {
+  it('defaults to IN/STOCK behavior (sessions calendar; fundamentals no longer gate signal eligibility)', () => {
     const config = resolveDataQualityConfig({});
     expect(config.calendarRegion).toBe('IN');
     expect(config.tradingMode).toBe('SESSIONS');
     expect(config.staleSessionThreshold).toBe(3);
-    expect(config.requiresFundamentals({ catalogSource: 'NSE_EQUITY_SECURITIES' })).toBe(true);
+    // Fundamentals are NOT a hard signal-eligibility gate for any market (incl. NSE mainboard):
+    // missing fundamentals downgrades reliabilityTier to PARTIAL in scoring, it does not exclude.
+    expect(config.requiresFundamentals({ catalogSource: 'NSE_EQUITY_SECURITIES' })).toBe(false);
     expect(config.requiresFundamentals({ catalogSource: 'OTHER' })).toBe(false);
     // matches the frozen default object
     expect(config.liquidity.volumeBands).toEqual(DEFAULT_DATA_QUALITY_CONFIG.liquidity.volumeBands);

@@ -5,11 +5,25 @@ import { useNavigate } from 'react-router-dom';
 import { useInstrumentSignal } from '../hooks/useInstrumentSignal';
 import { SignalBadge } from './SignalBadge';
 
+// Mirrors the backend canonical threshold DEFAULT_STALENESS_DAYS
+// (backend/src/modules/signal-generation-engine/signal-asof.ts). The backend's
+// isStaleAsOf() measures staleness from the underlying price date, so we anchor on
+// sourcePriceDate (falling back to generated_at) — a signal built on >5-day-old data
+// reflects an older market, not today's.
+const SIGNAL_STALENESS_DAYS = 5;
+
 export const SignalWidget: React.FC<{ instrumentId?: string }> = ({ instrumentId }) => {
   const navigate = useNavigate();
   const { signal, loading, error } = useInstrumentSignal(instrumentId);
 
   if (!instrumentId) return null;
+
+  const stalenessAnchor = signal ? (signal.sourcePriceDate ?? signal.generated_at) : null;
+  const anchorMs = stalenessAnchor ? new Date(stalenessAnchor).getTime() : NaN;
+  const daysOld = Number.isFinite(anchorMs)
+    ? Math.floor((Date.now() - anchorMs) / 86_400_000)
+    : null;
+  const isStale = daysOld != null && daysOld >= SIGNAL_STALENESS_DAYS;
 
   return (
     <Paper sx={{ p: 2, mb: 3 }}>
@@ -47,7 +61,17 @@ export const SignalWidget: React.FC<{ instrumentId?: string }> = ({ instrumentId
               <Typography key={reason.code} component="li" variant="body2">{reason.label}</Typography>
             ))}
           </Box>
-          <Typography variant="caption" color="text.secondary">{new Date(signal.generated_at).toLocaleString()}</Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap', mt: 0.5 }}>
+            {isStale && (
+              <Tooltip title={`This signal reflects data from about ${daysOld} days ago, not today's market — refresh to regenerate.`} arrow>
+                <Chip size="small" color="warning" variant="outlined" label={`Stale · ${daysOld}d old`} sx={{ height: 18, fontSize: 10, cursor: 'help' }} />
+              </Tooltip>
+            )}
+            <Typography variant="caption" color="text.secondary">
+              {new Date(signal.generated_at).toLocaleString()}
+              {signal.sourcePriceDate ? ` · prices through ${new Date(signal.sourcePriceDate).toLocaleDateString()}` : ''}
+            </Typography>
+          </Box>
         </>
       ) : (
         <Typography color="text.secondary">No signal generated yet.</Typography>
