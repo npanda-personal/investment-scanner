@@ -32,6 +32,10 @@ const tabs = [
   { value: 'signals-history', label: 'Signals & History' },
 ];
 
+// Tall, viewport-relative height so the chart reads like a real trading chart (and the
+// rail aligns to the same height) instead of a short strip with empty space below.
+const CHART_HEIGHT = { xs: '64vh', lg: '78vh' };
+
 export default function UnifiedStockPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { id } = useParams<{ id: string }>();
@@ -56,7 +60,9 @@ export default function UnifiedStockPage() {
             symbol: inst.symbol,
             exchange: inst.exchange,
             asset_type: inst.asset_type,
-            region: inst.region,
+            // Fall back to the active market so an instrument with a missing region still
+            // gets the correct exchange prefix (e.g. NSE: for an IN-market stock).
+            region: inst.region ?? scope.region,
           }),
         );
       })
@@ -93,11 +99,11 @@ export default function UnifiedStockPage() {
 
       {activeTab === 'chart' ? (
         <Grid container spacing={2}>
-          <Grid item xs={12} lg={8}>
-            <TradingViewChart symbol={tvSymbol} loading={instrumentLoading} />
+          <Grid item xs={12} lg={9}>
+            <TradingViewChart symbol={tvSymbol} loading={instrumentLoading} height={CHART_HEIGHT} />
           </Grid>
-          <Grid item xs={12} lg={4}>
-            <SourceListRail activeInstrumentId={id} />
+          <Grid item xs={12} lg={3}>
+            <SourceListRail activeInstrumentId={id} height={CHART_HEIGHT} />
           </Grid>
         </Grid>
       ) : activeTab === 'research' ? (
