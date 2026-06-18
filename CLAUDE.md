@@ -64,6 +64,16 @@ Un-cleaned agent processes pile up and spike RAM until the whole machine crawls.
 - Keep main-loop context lean: delegate bulky multi-file reads to subagents and have them return conclusions, not file dumps. Read narrow line ranges of large files instead of whole files.
 - Session-management MCP (`ccd_session`) and browser-preview results stay in context all session — use them sparingly, and after a heavy MCP/preview/exploration phase, remind the owner to `/compact` (or `/clear` when switching to an unrelated task).
 
+### Autonomous-run rate-limit safety (hard-learned 2026-06-18)
+
+Running a whole backlog in ONE never-reset session exhausts the session token/usage limit (a 9-item run died mid-way through the last item's gates). To stay under the limit:
+
+- **Session-per-item.** One item = one session: implement → `/wrap-up` (merge+delete) → `/clear` (hard reset) → next item in a FRESH session carrying only prior Done Reports. Never chain many items in one ever-growing context — that is the dominant burn.
+- **Right-size the gates to risk — stop over-gating.** Trivial/mechanical change (comment, single-file, no logic) → developer self-check only (tsc+jest), no subagents. Bounded single-module logic → ONE code-reviewer (it runs the tests). Substantial (schema / cross-cutting / multi-module / downstream-affecting) → code-reviewer **and** qa-verifier. Don't spend two Opus gates on a one-liner.
+- **Cheaper models for sub-work.** Investigation / implementation / QA → Sonnet (Haiku for purely mechanical); reserve Opus/Fable for adversarial correctness review and design. One investigation subagent per item, not several; subagents return conclusions only.
+- **Avoid the rework class.** When delegating edits into a worktree, the subagent's cwd may be the MAIN checkout — it can silently write there. Have the delegate confirm `pwd` / first-write path, or do the edits in the main loop; always point gates at the populated tree. A misplaced write cost a full wasted gate cycle.
+- **Pace to the reset window.** The limit resets on a clock — do N items per window, then `ScheduleWakeup`/resume after reset rather than pushing into the wall. Owner-gated/heavy items (schema, ingestion) get their own fresh post-reset session.
+
 ## Code Structure
 
 - Organize by responsibility and coupling, not size: a cohesive file beats a small file that mixes concerns.
