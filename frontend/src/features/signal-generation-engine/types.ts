@@ -10,7 +10,8 @@ export interface SignalItem {
 
 export type ReliabilityTier = 'FULL' | 'PARTIAL';
 export type CalibrationStatus = 'CALIBRATED' | 'PARTIAL' | 'PENDING' | 'UNAVAILABLE';
-export type LifecycleState = 'ACTIVE' | 'WEAKENING' | 'STALE' | 'EXITED' | 'UNKNOWN';
+// Matches the backend SignalLifecycleState contract (signal-lifecycle.ts / persisted column).
+export type LifecycleState = 'ENTRY' | 'ACTIVE' | 'EXIT' | 'EXPIRED';
 
 export interface SignalResult {
   id?: string;
