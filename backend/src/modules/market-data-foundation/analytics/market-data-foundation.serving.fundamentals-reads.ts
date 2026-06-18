@@ -149,6 +149,7 @@ export class FundamentalsReadsService {
         currency: record.currency,
         period_type: record.periodType,
         period_end_date: record.periodEndDate.toISOString(),
+        official_result_date: record.officialResultDate?.toISOString?.() ?? null,
         source: record.source,
         source_note: record.sourceNote ?? null,
         source_url: record.sourceUrl ?? null,
