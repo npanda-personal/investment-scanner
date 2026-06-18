@@ -54,18 +54,26 @@ export function buildTriggerContract(signal: SignalResultDto, instrument?: any):
   const primaryStrategy = signal.strategyMatches?.[0] || (signal.blockedStrategies?.length === 1 ? signal.blockedStrategies[0] : null);
   const assetClass = stringOrNull(instrument?.assetType ?? instrument?.asset_type);
   const region = stringOrNull(instrument?.region);
-  const strategyId = primaryStrategy?.strategyCode ?? null;
-  const strategyVersion = primaryStrategy?.strategyVersion ?? null;
   const sourceProvenPriceEvidence = primaryStrategy?.triggerPriceEvidence?.status === 'SOURCE_PROVEN'
     ? primaryStrategy.triggerPriceEvidence
     : null;
   const attemptedPriceEvidence = primaryStrategy?.triggerPriceEvidence ?? null;
-  const triggerTimestamp = primaryStrategy
-    ? sourceProvenPriceEvidence?.triggerTimestamp ?? null
-    : signal.sourcePriceDate ?? signal.sourceDataDate ?? null;
+
+  // Prefer the durable, persisted §17 trigger fields on the DTO; fall back to the
+  // on-demand strategyMatches evidence when this DTO has no persisted values
+  // (legacy rows, or DTOs produced without a write round-trip).
+  const strategyId = signal.strategyId ?? primaryStrategy?.strategyCode ?? null;
+  const strategyVersion = signal.strategyVersion ?? primaryStrategy?.strategyVersion ?? null;
+  const triggerPrice = signal.triggerPrice ?? sourceProvenPriceEvidence?.triggerPrice ?? null;
+  const triggerTimestamp = signal.triggerTimestamp
+    ?? (primaryStrategy
+      ? sourceProvenPriceEvidence?.triggerTimestamp ?? null
+      : signal.sourcePriceDate ?? signal.sourceDataDate ?? null);
+  const entryRuleId = signal.entryRuleId ?? sourceProvenPriceEvidence?.entryRuleIds[0] ?? null;
+  const timeframe = signal.triggerTimeframe ?? sourceProvenPriceEvidence?.timeframe ?? primaryStrategy?.timeframe ?? null;
+  const createdAt = signal.createdAt ?? null;
+  const updatedAt = signal.updatedAt ?? null;
   const dataQualityStatus = signal.dataQualityEligibility?.signalReadinessStatus ?? null;
-  const entryRuleId = sourceProvenPriceEvidence?.entryRuleIds[0] ?? null;
-  const timeframe = sourceProvenPriceEvidence?.timeframe ?? primaryStrategy?.timeframe ?? null;
 
   const mark = (field: string, reason: string) => {
     unavailable.add(field);
@@ -77,7 +85,7 @@ export function buildTriggerContract(signal: SignalResultDto, instrument?: any):
   if (!region) mark('region', 'instrument market region is unavailable from the current signal record.');
   if (!strategyId) mark('strategy_id', 'no Strategy Framework match is attached to this signal.');
   if (!strategyVersion) mark('strategy_version', 'no Strategy Framework version is attached to this signal.');
-  if (!sourceProvenPriceEvidence) {
+  if (triggerPrice === null) {
     mark('trigger_price', primaryStrategy?.triggerPriceEvidence?.unavailableReason || 'source-proven rule-trigger price is unavailable from attached Strategy Framework context.');
   }
   if (!triggerTimestamp) {
@@ -89,12 +97,18 @@ export function buildTriggerContract(signal: SignalResultDto, instrument?: any):
   mark('invalidation_rule_id', 'invalidation rule id is not persisted in the current signal record.');
   if (!dataQualityStatus) mark('data_quality_status', 'Data Quality readiness snapshot is unavailable from the current signal record.');
   if (!signal.lifecycleState) mark('lifecycle_status', 'lifecycle state is not available on the current signal record.');
-  mark('created_at', 'persistence created timestamp is not exposed by the current signal record.');
-  mark('updated_at', 'persistence updated timestamp is not exposed by the current signal record.');
+  if (!createdAt) mark('created_at', 'persistence created timestamp is not exposed by the current signal record.');
+  if (!updatedAt) mark('updated_at', 'persistence updated timestamp is not exposed by the current signal record.');
 
+  // exit_rule_id / invalidation_rule_id are §17 "where applicable" fields the Strategy
+  // Framework does not emit yet. They are surfaced in unavailable_fields for honesty,
+  // but — being optional and not-yet-implemented framework-wide — they do not block a
+  // row whose mandatory fields are all present from reaching COMPLETE.
+  const OPTIONAL_UNEMITTED = new Set(['exit_rule_id', 'invalidation_rule_id']);
+  const blockingUnavailable = Array.from(unavailable).filter((field) => !OPTIONAL_UNEMITTED.has(field));
   const contractStatus = signal.auditStatus === 'LEGACY_MISSING'
     ? 'LEGACY_INCOMPLETE'
-    : (unavailable.size > 0 ? 'CONTRACT_INCOMPLETE' : 'COMPLETE');
+    : (blockingUnavailable.length > 0 ? 'CONTRACT_INCOMPLETE' : 'COMPLETE');
 
   return {
     contractVersion: 'TriggerObjectV1',
@@ -107,7 +121,7 @@ export function buildTriggerContract(signal: SignalResultDto, instrument?: any):
     strategy_id: strategyId,
     strategy_version: strategyVersion,
     trigger_type: triggerTypeFor(signal.direction, instrument?.derivatives_eligible ?? instrument?.derivativesEligible, signal.regimeGateSuppressed),
-    trigger_price: sourceProvenPriceEvidence?.triggerPrice ?? null,
+    trigger_price: triggerPrice,
     trigger_timestamp: triggerTimestamp,
     timeframe,
     entry_rule_id: entryRuleId,
@@ -118,8 +132,8 @@ export function buildTriggerContract(signal: SignalResultDto, instrument?: any):
     failed_conditions: signal.negative_signals.map((item) => ({ code: item.code, label: item.label, category: item.category })),
     data_quality_status: dataQualityStatus,
     lifecycle_status: signal.lifecycleState ?? null,
-    created_at: null,
-    updated_at: null,
+    created_at: createdAt,
+    updated_at: updatedAt,
     audit: {
       auditStatus: signal.auditStatus,
       generationRunId: signal.generationRunId ?? null,

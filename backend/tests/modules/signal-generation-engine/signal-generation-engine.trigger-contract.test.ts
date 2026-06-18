@@ -1,6 +1,7 @@
 /// <reference types="@types/jest" />
 import { SignalGenerationEngineService } from '../../../src/modules/signal-generation-engine';
 import { StrategyFrameworkRegistry } from '../../../src/modules/strategy-framework';
+import { buildTriggerContract } from '../../../src/modules/signal-generation-engine/signal-trigger-contract';
 
 const trustedReadEvidence = {
   auditStatus: 'CURRENT' as const,
@@ -224,6 +225,55 @@ describe('signal generation trigger contract projection', () => {
     });
     expect(trigger?.trigger_price_evidence.unavailable_reason).toContain('Strategy category is FILTER, not ENTRY');
     expect(trigger?.unavailable_fields).toEqual(expect.arrayContaining(['trigger_price', 'trigger_timestamp', 'entry_rule_id']));
+  });
+
+  it('surfaces PERSISTED §17 trigger fields from the DTO and keeps them out of unavailable_fields', () => {
+    const persisted: any = {
+      ...baseSignal,
+      lifecycleState: 'ACTIVE',
+      // No strategyMatches attached: values must come from the persisted columns only.
+      strategyId: 'BREAKOUT_CONFIRMATION',
+      strategyVersion: '1.2.0',
+      triggerPrice: 220,
+      triggerTimestamp: '2026-05-16T00:00:00.000Z',
+      triggerTimeframe: 'DAILY_SWING',
+      entryRuleId: 'ENTRY_BREAKOUT',
+      createdAt: '2026-05-17T10:00:01.000Z',
+      updatedAt: '2026-05-17T10:00:02.000Z',
+    };
+    const contract = buildTriggerContract(persisted, { id: 'stock-1', symbol: 'ABC', asset_type: 'STOCK', region: 'IN' });
+
+    expect(contract).toMatchObject({
+      contractStatus: 'COMPLETE',
+      strategy_id: 'BREAKOUT_CONFIRMATION',
+      strategy_version: '1.2.0',
+      trigger_price: 220,
+      trigger_timestamp: '2026-05-16T00:00:00.000Z',
+      timeframe: 'DAILY_SWING',
+      entry_rule_id: 'ENTRY_BREAKOUT',
+      created_at: '2026-05-17T10:00:01.000Z',
+      updated_at: '2026-05-17T10:00:02.000Z',
+      data_quality_status: 'READY',
+      lifecycle_status: 'ACTIVE',
+    });
+    expect(contract.unavailable_fields).not.toContain('strategy_id');
+    expect(contract.unavailable_fields).not.toContain('strategy_version');
+    expect(contract.unavailable_fields).not.toContain('trigger_price');
+    expect(contract.unavailable_fields).not.toContain('trigger_timestamp');
+    expect(contract.unavailable_fields).not.toContain('timeframe');
+    expect(contract.unavailable_fields).not.toContain('entry_rule_id');
+    expect(contract.unavailable_fields).not.toContain('created_at');
+    expect(contract.unavailable_fields).not.toContain('updated_at');
+    // Not emitted by the framework yet — still unavailable.
+    expect(contract.unavailable_fields).toEqual(expect.arrayContaining(['exit_rule_id', 'invalidation_rule_id']));
+  });
+
+  it('marks created_at/updated_at unavailable only when the DTO genuinely lacks them', () => {
+    const noTimestamps: any = { ...baseSignal };
+    const contract = buildTriggerContract(noTimestamps, { id: 'stock-1', symbol: 'ABC', asset_type: 'STOCK', region: 'IN' });
+    expect(contract.created_at).toBeNull();
+    expect(contract.updated_at).toBeNull();
+    expect(contract.unavailable_fields).toEqual(expect.arrayContaining(['created_at', 'updated_at']));
   });
 
   it('marks legacy records incomplete instead of inventing Data Quality or trigger evidence', async () => {

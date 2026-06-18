@@ -208,6 +208,153 @@ describe('SignalGenerationEngineRepository', () => {
     });
   });
 
+  it('persists and reads back §17 trigger fields from a SOURCE_PROVEN strategy match', async () => {
+    const sourceProvenSignal: SignalResultDto = {
+      ...signal,
+      strategyMatches: [{
+        strategyCode: 'BREAKOUT_CONFIRMATION',
+        strategyVersion: '1.2.0',
+        decision: 'CANDIDATE' as any,
+        direction: 'BULLISH' as any,
+        score: 80,
+        confidence: 'HIGH',
+        reasons: [],
+        entryRulesPassed: [],
+        timeframe: 'DAILY_SWING',
+        triggerPriceEvidence: {
+          status: 'SOURCE_PROVEN',
+          triggerPrice: 220,
+          triggerTimestamp: '2026-04-28T00:00:00.000Z',
+          sourceModule: 'signal-generation-engine',
+          sourceField: 'strategyContext.prices[0].adjusted_close',
+          strategyCode: 'BREAKOUT_CONFIRMATION',
+          strategyVersion: '1.2.0',
+          timeframe: 'DAILY_SWING',
+          entryRuleIds: ['ENTRY_BREAKOUT'],
+          compatibilityOnly: true,
+        },
+      }],
+    };
+    // Echo what the engine would persist back as the stored row (Date columns).
+    const upsert = jest.fn().mockImplementation(({ create }: any) => Promise.resolve({
+      id: 'signal-1',
+      ...create,
+      createdAt: new Date('2026-04-29T15:45:01.000Z'),
+      updatedAt: new Date('2026-04-29T15:45:02.000Z'),
+    }));
+    const repository = new SignalGenerationEngineRepository({ signalResult: { findUnique: jest.fn().mockResolvedValue(null), upsert } } as any);
+
+    const write = await repository.createSignalResultWithStatus(sourceProvenSignal);
+
+    // Write: the durable columns are derived from the source-proven evidence.
+    expect(upsert.mock.calls[0][0].create).toMatchObject({
+      triggerPrice: 220,
+      triggerTimestamp: new Date('2026-04-28T00:00:00.000Z'),
+      triggerTimeframe: 'DAILY_SWING',
+      entryRuleId: 'ENTRY_BREAKOUT',
+      exitRuleId: null,
+      invalidationRuleId: null,
+      strategyId: 'BREAKOUT_CONFIRMATION',
+      strategyVersion: '1.2.0',
+    });
+    // createdAt/updatedAt are Prisma-managed — never written by the engine.
+    expect(upsert.mock.calls[0][0].create).not.toHaveProperty('createdAt');
+    expect(upsert.mock.calls[0][0].create).not.toHaveProperty('updatedAt');
+    // Read: the columns round-trip back onto the DTO (as ISO strings).
+    expect(write.status).toBe('CREATED');
+    expect(write.result).toMatchObject({
+      triggerPrice: 220,
+      triggerTimestamp: '2026-04-28T00:00:00.000Z',
+      triggerTimeframe: 'DAILY_SWING',
+      entryRuleId: 'ENTRY_BREAKOUT',
+      exitRuleId: null,
+      invalidationRuleId: null,
+      strategyId: 'BREAKOUT_CONFIRMATION',
+      strategyVersion: '1.2.0',
+      createdAt: '2026-04-29T15:45:01.000Z',
+      updatedAt: '2026-04-29T15:45:02.000Z',
+    });
+  });
+
+  it('persists null §17 trigger fields when there is no source-proven strategy match', async () => {
+    const upsert = jest.fn().mockImplementation(({ create }: any) => Promise.resolve({ id: 'signal-1', ...create }));
+    const repository = new SignalGenerationEngineRepository({ signalResult: { findUnique: jest.fn().mockResolvedValue(null), upsert } } as any);
+
+    const write = await repository.createSignalResultWithStatus(signal); // no strategyMatches
+
+    expect(upsert.mock.calls[0][0].create).toMatchObject({
+      triggerPrice: null,
+      triggerTimestamp: null,
+      triggerTimeframe: null,
+      entryRuleId: null,
+      exitRuleId: null,
+      invalidationRuleId: null,
+      strategyId: null,
+      strategyVersion: null,
+    });
+    expect(write.result).toMatchObject({
+      triggerPrice: null,
+      triggerTimestamp: null,
+      strategyId: null,
+      strategyVersion: null,
+      createdAt: null,
+      updatedAt: null,
+    });
+  });
+
+  it('treats §17 trigger fields as part of same-day idempotency (NO_OP vs UPDATED)', async () => {
+    const sourceProvenSignal: SignalResultDto = {
+      ...signal,
+      strategyMatches: [{
+        strategyCode: 'BREAKOUT_CONFIRMATION',
+        strategyVersion: '1.2.0',
+        decision: 'CANDIDATE' as any,
+        direction: 'BULLISH' as any,
+        score: 75,
+        confidence: 'HIGH',
+        reasons: [],
+        entryRulesPassed: [],
+        timeframe: 'DAILY_SWING',
+        triggerPriceEvidence: {
+          status: 'SOURCE_PROVEN',
+          triggerPrice: 220,
+          triggerTimestamp: '2026-04-28T00:00:00.000Z',
+          sourceModule: 'signal-generation-engine',
+          sourceField: 'f',
+          strategyCode: 'BREAKOUT_CONFIRMATION',
+          strategyVersion: '1.2.0',
+          timeframe: 'DAILY_SWING',
+          entryRuleIds: ['ENTRY_BREAKOUT'],
+          compatibilityOnly: true,
+        },
+      }],
+    };
+    // existing row whose trigger columns MATCH what the signal will derive → NO_OP
+    const matchingExisting = {
+      id: 'signal-1', instrumentId: 'stock-1', symbol: 'AAPL', companyName: 'Apple',
+      sector: 'Technology', country: 'US', score: 75, direction: 'BULLISH', confidence: 'HIGH',
+      triggeredSignals: signal.triggered_signals, negativeSignals: [], explanation: signal.explanation,
+      generatedAt: new Date(signal.generated_at), modelVersion: 'signal-engine-v1',
+      source: 'signal-generation-engine', dataStatus: 'COMPLETE',
+      triggerPrice: 220, triggerTimestamp: new Date('2026-04-28T00:00:00.000Z'), triggerTimeframe: 'DAILY_SWING',
+      entryRuleId: 'ENTRY_BREAKOUT', exitRuleId: null, invalidationRuleId: null,
+      strategyId: 'BREAKOUT_CONFIRMATION', strategyVersion: '1.2.0',
+    };
+    const repoNoOp = new SignalGenerationEngineRepository({ signalResult: {
+      findUnique: jest.fn().mockResolvedValue(matchingExisting),
+      upsert: jest.fn().mockResolvedValue(matchingExisting),
+    } } as any);
+    await expect(repoNoOp.createSignalResultWithStatus(sourceProvenSignal)).resolves.toMatchObject({ status: 'NO_OP' });
+
+    // existing row whose trigger columns DIFFER (no persisted trigger) → UPDATED
+    const staleExisting = { ...matchingExisting, triggerPrice: null, entryRuleId: null, strategyId: null, strategyVersion: null, triggerTimestamp: null, triggerTimeframe: null };
+    const repoUpdated = new SignalGenerationEngineRepository({ signalResult: {
+      findUnique: jest.fn().mockResolvedValue(staleExisting),
+      upsert: jest.fn().mockResolvedValue(matchingExisting),
+    } } as any);
+    await expect(repoUpdated.createSignalResultWithStatus(sourceProvenSignal)).resolves.toMatchObject({ status: 'UPDATED' });
+  });
+
   it('creates, completes, and reads latest run audit records', async () => {
     const runRecord = {
       id: 'run-1',
