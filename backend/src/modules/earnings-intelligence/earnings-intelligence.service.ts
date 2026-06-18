@@ -13,17 +13,9 @@ import {
   isTtmPeriod,
   type EarningsPeriodClass,
 } from './earnings-intelligence.period';
-import {
-  addDays,
-  addMonths,
-  dateTime,
-  daysBetween,
-  maxDate,
-  round2,
-  safeUtcDay,
-  startOfUtcDay,
-} from './earnings-intelligence.date-utils';
+import { addDays, addMonths, dateTime, daysBetween, maxDate, round2, safeUtcDay, startOfUtcDay } from './earnings-intelligence.date-utils';
 import { resultDateLabelFor, rowWarningsForSource } from './earnings-intelligence.presentation';
+import { deriveRecentResult } from './earnings-intelligence.derived-result';
 import {
   DEFAULT_EARNINGS_REGION,
   getEarningsRegionConfig,
@@ -275,56 +267,35 @@ export class EarningsIntelligenceService {
     const deliveryInterest = this.deliveryInterest(input.deliverySnapshots, config);
     const reactionDate = resultDateSource === 'OFFICIAL_CALENDAR' ? resultDate : null;
     const priceReaction = reactionDate ? this.priceReaction(input.prices, reactionDate, input.region, config) : null;
+    // Derived recent-result path (US / forward-date providers): engages ONLY when
+    // the official path did NOT already yield a recent past result (the IN path).
+    // See earnings-intelligence.derived-result.ts for the full rationale.
+    const officialRecentResult = resultDateSource === 'OFFICIAL_CALENDAR' && resultDate !== null
+      && resultDate <= input.snapshotDate && this.daysBetween(resultDate, input.snapshotDate) <= config.recentResultWindowDays;
+    const derived = deriveRecentResult({
+      latest, snapshotDate: input.snapshotDate, config, officialRecentResult,
+      computePriceReaction: (date) => this.priceReaction(input.prices, date, input.region, config),
+    });
     const preResultPriceMove = this.priceMove(input.prices, config.preResultPriceMoveLookbackBars);
     const freshness = this.freshness(input.snapshotDate, latest, config);
     const reasonTags = this.reasonTags({
-      latest,
-      revenueGrowth,
-      profitGrowth,
-      epsGrowth,
-      marginTrend,
-      consistencyScore,
-      accelerationScore,
-      deliveryInterest,
-      priceReaction,
-      preResultPriceMove,
+      latest, revenueGrowth, profitGrowth, epsGrowth, marginTrend, consistencyScore, accelerationScore,
+      deliveryInterest, priceReaction, preResultPriceMove, derivedRecentResult: derived.applies,
       upcoming: resultDateSource === 'OFFICIAL_CALENDAR' && daysToResult !== null && daysToResult >= 0,
-      resultDateSource,
-      config,
+      resultDateSource, config,
     });
     const riskTags = this.riskTags({
-      latest,
-      quarterlyCount: quarterly.length,
-      annualCount: annual.length,
-      ttmCount: ttm.length,
-      freshness,
-      revenueGrowth,
-      profitGrowth,
-      epsGrowth,
-      marginTrend,
-      consistencyScore,
-      priceReaction,
-      prices: input.prices,
+      latest, quarterlyCount: quarterly.length, annualCount: annual.length, ttmCount: ttm.length, freshness,
+      revenueGrowth, profitGrowth, epsGrowth, marginTrend, consistencyScore, priceReaction, prices: input.prices,
       estimatedResultDate: resultDateSource === 'DATE_TBA' || resultDateSource === 'ESTIMATED_FROM_PERIOD_CADENCE',
       authoritativeResultDate: resultDateSource === 'OFFICIAL_CALENDAR',
     });
     const warnings = rowWarningsForSource(resultDateSource);
     const categories = this.categories({
-      snapshotDate: input.snapshotDate,
-      resultDate,
-      resultDateSource,
-      daysToResult,
-      revenueGrowth,
-      profitGrowth,
-      epsGrowth,
-      marginTrend,
-      consistencyScore,
-      accelerationScore,
-      deliveryInterest,
-      priceReaction,
-      preResultPriceMove,
-      freshness,
-      config,
+      snapshotDate: input.snapshotDate, resultDate, resultDateSource, daysToResult,
+      revenueGrowth, profitGrowth, epsGrowth, marginTrend, consistencyScore, accelerationScore,
+      deliveryInterest, priceReaction, preResultPriceMove, freshness, config,
+      derivedRecentResult: derived.applies, derivedPriceReaction: derived.priceReaction,
     });
     const dataThroughDate = maxDate([
       input.dataThroughDate,
@@ -414,21 +385,14 @@ export class EarningsIntelligenceService {
   }
 
   private categories(input: {
-    snapshotDate: Date;
-    resultDate: Date | null;
-    resultDateSource: EarningsResultDateSource;
-    daysToResult: number | null;
-    revenueGrowth: number | null;
-    profitGrowth: number | null;
-    epsGrowth: number | null;
-    marginTrend: number | null;
-    consistencyScore: number;
-    accelerationScore: number;
-    deliveryInterest: boolean;
-    priceReaction: number | null;
-    preResultPriceMove: number | null;
-    freshness: EarningsFreshness;
-    config: EarningsRegionConfig;
+    snapshotDate: Date; resultDate: Date | null; resultDateSource: EarningsResultDateSource; daysToResult: number | null;
+    revenueGrowth: number | null; profitGrowth: number | null; epsGrowth: number | null; marginTrend: number | null;
+    consistencyScore: number; accelerationScore: number; deliveryInterest: boolean; priceReaction: number | null;
+    preResultPriceMove: number | null; freshness: EarningsFreshness; config: EarningsRegionConfig;
+    // Derived recent-result path (set only when the official path did NOT yield a
+    // recent past result).  Feeds ONLY the winner/disappointment gates below — never
+    // UPCOMING_RESULTS, PRE_RESULT_INTEREST, or RESULT_REACTION_HISTORY.
+    derivedRecentResult: boolean; derivedPriceReaction: number | null;
   }): EarningsIntelligenceCategory[] {
     const categories: EarningsIntelligenceCategory[] = [];
     const hasAuthoritativeResultDate = input.resultDateSource === 'OFFICIAL_CALENDAR';
@@ -436,7 +400,12 @@ export class EarningsIntelligenceService {
     // UPCOMING_RESULTS.  DATE_TBA / ESTIMATED_FROM_PERIOD_CADENCE rows must NOT
     // appear in UPCOMING_RESULTS as if they had a known date.
     const hasUsableResultDate = hasAuthoritativeResultDate;
-    const recentResult = Boolean(hasUsableResultDate && input.resultDate && this.daysBetween(input.resultDate, input.snapshotDate) <= input.config.recentResultWindowDays && input.resultDate <= input.snapshotDate);
+    const officialRecentResult = Boolean(hasUsableResultDate && input.resultDate && this.daysBetween(input.resultDate, input.snapshotDate) <= input.config.recentResultWindowDays && input.resultDate <= input.snapshotDate);
+    // A recent result for WINNER/DISAPPOINTMENT classification comes from EITHER the
+    // unchanged official-past path (IN) OR the derived estimated path (US).  The
+    // price reaction used by the gates follows whichever path supplied the date.
+    const recentResult = officialRecentResult || input.derivedRecentResult;
+    const reactionForGates = officialRecentResult ? input.priceReaction : input.derivedPriceReaction;
     const upcoming = input.daysToResult !== null
       && input.daysToResult >= 0
       && input.daysToResult <= input.config.upcomingWindowDays
@@ -445,8 +414,8 @@ export class EarningsIntelligenceService {
     if (upcoming && (input.deliveryInterest || (input.preResultPriceMove !== null && input.preResultPriceMove >= input.config.preResultPriceMoveThresholdPercent))) {
       categories.push('PRE_RESULT_INTEREST');
     }
-    if (recentResult && this.isWinner(input)) categories.push('RESULT_WINNERS');
-    if (recentResult && this.isDisappointment(input)) categories.push('RESULT_DISAPPOINTMENTS');
+    if (recentResult && this.isWinner({ ...input, priceReaction: reactionForGates })) categories.push('RESULT_WINNERS');
+    if (recentResult && this.isDisappointment({ ...input, priceReaction: reactionForGates })) categories.push('RESULT_DISAPPOINTMENTS');
     if (input.priceReaction !== null && hasAuthoritativeResultDate) categories.push('RESULT_REACTION_HISTORY');
     if (input.freshness !== 'MISSING' && (input.consistencyScore >= 70 || input.accelerationScore >= 70 || categories.includes('PRE_RESULT_INTEREST') || categories.includes('RESULT_WINNERS'))) {
       categories.push('EARNINGS_WATCHLIST');
@@ -484,16 +453,11 @@ export class EarningsIntelligenceService {
 
   private reasonTags(input: {
     latest: EarningsFundamentalInput | null;
-    revenueGrowth: number | null;
-    profitGrowth: number | null;
-    epsGrowth: number | null;
-    marginTrend: number | null;
-    consistencyScore: number;
-    accelerationScore: number;
-    deliveryInterest: boolean;
-    priceReaction: number | null;
-    preResultPriceMove: number | null;
-    upcoming: boolean;
+    revenueGrowth: number | null; profitGrowth: number | null; epsGrowth: number | null; marginTrend: number | null;
+    consistencyScore: number; accelerationScore: number; deliveryInterest: boolean; priceReaction: number | null;
+    preResultPriceMove: number | null; upcoming: boolean;
+    /** Recent result classified via the estimated period-cadence date (US path). */
+    derivedRecentResult: boolean;
     resultDateSource: EarningsResultDateSource;
     config: EarningsRegionConfig;
   }): string[] {
@@ -514,9 +478,9 @@ export class EarningsIntelligenceService {
     if (input.preResultPriceMove !== null && input.preResultPriceMove >= input.config.preResultPriceMoveThresholdPercent) tags.push('PRE_RESULT_PRICE_INTEREST');
     if (input.priceReaction !== null && input.priceReaction >= 2) tags.push('POSITIVE_RESULT_REACTION');
     if (input.upcoming) tags.push('RESULT_WINDOW_ESTIMATED_FROM_PERSISTED_PERIODS');
+    if (input.derivedRecentResult) tags.push('RECENT_RESULT_ESTIMATED_FROM_PERIOD_CADENCE'); // timed from period end + lag, not official
     if (input.resultDateSource === 'OFFICIAL_CALENDAR') tags.push('OFFICIAL_RESULT_DATE');
-    if (input.resultDateSource === 'PERIOD_END_DATE_FALLBACK') tags.push('RESULT_DATE_FROM_PERIOD_END_FALLBACK');
-    if (input.resultDateSource === 'VALIDATED_AT_FALLBACK') tags.push('RESULT_DATE_FROM_VALIDATION_TIMESTAMP_FALLBACK');
+    if (input.resultDateSource === 'PERIOD_END_DATE_FALLBACK') tags.push('RESULT_DATE_FROM_PERIOD_END_FALLBACK'); else if (input.resultDateSource === 'VALIDATED_AT_FALLBACK') tags.push('RESULT_DATE_FROM_VALIDATION_TIMESTAMP_FALLBACK');
     return [...new Set(tags)];
   }
 
