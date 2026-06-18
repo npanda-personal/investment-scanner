@@ -1,5 +1,7 @@
 import type { Request, Response } from 'express';
 import { normalizeMarketRegion } from '../../shared/utils/market-scope';
+import { cacheService, type CacheService } from '../../cache/cache.service';
+import { convictionKey } from '../../cache/cache-keys';
 import { ConvictionReadsService } from './analytics/market-data-foundation.serving.conviction-reads';
 
 /**
@@ -14,7 +16,10 @@ import { ConvictionReadsService } from './analytics/market-data-foundation.servi
  * Pure persisted-read: parses query params and shapes the response only. No live fetch.
  */
 export class MarketDataFoundationConvictionController {
-  constructor(private readonly service = new ConvictionReadsService()) {}
+  constructor(
+    private readonly service = new ConvictionReadsService(),
+    private readonly cache: CacheService = cacheService,
+  ) {}
 
   private parseBoolean(value: unknown): boolean {
     const v = Array.isArray(value) ? value[0] : value;
@@ -30,11 +35,11 @@ export class MarketDataFoundationConvictionController {
       const assetType = ((req.query.assetType || req.query.asset_type) as string | undefined)
         ?.trim()
         .toUpperCase() || undefined;
-      const result = await this.service.conviction({
-        region,
-        assetType,
-        onlyFnoEligible: this.parseBoolean(req.query.onlyFnoEligible),
-      });
+      const onlyFnoEligible = this.parseBoolean(req.query.onlyFnoEligible);
+      const result = await this.cache.cacheReadThrough(
+        convictionKey({ region, assetType, onlyFnoEligible }),
+        () => this.service.conviction({ region, assetType, onlyFnoEligible }),
+      );
       return res.json(result);
     } catch (error) {
       console.error('Conviction screener error:', error);

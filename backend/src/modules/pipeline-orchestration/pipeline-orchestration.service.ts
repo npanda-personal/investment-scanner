@@ -6,7 +6,10 @@ import { EarningsIntelligenceService } from '../earnings-intelligence';
 import { HistoricalContextSnapshotsService } from '../historical-context-snapshots';
 import { MarketContextIntelligenceService, MarketPulseSnapshotService } from '../market-context-intelligence';
 import { MarketDataFoundationService } from '../market-data-foundation/market-data-foundation.service';
+import { ConvictionReadsService } from '../market-data-foundation/analytics/market-data-foundation.serving.conviction-reads';
 import type { ScheduledRegionSyncSummary } from '../market-data-foundation/market-data-foundation.types';
+import { cacheService as defaultCacheService } from '../../cache/cache.service';
+import { pageCacheKeysForCommand } from './pipeline-page-cache';
 import { ResearchHubService } from '../research-hub';
 import { SignalGenerationEngineService } from '../signal-generation-engine';
 import { SignalCalibrationEngineService } from '../signal-calibration-engine';
@@ -180,7 +183,9 @@ export class PipelineOrchestrationService {
     private readonly earningsIntelligenceService = new EarningsIntelligenceService(),
     private readonly stockInterestService = new StockInterestSnapshotService(),
     private readonly workbenchRefreshService = new WorkbenchRefreshService(),
-    private readonly snapshotAssemblerService = new SnapshotAssemblerService()
+    private readonly snapshotAssemblerService = new SnapshotAssemblerService(),
+    private readonly convictionService = new ConvictionReadsService(),
+    private readonly cacheService = defaultCacheService
   ) {}
 
   // ---------------------------------------------------------------------------
@@ -210,6 +215,8 @@ export class PipelineOrchestrationService {
         stockInterestService: this.stockInterestService,
         workbenchRefreshService: this.workbenchRefreshService,
         snapshotAssemblerService: this.snapshotAssemblerService,
+        convictionService: this.convictionService,
+        cacheService: this.cacheService,
       });
       const alertFn = (summary: DagAlertSummary): void => {
         this.firePipelineRunAlert(
@@ -458,6 +465,32 @@ export class PipelineOrchestrationService {
   }
 
   async executeCommand(
+    request: PipelineCommandRequest,
+    context: PipelineCommandExecutionContext,
+    now = new Date()
+  ): Promise<PipelineCommandResponse> {
+    const response = await this.executeCommandInner(request, context, now);
+    // A manual snapshot-producing command updates the DB but not the page cache; bust the
+    // affected keys so the FE doesn't serve a stale page (the full pipeline warms via CACHE_WARM).
+    await this.invalidatePageCacheForCommand(response);
+    return response;
+  }
+
+  /** Bust the page-cache keys made stale by a successful manual snapshot-producing command. */
+  private async invalidatePageCacheForCommand(response: PipelineCommandResponse): Promise<void> {
+    if (!this.cacheService.isEnabled()) {
+      return;
+    }
+    if (response.status !== 'COMPLETED' && response.status !== 'PARTIAL') {
+      return;
+    }
+    const keys = pageCacheKeysForCommand(response.commandKey, response.scope);
+    if (keys.length > 0) {
+      await this.cacheService.delete(...keys);
+    }
+  }
+
+  private async executeCommandInner(
     request: PipelineCommandRequest,
     context: PipelineCommandExecutionContext,
     now = new Date()

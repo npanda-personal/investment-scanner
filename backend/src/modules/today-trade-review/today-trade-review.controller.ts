@@ -1,13 +1,22 @@
 import type { Request, Response } from 'express';
 import { TodayTradeReviewService } from './today-trade-review.service';
 import { parseTodayReviewQuery, parseTodayReviewRunRequest, requireTodayReviewId } from './today-trade-review.validation';
+import { cacheService, type CacheService } from '../../cache/cache.service';
+import { todayReviewKey } from '../../cache/cache-keys';
 
 export class TodayTradeReviewController {
-  constructor(private readonly service = new TodayTradeReviewService()) {}
+  constructor(
+    private readonly service = new TodayTradeReviewService(),
+    private readonly cache: CacheService = cacheService,
+  ) {}
 
   latest = async (req: Request, res: Response) => {
     try {
-      return res.json(await this.service.latest(parseTodayReviewQuery(req.query)));
+      const query = parseTodayReviewQuery(req.query);
+      return res.json(await this.cache.cacheReadThrough(
+        todayReviewKey(query),
+        () => this.service.latest(query),
+      ));
     } catch (error) {
       return this.error(res, error, 'Failed to load latest Today review.');
     }

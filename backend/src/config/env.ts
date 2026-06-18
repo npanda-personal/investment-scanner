@@ -4,6 +4,8 @@ dotenv.config();
 
 export interface AppConfig {
   port: number;
+  cacheEnabled: boolean;
+  redisUrl: string;
 }
 
 const parsePort = (value: string | undefined): number => {
@@ -18,4 +20,6 @@ const parsePort = (value: string | undefined): number => {
 
 export const appConfig: AppConfig = {
   port: parsePort(process.env.PORT),
+  cacheEnabled: process.env.CACHE_ENABLED === 'true',
+  redisUrl: process.env.REDIS_URL ?? 'redis://localhost:6379',
 };

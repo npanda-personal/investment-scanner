@@ -8,21 +8,29 @@ import { sendBlockDealsAlert } from './block-deals-telegram';
 import { getInstitutionalActivity } from './institutional-activity.service';
 import { resolveMarketProfile } from '../../shared/utils/market-profile';
 import { notApplicablePayload } from '../../shared/utils/not-applicable';
+import { cacheService, type CacheService } from '../../cache/cache.service';
+import { marketContextSummaryKey, marketPulseKey } from '../../cache/cache-keys';
 
 export class MarketContextIntelligenceController {
   constructor(
     private readonly service = new MarketContextIntelligenceService(),
     private readonly marketPulseService = new MarketPulseSnapshotService(),
     private readonly capitalPostureService = new CapitalPostureService(),
+    private readonly cache: CacheService = cacheService,
   ) {}
 
   summary = async (req: Request, res: Response) => {
     // Persisted-read only: never generate or write on a GET.
     // Repoints to the same persisted path used by persistedSummary so no
     // live .run() / saveSnapshot() is triggered.
-    const region = this.contextRegion(req);
+    // Uppercase so the cache key matches the warm/invalidation paths (region keys are canonical).
+    const region = this.contextRegion(req).toUpperCase();
     return this.respond(res, async () => {
-      const persisted = await this.service.latestPersistedSummary(region);
+      // Cache the expensive persisted read; the cheap envelope shaping below runs on cached data.
+      const persisted = await this.cache.cacheReadThrough(
+        marketContextSummaryKey(region),
+        () => this.service.latestPersistedSummary(region),
+      );
       if (!persisted) {
         return {
           status: 'missing',
@@ -86,11 +94,15 @@ export class MarketContextIntelligenceController {
 
   marketPulse = async (req: Request, res: Response) => {
     res.setHeader('Cache-Control', 'no-store');
-    return this.respond(res, () => this.marketPulseService.latestSnapshot({
-      region: this.region(req) || 'IN',
-      assetType: this.assetType(req) || 'STOCK',
-      timeframe: this.timeframe(req) || '1d',
-    }));
+    const scope = {
+      region: (this.region(req) || 'IN').toUpperCase(),
+      assetType: (this.assetType(req) || 'STOCK').toUpperCase(),
+      timeframe: (this.timeframe(req) || '1d').toLowerCase(),
+    };
+    return this.respond(res, () => this.cache.cacheReadThrough(
+      marketPulseKey(scope),
+      () => this.marketPulseService.latestSnapshot(scope),
+    ));
   };
 
   marketPulseHistory = async (req: Request, res: Response) => {
