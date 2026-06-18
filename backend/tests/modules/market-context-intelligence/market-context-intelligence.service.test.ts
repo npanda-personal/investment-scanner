@@ -204,9 +204,9 @@ describe('MarketContextIntelligenceService', () => {
     expect(countries.map((item) => item.country)).toEqual(expect.arrayContaining(['US', 'India']));
   });
 
-  it('returns missing macro fallback', () => {
+  it('returns missing macro fallback when no persisted FRED row exists', async () => {
     const service = new MarketContextIntelligenceService({} as any, {} as any);
-    expect(service.macro()).toMatchObject({ macroStatus: 'UNKNOWN', dataStatus: 'MISSING' });
+    await expect(service.macro()).resolves.toMatchObject({ macroStatus: 'UNKNOWN', dataStatus: 'MISSING' });
   });
 
   it('builds summary response shape (persisted-read path)', async () => {
