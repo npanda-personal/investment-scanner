@@ -130,6 +130,17 @@ describe('signal generation trigger contract projection', () => {
     ]));
   });
 
+  it('surfaces the persisted lifecycle state in the contract instead of marking it unavailable', async () => {
+    const service = createService({ ...baseSignal, lifecycleState: 'EXIT' });
+
+    const result = await service.topSignals({ limit: 5 });
+    const trigger = result.signals[0].triggerContract;
+
+    expect(trigger?.lifecycle_status).toBe('EXIT');
+    expect(trigger?.unavailable_fields).not.toContain('lifecycle_status');
+    expect(trigger?.incomplete_reasons.join(' ')).not.toContain('lifecycle');
+  });
+
   it('exposes source-proven entry trigger price evidence from Strategy Framework enrichment without target or R:R fields', async () => {
     const prices = Array.from({ length: 260 }, (_, index) => price(index, 220 - index * 0.1, index === 0 ? 4000 : 1000));
     const service = createService({ ...baseSignal, sourcePriceDate: prices[0].date }, undefined, prices);

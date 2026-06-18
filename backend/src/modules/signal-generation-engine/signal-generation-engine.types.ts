@@ -117,7 +117,27 @@ export interface SignalResultDto {
    * Surfaces the outcome depth so consumers can judge confidence.
    */
   calibrationSampleSize?: number | null;
+
+  // ── Historical cohort hit-rate overlay (additive, persisted-read only) ─────
+  /**
+   * Win-rate (0–1) of MATURE historical outcomes for this signal's cohort —
+   * its direction × score-bucket over `cohortMetricsHorizon`.  "Signals like
+   * this resolved in-direction X% historically."  null when the cohort has no
+   * mature outcomes yet (honest absent — never fabricated).
+   */
+  cohortWinRate?: number | null;
+  /** Directional sample size (BULLISH+BEARISH) behind cohortWinRate; judge significance. */
+  cohortDirectionalSampleSize?: number | null;
+  /** Average forward return (%) of the cohort over the horizon. */
+  cohortAvgReturnPercent?: number | null;
+  /** Horizon the cohort metrics are measured over (e.g. '20D'). */
+  cohortMetricsHorizon?: string | null;
+  /** Sample-size-based confidence in the win-rate: HIGH (>=100), MEDIUM (>=30), LOW, or null (no sample). */
+  cohortWinRateConfidence?: SignalWinRateConfidence | null;
 }
+
+/** Confidence in a cohort win-rate, derived from its directional sample size. */
+export type SignalWinRateConfidence = 'HIGH' | 'MEDIUM' | 'LOW';
 
 export type SignalWriteStatus = 'CREATED' | 'UPDATED' | 'NO_OP';
 
@@ -166,7 +186,7 @@ export interface SignalTriggerContractDto {
   passed_conditions: SignalTriggerConditionEvidence[];
   failed_conditions: SignalTriggerConditionEvidence[];
   data_quality_status: string | null;
-  lifecycle_status: null;
+  lifecycle_status: SignalLifecycleState | null;
   created_at: string | null;
   updated_at: string | null;
   audit: {

@@ -2,7 +2,7 @@
  * SG-4 batch peer-parity tests: the LIGHTWEIGHT batch path must derive peer valuation +
  * relative strength from the in-memory batch context (same-sector peers, cohort-isolated).
  */
-import { peerAggregates } from '../../../src/modules/signal-generation-engine/signal-peer-aggregates';
+import { peerAggregates, peerContextWarnings } from '../../../src/modules/signal-generation-engine/signal-peer-aggregates';
 
 function ctxOf(instruments: any[], funds: Record<string, any>, windows: Record<string, any[]>) {
   return {
@@ -52,5 +52,26 @@ describe('peerAggregates (SG-4)', () => {
     const single = peerAggregates(ctxOf([{ id: 'self', sector: 'Tech' }], {}, { self: win(120, 100) }), { id: 'self', sector: 'Tech' });
     expect(single.peerAveragePe).toBeNull(); // no peers
     expect(single.relativeToPeers).toBeNull();
+  });
+});
+
+describe('peerContextWarnings (#6 batch peer dropout)', () => {
+  it('warns when a batch has no same-sector peers for the instrument', () => {
+    // Only self + a different-sector instrument in this batch slice → Tech peers dropped out.
+    const ctx = ctxOf([{ id: 'self', sector: 'Tech' }, { id: 'other', sector: 'Energy' }], {}, {});
+    const warnings = peerContextWarnings(ctx, { id: 'self', sector: 'Tech' });
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toMatch(/no same-sector peers/i);
+  });
+
+  it('does not warn when at least one same-sector peer is in the batch', () => {
+    const ctx = ctxOf([{ id: 'self', sector: 'Tech' }, { id: 'p1', sector: 'Tech' }], {}, {});
+    expect(peerContextWarnings(ctx, { id: 'self', sector: 'Tech' })).toEqual([]);
+  });
+
+  it('does not warn outside batch mode (no context) or when the instrument has no sector', () => {
+    expect(peerContextWarnings(undefined, { id: 'self', sector: 'Tech' })).toEqual([]);
+    const ctx = ctxOf([{ id: 'self' }], {}, {});
+    expect(peerContextWarnings(ctx, { id: 'self' })).toEqual([]);
   });
 });
