@@ -273,7 +273,7 @@ const StrategyDecisionDashboard: React.FC = () => {
   };
 
   const candidateColumns: DataTableColumn<StrategyDecisionDto>[] = [
-    { id: 'symbol', label: 'Symbol', sortable: true, render: (d) => <Box component={Link} to={`/research/stocks/${d.instrumentId}`} sx={symbolLinkSx}>{d.symbol}</Box> },
+    { id: 'symbol', label: 'Symbol', sortable: true, render: (d) => <Box component={Link} to={`/stocks/${d.instrumentId}`} sx={symbolLinkSx}>{d.symbol}</Box> },
     { id: 'strategy', label: 'Strategy', sortable: true, render: (d) => <Box><Typography variant="body2">{d.strategy}</Typography>{d.strategyVersion && <Typography variant="caption" color="text.secondary">v{d.strategyVersion}</Typography>}</Box> },
     { id: 'decision', label: 'Decision', sortable: true, render: (d) => <Box><StatusBadge label={formatDecision(d.decision)} /><Typography variant="caption" display="block" color="text.secondary">{d.decision}</Typography></Box> },
     { id: 'frameworkBacked', label: 'Framework', sortable: true, render: (d) => <Typography variant="body2" color={d.frameworkBacked ? 'success.main' : 'text.secondary'}>{d.frameworkBacked ? 'Framework-backed' : 'Legacy'}</Typography> },
@@ -441,7 +441,7 @@ const StrategyDecisionDashboard: React.FC = () => {
       {activeTab === 2 && (
         <DataTable<StrategyDecisionDto>
           columns={[
-            { id: 'symbol', label: 'Symbol', render: (d) => <Box component={Link} to={`/research/stocks/${d.instrumentId}`} sx={symbolLinkSx}>{d.symbol}</Box> },
+            { id: 'symbol', label: 'Symbol', render: (d) => <Box component={Link} to={`/stocks/${d.instrumentId}`} sx={symbolLinkSx}>{d.symbol}</Box> },
             { id: 'decision', label: 'Status', render: (d) => <StatusBadge label={formatDecision(d.decision)} /> },
             { id: 'action', label: 'Requirement', render: (d) => formatAction(d.action) },
             { id: 'reasons', label: 'Reason', render: (d) => d.reasons[0] || 'Pending setup' },
@@ -461,7 +461,7 @@ const StrategyDecisionDashboard: React.FC = () => {
       {activeTab === 3 && (
         <DataTable<StrategyDecisionDto>
           columns={[
-            { id: 'symbol', label: 'Symbol', render: (d) => <Box component={Link} to={`/research/stocks/${d.instrumentId}`} sx={symbolLinkSx}>{d.symbol}</Box> },
+            { id: 'symbol', label: 'Symbol', render: (d) => <Box component={Link} to={`/stocks/${d.instrumentId}`} sx={symbolLinkSx}>{d.symbol}</Box> },
             { id: 'decision', label: 'Risk Level', render: (d) => <StatusBadge label={formatDecision(d.decision)} /> },
             { id: 'action', label: 'Review Action', render: (d) => formatAction(d.action) },
             { id: 'decisionScore', label: 'Risk Score', render: (d) => d.decisionScore },

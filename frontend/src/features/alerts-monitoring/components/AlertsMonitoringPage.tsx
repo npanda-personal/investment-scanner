@@ -29,7 +29,7 @@ import type { AlertEvent } from '../types';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
 
 const severityColor = (severity: string) => severity === 'CRITICAL' ? 'error' : severity === 'WARNING' ? 'warning' : 'info';
-const contextLink = (event: AlertEvent) => event.instrumentId ? `/research/stocks/${event.instrumentId}` : event.portfolioId ? `/portfolios/${event.portfolioId}` : event.watchlistId ? `/watchlists/${event.watchlistId}` : '/alerts';
+const contextLink = (event: AlertEvent) => event.instrumentId ? `/stocks/${event.instrumentId}` : event.portfolioId ? `/portfolios/${event.portfolioId}` : event.watchlistId ? `/watchlists/${event.watchlistId}` : '/alerts';
 
 export const AlertsMonitoringPage: React.FC = () => {
   const { scope } = useMarketScope();

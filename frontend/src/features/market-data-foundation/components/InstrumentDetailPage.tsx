@@ -177,7 +177,7 @@ const InstrumentDetailPage: React.FC<InstrumentDetailPageProps> = () => {
         backTo="/instrument-workspace"
         backLabel="Instrument search"
         secondaryActions={
-          <Button variant="outlined" onClick={() => navigate(`/research/stocks/${instrument.id}`)}>
+          <Button variant="outlined" onClick={() => navigate(`/stocks/${instrument.id}`)}>
             Research
           </Button>
         }
