@@ -7,6 +7,8 @@ import { MarketContextIntelligenceService } from '../market-context-intelligence
 import type { SectorSnapshotDto } from '../market-context-intelligence/market-context-intelligence.types';
 import { getEventFeed } from './event-feed.service';
 import { IndexConstituentsService } from './index-constituents.service';
+import { cacheService, type CacheService } from '../../cache/cache.service';
+import { stockInterestKey, sectorRotationKey } from '../../cache/cache-keys';
 
 export type RotationQuadrant = 'LEADING' | 'IMPROVING' | 'WEAKENING' | 'LAGGING';
 
@@ -63,12 +65,17 @@ export class MarketIntelligenceController {
     private readonly sectorConstituentsService = new SectorConstituentsService(),
     private readonly marketContextService = new MarketContextIntelligenceService(),
     private readonly indexConstituentsService = new IndexConstituentsService(),
+    private readonly cache: CacheService = cacheService,
   ) {}
 
   stockInterest = async (req: Request, res: Response) => {
     try {
       res.setHeader('Cache-Control', 'no-store');
-      return res.json(await this.stockInterestService.latestSnapshot(parseStockInterestScope(req.query as Record<string, unknown>)));
+      const scope = parseStockInterestScope(req.query as Record<string, unknown>);
+      return res.json(await this.cache.cacheReadThrough(
+        stockInterestKey(scope),
+        () => this.stockInterestService.latestSnapshot(scope),
+      ));
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to load Stock Interest snapshot';
       return res.status(500).json({
@@ -108,10 +115,14 @@ export class MarketIntelligenceController {
   sectorRotation = async (req: Request, res: Response) => {
     try {
       res.setHeader('Cache-Control', 'no-store');
-      const region = typeof req.query.region === 'string' ? req.query.region.trim() || 'IN' : 'IN';
-      const assetType = typeof req.query.assetType === 'string' ? req.query.assetType.trim() || 'STOCK' : 'STOCK';
+      // Uppercase so the cache key matches the warm/invalidation paths (region keys are canonical).
+      const region = (typeof req.query.region === 'string' ? req.query.region.trim() || 'IN' : 'IN').toUpperCase();
+      const assetType = (typeof req.query.assetType === 'string' ? req.query.assetType.trim() || 'STOCK' : 'STOCK').toUpperCase();
 
-      const envelope = await this.marketContextService.latestSectorIntelligenceSnapshot({ region, assetType });
+      const envelope = await this.cache.cacheReadThrough(
+        sectorRotationKey({ region, assetType }),
+        () => this.marketContextService.latestSectorIntelligenceSnapshot({ region, assetType }),
+      );
 
       if (envelope.sectors.length === 0) {
         const result: SectorRotationEnvelope = {

@@ -146,10 +146,10 @@ export default function UsSmartMoneyPanel({ symbol }: { symbol?: string | null }
   return (
     <Paper variant="outlined" sx={{ p: 2 }}>
       <Typography variant="subtitle2" fontWeight={800} sx={{ mb: 0.5 }}>
-        Smart Money (SEC filings)
+        Smart Money &amp; Short Pressure
       </Typography>
       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5, fontSize: '0.65rem' }}>
-        Insider (Form 4) &amp; institutional (13F) activity from public SEC filings. Research support only.
+        Insider (Form 4) &amp; institutional (13F) activity from public SEC filings, plus daily short-volume from FINRA Reg SHO. Research support only.
       </Typography>
 
       {loading && (
@@ -166,7 +166,7 @@ export default function UsSmartMoneyPanel({ symbol }: { symbol?: string | null }
 
       {!loading && !error && panel && !panel.hasData && (
         <Alert severity="info" sx={{ fontSize: '0.7rem' }}>
-          No SEC insider or institutional filings recorded for {panel.symbol} yet.
+          No SEC filings or short-volume data recorded for {panel.symbol} yet.
         </Alert>
       )}
 

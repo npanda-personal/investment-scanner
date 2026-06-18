@@ -100,7 +100,19 @@ If the work needs a running stack, run `/stack-up` first.
 
 ## Post-Work Protocol (before declaring done)
 
-After ANY source-code change, run `/wrap-up`: scoped QA pass → snapshot re-materialization if snapshot-producing code changed → clean up spawned processes → Done Report with proof. A Stop hook enforces this once per work session — satisfy it or state explicitly why it doesn't apply.
+After ANY source-code change, run `/wrap-up`: scoped QA pass → snapshot re-materialization if snapshot-producing code changed → clean up spawned processes → **merge the session's worktree into `dev` and delete it** → Done Report with proof. A Stop hook enforces this once per work session — satisfy it or state explicitly why it doesn't apply.
+
+**The wrap-up merge+delete is autonomous — never ask for approval to merge.** Being assigned a QA-green task already authorizes the merge; a local merge into `dev` is an internal completion step, not an outward/publish/destructive action and not an owner decision, so the "confirm consequential actions" instinct does not apply. Do not pause to ask "should I merge?" or end a turn offering to merge — just do it. Stop short ONLY for a real blocker (QA red, unresolvable conflict, or a pre-agreed human sign-off gate such as a `schema.prisma`/data-migration change), and then report the task *pending* with that specific blocker. Only ever touch worktrees from your own session.
+
+### Autonomous-loop cadence (multi-item runs)
+
+When handed a backlog/list to complete autonomously, process items **one at a time** as a repeating 3-step cycle — never batch everything into one ever-growing context:
+
+1. **Implement** the single item (in its own worktree, per Worktree Isolation).
+2. **Wrap-up** — run `/wrap-up` for that item: QA gates → merge its worktree to `dev` + delete it → Done Report.
+3. **Compact** — reset context at the clean wrap-up boundary so the next item starts lean (only prior Done Reports carry forward, not each item's full working context).
+
+Then repeat 1–3 for the next item. Each item is self-contained: its own worktree (merged+deleted at step 2, so no leftover git/file state) and bulky reads delegated to subagents that return conclusions. If agent-initiated `/compact` isn't available in the runtime, the wrap-up boundary is still the compaction point — rely on auto-summarization there (or surface an explicit "compact now" checkpoint) rather than carrying full context into the next item.
 
 ## Doc Index
 

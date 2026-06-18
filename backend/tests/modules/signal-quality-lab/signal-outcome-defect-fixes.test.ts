@@ -192,8 +192,8 @@ describe('Fix 2: syntheticSummaryFromPersistedMetrics uses real matureCount, emp
 
   it('syntheticSummaryFromPersistedMetrics returns null when matureCount=0 (passthrough)', () => {
     const svc = makeCalibrationService(0);
-    // Access private method for unit testing
-    const synth = (svc as any).syntheticSummaryFromPersistedMetrics('20D', { byScore: [], bySector: [], byType: [], persistedMatureCount: 0 }, null);
+    // moved to engine.metrics in the calibration refactor — reach via service.defaultEngine.metrics
+    const synth = (svc as any).defaultEngine.metrics.syntheticSummaryFromPersistedMetrics('20D', { byScore: [], bySector: [], byType: [], persistedMatureCount: 0 }, null);
     expect(synth).toBeNull();
   });
 });
@@ -297,7 +297,7 @@ describe('Fix 5: SCORE_BUCKETS canonical boundaries', () => {
       { latestForInstrument: jest.fn(), latestSignalUniverse: jest.fn(), latestSignalUniverseCount: jest.fn() } as any,
       { countMatureByHorizon: jest.fn(), qualityMetricsFromPersistedOutcomes: jest.fn(), byType: jest.fn(), byScoreBucket: jest.fn(), bySector: jest.fn(), noisy: jest.fn(), summary: jest.fn() } as any,
     );
-    const scoreBucket = (svc as any).scoreBucket.bind(svc);
+    const scoreBucket = (n: number) => (svc as any).defaultEngine.scorer.scoreBucket(n); // moved to engine.scorer in the refactor
     expect(scoreBucket(0)).toBe('0-39');
     expect(scoreBucket(40)).toBe('40-69');
     expect(scoreBucket(70)).toBe('70-84');

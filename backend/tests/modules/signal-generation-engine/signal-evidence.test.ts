@@ -8,7 +8,7 @@
  * plus v3-parity for the version-agnostic `scoreInstrument` orchestrator.
  */
 import { compositeV4, familyForCode, type CategoryEvaluationLike } from '../../../src/modules/signal-generation-engine/signal-evidence';
-import { signal, scoreInstrument, compositeScore } from '../../../src/modules/signal-generation-engine/signal-scoring';
+import { signal, scoreInstrument, compositeScore, directionForScore } from '../../../src/modules/signal-generation-engine/signal-scoring';
 import { DEFAULT_SIGNAL_SCORING_CONFIG, type SignalScoringConfig } from '../../../src/modules/signal-generation-engine/signal-scoring.config';
 
 const V4_CONFIG: SignalScoringConfig = { ...DEFAULT_SIGNAL_SCORING_CONFIG, scoringEngineVersion: 'v4' };
@@ -87,11 +87,15 @@ describe('compositeV4 — monotonicity (#7)', () => {
   });
 
   it('property sweep: adding one bullish technical factor never lowers the score across leans', () => {
+    // Carry a constant momentum vote so both sides clear the breadth gate (>=2 categories);
+    // otherwise the cap would collapse every single-category directional score to a constant
+    // and the monotonicity assertion would pass trivially.
+    const mom = (): CategoryEvaluationLike => cat(0.7, [['ONE_MONTH_MOMENTUM', 'MOMENTUM']]);
     for (let lean = 0.55; lean <= 0.99; lean += 0.05) {
-      const oneFactor = compositeV4(cat(lean, [['PRICE_ABOVE_SMA50', 'TECHNICAL']]), empty(), empty(), V4_CONFIG).score;
+      const oneFactor = compositeV4(cat(lean, [['PRICE_ABOVE_SMA50', 'TECHNICAL']]), mom(), empty(), V4_CONFIG).score;
       const twoFactor = compositeV4(
         cat(lean, [['PRICE_ABOVE_SMA50', 'TECHNICAL'], ['CONFIRMED_VOLUME_BREAKOUT', 'TECHNICAL']]),
-        empty(), empty(), V4_CONFIG,
+        mom(), empty(), V4_CONFIG,
       ).score;
       expect(twoFactor).toBeGreaterThanOrEqual(oneFactor);
     }
@@ -100,21 +104,109 @@ describe('compositeV4 — monotonicity (#7)', () => {
 
 describe('compositeV4 — decorrelation (#3)', () => {
   it('diverse families produce stronger conviction than the same count of collinear signals', () => {
-    // 3 collinear TREND signals vs 3 signals across 3 families, same category score.
+    // 3 collinear TREND signals vs 3 signals across 3 families, same category score.  A
+    // constant momentum vote keeps both past the breadth gate so the score comparison reflects
+    // family decorrelation rather than both being capped to the deadband edge.
+    const mom = (): CategoryEvaluationLike => cat(0.7, [['ONE_MONTH_MOMENTUM', 'MOMENTUM']]);
     const collinear = compositeV4(
       cat(0.8, [['PRICE_ABOVE_SMA50', 'TECHNICAL'], ['SMA50_ABOVE_SMA200', 'TECHNICAL'], ['NEAR_52_WEEK_HIGH', 'TECHNICAL']]),
-      empty(),
+      mom(),
       empty(),
       V4_CONFIG,
     );
     const diverse = compositeV4(
       cat(0.8, [['PRICE_ABOVE_SMA50', 'TECHNICAL'], ['CONFIRMED_VOLUME_BREAKOUT', 'TECHNICAL'], ['RSI_RECOVERING', 'TECHNICAL']]),
-      empty(),
+      mom(),
       empty(),
       V4_CONFIG,
     );
     expect(diverse.components.alignedFamilies).toBeGreaterThan(collinear.components.alignedFamilies);
     expect(diverse.score).toBeGreaterThanOrEqual(collinear.score);
+  });
+});
+
+describe('compositeV4 — evidence-breadth gate (anti thin-evidence inflation)', () => {
+  it('a lone single-category technical vote is capped to NEUTRAL (no longer surfaces as BULLISH)', () => {
+    const technical = cat(0.7222, [['PRICE_ABOVE_SMA50', 'TECHNICAL']]); // one TREND family only
+    const { score, components } = compositeV4(technical, empty(), empty(), V4_CONFIG);
+
+    expect(components.evidencedCategories).toBe(1);
+    expect(components.breadthDamped).toBe(true);
+    expect(score).toBe(V4_CONFIG.directionThresholds.bullish - 1); // capped into the deadband
+    expect(directionForScore(score, V4_CONFIG)).toBe('NEUTRAL');
+  });
+
+  it('a single category cannot bypass the gate by firing several families (the family-OR leak)', () => {
+    // TREND + VOLUME + MEAN_REVERSION — 3 families, but still ONE analysis dimension.
+    const technical = cat(0.85, [
+      ['PRICE_ABOVE_SMA50', 'TECHNICAL'],         // TREND
+      ['CONFIRMED_VOLUME_BREAKOUT', 'TECHNICAL'],  // VOLUME
+      ['RSI_RECOVERING', 'TECHNICAL'],             // MEAN_REVERSION
+    ]);
+    const { score, components } = compositeV4(technical, empty(), empty(), V4_CONFIG);
+    expect(components.alignedFamilies).toBeGreaterThanOrEqual(3);
+    expect(components.evidencedCategories).toBe(1);
+    expect(components.breadthDamped).toBe(true);
+    expect(directionForScore(score, V4_CONFIG)).toBe('NEUTRAL');
+  });
+
+  it('even a heavily-loaded single category stays NEUTRAL (cap holds regardless of magnitude)', () => {
+    const technical = cat(0.95, [
+      ['PRICE_ABOVE_SMA50', 'TECHNICAL'],
+      ['SMA50_ABOVE_SMA200', 'TECHNICAL'],
+      ['CONFIRMED_VOLUME_BREAKOUT', 'TECHNICAL'],
+      ['NEAR_52_WEEK_HIGH', 'TECHNICAL'],
+    ]);
+    const { score } = compositeV4(technical, empty(), empty(), V4_CONFIG);
+    expect(score).toBeLessThan(V4_CONFIG.directionThresholds.bullish);
+  });
+
+  it('a legitimate two-category bullish setup clears the gate and stays BULLISH (regression)', () => {
+    const technical = cat(0.85, [['PRICE_ABOVE_SMA50', 'TECHNICAL'], ['SMA50_ABOVE_SMA200', 'TECHNICAL']]);
+    const momentum = cat(0.8, [['ONE_MONTH_MOMENTUM', 'MOMENTUM']]);
+    const { score, components } = compositeV4(technical, momentum, empty(), V4_CONFIG);
+    expect(components.evidencedCategories).toBe(2);
+    expect(components.breadthDamped).toBe(false);
+    expect(score).toBeGreaterThan(V4_CONFIG.directionThresholds.bullish);
+  });
+
+  it('is symmetric: a lone single-category bearish vote is capped out of BEARISH', () => {
+    const technical = cat(0.2778, [], [['PRICE_BELOW_SMA50', 'TECHNICAL']]);
+    const { score, components } = compositeV4(technical, empty(), empty(), V4_CONFIG);
+    expect(components.breadthDamped).toBe(true);
+    expect(score).toBe(V4_CONFIG.directionThresholds.bearish + 1);
+    expect(directionForScore(score, V4_CONFIG)).toBe('NEUTRAL');
+  });
+
+  it('when the gate caps a directional score, effectiveDisplacement is reduced but keeps its sign', () => {
+    const capped = compositeV4(cat(0.72, [['PRICE_ABOVE_SMA50', 'TECHNICAL']]), empty(), empty(), V4_CONFIG).components;
+    expect(Math.abs(capped.effectiveDisplacement)).toBeLessThan(Math.abs(capped.displacement));
+    expect(Math.sign(capped.effectiveDisplacement)).toBe(Math.sign(capped.displacement));
+  });
+
+  it('a single evidenced category that lands inside the deadband is not flagged as breadth-damped', () => {
+    // One evidenced technical category whose bullish and bearish votes balance to a NEUTRAL
+    // lean: it HAS evidence (evidencedCategories === 1) but is not directional, so there is
+    // nothing to cap and the gate must NOT fire.
+    const technical = cat(0.5, [['PRICE_ABOVE_SMA50', 'TECHNICAL']], [['RSI_OVERBOUGHT', 'TECHNICAL']]);
+    const { score, components } = compositeV4(technical, empty(), empty(), V4_CONFIG);
+    expect(components.evidencedCategories).toBe(1);
+    expect(directionForScore(score, V4_CONFIG)).toBe('NEUTRAL');
+    expect(components.breadthDamped).toBe(false);
+  });
+
+  it('a no-evidence instrument scores exactly 50 and is not flagged as breadth-damped', () => {
+    const { score, components } = compositeV4(empty(), empty(), empty(), V4_CONFIG);
+    expect(score).toBe(50);
+    expect(components.evidencedCategories).toBe(0);
+    expect(components.breadthDamped).toBe(false);
+  });
+
+  it('v3 compositeScore is untouched: the same single-vote instrument is already NEUTRAL (~54)', () => {
+    // v3 dilutes via the two pinned-0.5 categories rather than capping; the gate is v4-only.
+    const v3 = compositeScore(0.75, 0.5, 0.5, 1, 0, 0, 0, 0, 0, DEFAULT_SIGNAL_SCORING_CONFIG);
+    expect(v3).toBe(54);
+    expect(directionForScore(v3, DEFAULT_SIGNAL_SCORING_CONFIG)).toBe('NEUTRAL');
   });
 });
 

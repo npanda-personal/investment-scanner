@@ -452,6 +452,8 @@ describe('pipeline-dag-contract — FIX 1 scope end-to-end', () => {
       workbenchRefreshService: makeWorkbenchRefreshStub() as any,
       marketDataService: makeMarketDataStub() as any,
       snapshotAssemblerService: snapshotAssemblerStub as any,
+      convictionService: { conviction: jest.fn().mockResolvedValue({}) } as any,
+      cacheService: { isEnabled: () => false, setJson: jest.fn() } as any,
     };
 
     const adapters = buildPipelineDagAdapters(services);
@@ -494,6 +496,8 @@ describe('pipeline-dag-contract — FIX 1 scope end-to-end', () => {
       workbenchRefreshService: makeWorkbenchRefreshStub() as any,
       marketDataService: makeMarketDataStub() as any,
       snapshotAssemblerService: makeSnapshotAssemblerStub() as any,
+      convictionService: { conviction: jest.fn().mockResolvedValue({}) } as any,
+      cacheService: { isEnabled: () => false, setJson: jest.fn() } as any,
     };
 
     const adapters = buildPipelineDagAdapters(services);
@@ -530,6 +534,8 @@ describe('pipeline-dag-contract — FIX 1 scope end-to-end', () => {
       workbenchRefreshService: makeWorkbenchRefreshStub() as any,
       marketDataService: makeMarketDataStub() as any,
       snapshotAssemblerService: snapshotAssemblerStub as any,
+      convictionService: { conviction: jest.fn().mockResolvedValue({}) } as any,
+      cacheService: { isEnabled: () => false, setJson: jest.fn() } as any,
     };
 
     const adapters = buildPipelineDagAdapters(services);

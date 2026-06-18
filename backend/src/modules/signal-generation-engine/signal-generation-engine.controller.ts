@@ -1,5 +1,6 @@
 import type { Request, Response } from 'express';
 import { SignalGenerationEngineService } from './signal-generation-engine.service';
+import { attachCohortMetrics } from './signal-cohort-overlay';
 import { parseRunRequest, parseSignalQuery, validateInstrumentId } from './signal-generation-engine.validation';
 import { isCryptoScope } from '../../shared/data-access/market-repository-router';
 import {
@@ -59,6 +60,20 @@ export class SignalGenerationEngineController {
     private readonly cryptoRepo: CryptoSignalGenerationRepository = cryptoSignalGenerationRepository,
   ) {}
 
+  /**
+   * Attach historical cohort hit-rate to an equity list response (persisted-read overlay).
+   * Lives in the controller because the service is at the hard 500-line cap (shrink-only);
+   * the actual logic is the module-owned `attachCohortMetrics`. Graceful: returns the
+   * response unchanged on empty/missing data. Crypto responses are not annotated (no equity
+   * outcome cohort applies to the isolated crypto plane).
+   */
+  private async withCohortMetrics<T extends { signals?: any[]; items?: any[] }>(response: T): Promise<T> {
+    const items = response?.items ?? response?.signals ?? [];
+    if (!Array.isArray(items) || items.length === 0) return response;
+    const enriched = await attachCohortMetrics(items);
+    return { ...response, signals: enriched, items: enriched };
+  }
+
   /** Build the crypto top/screener response (persisted-read from the crypto_* plane). */
   private async cryptoTopResponse(query: ReturnType<typeof parseSignalQuery>) {
     const result = await this.cryptoRepo.topSignals({
@@ -90,7 +105,7 @@ export class SignalGenerationEngineController {
       if (isCryptoScope({ region: query.region, assetType: query.assetType })) {
         return res.json(await this.cryptoTopResponse(query));
       }
-      return res.json(await this.service.topSignals(query));
+      return res.json(await this.withCohortMetrics(await this.service.topSignals(query)));
     } catch (error) {
       console.error('Signal top endpoint error:', error);
       return res.status(500).json({ error: 'Failed to load top signals' });
@@ -113,7 +128,7 @@ export class SignalGenerationEngineController {
       if (isCryptoScope({ region: query.region, assetType: query.assetType })) {
         return res.json({ scope: { region: 'GLOBAL', assetType: 'CRYPTO' }, signals: [], items: [], notApplicable: true });
       }
-      return res.json(await this.service.exitCandidates(query));
+      return res.json(await this.withCohortMetrics(await this.service.exitCandidates(query)));
     } catch (error) {
       console.error('Signal exit-candidates endpoint error:', error);
       return res.status(500).json({ error: 'Failed to load exit candidates' });
@@ -131,7 +146,7 @@ export class SignalGenerationEngineController {
       if (isCryptoScope({ region: query.region, assetType: query.assetType })) {
         return res.json({ scope: { region: 'GLOBAL', assetType: 'CRYPTO' }, signals: [], items: [], notApplicable: true });
       }
-      return res.json(await this.service.lifecycleSignals(query));
+      return res.json(await this.withCohortMetrics(await this.service.lifecycleSignals(query)));
     } catch (error) {
       console.error('Signal lifecycle endpoint error:', error);
       return res.status(500).json({ error: 'Failed to load lifecycle signals' });
@@ -157,6 +172,8 @@ export class SignalGenerationEngineController {
       const results = await this.service.latestPersistedForInstruments([instrumentId]);
       const result = results[0] ?? null;
       if (!result) return res.status(404).json({ error: 'No persisted signal found for this instrument. Run signal generation via POST /signals/run to populate.' });
+      // Cohort overlay is attached on the LIST endpoints (table/drawer) only; the single-instrument
+      // read stays a verbatim persisted-read. SignalWidget/SignalCard cohort display is a follow-up.
       return res.json(result);
     } catch (error) {
       console.error('Signal instrument endpoint error:', error);
@@ -201,7 +218,7 @@ export class SignalGenerationEngineController {
       if (isCryptoScope({ region: query.region, assetType: query.assetType })) {
         return res.json(await this.cryptoTopResponse(query));
       }
-      return res.json(await this.service.screener(query));
+      return res.json(await this.withCohortMetrics(await this.service.screener(query)));
     } catch (error) {
       console.error('Signal screener endpoint error:', error);
       return res.status(500).json({ error: 'Failed to load signal screener' });

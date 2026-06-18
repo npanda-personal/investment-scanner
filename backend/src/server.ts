@@ -1,6 +1,7 @@
 import http from 'http';
 import { createApp } from './app';
 import { appConfig } from './config/env';
+import { connectRedis } from './cache/redis';
 import {
   startMarketDataStartupLoads,
 } from './modules/market-data-foundation/market-data-foundation.scheduler';
@@ -19,6 +20,10 @@ export const startServer = (port = appConfig.port): http.Server => {
 
   server.listen(port, () => {
     console.log(`Server running on port ${port}`);
+    console.log(`[cache] page-response cache ${appConfig.cacheEnabled ? 'ENABLED' : 'disabled'}`);
+    connectRedis().catch((error) => {
+      console.error('[cache] redis startup connect error', error);
+    });
     startMarketDataStartupLoads().catch((error) => {
       console.error('[MarketDataStartup] failed to start market-data startup loads', error);
     });

@@ -29,6 +29,7 @@
  */
 import { resolveMarketProfile } from '../../shared/utils/market-profile';
 import { DIRECTION_BULLISH_THRESHOLD, DIRECTION_BEARISH_THRESHOLD } from '../../shared/types/signal.types';
+import type { V4EvidenceConfig } from './signal-evidence';
 
 export const SIGNAL_ENGINE_MODEL_VERSION = 'signal-engine-v3';
 
@@ -126,6 +127,12 @@ export interface SignalScoringConfig {
    * (the fitting itself is gated on historical signal-outcome data, not on this seam).
    */
   directionThresholds: { bullish: number; bearish: number };
+  /**
+   * Optional v4 evidence-model knob overrides (per-cohort tuning seam, incl. the
+   * evidence-breadth gate).  Unset → compositeV4 uses DEFAULT_V4_EVIDENCE.  The v3 path
+   * never reads this, so v3/crypto scoring stays byte-identical.
+   */
+  v4Evidence?: V4EvidenceConfig;
 }
 
 /**
