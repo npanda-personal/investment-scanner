@@ -22,9 +22,6 @@ export const DEFAULT_STALENESS_DAYS = 5;
  * Records with neither a valid official date nor period-end are excluded (fail-closed).
  *
  * Field names are snake_case to match the runtime shape from formatFundamentalsResponse.
- * Note: official_result_date is mapped from Fundamental.officialResultDate but is not
- * currently emitted by formatFundamentalsResponse — the preference path is a no-op until
- * that formatter is updated (tracked separately in market-data-foundation).
  */
 export function filterFundamentalsAsOf<T extends { official_result_date?: unknown; period_end_date?: unknown }>(
   records: T[],
