@@ -1604,7 +1604,7 @@ export class SignalGenerationEngineService {
       eligible: excluded ? false : (eligible ? true : null),
       excludedReason: excluded ? this.dataQualityExcludedReason(reasons) : undefined,
       // Carry readiness so the persisted snapshot satisfies the trusted-read predicate
-      // (signal-read-policy.ts requires signalReadinessStatus === 'READY').
+      // (signal-read-policy.ts requires signalReadinessStatus to be READY or LIMITED).
       ...(signalReadinessStatus ? { signalReadinessStatus } : {}),
     };
   }

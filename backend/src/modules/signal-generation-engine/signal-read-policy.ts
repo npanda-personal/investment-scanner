@@ -10,8 +10,22 @@
  *   1. its audit status is CURRENT (full provenance: ruleset + scoring + DQ snapshot), and
  *   2. the data-quality filter was applied, and
  *   3. it was found eligible, and
- *   4. its signal-readiness status is READY.
+ *   4. its signal-readiness status is READY or LIMITED.
+ *
+ * On (4): the READY band starts at score 75 and LIMITED spans 50-74
+ * (data-quality-engine.config: readinessStatus.ready=75 / limited=50). But signal
+ * ELIGIBILITY independently requires readinessScore >= 70
+ * (ELIGIBILITY_POLICY.signal.minReadinessScore), so an *eligible* signal is always READY
+ * (>=75) or LIMITED-at-70-to-74 — never lower (a 50-69 signal is LIMITED but ineligible,
+ * caught by the eligible===true clause). Requiring READY-only was therefore STRICTER than
+ * eligibility itself and silently 404'd eligible-but-LIMITED signals on the research tab.
+ * We trust both READY and LIMITED: eligibility is the authority for "serveable", and the
+ * READY/LIMITED distinction is surfaced to the user via reliabilityTier / confidence, not
+ * by hiding the signal. (Signals whose snapshot predates persisted readiness status carry
+ * no signalReadinessStatus and remain untrusted until regenerated — a separate concern.)
  */
+
+const TRUSTED_READINESS_STATUSES = new Set(['READY', 'LIMITED']);
 
 export interface TrustedReadCandidate {
   auditStatus?: 'CURRENT' | 'LEGACY_MISSING';
@@ -27,7 +41,7 @@ export function isTrustedReadSignal(signal: TrustedReadCandidate): boolean {
   return signal.auditStatus === 'CURRENT'
     && dataQuality?.filterApplied === true
     && dataQuality.eligible === true
-    && dataQuality.signalReadinessStatus === 'READY';
+    && TRUSTED_READINESS_STATUSES.has(dataQuality.signalReadinessStatus ?? '');
 }
 
 import { SIGNAL_ENGINE_MODEL_VERSION_V4 } from './signal-scoring.config';
