@@ -24,6 +24,26 @@ const CRYPTO_PRICE_WINDOW = 520;
 const MIN_BARS_FOR_SIGNAL = 15; // enough for RSI(14); fewer → skip (insufficient history)
 const NEUTRAL_FUNDAMENTAL_SCORE = 0.5; // crypto has no fundamentals → neutral contribution
 
+// Conviction gate for the crypto confidence tier (parity with the v4 SG-6 fix on the equity
+// lane).  Crypto runs the v3 composite, whose confidence was data-sufficiency-only — so a
+// coin-flip score (~50) with enough bars/signals could still read HIGH.  |score - 50| measures
+// how far the composite leans from neutral; HIGH requires a genuinely directional lean
+// (>=60 / <=40, the direction cut-points), MEDIUM a half-step.  A NEUTRAL-band score caps at LOW.
+const CRYPTO_CONVICTION_HIGH = 10;
+const CRYPTO_CONVICTION_MEDIUM = 5;
+
+/**
+ * Confidence tier for a crypto (v3) signal — both data sufficiency AND conviction must clear
+ * the bar.  Pure/exported so the conviction gate is unit-testable.  `score` is the 0-100
+ * composite; `|score - 50|` is the conviction proxy (v3 has no v4 displacement component).
+ */
+export function cryptoConfidenceFor(barCount: number, totalSignals: number, score: number): 'HIGH' | 'MEDIUM' | 'LOW' {
+  const conviction = Math.abs(score - 50);
+  if (barCount >= 200 && totalSignals >= 3 && conviction >= CRYPTO_CONVICTION_HIGH) return 'HIGH';
+  if (barCount >= 60 && totalSignals >= 1 && conviction >= CRYPTO_CONVICTION_MEDIUM) return 'MEDIUM';
+  return 'LOW';
+}
+
 // Crypto scoring config: capability-driven (no fundamentals/delivery), with the
 // unused fundamental weight redistributed across technical/momentum so crypto
 // scores can use the full conviction range (see signal-scoring.config.ts).
@@ -74,12 +94,6 @@ export class CryptoSignalGenerationService {
     });
     // crypto repo returns ascending (oldest first) → reverse to newest-first.
     return points.reverse();
-  }
-
-  private confidenceFor(barCount: number, totalSignals: number): string {
-    if (barCount >= 200 && totalSignals >= 3) return 'HIGH';
-    if (barCount >= 60 && totalSignals >= 1) return 'MEDIUM';
-    return 'LOW';
   }
 
   /** Generate (or refresh) signals for all active crypto assets into crypto_signal_results. */
@@ -136,7 +150,7 @@ export class CryptoSignalGenerationService {
         const triggeredSignals = [...technical.signals, ...momentum.signals];
         const negativeSignals = [...technical.negativeSignals, ...momentum.negativeSignals];
         const explanation = this.compute.explain(direction, triggeredSignals, negativeSignals);
-        const confidence = this.confidenceFor(prices.length, triggeredSignals.length + negativeSignals.length);
+        const confidence = cryptoConfidenceFor(prices.length, triggeredSignals.length + negativeSignals.length, score);
         const latestPriceDate = prices[0]?.date ? new Date(prices[0].date) : null;
 
         const { created } = await this.repo.upsertSignal({

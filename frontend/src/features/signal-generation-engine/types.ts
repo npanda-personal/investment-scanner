@@ -10,7 +10,8 @@ export interface SignalItem {
 
 export type ReliabilityTier = 'FULL' | 'PARTIAL';
 export type CalibrationStatus = 'CALIBRATED' | 'PARTIAL' | 'PENDING' | 'UNAVAILABLE';
-export type LifecycleState = 'ACTIVE' | 'WEAKENING' | 'STALE' | 'EXITED' | 'UNKNOWN';
+// Matches the backend SignalLifecycleState contract (signal-lifecycle.ts / persisted column).
+export type LifecycleState = 'ENTRY' | 'ACTIVE' | 'EXIT' | 'EXPIRED';
 
 export interface SignalResult {
   id?: string;
@@ -57,6 +58,12 @@ export interface SignalResult {
   // Relative-strength universe percentile (NR-6)
   rsPercentile?: number | null;
   relativeReturn?: number | null;
+  // Historical cohort hit-rate (#2): how signals like this (direction × score-bucket) resolved.
+  cohortWinRate?: number | null;
+  cohortDirectionalSampleSize?: number | null;
+  cohortAvgReturnPercent?: number | null;
+  cohortMetricsHorizon?: string | null;
+  cohortWinRateConfidence?: 'HIGH' | 'MEDIUM' | 'LOW' | null;
 }
 
 export interface SignalScoringInputSummary {

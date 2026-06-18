@@ -29,8 +29,9 @@ import {
   DEFAULT_SIGNAL_SCORING_CONFIG,
   type SignalScoringConfig,
 } from './signal-scoring.config';
-import { compositeV4, type V4Components } from './signal-evidence';
-export { peerAggregates } from './signal-peer-aggregates';
+import { compositeV4, DEFAULT_V4_EVIDENCE, type V4Components } from './signal-evidence';
+import { extraTechnicalVotes } from './signal-extra-votes';
+export { peerAggregates, peerContextWarnings } from './signal-peer-aggregates';
 export { attachRsPercentiles } from './signal-percentile';
 export { filterFundamentalsAsOf, isStaleAsOf, stalenessAnchor } from './signal-asof';
 
@@ -174,6 +175,12 @@ export function evaluateTechnical(
       ));
     }
   }
+
+  // MACD cross + Bollinger %B confirmation votes (reuse existing indicators; reinforce
+  // technical evidence without inflating v4 family breadth — see signal-extra-votes.ts).
+  const extra = extraTechnicalVotes(prices);
+  signals.push(...extra.signals);
+  negativeSignals.push(...extra.negativeSignals);
 
   return { score: categoryScore(signals.length, negativeSignals.length, config), signals, negativeSignals };
 }
@@ -456,7 +463,7 @@ export function scoreInstrument(
   let score: number;
   let components: V4Components | null = null;
   if (useV4) {
-    const result = compositeV4(technical, momentum, fundamentals, config);
+    const result = compositeV4(technical, momentum, fundamentals, config, config.v4Evidence ?? DEFAULT_V4_EVIDENCE);
     score = result.score;
     components = result.components;
   } else {
