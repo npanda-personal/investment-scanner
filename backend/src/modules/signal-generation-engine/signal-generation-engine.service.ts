@@ -313,6 +313,7 @@ export class SignalGenerationEngineService {
             eligibleInstrumentIds: resolvedInstrumentIds,
             excludedInstrumentIds: [] as string[],
             reasonsByInstrumentId: {} as Record<string, any>,
+            readinessStatusByInstrumentId: {} as Record<string, string>,
           };
         }
         warnings.push(`Signal verdict filter unavailable; trusted signal generation failed closed: ${error?.message || 'unknown error'}`);
@@ -320,6 +321,7 @@ export class SignalGenerationEngineService {
           eligibleInstrumentIds: [] as string[],
           excludedInstrumentIds: resolvedInstrumentIds,
           reasonsByInstrumentId: {} as Record<string, any>,
+          readinessStatusByInstrumentId: {} as Record<string, string>,
         };
       });
       if (filtered) {
@@ -1582,7 +1584,8 @@ export class SignalGenerationEngineService {
     const eligible = new Set(filtered.eligibleInstrumentIds);
     return Object.fromEntries(instrumentIds.map((instrumentId) => {
       const reasons = filtered.reasonsByInstrumentId[instrumentId];
-      return [instrumentId, this.toEligibilitySnapshot(true, eligible.has(instrumentId), excluded.has(instrumentId), reasons)];
+      const readinessStatus = filtered.readinessStatusByInstrumentId?.[instrumentId];
+      return [instrumentId, this.toEligibilitySnapshot(true, eligible.has(instrumentId), excluded.has(instrumentId), reasons, readinessStatus)];
     }));
   }
 
@@ -1595,11 +1598,14 @@ export class SignalGenerationEngineService {
     };
   }
 
-  private toEligibilitySnapshot(filterApplied: boolean, eligible: boolean, excluded: boolean, reasons: string[] | undefined): SignalDataQualityEligibility {
+  private toEligibilitySnapshot(filterApplied: boolean, eligible: boolean, excluded: boolean, reasons: string[] | undefined, signalReadinessStatus?: string): SignalDataQualityEligibility {
     return {
       filterApplied,
       eligible: excluded ? false : (eligible ? true : null),
       excludedReason: excluded ? this.dataQualityExcludedReason(reasons) : undefined,
+      // Carry readiness so the persisted snapshot satisfies the trusted-read predicate
+      // (signal-read-policy.ts requires signalReadinessStatus === 'READY').
+      ...(signalReadinessStatus ? { signalReadinessStatus } : {}),
     };
   }
 

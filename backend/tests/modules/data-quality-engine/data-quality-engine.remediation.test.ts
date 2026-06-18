@@ -29,7 +29,7 @@ const prices = (count: number, volume: number | null = 1_500_000) =>
   }));
 
 describe('DQE remediation — single eligibility authority (Phase 1)', () => {
-  it('legacy eligibleForSignals now enforces the mainboard-fundamentals gate (was silently skipped)', () => {
+  it('fundamentals no longer gate signal eligibility: a fresh, liquid, READY mainboard is eligible with or without fundamentals', () => {
     const mainboard = instrument({ catalog_source: 'NSE_EQUITY_SECURITIES' });
     const svc = new DataQualityEngineService();
 
@@ -38,9 +38,10 @@ describe('DQE remediation — single eligibility authority (Phase 1)', () => {
 
     // Same high readiness score in both cases…
     expect(withoutFundamentals.signalReadinessStatus).toBe('READY');
-    // …but a fresh, liquid, READY mainboard with NO fundamentals is now signal-INELIGIBLE,
-    // matching the instrument_eligibility verdict instead of the old score>=70 && !stale rule.
-    expect(withoutFundamentals.eligibleForSignals).toBe(false);
+    // …and a fresh, liquid, READY mainboard is signal-ELIGIBLE even with NO fundamentals:
+    // missing fundamentals is reflected via reliabilityTier=PARTIAL in scoring, it does not
+    // exclude the instrument from having a signal (aligns IN with US/EU/crypto).
+    expect(withoutFundamentals.eligibleForSignals).toBe(true);
     expect(withFundamentals.eligibleForSignals).toBe(true);
   });
 
@@ -100,6 +101,26 @@ describe('DQE remediation — honest missing-verdict reason (Phase 2)', () => {
 
     expect(result.excludedInstrumentIds).toEqual(['missing-1']);
     expect(result.reasonsByInstrumentId['missing-1']).toEqual(['ELIGIBILITY_NOT_COMPUTED']);
+  });
+
+  it('filterByVerdict surfaces signalReadinessStatus per instrument (so the persisted signal snapshot can satisfy the trusted-read predicate)', async () => {
+    const row = {
+      instrumentId: 'in-1', tradingDate: new Date('2026-06-17'), priceBars: 300,
+      lastPriceDate: new Date('2026-06-17'), staleSessions: 0, volumeCoveragePct: 100, maxGapDays: 1,
+      liquidityScore: 90, hasFundamentals: false, hasSector: true, hasIndustry: true, hasCountry: true,
+      signalEligible: true, reviewEligible: true, backtestEligible: true, calibrationEligible: true,
+      signalReasons: [], reviewReasons: [], backtestReasons: [], calibrationReasons: [],
+      readinessScore: 98, readinessStatus: 'READY', policyVersion: 'elig-v1', computedAt: new Date(),
+    };
+    const repository = { findEligibilityRows: jest.fn().mockResolvedValue([row]) };
+    const svc = new DataQualityEngineService(repository as any, {} as any, null);
+
+    const result = await svc.filterByVerdict(['in-1'], 'signal');
+
+    expect(result.eligibleInstrumentIds).toEqual(['in-1']);
+    // The readiness status must be carried through — without it the signal-generation
+    // snapshot omits signalReadinessStatus and every signal fails isTrustedReadSignal.
+    expect(result.readinessStatusByInstrumentId['in-1']).toBe('READY');
   });
 });
 

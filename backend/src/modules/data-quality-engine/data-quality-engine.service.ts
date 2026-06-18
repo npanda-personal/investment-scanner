@@ -56,6 +56,11 @@ export interface FilterByVerdictResult {
   eligibleInstrumentIds: string[];
   excludedInstrumentIds: string[];
   reasonsByInstrumentId: Record<string, EligibilityReasonCode[]>;
+  // Per-instrument signal-readiness status (READY/LIMITED/...) from the persisted
+  // eligibility row. Consumers (e.g. the signal-generation DQ snapshot) need this so
+  // the persisted snapshot carries signalReadinessStatus — the trusted-read predicate
+  // (signal-read-policy.ts) requires it, and omitting it makes every signal untrusted.
+  readinessStatusByInstrumentId: Record<string, string>;
 }
 
 type VerdictKey = 'signal' | 'review' | 'backtest' | 'calibration';
@@ -822,7 +827,7 @@ export class DataQualityEngineService {
     tradingDate?: Date,
   ): Promise<FilterByVerdictResult> {
     if (instrumentIds.length === 0) {
-      return { eligibleInstrumentIds: [], excludedInstrumentIds: [], reasonsByInstrumentId: {} };
+      return { eligibleInstrumentIds: [], excludedInstrumentIds: [], reasonsByInstrumentId: {}, readinessStatusByInstrumentId: {} };
     }
     const rows = await this.getEligibility(instrumentIds, tradingDate);
     const byId = new Map(rows.map((row) => [row.instrumentId, row]));
@@ -830,6 +835,7 @@ export class DataQualityEngineService {
     const eligibleInstrumentIds: string[] = [];
     const excludedInstrumentIds: string[] = [];
     const reasonsByInstrumentId: Record<string, EligibilityReasonCode[]> = {};
+    const readinessStatusByInstrumentId: Record<string, string> = {};
 
     for (const instrumentId of instrumentIds) {
       const row = byId.get(instrumentId);
@@ -840,6 +846,7 @@ export class DataQualityEngineService {
         reasonsByInstrumentId[instrumentId] = ['ELIGIBILITY_NOT_COMPUTED'];
         continue;
       }
+      if (row.readinessStatus) readinessStatusByInstrumentId[instrumentId] = row.readinessStatus;
       const eligible = row.verdicts[`${verdict}Eligible` as keyof EligibilityVerdicts] as boolean;
       if (eligible) {
         eligibleInstrumentIds.push(instrumentId);
@@ -850,7 +857,7 @@ export class DataQualityEngineService {
       }
     }
 
-    return { eligibleInstrumentIds, excludedInstrumentIds, reasonsByInstrumentId };
+    return { eligibleInstrumentIds, excludedInstrumentIds, reasonsByInstrumentId, readinessStatusByInstrumentId };
   }
 
   private toEligibilityRow(row: any): InstrumentEligibilityRow {
