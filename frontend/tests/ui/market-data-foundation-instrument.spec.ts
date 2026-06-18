@@ -308,35 +308,47 @@ test.describe('Market Data Instrument Detail UI', () => {
   });
 
   test('renders persisted evidence and stays read-only on the Overview tab', async ({ page }) => {
-    const requests = recordApiRequests(page);
     await mockInstrumentWorkspace(page);
 
     // Persisted read-only evidence lives on the Overview tab (Chart is now the default).
-    await visitModule(page, `/stocks/${instrumentId}?tab=overview`, 'Stock Workspace');
+    // ?tab= deep-links don't survive the auth redirect (ProtectedRoute drops the query),
+    // so drive the UI like a user and click the Overview tab to reach its content.
+    await visitModule(page, `/stocks/${instrumentId}`, 'Stock Workspace');
+    // Record AFTER auth so the read-only check scopes to the PAGE's requests, not the
+    // test-harness login bootstrap (visitAuthenticated POSTs /auth/login when the session
+    // isn't pre-authenticated).
+    const requests = recordApiRequests(page);
+    await page.getByRole('tab', { name: 'Overview' }).click();
 
-    await expect(page.getByText('Read-only instrument evidence, market context gaps, personal research workflow links, and source freshness.')).toBeVisible();
+    await expect(page.getByText('360 ONE WAM LIMITED').first()).toBeVisible();
     await expect(page.getByText('Data through:').first()).toBeVisible();
     await expect(page.getByText('Freshness: Price Ready')).toBeVisible();
     await expect(page.getByText('Source: Persisted Exchange', { exact: true })).toBeVisible();
     await expect(page.getByText('Source status: Complete', { exact: true })).toBeVisible();
     await expect(page.getByText('manual verified')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Corporate Actions' })).toBeVisible();
-    await expect(page.getByRole('row', { name: /dividend\s+4\/27\/2026\s+N\/A\s+N\/A\s+6\s+N\/A\s+6\s+INR\s+exchange corporate actions\s+COMPLETE/ })).toHaveCount(1);
+    await expect(page.getByRole('row', { name: /dividend\s+4\/27\/2026\s+N\/A\s+N\/A\s+6\s+N\/A\s+₹6\.00\s+INR\s+exchange corporate actions\s+COMPLETE/ })).toHaveCount(1);
     await expect(page.getByRole('row', { name: /split\s+3\/2\/2023\s+N\/A\s+N\/A\s+2\s+2\s+N\/A\s+N\/A\s+exchange corporate actions\s+COMPLETE/ })).toHaveCount(1);
     await expect.poll(() => requests.some((request) => request.path.includes(`/api/v1/prices/${instrumentId}/latest`) && request.path.includes('region=IN') && request.path.includes('assetType=STOCK'))).toBe(true);
     expectReadOnlyInitialRender(requests);
   });
 
   test('renders the research tab from persisted read-only endpoints without side-effect requests', async ({ page }) => {
-    const requests = recordApiRequests(page);
     await mockResearchTab(page);
 
-    await visitModule(page, `/stocks/${instrumentId}?tab=research`, 'Stock Workspace');
+    // ?tab= deep-links don't survive the auth redirect (ProtectedRoute drops the query),
+    // so click the Research tab to reach the research workbench.
+    await visitModule(page, `/stocks/${instrumentId}`, 'Stock Workspace');
+    // Record AFTER auth so the read-only check scopes to the PAGE's requests, not the
+    // test-harness login bootstrap (visitAuthenticated POSTs /auth/login when the session
+    // isn't pre-authenticated).
+    const requests = recordApiRequests(page);
+    await page.getByRole('tab', { name: 'Research' }).click();
 
     await expect(page.getByText('360 ONE WAM LIMITED').first()).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Price Chart' })).toBeVisible();
     await expect(page.getByText('persisted exchange').first()).toBeVisible();
-    await expect(page.getByText('No signal generated yet.')).toBeVisible();
+    await expect(page.getByText(/No persisted signal found for this instrument/)).toBeVisible();
     await expect(page.getByText('No strategy decision generated yet.')).toBeVisible();
     await expect.poll(() => requests.some((request) => request.path.includes(`/api/v1/research/stocks/${instrumentId}/workbench`) && request.path.includes('range=1Y'))).toBe(true);
     expectReadOnlyInitialRender(requests);
