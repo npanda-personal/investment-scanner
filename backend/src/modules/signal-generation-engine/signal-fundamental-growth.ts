@@ -5,10 +5,10 @@
  * multi-period Fundamental history already loaded by the generation path.  No new
  * columns, no new ingestion: revenue / eps are read off the same Fundamental records.
  *
- * CORRECTNESS — YoY, not QoQ: `records` is DESC by periodEndDate, so records[1] is the
+ * CORRECTNESS — YoY, not QoQ: `records` is DESC by period_end_date, so records[1] is the
  * immediately-prior period.  For QUARTERLY data that prior period is the previous
  * quarter (seasonally noisy) — NOT a year-over-year comparable.  `yoyComparable` finds
- * the same-periodType record closest to one year before `latest` within a tolerance
+ * the same-period_type record closest to one year before `latest` within a tolerance
  * window, so ANNUAL compares to the prior ANNUAL and QUARTERLY compares to the same
  * fiscal quarter a year earlier.
  *
@@ -53,19 +53,22 @@ function num(value: unknown): number | null {
 }
 
 /**
- * The year-over-year comparable for `latest`: the record with the SAME periodType whose
- * periodEndDate is closest to (latest.periodEndDate − 365d) within [300, 430] days
+ * The year-over-year comparable for `latest`: the record with the SAME period_type whose
+ * period_end_date is closest to (latest.period_end_date − 365d) within [300, 430] days
  * before latest.  Returns null when nothing falls in the window (graceful no-vote).
  *
  * Pure: scans the array, never mutates it.  Skips `latest` itself by identity AND by
  * an end-date that is not actually before latest's.
+ *
+ * Field names are snake_case to match the runtime shape from formatFundamentalsResponse
+ * (period_type, period_end_date as ISO string).
  */
-export function yoyComparable<T extends { periodType?: unknown; periodEndDate?: unknown }>(
+export function yoyComparable<T extends { period_type?: unknown; period_end_date?: unknown }>(
   records: T[],
   latest: T,
 ): T | null {
   if (!Array.isArray(records) || !latest) return null;
-  const latestEnd = toEpochMs(latest.periodEndDate);
+  const latestEnd = toEpochMs(latest.period_end_date);
   if (latestEnd === null) return null;
   const targetMs = latestEnd - YOY_TARGET_DAYS * MS_PER_DAY;
 
@@ -73,8 +76,8 @@ export function yoyComparable<T extends { periodType?: unknown; periodEndDate?: 
   let bestDelta = Infinity;
   for (const rec of records) {
     if (rec === latest) continue;
-    if (rec.periodType !== latest.periodType) continue;
-    const end = toEpochMs(rec.periodEndDate);
+    if (rec.period_type !== latest.period_type) continue;
+    const end = toEpochMs(rec.period_end_date);
     if (end === null) continue;
     const gapDays = (latestEnd - end) / MS_PER_DAY;
     if (gapDays < YOY_MIN_DAYS || gapDays > YOY_MAX_DAYS) continue;

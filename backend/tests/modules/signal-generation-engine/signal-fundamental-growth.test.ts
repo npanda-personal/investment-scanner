@@ -11,20 +11,22 @@ import {
   fundamentalGrowthVotes,
 } from '../../../src/modules/signal-generation-engine/signal-fundamental-growth';
 
-/** Build a record; periodEndDate is days-ago-from-anchor for readability. */
+/**
+ * Build a record using the runtime snake_case shape from formatFundamentalsResponse:
+ * period_type, period_end_date (ISO string), revenue, eps.
+ */
 const anchor = new Date('2026-03-31T00:00:00.000Z');
 const daysAgo = (d: number) => new Date(anchor.getTime() - d * 24 * 60 * 60 * 1000);
 
 const rec = (
-  periodType: 'QUARTERLY' | 'ANNUAL',
+  period_type: 'QUARTERLY' | 'ANNUAL',
   daysBeforeAnchor: number,
-  fields: { revenue?: number | null; eps?: number | null; netIncome?: number | null } = {},
+  fields: { revenue?: number | null; eps?: number | null } = {},
 ) => ({
-  periodType,
-  periodEndDate: daysAgo(daysBeforeAnchor),
+  period_type,
+  period_end_date: daysAgo(daysBeforeAnchor).toISOString(),
   revenue: fields.revenue ?? null,
   eps: fields.eps ?? null,
-  netIncome: fields.netIncome ?? null,
 });
 
 describe('yoyComparable — same-periodType, ~1yr-prior matcher', () => {
@@ -71,8 +73,8 @@ describe('yoyComparable — same-periodType, ~1yr-prior matcher', () => {
 
   it('returns null on empty / missing latest end-date', () => {
     expect(yoyComparable([], rec('ANNUAL', 0))).toBeNull();
-    const records: Array<{ periodType: string; periodEndDate: Date | null }> = [rec('ANNUAL', 365)];
-    expect(yoyComparable(records, { periodType: 'ANNUAL', periodEndDate: null })).toBeNull();
+    const records: Array<{ period_type: string; period_end_date: string | null }> = [rec('ANNUAL', 365)];
+    expect(yoyComparable(records, { period_type: 'ANNUAL', period_end_date: null })).toBeNull();
   });
 });
 

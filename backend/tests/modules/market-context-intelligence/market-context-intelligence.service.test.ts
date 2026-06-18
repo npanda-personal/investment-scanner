@@ -1,4 +1,11 @@
 /// <reference types="@types/jest" />
+// Isolate macro() from the live macro_snapshots table: with a FRED row seeded in the
+// shared DB, the unmocked persisted-read would return SUPPORTIVE/COMPLETE and make the
+// "no persisted FRED row → UNKNOWN/MISSING fallback" assertion non-deterministic. Mock the
+// getter to null so the fallback path is exercised deterministically (pre-FRED behaviour).
+jest.mock('../../../src/modules/market-context-intelligence/market-context-intelligence.macro-read.repository', () => ({
+  getLatestMacroSnapshot: jest.fn().mockResolvedValue(null),
+}));
 import { MarketContextIntelligenceService } from '../../../src/modules/market-context-intelligence';
 
 const instrument = (overrides: any = {}) => ({
@@ -204,9 +211,9 @@ describe('MarketContextIntelligenceService', () => {
     expect(countries.map((item) => item.country)).toEqual(expect.arrayContaining(['US', 'India']));
   });
 
-  it('returns missing macro fallback', () => {
+  it('returns missing macro fallback when no persisted FRED row exists', async () => {
     const service = new MarketContextIntelligenceService({} as any, {} as any);
-    expect(service.macro()).toMatchObject({ macroStatus: 'UNKNOWN', dataStatus: 'MISSING' });
+    await expect(service.macro()).resolves.toMatchObject({ macroStatus: 'UNKNOWN', dataStatus: 'MISSING' });
   });
 
   it('builds summary response shape (persisted-read path)', async () => {

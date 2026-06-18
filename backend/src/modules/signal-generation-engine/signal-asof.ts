@@ -17,11 +17,16 @@ export const DEFAULT_STALENESS_DAYS = 5;
 /**
  * Fundamentals public-availability filter for as-of / backfill runs (Fix #2).
  * A result is visible at `asOf` only when it was actually public by then:
- *   1. prefer the explicit officialResultDate (board-meeting announcement date);
- *   2. otherwise periodEndDate + a conservative per-market filing lag.
+ *   1. prefer the explicit official_result_date (board-meeting announcement date);
+ *   2. otherwise period_end_date + a conservative per-market filing lag.
  * Records with neither a valid official date nor period-end are excluded (fail-closed).
+ *
+ * Field names are snake_case to match the runtime shape from formatFundamentalsResponse.
+ * Note: official_result_date is mapped from Fundamental.officialResultDate but is not
+ * currently emitted by formatFundamentalsResponse — the preference path is a no-op until
+ * that formatter is updated (tracked separately in market-data-foundation).
  */
-export function filterFundamentalsAsOf<T extends { officialResultDate?: unknown; periodEndDate?: unknown }>(
+export function filterFundamentalsAsOf<T extends { official_result_date?: unknown; period_end_date?: unknown }>(
   records: T[],
   asOf: Date,
   publicLagDays: number,
@@ -29,11 +34,11 @@ export function filterFundamentalsAsOf<T extends { officialResultDate?: unknown;
   const asOfMs = asOf.getTime();
   const lagMs = publicLagDays * DAY_MS;
   return records.filter((record) => {
-    if (record.officialResultDate) {
-      const officialDate = new Date(record.officialResultDate as any);
+    if (record.official_result_date) {
+      const officialDate = new Date(record.official_result_date as any);
       if (Number.isFinite(officialDate.getTime())) return officialDate.getTime() <= asOfMs;
     }
-    const periodEndDate = record.periodEndDate ? new Date(record.periodEndDate as any) : null;
+    const periodEndDate = record.period_end_date ? new Date(record.period_end_date as any) : null;
     if (periodEndDate === null || !Number.isFinite(periodEndDate.getTime())) return false;
     return periodEndDate.getTime() + lagMs <= asOfMs;
   });

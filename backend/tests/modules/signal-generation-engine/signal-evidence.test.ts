@@ -256,12 +256,14 @@ describe('scoreInstrument — version routing & v3 parity', () => {
   });
 
   // Phase 1 growth votes: multi-period fundamentals with strong YoY revenue + EPS growth.
+  // Fixtures use the runtime snake_case shape from formatFundamentalsResponse
+  // (period_type, period_end_date as ISO string) — NOT camelCase.
   const day = 24 * 60 * 60 * 1000;
-  const periodEnd = (d: number) => new Date(Date.UTC(2026, 2, 31) - d * day);
+  const periodEnd = (d: number) => new Date(Date.UTC(2026, 2, 31) - d * day).toISOString();
   const growthRecords = [
-    { periodType: 'QUARTERLY', periodEndDate: periodEnd(0), revenue: 140, eps: 14, net_income: 20 },
-    { periodType: 'QUARTERLY', periodEndDate: periodEnd(91), revenue: 120, eps: 12, net_income: 18 },
-    { periodType: 'QUARTERLY', periodEndDate: periodEnd(365), revenue: 100, eps: 10, net_income: 15 },
+    { period_type: 'QUARTERLY', period_end_date: periodEnd(0), revenue: 140, eps: 14, net_income: 20 },
+    { period_type: 'QUARTERLY', period_end_date: periodEnd(91), revenue: 120, eps: 12, net_income: 18 },
+    { period_type: 'QUARTERLY', period_end_date: periodEnd(365), revenue: 100, eps: 10, net_income: 15 },
   ];
   const growthInput = {
     prices, relativeToPeers: 0.05,
