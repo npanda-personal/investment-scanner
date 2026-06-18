@@ -68,7 +68,7 @@ export default function InstrumentPriceChart({
         if (cancelled) return;
         const seen = new Set<string>();
         const rows = (res.prices ?? [])
-          .filter((p) => p.open != null && p.high != null && p.low != null && p.close != null)
+          .filter((p) => [p.open, p.high, p.low, p.close].every((v) => Number.isFinite(v)))
           .map((p) => ({
             time: String(p.date).slice(0, 10),
             open: p.open as number,
@@ -179,7 +179,7 @@ export default function InstrumentPriceChart({
         position: 'relative',
         height,
         overflow: 'hidden',
-        '&:hover .tv-ext-link': { opacity: 1 },
+        '&:hover .tv-ext-link, & .tv-ext-link:focus-visible': { opacity: 1 },
       }}
     >
       <Box ref={containerRef} sx={{ height: '100%', width: '100%' }} />
