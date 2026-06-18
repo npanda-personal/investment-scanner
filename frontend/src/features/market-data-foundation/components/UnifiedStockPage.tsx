@@ -19,7 +19,7 @@ import { useMarketScope } from '@/contexts/MarketScopeContext';
 import { fetchInstruments, fetchInstrument } from '../api/marketDataFoundationService';
 import { SignalsHistoryTab } from './SignalsHistoryTab';
 import { MarketContextRail } from './MarketContextRail';
-import TradingViewChart from '@/shared/components/TradingViewChart';
+import InstrumentPriceChart from '@/shared/components/InstrumentPriceChart';
 import SourceListRail from '@/shared/workspace/SourceListRail';
 import { buildTradingViewSymbol } from '@/shared/format/tradingViewSymbol';
 
@@ -47,10 +47,8 @@ export default function UnifiedStockPage() {
   const [derivativesEligible, setDerivativesEligible] = useState<boolean | null>(null);
   const [symbol, setSymbol] = useState<string | null>(null);
   const [tvSymbol, setTvSymbol] = useState<string>('');
-  const [instrumentLoading, setInstrumentLoading] = useState(true);
   useEffect(() => {
     if (!id) return;
-    setInstrumentLoading(true);
     fetchInstrument(id, { region: scope.region, assetType: scope.assetType })
       .then((inst) => {
         setDerivativesEligible(inst.derivatives_eligible ?? null);
@@ -70,8 +68,7 @@ export default function UnifiedStockPage() {
         setDerivativesEligible(null);
         setSymbol(null);
         setTvSymbol('');
-      })
-      .finally(() => setInstrumentLoading(false));
+      });
   }, [id, scope.region, scope.assetType]);
 
   return (
@@ -100,7 +97,13 @@ export default function UnifiedStockPage() {
       {activeTab === 'chart' ? (
         <Grid container spacing={2}>
           <Grid item xs={12} lg={9}>
-            <TradingViewChart symbol={tvSymbol} loading={instrumentLoading} height={CHART_HEIGHT} />
+            <InstrumentPriceChart
+              instrumentId={id}
+              region={scope.region}
+              assetType={scope.assetType}
+              tvSymbol={tvSymbol}
+              height={CHART_HEIGHT}
+            />
           </Grid>
           <Grid item xs={12} lg={3}>
             <SourceListRail activeInstrumentId={id} height={CHART_HEIGHT} />
