@@ -7,25 +7,16 @@
  * render only from already-persisted row fields — no fetching, research-support language only.
  */
 import { Box, Chip, TableCell, Tooltip, Typography } from '@mui/material';
-import { Link as RouterLink } from 'react-router-dom';
+import { StockWorkspaceLink } from '@/shared/workspace/StockWorkspaceLink';
+import type { WorkspaceSource } from '@/shared/workspace/types';
 import type { ScreenerCapBand, FnoReadinessComponents, ScreenerRow } from '../../types';
 
 // ---------------------------------------------------------------------------
 // Base cells (moved verbatim from ScreenerPage)
 // ---------------------------------------------------------------------------
 
-export function SymbolLink({ instrumentId, symbol }: { instrumentId: string; symbol: string }) {
-  return (
-    <Typography
-      component={RouterLink}
-      to={`/stocks/${instrumentId}`}
-      variant="body2"
-      sx={{ fontWeight: 600, textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
-      color="primary"
-    >
-      {symbol}
-    </Typography>
-  );
+export function SymbolLink({ instrumentId, symbol, source }: { instrumentId: string; symbol: string; source: WorkspaceSource }) {
+  return <StockWorkspaceLink instrumentId={instrumentId} symbol={symbol} source={source} />;
 }
 
 export function SignalChip({ direction, score }: { direction: 'BULLISH' | 'BEARISH' | 'NEUTRAL' | null; score: number | null }) {

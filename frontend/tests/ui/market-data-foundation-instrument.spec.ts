@@ -296,11 +296,23 @@ test.describe('Market Data Instrument Detail UI', () => {
     await mockAuthenticatedUser(page);
   });
 
-  test('renders persisted evidence and stays read-only on the Instrument Workspace initial render', async ({ page }) => {
+  test('defaults to the Chart tab with the source-list rail empty state', async ({ page }) => {
+    await mockInstrumentWorkspace(page);
+
+    // No ?tab param → the workspace now lands on the Chart tab by default.
+    await visitModule(page, `/stocks/${instrumentId}`, 'Stock Workspace');
+
+    await expect(page.getByRole('tab', { name: 'Chart', selected: true })).toBeVisible();
+    // With no prior list click, the reusable source-list rail shows its empty state.
+    await expect(page.getByText(/No list context yet/)).toBeVisible();
+  });
+
+  test('renders persisted evidence and stays read-only on the Overview tab', async ({ page }) => {
     const requests = recordApiRequests(page);
     await mockInstrumentWorkspace(page);
 
-    await visitModule(page, `/stocks/${instrumentId}`, 'Instrument Workspace');
+    // Persisted read-only evidence lives on the Overview tab (Chart is now the default).
+    await visitModule(page, `/stocks/${instrumentId}?tab=overview`, 'Stock Workspace');
 
     await expect(page.getByText('Read-only instrument evidence, market context gaps, personal research workflow links, and source freshness.')).toBeVisible();
     await expect(page.getByText('Data through:').first()).toBeVisible();
@@ -319,7 +331,7 @@ test.describe('Market Data Instrument Detail UI', () => {
     const requests = recordApiRequests(page);
     await mockResearchTab(page);
 
-    await visitModule(page, `/stocks/${instrumentId}?tab=research`, 'Instrument Workspace');
+    await visitModule(page, `/stocks/${instrumentId}?tab=research`, 'Stock Workspace');
 
     await expect(page.getByText('360 ONE WAM LIMITED').first()).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Price Chart' })).toBeVisible();

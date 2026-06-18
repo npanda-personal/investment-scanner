@@ -6,6 +6,7 @@ import { AddToWatchlistDialog } from '@/features/watchlist-management';
 import { CreateAlertDialog } from '@/features/alerts-monitoring';
 import { DataTable, StatusBadge, type SortDirection } from '@/shared/components';
 import type { SignalResult } from '../types';
+import { useWorkspaceSourceListStore } from '@/shared/workspace/workspaceSourceListStore';
 import { buildSignalColumns } from './signalTableColumns';
 import { formatDate } from './signalTableFormat';
 
@@ -27,6 +28,13 @@ type SignalTableProps = {
 
 export function SignalTable({ signals, totalCount, loading, page, pageSize, sortBy, sortDirection, onPageChange, onPageSizeChange, onSortChange, strategyContextLoaded = false, bannedSymbols, emptyMessage }: SignalTableProps) {
   const navigate = useNavigate();
+  const setSource = useWorkspaceSourceListStore((s) => s.setSource);
+  // Open the Stock Workspace (Chart tab by default) and capture this signal list so the
+  // workspace rail lets the user step through the other signals.
+  const openWorkspace = (instrumentId: string) => {
+    setSource('Signals', signals.map((s) => ({ instrumentId: s.instrument_id, symbol: s.symbol, companyName: s.company_name })));
+    navigate(`/stocks/${instrumentId}`);
+  };
   const [selectedSignal, setSelectedSignal] = React.useState<SignalResult | null>(null);
   const [portfolioSignal, setPortfolioSignal] = React.useState<SignalResult | null>(null);
   const [watchlistSignal, setWatchlistSignal] = React.useState<SignalResult | null>(null);
@@ -36,6 +44,7 @@ export function SignalTable({ signals, totalCount, loading, page, pageSize, sort
 
   const columns = buildSignalColumns({
     navigate,
+    openWorkspace,
     strategyContextLoaded,
     bannedSymbols,
     onAddWatchlist: setWatchlistSignal,
@@ -230,7 +239,7 @@ export function SignalTable({ signals, totalCount, loading, page, pageSize, sort
             <Divider />
 
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
-              <Button variant="outlined" onClick={() => navigate(`/research/stocks/${selectedSignal.instrument_id}`)}>Open Research</Button>
+              <Button variant="outlined" onClick={() => openWorkspace(selectedSignal.instrument_id)}>Open Workspace</Button>
               <Button variant="contained" onClick={() => navigate(`/strategy?instrumentId=${selectedSignal.instrument_id}`)}>Review Strategy Decision</Button>
             </Stack>
           </Stack>

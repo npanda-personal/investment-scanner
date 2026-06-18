@@ -31,6 +31,7 @@ import { useMarketScope } from '@/contexts/MarketScopeContext';
 import { compactByProfile, money } from '@/shared/format/money';
 import { screenerSubtitle as buildScreenerSubtitle } from '@/shared/format/exchangeLabels';
 import type { ScreenerFilters, ScreenerRow, ScreenerCapBand, ScreenerSignalDirection } from '../types';
+import type { WorkspaceSource } from '@/shared/workspace/types';
 import { fetchScreener } from '../api/screenerService';
 import {
   SymbolLink,
@@ -159,6 +160,13 @@ export default function ScreenerPage() {
       </Box>
     );
   }
+
+  // Source list for the Stock Workspace rail — the full screened set, so the rail lets
+  // the user step through every match without leaving the chart.
+  const screenerSource: WorkspaceSource = {
+    label: 'Screener',
+    items: rows.map((r) => ({ instrumentId: r.instrumentId, symbol: r.symbol, companyName: r.companyName })),
+  };
 
   return (
     <Box sx={{ p: 3 }}>
@@ -409,7 +417,7 @@ export default function ScreenerPage() {
               {rows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((row) => (
                 <TableRow key={row.instrumentId} hover>
                   <TableCell>
-                    <SymbolLink instrumentId={row.instrumentId} symbol={row.symbol} />
+                    <SymbolLink instrumentId={row.instrumentId} symbol={row.symbol} source={screenerSource} />
                   </TableCell>
                   <TableCell>
                     <Tooltip title={row.companyName}>

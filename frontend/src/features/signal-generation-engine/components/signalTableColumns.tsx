@@ -90,6 +90,9 @@ const BlockedStrategyDetails = ({ signal }: { signal: SignalResult }) => (
 
 export interface SignalColumnDeps {
   navigate: NavigateFunction;
+  /** Open the Stock Workspace (Chart tab) for an instrument and capture the signal list
+   * as the workspace source-list rail. */
+  openWorkspace: (instrumentId: string) => void;
   strategyContextLoaded: boolean;
   bannedSymbols?: Set<string>;
   onAddWatchlist: (signal: SignalResult) => void;
@@ -97,7 +100,7 @@ export interface SignalColumnDeps {
   onCreateAlert: (signal: SignalResult) => void;
 }
 
-export function buildSignalColumns({ navigate, strategyContextLoaded, bannedSymbols, onAddWatchlist, onAddPortfolio, onCreateAlert }: SignalColumnDeps): DataTableColumn<SignalResult>[] {
+export function buildSignalColumns({ navigate, openWorkspace, strategyContextLoaded, bannedSymbols, onAddWatchlist, onAddPortfolio, onCreateAlert }: SignalColumnDeps): DataTableColumn<SignalResult>[] {
   return [
     {
       id: 'symbol',
@@ -105,7 +108,7 @@ export function buildSignalColumns({ navigate, strategyContextLoaded, bannedSymb
       sortable: true,
       render: (signal) => (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-          <Button size="small" onClick={(event) => { event.stopPropagation(); navigate(`/research/stocks/${signal.instrument_id}`); }}>{signal.symbol}</Button>
+          <Button size="small" onClick={(event) => { event.stopPropagation(); openWorkspace(signal.instrument_id); }}>{signal.symbol}</Button>
           {bannedSymbols?.has(signal.symbol) && (
             <Tooltip title="In F&O ban period — derivatives trading restricted; elevated risk." arrow enterDelay={200}>
               <Chip
@@ -326,7 +329,7 @@ export function buildSignalColumns({ navigate, strategyContextLoaded, bannedSymb
       render: (signal) => (
         <Box sx={{ display: 'flex', gap: 0.5 }} onClick={(event) => event.stopPropagation()}>
           <Tooltip title="View Stock Details" arrow>
-            <IconButton size="small" onClick={() => navigate(`/research/stocks/${signal.instrument_id}`)}>
+            <IconButton size="small" onClick={() => openWorkspace(signal.instrument_id)}>
               <VisibilityOutlined fontSize="small" />
             </IconButton>
           </Tooltip>
