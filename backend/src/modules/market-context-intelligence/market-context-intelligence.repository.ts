@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
 import { Prisma, PrismaClient } from '@prisma/client';
 import prisma from '../../db/prisma';
-import { isKnownSector } from '../../shared/utils/sector-metadata';
+import { isKnownSector } from '../../shared/utils/sector-metadata'; import { getLatestMacroSnapshot } from './market-context-intelligence.macro-read.repository';
 import type { 
   MarketContextSummary, 
   MarketRegimeSummary, 
@@ -30,15 +30,15 @@ export class MarketContextIntelligenceRepository {
     const today = new Date();
     today.setUTCHours(0, 0, 0, 0);
 
-    const [market, sectors, countries] = await Promise.all([
+    const [market, sectors, countries, macro] = await Promise.all([
       this.db.marketContextSnapshot.findUnique({ where: { snapshotDate_region: { snapshotDate: today, region } } }),
       this.db.sectorContextSnapshot.findMany({ where: { snapshotDate: today, region }, orderBy: { relativeStrengthScore: 'desc' } }),
-      this.db.countryContextSnapshot.findMany({ where: { snapshotDate: today, region }, orderBy: { relativeStrengthScore: 'desc' } })
+      this.db.countryContextSnapshot.findMany({ where: { snapshotDate: today, region }, orderBy: { relativeStrengthScore: 'desc' } }), getLatestMacroSnapshot('GLOBAL').catch(() => null)
     ]);
 
     if (!market) return null;
 
-    return this.toSummary(market, sectors, countries);
+    return this.toSummary(market, sectors, countries, macro);
   }
 
   async latestPersistedSnapshot(region: string = 'GLOBAL'): Promise<MarketContextSummary | null> {
@@ -48,12 +48,12 @@ export class MarketContextIntelligenceRepository {
     });
     if (!market) return null;
 
-    const [sectors, countries] = await Promise.all([
+    const [sectors, countries, macro] = await Promise.all([
       this.db.sectorContextSnapshot.findMany({ where: { snapshotDate: market.snapshotDate, region }, orderBy: { relativeStrengthScore: 'desc' } }),
-      this.db.countryContextSnapshot.findMany({ where: { snapshotDate: market.snapshotDate, region }, orderBy: { relativeStrengthScore: 'desc' } })
+      this.db.countryContextSnapshot.findMany({ where: { snapshotDate: market.snapshotDate, region }, orderBy: { relativeStrengthScore: 'desc' } }), getLatestMacroSnapshot('GLOBAL').catch(() => null)
     ]);
 
-    return this.toSummary(market, sectors, countries);
+    return this.toSummary(market, sectors, countries, macro);
   }
 
   async loadSectorIndexInputs(query: { region: string; dataThroughDate?: Date | null }): Promise<SectorIndexInput[]> {
@@ -320,7 +320,7 @@ export class MarketContextIntelligenceRepository {
     return (rows as any[]).map((row) => this.toSectorSnapshotDto(row));
   }
 
-  private toSummary(market: any, sectors: any[], countries: any[]): MarketContextSummary {
+  private toSummary(market: any, sectors: any[], countries: any[], loadedMacro?: MacroSnapshot | null): MarketContextSummary {
     const regime: MarketRegimeSummary = {
       regime: market.regime as any,
       score: Number(market.regimeScore),
@@ -366,7 +366,7 @@ export class MarketContextIntelligenceRepository {
       bullishSignalCount: c.bullishSignalCount || 0,
     }));
 
-    const macro: MacroSnapshot = {
+    const macro: MacroSnapshot = loadedMacro ?? {
       interestRateProxy: null,
       inflationProxy: null,
       usdStrengthProxy: null,

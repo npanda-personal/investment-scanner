@@ -8,6 +8,7 @@ import {
 import { startEodIngestScheduler } from './modules/market-context-intelligence/eod-ingest.scheduler';
 import { startUsEodPriceScheduler } from './modules/market-context-intelligence/us-eod-price.scheduler';
 import { startUsEarningsScheduler } from './modules/market-context-intelligence/us-earnings.scheduler';
+import { startFredScheduler } from './modules/market-context-intelligence/market-context-intelligence.fred.scheduler';
 import { startPipelineReaperScheduler } from './modules/pipeline-orchestration/pipeline-orchestration.scheduler';
 
 export const createHttpServer = (): http.Server => {
@@ -30,6 +31,7 @@ export const startServer = (port = appConfig.port): http.Server => {
     startEodIngestScheduler();
     startUsEodPriceScheduler();
     startUsEarningsScheduler();
+    startFredScheduler();
     startPipelineReaperScheduler();
   });
 

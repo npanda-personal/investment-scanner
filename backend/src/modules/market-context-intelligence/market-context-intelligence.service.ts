@@ -1,7 +1,7 @@
 import { MarketDataFoundationService } from '../market-data-foundation';
 import { isKnownSector } from '../../shared/utils/sector-metadata';
 import { resolveMarketProfile } from '../../shared/utils/market-profile';
-import { MarketContextIntelligenceRepository } from './market-context-intelligence.repository';
+import { MarketContextIntelligenceRepository } from './market-context-intelligence.repository'; import { getLatestMacroSnapshot } from './market-context-intelligence.macro-read.repository';
 import type {
   BreadthDivergenceNote,
   BreadthInternalsDelta,
@@ -116,7 +116,7 @@ export class MarketContextIntelligenceService {
     );
     const breadthByCapBand = this.calculateBreadthByCapBand(capBandUniverse, region);
     const countries = this.rankCountries(enriched);
-    const macro = this.macro();
+    const macro = await this.macro();
 
     const summary: MarketContextSummary = {
       regime,
@@ -185,7 +185,7 @@ export class MarketContextIntelligenceService {
       breadth,
       breadthByCapBand: [],
       countryStrength: [],
-      macro: this.macro(),
+      macro: await this.macro(),
       explanation: [`Crypto market regime from ${items.length} coins (benchmark ${profile.benchmark.label}).${dominanceNote}`.trim()],
       updatedAt: (asOf ?? new Date()).toISOString(),
       dataStatus: items.length > 0 ? 'PARTIAL' : 'MISSING',
@@ -401,14 +401,11 @@ export class MarketContextIntelligenceService {
     return s?.countryStrength ?? [];
   }
 
-  macro(): MacroSnapshot {
-    return {
-      interestRateProxy: null,
-      inflationProxy: null,
-      usdStrengthProxy: null,
-      commodityProxy: null,
-      macroStatus: 'UNKNOWN',
-      dataStatus: 'MISSING',
+  /** Persisted-read of the latest GLOBAL FRED macro row; falls back to UNKNOWN/MISSING stub. */
+  async macro(): Promise<MacroSnapshot> {
+    return (await getLatestMacroSnapshot('GLOBAL').catch(() => null)) ?? {
+      interestRateProxy: null, inflationProxy: null, usdStrengthProxy: null, commodityProxy: null,
+      macroStatus: 'UNKNOWN', dataStatus: 'MISSING',
       explanation: 'Macro providers are not configured yet; macro context is intentionally returned as missing in the MVP.',
     };
   }
@@ -692,7 +689,7 @@ export class MarketContextIntelligenceService {
       regime.explanation,
       top && weak ? `${top.sector} is leading while ${weak.sector} is lagging.` : 'Sector rotation is unavailable until more sector data exists.',
       breadth.percentAboveSma50 !== null ? `Breadth sample has ${this.formatPercent(breadth.percentAboveSma50)} above SMA50.` : 'Breadth is missing because price history is unavailable.',
-      `Macro status is ${macro.macroStatus.toLowerCase()} because macro proxy data is not configured.`,
+      macro.dataStatus !== 'MISSING' ? `Macro status is ${macro.macroStatus.toLowerCase()}. ${macro.explanation}` : `Macro status is ${macro.macroStatus.toLowerCase()} because macro proxy data is unavailable.`,
     ];
   }
 
