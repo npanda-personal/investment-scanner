@@ -68,6 +68,23 @@ export interface SignalResultDto {
   writeStatus?: SignalWriteStatus;
   triggerContract?: SignalTriggerContractDto;
 
+  // ── §17 Trigger Object persisted fields (durable, derived at write time) ────
+  // Populated from the primary strategy match's SOURCE_PROVEN triggerPriceEvidence
+  // at write time and read back directly from the SignalResult row, so the trigger
+  // contract no longer has to re-derive them on every read. All null when no
+  // source-proven match exists (honest absent — never fabricated).
+  triggerPrice?: number | null;
+  triggerTimestamp?: string | null;
+  triggerTimeframe?: string | null;
+  entryRuleId?: string | null;
+  exitRuleId?: string | null;
+  invalidationRuleId?: string | null;
+  strategyId?: string | null;
+  strategyVersion?: string | null;
+  /** Prisma-managed persistence timestamps (read-only; never written by the engine). */
+  createdAt?: string | null;
+  updatedAt?: string | null;
+
   // ── Delivery% evidence (NSE-sourced, persisted-read, null when absent) ──────
   /**
    * Latest NSE delivery% (deliverable qty / traded qty × 100) for this stock.

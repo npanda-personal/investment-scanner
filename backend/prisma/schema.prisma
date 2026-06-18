@@ -382,6 +382,15 @@ model SignalResult {
   lifecycleState                 String?
   /// Score from the immediately prior persisted run for the same instrument+modelVersion (nullable)
   priorScore                     Float?
+  /// TriggerObjectV1 (#7): source-proven trigger fields, populated only on a strategy-aware run; null otherwise.
+  triggerPrice         Float?
+  triggerTimestamp     DateTime?
+  triggerTimeframe     String?
+  entryRuleId          String?
+  exitRuleId           String?
+  invalidationRuleId   String?
+  strategyId           String?
+  strategyVersion      String?
   createdAt                      DateTime             @default(now())
   updatedAt                      DateTime             @updatedAt
 
