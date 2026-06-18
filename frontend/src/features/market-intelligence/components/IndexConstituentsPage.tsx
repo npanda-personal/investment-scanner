@@ -25,6 +25,7 @@ import {
 import TableSortLabel from '@mui/material/TableSortLabel';
 import { PageHeader } from '@/shared/components/PageHeader';
 import { NotApplicableForAssetClass } from '@/shared/components/NotApplicableForAssetClass';
+import { useWorkspaceSourceListStore } from '@/shared/workspace/workspaceSourceListStore';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
 import { money, compact, changeColor } from '@/shared/format/money';
 import { humanizeCode } from '@/shared/format/enumLabels';
@@ -130,6 +131,7 @@ function sortedRows(
 
 export function IndexConstituentsPage() {
   const { scope, profile } = useMarketScope();
+  const setSource = useWorkspaceSourceListStore((s) => s.setSource);
   const regionIndexOptions = INDEX_OPTIONS.filter((o) => o.region === scope.region);
   const defaultIndex = DEFAULT_INDEX_BY_REGION[scope.region] ?? regionIndexOptions[0]?.value ?? 'NIFTY_50';
   const [selectedIndex, setSelectedIndex] = useState<SupportedIndex>(defaultIndex);
@@ -347,6 +349,14 @@ export function IndexConstituentsPage() {
                           variant="body2"
                           component={Link}
                           to={`/instrument-workspace/${encodeURIComponent(row.symbol)}`}
+                          onClick={() =>
+                            setSource(
+                              `Index: ${regionIndexOptions.find((o) => o.value === selectedIndex)?.label ?? envelope?.indexLabel ?? selectedIndex}`,
+                              rows
+                                .filter((r) => r.instrumentId)
+                                .map((r) => ({ instrumentId: r.instrumentId as string, symbol: r.symbol, companyName: r.companyName ?? undefined })),
+                            )
+                          }
                           sx={{ fontWeight: 600, color: 'primary.main', textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
                         >
                           {row.symbol}

@@ -25,6 +25,7 @@ import { SaveOutlined, DeleteOutline, NotificationsOutlined } from '@mui/icons-m
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { SignalBadge } from '@/features/signal-generation-engine';
 import { DataTable, InstrumentSearchSelect, PageHeader, StatusBadge, type DataTableColumn } from '@/shared/components';
+import { useWorkspaceSourceListStore } from '@/shared/workspace/workspaceSourceListStore';
 import type { V1Instrument } from '@/features/market-data-foundation';
 import {
   addWatchlistItem,
@@ -63,6 +64,7 @@ const WatchlistManagementPage: React.FC = () => {
   const regionCurrency = scope.region === 'IN' ? 'INR' : 'USD';
   const [sort, setSort] = useState<WatchlistSortOption>('recentlyAdded');
   const { watchlists, detail, loading, error, reload } = useWatchlistManagement(id, sort);
+  const setSource = useWorkspaceSourceListStore((s) => s.setSource);
   const [formError, setFormError] = useState<string | null>(null);
   const [snackbar, setSnackbar] = useState<string | null>(null);
   const [name, setName] = useState('');
@@ -141,7 +143,19 @@ const WatchlistManagementPage: React.FC = () => {
   };
 
   const itemColumns: DataTableColumn<WatchlistDashboardItem>[] = [
-    { id: 'symbol', label: 'Symbol', render: (item) => <Button component={Link} to={item.researchUrl} size="small">{item.symbol}</Button> },
+    { id: 'symbol', label: 'Symbol', render: (item) => (
+      <Button
+        component={Link}
+        to={`/stocks/${item.instrumentId}`}
+        size="small"
+        onClick={() => setSource(
+          `Watchlist: ${detail?.watchlist.name ?? ''}`,
+          (detail?.items ?? []).map((i) => ({ instrumentId: i.instrumentId, symbol: i.symbol, companyName: i.companyName })),
+        )}
+      >
+        {item.symbol}
+      </Button>
+    ) },
     { id: 'companyName', label: 'Company', render: (item) => item.companyName || 'Unknown company' },
     { id: 'sector', label: 'Sector', render: (item) => item.sector || 'N/A' },
     { id: 'country', label: 'Country', render: (item) => item.country || 'N/A' },

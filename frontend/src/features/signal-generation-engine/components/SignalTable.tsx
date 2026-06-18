@@ -17,81 +17,8 @@ import { AddToWatchlistDialog } from '@/features/watchlist-management';
 import { CreateAlertDialog } from '@/features/alerts-monitoring';
 import { DataTable, StatusBadge, type DataTableColumn, type SortDirection } from '@/shared/components';
 import type { SignalResult } from '../types';
-import { humanizeCode } from '@/shared/format/enumLabels';
-
-const formatMoney = (value: number | null, currency: string | null) => {
-  if (value === null) return 'N/A';
-  try {
-    return new Intl.NumberFormat(undefined, { style: 'currency', currency: currency || 'USD', maximumFractionDigits: 2 }).format(value);
-  } catch {
-    return `${currency || ''} ${value.toFixed(2)}`.trim();
-  }
-};
-const formatPercent = (value: number | null) => value === null ? 'N/A' : `${value >= 0 ? '+' : ''}${(value * 100).toFixed(1)}%`;
-const formatDate = (value?: string | null) => value ? new Date(value).toLocaleDateString() : 'N/A';
-
-const SignalReasons = ({ signal }: { signal: SignalResult }) => {
-  const triggered = signal.triggered_signals.map(s => s.label);
-  const negative = signal.negative_signals.map(s => s.label);
-  const warnings = signal.warnings || [];
-
-  return (
-    <Box sx={{ p: 1 }}>
-      {warnings.length > 0 && (
-        <Box sx={{ mb: 1 }}>
-          <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: 'orange' }}>Warnings:</Typography>
-          {warnings.map((w, i) => <Typography key={i} variant="caption" display="block">• {w}</Typography>)}
-        </Box>
-      )}
-      {triggered.length > 0 && (
-        <Box sx={{ mb: 1 }}>
-          <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: '#4caf50' }}>Bullish Factors:</Typography>
-          {triggered.map((s, i) => <Typography key={i} variant="caption" display="block">• {s}</Typography>)}
-        </Box>
-      )}
-      {negative.length > 0 && (
-        <Box>
-          <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: '#f44336' }}>Bearish Factors:</Typography>
-          {negative.map((s, i) => <Typography key={i} variant="caption" display="block">• {s}</Typography>)}
-        </Box>
-      )}
-    </Box>
-  );
-};
-
-const reasonSummary = (signal: SignalResult) => {
-  const primary = signal.direction === 'BEARISH' ? signal.negative_signals : signal.triggered_signals;
-  const secondary = signal.direction === 'BEARISH' ? signal.triggered_signals : signal.negative_signals;
-  
-  const top = primary.length > 0 ? primary : secondary;
-  return top.slice(0, 2).map((reason) => reason.label).join('; ') || 'Insufficient data';
-};
-
-const StrategyMatchDetails = ({ signal }: { signal: SignalResult }) => (
-  <Box sx={{ p: 1, maxWidth: 420 }}>
-    {(signal.strategyMatches || []).map((match) => (
-      <Box key={`${match.strategyCode}-${match.strategyVersion}`} sx={{ mb: 1 }}>
-        <Typography variant="subtitle2" fontWeight={700}>{match.strategyName || match.strategyCode} v{match.strategyVersion}</Typography>
-        <Typography variant="caption" display="block">Score {match.score} · {match.confidence} · {humanizeCode(match.ratingGrade || 'UNPROVEN')} · {humanizeCode(match.readinessLabel || 'RESEARCH_ONLY')}</Typography>
-        {match.reasons.slice(0, 3).map((reason, index) => <Typography key={index} variant="caption" display="block">- {reason}</Typography>)}
-      </Box>
-    ))}
-    {(signal.strategyMatches || []).length === 0 && <Typography variant="caption">No registered strategy match for this raw signal.</Typography>}
-  </Box>
-);
-
-const BlockedStrategyDetails = ({ signal }: { signal: SignalResult }) => (
-  <Box sx={{ p: 1, maxWidth: 420 }}>
-    {(signal.blockedStrategies || []).map((blocked) => (
-      <Box key={`${blocked.strategyCode}-${blocked.strategyVersion}`} sx={{ mb: 1 }}>
-        <Typography variant="subtitle2" fontWeight={700}>{blocked.strategyName || blocked.strategyCode} v{blocked.strategyVersion}</Typography>
-        <Typography variant="caption" display="block">{blocked.reason}</Typography>
-        {[...blocked.blockers, ...blocked.dataGaps, ...blocked.warnings].slice(0, 4).map((item, index) => <Typography key={index} variant="caption" display="block">- {item}</Typography>)}
-      </Box>
-    ))}
-    {(signal.blockedStrategies || []).length === 0 && <Typography variant="caption">No blocked Strategy Framework matches.</Typography>}
-  </Box>
-);
+import { useWorkspaceSourceListStore } from '@/shared/workspace/workspaceSourceListStore';
+import { formatMoney, formatPercent, formatDate, SignalReasons, reasonSummary, StrategyMatchDetails, BlockedStrategyDetails } from './signalTableParts';
 
 type SignalTableProps = {
   signals: SignalResult[];
@@ -111,6 +38,13 @@ type SignalTableProps = {
 
 export function SignalTable({ signals, totalCount, loading, page, pageSize, sortBy, sortDirection, onPageChange, onPageSizeChange, onSortChange, strategyContextLoaded = false, bannedSymbols, emptyMessage }: SignalTableProps) {
   const navigate = useNavigate();
+  const setSource = useWorkspaceSourceListStore((s) => s.setSource);
+  // Open the Stock Workspace (Chart tab by default) and capture this signal list so the
+  // workspace rail lets the user step through the other signals.
+  const openWorkspace = (instrumentId: string) => {
+    setSource('Signals', signals.map((s) => ({ instrumentId: s.instrument_id, symbol: s.symbol, companyName: s.company_name })));
+    navigate(`/stocks/${instrumentId}`);
+  };
   const [selectedSignal, setSelectedSignal] = React.useState<SignalResult | null>(null);
   const [portfolioSignal, setPortfolioSignal] = React.useState<SignalResult | null>(null);
   const [watchlistSignal, setWatchlistSignal] = React.useState<SignalResult | null>(null);
@@ -125,7 +59,7 @@ export function SignalTable({ signals, totalCount, loading, page, pageSize, sort
       sortable: true,
       render: (signal) => (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-          <Button size="small" onClick={(event) => { event.stopPropagation(); navigate(`/research/stocks/${signal.instrument_id}`); }}>{signal.symbol}</Button>
+          <Button size="small" onClick={(event) => { event.stopPropagation(); openWorkspace(signal.instrument_id); }}>{signal.symbol}</Button>
           {bannedSymbols?.has(signal.symbol) && (
             <Tooltip title="In F&O ban period — derivatives trading restricted; elevated risk." arrow enterDelay={200}>
               <Chip
@@ -287,7 +221,7 @@ export function SignalTable({ signals, totalCount, loading, page, pageSize, sort
       render: (signal) => (
         <Box sx={{ display: 'flex', gap: 0.5 }} onClick={(event) => event.stopPropagation()}>
           <Tooltip title="View Stock Details" arrow>
-            <IconButton size="small" onClick={() => navigate(`/research/stocks/${signal.instrument_id}`)}>
+            <IconButton size="small" onClick={() => openWorkspace(signal.instrument_id)}>
               <VisibilityOutlined fontSize="small" />
             </IconButton>
           </Tooltip>
@@ -488,7 +422,7 @@ export function SignalTable({ signals, totalCount, loading, page, pageSize, sort
             <Divider />
 
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
-              <Button variant="outlined" onClick={() => navigate(`/research/stocks/${selectedSignal.instrument_id}`)}>Open Research</Button>
+              <Button variant="outlined" onClick={() => openWorkspace(selectedSignal.instrument_id)}>Open Workspace</Button>
               <Button variant="contained" onClick={() => navigate(`/strategy?instrumentId=${selectedSignal.instrument_id}`)}>Review Strategy Decision</Button>
             </Stack>
           </Stack>

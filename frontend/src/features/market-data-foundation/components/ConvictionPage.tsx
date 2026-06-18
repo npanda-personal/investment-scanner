@@ -18,9 +18,10 @@ import {
   Typography,
 } from '@mui/material';
 import { useCallback, useEffect, useState } from 'react';
-import { Link as RouterLink } from 'react-router-dom';
 import { PageHeader } from '@/shared/components';
 import { NotApplicableForAssetClass } from '@/shared/components/NotApplicableForAssetClass';
+import { StockWorkspaceLink } from '@/shared/workspace/StockWorkspaceLink';
+import type { WorkspaceSource } from '@/shared/workspace/types';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
 import { fetchConviction, type ConvictionRow, type ConvictionFunnel } from '../api/convictionService';
 import { ConvictionFunnelPanel } from './ConvictionFunnelPanel';
@@ -28,20 +29,6 @@ import { ConvictionFunnelPanel } from './ConvictionFunnelPanel';
 // ---------------------------------------------------------------------------
 // Small display helpers (self-contained — the screener cells are an in-flight refactor)
 // ---------------------------------------------------------------------------
-
-function SymbolLink({ instrumentId, symbol }: { instrumentId: string; symbol: string }) {
-  return (
-    <Typography
-      component={RouterLink}
-      to={`/stocks/${instrumentId}`}
-      variant="body2"
-      sx={{ fontWeight: 600, textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
-      color="primary"
-    >
-      {symbol}
-    </Typography>
-  );
-}
 
 function SignalChip({ direction, score }: { direction: ConvictionRow['signalDirection']; score: number | null }) {
   if (!direction) return <Typography variant="body2" color="text.disabled">—</Typography>;
@@ -161,6 +148,10 @@ export default function ConvictionPage() {
   }
 
   const sortedRows = sortRows(rows, sortKey, sortDir);
+  const convictionSource: WorkspaceSource = {
+    label: 'Conviction',
+    items: sortedRows.map((r) => ({ instrumentId: r.instrumentId, symbol: r.symbol, companyName: r.companyName })),
+  };
 
   return (
     <Box sx={{ p: 3 }}>
@@ -249,7 +240,7 @@ export default function ConvictionPage() {
               {sortedRows.map((row) => (
                 <TableRow key={row.instrumentId} hover>
                   <TableCell>
-                    <SymbolLink instrumentId={row.instrumentId} symbol={row.symbol} />
+                    <StockWorkspaceLink instrumentId={row.instrumentId} symbol={row.symbol} source={convictionSource} />
                   </TableCell>
                   <TableCell>
                     <Tooltip title={row.companyName}>
