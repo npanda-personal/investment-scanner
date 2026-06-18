@@ -18,8 +18,8 @@ import { useWorkspaceSourceListStore } from './workspaceSourceListStore';
 interface SourceListRailProps {
   /** Instrument id of the stock currently open — highlighted and scrolled into view. */
   activeInstrumentId?: string;
-  /** Matches the chart height so the two columns align. */
-  height?: number | string;
+  /** Matches the chart height so the two columns align (px, CSS length, or responsive sx). */
+  height?: number | string | Record<string, number | string>;
 }
 
 export default function SourceListRail({ activeInstrumentId, height = 620 }: SourceListRailProps) {
