@@ -16,7 +16,6 @@ import {
   ColorType,
   CrosshairMode,
   type IChartApi,
-  type UTCTimestamp,
 } from 'lightweight-charts';
 import { fetchInstrumentPrices } from '@/features/market-data-foundation/api/marketDataFoundationService';
 
