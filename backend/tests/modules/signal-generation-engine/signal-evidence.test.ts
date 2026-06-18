@@ -30,6 +30,15 @@ describe('compositeV4 — family mapping', () => {
     expect(familyForCode('CONFIRMED_VOLUME_BREAKOUT')).toBe('VOLUME');
     expect(familyForCode('SOMETHING_UNKNOWN')).toBe('OTHER');
   });
+
+  it('maps the Phase 1 YoY growth codes to an independent GROWTH family', () => {
+    expect(familyForCode('REVENUE_GROWTH_YOY')).toBe('GROWTH');
+    expect(familyForCode('REVENUE_DECLINE_YOY')).toBe('GROWTH');
+    expect(familyForCode('EPS_GROWTH_YOY')).toBe('GROWTH');
+    expect(familyForCode('EPS_DECLINE_YOY')).toBe('GROWTH');
+    // GROWTH is distinct from PROFITABILITY/VALUATION so it adds genuine breadth.
+    expect(familyForCode('POSITIVE_EPS')).toBe('PROFITABILITY');
+  });
 });
 
 describe('compositeV4 — data-availability invariance (#2)', () => {
@@ -244,5 +253,43 @@ describe('scoreInstrument — version routing & v3 parity', () => {
     expect(out.components?.engineVersion).toBe('v4');
     expect(out.score).toBeGreaterThanOrEqual(0);
     expect(out.score).toBeLessThanOrEqual(100);
+  });
+
+  // Phase 1 growth votes: multi-period fundamentals with strong YoY revenue + EPS growth.
+  const day = 24 * 60 * 60 * 1000;
+  const periodEnd = (d: number) => new Date(Date.UTC(2026, 2, 31) - d * day);
+  const growthRecords = [
+    { periodType: 'QUARTERLY', periodEndDate: periodEnd(0), revenue: 140, eps: 14, net_income: 20 },
+    { periodType: 'QUARTERLY', periodEndDate: periodEnd(91), revenue: 120, eps: 12, net_income: 18 },
+    { periodType: 'QUARTERLY', periodEndDate: periodEnd(365), revenue: 100, eps: 10, net_income: 15 },
+  ];
+  const growthInput = {
+    prices, relativeToPeers: 0.05,
+    fundamental: { eps: 14, revenue: 140, net_income: 20, pe_ratio: 15 },
+    fundamentalRecords: growthRecords,
+    peerAveragePe: 20, peerAverageYield: null,
+  };
+
+  it('v4: strong YoY revenue+EPS growth fires the growth votes and adds a GROWTH family', () => {
+    const out = scoreInstrument(growthInput, V4_CONFIG);
+    const codes = out.triggeredSignals.map((s) => s.code);
+    expect(codes).toEqual(expect.arrayContaining(['REVENUE_GROWTH_YOY', 'EPS_GROWTH_YOY']));
+    const families = new Set(
+      [...out.triggeredSignals, ...out.negativeSignals].map((s) => familyForCode(s.code)),
+    );
+    expect(families.has('GROWTH')).toBe(true);
+  });
+
+  it('v3: the SAME multi-period data produces NO growth votes (byte-identical to no-records)', () => {
+    const withRecords = scoreInstrument(growthInput, DEFAULT_SIGNAL_SCORING_CONFIG);
+    const codes = withRecords.triggeredSignals.map((s) => s.code);
+    expect(codes).not.toContain('REVENUE_GROWTH_YOY');
+    expect(codes).not.toContain('EPS_GROWTH_YOY');
+    // Identical to scoring the same instrument with fundamentalRecords omitted entirely.
+    const { fundamentalRecords, ...withoutRecords } = growthInput;
+    const baseline = scoreInstrument(withoutRecords, DEFAULT_SIGNAL_SCORING_CONFIG);
+    expect(withRecords.score).toBe(baseline.score);
+    expect(withRecords.triggeredSignals.map((s) => s.code)).toEqual(baseline.triggeredSignals.map((s) => s.code));
+    expect(withRecords.negativeSignals.map((s) => s.code)).toEqual(baseline.negativeSignals.map((s) => s.code));
   });
 });

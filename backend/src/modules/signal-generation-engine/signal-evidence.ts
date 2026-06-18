@@ -43,6 +43,7 @@ export type FactorFamily =
   | 'PROFITABILITY'
   | 'VALUATION'
   | 'INCOME'
+  | 'GROWTH'
   | 'OTHER';
 
 /** Map a factor code to its independent family.  Handles the `_NEGATIVE` suffix. */
@@ -81,6 +82,12 @@ const FAMILY_BY_CODE: Readonly<Record<string, FactorFamily>> = {
   NEGATIVE_NET_MARGIN: 'PROFITABILITY',
   PE_BELOW_PEERS: 'VALUATION',
   YIELD_ABOVE_PEERS: 'INCOME',
+  // Phase 1 YoY growth votes — an INDEPENDENT family from PROFITABILITY/VALUATION so
+  // growth adds genuine evidence breadth (not a collinear echo of the EPS-sign vote).
+  REVENUE_GROWTH_YOY: 'GROWTH',
+  REVENUE_DECLINE_YOY: 'GROWTH',
+  EPS_GROWTH_YOY: 'GROWTH',
+  EPS_DECLINE_YOY: 'GROWTH',
 };
 
 export function familyForCode(code: string): FactorFamily {

@@ -31,6 +31,7 @@ import {
 } from './signal-scoring.config';
 import { compositeV4, DEFAULT_V4_EVIDENCE, type V4Components } from './signal-evidence';
 import { extraTechnicalVotes } from './signal-extra-votes';
+import { fundamentalGrowthVotes } from './signal-fundamental-growth';
 export { peerAggregates, peerContextWarnings } from './signal-peer-aggregates';
 export { attachRsPercentiles } from './signal-percentile';
 export { filterFundamentalsAsOf, isStaleAsOf, stalenessAnchor } from './signal-asof';
@@ -268,6 +269,7 @@ export function evaluateFundamentals(
   peerAveragePe: number | null,
   peerAverageYield: number | null,
   config: SignalScoringConfig = DEFAULT_SIGNAL_SCORING_CONFIG,
+  fundamentalRecords?: any[] | null,
 ): CategoryEvaluation {
   const signals: SignalItem[] = [];
   const negativeSignals: SignalItem[] = [];
@@ -297,6 +299,12 @@ export function evaluateFundamentals(
       const margin = netIncome / revenue;
       if (margin >= 0.10) signals.push(signal('HEALTHY_NET_MARGIN', `net margin is ${(margin * 100).toFixed(1)}% (healthy profitability)`, 'FUNDAMENTAL'));
       else if (margin < 0) negativeSignals.push(signal('NEGATIVE_NET_MARGIN', 'net margin is negative (lossmaking)', 'FUNDAMENTAL'));
+    }
+    // Phase 1 (v4 only): YoY revenue/EPS growth from multi-period history (heavy matcher
+    // in signal-fundamental-growth.ts). records[0] (DESC) is the dated latest period.
+    if (Array.isArray(fundamentalRecords) && fundamentalRecords.length >= 2) {
+      const growth = fundamentalGrowthVotes(fundamentalRecords[0], fundamentalRecords);
+      signals.push(...growth.signals); negativeSignals.push(...growth.negativeSignals);
     }
   }
 
@@ -429,6 +437,7 @@ export interface ScoreInstrumentInput {
   prices: SignalPricePoint[];
   relativeToPeers: number | null;
   fundamental: unknown;
+  fundamentalRecords?: any[] | null; // multi-period history (DESC) for v4 YoY growth votes
   peerAveragePe: number | null;
   peerAverageYield: number | null;
 }
@@ -453,7 +462,7 @@ export function scoreInstrument(
 ): ScoreInstrumentResult {
   const technical = evaluateTechnical(input.prices, config);
   const momentum = evaluateMomentum(input.prices, input.relativeToPeers, config);
-  const fundamentals = evaluateFundamentals(input.fundamental, input.peerAveragePe, input.peerAverageYield, config);
+  const fundamentals = evaluateFundamentals(input.fundamental, input.peerAveragePe, input.peerAverageYield, config, input.fundamentalRecords);
 
   const triggeredSignals = [...technical.signals, ...momentum.signals, ...fundamentals.signals];
   const negativeSignals = [...technical.negativeSignals, ...momentum.negativeSignals, ...fundamentals.negativeSignals];

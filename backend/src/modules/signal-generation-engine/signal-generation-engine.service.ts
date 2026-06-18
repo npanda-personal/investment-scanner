@@ -544,7 +544,7 @@ export class SignalGenerationEngineService {
     // v4 (engineVersion:'v4' above) and scoreOutcome.components is persisted into
     // scoringInputSummary.v4 (the audit JSON) below; the crypto lane / DEFAULT config stay v3.
     const scoreOutcome = Scoring.scoreInstrument(
-      { prices, relativeToPeers, fundamental: latestFundamental, peerAveragePe, peerAverageYield },
+      { prices, relativeToPeers, fundamental: latestFundamental, fundamentalRecords: fundamentalsResponse?.records ?? null, peerAveragePe, peerAverageYield },
       scoringConfig,
     );
     const { score, direction, triggeredSignals, negativeSignals, totalEvaluated } = scoreOutcome;
