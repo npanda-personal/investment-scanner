@@ -178,6 +178,25 @@ export const getSecEndpoints = (): SecEndpoints => ({
   wwwBase: resolveBase('SEC_WWW_BASE', 'https://www.sec.gov'),
 });
 
+export interface FinraEndpoints {
+  /**
+   * cdn.finra.org — FINRA Reg SHO daily short-sale volume files
+   * (CNMSshvol<YYYYMMDD>.txt). FREE, public; fetched with a browser-like
+   * User-Agent. One pipe-delimited file per trading day, all US symbols.
+   */
+  readonly cdnBase: ResolvedEndpoint;
+}
+
+export const getFinraEndpoints = (): FinraEndpoints => ({
+  cdnBase: resolveBase('FINRA_CDN_BASE', 'https://cdn.finra.org'),
+});
+
+/** Daily Reg SHO consolidated short-volume file URL for an ISO YYYY-MM-DD date. */
+export const finraRegShoDailyUrl = (isoDate: string): string => {
+  const compact = isoDate.replace(/-/g, ''); // YYYYMMDD
+  return `${getFinraEndpoints().cdnBase.url}/equity/regsho/daily/CNMSshvol${compact}.txt`;
+};
+
 // ---------------------------------------------------------------------------
 // GLOBAL — crypto providers
 // ---------------------------------------------------------------------------
@@ -213,6 +232,7 @@ export interface RegionDataSources {
   readonly usCatalog?: UsCatalogEndpoints;
   readonly yahoo?: YahooEndpoints;
   readonly sec?: SecEndpoints;
+  readonly finra?: FinraEndpoints;
   readonly crypto?: CryptoEndpoints;
 }
 
@@ -236,6 +256,7 @@ export const getRegionDataSources = (region: MarketRegion): RegionDataSources =>
         usCatalog: getUsCatalogEndpoints(),
         yahoo: getYahooEndpoints(),
         sec: getSecEndpoints(),
+        finra: getFinraEndpoints(),
       };
     case 'EU':
       return { region, yahoo: getYahooEndpoints() };
@@ -256,6 +277,7 @@ export const describeMarketDataEndpoints = (): Record<string, ResolvedEndpoint> 
   const us = getUsCatalogEndpoints();
   const yahoo = getYahooEndpoints();
   const sec = getSecEndpoints();
+  const finra = getFinraEndpoints();
   const crypto = getCryptoEndpoints();
   return {
     nseWww: nse.wwwBase,
@@ -266,6 +288,7 @@ export const describeMarketDataEndpoints = (): Record<string, ResolvedEndpoint> 
     yahooChart: yahoo.chartBase,
     secData: sec.dataBase,
     secWww: sec.wwwBase,
+    finraCdn: finra.cdnBase,
     coingecko: crypto.coingeckoBase,
     binance: crypto.binanceBase,
     coinpaprika: crypto.coinpaprikaBase,

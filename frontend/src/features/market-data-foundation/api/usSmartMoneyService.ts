@@ -51,11 +51,29 @@ export interface UsSmartMoneySummary {
   explanation: string;
 }
 
+export interface UsShortPressure {
+  symbol: string;
+  /** Latest session's short-sale volume share (%), or null when total volume was 0. */
+  shortVolumePct: number | null;
+  /** ISO date (YYYY-MM-DD) of the latest session. */
+  tradingDate: string;
+  /** Trailing up-to-5-session average short volume % (nulls skipped). */
+  avg5dPct: number | null;
+  /** Number of sessions backing the 5-day average. */
+  sessionsInAvg: number;
+  source: string;
+}
+
 export interface UsSmartMoneyPanel {
   symbol: string;
   summary: UsSmartMoneySummary;
   insiderTrades: UsInsiderTrade[];
   institutional: UsInstitutionalHolding | null;
+  /**
+   * Latest FINRA Reg SHO daily short-sale volume share (a short-pressure proxy,
+   * NOT short interest), or null when none persisted. Research support only.
+   */
+  shortPressure: UsShortPressure | null;
   hasData: boolean;
 }
 

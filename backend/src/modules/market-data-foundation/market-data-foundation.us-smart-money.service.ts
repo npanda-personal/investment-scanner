@@ -19,6 +19,10 @@ import {
   type UsSmartMoneySummary,
 } from './ingestion/us/market-data-foundation.us-institutional.repository';
 import { parse13fPeriod } from './ingestion/us/market-data-foundation.sec-13f.periods';
+import {
+  getShortPressureForSymbol,
+  type UsShortPressure,
+} from './ingestion/us/market-data-foundation.us-short-volume.repository';
 
 export interface UsInstitutionalHoldingView extends UsInstitutionalHolding {
   /** Human-readable 13F filing window, e.g. "Mar–May 2026". */
@@ -32,17 +36,24 @@ export interface UsSmartMoneyPanel {
   insiderTrades: UsInsiderTrade[];
   /** Latest 13F institutional aggregate (the largest CUSIP line for the symbol), or null. */
   institutional: UsInstitutionalHoldingView | null;
-  /** False when neither filing source has data for this symbol (drives the empty state). */
+  /**
+   * Latest FINRA Reg SHO daily short-sale volume share (a short-pressure proxy,
+   * NOT short interest), with the as-of date + trailing 5-session average, or
+   * null when none persisted. Research support only.
+   */
+  shortPressure: UsShortPressure | null;
+  /** False when no filing/short-volume source has data for this symbol (drives the empty state). */
   hasData: boolean;
 }
 
 export class UsSmartMoneyService {
   async getPanel(symbol: string, insiderLimit = 50): Promise<UsSmartMoneyPanel> {
     const sym = symbol.trim().toUpperCase();
-    const [summary, insiderTrades, holding] = await Promise.all([
+    const [summary, insiderTrades, holding, shortPressure] = await Promise.all([
       getUsSmartMoneySummary(sym),
       getInsiderTradesForSymbol(sym, insiderLimit),
       getLatestInstitutionalHolding(sym),
+      getShortPressureForSymbol(sym),
     ]);
     const institutional: UsInstitutionalHoldingView | null = holding
       ? { ...holding, periodLabel: parse13fPeriod(holding.quarter)?.label ?? holding.quarter }
@@ -52,7 +63,8 @@ export class UsSmartMoneyService {
       summary,
       insiderTrades,
       institutional,
-      hasData: insiderTrades.length > 0 || institutional !== null,
+      shortPressure,
+      hasData: insiderTrades.length > 0 || institutional !== null || shortPressure !== null,
     };
   }
 }

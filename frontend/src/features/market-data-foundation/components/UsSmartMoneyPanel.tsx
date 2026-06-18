@@ -44,6 +44,11 @@ function formatShares(value: number | null | undefined): string {
   return value.toLocaleString('en-US');
 }
 
+function formatPct(value: number | null | undefined): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) return '—';
+  return `${value.toFixed(1)}%`;
+}
+
 /** SEC Form 4 transaction codes → short human label. */
 const TXN_CODE_LABELS: Record<string, string> = {
   P: 'Buy',
@@ -200,6 +205,33 @@ export default function UsSmartMoneyPanel({ symbol }: { symbol?: string | null }
                   ))}
                 </Box>
               )}
+            </>
+          )}
+
+          {panel.shortPressure && (
+            <>
+              <Divider />
+              <Box>
+                <Stack direction="row" spacing={1} flexWrap="wrap" alignItems="flex-start">
+                  <StatTile
+                    label="Daily Short Volume %"
+                    value={formatPct(panel.shortPressure.shortVolumePct)}
+                    sub={`as of ${panel.shortPressure.tradingDate}`}
+                  />
+                  <StatTile
+                    label={`${panel.shortPressure.sessionsInAvg}-session avg`}
+                    value={formatPct(panel.shortPressure.avg5dPct)}
+                  />
+                </Stack>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ display: 'block', mt: 0.5, fontSize: '0.6rem' }}
+                >
+                  Observed share of consolidated volume executed as short sales (FINRA Reg SHO).
+                  A short-pressure proxy — not short interest, a squeeze prediction, or advice.
+                </Typography>
+              </Box>
             </>
           )}
 
