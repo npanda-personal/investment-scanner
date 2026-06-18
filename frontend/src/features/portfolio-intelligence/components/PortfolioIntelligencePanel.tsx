@@ -87,7 +87,7 @@ const ReviewCard: React.FC<{ item: ReviewItem }> = ({ item }) => (
     <Stack direction="row" justifyContent="space-between" spacing={1}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         <Tooltip title="View Research" arrow>
-          <IconButton component={Link} to={`/research/stocks/${item.instrumentId}`} size="small">
+          <IconButton component={Link} to={`/stocks/${item.instrumentId}`} size="small">
             <LaunchOutlined fontSize="small" />
           </IconButton>
         </Tooltip>
@@ -126,7 +126,7 @@ const GroupSection: React.FC<{ title: string; items: GroupedHoldingSummary[] }> 
             {visible.map((item) => (
               <Box key={item.holdingId} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <Tooltip title="View Research" arrow>
-                  <IconButton component={Link} to={`/research/stocks/${item.instrumentId}`} size="small">
+                  <IconButton component={Link} to={`/stocks/${item.instrumentId}`} size="small">
                     <LaunchOutlined fontSize="small" />
                   </IconButton>
                 </Tooltip>

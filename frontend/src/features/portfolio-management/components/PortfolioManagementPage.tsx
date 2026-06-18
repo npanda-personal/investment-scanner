@@ -429,7 +429,7 @@ const PortfolioManagementPage: React.FC = () => {
                   {summary.holdings.map((holding: HoldingValuation) => (
                     <TableRow key={holding.id} hover>
                       <TableCell>
-                        <Button component={Link} to={`/research/stocks/${holding.instrumentId}`} size="small">{holding.symbol}</Button>
+                        <Button component={Link} to={`/stocks/${holding.instrumentId}`} size="small">{holding.symbol}</Button>
                       </TableCell>
                       <TableCell>{holding.companyName || 'N/A'}</TableCell>
                       <TableCell align="right">{holding.quantity}</TableCell>

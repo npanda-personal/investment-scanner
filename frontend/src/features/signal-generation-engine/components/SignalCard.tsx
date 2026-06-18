@@ -84,7 +84,7 @@ export const SignalCard: React.FC<{ signal: SignalResult }> = ({ signal }) => {
         <Typography variant="caption" color="text.secondary">{formatDateTime(signal.generated_at)}</Typography>
         <Box sx={{ mt: 1, display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
           <Tooltip title="View Research" arrow>
-            <IconButton size="small" onClick={() => navigate(`/research/stocks/${signal.instrument_id}`)}>
+            <IconButton size="small" onClick={() => navigate(`/stocks/${signal.instrument_id}`)}>
               <VisibilityOutlined fontSize="small" />
             </IconButton>
           </Tooltip>
