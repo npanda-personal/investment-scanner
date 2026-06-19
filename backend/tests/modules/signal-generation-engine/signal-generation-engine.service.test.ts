@@ -2223,9 +2223,11 @@ describe('SignalGenerationEngineService v2 accuracy fixes', () => {
       listPricesByInstrumentId: jest.fn().mockResolvedValue({ prices }),
       storedFundamentalsByInstrumentId: jest.fn().mockResolvedValue({
         records: [
-          { eps: 5, pe_ratio: 12, periodEndDate: new Date('2025-03-31') }, // future — should be filtered out
-          { eps: 3, pe_ratio: 10, periodEndDate: new Date('2018-09-30') }, // visible as of 2018-12-31
-          { eps: 2, pe_ratio: 8, periodEndDate: new Date('2018-03-31') }, // visible
+          // snake_case + ISO strings to match the runtime shape from formatFundamentalsResponse
+          // (which is what filterFundamentalsAsOf reads).
+          { eps: 5, pe_ratio: 12, period_end_date: new Date('2025-03-31').toISOString() }, // future — should be filtered out
+          { eps: 3, pe_ratio: 10, period_end_date: new Date('2018-09-30').toISOString() }, // visible as of 2018-12-31
+          { eps: 2, pe_ratio: 8, period_end_date: new Date('2018-03-31').toISOString() }, // visible
         ],
       }),
     };
