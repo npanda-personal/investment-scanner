@@ -35,9 +35,13 @@ function fetchFirstTradeDate(rawSymbol: string): Promise<Date | null> {
     // Yahoo strips dots: "BRK.B" → "BRK-B" on their side; we store the
     // already-normalised form in providerSymbol.
     const encoded = encodeURIComponent(rawSymbol);
+    // Fetch a short recent window (7 days) so Yahoo returns a valid response
+    // with the meta block that contains firstTradeDate.
+    const p2 = Math.floor(Date.now() / 1000);
+    const p1 = p2 - 7 * 86400;
     const url =
       `https://query1.finance.yahoo.com/v8/finance/chart/${encoded}` +
-      `?period1=1&period2=2&interval=1d&includeAdjustedClose=false`;
+      `?period1=${p1}&period2=${p2}&interval=1d&includeAdjustedClose=false`;
 
     const req = https.get(
       url,
@@ -50,9 +54,11 @@ function fetchFirstTradeDate(rawSymbol: string): Promise<Date | null> {
             const json = JSON.parse(body);
             const meta = json?.chart?.result?.[0]?.meta as Record<string, unknown> | undefined;
             // Yahoo returns firstTradeDateEpochUtc (seconds) or firstTradeDate
+            // Yahoo returns `firstTradeDate` (seconds epoch) in the meta block.
+            // `firstTradeDateEpochUtc` is absent in practice; keep as fallback.
             const epoch =
-              (meta?.firstTradeDateEpochUtc as number | undefined) ??
-              (meta?.firstTradeDate as number | undefined);
+              (meta?.firstTradeDate as number | undefined) ??
+              (meta?.firstTradeDateEpochUtc as number | undefined);
             if (epoch && Number.isFinite(epoch) && epoch > 0) {
               resolve(new Date(epoch * 1000));
             } else {
