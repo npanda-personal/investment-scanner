@@ -92,7 +92,7 @@ describe('#2 Fundamentals point-in-time lag', () => {
     // Use asOf = Aug 13, 2023 → lag NOT elapsed → filing should be excluded.
     const asOfExcludes = new Date('2023-08-13T00:00:00.000Z');
 
-    const records = [{ eps: 5, periodEndDate: '2023-06-30T00:00:00.000Z' }];
+    const records = [{ eps: 5, period_end_date: '2023-06-30T00:00:00.000Z' }];
     const marketDataService = {
       getInstrument: jest.fn().mockResolvedValue({
         id: 'inst-1', symbol: 'TEST', company_name: 'Test Co', sector: 'Tech', country: 'IN',
@@ -121,7 +121,7 @@ describe('#2 Fundamentals point-in-time lag', () => {
 
   it('includes a filing whose period ended 60 days before asOf (past 45-day lag)', async () => {
     // period end = Jun 30 2023, asOf = Sep 01 2023 (+63 days from Jun 30 → past 45d lag)
-    const records = [{ eps: 5, periodEndDate: '2023-06-30T00:00:00.000Z' }];
+    const records = [{ eps: 5, period_end_date: '2023-06-30T00:00:00.000Z' }];
     const marketDataService = {
       getInstrument: jest.fn().mockResolvedValue({
         id: 'inst-2', symbol: 'TEST2', company_name: 'Test Co 2', sector: 'Tech', country: 'IN',
@@ -149,7 +149,7 @@ describe('#2 Fundamentals point-in-time lag', () => {
   it('uses officialResultDate when available, ignoring the 45-day lag', async () => {
     // officialResultDate = Aug 01 2023, asOf = Aug 02 2023 → included
     // Without officialResultDate, periodEnd+45d = Aug 14 → would be excluded on Aug 02
-    const records = [{ eps: 5, periodEndDate: '2023-06-30T00:00:00.000Z', officialResultDate: '2023-08-01T00:00:00.000Z' }];
+    const records = [{ eps: 5, period_end_date: '2023-06-30T00:00:00.000Z', official_result_date: '2023-08-01T00:00:00.000Z' }];
     const marketDataService = {
       getInstrument: jest.fn().mockResolvedValue({
         id: 'inst-3', symbol: 'TEST3', company_name: 'Test Co 3', sector: 'Tech', country: 'IN',
