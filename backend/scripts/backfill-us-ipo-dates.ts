@@ -6,8 +6,9 @@
  * requirement when ipoDate is NULL. Populating it lets stocks listed after the
  * lookback cutoff be trusted based on their actual listing date instead.
  *
- * Uses a minimal chart request (period1=1&period2=2) so no OHLCV payload is
- * downloaded — just the meta block. ~300ms throttle to avoid Yahoo bans.
+ * Uses a 7-day recent chart request so Yahoo returns a valid response with the
+ * meta block (firstTradeDate). Throttle applies per-worker; default concurrency=3
+ * means ~10 req/s aggregate — keep concurrency low to stay within Yahoo limits.
  *
  * Usage (from backend/):
  *   npx ts-node --transpile-only scripts/backfill-us-ipo-dates.ts
