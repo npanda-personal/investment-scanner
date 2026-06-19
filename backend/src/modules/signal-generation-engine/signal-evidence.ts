@@ -154,7 +154,12 @@ export interface V4EvidenceConfig {
 
 export const DEFAULT_V4_EVIDENCE: V4EvidenceConfig = {
   categoryScoreAlpha: 1,
-  spreadGain: 1.8,
+  // spreadGain reduced 1.8 -> 1.5 (2026-06): at 1.8 the strongest signals overshot the 100
+  // clamp and ~100 stocks pinned to an identical "BULLISH 100", leaving the Screener's top a
+  // flat wall. 1.5 keeps the strongest off the ceiling (max ~99, no clamp pile-up) so the top
+  // spreads across genuinely distinct scores, at the cost of a modest, intended tightening of
+  // the bullish band (borderline 60-62 names ease into NEUTRAL — a more selective top).
+  spreadGain: 1.5,
   familySaturation: 4,
   countWeight: 0.55,
   agreementWeight: 0.45,

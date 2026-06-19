@@ -295,3 +295,34 @@ describe('scoreInstrument — version routing & v3 parity', () => {
     expect(withRecords.negativeSignals.map((s) => s.code)).toEqual(baseline.negativeSignals.map((s) => s.code));
   });
 });
+
+describe('compositeV4 — recalibrated spreadGain keeps strong signals off the 100 ceiling', () => {
+  it('a strong multi-family, 3-category bullish input scores high but strictly below 100', () => {
+    // With spreadGain 1.5, even a near-maximal bullish stack lands below the clamp, so the
+    // strongest signals spread across distinct scores instead of all pinning to 100.
+    const technical = cat(0.85, [['PRICE_ABOVE_SMA50', 'TECHNICAL'], ['CONFIRMED_VOLUME_BREAKOUT', 'TECHNICAL'], ['RSI_RECOVERING', 'TECHNICAL']]);
+    const momentum = cat(0.85, [['ONE_MONTH_MOMENTUM', 'MOMENTUM'], ['THREE_MONTH_MOMENTUM', 'MOMENTUM']]);
+    const fundamentals = cat(0.85, [['POSITIVE_EPS', 'FUNDAMENTAL'], ['REVENUE_GROWTH_YOY', 'FUNDAMENTAL']]);
+    const { score, components } = compositeV4(technical, momentum, fundamentals, V4_CONFIG);
+
+    expect(components.evidencedCategories).toBe(3); // clears the breadth gate (not damped)
+    expect(score).toBeGreaterThan(80); // still a high-conviction reading
+    expect(score).toBeLessThan(100);   // no hard-clamp pile-up at exactly 100
+  });
+
+  it('a stronger stack still outscores a weaker one (monotonic, not flattened by the clamp)', () => {
+    const weaker = compositeV4(
+      cat(0.7, [['PRICE_ABOVE_SMA50', 'TECHNICAL']]),
+      cat(0.7, [['ONE_MONTH_MOMENTUM', 'MOMENTUM']]),
+      empty(),
+      V4_CONFIG,
+    ).score;
+    const stronger = compositeV4(
+      cat(0.85, [['PRICE_ABOVE_SMA50', 'TECHNICAL'], ['CONFIRMED_VOLUME_BREAKOUT', 'TECHNICAL']]),
+      cat(0.85, [['ONE_MONTH_MOMENTUM', 'MOMENTUM'], ['THREE_MONTH_MOMENTUM', 'MOMENTUM']]),
+      cat(0.85, [['POSITIVE_EPS', 'FUNDAMENTAL']]),
+      V4_CONFIG,
+    ).score;
+    expect(stronger).toBeGreaterThan(weaker);
+  });
+});
