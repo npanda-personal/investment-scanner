@@ -24,8 +24,6 @@ import {
   CrosshairMode,
   LineStyle,
   type IChartApi,
-  type ISeriesApi,
-  type SeriesType,
   type LogicalRange,
 } from 'lightweight-charts';
 import { fetchInstrumentPrices } from '@/features/market-data-foundation/api/marketDataFoundationService';
@@ -58,7 +56,6 @@ export default function InstrumentPriceChart({
   const mainChartRef = useRef<IChartApi | null>(null);
   const oscContainerRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const oscChartRefs = useRef<Map<string, IChartApi>>(new Map());
-  const oscSeriesRefs = useRef<Map<string, ISeriesApi<SeriesType>>>(new Map());
   const syncing = useRef(false);
 
   const [candles, setCandles] = useState<OHLCVBar[] | null>(null);
@@ -80,13 +77,18 @@ export default function InstrumentPriceChart({
     [activeIndicatorIds],
   );
 
-  const oscRefCallback = useCallback(
-    (id: string) => (el: HTMLDivElement | null) => {
-      if (el) oscContainerRefs.current.set(id, el);
-      else oscContainerRefs.current.delete(id);
-    },
-    [],
-  );
+  const oscRefCallbacks = useRef<Map<string, (el: HTMLDivElement | null) => void>>(new Map());
+  const oscRefCallback = useCallback((id: string) => {
+    let cb = oscRefCallbacks.current.get(id);
+    if (!cb) {
+      cb = (el: HTMLDivElement | null) => {
+        if (el) oscContainerRefs.current.set(id, el);
+        else oscContainerRefs.current.delete(id);
+      };
+      oscRefCallbacks.current.set(id, cb);
+    }
+    return cb;
+  }, []);
 
   // Fetch persisted OHLC
   useEffect(() => {
@@ -222,7 +224,6 @@ export default function InstrumentPriceChart({
         refLine.setData(displayBars.map((b) => ({ time: b.time, value: ref.value })));
       }
 
-      let firstSeries: ISeriesApi<SeriesType> | null = null;
       for (const s of result.series) {
         const series = oscChart.addLineSeries({
           color: s.color,
@@ -234,9 +235,7 @@ export default function InstrumentPriceChart({
           crosshairMarkerVisible: true,
         });
         series.setData(s.data);
-        if (!firstSeries) firstSeries = series;
       }
-      if (firstSeries) oscSeriesRefs.current.set(def.id, firstSeries);
 
       oscChart.priceScale('right').applyOptions({
         scaleMargins: { top: 0.08, bottom: 0.08 },
@@ -250,10 +249,13 @@ export default function InstrumentPriceChart({
     const syncRange = (source: IChartApi) => (range: LogicalRange | null) => {
       if (syncing.current || !range) return;
       syncing.current = true;
-      for (const chart of allCharts) {
-        if (chart !== source) chart.timeScale().setVisibleLogicalRange(range);
+      try {
+        for (const chart of allCharts) {
+          if (chart !== source) chart.timeScale().setVisibleLogicalRange(range);
+        }
+      } finally {
+        syncing.current = false;
       }
-      syncing.current = false;
     };
 
     for (const chart of allCharts) {
@@ -270,7 +272,6 @@ export default function InstrumentPriceChart({
       mainChartRef.current = null;
       for (const osc of oscCharts) osc.remove();
       oscChartRefs.current.clear();
-      oscSeriesRefs.current.clear();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [displayBars, theme.palette.mode, activeIndicatorIds]);
