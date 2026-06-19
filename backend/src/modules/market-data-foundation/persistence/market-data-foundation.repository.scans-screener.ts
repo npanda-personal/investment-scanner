@@ -129,15 +129,20 @@ export class ScreenerRepository {
 
     // Latest-date F&O positioning + option-sentiment read models (one row per
     // underlying; near-expiry PCR first). Used by the F&O readiness composite.
+    // MATERIALIZED is REQUIRED on both F&O CTEs. Without it, the planner inlines them
+    // into nested loops against the 2856-stock universe — producing 2856 × 208 = 594k
+    // cross-comparisons via a Join Filter on the regexp_replace expression (measured:
+    // fo_oi 782ms + fo_opt 6194ms = 6976ms wasted). Forcing materialization lets the
+    // planner build a 208-row hash table and probe it once per stock instead.
     const foCtes = Prisma.sql`
-      fo_oi AS (
+      fo_oi AS MATERIALIZED (
         SELECT DISTINCT ON (b.underlying)
           b.underlying, b.buildup_label AS "buildupLabel", b.oi_change_pct AS "oiChangePct"
         FROM fo_oi_buildup b
         WHERE b.trading_date = (SELECT MAX(trading_date) FROM fo_oi_buildup)
         ORDER BY b.underlying, b.instrument_type
       ),
-      fo_opt AS (
+      fo_opt AS MATERIALIZED (
         SELECT DISTINCT ON (m.underlying)
           m.underlying, m.pcr_oi AS "pcrOi"
         FROM fo_option_metrics m
