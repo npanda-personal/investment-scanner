@@ -20,7 +20,7 @@ export interface IndicatorSeries {
   id: string;
   label: string;
   color: string;
-  lineWidth?: number;
+  lineWidth?: 1 | 2 | 3 | 4;
   data: IndicatorPoint[];
   dashed?: boolean;
 }

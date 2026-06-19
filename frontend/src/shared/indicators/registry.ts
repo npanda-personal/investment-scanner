@@ -111,7 +111,8 @@ const PIVOT_STANDARD: IndicatorDef = {
       color,
       lineWidth: 1 as const,
       dashed,
-      data: bars.map((b) => ({ time: b.time, value: val })),
+      // Only draw over the most recent ~60 bars so lines don't span years of history.
+      data: bars.slice(-60).map((b) => ({ time: b.time, value: val })),
     });
     return {
       id: 'pivot_standard',

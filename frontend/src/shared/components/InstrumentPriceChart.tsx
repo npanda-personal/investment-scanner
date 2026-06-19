@@ -142,9 +142,7 @@ export default function InstrumentPriceChart({
     });
     chartRef.current = chart;
 
-    if (activeOscillators.length > 0) {
-      chart.priceScale('right').applyOptions({ scaleMargins: layout.right });
-    }
+    chart.priceScale('right').applyOptions({ scaleMargins: layout.right });
 
     // Candle series
     const candleSeries = chart.addCandlestickSeries({
@@ -174,7 +172,7 @@ export default function InstrumentPriceChart({
       for (const s of result.series) {
         const series = chart.addLineSeries({
           color: s.color,
-          lineWidth: ((s.lineWidth ?? 1) as 1 | 2 | 3 | 4),
+          lineWidth: s.lineWidth ?? 1,
           lineStyle: s.dashed ? LineStyle.Dashed : LineStyle.Solid,
           title: s.label,
           priceLineVisible: false,

@@ -12,13 +12,12 @@ export interface PivotLevels {
 
 /**
  * Classic pivot point formula (Standard / Floor-trader pivots).
- * Uses the second-to-last bar as the reference session (the most recent
- * complete session when today's bar may still be forming).
- * Returns null if there are fewer than 2 bars.
+ * Uses the last bar as the reference session (the most recent complete EOD
+ * session in our persisted data). Returns null if there are fewer than 1 bar.
  */
 export function pivotPointsStandard(bars: OHLCVBar[]): PivotLevels | null {
-  if (bars.length < 2) return null;
-  const { high: h, low: l, close: c } = bars[bars.length - 2];
+  if (bars.length < 1) return null;
+  const { high: h, low: l, close: c } = bars[bars.length - 1];
   const pp = (h + l + c) / 3;
   return {
     pp,
