@@ -340,7 +340,10 @@ export class UniverseReadinessService {
     startDate.setUTCDate(startDate.getUTCDate() - (scope.region === 'IN' && scope.assetType === 'STOCK' ? 45 : 30));
     startDate.setUTCHours(0, 0, 0, 0);
     const defaultRequiredHistoryStartDate = new Date(endDate);
-    defaultRequiredHistoryStartDate.setUTCFullYear(defaultRequiredHistoryStartDate.getUTCFullYear() - 15);
+    // US equities: 5-year minimum (Phase 1; full 15-year extended backfill deferred).
+    // IN/EU: 15-year minimum for calibration-grade signal history.
+    const historyLookbackYears = scope.region === 'US' ? 5 : 15;
+    defaultRequiredHistoryStartDate.setUTCFullYear(defaultRequiredHistoryStartDate.getUTCFullYear() - historyLookbackYears);
     defaultRequiredHistoryStartDate.setUTCHours(0, 0, 0, 0);
     return {
       latestCompletedEodDate,
