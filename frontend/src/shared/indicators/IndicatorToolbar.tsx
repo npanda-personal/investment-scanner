@@ -1,3 +1,4 @@
+import React from 'react';
 import { Box, Chip, Typography } from '@mui/material';
 import { INDICATOR_ORDER, INDICATOR_REGISTRY } from './registry';
 import type { IndicatorId } from './types';
@@ -5,9 +6,10 @@ import type { IndicatorId } from './types';
 interface IndicatorToolbarProps {
   activeIds: IndicatorId[];
   onChange: (ids: IndicatorId[]) => void;
+  rightSlot?: React.ReactNode;
 }
 
-export default function IndicatorToolbar({ activeIds, onChange }: IndicatorToolbarProps) {
+export default function IndicatorToolbar({ activeIds, onChange, rightSlot }: IndicatorToolbarProps) {
   const toggle = (id: IndicatorId) => {
     onChange(
       activeIds.includes(id) ? activeIds.filter((a) => a !== id) : [...activeIds, id],
@@ -51,6 +53,7 @@ export default function IndicatorToolbar({ activeIds, onChange }: IndicatorToolb
           />
         );
       })}
+      {rightSlot && <Box sx={{ ml: 'auto' }}>{rightSlot}</Box>}
     </Box>
   );
 }
