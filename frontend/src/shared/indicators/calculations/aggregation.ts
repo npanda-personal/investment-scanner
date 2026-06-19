@@ -38,7 +38,7 @@ export function aggregateBars(bars: OHLCVBar[], tf: ChartTimeframe): OHLCVBar[] 
 
 /** Return the Monday (YYYY-MM-DD) of the ISO week containing the given date string. */
 function isoWeekMonday(dateStr: string): string {
-  const d = new Date(dateStr + 'T00:00:00');
+  const d = new Date(dateStr + 'T00:00:00Z');
   const day = d.getUTCDay();
   const diff = day === 0 ? -6 : 1 - day;
   d.setUTCDate(d.getUTCDate() + diff);
