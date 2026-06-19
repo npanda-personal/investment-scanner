@@ -46,7 +46,7 @@ export default function UnifiedStockPage() {
   // and build the TradingView symbol for the Chart tab.
   const [derivativesEligible, setDerivativesEligible] = useState<boolean | null>(null);
   const [symbol, setSymbol] = useState<string | null>(null);
-  const [tvSymbol, setTvSymbol] = useState<string>('');
+  const [tvSymbol, setTvSymbol] = useState<string | undefined>(undefined);
   useEffect(() => {
     if (!id) return;
     fetchInstrument(id, { region: scope.region, assetType: scope.assetType })
@@ -67,7 +67,7 @@ export default function UnifiedStockPage() {
       .catch(() => {
         setDerivativesEligible(null);
         setSymbol(null);
-        setTvSymbol('');
+        setTvSymbol(undefined);
       });
   }, [id, scope.region, scope.assetType]);
 

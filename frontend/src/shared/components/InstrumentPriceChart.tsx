@@ -1,12 +1,12 @@
 /**
- * InstrumentPriceChart — a candlestick + volume chart rendered with TradingView's
- * open-source `lightweight-charts` library, fed by THIS app's persisted OHLC price data
- * (GET /v1/prices/:id). Unlike the TradingView embed widget, this works uniformly for
- * NSE/BSE/US/crypto (it's our own data, no exchange-licensing restriction) and honours
- * the persisted-read rule.
+ * InstrumentPriceChart — candlestick + volume chart (lightweight-charts) on the app's
+ * own persisted OHLC data (GET /v1/prices/:id). Works for NSE/BSE/US/crypto uniformly.
  *
- * On hover, a "View on TradingView ↗" link opens the full TradingView chart for the
- * mapped symbol in a new tab, for users who want indicators/drawing tools.
+ * Includes a toggleable indicator toolbar (RSI, Stoch RSI, 50/200 DMA, Pivot Points).
+ * Add new indicators by registering them in shared/indicators/registry.ts — no changes
+ * needed to this component.
+ *
+ * A "View on TradingView ↗" link is always gently visible; full opacity on hover.
  */
 import { useEffect, useRef, useState } from 'react';
 import { Box, CircularProgress, Link, Paper, Typography, useTheme } from '@mui/material';
@@ -15,9 +15,13 @@ import {
   createChart,
   ColorType,
   CrosshairMode,
+  LineStyle,
   type IChartApi,
 } from 'lightweight-charts';
 import { fetchInstrumentPrices } from '@/features/market-data-foundation/api/marketDataFoundationService';
+import IndicatorToolbar from '@/shared/indicators/IndicatorToolbar';
+import { DEFAULT_INDICATORS, INDICATOR_REGISTRY } from '@/shared/indicators/registry';
+import type { IndicatorId, OHLCVBar } from '@/shared/indicators/types';
 
 interface InstrumentPriceChartProps {
   instrumentId?: string;
@@ -29,17 +33,40 @@ interface InstrumentPriceChartProps {
   height?: number | string | Record<string, number | string>;
 }
 
-interface Candle {
-  time: string;
-  open: number;
-  high: number;
-  low: number;
-  close: number;
-  volume: number | null;
-}
-
 const UP = '#26a69a';
 const DOWN = '#ef5350';
+
+// ─── pane layout helpers ─────────────────────────────────────────────────────
+
+interface PaneLayout {
+  right: { top: number; bottom: number };
+  vol: { top: number; bottom: number };
+  oscScales: { top: number; bottom: number }[];
+}
+
+function computePaneLayout(oscCount: number): PaneLayout {
+  if (oscCount === 0) {
+    return { right: { top: 0, bottom: 0 }, vol: { top: 0.82, bottom: 0 }, oscScales: [] };
+  }
+  if (oscCount === 1) {
+    return {
+      right: { top: 0, bottom: 0.42 },
+      vol:   { top: 0.59, bottom: 0.37 },
+      oscScales: [{ top: 0.63, bottom: 0 }],
+    };
+  }
+  // 2+ oscillators
+  return {
+    right: { top: 0, bottom: 0.50 },
+    vol:   { top: 0.51, bottom: 0.45 },
+    oscScales: [
+      { top: 0.55, bottom: 0.24 },
+      { top: 0.76, bottom: 0 },
+    ],
+  };
+}
+
+// ─── component ───────────────────────────────────────────────────────────────
 
 export default function InstrumentPriceChart({
   instrumentId,
@@ -51,15 +78,13 @@ export default function InstrumentPriceChart({
   const theme = useTheme();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
-  const [candles, setCandles] = useState<Candle[] | null>(null); // null = loading
+  const [candles, setCandles] = useState<OHLCVBar[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [activeIndicatorIds, setActiveIndicatorIds] = useState<IndicatorId[]>(DEFAULT_INDICATORS);
 
   // Fetch persisted OHLC for this instrument.
   useEffect(() => {
-    if (!instrumentId) {
-      setCandles([]);
-      return;
-    }
+    if (!instrumentId) { setCandles([]); return; }
     let cancelled = false;
     setCandles(null);
     setError(null);
@@ -84,15 +109,21 @@ export default function InstrumentPriceChart({
       .catch(() => {
         if (!cancelled) setError('Unable to load price history for this instrument.');
       });
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [instrumentId, region, assetType]);
 
-  // Build / rebuild the chart whenever data or theme changes.
+  // Build / rebuild the chart when data, theme, or active indicators change.
   useEffect(() => {
     const el = containerRef.current;
     if (!el || !candles || candles.length === 0) return;
+
+    const activeOverlay = activeIndicatorIds
+      .map((id) => INDICATOR_REGISTRY[id])
+      .filter((d) => d?.pane === 'overlay');
+    const activeOscillators = activeIndicatorIds
+      .map((id) => INDICATOR_REGISTRY[id])
+      .filter((d) => d?.pane === 'oscillator');
+    const layout = computePaneLayout(activeOscillators.length);
 
     const chart = createChart(el, {
       autoSize: true,
@@ -111,22 +142,20 @@ export default function InstrumentPriceChart({
     });
     chartRef.current = chart;
 
+    chart.priceScale('right').applyOptions({ scaleMargins: layout.right });
+
+    // Candle series
     const candleSeries = chart.addCandlestickSeries({
-      upColor: UP,
-      downColor: DOWN,
-      borderVisible: false,
-      wickUpColor: UP,
-      wickDownColor: DOWN,
+      upColor: UP, downColor: DOWN, borderVisible: false,
+      wickUpColor: UP, wickDownColor: DOWN,
     });
     candleSeries.setData(
       candles.map((c) => ({ time: c.time, open: c.open, high: c.high, low: c.low, close: c.close })),
     );
 
-    const volSeries = chart.addHistogramSeries({
-      priceFormat: { type: 'volume' },
-      priceScaleId: 'vol',
-    });
-    chart.priceScale('vol').applyOptions({ scaleMargins: { top: 0.82, bottom: 0 } });
+    // Volume series
+    const volSeries = chart.addHistogramSeries({ priceFormat: { type: 'volume' }, priceScaleId: 'vol' });
+    chart.priceScale('vol').applyOptions({ scaleMargins: layout.vol });
     volSeries.setData(
       candles
         .filter((c) => c.volume != null)
@@ -137,56 +166,105 @@ export default function InstrumentPriceChart({
         })),
     );
 
+    // Overlay indicators (DMA lines, Pivot Points) — rendered on the main candle scale
+    for (const def of activeOverlay) {
+      const result = def.calculate(candles);
+      for (const s of result.series) {
+        const series = chart.addLineSeries({
+          color: s.color,
+          lineWidth: s.lineWidth ?? 1,
+          lineStyle: s.dashed ? LineStyle.Dashed : LineStyle.Solid,
+          title: s.label,
+          priceLineVisible: false,
+          lastValueVisible: true,
+          crosshairMarkerVisible: false,
+        });
+        series.setData(s.data);
+      }
+    }
+
+    // Oscillator indicators — each in its own sub-pane with a dedicated price scale
+    activeOscillators.forEach((def, oscIdx) => {
+      const result = def.calculate(candles);
+      const scaleId = `osc${oscIdx}`;
+      const oscMargins = layout.oscScales[oscIdx] ?? { top: 0.85, bottom: 0 };
+
+      // Reference levels (overbought / oversold / midline)
+      for (const ref of result.referenceLevels ?? []) {
+        const refLine = chart.addLineSeries({
+          color: ref.color,
+          lineWidth: 1,
+          lineStyle: LineStyle.Dashed,
+          priceScaleId: scaleId,
+          title: ref.label ?? '',
+          priceLineVisible: false,
+          lastValueVisible: ref.label != null,
+          crosshairMarkerVisible: false,
+        });
+        refLine.setData(candles.map((b) => ({ time: b.time, value: ref.value })));
+      }
+
+      // Main indicator series (%K/%D, RSI line, etc.)
+      for (const s of result.series) {
+        const series = chart.addLineSeries({
+          color: s.color,
+          lineWidth: ((s.lineWidth ?? 2) as 1 | 2 | 3 | 4),
+          lineStyle: s.dashed ? LineStyle.Dashed : LineStyle.Solid,
+          priceScaleId: scaleId,
+          title: s.label,
+          priceLineVisible: false,
+          lastValueVisible: true,
+          crosshairMarkerVisible: true,
+        });
+        series.setData(s.data);
+      }
+
+      chart.priceScale(scaleId).applyOptions({ scaleMargins: oscMargins, autoScale: true });
+    });
+
     chart.timeScale().fitContent();
 
-    return () => {
-      chart.remove();
-      chartRef.current = null;
-    };
+    return () => { chart.remove(); chartRef.current = null; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [candles, theme.palette.mode]);
+  }, [candles, theme.palette.mode, activeIndicatorIds]);
 
   const tvHref = tvSymbol
     ? `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(tvSymbol)}`
     : null;
 
-  if (!instrumentId) {
-    return <StateCard height={height}>No instrument selected.</StateCard>;
-  }
-  if (candles === null) {
-    return (
-      <StateCard height={height}>
-        <CircularProgress size={28} />
-      </StateCard>
-    );
-  }
-  if (error) {
-    return <StateCard height={height}>{error}</StateCard>;
-  }
-  if (candles.length === 0) {
-    return (
-      <StateCard height={height}>
-        No price history available yet for this instrument.
-        {tvHref ? <TvLink href={tvHref} sx={{ position: 'static', opacity: 1, mt: 1 }} /> : null}
-      </StateCard>
-    );
-  }
-
   return (
-    <Paper
-      sx={{
-        p: 0,
-        position: 'relative',
-        height,
-        overflow: 'hidden',
-        '&:hover .tv-ext-link, & .tv-ext-link:focus-visible': { opacity: 1 },
-      }}
-    >
-      <Box ref={containerRef} sx={{ height: '100%', width: '100%' }} />
-      {tvHref ? <TvLink href={tvHref} /> : null}
-    </Paper>
+    <Box>
+      <IndicatorToolbar activeIds={activeIndicatorIds} onChange={setActiveIndicatorIds} />
+      {!instrumentId ? (
+        <StateCard height={height}>No instrument selected.</StateCard>
+      ) : candles === null ? (
+        <StateCard height={height}><CircularProgress size={28} /></StateCard>
+      ) : error ? (
+        <StateCard height={height}>{error}</StateCard>
+      ) : candles.length === 0 ? (
+        <StateCard height={height}>
+          No price history available yet for this instrument.
+          {tvHref ? <TvLink href={tvHref} sx={{ position: 'static', opacity: 1, mt: 1 }} /> : null}
+        </StateCard>
+      ) : (
+        <Paper
+          sx={{
+            p: 0,
+            position: 'relative',
+            height,
+            overflow: 'hidden',
+            '&:hover .tv-ext-link, & .tv-ext-link:focus-visible': { opacity: 1 },
+          }}
+        >
+          <Box ref={containerRef} sx={{ height: '100%', width: '100%' }} />
+          {tvHref ? <TvLink href={tvHref} /> : null}
+        </Paper>
+      )}
+    </Box>
   );
 }
+
+// ─── sub-components ──────────────────────────────────────────────────────────
 
 function TvLink({ href, sx }: { href: string; sx?: object }) {
   return (
@@ -212,7 +290,7 @@ function TvLink({ href, sx }: { href: string; sx?: object }) {
         fontSize: '0.72rem',
         fontWeight: 600,
         color: 'primary.main',
-        opacity: 0,
+        opacity: 0.35,
         transition: 'opacity 0.15s ease',
         ...sx,
       }}
