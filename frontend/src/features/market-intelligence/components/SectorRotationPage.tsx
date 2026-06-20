@@ -326,6 +326,8 @@ export function SectorRotationPage() {
     load();
   }, [load]);
 
+  const [warningsExpanded, setWarningsExpanded] = useState(false);
+
   const sectors = data?.sectors ?? [];
   const quadrants: RotationQuadrant[] = ['LEADING', 'IMPROVING', 'WEAKENING', 'LAGGING'];
 
@@ -340,8 +342,6 @@ export function SectorRotationPage() {
       </Box>
     );
   }
-
-  const [warningsExpanded, setWarningsExpanded] = useState(false);
 
   return (
     <Box className="page-container page-container--hub">
