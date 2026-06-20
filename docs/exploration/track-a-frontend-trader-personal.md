@@ -1,266 +1,284 @@
-# Frontend Recon — Trader Personal / Account Screens
+# Frontend Trader-Personal Screens — Re-Audit (2026-06-16)
 
-**Wave:** Trader Personal  
-**Date:** 2026-06-15  
-**Server:** http://localhost:5173 (shared dev instance)  
-**Auth:** test@example.com / TestUser123!
+Audit method: source-code inspection + direct API probing with a test-user JWT (test@example.com, planCode=ADMIN). Computer-use / Chrome MCP unavailable in this session (timeout / no extension). All findings are derived from component source and live API responses; no state was mutated.
 
 ---
 
-## 1. Portfolios (`/portfolios`)
+## 1. Portfolio Management (`/portfolios`, `/portfolios/:id`)
 
-**Purpose:** Create and browse manual portfolios; view holdings, valuation, allocation, and transactions.
+**Purpose:** Manual portfolio tracker — holdings, valuation (mark-to-market), allocation breakdown, intelligence overlay, and transaction log.
 
-**UI Elements:**
-- Page header: "Portfolios" with "Scope: IN" label and subtitle "Manual portfolios, holdings, valuation, allocation, and transaction tracking."
-- **Left panel — Select Portfolio:** Autocomplete/combobox "Search portfolios..." with an Open button. For the test user the dropdown is empty (no existing portfolios).
-- **Left panel — Create New form:** Name (text), Currency (text, defaults to "INR"), Description (text), and "Create" button. No validation hints visible in empty state; the Create button is always present regardless of form fill.
-- **Right panel (default):** Empty state — heading "Select a portfolio" + instruction "Choose or create a portfolio to view holdings, valuation, allocation, and transactions." No portfolio detail tabs are rendered until one is selected.
+**UI elements:**
+- Top bar: Select-portfolio autocomplete + Create-New inline form (name / currency / description / Create button).
+- When a portfolio is selected: five tabs — Overview, Holdings, Allocation, Intelligence, Transactions.
+- Overview tab: Capital-Posture banner (live from `/api/v1/market-context/capital-posture?region=...`), then 4 summary cards (Total Value / Unrealized P&L / Daily Change / Holdings count).
+- Holdings tab: read-only table (Symbol → research link, Company, Qty, Avg Cost, Current, Value, Unrealized P&L %, Signal badge) + Add Holding / Edit Holding inline form (instrument search-select, qty, avg cost, currency, notes).
+- Allocation tab: Top Holdings / Sectors / Countries bar lists.
+- Intelligence tab: delegates to `PortfolioIntelligencePanel`.
+- Transactions tab: Add Transaction form (type, instrument, qty, price, amount, date, currency, notes) + transaction list table.
+- Delete portfolio: outlined error button → MUI Dialog with cancel/confirm (confirmation gate IS present).
 
-**API Calls (on page load):**
-- `GET /api/v1/portfolios?region=IN&assetType=STOCK` → 200 (returns empty array for test user)
-- `GET /api/v1/alerts/events?region=IN&assetType=STOCK` → 200 (header alert badge)
-- `GET /api/v1/market-context/capital-posture?region=IN&assetType=STOCK` → 200 (header posture chip)
+**API calls (method + path):**
+- `GET /api/v1/portfolios` — list
+- `GET /api/v1/portfolios/:id/summary`
+- `GET /api/v1/portfolios/:id/allocation`
+- `GET /api/v1/portfolios/:id/transactions`
+- `GET /api/v1/market-context/capital-posture?region=...` — live; fetched when Overview tab is active and a portfolio is selected
+- `POST /api/v1/portfolios` — create
+- `POST /api/v1/portfolios/:id/holdings` — add
+- `PATCH /api/v1/portfolios/:id/holdings/:hid` — update
+- `DELETE /api/v1/portfolios/:id/holdings/:hid` — remove
+- `POST /api/v1/portfolios/:id/transactions` — add
+- `DELETE /api/v1/portfolios/:id` — delete
 
-**Data Notes:**
-- Portfolio list is empty for test user; no holdings/transaction data exists.
-- The `portfolio_transactions` table is known-empty in the DB — the UI gracefully shows the empty-state panel.
+**Data notes:**
+- Test user has **zero portfolios** → page shows "Select or create a portfolio" state correctly.
+- No holdings → "No holdings yet. Add your first holding…" with CTA button to switch to Holdings tab — clean zero-state.
+- No transactions → "No transactions recorded yet." — correct zero-state.
+- Capital Posture uses a live fetch (not persisted-read) on every Overview tab activation. This may conflict with the persisted-read convention for trader-facing pages; flagged but left as out-of-scope.
+- Scope chip (IN/US/etc.) shown in header badges; allocation currency adapts to `selectedPortfolio.baseCurrency`.
 
 **Gaps / Issues:**
-- The Create form has no visible required-field markers or inline validation before submit.
-- No "No portfolios yet" empty state is shown inside the search combobox — it just shows nothing when opened.
-- No `DELETE` or rename portfolio controls observed from this view.
+- ISSUE (unchanged from prior audit): The Capital Posture section does a live GET on page-load sub-event (Overview tab activation), violating the persisted-read trader-facing pattern.
+- No pagination on the Holdings or Transactions table — could become unwieldy with many records, but no functional break today.
+- `GET /api/v1/portfolios/:id/changes` endpoint exists in router but is not used by the FE; dead surface.
 
 ---
 
-## 2. Watchlists (`/watchlists`)
+## 2. Watchlist Management (`/watchlists`, `/watchlists/:id`)
 
-**Purpose:** Track candidate stocks before they become portfolio holdings.
+**Purpose:** Track stocks of interest before they become holdings; annotate with notes and tags; view price + signal overlay.
 
-**UI Elements:**
-- Page header: "Watchlists" with "Scope: IN" label and subtitle "Track stocks you are interested in before they become portfolio holdings."
-- **Left panel — Select Watchlist:** Autocomplete/combobox "Search watchlists..." with Open button. Empty for test user.
-- **Left panel — Create New form:** Name (required, text) and Description (text, no currency field — contrast with Portfolios). "Create" button.
-- **Right panel (default):** Empty state — "Select a watchlist" / "Choose or create a watchlist to view tracked stocks."
+**UI elements:**
+- Select-watchlist autocomplete + Create-New inline form (name / description / Create button).
+- When a watchlist is selected: instrument-search-select + sort dropdown (Recently Added / Signal Score / Daily Change High / Daily Change Low / Symbol) + Add Stock button.
+- DataTable: Symbol (→ research link), Company, Sector, Country, Price, Daily % change (color-coded), Signal (badge + confidence chip + date), Notes/Tags inline editable fields, Actions (Save notes/tags, Set Price Alert dialog, Remove).
+- "Set Price Alert" opens `CreateAlertDialog` pre-filled with `scope=STOCK, type=PRICE_ABOVE, instrumentId`.
+- Delete watchlist: error outlined button → confirmation dialog (gate IS present).
+- Snackbar for silent errors.
 
-**API Calls (on page load):**
-- `GET /api/v1/watchlists?region=IN&assetType=STOCK` → 200 (empty array)
-- `GET /api/v1/alerts/events?region=IN&assetType=STOCK` → 200
-- `GET /api/v1/market-context/capital-posture?region=IN&assetType=STOCK` → 200
+**API calls:**
+- `GET /api/v1/watchlists` — list
+- `GET /api/v1/watchlists/:id?sort=...` — detail with items
+- `POST /api/v1/watchlists` — create
+- `POST /api/v1/watchlists/:id/items` — add stock
+- `PATCH /api/v1/watchlists/:id/items/:iid` — update notes/tags
+- `DELETE /api/v1/watchlists/:id/items/:iid` — remove stock
+- `DELETE /api/v1/watchlists/:id` — delete watchlist
 
-**Data Notes:**
-- Watchlist list is empty for test user; structure mirrors Portfolios page layout.
+**Data notes:**
+- Test user has 2 watchlists: **IN** (27 stocks, all with prices, none with signals — `latestSignal: null` for every item) and **US** (14 stocks, mix of BULLISH/NEUTRAL signals scored 43–74 from 2026-06-05).
+- IN watchlist: no signals baked — signal generation pipeline may not be running for IN instruments or snapshots are stale.
+- US watchlist: signals present, prices current as of latest EOD run.
+- Client-side pagination (slice of detail.items), page defaults to 25.
 
 **Gaps / Issues:**
-- Same as Portfolios: no required-field markers on the Create form; combobox empty-state is silent.
-- Watchlist detail tabs (e.g., stock list, signals) not visible since no watchlist selected.
+- ISSUE: IN watchlist has 27 stocks but every `latestSignal` is null. Needs investigation whether IN signal pipeline is running.
+- Sort options send `sort` query param to backend — server-side sort.
+- No bulk-remove or bulk-select on watchlist items table.
 
 ---
 
-## 3. Alerts (`/alerts`)
+## 3. Alerts Monitoring (`/alerts`)
 
-**Purpose:** Manage personal alert rules and view the alert event inbox.
+**Purpose:** Personal alert rules (conditions on stocks/portfolios/watchlists) and an alert inbox showing triggered events.
 
-**UI Elements:**
-- Page header: "Alerts" with "Scope: IN" label and subtitle "Personal alert rules and alert inbox for stocks, triggers, portfolios, and watchlists."
-- **"Create Alert" button** (top right of content area) → opens "Create Alert Rule" modal dialog.
-- **Alert Inbox section:**
-  - Toggle group: "All" / "Unread" filter buttons.
-  - "Evaluate Now" button (tooltip: "Run alert rules now and check for new events").
-  - "Mark All Read" button.
-  - Empty state: "No alert events yet. Create rules and check alerts when you want a local review."
-- **Alert Rules section:** Empty state — "No alert rules yet."
+**UI elements:**
+- Page header with "Create Alert" button (opens `CreateAlertDialog`).
+- Alert Inbox panel: All / Unread toggle-button-group; "Evaluate Now" button (triggers backend evaluation); "Mark All Read" button. Each event card: severity chip, title, message, timestamp, Open Context link, Mark Read (if unread), Dismiss icon.
+- Alert Rules panel: list of rules with name, type, scope, threshold; Enabled/Disabled chip; Enable/Disable toggle icon; Delete icon.
 
-**Create Alert Rule Dialog** (fields from source code):
-- Name (text)
-- Scope (select): Stock | Portfolio | Watchlist
-- Type (select, 11 options): Price Above, Price Below, Daily Move Above, Daily Move Below, Signal Score Above, Signal Direction Changed, Portfolio Holding Drawdown, Portfolio Bearish Signal, Watchlist Signal Score Above, Watchlist Price Above, Watchlist Price Below
-- Conditional fields by scope:
-  - STOCK: InstrumentSearchSelect autocomplete
-  - PORTFOLIO: Autocomplete from user's portfolios list
-  - WATCHLIST: Autocomplete from user's watchlists list
-- Threshold (number): hidden when Type = SIGNAL_DIRECTION_CHANGED (threshold-free)
-- Cancel / Create buttons
+**API calls:**
+- `GET /api/v1/alerts/rules` — list rules
+- `GET /api/v1/alerts/events` — list events
+- `GET /api/v1/alerts/summary` — unread/critical counts
+- `POST /api/v1/alerts/rules` — create
+- `PATCH /api/v1/alerts/rules/:id` — update (enable/disable)
+- `DELETE /api/v1/alerts/rules/:id` — delete
+- `POST /api/v1/alerts/evaluate` — manual evaluation
+- `PATCH /api/v1/alerts/events/:id/read` — mark read
+- `PATCH /api/v1/alerts/events/:id/dismiss` — dismiss
+- `POST /api/v1/alerts/events/mark-all-read` — bulk read
 
-**API Calls (on page load):**
-- `GET /api/v1/alerts/rules?region=IN&assetType=STOCK` → 200 (empty)
-- `GET /api/v1/alerts/events?region=IN&assetType=STOCK` → 200 (empty)
-
-**Data Notes:**
-- Both `alert_rules` and `alert_events` tables are empty for test user — confirmed by API 200 + empty state copy.
-- Evaluate Now would trigger `POST /api/v1/alerts/evaluate` (not triggered during recon).
+**Data notes:**
+- `alert_rules`: 0 rows. Zero-state: "No alert rules yet." — correct.
+- `alert_events`: 0 rows. Zero-state: "No alert events yet. Create rules and check alerts when you want a local review." — correct.
+- Summary: `{ unreadCount: 0, criticalCount: 0 }`.
 
 **Gaps / Issues:**
-- The "Create Alert" button at the page level did not respond to a CSS-selector click; required a direct JS `.click()` on the button element — possible event-propagation quirk.
-- No pagination or date-range filter on the Alert Inbox.
-- No "Dismiss" or "Delete" action visible on alert events (not observable since inbox is empty, but the `dismissedAt` field exists in the type).
+- Zero-states render correctly. No functional issues observed.
+- No pagination on inbox or rules panel — acceptable for a personal tool.
 
 ---
 
 ## 4. AI Investment Copilot (`/copilot`)
 
-**Purpose:** On-demand deterministic research summaries assembled from existing intelligence modules. No external LLM.
+**Purpose:** Deterministic, text-based research summaries generated from existing backend modules. Five tabs: Market Brief, Stock Summary, Portfolio Summary, Watchlist Summary, Alert Digest.
 
-**UI Elements:**
-- Page heading: "AI Investment Copilot"
-- Subtitle: "Deterministic research summaries from your existing modules. Research support only, never an instruction." (correct research-support language — no advice wording)
-- **5 tabs:**
-  1. **Market Brief** — "Load Brief" button; no input needed. Inline disclaimer alert: "Research support only; never an instruction."
-  2. **Stock Summary** — Instrument search autocomplete + "Summarize" button.
-  3. **Portfolio Summary** — Portfolio autocomplete + "Summarize" button.
-  4. **Watchlist Summary** — Watchlist autocomplete + "Summarize" button.
-  5. **Alert Digest** — "Load Brief" button; no input needed.
+**UI elements:**
+- Five-tab navigation (scrollable, auto scroll buttons).
+- Left panel: ActionCard (Market Brief / Alert Digest — single "Load Brief" button) or RequestCard (Stock / Portfolio / Watchlist — selector + "Summarize" button, disabled until selection made).
+- Right panel: SummaryPanel — title, generated-at, data-status chip, prominent `Alert severity="info"` disclaimer ("Research support only; never an instruction."), summary text, source-modules chips, 4 list sections (Key Takeaways, Suggested Next Reviews, Bullish Factors, Bearish/Risk Factors), Data Gaps section.
 
-**Output observed — Market Brief (loaded):**
-- Status badge: PARTIAL
-- Timestamp: "Generated 6/15/2026, 5:28:16 PM"
-- Sources labeled: `market-context-intelligence`, `smart-money-intelligence`
-- Key Takeaways, Suggested Next Reviews, Bullish Factors, Bearish/Risk Factors sections rendered with real data.
-- Data Gaps section: "Macro proxy data is not configured yet."
-- Content: regime=NEUTRAL; bullish sectors Technology (RS 79), Utilities (71), Industrials (69); bearish/lagging IT, Consumer Defensive, Real Estate.
+**API calls:**
+- `GET /api/v1/copilot/market-brief`
+- `GET /api/v1/copilot/alert-digest`
+- `POST /api/v1/copilot/stock-summary` (body: `{ instrumentId }`)
+- `POST /api/v1/copilot/portfolio-summary` (body: `{ portfolioId }`)
+- `POST /api/v1/copilot/watchlist-summary` (body: `{ watchlistId }`)
+- `GET /api/v1/portfolios` — fetched on mount to populate portfolio picker
+- `GET /api/v1/watchlists` — fetched on mount to populate watchlist picker
 
-**Output observed — Alert Digest (loaded):**
-- Status badge: COMPLETE
-- Content: "0 unread alert events, including 0 critical items" — correct empty-state handling.
-- Sections: Key Takeaways, Suggested Next Reviews, Bullish/Bearish Factors (all returning placeholder "no factors" copy).
+**Data notes (live API sample — Market Brief):**
+- Returns real content: regime NEUTRAL, 3 keyTakeaways, bullishFactors (Technology/Utilities/Industrials), bearishFactors (IT/Consumer Defensive/Real Estate), riskFactors (macro data missing), dataStatus PARTIAL, generated real-time.
+- Alert Digest returns real content summarising the 0-event state correctly.
 
-**API Calls:**
-- `GET /api/v1/copilot/market-brief?region=IN&assetType=STOCK` → 200 (on "Load Brief")
-- `GET /api/v1/copilot/alert-digest?region=IN&assetType=STOCK` → 200 (on "Load Brief")
-- (Stock/Portfolio/Watchlist Summary endpoints not called — no instrument/entity selected)
+**Re-audit focus — prior findings:**
 
-**Data Notes:**
-- Output is fully deterministic rule-based template assembly — no external LLM calls observed in network log.
-- PARTIAL status on Market Brief is due to missing macro proxy data, not a code error.
-- Copilot usage is gated: "Copilot summaries today: 9 / 10" visible on billing page — usage metered correctly.
+| Prior finding | Current state |
+|---|---|
+| Does it produce real output? | RESOLVED — Market Brief and Alert Digest return real structured output from backend. |
+| Research-support disclaimer present? | RESOLVED — `Alert severity="info"` "Research support only; never an instruction." renders in SummaryPanel. Subtitle also carries research-support wording. |
+| Tab switch fails to clear prior panel? | STILL PRESENT — `activeSummary` state is held in the hook and is NOT reset when `activeTab` changes. Switching from Market Brief to Stock Summary leaves the Market Brief result visible until a new summary is explicitly requested. |
 
 **Gaps / Issues:**
-- Stock Summary, Portfolio Summary, and Watchlist Summary tabs still show the previously-loaded Market Brief output in the right panel after tab switch. The summary panel does not clear/reset when switching tabs — the right panel persists last-loaded content until a new "Summarize" is triggered. This could confuse traders who switch tabs and assume they see the current tab's output.
-- No copy-to-clipboard or export action on generated summaries.
-- PARTIAL status badge semantics not explained to the user in-UI (no tooltip or legend).
+- ISSUE (persists): Tab switch does not clear `activeSummary`. User can mistake a prior-tab result for the current-tab context.
+- Copilot does live GETs on button press, not persisted snapshots — consistent with an on-demand tool but worth noting.
+- No per-tab result history or "last loaded" timestamp per tab.
 
 ---
 
-## 5. Notifications Delivery (`/notifications`)
+## 5. Notifications (redirects `/notifications` → `/account`)
 
-**Route behavior:** `<Navigate to="/account" replace />` — the `/notifications` path redirects to `/account`. The redirect functions correctly (verified: navigating to `/notifications` lands on `/account`).
+The `notifications-delivery` route is a React Router `<Navigate to="/account" replace />`. The standalone `/notifications` path no longer exists as a dedicated route — all notification preferences now live inside the Account page (`/account`).
 
-Notification preferences are embedded in the Account page — see Section 6 below.
+**AccountPage (`/account`) — Notifications section:**
+- Four `FormControlLabel + Switch` toggles: Enable email notifications, Alert email digests, Daily digest, Weekly digest.
+- Quiet-hours TextFields with labels "Quiet hours start" / "Quiet hours end" and placeholder "22:00" / "07:00".
+- Toggles and TextFields auto-save immediately on change via `patchPreference(...)` — no explicit Save button needed.
+- Provider Status paper: provider name, SMTP configured/active chips, info alert.
+- Manual Sends: Send Test Email, Send Alert Digest, Send Daily Digest, Send Weekly Digest buttons.
+
+**API calls (notifications section):**
+- `GET /api/v1/notifications/preferences`
+- `PATCH /api/v1/notifications/preferences`
+- `GET /api/v1/notifications/events`
+- `GET /api/v1/notifications/provider-status`
+- `POST /api/v1/notifications/test-email`
+- `POST /api/v1/notifications/send-alert-digest`
+- `POST /api/v1/notifications/send-daily-digest`
+- `POST /api/v1/notifications/send-weekly-digest`
+
+**Data notes:**
+- Test user preferences: all booleans false, quietHoursStart/End null.
+- Provider status: `{ activeChannel: "EMAIL_LOG", providerName: "log-email-provider", smtpConfigured: false, smtpAvailable: false }`.
+- Delivery events: 0 records. Zero-state: "No notification delivery records yet." — correct.
+
+**Re-audit focus — prior findings:**
+
+| Prior finding | Current state |
+|---|---|
+| Quiet-hours inputs missing labels? | RESOLVED — both TextFields have explicit MUI `label` props. |
+| No visible Save button? | RESOLVED / by-design — auto-save on change via `patchPreference`. Consistent UX. |
+
+**Gaps / Issues:**
+- MINOR: Quiet-hours TextFields fire a PATCH on every keystroke (no debounce) — typing "22:00" sends 5 requests.
+- `/notifications` redirect to `/account` is silent with no scroll-to-notifications anchor. Users following old bookmarks land at the top of the account page with no visual cue.
+- `NotificationsDeliveryPage.tsx` component still exists but is unreachable via routing — dead component (same functionality duplicated in AccountPage).
 
 ---
 
 ## 6. Subscription & Billing (`/billing`)
 
-**Purpose:** Plan management, feature limit metering, and usage display. No real payment provider.
+**Purpose:** Plan management, feature usage metering, and billing provider status.
 
-**UI Elements:**
-- Page header: "Subscription & Billing"
-- Subtitle explicitly states: "Plan readiness, feature limits, and usage metering. Billing provider is manual/disabled by default." (confirmed: no checkout flow exists)
-- **My Plan card:** Shows current plan name, Status: ACTIVE, and user email.
-- **Available Plans:** 3 plan cards — Admin, Free, Pro. Each shows a "Select" / "Current" / "Downgrade" button. No price, feature comparison copy, or payment link on any card.
-- **Feature Limits section (per Free plan):**
-  - Portfolios: 0 / 1 (Available) — progress bar
-  - Watchlists: 0 / 1 (Available) — progress bar
-  - Alerts: 0 / 5 (Available) — progress bar
-  - Backtest runs this month: 25 / 5 — "Limit reached" warning alert
-  - Copilot summaries today: 9 / 10 — progress bar
-- **Developer note alert** (visible to all users): "Upgrade prompts are returned by backend gating errors when a limit is reached. Future UI flows can show those as modals near the blocked action."
+**UI elements:**
+- Header: title + current-plan chip (color: secondary for ADMIN, primary for PRO, default for FREE).
+- Left column: "My Plan" card (plan name, status, account email) + "Available Plans" card listing all plans.
+- Right column: "Feature Limits" grid + info Alert.
+- PlanCard per plan: name, "Active plan option" / "Inactive" caption, action button.
+  - Button label: "Current" if already on that plan (outlined, disabled), "Select" for PRO, "Downgrade" for FREE.
+  - Button fires `changePlan(plan.code)` directly on click — **NO confirmation dialog**.
+- FeatureUsage per feature: label, used/limit text, LinearProgress bar (hidden when limit=null), status chip.
 
-**Plan switching:** Clicking "Select" on Admin plan immediately changed the active plan to Admin (no confirmation dialog, no payment step, instant 200 response). Feature Limits updated to show all limits as "Unlimited". This is expected behavior (billing provider is manual/disabled), but: the test user's plan was mutated to Admin as a side effect of this recon session (not reversed — the "Downgrade" action was blocked by the recon boundary rule).
+**API calls:**
+- `GET /api/v1/subscription/me` — current subscription + features
+- `GET /api/v1/subscription/plans` — all plans
+- `POST /api/v1/subscription/change-plan` — change plan (no confirmation in UI)
 
-**API Calls:**
-- `GET /api/v1/subscription/me?region=IN&assetType=STOCK` → 200
-- `GET /api/v1/subscription/plans?region=IN&assetType=STOCK` → 200
-- `POST /api/v1/subscription/change-plan?region=IN&assetType=STOCK` → 200 (on Select click)
+**Data notes:**
+- Test user: planCode=ADMIN, status=ACTIVE, startedAt 2026-06-15.
+- Plans: Admin, Free, Pro — all active.
+- Features (all limits null = unlimited on ADMIN): Portfolios used 0, Watchlists used 0, Alerts used 0, Backtest runs this month used **25** (limit null → "Unlimited"), Copilot summaries today used **1** (limit null → "Unlimited").
 
-**Data Notes:**
-- No Stripe/Razorpay/payment-provider calls in network log — consistent with manual/disabled billing.
-- Backtest usage shows 25 / 5 (over limit) — this is real persisted usage state, not a test artifact.
+**Re-audit focus — prior findings:**
 
-**Gaps / Issues:**
-- The developer note alert ("Upgrade prompts are returned by backend gating errors...") is visible to all users including non-admin. This is implementation notes copy leaking into the trader-facing UI — should be hidden or moved to admin-only views.
-- Plan cards show no price, description, or feature comparison — the Available Plans section is a bare list of names + buttons.
-- No confirmation dialog before plan change — a single click mutates the plan.
-- "Backtest runs this month: 25 / 5" (over-limit display) shows usage exceeding the plan cap, which is unexpected. Could indicate either that the metering check is not enforced at write time or that counts were accumulated before the limit was set.
-
----
-
-## 7. Account + Notifications (`/account`)
-
-**Purpose:** Profile editing and notification delivery configuration.
-
-**UI Elements — Profile section:**
-- "Signed in as test@example.com"
-- Name field (editable text, pre-filled: "Test User")
-- "Save profile" button
-- "Log out" button
-
-**UI Elements — Notifications section:**
-- Section heading "Notifications" with subtitle "Configure delivery preferences, email digests, and notification history."
-- **Preferences card:**
-  - Provider badge: "EMAIL_LOG"
-  - Toggle switches (all OFF for test user): Enable email notifications, Alert email digests, Daily digest, Weekly digest
-  - Quiet hours start (time input, empty)
-  - Quiet hours end (time input, empty)
-- **Provider Status card:**
-  - "SMTP is not configured; notification email is delivered through the local log provider."
-  - Provider: log-email-provider
-  - SMTP configured: No
-  - SMTP active: No
-  - Info alert: "Local email delivery is free and requires no paid email service — deliveries are recorded locally."
-- **Manual Sends card:** Four buttons — "Send Test Email", "Send Alert Digest", "Send Daily Digest", "Send Weekly Digest". (Not triggered during recon.)
-- **Recent Delivery History:** Empty state — "No notification delivery records yet."
-
-**API Calls (on page load):**
-- `GET /api/v1/auth/me?region=IN&assetType=STOCK` → 200
-- `GET /api/v1/notifications/preferences?region=IN&assetType=STOCK` → 200
-- `GET /api/v1/notifications/events?region=IN&assetType=STOCK` → 200
-- `GET /api/v1/notifications/provider-status?region=IN&assetType=STOCK` → 200
-
-**Data Notes:**
-- All notification toggles are disabled (off) for test user. No delivery history exists.
-- Provider is log-email-provider (local, no SMTP) — consistent with zero-paid-services constraint.
+| Prior finding | Current state |
+|---|---|
+| Current plan shown correctly? | RESOLVED — planCode=ADMIN, Chip label "Admin", color "secondary". Correctly reflects DB state. |
+| Single-click plan change with NO confirmation? | STILL PRESENT — `onSelect={() => void changePlan(plan.code)}` has no confirmation dialog. One click on "Select" or "Downgrade" immediately fires `POST /api/v1/subscription/change-plan`. This caused the prior accidental plan change. |
+| Dev/implementation commentary as user copy? | STILL PRESENT — `Alert severity="info"` on Feature Limits reads: "Upgrade prompts are returned by backend gating errors when a limit is reached. Future UI flows can show those as modals near the blocked action." This is developer commentary, not user-facing copy. |
+| Over-limit usage (25/5 backtests) shown? | CHANGED — on ADMIN plan all limits are null (unlimited). Feature row shows "25 / Unlimited" with an "Unlimited" chip, no warning rendered. The prior "25/5" was when the test user was on a limited plan. |
 
 **Gaps / Issues:**
-- The Quiet hours time inputs have no labels visible in the snapshot tree (they appear in textContent as "Quiet hours start / end" but there is no `<label>` element associated with the `<input>` in the DOM — accessibility gap).
-- No "Save preferences" button is visible for the Notifications section; it's unclear whether toggles auto-save on change or require an explicit save action.
-- No indication of what email address digests would be sent to (the profile email is shown on /billing but not repeated in the Notifications section).
-- The `/notifications` route redirects to `/account` rather than anchoring the page at the Notifications section, which could disorient users who bookmark or link directly to `/notifications`.
+- ISSUE (persists): Plan change fires immediately on button click with no confirmation gate.
+- ISSUE (persists): Developer commentary rendered as user-facing Alert.
+- MINOR: PlanCard shows no feature summary or pricing info — user cannot compare plans before switching.
 
 ---
 
-## Summary Table
+## 7. Radar Screens (Re-audit)
 
-| Screen | Route | Key API Paths | State | Notable Issues |
-|--------|-------|---------------|-------|----------------|
-| Portfolios | `/portfolios` | `GET /api/v1/portfolios` | Empty (no portfolios) | No required-field validation markers on create form |
-| Watchlists | `/watchlists` | `GET /api/v1/watchlists` | Empty (no watchlists) | Same as Portfolios |
-| Alerts | `/alerts` | `GET /api/v1/alerts/rules`, `GET /api/v1/alerts/events` | Empty (no rules/events) | Create Alert button needs direct JS click; no inbox pagination |
-| Copilot | `/copilot` | `GET /api/v1/copilot/market-brief`, `GET /api/v1/copilot/alert-digest` | Functional (PARTIAL / COMPLETE) | Tab switch does not clear previous summary; PARTIAL badge unexplained |
-| Notifications | `/notifications` | (redirects to `/account`) | Redirect works | Anchor jump to notifications section missing |
-| Billing | `/billing` | `GET /api/v1/subscription/me`, `GET /api/v1/subscription/plans`, `POST /api/v1/subscription/change-plan` | Admin (mutated by recon) | Dev note leaks to trader UI; no plan confirmation dialog; over-limit usage (25/5 backtests) |
-| Account | `/account` | `GET /api/v1/notifications/preferences`, `GET /api/v1/notifications/events`, `GET /api/v1/notifications/provider-status` | Active, all notif off | Quiet hours inputs lack `<label>` association; no visible Save for preferences |
+Three routes registered in `frontend/src/features/market-intelligence/routes.tsx`:
+
+| Route | Status |
+|---|---|
+| `/compounder-radar` | **STILL STUB** — `fetchCompounderRadarSnapshot` returns `unavailable(scope, 'Compounder Radar backend not available yet.')`. Page renders "Compounder Radar data not available yet." with suggestion link to `/stock-interest-radar`. |
+| `/trader-setup-radar` | **STILL STUB** — same pattern. "Trader Setup Radar data not available yet." |
+| `/risk-radar` | **STILL STUB** — same pattern. "Risk Radar data not available yet." |
+
+All three have proper "Not Applicable for Asset Class" fallbacks for crypto/non-fundamentals scope, but the underlying snapshot fetch functions short-circuit to `unavailable(...)` before any API call is made. No backend endpoints exist for these radars.
 
 ---
 
-## Distinct API Paths Observed
+## Summary Table — Re-audit Focus Items
 
-- `GET /api/v1/auth/me`
-- `GET /api/v1/market-context/capital-posture`
-- `GET /api/v1/portfolios`
-- `GET /api/v1/watchlists`
-- `GET /api/v1/alerts/rules`
-- `GET /api/v1/alerts/events`
-- `GET /api/v1/subscription/me`
-- `GET /api/v1/subscription/plans`
-- `POST /api/v1/subscription/change-plan`
-- `GET /api/v1/copilot/market-brief`
-- `GET /api/v1/copilot/alert-digest`
-- `GET /api/v1/notifications/preferences`
-- `GET /api/v1/notifications/events`
-- `GET /api/v1/notifications/provider-status`
-- `GET /api/v1/instruments` (header instrument search)
+| Issue | Prior state | Current state (2026-06-16) |
+|---|---|---|
+| Billing: current plan shown correctly | Incorrect (mis-set) | RESOLVED — ADMIN plan correctly shown |
+| Billing: single-click plan change, no confirmation | Present | STILL PRESENT |
+| Billing: developer commentary as user copy | Present | STILL PRESENT |
+| Billing: over-limit usage display (25/5 backtests) | Present | CHANGED — now ADMIN (unlimited), shows "25 / Unlimited" |
+| Copilot: real output produced | Failing / empty | RESOLVED — Market Brief and Alert Digest return real data |
+| Copilot: research-support disclaimer | Missing | RESOLVED — inline Alert + subtitle both present |
+| Copilot: tab switch fails to clear prior panel | Present | STILL PRESENT |
+| Notifications: quiet-hours inputs missing labels | Present | RESOLVED — labels added |
+| Notifications: no visible Save button | Present | RESOLVED / by-design — auto-save on change |
+| Radar screens: still stubs | All 3 stubs | STILL STUBS — all 3 |
 
-## Console Errors
+---
 
-None observed across all screens in this wave.
+## Distinct API Paths Observed (this wave)
+
+```
+GET  /api/v1/auth/me
+GET  /api/v1/portfolios
+GET  /api/v1/portfolios/:id/summary
+GET  /api/v1/portfolios/:id/allocation
+GET  /api/v1/portfolios/:id/transactions
+GET  /api/v1/market-context/capital-posture?region=...
+GET  /api/v1/watchlists
+GET  /api/v1/watchlists/:id?sort=...
+GET  /api/v1/alerts/rules
+GET  /api/v1/alerts/events
+GET  /api/v1/alerts/summary
+GET  /api/v1/copilot/market-brief
+GET  /api/v1/copilot/alert-digest
+GET  /api/v1/subscription/me
+GET  /api/v1/subscription/plans
+GET  /api/v1/subscription/usage
+GET  /api/v1/subscription/features
+GET  /api/v1/notifications/preferences
+GET  /api/v1/notifications/events
+GET  /api/v1/notifications/provider-status
+```

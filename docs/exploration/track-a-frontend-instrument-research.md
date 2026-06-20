@@ -1,334 +1,261 @@
-# Track A — Frontend Instrument & Research Exploration
+# Frontend Audit: Instrument & Research Screens
 
-**Date:** 2026-06-15
-**Server:** http://localhost:5181 (ui-userfacing variant)
-**Scope:** Instrument Workspace, UnifiedStockPage (all tabs), StockResearchWorkbench, Research Hub
-**Method:** Browser automation via preview_* tools — read-only, no destructive actions.
+**Audit date:** 2026-06-16
+**Method:** Source-code analysis + live API probes (authenticated, `test@example.com`). Computer-use / Chrome extension unavailable during this run — observations are derived from source code and backend API responses rather than rendered screenshots.
 
 ---
 
 ## 1. Instrument Workspace Landing (`/instrument-workspace`)
 
-**Purpose:** Entry point for stock lookup. Search the local catalog and open a stock workspace.
+**Component:** `InstrumentWorkspaceLandingPage` in `frontend/src/features/market-intelligence/components/MarketIntelligencePages.tsx:314`
+**Route:** `market-intelligence/routes.tsx` → `{ path: 'instrument-workspace', element: <InstrumentWorkspaceLandingPage /> }`
 
-**Route registration:** `InstrumentWorkspaceLandingPage` from `market-intelligence/components/MarketIntelligencePages.tsx` — registered at `/instrument-workspace` via `marketIntelligenceRoutes`. **Not** in `market-data-foundation/routes.tsx`.
+### UI Elements
+- `PageHeader` with dynamic subtitle derived from `instrumentWorkspaceSubtitle(scope)`.
+- A single `Paper` card (max-width 680px) containing:
+  - "Open a stock" heading + explanatory copy.
+  - `InstrumentSearchSelect` autocomplete — calls `GET /api/v1/instruments?search=<query>&...` on every keystroke; navigates to `/stocks/:id` on selection.
+  - Bullet list of what the workspace shows once opened (Market regime, sector strength, relative strength, optionally institutional flow + F&O ban if `profile.capabilities.hasInstitutionalFlow`, latest signal).
 
-**UI Elements:**
-- PageHeader: "Instrument Workspace" / subtitle describing NSE/BSE coverage
-- `InstrumentSearchSelect` component (MUI Autocomplete) — debounce-triggered, calls `GET /api/v1/instruments?search=<query>&page=1&pageSize=20&...`
-- "Open" button (submits selected instrument → navigates to `/stocks/:id`)
-- Bullet list of what the workspace shows once a stock is open
+### API Calls
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/api/v1/instruments?search=&page=1&pageSize=20&sortBy=symbol&sortOrder=asc` | Search / list instruments for autocomplete |
 
-**API calls on load:**
-- `GET /api/v1/auth/me`
-- `GET /api/v1/alerts/events`
-- `GET /api/v1/market-context/capital-posture`
-- `GET /api/v1/instruments?page=1&pageSize=20&sortBy=symbol&sortOrder=asc` (initial catalog load)
+### Data Notes
+- Instruments list returns 20 items per page; total count field is `null` in the response (no pagination metadata exposed).
+- Default sort `asc` by symbol — first page begins with `20MICRONS`, `21STCENMGM`, `360ONE`.
+- `price_readiness` is present on each item: many return `READY`; notable symbols (RELIANCE, TCS, INFY) return `INADEQUATE_HISTORY` despite having 2,400–2,800 price bars.
 
-**Data rendering:** Landing page has no data panels — purely a search entry point.
-
-**Gaps / Issues:**
-- None observed on landing itself. The `InstrumentSearchSelect` autocomplete requires actual keyboard interaction (React debounce) and cannot be reliably exercised via eval injection.
-
----
-
-## 2. Deep-Link Symbol Resolution (`/instrument-workspace/:symbol`)
-
-**Purpose:** Resolve a human-readable symbol to an instrument ID, then redirect to `/stocks/:id`.
-
-**Route:** `InstrumentWorkspaceSymbolRedirect` in `UnifiedStockPage.tsx`.
-
-**Behavior observed:**
-- `/instrument-workspace/RELIANCE` → resolved and redirected to `/stocks/cmo2xk6uj000kw5og9smyrvys`
-- `/instrument-workspace/TCS` → `/stocks/cmo2xk6up000lw5og...`
-- `/instrument-workspace/INFY` → `/stocks/cmo2xk6uu000mw5og...`
-- All three resolved correctly via `GET /api/v1/instruments?search=<SYMBOL>&page=1&pageSize=5` (exact-match preferred, falls back to first result)
-
-**Gaps / Issues:** None. Symbol resolution works correctly for all three tested symbols.
+### Gaps / Issues
+- No issues with the landing page itself. It is a simple search-and-redirect shell.
 
 ---
 
-## 3. UnifiedStockPage (`/stocks/:id`) — RELIANCE
+## 2. UnifiedStockPage — `/stocks/:id` (deep link: `/instrument-workspace/:symbol → /stocks/:id`)
 
-**Purpose:** Single-instrument workspace with five tabs covering price, research, fundamentals, signals.
+**Component:** `frontend/src/features/market-data-foundation/components/UnifiedStockPage.tsx`
+**Deep-link resolver:** `InstrumentWorkspaceSymbolRedirect` (same file) — calls `GET /api/v1/instruments?search=<symbol>` to resolve symbol → id, then redirects to `/stocks/:id`.
 
-**Route:** `stocks/:id` → `UnifiedStockPage` component.
+### Tabs
+The page renders five tabs via `?tab=<value>` query parameter:
+| Tab | `value` | Renders |
+|-----|---------|---------|
+| Overview | `overview` (default) | `InstrumentDetailPage` (activeTab='overview') + `MarketContextRail` |
+| Research | `research` | `StockResearchWorkbenchPage` (embedded) |
+| Prices | `prices` | `InstrumentDetailPage` (activeTab='prices') + `MarketContextRail` |
+| Fundamentals | `fundamentals` | `InstrumentDetailPage` (activeTab='fundamentals') + `MarketContextRail` |
+| Signals & History | `signals-history` | `SignalsHistoryTab` / `EquitySignalsHistoryTab` |
 
-**Tabs:** Overview | Research | Prices | Fundamentals | Signals & History
-
-**Key structural note:** Tabs are rendered by `UnifiedStockPage`. Only `Research` and `Signals & History` swap the main content area; `Overview`, `Prices`, and `Fundamentals` all render `InstrumentDetailPage` — but `InstrumentDetailPage` **ignores the `activeTab` prop** (prop is declared in the interface but the component body does not use it). All three tab states show the same full-page layout: price summary cards, data coverage panel, chart, price table, fundamentals table, corporate actions table. There is no tab-level filtering of content.
-
-### 3a. Overview / Prices / Fundamentals tabs (same content — InstrumentDetailPage)
-
-**API calls on load (all fired in parallel):**
-- `GET /api/v1/instruments/:id`
-- `GET /api/v1/prices/:id/latest`
-- `GET /api/v1/prices/:id?limit=120`
-- `GET /api/v1/fundamentals/:id`
-- `GET /api/v1/corporate-actions/:id`
-- `GET /api/v1/market-intelligence/instrument-context/:id`
-- `GET /api/v1/instruments/:id` (second call from `UnifiedStockPage` itself for `derivativesEligible`)
-
-**Data rendered (RELIANCE):**
-- Latest Price: ₹1,307.00 as of 6/15/2026
-- 120-day price range: ₹1,161.90 – ₹1,456.40
-- Exchange: NSE, ISIN: INE002A01018
-- Data coverage: through 6/15/2026; freshness chip shows **"Inadequate History"** (price_readiness field)
-- Historical price chart (Recharts LineChart, 120 bars)
-- Price Table: 20 rows of OHLCV + adjusted close + source column (NSE_UDIFF_CM_BHAVCOPY)
-- Fundamentals Table (hasFundamentals=true for India): 6+ quarterly records + 1 annual. Revenue, EPS, Net Income populated. PE Ratio, Dividend Yield, Shares Outstanding, Market Cap all show **N/A** — status "PARTIAL" from source "MANUAL_VERIFIED"
-- Corporate Actions: Full history — dividends back to 2014, bonus issues (2017, 2024). Status: COMPLETE.
-
-**Market Context Rail (right column):**
-- Market regime: NEUTRAL (53), as of 2026-06-05
-- Sector strength: Energy: NEUTRAL
-- Relative strength: — (missing)
-- Institutional flow: DISTRIBUTION (31), as of 2026-06-15
-- F&O eligible: Yes
-- F&O ban: Not banned (ban list 2026-06-16)
-- Latest signal: — (no signal)
-
-**Gaps / Issues:**
-- `activeTab` prop is declared but never consumed — Overview/Prices/Fundamentals show identical content regardless of tab. This is a UX gap: a user clicking "Prices" or "Fundamentals" does not get a focused view.
-- Fundamentals: PE Ratio, Dividend Yield, Shares Outstanding, Market Cap all N/A — data marked PARTIAL.
-- Relative strength in context rail: missing (—).
-- Latest signal in context rail: — (no signal data for RELIANCE).
-- Freshness chip shows "Inadequate History" despite data being current to 6/15/2026 — this is the `price_readiness` field from the backend, likely reflecting insufficient historical depth.
-- `[MarketDataFoundation]` debug logs fire continuously in the console (432+ entries during session) — these should be removed or gated behind a flag before production.
-
-### 3b. Signals & History tab
-
-**API calls:**
-- `GET /api/v1/signals/:id/history?limit=20`
-- `GET /api/v1/signals/:id/outcomes?horizon=20D`
-
-**Data rendered (RELIANCE, TCS, INFY — all three tested):**
-- Latest Signal panel: "No signals available for this stock yet."
-- Track Record (20-day horizon): "No completed signal outcomes yet for this stock."
-- Recent Signals table: "No signal history available."
-
-**Gaps / Issues:**
-- **Signals & History tab is entirely empty for all three tested instruments** (RELIANCE, TCS, INFY). No signal data has been generated. The Research Hub confirms 1,265 raw signals exist in the universe, but none for these three specific instruments. Signal generation has not been run for these instruments.
-
-### 3c. Research tab (renders StockResearchWorkbenchPage)
-
-See Section 4 below — same component, accessed from both `?tab=research` on UnifiedStockPage and the direct route `/research/stocks/:id`.
+### API Calls (all tabs combined)
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/api/v1/instruments/:id` | Instrument record (for `derivativesEligible`) |
+| GET | `/api/v1/prices/:id?limit=250` | Historical price series (120 bars requested by InstrumentDetailPage) |
+| GET | `/api/v1/prices/:id/latest` | Latest price record |
+| GET | `/api/v1/fundamentals/:id` | Fundamentals records |
+| GET | `/api/v1/corporate-actions/:id` | Corporate actions |
+| GET | `/api/v1/market-intelligence/instrument-context/:id` | Market Context Rail |
+| GET | `/api/v1/signals/:id/history?limit=20` | Signals & History tab — signal list |
+| GET | `/api/v1/signals/:id/outcomes?horizon=20D` | Signals & History tab — track record aggregate |
 
 ---
 
-## 4. Stock Research Workbench (`/research/stocks/:id`)
+### 2a. Overview tab + Market Context Rail
 
-**Purpose:** Full single-instrument research page — signal evidence, price chart with range selectors, performance metrics, fundamentals snapshot, valuation context, relative strength, peer comparison, corporate actions, signal track record.
+**InstrumentDetailPage (activeTab='overview', 'prices', 'fundamentals')**
 
-**Route:** `research/stocks/:id` → `StockResearchWorkbenchPage` (also embedded in UnifiedStockPage as the Research tab).
+The `activeTab` prop is **declared in the component's `InstrumentDetailPageProps` interface but never destructured or used inside the function body** (`const InstrumentDetailPage: React.FC<InstrumentDetailPageProps> = () => {`). All three tab values (Overview, Prices, Fundamentals) render the complete page layout — price summary cards, data-coverage row, historical chart, price table, fundamentals table, corporate actions — regardless of the `activeTab` value passed.
 
-**API calls on load:**
-- `GET /api/v1/research/stocks/:id/workbench?range=1Y`
-- `GET /api/v1/signals/:id` → **404 Not Found** (signal for this instrument does not exist)
-- `GET /api/v1/strategy/:id`
-- `GET /api/v1/strategy/market-gate`
+**Prior finding: `activeTab` prop ignored / all three tabs render identical layouts → CONFIRMED STILL PRESENT.**
 
-**Interactive elements:**
-- Range selector toggle group: 1W | 1M | 3M | 6M | YTD | 1Y | 3Y | 5Y | MAX (fires `GET /api/v1/research/stocks/:id/workbench?range=<selected>`)
-- "Add to Watchlist" icon button → opens modal: "Add RELIANCE to Watchlist" with Watchlist dropdown, Note, Tags fields + Cancel/Add
-- "Create Price Alert" icon button → opens modal: "Create Alert Rule" with Name, Scope, Type, Stock pre-filled, Threshold field + Cancel/Create
-- "Open Signals Dashboard" icon button (present but not exercised — navigates to signal generation engine)
-- "Back to Research Command Center" → `/research`
+**Data observed for RELIANCE (cmo2xk6uj000kw5og9smyrvys):**
+- Latest price: 1307 (date 2026-06-15) — `data_status: COMPLETE`
+- Price history: 250 bars returned (limit=250), oldest 2024-05-29; chart gets 120 bars.
+- `price_readiness: INADEQUATE_HISTORY` on the instrument record even though 2,811 bars are stored and latest date matches expected. The "Freshness" chip on the page will show "Inadequate History" — a confusing mismatch vs. the COMPLETE data_status on the actual price rows.
+- Fundamentals: 11 records (latest: QUARTERLY 2024-12-31, eps 6.44).
+- Corporate actions: 15 records (most recent: dividend 2026-06-05, value 6).
 
-**Data rendered (RELIANCE, 1Y range):**
+**Market Context Rail (RELIANCE):**
+- Market regime: `NEUTRAL` (score 53) — present
+- Sector strength (Energy): `WEAK` (sectorScore 32, 1W -1.34%, 1M -3.18%) — present
+- Relative strength: `absent: true` — no 63d relative return computed. Shows "—" chip.
+- Smart Money: `absent: false` — status present.
+- F&O ban: `absent: false` — data present.
+- Latest signal: `absent: true`, value null — no signal generated for RELIANCE yet.
 
-| Section | Source | Status | Content |
-|---|---|---|---|
-| Signal Score | — | — | "No persisted signal found for this instrument. Run signal generation via POST /signals/run to populate." |
-| Strategy Decision | strategy API | OK | "Insufficient Data / No Action" — Market Gate: SELECTIVE |
-| Price Chart | NSE_UDIFF_CM_BHAVCOPY | COMPLETE | Warning: "Insufficient price bars for the selected range — data gap in this period." Chart shows only 1-day data at 1Y range. |
-| Performance | NSE_UDIFF_CM_BHAVCOPY | COMPLETE | 1Y: -10.68%, 1D: -7.27%, 1W: -8.17%, 1M: -7.36%, YTD: 0%, 3Y CAGR: 1.86%, Max Drawdown: N/A, Volatility: N/A |
-| Fundamental Snapshot | MANUAL_VERIFIED | PARTIAL | Revenue: ₹1,28,260 Cr, EPS: ₹6.44, Net Income: ₹8,721 Cr, P/E: 18.62 (derived), Yield: 0.88% (derived), Shares: N/A, Market Cap: N/A |
-| Valuation Context | NSE_UDIFF_CM_BHAVCOPY | COMPLETE | Stock P/E: 18.62, Peer Avg P/E: N/A, Dividend Yield: 0.88%, Peer Avg Yield: N/A, Market Cap Rank: 1 of 11 |
-| Relative Strength | NSE_UDIFF_CM_BHAVCOPY | MISSING | "Insufficient price history for the 1Y range — data gap." |
-| Peer Comparison | NSE_UDIFF_CM_BHAVCOPY | PARTIAL | 10 peers listed (ONGC, ADANIENT, COALINDIA, IOC, BPCL, OIL, HINDPETRO, PETRONET, MRPL, AEGISLOG) — price and 1Y return shown, P/E: N/A for all peers |
-| Corporate Actions | NSE_CORPORATE_ACTIONS | COMPLETE | Full history: dividends 2014–2026, bonus issues 2017 and 2024 |
-| Signal Evidence / Track Record | — | — | "NO TRACK RECORD" — N/A for all metrics (Sample Size, Win Rate, Avg Forward Return, Calibrated Score, Calibrated Direction, Reliability Tier) |
-
-**Range selector behavior:**
-- At 3M range: chart still shows insufficient bars, Relative Strength still MISSING, 3M Return shows N/A
-- At MAX range: same warnings persist — the instrument has a data gap across all ranges
-
-**Gaps / Issues:**
-- `GET /api/v1/signals/:id` returns **404** — no signal record exists for RELIANCE. This is logged as a network failure but handled gracefully in the UI.
-- Price chart shows data gap warning across all range selections for RELIANCE — "Inadequate History" freshness matches this.
-- Relative Strength section is consistently MISSING for RELIANCE (data gap prevents calculation).
-- Peer Avg P/E and Peer Avg Yield both N/A — peer fundamentals not populated.
-- Signal Evidence / Track Record: all N/A (no signals have ever been generated for RELIANCE).
-- Max Drawdown and Volatility: N/A (insufficient history).
-- Strategy says "Data quality marks this instrument ineligible for signals" — `data_quality_readiness: LIMITED`.
+**Market Context Rail (TCS):**
+- Sector strength: `absent: true` — source field exposes raw DB error string `"SectorSnapshot (no rows for sector="Information Technology")"`.
+- **Prior finding: raw backend error string leaking into Market Context Rail for TCS → CONFIRMED STILL PRESENT.**
+  - The `source` field of `sectorStrength` contains the internal error message. This is used as the `sub` prop in `ContextRow` which renders it as small text under the sector chip, visible to the trader.
+- Latest signal: `absent: true`.
 
 ---
 
-## 5. Research Hub (`/research`)
+### 2b. Prices tab
 
-**Purpose:** Prioritized market intelligence dashboard — actionability status, priority board, signal track record summary, market pulse drilldown tabs.
+Renders the same `InstrumentDetailPage` layout (see above — `activeTab` prop is ignored). Displays historical chart (Recharts `LineChart`, 120-bar window, date/close only, no volume). Price table shows up to 20 rows with Date/Open/High/Low/Close/Adj.Close/Volume/Source columns. Range band is derived from loaded price array (not a true 52-week field). SMA overlays are absent from this chart (SMA overlays only appear in the Research/Workbench tab chart).
 
-**Route:** `/research` → `ResearchOverviewPage` (lazy-loaded).
-
-**API calls on load:**
-- `GET /api/v1/research/overview`
-- `GET /api/v1/signals/quality/summary?horizon=20D&limit=10000&minSampleSize=0`
-- `GET /api/v1/market-intelligence/market-pulse?timeframe=1d`
-- `GET /api/v1/market-context/persisted-breadth`
-- `GET /api/v1/market-intelligence/sectors`
-- `GET /api/v1/smart-money/sectors?range=3M`
-
-**Interactive elements:**
-- "Reload Snapshot" button (re-fetches research overview snapshot)
-- Drilldown tabs: Market Pulse | Breadth / Participation | Sector Map | Flow / Institutional
-- Candidate cards link to `/strategy?instrumentId=:id` (strategy decision engine)
-- Candidate cards also link to `/stocks/:id` (instrument icon)
-- Action links: "Run Data Quality & Universe Sync" → `/data-quality`, "Run Strategy Evaluation" → `/strategy`, "Generate missing strategy performance summaries" → `/strategies`
-
-**Data rendered (snapshot as of 2026-06-15 15:22):**
-
-**Actionability Banner:**
-- Overall: UNPROVEN
-- Data Readiness: LIMITED
-- Strategy Proof: UNPROVEN
-- Signal Evidence: LIMITED (1,265 raw signals — 942 bullish / 323 bearish; quality maturity not wired into Research Hub)
-- Market Environment: LIMITED (SELECTIVE)
-- Trade Plan Readiness: INSUFFICIENT DATA (service unavailable)
-- Calibration Readiness: LIMITED (10,514 calibrated signals, readiness UNAVAILABLE)
-- Today Review Readiness: INSUFFICIENT DATA (service unavailable)
-
-**Signal Track Record strip (last 20 trading days):**
-- Bullish win rate: 56.5%, Bearish win rate: 50.6%
-- Avg 20-day return: +3.0%, Sample size: 583/583
-- Best signal type: CONFIRMED_VOLUME_BREAKOUT, Worst: VOLUME_BREAKOUT
-- Best sector: Basic Materials, Worst: Utilities
-
-**Research Priority Board:**
-- Review Candidates: 0 (none meet proof threshold)
-- Exit / Reduce Risk: 0
-- Watch / Wait: 5 candidates (ABSLAMC 100, ADANIGREEN 95, ADANIPOWER 92, ATGL 92, AIAENG 89) — all "Unproven / Research Only / UNKNOWN_FROM_SNAPSHOT - HIGH, No backtest summary available"
-- Avoid / Risk: 5 candidates (ADANIENT 79, AEGISLOG 59, ABB 66, ICICIBANK 62, SBIN 62) — all same UNKNOWN_FROM_SNAPSHOT / no backtest
-
-**Strategy Proof summary:** 0 Proven, 10 Unproven (all 10 have missing backtests)
-
-**Confirmation Layers:**
-- Signal Pulse: 942 Bullish / 323 Bearish (significant bullish dominance)
-- Smart Money Alignment: "No direct smart money confirmations detected"
-- Sector Tailwinds: Leading: Technology, Utilities, Industrials; 63% above SMA50
-
-**What Changed:** "No changes since the last snapshot."
-
-### 5a. Market Pulse drilldown tab
-
-Shows market health summary inline (from market-pulse API):
-- Health score: 54, India VIX: 14.7 (CALM)
-- A/D ratio: 2.86, Data through 6/15/2026
-- Key indices: Nifty 50: 23,622 (+2.0%), Nifty Next 50: 70,007 (+2.4%), Nifty Midcap 100: 60,768 (+2.4%)
-- Strong sectors: Private Bank, Media, Bank Nifty, Capital Markets, Financial Services
-- Weak sectors: Consumer Durables, FMCG, Oil and Gas, IT, PSE
-
-### 5b. Breadth / Participation drilldown tab
-
-- Above SMA 50: 62.7%, Above SMA 200: 54.9%
-- A/D Ratio: 3.00, 52W Highs: 43, 52W Lows: 4
-- Bullish Signals: 0, Bearish Signals: 0 (breadth panel shows 0 — data gap or not persisted from signals)
-- Price Universe: 360 instruments, SMA 50 Sample: 360
-- Official NSE A/D: not ingested — "Official advance/decline counts from NSE are not yet part of the data pipeline"
-
-### 5c. Sector Map drilldown tab
-
-- 16 sectors, status READY, data through 6/15/2026
-- Note: "(Stock-level map not available — sector rotation only)"
-- Top: Private Bank (Strong, 79), Bank (Strong, 75), PSU Bank (Improving, 71), Media (Improving, 68)
-- Bottom: Energy (Neutral, 46)
-
-### 5d. Flow / Institutional drilldown tab
-
-- Ownership data from institutional filings unavailable for NSE/BSE — using price-volume proxy
-- Sector table: Utilities (Accumulating, 61), Energy (Accumulating, 59), Financial Services (Accumulating, 59), Industrials (Accumulating, 59)... Information Technology (Distributing, 0)
-
-**Gaps / Issues:**
-- All 10 candidates on Priority Board show "UNKNOWN_FROM_SNAPSHOT" — backtest summaries not generated, strategy proof is UNPROVEN for all.
-- 0 Review Candidates — the hub is in a pre-proof state.
-- Trade Plan Readiness: INSUFFICIENT DATA (service unavailable).
-- Today Review Readiness: INSUFFICIENT DATA (service unavailable).
-- Signal Evidence not wired into Research Hub actionability (comment in data: "Signal quality maturity evidence is not yet wired into Research Hub actionability").
-- Breadth panel shows Bullish Signals: 0 / Bearish Signals: 0 — this appears to be a persisted breadth snapshot field, not the 1,265 signals reported in the signal quality summary; the discrepancy is unexplained.
-- Official NSE advance/decline counts not ingested ("not yet part of the data pipeline").
-- Sector Map note: "Stock-level map not available — sector rotation only" — granularity limited to sector level.
+**Gap:** Historical chart is limited to 120 bars (~6 months) for the simple Prices view. There is no range selector here — unlike the workbench which has 1W/1M/3M/6M/YTD/1Y/3Y/5Y/MAX toggle buttons.
 
 ---
 
-## 6. Console Observations
+### 2c. Fundamentals tab
 
-**Errors:** No JS errors observed.
+Renders the same `InstrumentDetailPage` layout. Fundamentals table shows Period/Period End/Revenue/EPS/Net Income/PE/Dividend Yield/Shares/Market Cap/Currency/Source/Status columns. `hasFundamentals` capability gates the section (India NSE equity: shown; crypto: hidden).
 
-**Warnings (React Router):**
-- `No routes matched location "/derivatives-intelligence"` — repeated 8+ times. A link/redirect somewhere points to `/derivatives-intelligence` which does not exist in the route tree. The correct route appears to be `/derivatives`.
-
-**Debug spam:**
-- `[MarketDataFoundation] Object` and `[MarketDataFoundation] [object Object]` — 400+ debug console.log entries firing throughout the session. These should be removed before production builds.
+**Data — RELIANCE:** 11 fundamentals records present. Latest quarterly row: eps 6.44, 2024-12-31.
 
 ---
 
-## 7. API Paths Inventory
+### 2d. Signals & History tab
 
-### Instrument Workspace / UnifiedStockPage
-| Method | Path | Notes |
+**Component:** `EquitySignalsHistoryTab` in `UnifiedStockPage.tsx`
+
+**Data status (RELIANCE, TCS, INFY — all three):**
+- `GET /api/v1/signals/:id/history?limit=20` → `{ items: [] }` (0 signals)
+- `GET /api/v1/signals/:id/outcomes?horizon=20D` → `{ items: [], aggregate: null }`
+
+**Prior finding: Signals & History tab EMPTY, GET /api/v1/signals/:id returned 404 → UPDATED STATUS.**
+- The 404 from a prior run is gone — the endpoints now return HTTP 200 with an empty items array and no error.
+- The tab renders three panels: "Latest Signal" (shows "No signals available for this stock yet."), "Track Record (20-day horizon)" (shows "No completed signal outcomes yet…"), "Recent Signals" (shows "No signal history available.").
+- Root cause confirmed: no signal generation pipeline has been run. Backend message when probing `/api/v1/signals/quality-summary`: `"No persisted signal found for this instrument. Run signal generation via POST /signals/run to populate."`
+- This is not a bug — it is a data/pipeline state issue. The UI handles the empty-state correctly with informational copy.
+
+---
+
+### 2e. Research tab (StockResearchWorkbenchPage embedded)
+
+This tab embeds `StockResearchWorkbenchPage` (same component as `/research/stocks/:id`). See Section 3 below for full details.
+
+---
+
+## 3. Stock Research Workbench (`/research/stocks/:id`)
+
+**Component:** `frontend/src/features/stock-research-workbench/components/StockResearchWorkbenchPage.tsx`
+**Route:** `{ path: 'research/stocks/:id', element: <StockResearchWorkbenchPage /> }`
+**API base:** `GET /api/v1/research/stocks/:id/workbench?range=<range>`
+
+### UI Elements
+- Back button to `/research`.
+- Overview header: company name, symbol/exchange/country/currency, sector/industry, cap-tier badge (Large/Mid/Small + indicative circuit limit), 52-week range, latest price + daily change, data_status chip.
+- Watchlist add icon + alert create icon (read-only safe — dialogs, no auto-submit).
+- Signal widget (`SignalWidget`) and Strategy decision widget (`StrategyDecisionWidget`).
+- Calibration strip: calibrated score + direction (or "Calibration pending" if absent).
+- Price chart with SMA-50 / SMA-200 overlays + volume bars + corporate action reference lines. Range toggle: 1W/1M/3M/6M/YTD/1Y/3Y/5Y/MAX.
+- Performance section (selected-range return + 1D/1W/1M/YTD/1Y/3Y CAGR/max drawdown/volatility).
+- Fundamental Snapshot (revenue/EPS/net income/P-E/dividend yield/shares/market cap/period).
+- Valuation Context (stock vs peer P-E, dividend yield, market cap rank).
+- Relative Strength (stock return vs benchmark + peers for selected range).
+- Peer Comparison (grid of clickable peer cards).
+- Corporate Actions list.
+- Signal Evidence / Track Record section.
+
+### API Calls
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/api/v1/research/stocks/:id/workbench?range=<range>` | All workbench data (assembled snapshot) |
+
+### Data Observed (RELIANCE, range=MAX)
+- Symbol: RELIANCE, latest_price: 1307, data_status: COMPLETE, trust.source: NSE_UDIFF_CM_BHAVCOPY
+- `chart.prices: 1`, `chart.insufficient_range_bars: true` — only 1 price bar returned for all range values including MAX. This triggers the `insufficient_range_bars` warning banner.
+- `chart.adjusted_close_fallback: true` — adjusted_close unavailable; fallback to close.
+- `performance.return_1y: -10.68%`, `performance.return_1w: -8.17%` — computed despite chart having only 1 price bar (backend uses stored data, not chart slice for performance).
+- `relative_strength.stock_return: null` (data_status: MISSING) — stock return is null, triggering the "Insufficient price history" alert in the Relative Strength section.
+- `signalEvidence.status: NO_TRACK_RECORD`, `outcomeDepth: null` — signal evidence section shows "No outcome track record yet" info alert, which is accurate.
+- `peers: 10 peers` — peer comparison grid renders.
+- `corporate_actions: 15 records` — corporate actions section renders.
+
+**Prior finding: price chart limited to 1-day / "insufficient history" → CONFIRMED STILL PRESENT.**
+- The workbench snapshot has only 1 price bar in its `chart.prices` array for ALL range values, for RELIANCE, TCS, and INFY.
+- Root cause: the workbench snapshot is assembled live (HTTP 200 not 202, so it is not a NOT_YET_COMPUTED case). The backend workbench service is only returning 1 bar regardless of range. This causes the chart to be effectively blank and `relative_strength.stock_return` to be null.
+- The "Data is being prepared by the daily pipeline" NOT_YET_COMPUTED state is not being triggered — the backend returns 200 with real (though data-thin) results.
+
+### TCS Workbench (1Y / MAX)
+- Same pattern: chart.prices = 1, insufficient_range_bars = true, relative_strength.stock_return = null.
+
+---
+
+## 4. Research Hub (`/research`)
+
+**Component:** `frontend/src/features/research-hub/components/ResearchOverviewPage.tsx`
+**Route:** `researchHubRoutes → { path: '/research', element: <ResearchOverviewPage /> }`
+**API:** `GET /api/v1/research/overview?region=IN&assetType=EQUITY`
+
+### UI Elements (layout as rendered)
+- `PageHeader` with "Reload Snapshot" button.
+- Sticky "As of <timestamp>" banner (when `generatedAt` present).
+- **Actionability Summary** — outer Paper card with overallStatus chip, canReviewActionableSetups chip, headline text, grid of 7 `ActionabilityDimensionTile`s (Market Environment / Data Readiness / Signal Evidence / Calibration Readiness / Strategy Proof / Today Review Readiness / Trade Plan Readiness).
+- **Market Readiness Hero** — left-bordered card with gate icon (OPEN/CLOSED/UNKNOWN), market gate text, allowed action chips, blockers box, recommended next actions buttons.
+- **Signal Track Record Panel** — calls `GET /api/v1/signals/quality-summary?horizon=20D`.
+- **Research Priority Board** (4 cards in 2x2 grid):
+  - Review Candidates (tradeCandidates)
+  - Exit / Reduce Risk (exitCandidates)
+  - Watch / Wait (watchCandidates)
+  - Avoid / Risk (avoidCandidates)
+- **Strategy Proof Panel** (proven/unproven/missing backtest/market blocked counts).
+- **Confirmation Layers** (Signal Pulse / Smart Money Alignment / Sector Tailwinds).
+- **What Changed Panel** (new candidates / dropped / improved / weakened + stale indicator).
+- **Drilldown Analysis Tabs** (Market Pulse / Breadth / Sector Map / Flow).
+
+### API Calls
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/api/v1/research/overview` | All overview data |
+| GET | `/api/v1/signals/quality-summary?horizon=20D` | SignalTrackRecordPanel |
+| GET | `/api/v1/market-intelligence/market-pulse?region=IN&assetType=EQUITY&timeframe=1d` | Drilldown: Market Pulse tab |
+| GET | `/api/v1/market-context/breadth?region=IN` | Drilldown: Breadth tab |
+| GET | `/api/v1/market-intelligence/sectors?region=IN&assetType=EQUITY` | Drilldown: Sector Map tab |
+| GET | `/api/v1/smart-money/sectors?window=3M&region=IN&assetType=EQUITY` | Drilldown: Flow tab |
+
+### Data Observed (2026-06-16, IN / EQUITY)
+
+**Overview endpoint:**
+- `generatedAt: 2026-06-16T10:09:19Z`
+- `dataGaps: ["Research overview snapshot is not ready yet. Run the backend pipeline to materialize this dashboard."]`
+- `tradeCandidates: 0`, `watchCandidates: 0`, `exitCandidates: 0`, `avoidCandidates: 0`
+- `marketGate: UNKNOWN`
+- `strategyProofSummary.provenCandidateCount: 0`, `unprovenCandidateCount: 0`
+
+The page shows the `isNotYetComputed` alert banner: "Data is being prepared by the daily pipeline. The Research Hub snapshot hasn't been computed yet."
+
+**Signal Track Record Panel:**
+- `GET /api/v1/signals/quality-summary` returns error: "No persisted signal found for this instrument." — panel shows warning alert.
+
+**Drilldown — Market Pulse tab:**
+- `availability: EMPTY` — info alert renders: "Market Pulse snapshot is not available for this scope."
+
+**Drilldown — Sector Map tab:**
+- `status: missing`, 0 sector rows — info alert renders.
+
+**Prior finding: Research Hub Priority Board — how many review candidates now (was 0)?**
+- **STILL 0.** tradeCandidates, watchCandidates, exitCandidates, avoidCandidates all return empty arrays. The `isNotYetComputed` guard fires because the dataGaps contains "not ready yet."
+- Empty-state copy now includes snapshot timestamp and stale indicator (when snapshot age > 1 day).
+
+---
+
+## Summary of Re-Audit Focus Items
+
+| Prior Finding | Current Status | Detail |
 |---|---|---|
-| GET | `/api/v1/instruments` | search, pagination, sortBy/sortOrder |
-| GET | `/api/v1/instruments/:id` | single instrument detail |
-| GET | `/api/v1/prices/:id/latest` | latest price record |
-| GET | `/api/v1/prices/:id?limit=120` | price history |
-| GET | `/api/v1/fundamentals/:id` | fundamentals records |
-| GET | `/api/v1/corporate-actions/:id` | corporate action history |
-| GET | `/api/v1/market-intelligence/instrument-context/:id` | context snapshot (regime, sector, smart money, signal) |
-| GET | `/api/v1/signals/:id/history?limit=20` | signal history (returns empty) |
-| GET | `/api/v1/signals/:id/outcomes?horizon=20D` | outcome track record (returns empty) |
-
-### Stock Research Workbench
-| Method | Path | Notes |
-|---|---|---|
-| GET | `/api/v1/research/stocks/:id/workbench?range=1Y` | full workbench snapshot |
-| GET | `/api/v1/signals/:id` | 404 for RELIANCE — no signal record |
-| GET | `/api/v1/strategy/:id` | strategy decision |
-| GET | `/api/v1/strategy/market-gate` | market gate status |
-
-### Research Hub
-| Method | Path | Notes |
-|---|---|---|
-| GET | `/api/v1/research/overview` | full research hub snapshot |
-| GET | `/api/v1/signals/quality/summary?horizon=20D&limit=10000&minSampleSize=0` | signal quality stats |
-| GET | `/api/v1/market-intelligence/market-pulse?timeframe=1d` | market pulse |
-| GET | `/api/v1/market-context/persisted-breadth` | breadth metrics |
-| GET | `/api/v1/market-intelligence/sectors` | sector strength |
-| GET | `/api/v1/smart-money/sectors?range=3M` | institutional flow by sector |
-
-### Global (every page)
-| Method | Path |
-|---|---|
-| GET | `/api/v1/auth/me` |
-| GET | `/api/v1/alerts/events` |
-| GET | `/api/v1/market-context/capital-posture` |
+| Signals & History EMPTY, GET /api/v1/signals/:id returned 404 | PARTIALLY RESOLVED | 404 is gone (HTTP 200 returned). Items array is still empty (no signals generated). UI shows correct empty-state copy. |
+| Price chart limited to 1-day / "insufficient history" | CONFIRMED STILL PRESENT | `chart.prices: 1` for RELIANCE/TCS/INFY on all range values including MAX. `insufficient_range_bars: true` warning shown. `relative_strength.stock_return: null`. |
+| `activeTab` prop ignored (Overview/Prices/Fundamentals render identical layouts) | CONFIRMED STILL PRESENT | `InstrumentDetailPage` declares the prop in its interface but never destructures or uses it. All three tabs render the full page layout identically. |
+| Raw backend error string leaking into Market Context Rail for TCS | CONFIRMED STILL PRESENT | `sectorStrength.source = "SectorSnapshot (no rows for sector=Information Technology)"` rendered as sub-label text under the sector chip. |
+| Research Hub Priority Board — 0 review candidates | STILL 0 | Snapshot not yet materialized; `isNotYetComputed` alert fires correctly. |
 
 ---
 
-## 8. Summary of Notable Gaps / Issues
+## Notable Empty / Data-State Issues
 
-| # | Screen | Issue | Severity |
-|---|---|---|---|
-| 1 | UnifiedStockPage | `activeTab` prop declared but ignored — Overview/Prices/Fundamentals tabs render identical full-page content with no tab-level focus | Medium |
-| 2 | UnifiedStockPage — Signals & History | Entirely empty for RELIANCE, TCS, INFY — no signals generated for any of these instruments | Medium |
-| 3 | Stock Research Workbench | `GET /api/v1/signals/:id` returns 404 for RELIANCE — no signal record; handled gracefully but notable | Low |
-| 4 | Stock Research Workbench | Price chart and Relative Strength MISSING across all range selections for RELIANCE due to data gap ("Inadequate History") | Medium |
-| 5 | Stock Research Workbench | Peer Avg P/E and Peer Avg Yield all N/A — peer fundamentals not populated | Low |
-| 6 | Stock Research Workbench / Fundamentals | PE Ratio, Shares Outstanding, Market Cap all N/A in fundamentals table — source PARTIAL | Low |
-| 7 | Research Hub | All 10 Priority Board candidates are UNKNOWN_FROM_SNAPSHOT — backtest summaries not generated; 0 Review Candidates | Medium |
-| 8 | Research Hub | Trade Plan Readiness and Today Review Readiness: INSUFFICIENT DATA (service unavailable) | Medium |
-| 9 | Research Hub | Signal Evidence not wired into Research Hub actionability | Medium |
-| 10 | Research Hub — Breadth | Bullish Signals: 0 / Bearish Signals: 0 in breadth panel (vs 1,265 in signal quality summary) — unexplained discrepancy | Low |
-| 11 | Research Hub | Official NSE advance/decline counts not yet ingested | Low |
-| 12 | Console | `No routes matched location "/derivatives-intelligence"` — stale link somewhere pointing to removed route | Low |
-| 13 | Console | 400+ `[MarketDataFoundation]` debug log entries per session — should be removed/gated | Low |
-| 14 | Market Context Rail — TCS | Sector strength shows "— SectorSnapshot (no rows for sector="Information Technology")" — raw debug message leaking into UI | Medium |
+1. **Chart price series = 1 bar across all instruments and range values** — the workbench backend assembles a snapshot with only 1 price bar regardless of `range` parameter. This makes the price chart effectively a single-point line (invisible) and breaks relative-strength calculation. Needs investigation in `stock-research-workbench` backend snapshot builder.
+
+2. **`price_readiness: INADEQUATE_HISTORY` on RELIANCE/TCS/INFY** — instruments show this status on the instrument record despite having 2,400–2,800 stored bars and `data_status: COMPLETE` on the price rows. The Freshness chip on `InstrumentDetailPage` renders "Inadequate History" which may confuse traders.
+
+3. **`relative_strength.stock_return: null` for all instruments** — always null in workbench data because the chart has only 1 bar; the Relative Strength section shows the "Insufficient price history for the 1Y range" alert. Appears to be a downstream consequence of issue 1.
+
+4. **No signals anywhere** — `GET /api/v1/signals/:id/history` returns 0 items for all tested instruments. Signal generation pipeline has never been run on this environment. Signals & History tab and Signal Evidence in workbench both correctly show "no signals yet" states.
+
+5. **Market Pulse, Sector Map, Breadth all EMPTY** — none of the market-intelligence pipelines have been run. Drilldown tabs on Research Hub all render info-alert empty states. This is a data/pipeline issue, not a UI bug.
+
+6. **Raw internal DB/service error exposed in Market Context Rail (TCS sectorStrength)** — the `source` string `SectorSnapshot (no rows for sector="Information Technology")` is an internal diagnostic message, not a trader-facing label. It leaks through the `ContextRow sub` prop render path.

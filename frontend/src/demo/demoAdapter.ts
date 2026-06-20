@@ -7,9 +7,9 @@
  * demo mode (see main.tsx) we resolve EVERY request from baked JSON instead of an
  * HTTP call — no backend, no ~30 service edits.
  *
- * Matching is by request PATH only (method- and query-agnostic): the captured
- * region/assetType/filter/limit params are irrelevant for a point-in-time
- * snapshot, and copilot's POST summaries resolve from the same path key as a GET.
+ * Matching is region-aware: for scoped endpoints the manifest key is
+ * `path?region=XX`, falling back to the bare path for non-scoped endpoints.
+ * The region is read from config.params (set by marketScopeInterceptor).
  * Unknown paths (uncaptured detail ids, refresh/mutation POSTs) resolve to a
  * benign 200 {} so the UI degrades to empty states rather than erroring.
  *
@@ -71,11 +71,28 @@ function makeResponse(
   } as AxiosResponse;
 }
 
+function resolveEntry(
+  manifest: Manifest,
+  path: string,
+  params: Record<string, unknown> | undefined,
+): ManifestEntry | undefined {
+  const region = (params?.region ?? params?.market) as string | undefined;
+  const sector = params?.sector as string | undefined;
+  if (region && sector) {
+    const key = `${path}?region=${region}&sector=${sector}`;
+    if (manifest[key]) return manifest[key];
+  }
+  if (region) {
+    const key = `${path}?region=${region}`;
+    if (manifest[key]) return manifest[key];
+  }
+  return manifest[path];
+}
+
 export const demoAdapter: AxiosAdapter = async (config) => {
   const manifest = await loadManifest();
   const path = normalizePath(config.url || '');
-  const entry = manifest[path];
-
+  const entry = resolveEntry(manifest, path, config.params as Record<string, unknown> | undefined);
   if (entry) {
     try {
       const res = await fetch(`${base}demo-api/${entry.file}`);

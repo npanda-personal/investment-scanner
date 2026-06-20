@@ -1,1082 +1,419 @@
-# Track C — DB Reconnaissance: Signals / Strategy / Snapshots
+# DB Audit: Signals / Strategy / Snapshots Group
 
-> Generated: 2026-06-15 | Read-only SELECT / introspection only. Schema source: `backend/prisma/schema.prisma`. DB: `investment_scanner`.
-
----
-
-## Table of Contents
-
-1. [SignalResult](#1-signalresult--signal_results)
-2. [SignalOutcome](#2-signaloutcome--signal_outcomes)
-3. [SignalGenerationRun](#3-signalgenerationrun--signal_generation_runs)
-4. [SignalCalibrationResult](#4-signalcalibrationresult--signal_calibration_results)
-5. [DataQualityEvaluation](#5-dataqualityevaluation--data_quality_evaluations)
-6. [StrategyDecisionResult](#6-strategydecisionresult--strategy_decision_results)
-7. [StrategyDefinition](#7-strategydefinition--strategy_definitions)
-8. [StrategyPerformanceSummary](#8-strategyperformancesummary--strategy_performance_summaries)
-9. [TradePlanResult](#9-tradeplanresult--trade_plan_results)
-10. [TodayReviewRun](#10-todayreviewrun--today_review_runs)
-11. [TodayReviewCandidate](#11-todayreviewcandidate--today_review_candidates)
-12. [PipelineRun](#12-pipelinerun--pipeline_runs)
-13. [PipelineStageRun](#13-pipelinestagerun--pipeline_stage_runs)
-14. [SignalPositionLedgerEntry](#14-signalpositionledgerentry--signal_position_ledger_entries)
-15. [WorkbenchSnapshot](#15-workbenchsnapshot--workbench_snapshots)
-16. [EarningsIntelligenceSnapshot](#16-earningsintelligencesnapshot--earnings_intelligence_snapshots)
-17. [StockInterestSnapshot](#17-stockinterestsnapshot--stock_interest_snapshots)
-18. [MarketContextSnapshot](#18-marketcontextsnapshot--market_context_snapshots)
-19. [MarketPulseSnapshot](#19-marketpulsesnapshot--market_pulse_snapshots)
-20. [SectorContextSnapshot](#20-sectorcontextsnapshot--sector_context_snapshots)
-21. [SectorSnapshot](#21-sectorsnapshot--sector_snapshots)
-22. [CountryContextSnapshot](#22-countrycontextsnapshot--country_context_snapshots)
-23. [SmartMoneyContextSnapshot](#23-smartmoneycontextsnapshot--smart_money_context_snapshots)
-24. [DataQualitySnapshot](#24-dataqualitysnapshot--data_quality_snapshots)
-25. [MarketScanSnapshot](#25-marketscansnapshot--market_scan_snapshots)
-26. [ResearchOverviewSnapshot](#26-researchoverviewsnapshot--research_overview_snapshots)
-27. [PortfolioIntelligenceSnapshot](#27-portfoliointelligencesnapshot--portfolio_intelligence_snapshots)
+**Audit date:** 2026-06-16 (re-audit)
+**Method:** `reltuples` estimates for large tables; `count(*)` for small/medium ones; null-density via `count(col) / count(*)`.
+**Today's date for staleness judgement:** 2026-06-16
+**DB:** `investment_scanner`, user `scanner`, Postgres (Docker)
 
 ---
 
-## 1. SignalResult — `signal_results`
+## Re-Audit Findings (Prior Items — Read This First)
 
-### Schema
-| Column | Type | Notes |
-|---|---|---|
-| id | String (cuid) | PK |
-| instrumentId | String | FK → stocks.id (Cascade) |
-| generationRunId | String? | FK → signal_generation_runs.id (SetNull) |
-| symbol | String | |
-| companyName | String? | |
-| sector | String? | |
-| country | String? | |
-| score | Float | |
-| direction | String | |
-| confidence | String | |
-| triggeredSignals | Json | |
-| negativeSignals | Json | |
-| explanation | String | |
-| generatedAt | DateTime | default now() |
-| generatedDate | DateTime? | Normalized UTC midnight |
-| modelVersion | String | default "signal-engine-v1" |
-| rulesetVersion | String? | |
-| sourceDataDate | DateTime? | |
-| sourcePriceDate | DateTime? | |
-| scoringInputSummary | Json? | |
-| dataQualityEligibilitySnapshot | Json? | |
-| source | String | default "signal-generation-engine" |
-| dataStatus | String | default "PARTIAL" |
-| reliabilityTier | String? | |
-| lifecycleState | String? | ENTRY\|ACTIVE\|EXIT\|EXPIRED; nullable pre-migration |
-| priorScore | Float? | Prior run score for same instrument+modelVersion |
-| createdAt / updatedAt | DateTime | |
+### 1. `signal_outcomes.benchmarkReturnPercent` / `alphaPercent` — STILL CRITICAL NULL
 
-**Unique:** (instrumentId, modelVersion, generatedDate). **Indexes:** generationRunId, modelVersion+sourceDataDate, instrumentId+generatedAt, direction+score, lifecycleState, sector, country.
+**Prior finding:** 100% null (106K rows).
+**Current state:** 105,610 rows total. **Only 12 rows have non-null `benchmarkReturnPercent`** (all 1D horizon, all for signal date 2026-06-11). `alphaPercent` is also non-null for exactly those 12 rows. All other horizons (5D, 10D, 20D, 60D) are **0% populated** for benchmark/alpha.
+**Verdict:** The CB-8 benchmark enrichment code landed in `signal-quality-lab.repository.ts` (raw SQL UPDATE path is present and correct) but the sweep has barely run — only 12 of ~8,577 data-complete rows have been enriched. This is effectively still a gap. The sweep either did not back-fill older rows or the 1D window condition is only partially satisfied for recent signals. `forwardReturnPercent` is non-null for 8,577 rows (data-complete rows), so the underlying price data is present. Backfill has not been triggered at scale.
 
-### Population
-| Metric | Value |
-|---|---|
-| Row count (exact) | 43,410 |
-| Latest createdAt | 2026-06-15 |
-| generationRunId non-null | 43,410 / 43,410 (100%) |
-| generatedDate non-null | 43,410 / 43,410 (100%) |
-| lifecycleState non-null | 19,202 / 43,410 (44%) — sparse, pre-migration rows lack it |
-| priorScore non-null | 15,702 / 43,410 (36%) |
-| reliabilityTier non-null | 43,410 / 43,410 (100%) |
-| scoringInputSummary non-null | 43,410 / 43,410 (100%) |
-| dataQualityEligibilitySnapshot non-null | 43,410 / 43,410 (100%) |
+### 2. `market_pulse_snapshots` status — STILL PARTIALLY BROKEN
 
-**Scope:** IN (most), US, EU (small). Data freshness: active through today.
+**Prior finding:** all status=PARTIAL.
+**Current state:** 20 rows total; 15 PARTIAL (latest snapshotDate 2026-06-15, age 1 day), 5 FRESH (latest 2026-06-12, age 4 days). PARTIAL rows are dominant and more recent than the FRESH ones. Not resolved.
 
-### Endpoints / Readers
-- `signal-generation-engine.repository.ts` — upsert, reads by instrument/date/lifecycle
-- `market-context-intelligence.repository.ts` — reads latest for signal health checks
-- `market-intelligence/index-constituents.repository.ts` — reads for index context
-- `market-intelligence/sector-constituents.repository.ts` — reads for sector context
-- `portfolio-management.repository.ts` — reads signals for portfolio instruments
-- `market-intelligence/instrument-context.service.ts` — reads for per-instrument context
-- `signal-position-ledger.repository.ts` — reads for lookahead/exit evidence
+### 3. `research_overview_snapshots` — REFRESHED, NO LONGER STALE
+
+**Prior finding:** stale.
+**Current state:** 3 rows (IN/STOCK, US/STOCK, EU/STOCK). All computed 2026-06-15 (IN at 21:20 UTC, US at 22:32, EU at 15:49). Age: 1 day. FRESH.
+
+### 4. `portfolio_intelligence_snapshots` — STILL STALE
+
+**Prior finding:** stale (2 rows).
+**Current state:** 2 rows. Latest `computedAt` 2026-06-07 (9 days ago). Both HEALTHY status. Snapshots have not been refreshed since 2026-06-07.
+
+### 5. `pipeline_stage_runs` SNAPSHOT_ASSEMBLER — FAILING FOR IN/STOCK
+
+**Prior finding:** SNAPSHOT_ASSEMBLER failing.
+**Current state:** 12 total SNAPSHOT_ASSEMBLER stage runs — 10 COMPLETED, 2 FAILED. The most recent run was **FAILED** for IN/STOCK on 2026-06-15 at 21:27 UTC. Error: "Transaction already closed — 5000 ms timeout, 7099 ms elapsed" in `snapshot-assembler.repository.ts:630` (`createMany` inside interactive transaction). US/STOCK and EU/STOCK SNAPSHOT_ASSEMBLER runs completed successfully on 2026-06-15 (small universe: 25 and 24 instruments respectively). IN/STOCK SNAPSHOT_ASSEMBLER is failing due to transaction timeout, blocking daily snapshot materialization for the primary market.
+
+### 6. `trade_plan_results.portfolioImpact` — STILL NEAR-100% NULL
+
+**Prior finding:** ~99.6% null.
+**Current state:** 1,293 rows, only 5 non-null `portfolioImpact`. **99.6% null — unchanged.**
 
 ---
 
-## 2. SignalOutcome — `signal_outcomes`
-
-### Schema
-| Column | Type | Notes |
-|---|---|---|
-| id | String (cuid) | PK |
-| signalResultId | String | FK → signal_results.id (Cascade) |
-| instrumentId | String | denormalized |
-| symbol | String | |
-| direction | String | |
-| score | Float | |
-| sector, country | String? | |
-| modelVersion | String | |
-| signalGeneratedDate | DateTime | |
-| horizon | String | 1D\|5D\|10D\|20D\|60D |
-| dataComplete | Boolean | default false |
-| priceAtSignal | Float? | |
-| futurePrice | Float? | |
-| windowEndDate | DateTime? | |
-| forwardReturnPercent | Float? | |
-| maxFavorableExcursion / maxAdverseExcursion / maxDrawdownPercent | Float? | |
-| benchmarkReturnPercent | Float? | CB-8: Nifty 50 return |
-| alphaPercent | Float? | signal return minus benchmark |
-| evaluatedAt | DateTime | |
-
-**Unique:** (signalResultId, horizon). **Indexes:** instrumentId+horizon+date, modelVersion+horizon+date, sector+horizon, direction+horizon+dataComplete, dataComplete+horizon+evaluatedAt.
-
-### Population
-| Metric | Value |
-|---|---|
-| Row count (approx) | 105,610 |
-| Latest createdAt | 2026-06-11 |
-| priceAtSignal non-null | 74,330 / 105,610 (70%) |
-| futurePrice non-null | 8,577 / 105,610 (8%) |
-| forwardReturnPercent non-null | 8,577 / 105,610 (8%) |
-| dataComplete = true | 8,577 / 105,610 (8%) |
-| benchmarkReturnPercent non-null | 0 / 105,610 (0%) — entirely null |
-| alphaPercent non-null | 0 / 105,610 (0%) — entirely null |
-
-**Notable:** `benchmarkReturnPercent` and `alphaPercent` (CB-8 alpha calculation) are 100% null — the Nifty benchmark enrichment pipeline has never run or written to this table. Only ~8% of outcomes have completed data (futurePrice resolved); the rest are open windows.
-
-### Endpoints / Readers
-- `signal-quality-lab.repository.ts` — upsert, update, read outcomes for maturity analysis
+## Table-by-Table Detail
 
 ---
 
-## 3. SignalGenerationRun — `signal_generation_runs`
+### `signal_results`
 
-### Schema
-| Column | Type | Notes |
-|---|---|---|
-| id | String (cuid) | PK |
-| region, assetType | String | scope |
-| requestedByUserId | String | |
-| status | String | |
-| modelVersion, rulesetVersion | String | |
-| sourceDataDate | DateTime? | |
-| generatedDate | DateTime | |
-| batchSize, offset | Int | |
-| totalCount…failedCount | Int | counters, default 0 |
-| excludedByDataQuality | Int | |
-| missingQualityEvaluationCount | Int | |
-| durationMs | Int | |
-| warnings | Json | |
-| startedAt | DateTime | |
-| completedAt | DateTime? | |
+**Schema:** `id`, `instrumentId` (FK stocks), `generationRunId` (FK signal_generation_runs, nullable), `symbol`, `companyName?`, `sector?`, `country?`, `score`, `direction`, `confidence`, `triggeredSignals` (JSON), `negativeSignals` (JSON), `explanation`, `generatedAt`, `generatedDate?`, `modelVersion`, `rulesetVersion?`, `sourceDataDate?`, `sourcePriceDate?`, `scoringInputSummary?` (JSON), `dataQualityEligibilitySnapshot?` (JSON), `source`, `dataStatus`, `reliabilityTier?`, `lifecycleState?`, `priorScore?`.
+PK: `id`. Unique: `[instrumentId, modelVersion, generatedDate]`. FK → `stocks`, `signal_generation_runs`.
 
-**Indexes:** region+assetType+modelVersion+generatedDate, status+startedAt.
+**Population:** 43,459 rows (real count).
+- `generatedDate`: 100% non-null.
+- `lifecycleState`: 19,251 non-null (~44% — pre-migration rows are null).
+- `reliabilityTier`: 100% non-null.
+- Latest `generatedDate`: 2026-06-15. FRESH (1 day old).
 
-### Population
-| Metric | Value |
-|---|---|
-| Row count (exact) | 2,423 |
-| Latest createdAt | 2026-06-15 |
-| completedAt non-null | 2,287 / 2,423 (94%) |
-| sourceDataDate non-null | 1,696 / 2,423 (70%) |
-| Scope breakdown | IN STOCK: 1,586 runs (latest 2026-06-15); US STOCK: 166 (latest 2026-06-14); GLOBAL STOCK: 665 (latest 2026-06-06); EU STOCK: 6 (latest 2026-06-05) |
-
-### Endpoints / Readers
-- `signal-generation-engine.repository.ts` — creates, updates, finds runs
+**Endpoints / modules:** `signal-generation-engine.repository.ts`, `signal-generation-engine.service.ts`, `signal-quality-lab.repository.ts`, `market-intelligence/instrument-context.service.ts` (findFirst for latest signal per instrument), `ai-investment-copilot.repository.ts`.
 
 ---
 
-## 4. SignalCalibrationResult — `signal_calibration_results`
+### `signal_outcomes`
 
-### Schema
-| Column | Type | Notes |
-|---|---|---|
-| id | String (cuid) | PK |
-| signalResultId | String | FK (no relation declared — raw string) |
-| instrumentId | String | |
-| symbol, companyName?, sector?, country? | String? | |
-| rawScore, calibratedScore, scoreDelta | Float | |
-| rawDirection, calibratedDirection | String | |
-| rawConfidence, calibratedConfidence | String | |
-| boosts, penalties, calibrationReasons, dataGaps | Json | |
-| calibrationModelVersion | String | |
-| rawSignalModelVersion | String? | |
-| generatedAt, createdAt, updatedAt | DateTime | |
+**Schema:** `id`, `signalResultId` (FK signal_results), `instrumentId`, `symbol`, `direction`, `score`, `sector?`, `country?`, `modelVersion`, `signalGeneratedDate`, `horizon` (1D/5D/10D/20D/60D), `dataComplete`, `priceAtSignal?`, `futurePrice?`, `windowEndDate?`, `forwardReturnPercent?`, `maxFavorableExcursion?`, `maxAdverseExcursion?`, `maxDrawdownPercent?`, **`benchmarkReturnPercent?`** (CB-8), **`alphaPercent?`** (CB-8), `evaluatedAt`.
+Unique: `[signalResultId, horizon]`. FK → `signal_results`.
 
-**Unique:** (signalResultId, calibrationModelVersion). **Indexes:** instrumentId+generatedAt, calibratedDirection+calibratedScore, sector, country.
+**Population:** 105,610 rows total; 21,122 rows per horizon (5 horizons).
+- Signal date range: 2019-03-01 to 2026-06-11.
+- `dataComplete = true`: 8,577 rows (8.1%).
+- `forwardReturnPercent` non-null: 8,577 (matches dataComplete).
+- **`benchmarkReturnPercent` non-null: 12 rows only (0.01%) — all 1D horizon, signalGeneratedDate 2026-06-11.**
+- **`alphaPercent` non-null: same 12 rows.**
+- 5D/10D/20D/60D benchmarkReturnPercent: 0 non-null.
 
-### Population
-| Metric | Value |
-|---|---|
-| Row count (exact) | 10,514 |
-| Latest createdAt | 2026-06-13 |
-| companyName non-null | 10,514 / 10,514 (100%) |
-| sector non-null | 9,248 / 10,514 (88%) — 1,266 missing sector |
-| rawSignalModelVersion non-null | 10,514 / 10,514 (100%) |
+**KEY GAP:** CB-8 enrichment code exists and is correct (raw SQL UPDATE in `signal-quality-lab.repository.ts:88-103`) but has fired for only 12 rows. Full back-fill not triggered.
 
-### Endpoints / Readers
-- `signal-calibration-engine.repository.ts` — upsert, reads for calibration service
-- `signal-calibration-engine.scorer.ts` — reads `dataQualityEvaluation` at runtime for scoring context
+**Endpoints / modules:** `signal-quality-lab` (primary reader/writer for maturity sweep), `signal-calibration-engine.metrics.ts` (reads alpha for performance analytics).
 
 ---
 
-## 5. DataQualityEvaluation — `data_quality_evaluations`
+### `signal_generation_runs`
 
-### Schema
-| Column | Type | Notes |
-|---|---|---|
-| id | String (cuid) | PK |
-| instrumentId | String | @unique — one per instrument |
-| stock | FK → stocks.id (Cascade) | |
-| symbol, companyName?, sector?, industry?, country?, currency? | String? | |
-| coverageScore, signalReadinessScore, liquidityScore | Float | |
-| coverageStatus, signalReadinessStatus, liquidityStatus | String | |
-| eligibleForSignals, eligibleForBacktesting, eligibleForCalibration | Boolean | |
-| dataGaps, warnings, readinessReasons, readinessBlockers | Json | |
-| evaluatedAt | DateTime | |
+**Schema:** `id`, `region`, `assetType`, `requestedByUserId`, `status`, `modelVersion`, `rulesetVersion`, `sourceDataDate?`, `generatedDate`, `batchSize`, `offset`, `totalCount`, `processedCount`, `generatedCount`, `updatedCount`, `noOpCount`, `duplicateOrIdempotentCount`, `skippedCount`, `failedCount`, `excludedByDataQuality`, `missingQualityEvaluationCount`, `durationMs`, `warnings` (JSON), `startedAt`, `completedAt?`.
 
-**Unique:** instrumentId (one row per instrument). **Indexes:** coverageStatus, signalReadinessStatus, liquidityStatus, sector, country, evaluatedAt.
+**Population:** ~2,472 rows (est).
+- Status: 2,359 COMPLETED (latest generatedDate 2026-06-15), 136 RUNNING (latest 2026-06-05 — stale orphans from interrupted runs), 24 FAILED (latest 2026-06-04).
+- 136 stuck RUNNING rows are likely orphaned (never cleaned up after server restarts).
 
-### Population
-| Metric | Value |
-|---|---|
-| Row count (exact) | 10,071 |
-| Latest createdAt | 2026-06-14 |
-| Coverage | One evaluation per tracked instrument; all columns fully populated |
-
-### Endpoints / Readers
-- `data-quality-engine.repository.ts` — upsert + read for DQE pipeline stage
-- `signal-calibration-engine.scorer.ts` — reads via service call for per-signal adjustment
+**Endpoints / modules:** `signal-generation-engine.repository.ts`, `signal-generation-engine.service.ts`.
 
 ---
 
-## 6. StrategyDecisionResult — `strategy_decision_results`
+### `signal_calibration_results`
 
-### Schema
-| Column | Type | Notes |
-|---|---|---|
-| id | String (cuid) | PK |
-| instrumentId | String? | FK → stocks.id (Cascade) |
-| portfolioId, holdingId | String? | optional portfolio context |
-| symbol, country?, exchange? | String? | |
-| strategy | String | strategy code |
-| strategyName? | String? | |
-| decision | String | TRADE_CANDIDATE\|WATCH\|WAIT\|AVOID\|EXIT_CANDIDATE etc |
-| action | String | CONSIDER_ENTRY etc |
-| decisionScore | Int | |
-| confidence | String | LOW\|MEDIUM\|HIGH |
-| marketCondition, marketGate | String | |
-| entryZone | String? | |
-| riskPlan | Json? | |
-| scoreBreakdown | Json? | |
-| reasons, blockers, warnings, dataGaps | Json | |
-| strategyVersion | String? | |
-| frameworkBacked | Boolean | default false |
-| frameworkDecision, frameworkAction | String? | |
-| entryRulesPassed, exitRulesTriggered, invalidationRulesTriggered, noiseFiltersTriggered | Json? | |
-| strategyRating, readinessLabel | Json?/String? | |
-| strategyDefinitionSource, strategyDefinitionDrift | String?/Json? | |
-| modelVersion | String | default "strategy-decision-v1" |
-| generatedAt, generatedDate | DateTime | |
+**Schema:** `id`, `signalResultId`, `instrumentId`, `symbol`, `companyName?`, `sector?`, `country?`, `rawScore`, `calibratedScore`, `scoreDelta`, `rawDirection`, `calibratedDirection`, `rawConfidence`, `calibratedConfidence`, `boosts` (JSON), `penalties` (JSON), `calibrationReasons` (JSON), `dataGaps` (JSON), `calibrationModelVersion`, `rawSignalModelVersion?`, `generatedAt`.
+Unique: `[signalResultId, calibrationModelVersion]`.
 
-**Unique:** (instrumentId, strategy, modelVersion, generatedDate). **Indexes:** instrumentId, portfolioId, strategy, strategyDefinitionSource.
+**Population:** 10,514 rows. Latest `generatedAt`: 2026-06-15 21:14. FRESH.
 
-### Population
-| Metric | Value |
-|---|---|
-| Row count (exact) | 296,118 |
-| Latest createdAt | 2026-06-15 |
-| instrumentId non-null | 296,118 / 296,118 (100%) |
-| riskPlan non-null | 296,118 / 296,118 (100%) |
-| scoreBreakdown non-null | 296,018 / 296,118 (~100%) |
-| frameworkDecision non-null | 296,018 / 296,118 (~100%) |
-| entryRulesPassed non-null | 296,018 / 296,118 (~100%) |
-| strategyRating non-null | 296,018 / 296,118 (~100%) |
-
-**Richly-populated table.** The largest table in this group at 296k rows. All major nullable fields are populated. Produced daily per instrument x strategy combination.
-
-### Endpoints / Readers
-- `strategy-decision-engine.repository.ts` — upsert, bulk deleteMany+createMany, reads by scope/date
-- `snapshot-assembler.repository.ts` — reads for daily snapshot assembly
-- `signal-position-ledger.repository.ts` — reads for exit evidence
+**Endpoints / modules:** `signal-calibration-engine.repository.ts`, `signal-calibration-engine.metrics.ts` (reads for performance analytics).
 
 ---
 
-## 7. StrategyDefinition — `strategy_definitions`
+### `data_quality_evaluations`
 
-### Schema
-| Column | Type | Notes |
-|---|---|---|
-| id | String (cuid) | PK |
-| strategyCode | String | |
-| name, description | String | |
-| category, style, timeframe | String | |
-| assetTypes, supportedRegions | Json | |
-| strategyVersion | String | |
-| status | String | ACTIVE\|DRAFT |
-| parameters, entryRules, exitRules, invalidationRules, noiseFilters, riskRules, requiredInputs, marketGateRules | Json | |
-| strategyRating | Json? | |
-| readinessLabel | String | default "RESEARCH_ONLY" |
-| checksum | String | default "LEGACY_UNCHECKED" |
-| effectiveAt, createdAt, updatedAt | DateTime | |
+**Schema:** `id`, `instrumentId` (unique FK stocks), `symbol`, `companyName?`, `sector?`, `industry?`, `country?`, `currency?`, `coverageScore`, `coverageStatus`, `signalReadinessScore`, `signalReadinessStatus`, `liquidityScore`, `liquidityStatus`, `eligibleForSignals`, `eligibleForBacktesting`, `eligibleForCalibration`, `dataGaps` (JSON), `warnings` (JSON), `readinessReasons` (JSON), `readinessBlockers` (JSON), `evaluatedAt`.
+One row per instrument (unique on `instrumentId`). FK → `stocks`.
 
-**Unique:** (strategyCode, strategyVersion). **Indexes:** strategyCode, status, category, style.
+**Population:** 10,071 rows. Latest `evaluatedAt`: 2026-06-15 21:13. FRESH.
+- `eligibleForSignals = true`: 4,876 (48%).
 
-### Population
-| Metric | Value |
-|---|---|
-| Row count (exact) | 11 |
-| Latest createdAt | 2026-06-08 |
-| Contents | 11 strategy definitions: BREAKOUT_CONFIRMATION, DEFENSIVE_EXIT, LOW_QUALITY_DATA_REJECTION, MEAN_REVERSION_PULLBACK, PULLBACK_IN_UPTREND, QUALITY_TREND, RISK_OFF_AVOIDANCE, SECTOR_LEADER_MOMENTUM, SMART_MONEY_ACCUMULATION, TREND_MOMENTUM (all v1.2.0 ACTIVE or DRAFT), BREAKDOWN_MOMENTUM (v1.0.0 DRAFT) |
-| readinessLabel | All "RESEARCH_ONLY" |
-
-Small reference table — fully populated as expected.
-
-### Endpoints / Readers
-- `strategy-framework.repository.ts` — upsert + findMany + findUnique + count ACTIVE
+**Endpoints / modules:** `data-quality-engine` (writer), referenced as input to signal-generation and snapshot-assembler pipelines.
 
 ---
 
-## 8. StrategyPerformanceSummary — `strategy_performance_summaries`
+### `strategy_decision_results`
 
-### Schema
-| Column | Type | Notes |
-|---|---|---|
-| id | String (cuid) | PK |
-| strategyCode, strategyVersion | String | |
-| timeframe, region, assetType, universeKey | String | |
-| startingCapital, endingCapital, totalReturn | Float | |
-| cagr, maxDrawdown, volatility?, sharpe?, winRate?, profitFactor? | Float? | |
-| tradeCount | Int | |
-| averageHoldingDays?, exposurePercent? | Float? | |
-| benchmarkTotalReturn?, benchmarkCagr?, excessReturn?, excessCagr? | Float? | |
-| endOfTestExitPercent?, dataCoveragePercent? | Float? | |
-| ratingScore | Int | |
-| ratingGrade | String | EXCELLENT\|AVERAGE\|UNPROVEN etc |
-| automationEligibility | String | PAPER_TRADING_ELIGIBLE\|WATCHLIST_ONLY\|NOT_ELIGIBLE |
-| readinessLabel | String | default "RESEARCH_ONLY" |
-| ratingReasons, ratingWarnings, ratingCapsApplied | Json? | |
-| backtestRunId | String? | |
-| generatedAt, createdAt, updatedAt | DateTime | |
+**Schema:** `id`, `instrumentId?` (FK stocks, nullable), `portfolioId?`, `holdingId?`, `symbol?`, `country?`, `exchange?`, `strategy`, `strategyName?`, `decision`, `action`, `decisionScore`, `confidence`, `marketCondition`, `marketGate`, `entryZone?`, `riskPlan?` (JSON), `scoreBreakdown?` (JSON), `reasons` (JSON), `blockers` (JSON), `warnings` (JSON), `dataGaps` (JSON), `strategyVersion?`, `frameworkBacked`, `frameworkDecision?`, `frameworkAction?`, `entryRulesPassed?` (JSON), `exitRulesTriggered?` (JSON), `invalidationRulesTriggered?` (JSON), `noiseFiltersTriggered?` (JSON), `strategyRating?` (JSON), `readinessLabel?`, `strategyDefinitionSource?`, `strategyDefinitionDrift?` (JSON), `modelVersion`, `generatedAt`, `generatedDate`.
+Unique: `[instrumentId, strategy, modelVersion, generatedDate]`. FK → `stocks`.
 
-**Unique:** (strategyCode, strategyVersion, timeframe, region, assetType, universeKey). **Indexes:** strategyCode, ratingGrade, automationEligibility.
+**Population:** ~296,590 rows (est — largest table in scope group). Latest `generatedDate`: 2026-06-15. FRESH.
+- Decision distribution: INSUFFICIENT_DATA 161,592 (54%), AVOID 82,776 (28%), REDUCE_RISK 19,078, HOLD 14,600, WATCH 12,053, WAIT 2,856, TRADE_CANDIDATE 2,006, EXIT_CANDIDATE 1,451.
 
-### Population
-| Metric | Value |
-|---|---|
-| Row count (exact) | 41 |
-| Latest createdAt | 2026-06-08 |
-| Notable results | BREAKOUT_CONFIRMATION 5Y/10Y IN=EXCELLENT (PAPER_TRADING_ELIGIBLE); most others UNPROVEN or NOT_ELIGIBLE |
-| All readinessLabel | "RESEARCH_ONLY" |
-
-Small backtest result catalog. Only BREAKOUT_CONFIRMATION has paper-trading eligibility for long backtests in IN.
-
-### Endpoints / Readers
-- `strategy-framework.repository.ts` — findMany by code/region, upsert, count
+**Endpoints / modules:** `strategy-decision-engine.repository.ts`, `strategy-decision-engine.service.ts`, `today-trade-review.repository.ts`, `ai-investment-copilot.repository.ts`, `pipeline-dag-stages-extended.ts`.
 
 ---
 
-## 9. TradePlanResult — `trade_plan_results`
+### `strategy_definitions`
 
-### Schema
-| Column | Type | Notes |
-|---|---|---|
-| id | String (cuid) | PK |
-| instrumentId | String | |
-| strategyDecisionId | String? | FK ref (no Prisma relation) |
-| portfolioId | String? | |
-| portfolioKey | String | default "NO_PORTFOLIO" |
-| symbol, region?, assetType? | String? | |
-| strategy, strategyVersion | String | |
-| strategyRating?, readinessLabel?, backtestTimeframe? | String? | |
-| backtestSummary | Json? | |
-| strategyProofSnapshot, strategyDecisionSnapshot, marketDataSnapshot, dataQualitySnapshot | Json? | |
-| latestPrice | Float? | |
-| latestPriceTimestamp | DateTime? | |
-| paperReadinessStatus?, paperReadinessReasons?, paperReadinessBlockers? | String?/Json? | |
-| planStatus | String | |
-| riskGrade | String | |
-| entryZone, stopLoss, target | Json? | |
-| rewardRiskRatio | Float | |
-| positionSizing | Json? | |
-| portfolioImpact | Json? | |
-| invalidationRules, warnings, blockers, dataGaps | Json? | |
-| modelVersion | String | |
-| generatedAt, generatedDate | DateTime | |
+**Schema:** `id`, `strategyCode`, `name`, `description`, `category`, `style`, `timeframe`, `assetTypes` (JSON), `supportedRegions` (JSON), `strategyVersion`, `status`, `parameters` (JSON), `entryRules` (JSON), `exitRules` (JSON), `invalidationRules` (JSON), `noiseFilters` (JSON), `riskRules` (JSON), `requiredInputs` (JSON), `marketGateRules` (JSON), `strategyRating?` (JSON), `readinessLabel`, `checksum`, `effectiveAt`.
+Unique: `[strategyCode, strategyVersion]`.
 
-**Unique:** (instrumentId, strategy, modelVersion, generatedDate, region, assetType, portfolioKey).
+**Population:** 11 rows (real count). Status: 8 ACTIVE, 3 DRAFT. Static configuration table — not time-series.
 
-### Population
-| Metric | Value |
-|---|---|
-| Row count (exact) | 1,293 |
-| Latest createdAt | 2026-06-13 |
-| strategyDecisionId non-null | 1,293 / 1,293 (100%) |
-| latestPrice non-null | 1,277 / 1,293 (99%) |
-| backtestSummary non-null | 435 / 1,293 (34%) |
-| positionSizing non-null | 1,256 / 1,293 (97%) |
-| portfolioImpact non-null | 5 / 1,293 (0.4%) — nearly always null (portfolio context rarely provided) |
-| region non-null | 1,293 / 1,293 (100%) |
-
-**Notable:** `portfolioImpact` is 99.6% null (portfolio-aware trade plans nearly absent). `backtestSummary` only 34% populated, suggesting many plans generated without resolved backtest results.
-
-### Endpoints / Readers
-- `snapshot-assembler.repository.ts` — reads for daily snapshot assembly
+**Endpoints / modules:** `strategy-framework.repository.ts`, `strategy-decision-engine.repository.ts` (reads definitions to validate decisions).
 
 ---
 
-## 10. TodayReviewRun — `today_review_runs`
+### `strategy_performance_summaries`
 
-### Schema
-| Column | Type | Notes |
-|---|---|---|
-| id | String (cuid) | PK |
-| runDate | DateTime | |
-| region, assetType | String | |
-| status | String | |
-| dataThroughDate | DateTime? | |
-| startedAt | DateTime | |
-| finishedAt | DateTime? | |
-| warnings | Json | |
-| candidateCounts | Json | |
-| sourceSnapshot | Json | |
+**Schema:** `id`, `strategyCode`, `strategyVersion`, `timeframe`, `region`, `assetType`, `universeKey`, `startingCapital`, `endingCapital`, `totalReturn`, `cagr?`, `maxDrawdown`, `volatility?`, `sharpe?`, `winRate?`, `profitFactor?`, `tradeCount`, `averageHoldingDays?`, `exposurePercent?`, `benchmarkTotalReturn?`, `benchmarkCagr?`, `excessReturn?`, `excessCagr?`, `endOfTestExitPercent?`, `dataCoveragePercent?`, `ratingScore`, `ratingGrade`, `automationEligibility`, `readinessLabel`, `ratingReasons?` (JSON), `ratingWarnings?` (JSON), `ratingCapsApplied?` (JSON), `backtestRunId?`, `generatedAt`.
+Unique: `[strategyCode, strategyVersion, timeframe, region, assetType, universeKey]`.
 
-**Unique:** (runDate, region, assetType). **Indexes:** region+assetType+runDate.
+**Population:** 41 rows. Latest `generatedAt`: 2026-06-11 (5 days old). Near-fresh.
 
-### Population
-| Metric | Value |
-|---|---|
-| Row count (exact) | 30 |
-| Latest createdAt | 2026-06-15 |
-| Scope | IN STOCK: 21 runs; US STOCK: 9 runs |
-
-Small run log table; all recent and active.
-
-### Endpoints / Readers
-- `today-trade-review.repository.ts` — upsert run, update, delete candidates on re-run
+**Endpoints / modules:** `backtesting-strategy-lab` (writer), `strategy-decision-engine.repository.ts` (reads rating/grade), `research-hub.service.ts`.
 
 ---
 
-## 11. TodayReviewCandidate — `today_review_candidates`
+### `trade_plan_results`
 
-### Schema
-| Column | Type | Notes |
-|---|---|---|
-| id | String (cuid) | PK |
-| runId | String | FK → today_review_runs.id (Cascade) |
-| instrumentId | String | |
-| symbol | String | |
-| companyName? | String? | |
-| direction | String | |
-| state | String | |
-| setupType? | String? | |
-| strategyCode, strategyVersion? | String | |
-| rank | Int | |
-| grade | String | |
-| confidenceScore | Int | |
-| reasonSummary | String | |
-| blockers, watchReasons | Json | |
-| dataQualitySnapshot, marketContextSnapshot, strategyProofSnapshot, tradePlanSnapshot, sourceSignalSnapshot | Json? | |
+**Schema:** `id`, `instrumentId`, `strategyDecisionId?`, `portfolioId?`, `portfolioKey`, `symbol`, `region?`, `assetType?`, `strategy`, `strategyVersion`, `strategyRating?`, `readinessLabel?`, `backtestTimeframe?`, `backtestSummary?` (JSON), `strategyProofSnapshot?` (JSON), `strategyDecisionSnapshot?` (JSON), `latestPrice?`, `latestPriceTimestamp?`, `marketDataSnapshot?` (JSON), `dataQualitySnapshot?` (JSON), `paperReadinessStatus?`, `paperReadinessReasons?` (JSON), `paperReadinessBlockers?` (JSON), `proofGeneratedAt?`, `snapshotVersion?`, `planStatus`, `riskGrade`, `entryZone?` (JSON), `stopLoss?` (JSON), `target?` (JSON), `rewardRiskRatio`, **`portfolioImpact?`** (JSON), `invalidationRules?` (JSON), `warnings?` (JSON), `blockers?` (JSON), `dataGaps?` (JSON), `modelVersion`, `generatedAt`, `generatedDate`.
+Unique: `[instrumentId, strategy, modelVersion, generatedDate, region, assetType, portfolioKey]`. FK → `instruments`.
 
-**Unique:** (runId, instrumentId, strategyCode, direction). **Indexes:** runId+rank, instrumentId, state.
+**Population:** 1,293 rows. Latest `generatedAt`: 2026-06-13 (3 days old). Near-fresh.
+- **`portfolioImpact`: 5 non-null (0.4%) — 99.6% null. Unchanged from prior audit.**
 
-### Population
-| Metric | Value |
-|---|---|
-| Row count (exact) | 839 |
-| Latest createdAt | 2026-06-15 |
-
-Small candidate list; refreshed daily. All recent.
-
-### Endpoints / Readers
-- `today-trade-review.repository.ts` — deleteMany on re-run + bulk create
+**Endpoints / modules:** `trade-plan-risk-engine.repository.ts`, `trade-plan-risk-engine.service.ts`, `today-trade-review.repository.ts`, `ai-investment-copilot.repository.ts`.
 
 ---
 
-## 12. PipelineRun — `pipeline_runs`
+### `today_review_runs`
 
-### Schema
-| Column | Type | Notes |
-|---|---|---|
-| id | String (cuid) | PK |
-| pipelineKey | String | identifies the pipeline type |
-| scopeRegion, scopeAssetType, timeframe | String | |
-| triggerType | String | MANUAL\|SCHEDULED etc |
-| status | String | |
-| idempotencyKey | String | @unique |
-| dataThroughDate | DateTime? | |
-| sourceFingerprint | String? | |
-| changedInstrumentCount, totalCount, processedCount, succeededCount, partialCount, failedCount, skippedCount, unchangedCount | Int | |
-| warnings, errors | Json | |
-| metadata | Json? | |
-| startedAt, completedAt?, durationMs? | DateTime/Int | |
+**Schema:** `id`, `runDate`, `region`, `assetType`, `status`, `dataThroughDate?`, `startedAt`, `finishedAt?`, `warnings` (JSON), `candidateCounts` (JSON), `sourceSnapshot` (JSON).
+Unique: `[runDate, region, assetType]`. Children: `TodayReviewCandidate`.
 
-**Indexes:** pipelineKey+scope+timeframe+dataThroughDate, scope+startedAt, status+startedAt.
+**Population:** 32 rows (real count).
+- Status: PARTIAL 28 (latest runDate 2026-06-15), RUNNING 3 (latest 2026-06-14 — stuck), COMPLETED 1 (2026-05-11 — only ever-completed run).
+- 28/32 runs are PARTIAL; the TODAY_REVIEW pipeline has never cleanly completed for any recent date.
 
-### Population
-| Metric | Value |
-|---|---|
-| Row count (exact) | 1,179 |
-| Latest createdAt | 2026-06-15 |
-| Pipeline key breakdown | market-intelligence/IN: 901 runs (main workhorse); market-intelligence/US: 123; signal-position-ledger: 57; research-hub-overview: 6; dag-runner: 3; market-data-historical-exchange-backfill: 81 |
-
-### Endpoints / Readers
-- `pipeline-orchestration.repository.ts` — create, update, findMany
-- `pipeline-dag-persistence.ts` — findUnique by idempotencyKey
+**Endpoints / modules:** `today-trade-review.repository.ts`, `today-trade-review.service.ts`. Route: `GET /api/today-trade-review`.
 
 ---
 
-## 13. PipelineStageRun — `pipeline_stage_runs`
+### `today_review_candidates`
 
-### Schema
-| Column | Type | Notes |
-|---|---|---|
-| id | String (cuid) | PK |
-| pipelineRunId | String | FK → pipeline_runs.id (Cascade) |
-| stageKey | String | |
-| stageOrder | Int | |
-| status | String | |
-| idempotencyKey | String | @unique |
-| scopeRegion, scopeAssetType, timeframe | String | |
-| dataThroughDate | DateTime? | |
-| inputFingerprint, outputFingerprint | String? | |
-| changedInstrumentCount, batchSize?, offset?, nextOffset? | Int? | |
-| hasMore | Boolean | default false |
-| totalCount…unchangedCount | Int | counters |
-| attemptCount | Int | |
-| cacheKey?, cacheStatus, cacheExpiresAt? | String?/DateTime? | |
-| leaseOwner?, leaseExpiresAt? | String?/DateTime? | |
-| startedAt?, completedAt?, durationMs? | DateTime?/Int? | |
-| warnings, errors, metadata? | Json | |
+**Schema:** `id`, `runId` (FK today_review_runs), `instrumentId`, `symbol`, `companyName?`, `direction`, `state`, `setupType?`, `strategyCode`, `strategyVersion?`, `rank`, `grade`, `confidenceScore`, `reasonSummary`, `blockers` (JSON), `watchReasons` (JSON), `dataQualitySnapshot?` (JSON), `marketContextSnapshot?` (JSON), `strategyProofSnapshot?` (JSON), `tradePlanSnapshot?` (JSON), `sourceSignalSnapshot?` (JSON).
+Unique: `[runId, instrumentId, strategyCode, direction]`. FK → `today_review_runs`.
 
-**Unique:** (pipelineRunId, stageKey). **Indexes:** pipelineRunId+stageOrder, stageKey+scope+timeframe+dataThroughDate, stageKey+status+leaseExpiresAt.
+**Population:** 839 rows. Latest `createdAt`: 2026-06-15 21:22. FRESH (embedded in PARTIAL parent runs).
 
-### Population
-| Metric | Value |
-|---|---|
-| Row count (exact) | 34,755 |
-| Latest createdAt | 2026-06-15 |
-
-Largest operational log table. Active daily.
-
-### Endpoints / Readers
-- `pipeline-dag-persistence.ts` — findFirst, updateMany for DAG stage state
-- `pipeline-orchestration.repository.ts` — create, update, findMany
+**Endpoints / modules:** `today-trade-review.repository.ts`. Route: `GET /api/today-trade-review/candidates`.
 
 ---
 
-## 14. SignalPositionLedgerEntry — `signal_position_ledger_entries`
+### `pipeline_runs`
 
-### Schema
-| Column | Type | Notes |
-|---|---|---|
-| id | String (cuid) | PK |
-| ledgerKey | String | @unique |
-| scopeRegion, scopeAssetType | String | |
-| instrumentId | String | FK → stocks.id (Cascade) |
-| stockKey | String | default "" |
-| activeSlot | String? | for one-active-per-scope constraint |
-| symbol, companyName? | String? | |
-| status | String | ACTIVE\|RISK_WARNING\|INVALIDATED |
-| entrySignalId? | String? | |
-| entryTriggerType | String | default "bullish_entry_trigger" |
-| entryTriggerTimestamp | DateTime | |
-| entryTriggerPrice | Float | |
-| entryReasonSummary | String | |
-| strategyId?, strategyVersion?, strategyDecision?, strategyReadinessLabel?, strategyRatingGrade? | String? | |
-| entryRuleId? | String? | |
-| latestTrustedPriceDate?, latestTrustedPrice?, currentReturnPercent? | Float?/DateTime? | |
-| currentReturnStatus, lifecycleEvidenceStatus, trustEvidenceStatus, calibrationEvidenceStatus | String | various defaults |
-| displayWarnings | Json | default "[]" |
-| exitSignalId?, exitStrategyId?, … exitRuleId?, exitRuleIds | multiple String?/Json | |
-| exitTriggerTimestamp?, exitTriggerPrice?, closePriceStatus, exitReasonSummary? | | |
-| invalidationSourceDecisionId?, invalidationRuleIds, invalidationTimestamp? | | |
-| closedAt?, lastEvaluatedAt? | DateTime? | |
+**Schema:** `id`, `pipelineKey`, `scopeRegion`, `scopeAssetType`, `timeframe`, `triggerType`, `status`, `idempotencyKey` (unique), `dataThroughDate?`, `sourceFingerprint?`, `changedInstrumentCount`, `totalCount`, `processedCount`, `succeededCount`, `partialCount`, `failedCount`, `skippedCount`, `unchangedCount`, `warnings` (JSON), `errors` (JSON), `metadata?` (JSON), `startedAt`, `completedAt?`, `durationMs?`.
 
-**Unique:** ledgerKey; scopeRegion+scopeAssetType+activeSlot (one-active-per-scope).
+**Population:** ~1,186 rows (est). Latest `startedAt`: 2026-06-16 07:37 (today). FRESH.
+- Status: COMPLETED 714, PARTIAL 369, FAILED 45, ABANDONED 40, SKIPPED 11, CANCELLED 7, BLOCKED 3.
 
-### Population
-| Metric | Value |
-|---|---|
-| Row count (exact) | 1,414 |
-| Latest createdAt | 2026-06-15 |
-| Status breakdown | ACTIVE: 52; RISK_WARNING: 1,126; INVALIDATED: 236 |
-
-**Notable:** 1,126 entries (80%) are in RISK_WARNING state — the ledger is populated but most prior entries have triggered risk warnings rather than clean exits. Only 52 currently ACTIVE.
-
-### Endpoints / Readers
-- `signal-position-ledger.repository.ts` — CRUD via `(this.db as any).signalPositionLedgerEntry` (uses raw cast due to Prisma type quirks)
+**Endpoints / modules:** `pipeline-orchestration.service.ts`, `pipeline-dag-persistence.ts`. Route: `GET /api/pipeline/runs`.
 
 ---
 
-## 15. WorkbenchSnapshot — `workbench_snapshots`
+### `pipeline_stage_runs`
 
-### Schema
-| Column | Type | Notes |
-|---|---|---|
-| id | String (cuid) | PK |
-| instrumentId | String | @unique — one per instrument |
-| stock | FK → stocks.id (Cascade) | |
-| symbol | String | |
-| computedAt | DateTime | default now() |
-| dataThroughDate | DateTime? | |
-| payloadJson | Json | full workbench payload (overview/chart/performance/fundamentals/valuation/peers/relative_strength/corporate_actions/trust/signalEvidence) |
+**Schema:** `id`, `pipelineRunId` (FK pipeline_runs), `stageKey`, `stageOrder`, `status`, `idempotencyKey` (unique), `scopeRegion`, `scopeAssetType`, `timeframe`, `dataThroughDate?`, `inputFingerprint?`, `outputFingerprint?`, `changedInstrumentCount`, `batchSize?`, `offset?`, `nextOffset?`, `hasMore`, `totalCount`, `processedCount`, `succeededCount`, `partialCount`, `failedCount`, `skippedCount`, `unchangedCount`, `attemptCount`, `cacheKey?`, `cacheStatus`, `cacheExpiresAt?`, `leaseOwner?`, `leaseExpiresAt?`, `startedAt?`, `completedAt?`, `durationMs?`, `warnings` (JSON), `errors` (JSON), `metadata?` (JSON).
+Unique: `[pipelineRunId, stageKey]`. FK → `pipeline_runs`.
 
-**Indexes:** instrumentId, computedAt.
+**Population:** 34,804 rows (real count). Latest `createdAt`: 2026-06-16 07:41 (today). FRESH.
 
-### Population
-| Metric | Value |
-|---|---|
-| Row count (exact) | 2,972 |
-| computedAt range | 2026-06-06 to 2026-06-15 |
-| dataThroughDate non-null | 2,972 / 2,972 (100%) |
+**SNAPSHOT_ASSEMBLER status (12 total stage rows):**
+- COMPLETED 10: US/STOCK 2026-06-15 (25 instruments, 0 failed), EU/STOCK 2026-06-15 (24 instruments).
+- FAILED 2: IN/STOCK 2026-06-15 21:27 UTC. Error: interactive transaction timeout — `createMany` in `snapshot-assembler.repository.ts:630` exceeded 5,000 ms (actual: 7,099 ms). Root cause: IN/STOCK universe is too large for the 5s interactive transaction limit.
 
-**Active, fresh.** One snapshot per instrument; all computed within last 10 days and all have dataThroughDate populated.
-
-### Endpoints / Readers
-- `workbench-snapshot.repository.ts` — upsert, findUnique, findMany (by computedAt)
-- `market-intelligence/instrument-context.service.ts` — reads via `prisma.workbenchSnapshot.findUnique`
+**Endpoints / modules:** `pipeline-dag-persistence.ts`, `pipeline-orchestration.service.ts`. Route: `GET /api/pipeline/stage-runs`.
 
 ---
 
-## 16. EarningsIntelligenceSnapshot — `earnings_intelligence_snapshots`
+### `signal_position_ledger_entries`
 
-### Schema
-| Column | Type | Notes |
-|---|---|---|
-| id | String (cuid) | PK |
-| snapshotDate | DateTime | |
-| dataThroughDate | DateTime? | |
-| stockId | String | FK → stocks.id (Cascade) |
-| symbol | String | |
-| scopeRegion, scopeAssetType | String | |
-| resultDate? | DateTime? | |
-| resultDateSource | String | default "UNKNOWN" |
-| periodEndDate? | DateTime? | |
-| validatedAt? | DateTime? | |
-| daysToResult? | Int? | |
-| revenueGrowth?, profitGrowth?, epsGrowth?, marginTrend? | Float? | |
-| consistencyScore, accelerationScore | Float | |
-| reasonTags, riskTags, warnings, categories | Json | default "[]" |
-| freshness | String | |
-| calculationVersion | String | default "earnings-intelligence-v1" |
+**Schema:** `id`, `ledgerKey` (unique), `scopeRegion`, `scopeAssetType`, `instrumentId` (FK stocks), `stockKey`, `activeSlot?`, `symbol`, `companyName?`, `status`, `entrySignalId?`, `entryTriggerType`, `entryTriggerTimestamp`, `entryTriggerPrice`, `entryReasonSummary`, `strategyId?`, `strategyVersion?`, `strategyDecision?`, `strategyReadinessLabel?`, `strategyRatingGrade?`, `entryRuleId?`, `latestTrustedPriceDate?`, `latestTrustedPrice?`, `currentReturnPercent?`, `currentReturnStatus`, `currentDataQualityStatus?`, `lifecycleEvidenceStatus`, `trustEvidenceStatus`, `calibrationEvidenceStatus`, `displayWarnings` (JSON), `exitSignalId?`, `exitStrategyId?`, `exitStrategyVersion?`, `exitSourceDecisionId?`, `exitTriggerTimestamp?`, `exitTriggerPrice?`, `closePriceStatus`, `exitReasonSummary?`, `exitRuleId?`, `exitRuleIds` (JSON), `exitDecision?`, `invalidationSourceDecisionId?`, `invalidationRuleIds` (JSON), `invalidationTimestamp?`, `closedAt?`, `lastEvaluatedAt?`.
+Unique: `[scopeRegion, scopeAssetType, activeSlot]` (one active slot per scope). FK → `stocks`.
 
-**Unique:** (snapshotDate, scopeRegion, scopeAssetType, symbol).
+**Population:** ~1,429 rows (est).
+- Status: RISK_WARNING 1,133 (79%), INVALIDATED 238 (17%), ACTIVE 58 (4%).
+- Latest entry (ACTIVE/RISK_WARNING): 2026-06-15. FRESH.
 
-### Population
-| Metric | Value |
-|---|---|
-| Row count (exact) | 16,194 |
-| Latest snapshotDate | 2026-06-15 |
-| Scope breakdown | IN/STOCK: 15,681 rows (latest 2026-06-15); EU/STOCK: 297 (latest 2026-06-08); US/STOCK: 216 (latest 2026-06-12) |
-| dataThroughDate non-null (IN) | 15,681 / 15,681 (100%) |
-| resultDate non-null (IN) | 10,784 / 15,681 (69%) — 31% missing result date |
-| revenueGrowth non-null (IN) | 15,283 / 15,681 (97%) |
-| revenueGrowth non-null (EU) | 2 / 297 (0.7%) — EU fundamentals almost entirely missing |
-| revenueGrowth non-null (US) | 0 / 216 (0%) — US earnings growth data absent |
-
-**Notable:** EU and US scopes have effectively no growth data — EU has 2 rows with revenueGrowth, US has 0. Earnings intelligence is only meaningfully operational for IN/STOCK.
-
-### Endpoints / Readers
-- `earnings-intelligence.repository.ts` — upsert, findFirst, findMany
+**Endpoints / modules:** `signal-position-ledger.repository.ts`, `signal-position-ledger.service.ts`. Route: `GET /api/signal-position-ledger`.
 
 ---
 
-## 17. StockInterestSnapshot — `stock_interest_snapshots`
+### `workbench_snapshots`
 
-### Schema
-| Column | Type | Notes |
-|---|---|---|
-| id | String (cuid) | PK |
-| snapshotDate, dataThroughDate?, generatedAt | DateTime | |
-| stockId | String | FK → stocks.id (Cascade) |
-| symbol, company | String | |
-| sector? | String? | |
-| scopeRegion, scopeAssetType | String | defaults IN/STOCK |
-| timeframe | String | default "1d" |
-| category | String | |
-| score | Float | |
-| direction | String | |
-| reasonTags, riskTags, warnings | Json | default "[]" |
-| freshness | String | |
-| calculationVersion | String | default "stock-interest-v1" |
+**Schema:** `id`, `instrumentId` (unique FK stocks), `symbol`, `computedAt`, `dataThroughDate?`, `payloadJson` (JSON — full workbench payload: overview/chart/performance/fundamentals/valuation/peers/relative_strength/corporate_actions/trust/signalEvidence).
+One row per instrument.
 
-**Unique:** (snapshotDate, scopeRegion, scopeAssetType, timeframe, category, symbol).
+**Population:** 2,972 rows. Latest `computedAt`: 2026-06-15 22:42. FRESH.
 
-### Population
-| Metric | Value |
-|---|---|
-| Row count (exact) | 9,092 |
-| Latest snapshotDate | 2026-06-15 |
-| dataThroughDate non-null | 9,000 / 9,092 (99%) |
-
-**Active.** Well-populated and fresh.
-
-### Endpoints / Readers
-- `market-intelligence/stock-interest-snapshot.repository.ts` — upsert, delete, findFirst, findMany
+**Endpoints / modules:** `workbench-snapshot.repository.ts` (upsert + findUnique + findMany), `market-intelligence/instrument-context.service.ts` (findUnique). Route: `GET /api/workbench/:symbol`.
 
 ---
 
-## 18. MarketContextSnapshot — `market_context_snapshots`
+### `earnings_intelligence_snapshots`
 
-### Schema
-| Column | Type | Notes |
-|---|---|---|
-| id | String (cuid) | PK |
-| snapshotDate | DateTime | |
-| region | String | default "GLOBAL" |
-| regime | String | |
-| regimeScore | Float | |
-| breadthPercentAboveSma50?, breadthPercentAboveSma200?, advanceDeclineRatio? | Float? | |
-| newHighCount?, newLowCount? | Int? | |
-| macroStatus?, explanation? | String? | |
-| breadthByCapBand? | Json? | |
-| fearGreedIndex?, fearGreedLabel? | Float?/String? | crypto only |
-| source, dataStatus | String | |
+**Schema:** `id`, `snapshotDate`, `dataThroughDate?`, `stockId` (FK stocks), `symbol`, `scopeRegion`, `scopeAssetType`, `resultDate?`, `resultDateSource`, `periodEndDate?`, `validatedAt?`, `daysToResult?`, `revenueGrowth?`, `profitGrowth?`, `epsGrowth?`, `marginTrend?`, `consistencyScore`, `accelerationScore`, `reasonTags` (JSON), `riskTags` (JSON), `warnings` (JSON), `freshness`, `categories` (JSON), `calculationVersion`.
+Unique: `[snapshotDate, scopeRegion, scopeAssetType, symbol]`. FK → `stocks`.
 
-**Unique:** (snapshotDate, region). **Indexes:** snapshotDate.
+**Population:** ~16,243 rows (est).
+- freshness: FRESH 13,893 (86%), STALE 2,159 (13%), PARTIAL 191 (1%).
+- Latest `snapshotDate`: 2026-06-15. FRESH.
 
-### Population
-| Metric | Value |
-|---|---|
-| Row count (exact) | 151 |
-| Region breakdown | IN: 114 rows (latest 2026-06-15); GLOBAL: 16 (latest 2026-06-05); US: 12 (latest 2026-06-14); CRYPTO: 8 (latest 2026-06-15); NSE: 1 (2026-06-04 — stale) |
-
-**GLOBAL region stale** (2026-06-05, 10 days old). NSE region appears to be a legacy/duplicate of IN and hasn't updated.
-
-### Endpoints / Readers
-- `historical-context-snapshots.repository.ts` — upsert, findMany, findFirst, count
+**Endpoints / modules:** `earnings-intelligence.repository.ts` (writer), `research-hub.snapshot-reader.ts`, `ai-investment-copilot.repository.ts`. Route: `GET /api/earnings-intelligence`.
 
 ---
 
-## 19. MarketPulseSnapshot — `market_pulse_snapshots`
+### `stock_interest_snapshots`
 
-### Schema
-| Column | Type | Notes |
-|---|---|---|
-| id | String (cuid) | PK |
-| snapshotDate | DateTime | |
-| dataThroughDate | DateTime | |
-| generatedAt | DateTime | |
-| region, assetType, timeframe | String | |
-| status | String | |
-| marketHealthScore, marketHealthLabel | Float/String | |
-| indexTrendScore, sectorStrengthScore, breadthScore, deliveryParticipationScore, dataFreshnessScore | Float | |
-| topIndicesJson, strongSectorsJson, weakSectorsJson | Json | |
-| breadthSummaryJson, deliverySummaryJson | Json | |
-| vixSummaryJson?, advanceDeclineJson? | Json? | |
-| candidateCount | Int | |
-| warningsJson, sourceSummaryJson | Json | |
-| pipelineRunId? | String? | |
+**Schema:** `id`, `snapshotDate`, `dataThroughDate?`, `generatedAt`, `stockId` (FK stocks), `symbol`, `company`, `sector?`, `scopeRegion`, `scopeAssetType`, `timeframe`, `category`, `score`, `direction`, `reasonTags` (JSON), `riskTags` (JSON), `freshness`, `warnings` (JSON), `calculationVersion`.
+Unique: `[snapshotDate, scopeRegion, scopeAssetType, timeframe, category, symbol]`. FK → `stocks`.
 
-**Unique:** (snapshotDate, region, assetType, timeframe).
+**Population:** ~7,974 rows (est).
+- Categories: RISK_AVOID 2,104, TODAY_TOP_INTEREST 2,093, ACCUMULATION 2,086, SECTOR_LEADERS 2,075, GROWTH_CONSISTENCY 455, GROWTH_ACCELERATION 455.
+- Latest `snapshotDate`: 2026-06-15. FRESH.
 
-### Population
-| Metric | Value |
-|---|---|
-| Row count (exact) | 19 |
-| pipelineRunId non-null | 1 / 19 (5%) — nearly all without pipeline linkage |
-| Status | All IN/STOCK rows show "PARTIAL"; US/STOCK rows show "FRESH" |
-| Latest | 2026-06-15 |
-
-**Notable:** `pipelineRunId` is almost entirely null (only 1 row linked to a pipeline run). The table is lightly populated (19 rows total) and IN rows consistently show PARTIAL status — indicating the market pulse pipeline runs but doesn't fully resolve for India.
-
-### Endpoints / Readers
-- `market-context-intelligence/market-pulse-snapshot.repository.ts` — findFirst, findMany, upsert
+**Endpoints / modules:** `stock-interest-snapshot.repository.ts`, `research-hub.snapshot-reader.ts`, `ai-investment-copilot.repository.ts`. Route: consumed by `GET /api/research/overview`.
 
 ---
 
-## 20. SectorContextSnapshot — `sector_context_snapshots`
+### `market_context_snapshots`
 
-### Schema
-| Column | Type | Notes |
-|---|---|---|
-| id | String (cuid) | PK |
-| snapshotDate | DateTime | |
-| region | String | default "GLOBAL" |
-| sector | String | |
-| oneMonthReturn?, threeMonthReturn?, sixMonthReturn? | Float? | |
-| relativeStrengthScore | Float | |
-| instrumentCount | Int | |
-| bullishSignalCount?, bearishSignalCount? | Int? | |
-| leadershipStatus | String | |
-| source, dataStatus | String | |
+**Schema:** `id`, `snapshotDate`, `region`, `regime`, `regimeScore`, `breadthPercentAboveSma50?`, `breadthPercentAboveSma200?`, `advanceDeclineRatio?`, `newHighCount?`, `newLowCount?`, `macroStatus?`, `explanation?`, `breadthByCapBand?` (JSON), `fearGreedIndex?` (CRYPTO region only), `fearGreedLabel?`, `source`, `dataStatus`.
+Unique: `[snapshotDate, region]`.
 
-**Unique:** (snapshotDate, region, sector). **Indexes:** snapshotDate, sector.
+**Population:** 153 rows.
+- Region: IN 114 (latest 2026-06-15), GLOBAL 16 (latest 2026-06-05 — 11 days old, slightly stale), US 13 (latest 2026-06-15), CRYPTO 9 (latest 2026-06-16, today), EU 1 (2026-06-15), NSE 1 (2026-06-04 — legacy stale row).
 
-### Population
-| Metric | Value |
-|---|---|
-| Row count (exact) | 1,315 |
-| Region breakdown | IN: 1,114 (latest 2026-06-15); US: 100 (latest 2026-06-14); GLOBAL: 101 (latest 2026-06-05 — stale) |
-
-**GLOBAL stale** (same pattern as MarketContextSnapshot).
-
-### Endpoints / Readers
-- `historical-context-snapshots.repository.ts` — upsert, findMany, findFirst
+**Endpoints / modules:** `market-context-intelligence.repository.ts`, `market-context-intelligence.controller.ts`, `pipeline-dag-stages-crypto.ts` (findFirst + update for CRYPTO region). Route: `GET /api/market-context`.
 
 ---
 
-## 21. SectorSnapshot — `sector_snapshots`
+### `market_pulse_snapshots`
 
-### Schema
-| Column | Type | Notes |
-|---|---|---|
-| id | String (cuid) | PK |
-| snapshotDate | DateTime | |
-| dataThroughDate | DateTime | |
-| scopeRegion, scopeAssetType | String | defaults IN/STOCK |
-| sector | String | |
-| classification | String | |
-| sectorScore | Int | |
-| return1W?, return1M?, return3M? | Float? | |
-| trendScore | Int | |
-| reasonTags, warnings | Json | default "[]" |
-| source | String | default "sector-intelligence" |
+**Schema:** `id`, `snapshotDate`, `dataThroughDate`, `generatedAt`, `region`, `assetType`, `timeframe`, `status`, `marketHealthScore`, `marketHealthLabel`, `indexTrendScore`, `sectorStrengthScore`, `breadthScore`, `deliveryParticipationScore`, `dataFreshnessScore`, `topIndicesJson` (JSON), `strongSectorsJson` (JSON), `weakSectorsJson` (JSON), `breadthSummaryJson` (JSON), `deliverySummaryJson` (JSON), `vixSummaryJson?` (JSON), `advanceDeclineJson?` (JSON), `candidateCount`, `warningsJson` (JSON), `sourceSummaryJson` (JSON), `pipelineRunId?`.
+Unique: `[snapshotDate, region, assetType, timeframe]`.
 
-**Unique:** (snapshotDate, scopeRegion, scopeAssetType, sector). **Indexes:** scopeRegion+scopeAssetType+snapshotDate, dataThroughDate, classification+sectorScore.
+**Population:** 20 rows.
+- Status: PARTIAL 15 (latest snapshotDate 2026-06-15, age 1 day), FRESH 5 (latest 2026-06-12, age 4 days).
+- PARTIAL rows are both dominant and more recent than FRESH — still not generating FRESH rows consistently.
 
-### Population
-| Metric | Value |
-|---|---|
-| Row count (exact) | 226 |
-| Scope breakdown | IN/STOCK: 160 rows (latest 2026-06-15); US/STOCK: 66 (latest 2026-06-14) |
-
-Active, fresh for both regions.
-
-### Endpoints / Readers
-- `market-intelligence/instrument-context.service.ts` — reads via `(prisma as any).sectorSnapshot.findFirst`
+**Endpoints / modules:** `market-pulse-snapshot.repository.ts`, `market-context-intelligence.controller.ts`. Route: `GET /api/market-context/pulse`.
 
 ---
 
-## 22. CountryContextSnapshot — `country_context_snapshots`
+### `sector_context_snapshots`
 
-### Schema
-| Column | Type | Notes |
-|---|---|---|
-| id | String (cuid) | PK |
-| snapshotDate | DateTime | |
-| region | String | default "GLOBAL" |
-| country | String | |
-| oneMonthReturn?, threeMonthReturn?, sixMonthReturn? | Float? | |
-| relativeStrengthScore | Float | |
-| bullishSignalCount?, bearishSignalCount? | Int? | |
-| source, dataStatus | String | |
+**Schema:** `id`, `snapshotDate`, `region`, `sector`, `oneMonthReturn?`, `threeMonthReturn?`, `sixMonthReturn?`, `relativeStrengthScore`, `instrumentCount`, `bullishSignalCount?`, `bearishSignalCount?`, `leadershipStatus`, `source`, `dataStatus`.
+Unique: `[snapshotDate, region, sector]`.
 
-**Unique:** (snapshotDate, region, country). **Indexes:** snapshotDate, country.
+**Population:** 1,335 rows. Latest `snapshotDate`: 2026-06-15. FRESH.
 
-### Population
-| Metric | Value |
-|---|---|
-| Row count (exact) | 173 |
-| Region breakdown | IN: 114 (latest 2026-06-15); US: 15 (latest 2026-06-14); GLOBAL: 44 (latest 2026-06-05 — stale) |
-
-Same staleness pattern on GLOBAL as other context snapshots.
-
-### Endpoints / Readers
-- `historical-context-snapshots.repository.ts` — upsert, findMany, findFirst, count
+**Endpoints / modules:** `market-context-intelligence.repository.ts`, `historical-context-snapshots.repository.ts`. Route: `GET /api/market-context/sectors`.
 
 ---
 
-## 23. SmartMoneyContextSnapshot — `smart_money_context_snapshots`
+### `sector_snapshots`
 
-### Schema
-| Column | Type | Notes |
-|---|---|---|
-| id | String (cuid) | PK |
-| snapshotDate | DateTime | |
-| instrumentId | String | FK → stocks.id (Cascade) |
-| symbol, companyName?, sector? | String? | |
-| smartMoneyScore | Float | |
-| status, confidence | String | |
-| accumulationSignalCount, distributionSignalCount | Int | |
-| unusualVolumeDetected | Boolean | |
-| explanation? | String? | |
-| source, dataStatus | String | |
-| latestClose?, latestVolume?, averageVolume20?, dailyChangePercent? | Float? | |
-| signals?, insiderOwnership? | Json? | |
-| range | String | default "3M" |
+**Schema:** `id`, `snapshotDate`, `dataThroughDate`, `scopeRegion`, `scopeAssetType`, `sector`, `classification`, `sectorScore`, `return1W?`, `return1M?`, `return3M?`, `trendScore`, `reasonTags` (JSON), `warnings` (JSON), `source`.
+Unique: `[snapshotDate, scopeRegion, scopeAssetType, sector]`.
 
-**Unique:** (snapshotDate, instrumentId, range). **Indexes:** snapshotDate, instrumentId, sector, status+smartMoneyScore.
+**Population:** 237 rows. Latest `snapshotDate`: 2026-06-15. FRESH.
 
-### Population
-| Metric | Value |
-|---|---|
-| Row count (exact) | 140,220 |
-| Range breakdown | 1M: 45,647; 3M: 48,926; 6M: 45,647 |
-| Latest snapshotDate | 2026-06-15 |
-
-**Largest snapshot table** in this group at 140k rows. Three time-range variants per instrument per day. Active and fresh.
-
-### Endpoints / Readers
-- `historical-context-snapshots.repository.ts` — upsert, findMany, findFirst, count
-- `market-intelligence/instrument-context.service.ts` — reads via portfolio snapshot context
+**Endpoints / modules:** `research-hub.snapshot-reader.ts`. Route: sector section of `GET /api/research/overview`.
 
 ---
 
-## 24. DataQualitySnapshot — `data_quality_snapshots`
+### `country_context_snapshots`
 
-### Schema
-| Column | Type | Notes |
-|---|---|---|
-| id | String (cuid) | PK |
-| snapshotDate | DateTime | |
-| instrumentId | String | |
-| symbol | String | |
-| priceHistoryDays | Int | |
-| hasLatestPrice, hasFundamentals, hasSector, hasIndustry | Boolean | |
-| dataStatus | String | |
-| signalReadinessScore | Float | |
+**Schema:** `id`, `snapshotDate`, `region`, `country`, `oneMonthReturn?`, `threeMonthReturn?`, `sixMonthReturn?`, `relativeStrengthScore`, `bullishSignalCount?`, `bearishSignalCount?`, `source`, `dataStatus`.
+Unique: `[snapshotDate, region, country]`.
 
-**Unique:** (snapshotDate, instrumentId). **Indexes:** snapshotDate, instrumentId.
+**Population:** 182 rows. Latest `snapshotDate`: 2026-06-15. FRESH.
 
-### Population
-| Metric | Value |
-|---|---|
-| Row count (exact) | 24,926 |
-| snapshotDate range | 2026-04-27 to 2026-06-15 |
-| Distinct instruments | 2,965 |
-
-**Note:** This is an older/legacy table. It has a narrower schema compared to `DataQualityEvaluation` (no JSON fields for gaps/blockers, no eligibility flags). The `DataQualityEvaluation` table (one row per instrument) appears to be the current authoritative source. This table holds daily history per instrument per date.
-
-### Endpoints / Readers
-- `historical-context-snapshots.repository.ts` — upsert, findMany, findFirst, count
+**Endpoints / modules:** `market-context-intelligence.repository.ts`, `historical-context-snapshots.repository.ts`. Route: `GET /api/market-context/countries`.
 
 ---
 
-## 25. MarketScanSnapshot — `market_scan_snapshots`
+### `smart_money_context_snapshots`
 
-### Schema
-| Column | Type | Notes |
-|---|---|---|
-| id | String (cuid) | PK |
-| scanType | String | MOVERS_GAINERS\|MOVERS_LOSERS\|52W_HIGH\|52W_LOW\|DELIVERY_SPIKE\|VOLUME_SPIKE\|MARKET_MAP |
-| scanRange | String? | 1D\|1W\|1M\|3M\|6M\|1Y (null for non-mover scans) |
-| region, assetType | String | |
-| tradingDate | DateTime | |
-| rank | Int | 1-based within type+range+scope+date |
-| payloadJson | Json | full row payload (shape varies by scanType) |
-| computedAt | DateTime | |
+**Schema:** `id`, `snapshotDate`, `instrumentId` (FK stocks), `symbol`, `companyName?`, `sector?`, `smartMoneyScore`, `status`, `confidence`, `accumulationSignalCount`, `distributionSignalCount`, `unusualVolumeDetected`, `explanation?`, `source`, `dataStatus`, `latestClose?`, `latestVolume?`, `averageVolume20?`, `dailyChangePercent?`, `signals?` (JSON), `insiderOwnership?` (JSON), `range`.
+Unique: `[snapshotDate, instrumentId, range]`. FK → `stocks`.
 
-**Unique:** (scanType, scanRange, region, assetType, tradingDate, rank). **Indexes:** lookup by type+range+scope+date, date+scope.
+**Population:** ~140,367 rows (est — second largest in group). Latest `snapshotDate`: 2026-06-15. FRESH.
 
-### Population
-| Metric | Value |
-|---|---|
-| Row count (exact) | 5,815 |
-| Latest tradingDate | 2026-06-15 (IN); 2026-06-12 (US) |
-| Scan types | MOVERS_GAINERS/LOSERS (6 ranges each), 52W_HIGH, 52W_LOW, DELIVERY_SPIKE, VOLUME_SPIKE, MARKET_MAP (6 ranges) |
-| Scopes | IN/STOCK (all types); US/STOCK (movers, 52W, MARKET_MAP — no DELIVERY_SPIKE/VOLUME_SPIKE) |
-
-Active and fresh. MARKET_MAP is a new scan type not in the schema comment (added after).
-
-### Endpoints / Readers
-- `market-data-foundation/analytics/market-data-foundation.serving.scan-reads.ts` — reads via `(db as any).marketScanSnapshot`
-- `market-data-foundation/ingestion/market-data-foundation.ingestion.scan-snapshots.ts` — deleteMany + createMany (refresh)
+**Endpoints / modules:** `market-intelligence/instrument-context.service.ts` (findFirst per instrument), `historical-context-snapshots.repository.ts`. Route: `GET /api/instruments/:symbol/context`.
 
 ---
 
-## 26. ResearchOverviewSnapshot — `research_overview_snapshots`
+### `data_quality_snapshots`
 
-### Schema
-| Column | Type | Notes |
-|---|---|---|
-| id | String (cuid) | PK |
-| region, assetType | String | |
-| overviewJson | Json | full ResearchOverview DTO |
-| marketGate | String | denormalized for cheap queries |
-| overallStatus | String | denormalized |
-| dataGaps | String[] | |
-| computedAt | DateTime | |
+**Schema:** `id`, `snapshotDate`, `instrumentId`, `symbol`, `priceHistoryDays`, `hasLatestPrice`, `hasFundamentals`, `hasSector`, `hasIndustry`, `dataStatus`, `signalReadinessScore`.
+Unique: `[snapshotDate, instrumentId]`.
 
-**Unique:** (region, assetType). **Indexes:** region+assetType+marketGate+overallStatus.
+**Population:** 24,975 rows (real count). Latest `snapshotDate`: 2026-06-15. FRESH.
 
-### Population
-| Metric | Value |
-|---|---|
-| Row count (exact) | 3 |
-| Contents | IN/STOCK (computedAt 2026-06-15, marketGate=SELECTIVE, status=UNPROVEN); US/STOCK (2026-06-14, OPEN, UNPROVEN); EU/STOCK (2026-06-08 — stale, UNKNOWN, INSUFFICIENT_DATA) |
+**Note:** Older per-day snapshot model for DQ. The newer canonical model is `instrument_eligibility` (outside this scope group), which supersedes this for pipeline verdicts.
 
-**EU/STOCK stale** (last computed 7 days ago). Only 3 rows total (one per active region scope). The `GET /research/overview` endpoint reads from this table.
-
-### Endpoints / Readers
-- `research-hub.service.ts` — findUnique (read) + upsert (refresh) via `(this.db as any).researchOverviewSnapshot`
-- `scripts/seedResearchOverview.ts` — one-time seed script
+**Endpoints / modules:** `historical-context-snapshots.repository.ts`.
 
 ---
 
-## 27. PortfolioIntelligenceSnapshot — `portfolio_intelligence_snapshots`
+### `market_scan_snapshots`
 
-### Schema
-| Column | Type | Notes |
-|---|---|---|
-| id | String (cuid) | PK |
-| portfolioId | String | @unique — one per portfolio |
-| portfolio | FK → portfolios.id (Cascade) | |
-| computedAt | DateTime | |
-| healthScore | Int | denormalized |
-| status | String | HEALTHY\|WATCH\|AT_RISK |
-| payloadJson | Json | full PortfolioIntelligenceResponse |
+**Schema:** `id`, `scanType` (MOVERS_GAINERS | MOVERS_LOSERS | 52W_HIGH | 52W_LOW | DELIVERY_SPIKE | VOLUME_SPIKE | MARKET_MAP), `scanRange?`, `region`, `assetType`, `tradingDate`, `rank`, `payloadJson` (JSON — full row payload, shape varies by scanType).
+Unique: `[scanType, scanRange, region, assetType, tradingDate, rank]`.
 
-**Unique:** portfolioId. **Indexes:** portfolioId+computedAt.
+**Population:** ~6,688 rows (est).
+- scanType distribution: MARKET_MAP 3,017, 52W_HIGH 800, 52W_LOW 796, VOLUME_SPIKE 667, MOVERS_GAINERS 583, MOVERS_LOSERS 520, DELIVERY_SPIKE 305.
+- Latest `tradingDate`: 2026-06-15. FRESH.
 
-### Population
-| Metric | Value |
-|---|---|
-| Row count (exact) | 2 |
-| Contents | Portfolio 1: HEALTHY, computedAt 2026-06-06; Portfolio 2: HEALTHY, computedAt 2026-06-07 |
-| Staleness | Both snapshots are 8-9 days old |
-
-**STALE.** Only 2 portfolio snapshots exist and both are nearly 9 days old. `GET /portfolios/:id/intelligence` reads from here without recomputation — users would see week-old intelligence until a refresh runs.
-
-### Endpoints / Readers
-- `portfolio-intelligence.repository.ts` — upsert (write), findUnique (read)
-- `scripts/seedPortfolioIntelligence.ts` — seed script
+**Endpoints / modules:** `market-data-foundation.serving.scan-reads.ts` (reads), `market-data-foundation.ingestion.scan-snapshots.ts` (writes). Route: `GET /api/market-scan/:scanType`.
 
 ---
 
-## Summary Findings
+### `research_overview_snapshots`
 
-### Empty / Near-Empty Tables (schema exists, barely used)
-| Table | Rows | Finding |
-|---|---|---|
-| `portfolio_intelligence_snapshots` | 2 | Only 2 portfolios tracked; both snapshots 8-9 days stale |
-| `research_overview_snapshots` | 3 | EU/STOCK stale (7 days); only 3 total rows |
-| `strategy_performance_summaries` | 41 | Very small; most strategies UNPROVEN or NOT_ELIGIBLE |
-| `strategy_definitions` | 11 | Small reference table (expected); all RESEARCH_ONLY |
-| `today_review_runs` | 30 | Intentionally small (one per day/scope) |
-| `market_pulse_snapshots` | 19 | Lightly populated; pipelineRunId 95% null |
+**Schema:** `id`, `region`, `assetType`, `overviewJson` (JSON — full ResearchOverview DTO with pre-diffed whatChanged + actionability), `marketGate`, `overallStatus`, `dataGaps` (String[]), `computedAt`.
+Unique: `[region, assetType]`.
 
-### Stale Snapshot Tables (data present but not updated recently)
-| Table | Stale Scope | Last Updated |
-|---|---|---|
-| `market_context_snapshots` | GLOBAL | 2026-06-05 (10 days) |
-| `market_context_snapshots` | NSE (legacy) | 2026-06-04 (11 days) |
-| `sector_context_snapshots` | GLOBAL | 2026-06-05 (10 days) |
-| `country_context_snapshots` | GLOBAL | 2026-06-05 (10 days) |
-| `research_overview_snapshots` | EU/STOCK | 2026-06-08 (7 days) |
-| `portfolio_intelligence_snapshots` | all | 2026-06-06 / 2026-06-07 (8-9 days) |
-| `earnings_intelligence_snapshots` | EU/STOCK, US/STOCK | 2026-06-08 / 2026-06-12 (partial) |
+**Population:** 3 rows.
+- IN/STOCK: marketGate=SELECTIVE, overallStatus=UNPROVEN, computedAt 2026-06-15 21:20. Age: 1 day. FRESH.
+- US/STOCK: marketGate=OPEN, overallStatus=UNPROVEN, computedAt 2026-06-15 22:32. Age: 1 day. FRESH.
+- EU/STOCK: marketGate=OPEN, overallStatus=UNPROVEN, computedAt 2026-06-15 15:49. Age: 1 day. FRESH.
+**Status: REFRESHED. No longer stale (was stale in prior audit).**
 
-### Richly Populated / Active Tables
-| Table | Rows | Notes |
-|---|---|---|
-| `strategy_decision_results` | 296,118 | Largest; all key columns populated; daily production |
-| `smart_money_context_snapshots` | 140,220 | Three time-ranges per instrument; fresh |
-| `signal_outcomes` | 105,610 | Outcome tracking; only 8% resolved (dataComplete=true) |
-| `signal_results` | 43,410 | Active signal pipeline output; all fully populated |
-| `pipeline_stage_runs` | 34,755 | Operational log; active |
-| `data_quality_snapshots` | 24,926 | Daily per-instrument quality history |
-| `earnings_intelligence_snapshots` | 16,194 | Active for IN; sparse for EU/US |
-| `data_quality_evaluations` | 10,071 | Current state per instrument; well-populated |
-| `signal_calibration_results` | 10,514 | Calibrated signals; active |
-| `stock_interest_snapshots` | 9,092 | Interest scoring per instrument; fresh |
+**Endpoints / modules:** `research-hub.snapshot-reader.ts`, `research-hub.service.ts`. Script: `seedResearchOverview.ts`. Route: `GET /api/research/overview`.
 
-### Notably Null Important Columns
-| Table | Column | Null Rate | Impact |
+---
+
+### `portfolio_intelligence_snapshots`
+
+**Schema:** `id`, `portfolioId` (unique FK portfolios), `computedAt`, `healthScore` (Int — denormalized scalar), `status` (HEALTHY | WATCH | AT_RISK — denormalized scalar), `payloadJson` (JSON — full PortfolioIntelligenceResponse).
+One row per portfolio.
+
+**Population:** 2 rows.
+- Portfolio 1: healthScore=83, HEALTHY, computedAt 2026-06-06 12:21. Age: **10 days. STALE.**
+- Portfolio 2: healthScore=78, HEALTHY, computedAt 2026-06-07 23:30. Age: **9 days. STALE.**
+
+**Refresh not triggered** since 2026-06-07. Likely because `refreshPortfolioIntelligence()` is triggered on holdings change + daily cron, and neither fired for these portfolios.
+
+**Endpoints / modules:** `portfolio-intelligence.repository.ts` (upsert + findUnique), `seedPortfolioIntelligence.ts` (seed script). Route: `GET /api/portfolios/:id/intelligence`.
+
+---
+
+## Summary Table
+
+| Table | Est. Rows | Latest Data | Status |
 |---|---|---|---|
-| `signal_outcomes` | `benchmarkReturnPercent` | 100% null | CB-8 alpha calculation never ran |
-| `signal_outcomes` | `alphaPercent` | 100% null | Derived; blocked by above |
-| `signal_outcomes` | `futurePrice` / `forwardReturnPercent` | 92% null | Outcome resolution only at 8% |
-| `signal_results` | `lifecycleState` | 56% null | Pre-migration rows; newer rows populated |
-| `signal_results` | `priorScore` | 64% null | Populated only when prior run exists |
-| `trade_plan_results` | `portfolioImpact` | 99.6% null | Portfolio-aware plans almost never generated |
-| `trade_plan_results` | `backtestSummary` | 66% null | Backtest linkage incomplete |
-| `signal_generation_runs` | `sourceDataDate` | 30% null | Older runs before field was required |
-| `earnings_intelligence_snapshots` (IN) | `resultDate` | 31% null | 31% of IN instruments lack NSE result date |
-| `earnings_intelligence_snapshots` (EU/US) | `revenueGrowth` | 99%+/100% null | Fundamentals data absent for non-IN |
-| `market_pulse_snapshots` | `pipelineRunId` | 95% null | Pipeline not linking stage runs to pulse records |
+| strategy_decision_results | ~296,590 | 2026-06-15 | FRESH |
+| smart_money_context_snapshots | ~140,367 | 2026-06-15 | FRESH |
+| signal_outcomes | 105,610 | 2026-06-11 | FRESH — bench/alpha 0.01% populated (critical gap) |
+| pipeline_stage_runs | 34,804 | 2026-06-16 | FRESH — IN SNAPSHOT_ASSEMBLER failing (tx timeout) |
+| data_quality_snapshots | 24,975 | 2026-06-15 | FRESH |
+| signal_results | 43,459 | 2026-06-15 | FRESH — lifecycleState 44% null (pre-migration rows) |
+| earnings_intelligence_snapshots | ~16,243 | 2026-06-15 | FRESH (86% FRESH freshness) |
+| signal_calibration_results | 10,514 | 2026-06-15 | FRESH |
+| data_quality_evaluations | 10,071 | 2026-06-15 | FRESH |
+| stock_interest_snapshots | ~7,974 | 2026-06-15 | FRESH |
+| market_scan_snapshots | ~6,688 | 2026-06-15 | FRESH |
+| workbench_snapshots | 2,972 | 2026-06-15 | FRESH |
+| signal_generation_runs | ~2,472 | 2026-06-15 | FRESH — 136 stuck RUNNING orphans |
+| signal_position_ledger_entries | ~1,429 | 2026-06-15 | FRESH |
+| sector_context_snapshots | 1,335 | 2026-06-15 | FRESH |
+| pipeline_runs | ~1,186 | 2026-06-16 | FRESH |
+| trade_plan_results | 1,293 | 2026-06-13 | Near-fresh — portfolioImpact 99.6% null |
+| today_review_candidates | 839 | 2026-06-15 | FRESH (in PARTIAL parent runs) |
+| sector_snapshots | 237 | 2026-06-15 | FRESH |
+| country_context_snapshots | 182 | 2026-06-15 | FRESH |
+| market_context_snapshots | 153 | 2026-06-15 | FRESH (GLOBAL region 11 days stale) |
+| strategy_performance_summaries | 41 | 2026-06-11 | Near-fresh (5 days) |
+| today_review_runs | 32 | 2026-06-15 | PARTIAL dominant (28/32); only 1 COMPLETED ever |
+| strategy_definitions | 11 | — | Static config — 8 ACTIVE, 3 DRAFT |
+| market_pulse_snapshots | 20 | 2026-06-15 | PARTIAL dominant — not generating FRESH consistently |
+| research_overview_snapshots | 3 | 2026-06-15 | FRESH — resolved since prior audit |
+| portfolio_intelligence_snapshots | 2 | 2026-06-07 | STALE — 9–10 days |

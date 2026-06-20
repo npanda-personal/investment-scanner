@@ -1,4 +1,5 @@
 {
+  "model": "sonnet",
   "worktree": {
     "baseRef": "head"
   },
@@ -31,6 +32,10 @@
       "Bash(git diff:*)",
       "Bash(git show:*)",
       "Bash(git branch:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git merge:*)",
+      "Bash(git worktree:*)",
       "Bash(npm test:*)",
       "Bash(npm run build:*)",
       "Bash(npm run lint:*)",
@@ -48,6 +53,10 @@
       "PowerShell(git diff:*)",
       "PowerShell(git show:*)",
       "PowerShell(git branch:*)",
+      "PowerShell(git add:*)",
+      "PowerShell(git commit:*)",
+      "PowerShell(git merge:*)",
+      "PowerShell(git worktree:*)",
       "PowerShell(npm test:*)",
       "PowerShell(npm run build:*)",
       "PowerShell(npm run lint:*)",

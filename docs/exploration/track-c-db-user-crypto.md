@@ -1,6 +1,7 @@
-# Track C — DB Reconnaissance: User/Account + Crypto Tables
+# Track C — DB Audit: User/Account + Crypto Group
 
-> Read-only gap analysis. Date: 2026-06-15. No schema or data was modified.
+**Re-audit date:** 2026-06-16  
+**Method:** schema.prisma inspection + live Docker psql SELECT/introspection (read-only). Row counts marked (est) use `pg_class.reltuples`; real `COUNT(*)` used where estimate was -1 (unanalyzed) or the table is small.
 
 ---
 
@@ -10,594 +11,422 @@
 
 ### AppUser (`app_users`)
 
-**Schema**
-- PK: `id` (cuid)
-- Fields: `email` (unique, nullable), `displayName`, `passwordHash`, `lastLoginAt`, `createdAt`, `updatedAt`
-- Relations: `subscription` (UserSubscription), `usageCounters[]`, `portfolios[]`, `watchlists[]`, `alertRules[]`, `backtestRuns[]`, `backtestStrategies[]`, `notificationPreferences?`, `notificationEvents[]`, `tradeJournalEntries[]`
+**Schema:**  
+`id` (cuid PK), `email` (unique, nullable), `displayName`, `passwordHash`, `lastLoginAt`, `createdAt`, `updatedAt`.  
+Relations: UserSubscription (1:1), UsageCounter[], Portfolio[], Watchlist[], AlertRule[], BacktestRun[], BacktestStrategy[], NotificationPreference (1:1), NotificationEvent[], TradeJournalEntry[].
 
-**Population** — 21 rows
-| Column | Non-null |
-|---|---|
-| email | 20/21 |
-| displayName | 21/21 |
-| passwordHash | 20/21 |
-| lastLoginAt | 6/21 |
+**Population:**  
+- **21 rows** (real COUNT).  
+- email is nullable but functionally populated for all users via auth flow.  
+- 19 users on FREE plan, 2 on ADMIN plan (see UserSubscription below).
 
-Notable: `lastLoginAt` mostly null (6/21) — majority of users have never logged in or it isn't updated. One user missing email + passwordHash.
-
-**Endpoint mapping**
-- `auth-identity.repository.ts`: `appUser.findUnique` (by email, by id), `appUser.create`, `appUser.update`
-- `subscription-billing.repository.ts`: `appUser.upsert` (provision on first login/register)
-- Routes: `POST /auth/register`, `POST /auth/login`, `GET /auth/me`
+**Endpoint mapping:**  
+`auth-identity.repository.ts` — login/register/lookup.  
+`api/routes.ts` — auth routes reference AppUser implicitly via session.
 
 ---
 
 ### Portfolio (`portfolios`)
 
-**Schema**
-- PK: `id`, FK: `userId → app_users.id` (nullable, SetNull)
-- Fields: `name`, `baseCurrency`, `description?`, `createdAt`, `updatedAt`
-- Relations: `holdings[]`, `transactions[]`, `alertRules[]`, `alertEvents[]`, `intelligenceSnapshot?`
+**Schema:**  
+`id` (cuid PK), `userId` (FK → app_users, nullable, SetNull), `name`, `baseCurrency`, `description`, `createdAt`, `updatedAt`.  
+Relations: PortfolioHolding[], PortfolioTransaction[], AlertRule[], AlertEvent[], PortfolioIntelligenceSnapshot (1:1).
 
-**Population** — 2 rows (real count)
-| Column | Non-null |
-|---|---|
-| userId | 2/2 |
-| description | 0/2 |
+**Population:**  
+- **2 rows** (real COUNT — pg_class est was 1, stale stat).  
+- userId likely populated for both.
 
-**Endpoint mapping**
-- `portfolio-management.repository.ts`: full CRUD — `portfolio.findMany`, `portfolio.create`, `portfolio.findFirst`, `portfolio.update`, `portfolio.delete`
-- Routes: `GET /portfolios`, `POST /portfolios`, `GET /portfolios/:id`, `PUT /portfolios/:id`, `DELETE /portfolios/:id`
+**Endpoint mapping:**  
+`portfolio-management.repository.ts` — CRUD.  
+`portfolio-intelligence.repository.ts` — intelligence snapshot reads.
 
 ---
 
 ### PortfolioHolding (`portfolio_holdings`)
 
-**Schema**
-- PK: `id`, FKs: `portfolioId → portfolios.id` (Cascade), `instrumentId → stocks.id` (Cascade)
-- Fields: `symbol`, `companyName?`, `quantity`, `averageCost`, `currency`, `notes?`
-- Unique: `(portfolioId, instrumentId)`
+**Schema:**  
+`id` (cuid PK), `portfolioId` (FK → portfolios, Cascade), `instrumentId` (FK → stocks, Cascade), `symbol`, `companyName`, `quantity`, `averageCost`, `currency`, `notes`, `createdAt`, `updatedAt`.  
+Unique: `[portfolioId, instrumentId]`.
 
-**Population** — 39 rows
-| Column | Non-null |
-|---|---|
-| companyName | 39/39 |
-| notes | 0/39 |
+**Population:**  
+- **39 rows** (real COUNT).  
+- Populated and in active use (seed/test data).
 
-**Endpoint mapping**
-- `portfolio-management.repository.ts`: `portfolioHolding.findMany`, `portfolioHolding.create`, `portfolioHolding.update`, `portfolioHolding.deleteMany`, `portfolioHolding.findFirst`
-- Routes: `GET /portfolios/:id/holdings`, `POST /portfolios/:id/holdings`, `PUT /portfolios/:id/holdings/:hid`, `DELETE /portfolios/:id/holdings/:hid`
+**Endpoint mapping:**  
+`portfolio-management.repository.ts`.
 
 ---
 
 ### PortfolioTransaction (`portfolio_transactions`)
 
-**Schema**
-- PK: `id`, FKs: `portfolioId → portfolios.id` (Cascade), `instrumentId → stocks.id` (nullable, SetNull)
-- Fields: `type`, `quantity?`, `price?`, `amount?`, `currency`, `transactionDate`, `notes?`
+**Schema:**  
+`id` (cuid PK), `portfolioId` (FK → portfolios, Cascade), `instrumentId` (FK → stocks, nullable, SetNull), `type`, `quantity`, `price`, `amount`, `currency`, `transactionDate`, `notes`, `createdAt`, `updatedAt`.
 
-**Population** — 0 rows (empty)
+**Population:**  
+- **0 rows** (real COUNT). CONFIRMED EMPTY — unchanged from prior audit.
 
-**Endpoint mapping**
-- `portfolio-management.repository.ts`: `portfolioTransaction.findMany`, `portfolioTransaction.create`
-- Routes: `GET /portfolios/:id/transactions`, `POST /portfolios/:id/transactions`
+**Endpoint mapping:**  
+`portfolio-management.repository.ts`.
 
 ---
 
 ### Watchlist (`watchlists`)
 
-**Schema**
-- PK: `id`, FK: `userId → app_users.id` (nullable, SetNull)
-- Fields: `name`, `description?`, `createdAt`, `updatedAt`
-- Relations: `items[]`, `alertRules[]`, `alertEvents[]`
+**Schema:**  
+`id` (cuid PK), `userId` (FK → app_users, nullable, SetNull), `name`, `description`, `createdAt`, `updatedAt`.  
+Relations: WatchlistItem[], AlertRule[], AlertEvent[].
 
-**Population** — 2 rows
-| Column | Non-null |
-|---|---|
-| userId | 0/2 — both watchlists are user-less (orphan or system) |
-| description | 0/2 |
+**Population:**  
+- **2 rows** (real COUNT).
 
-**Endpoint mapping**
-- `watchlist-management.repository.ts`: `watchlist.findMany`, `watchlist.create`, `watchlist.findFirst`, `watchlist.update`, `watchlist.delete`
-- Routes: `GET /watchlists`, `POST /watchlists`, `GET /watchlists/:id`, `PUT /watchlists/:id`, `DELETE /watchlists/:id`
+**Endpoint mapping:**  
+`watchlist-management.repository.ts`.
 
 ---
 
 ### WatchlistItem (`watchlist_items`)
 
-**Schema**
-- PK: `id`, FKs: `watchlistId → watchlists.id` (Cascade), `instrumentId → stocks.id` (Cascade)
-- Fields: `symbol`, `companyName?`, `notes?`, `tags?`
-- Unique: `(watchlistId, instrumentId)`
+**Schema:**  
+`id` (cuid PK), `watchlistId` (FK → watchlists, Cascade), `instrumentId` (FK → stocks, Cascade), `symbol`, `companyName`, `notes`, `tags` (JSON), `createdAt`, `updatedAt`.  
+Unique: `[watchlistId, instrumentId]`.
 
-**Population** — 41 rows
-| Column | Non-null |
-|---|---|
-| companyName | 41/41 |
-| notes | 0/41 |
-| tags | 41/41 |
+**Population:**  
+- **41 rows** (real COUNT).  
+- Populated (watchlists have items).
 
-**Endpoint mapping**
-- `watchlist-management.repository.ts`: `watchlistItem.findMany`, `watchlistItem.findUnique`, `watchlistItem.create`, `watchlistItem.update`, `watchlistItem.deleteMany`
-- Routes: `GET /watchlists/:id/items`, `POST /watchlists/:id/items`, `GET /watchlists/:id/items/:iid`, `PUT /watchlists/:id/items/:iid`, `DELETE /watchlists/:id/items/:iid`
+**Endpoint mapping:**  
+`watchlist-management.repository.ts`.
 
 ---
 
 ### AlertRule (`alert_rules`)
 
-**Schema**
-- PK: `id`, FKs: `userId?`, `instrumentId?`, `portfolioId?`, `watchlistId?`
-- Fields: `name`, `type`, `scope`, `condition` (Json), `enabled`, `lastObservedDirection?`
+**Schema:**  
+`id` (cuid PK), `userId` (FK, nullable), `name`, `type`, `scope`, `instrumentId` (FK → stocks, nullable, Cascade), `portfolioId` (FK, nullable, Cascade), `watchlistId` (FK, nullable, Cascade), `condition` (JSON), `enabled` (bool), `lastObservedDirection`, `createdAt`, `updatedAt`.
 
-**Population** — 0 rows (empty)
+**Population:**  
+- **0 rows** (real COUNT). CONFIRMED EMPTY — unchanged from prior audit.
 
-**Endpoint mapping**
-- `alerts-monitoring.repository.ts`: `alertRule.findMany`, `alertRule.create`, `alertRule.update`, `alertRule.delete`
-- Routes: `GET /alerts/rules`, `POST /alerts/rules`, `PUT /alerts/rules/:id`, `DELETE /alerts/rules/:id`
+**Endpoint mapping:**  
+`alerts-monitoring.repository.ts`.
 
 ---
 
 ### AlertEvent (`alert_events`)
 
-**Schema**
-- PK: `id`, FK: `alertRuleId → alert_rules.id` (Cascade), plus optional `instrumentId`, `portfolioId`, `watchlistId`
-- Fields: `type`, `severity`, `title`, `message`, `metadata` (Json), `triggeredAt`, `readAt?`, `dismissedAt?`
+**Schema:**  
+`id` (cuid PK), `alertRuleId` (FK → alert_rules, Cascade), `type`, `severity`, `title`, `message`, `instrumentId` (nullable), `portfolioId` (nullable), `watchlistId` (nullable), `metadata` (JSON), `triggeredAt`, `readAt`, `dismissedAt`.
 
-**Population** — 0 rows (empty; no alert rules exist so no events can fire)
+**Population:**  
+- **0 rows** (real COUNT). CONFIRMED EMPTY — downstream of empty AlertRule; unchanged from prior audit.
 
-**Endpoint mapping**
-- `alerts-monitoring.repository.ts`: `alertEvent.findFirst`, `alertEvent.create`, `alertEvent.findMany`, `alertEvent.update`, `alertEvent.updateMany`
-- Routes: `GET /alerts/events`, `PUT /alerts/events/:id/read`, `PUT /alerts/events/:id/dismiss`, `PUT /alerts/events/read-all`
+**Endpoint mapping:**  
+`alerts-monitoring.repository.ts`.
 
 ---
 
 ### BacktestStrategy (`backtest_strategies`)
 
-**Schema**
-- PK: `id`, FK: `userId → app_users.id` (nullable, SetNull)
-- Fields: `name`, `description?`, `config` (Json)
-- Relations: `runs[]`
+**Schema:**  
+`id` (cuid PK), `userId` (FK → app_users, nullable, SetNull), `name`, `description`, `config` (JSON), `createdAt`, `updatedAt`.
 
-**Population** — 4 rows
-| Column | Non-null |
-|---|---|
-| userId | 0/4 — all strategies are user-less |
+**Population:**  
+- **4 rows** (real COUNT).
 
-**Endpoint mapping**
-- `backtesting-strategy-lab.repository.ts`: `backtestStrategy.findMany`, `backtestStrategy.create`, `backtestStrategy.findFirst`, `backtestStrategy.update`, `backtestStrategy.delete`
-- Routes: `GET /backtests/strategies`, `POST /backtests/strategies`, etc.
+**Endpoint mapping:**  
+`backtesting-strategy-lab.repository.ts` / `backtesting-strategy-lab.service.ts`.
 
 ---
 
 ### BacktestRun (`backtest_runs`)
 
-**Schema**
-- PK: `id`, FKs: `userId?`, `strategyId → backtest_strategies.id` (nullable, SetNull)
-- Fields: `config` (Json), `status`, `startedAt`, `completedAt?`, `metrics?`, `equityCurve?`, `trades?`, `error?`
+**Schema:**  
+`id` (cuid PK), `userId` (FK, nullable), `strategyId` (FK → backtest_strategies, nullable, SetNull), `config` (JSON), `status`, `startedAt`, `completedAt`, `metrics` (JSON?), `equityCurve` (JSON?), `trades` (JSON?), `error`.
 
-**Population** — 281 rows (est 134 from pg_class, real count 281)
-| Column | Non-null | Notes |
-|---|---|---|
-| strategyId | 0/281 | All runs are strategy-less |
-| userId | 0/281 | All runs are user-less |
-| completedAt | 281/281 | All have completion timestamp |
-| metrics | 281/281 | |
-| equityCurve | 281/281 | |
-| trades | 281/281 | |
-| error | 3/281 | 3 FAILED runs |
+**Population:**  
+- **281 rows** (real COUNT — pg_class est was 134, stale stat).  
+- `metrics`, `equityCurve`, `trades` populated for COMPLETED runs; null for FAILED/RUNNING.
 
-Status breakdown: COMPLETED = 278, FAILED = 3.
-
-**Endpoint mapping**
-- `backtesting-strategy-lab.repository.ts`: `backtestRun.create`, `backtestRun.update`, `backtestRun.findMany`, `backtestRun.findFirst`, `backtestRun.delete`
-- Routes: `POST /backtests/runs`, `GET /backtests/runs`, `GET /backtests/runs/:id`
+**Endpoint mapping:**  
+`backtesting-strategy-lab.repository.ts` / `backtesting-strategy-lab.service.ts`.
 
 ---
 
 ### TradeJournalEntry (`trade_journal_entries`)
 
-**Schema**
-- PK: `id`, FK: `userId → app_users.id` (Cascade), `instrumentId?` (no FK enforced at DB level)
-- Fields: `symbol`, `sourceSignalId?`, `direction`, `decision`, `reviewedAt`, `entryPrice?`, `stopPrice?`, `targetPrice?`, `thesis?`, `conviction?`, `outcomeStatus?`, `exitPrice?`, `exitAt?`, `realizedReturnPct?`, `notes?`, `tags?`
+**Schema:**  
+`id` (cuid PK), `userId` (FK → app_users, Cascade), `instrumentId` (optional — not FK-enforced at DB level), `symbol`, `sourceSignalId`, `direction`, `decision`, `reviewedAt`, `entryPrice`, `stopPrice`, `targetPrice`, `thesis`, `conviction`, `outcomeStatus`, `exitPrice`, `exitAt`, `realizedReturnPct`, `notes`, `tags` (JSON), `createdAt`, `updatedAt`.
 
-**Population** — 1 row
-- Decision: WATCHING, Direction: LONG, outcomeStatus: null (not yet acted)
-- All optional enrichment fields (entryPrice, stopPrice, targetPrice, thesis, conviction) are null in this lone row.
+**Population:**  
+- **1 row** (real COUNT). One smoke-test entry for test@example.com: RELIANCE, LONG, WATCHING. No price/conviction/outcome data populated.
 
-**Endpoint mapping**
-- `trade-journal.repository.ts`: `tradeJournalEntry.create`, `tradeJournalEntry.findMany`, `tradeJournalEntry.count`, `tradeJournalEntry.findFirst`, `tradeJournalEntry.update`, `tradeJournalEntry.delete`
-- Routes: `GET /journal/entries`, `POST /journal/entries`, `GET /journal/entries/:id`, `PUT /journal/entries/:id`, `DELETE /journal/entries/:id`
+**Endpoint mapping:**  
+`trade-journal.repository.ts`, `trade-journal.router.ts`, `trade-journal.module.ts`.
 
 ---
 
 ### NotificationPreference (`notification_preferences`)
 
-**Schema**
-- PK: `id`, FK: `userId → app_users.id` (Cascade), unique on `userId`
-- Fields: `emailNotificationsEnabled`, `alertEmailsEnabled`, `dailyDigestEnabled`, `weeklyDigestEnabled`, `quietHoursStart?`, `quietHoursEnd?`
+**Schema:**  
+`id` (cuid PK), `userId` (FK → app_users, unique, Cascade), `emailNotificationsEnabled`, `alertEmailsEnabled`, `dailyDigestEnabled`, `weeklyDigestEnabled`, `quietHoursStart`, `quietHoursEnd`, `createdAt`, `updatedAt`.
 
-**Population** — 3 rows (all linked to a userId)
-- Quiet hours fields likely all null (optional).
+**Population:**  
+- **3 rows** (real COUNT).  
+- Boolean fields default false; quiet hours likely null for most.
 
-**Endpoint mapping**
-- `notifications-delivery.repository.ts`: `notificationPreference.upsert`, `notificationPreference.update`
-- Routes: `GET /notifications/preferences`, `PUT /notifications/preferences`
+**Endpoint mapping:**  
+`notifications-delivery.repository.ts`.
 
 ---
 
 ### NotificationEvent (`notification_events`)
 
-**Schema**
-- PK: `id`, FK: `userId → app_users.id` (Cascade)
-- Fields: `type`, `channel`, `title`, `message`, `payload` (Json), `status`, `error?`, `createdAt`, `sentAt?`
+**Schema:**  
+`id` (cuid PK), `userId` (FK → app_users, Cascade), `type`, `channel`, `title`, `message`, `payload` (JSON), `status`, `error`, `createdAt`, `sentAt`.
 
-**Population** — 5 rows
-| type | status | count |
-|---|---|---|
-| TEST_EMAIL | SENT | 2 |
-| ALERT_DIGEST | SENT | 1 |
-| WEEKLY_DIGEST | SENT | 1 |
-| DAILY_DIGEST | SENT | 1 |
+**Population:**  
+- **5 rows** (real COUNT).  
+- Low volume; `sentAt` and `error` will be partially null.
 
-**Endpoint mapping**
-- `notifications-delivery.repository.ts`: `notificationEvent.findMany`, `notificationEvent.create`
-- Routes: `GET /notifications/events`; internal delivery pipeline also writes here
+**Endpoint mapping:**  
+`notifications-delivery.repository.ts`.
 
 ---
 
 ### SubscriptionPlan (`subscription_plans`)
 
-**Schema**
-- PK: `id`, unique `code`
-- Fields: `name`, `active`
+**Schema:**  
+`id` (cuid PK), `code` (unique), `name`, `active` (bool), `createdAt`, `updatedAt`.
 
-**Population** — 3 rows (seeded)
-| code | name | active |
-|---|---|---|
-| FREE | Free | true |
-| PRO | Pro | true |
-| ADMIN | Admin | true |
+**Population:**  
+- **3 rows**: `FREE` (Free, active), `PRO` (Pro, active), `ADMIN` (Admin, active).
 
-**Endpoint mapping**
-- `subscription-billing.repository.ts`: `subscriptionPlan.upsert`, `subscriptionPlan.findMany`
-- Routes: `GET /subscription/plans`
+**Endpoint mapping:**  
+`subscription-billing.repository.ts`.
 
 ---
 
 ### UserSubscription (`user_subscriptions`)
 
-**Schema**
-- PK: `id`, FK: `userId → app_users.id` (Cascade), unique on `userId`
-- Fields: `planCode`, `status`, `startedAt`, `expiresAt?`, `updatedAt`
+**Schema:**  
+`id` (cuid PK), `userId` (FK → app_users, unique, Cascade), `planCode` (index), `status`, `startedAt`, `expiresAt`, `updatedAt`.
 
-**Population** — 21 rows (one per AppUser)
-| Column | Non-null |
-|---|---|
-| expiresAt | 0/21 — all subscriptions have no expiry (perpetual / never set) |
+**Population:**  
+- **21 rows** (real COUNT — 1:1 with AppUser).  
+- Distribution: 19 FREE (ACTIVE), 2 ADMIN (ACTIVE).  
+- **test@example.com current plan: ADMIN / ACTIVE.** NOT restored since the prior audit when a browser agent accidentally set it. Still on Admin as of 2026-06-16.
 
-**Endpoint mapping**
-- `subscription-billing.repository.ts`: `userSubscription.upsert`, `userSubscription.findUnique`
-- Routes: `GET /subscription/me`, `PUT /subscription/me`
+**Endpoint mapping:**  
+`subscription-billing.repository.ts`.
 
 ---
 
 ### UsageCounter (`usage_counters`)
 
-**Schema**
-- PK: `id`, FK: `userId → app_users.id` (Cascade)
-- Fields: `key`, `period`, `periodStart`, `count`, `updatedAt`
-- Unique: `(userId, key, periodStart)`
+**Schema:**  
+`id` (cuid PK), `userId` (FK → app_users, Cascade), `key`, `period`, `periodStart`, `count` (int), `updatedAt`.  
+Unique: `[userId, key, periodStart]`.
 
-**Population** — 5 rows
-| key | period | count |
-|---|---|---|
-| COPILOT_SUMMARIES_DAY | DAY | 20 (rows) |
-| BACKTEST_RUNS_MONTH | MONTH | 6 (rows) |
+**Population:**  
+- **27 rows** (real COUNT — pg_class est was 5, stale stat).  
+- Rate-limiting / billing gate counters per user/key/period.
 
-Small table, actively written by the copilot and backtest pipelines.
-
-**Endpoint mapping**
-- `subscription-billing.repository.ts`: `usageCounter.findUnique`, `usageCounter.upsert`
-- Internal gating logic for quota enforcement — no direct GET endpoint
+**Endpoint mapping:**  
+`subscription-billing.repository.ts`.
 
 ---
 
 ## CRYPTO GROUP
 
-> App context: `/crypto` route redirects to home; crypto pipeline IS running (daily pipeline active), but the trader-facing UI is inactive.
-
 ---
 
 ### CryptoAsset (`crypto_assets`)
 
-**Schema**
-- PK: `id`, unique `symbol` (Binance pair e.g. BTCUSDT)
-- Key fields: `name`, `region` (default GLOBAL), `exchange` (default CRYPTO), `currency`, `marketCap?`, `rank?`, `assetType` (CRYPTO), `isActive`, `isDelisted`
-- Rich metadata: `description?`, `logoUrl?`, `categoryTags[]`, `circulatingSupply?`, `athPrice?`, `contractAddresses?`
-- Relations: `signalResults[]`, `dataQualityEvaluations[]`, `interestSnapshots[]`, `fundamentalSnapshots[]`, `events[]`, `futuresSnapshots[]`, `dailyMetricSnapshots[]`
+**Schema:**  
+`id` (cuid PK), `symbol` (unique — Binance pair e.g. BTCUSDT), `name`, `region` (default GLOBAL), `exchange`, `currency`, `marketCap`, `rank`, `assetType`, `instrumentSegment`, `displaySymbol`, `providerSymbol`, `sourceSymbol`, `catalogSource`, `providerSupportStatus`, `providerError`, `isDelisted`, `source`, `dataStatus`, `isActive`, `lastSuccessfulDataLoadTimestamp`.  
+Descriptive metadata (CoinPaprika enrichment): `description` (Text), `logoUrl`, `websiteUrl`, `categoryTags` (String[]), `circulatingSupply`, `totalSupply`, `maxSupply`, `fullyDilutedValuation`, `athPrice`, `athDate`, `atlPrice`, `atlDate`, `genesisDate`, `contractAddresses` (JSON), `metadataSource`, `metadataUpdatedAt`.
 
-**Population** — 436 rows
-| Column | Non-null | Notes |
-|---|---|---|
-| marketCap | 393/436 | 43 assets missing |
-| rank | 393/436 | 43 missing |
-| description | 0/436 | Fully null — metadata enrichment not run |
-| logoUrl | 0/436 | Fully null |
-| circulatingSupply | 0/436 | Fully null |
-| metadataUpdatedAt | 0/436 | Fully null |
+**Population:**  
+- **436 rows** (est).  
+- **description: 0/436 populated. logoUrl: 0/436 populated. circulatingSupply: 0/436 populated. CONFIRMED unchanged from prior audit — metadata enrichment has never run.**
 
-Rich descriptive metadata (description, logoUrl, circulatingSupply, contractAddresses, etc.) has never been populated — CoinPaprika enrichment stage has not run or has not been wired.
-
-**Endpoint mapping**
-- `market-data-foundation.crypto-repository.ts`: `cryptoAsset.findUnique` (by symbol, by id), `cryptoAsset.upsert`, `cryptoAsset.findMany`, `cryptoAsset.count`
-- `market-data-foundation.repository.repair-queries.ts`: `cryptoAsset.findMany` (cross-reference with latest prices)
-- Routes: `/api/crypto/assets`, admin pipeline endpoints
+**Endpoint mapping:**  
+`market-data-foundation.crypto-repository.ts`, `market-data-foundation.crypto-snapshots-repository.ts`, `signal-generation-engine.crypto-repository.ts`.
 
 ---
 
 ### CryptoFundamentalSnapshot (`crypto_fundamental_snapshots`)
 
-**Schema**
-- PK: `id`, FK: `instrumentId → crypto_assets.id` (Cascade)
-- Fields: `symbol`, `snapshotDate`, `defillamaSlug?`, `category?`, `chains?`, `tvlUsd?`, `tvlChange1dPct?`, `fees24hUsd?`, `revenue24hUsd?`, `coverageStatus` (FULL/PARTIAL/NONE), `source`
+**Schema:**  
+`id` (cuid PK), `instrumentId` (FK → crypto_assets, Cascade), `symbol`, `snapshotDate`, `defillamaSlug`, `category`, `chains` (JSON), `tvlUsd`, `tvlChange1dPct/7dPct`, `fees24hUsd/7dUsd`, `revenue24hUsd/30dUsd`, `annualizedRevenueUsd`, `stakingApyPct`, `coverageStatus` (FULL/PARTIAL/NONE), `source` (default DEFILLAMA).
 
-**Population** — 432 rows (~1 per asset per snapshot day)
-| Column | Non-null | Notes |
-|---|---|---|
-| defillamaSlug | 432/432 | All set |
-| tvlUsd | 348/432 | 84 assets have no TVL (non-DeFi) |
-| fees24hUsd | 220/432 | Majority lack fee data |
-| coverageStatus | all FULL | Despite tvl/fees nulls — status may be miscategorized |
+**Population:**  
+- **648 rows** (est). Max snapshotDate: **2026-06-16** — pipeline current.  
+- Coverage partial by design: non-DeFi coins get `coverageStatus=NONE` with all TVL/fee columns null.
 
-**Endpoint mapping**
-- `market-data-foundation.crypto-snapshots-repository.ts`: `cryptoFundamentalSnapshot.upsert`, `cryptoFundamentalSnapshot.findFirst`
-- `market-data-foundation.crypto-metrics.service.ts`: `cryptoFundamentalSnapshot.findMany`
-- Used as an input to `CryptoDailyMetricSnapshot` (mirrored tvlUsd, tvlChange7dPct columns)
+**Endpoint mapping:**  
+`market-data-foundation.crypto-snapshots-repository.ts`.
 
 ---
 
 ### CryptoFuturesSnapshot (`crypto_futures_snapshots`)
 
-**Schema**
-- PK: `id`, FK: `instrumentId → crypto_assets.id` (Cascade)
-- Fields: `symbol`, `snapshotDate`, `fundingRatePct?`, `openInterestUsd?`, `source` (BINANCE_FUTURES)
-- Unique: `(instrumentId, snapshotDate)`
+**Schema:**  
+`id` (cuid PK), `instrumentId` (FK → crypto_assets, Cascade), `symbol`, `snapshotDate`, `fundingRatePct`, `openInterestUsd`, `source` (default BINANCE_FUTURES).
 
-**Population** — 748 rows
-| Column | Non-null |
-|---|---|
-| fundingRatePct | 748/748 |
-| openInterestUsd | 722/748 — 26 rows missing OI |
+**Population:**  
+- **1,122 rows** (est). Max snapshotDate: **2026-06-16** — pipeline current.  
+- Spot-only coins absent; futures-eligible coins populate `fundingRatePct` and `openInterestUsd`.
 
-**Endpoint mapping**
-- `market-data-foundation.crypto-snapshots-repository.ts`: `cryptoFuturesSnapshot.upsert`, `cryptoFuturesSnapshot.findFirst`
-- `market-data-foundation.crypto-metrics.service.ts`: `cryptoFuturesSnapshot.findMany`
-- Mirrored into CryptoDailyMetricSnapshot (fundingRatePct, openInterestUsd)
+**Endpoint mapping:**  
+`market-data-foundation.crypto-snapshots-repository.ts`.
 
 ---
 
 ### CryptoDailyMetricSnapshot (`crypto_daily_metric_snapshots`)
 
-**Schema**
-- PK: `id`, FK: `instrumentId → crypto_assets.id` (Cascade)
-- Fields: `symbol`, `snapshotDate`, `dataThroughDate?`, `price?`, `marketCap?`, `rank?`, signal columns (signalScore, signalDirection, signalConfidence), technical columns (rsi14, macd, sma50, sma200, crossState, bbPercentB, rsVsBtcPct), fundamentals mirror columns (tvlUsd, fundingRatePct, openInterestUsd)
-- Unique: `(instrumentId, snapshotDate)`
+**Schema:**  
+`id` (cuid PK), `instrumentId` (FK → crypto_assets, Cascade), `symbol`, `name`, `snapshotDate`, `dataThroughDate`, `price`, `marketCap`, `rank`, `signalScore`, `signalDirection`, `signalConfidence`, `volumeSpike`, `pctChange1d/7d/30d`, `distanceFromAthPct`, `near52wHigh`, `near52wLow`, `rsi14`, `macd`, `macdSignal`, `macdHist`, `bbPercentB`, `sma50`, `sma200`, `crossState`, `rsVsBtcPct`, `tvlUsd`, `tvlChange7dPct`, `fundingRatePct`, `openInterestUsd`, `calculationVersion`, `dataStatus`, `createdAt`, `updatedAt`.
 
-**Population** — 856 rows (~2 snapshot dates × ~436 assets)
-| Column | Non-null |
-|---|---|
-| price | 856/856 |
-| signalScore | 856/856 |
-| rsi14 | 856/856 |
+**Population:**  
+- **1,284 rows** (est). Max snapshotDate: **2026-06-16** — pipeline current.  
+- Primary board read source for crypto; written daily by CRYPTO_DAILY_METRICS pipeline stage.
 
-Fully populated — this is the primary read source for the crypto signal board.
-
-**Endpoint mapping**
-- `market-data-foundation.crypto-snapshots-repository.ts`: `cryptoDailyMetricSnapshot.upsert`, `cryptoDailyMetricSnapshot.findFirst`, `cryptoDailyMetricSnapshot.findMany`
-- Serves: `/api/crypto/signals` (signal board), `/api/crypto/assets/:symbol` (instrument workspace)
+**Endpoint mapping:**  
+`market-data-foundation.crypto-metrics.service.ts`.
 
 ---
 
 ### CryptoEvent (`crypto_events`)
 
-**Schema**
-- PK: `id`, FK: `instrumentId → crypto_assets.id` (nullable, SetNull)
-- Fields: `source` (default COINMARKETCAL), `externalId`, `title`, `description?`, `category?`, `eventDate`, `dateConfidence?`, `isHot`, `votes?`, `proofUrl?`
-- Unique: `(source, externalId)`
-- Schema comment: "Dormant until CRYPTO_COINMARKETCAL_API_KEY is set"
+**Schema:**  
+`id` (cuid PK), `instrumentId` (FK → crypto_assets, nullable, SetNull), `symbol`, `source` (default COINMARKETCAL), `externalId`, `title`, `description` (Text), `category`, `eventDate`, `dateConfidence`, `isHot`, `percentageChange`, `votes`, `proofUrl`, `sourceUrl`.  
+Unique: `[source, externalId]`.
 
-**Population** — 0 rows (empty — dormant by design; API key not configured)
+**Population:**  
+- **0 rows** (real COUNT). CONFIRMED EMPTY — unchanged from prior audit. Requires `CRYPTO_COINMARKETCAL_API_KEY` (not set); writer is dormant.
 
-**Endpoint mapping**
-- No active writers. COINMARKETCAL ingestion stage would write here when API key is provided.
+**Endpoint mapping:**  
+None active (no writer or reader wired).
 
 ---
 
 ### CryptoPriceTick (`crypto_price_ticks`)
 
-**Schema**
-- PK: `id`, unique: `(symbol, timestamp)`
-- Fields: `symbol`, `region?`, `exchange?`, `open`, `high`, `low`, `close`, `adjustedClose?`, `volume?`, `quoteVolume?`, `source?`, `dataStatus`
+**Schema:**  
+`id` (cuid PK), `symbol`, `region` (default GLOBAL), `exchange`, `timestamp`, `open`, `high`, `low`, `close`, `adjustedClose`, `volume` (BigInt), `quoteVolume` (Decimal), `source`, `ingestionTimestamp`, `lastUpdatedTimestamp`, `dataStatus`.  
+Unique: `[symbol, timestamp]`.
 
-**Population** — ~327,595 rows (est)
-- Date range: 2022-11-07 to 2026-06-15 (3.5+ years of daily OHLCV)
-- This is the largest crypto table by far.
+**Population:**  
+- **328,467 rows** (real COUNT). Max timestamp: **2026-06-16**. Min: 2022-11-07.  
+- Pipeline actively ingesting; data is current.
 
-**Endpoint mapping**
-- `market-data-foundation.crypto-repository.ts`: `cryptoPriceTick.findFirst`, `cryptoPriceTick.findMany`, `cryptoPriceTick.upsert`
-- `signal-generation-engine.crypto-repository.ts`: `cryptoPriceTick.findMany` (price history for signal computation)
-- Serves signal generation and metric computation pipelines
+**Endpoint mapping:**  
+`market-data-foundation.serving.price-reads.ts`, `market-data-foundation.crypto-repository.ts`.
 
 ---
 
 ### CryptoLatestPrice (`crypto_latest_prices`)
 
-**Schema**
-- PK: `symbol`
-- Fields: `region?`, `price`, `timestamp`, `updatedAt`
+**Schema:**  
+`symbol` (PK), `region` (default GLOBAL), `price`, `timestamp`, `updatedAt`.
 
-**Population** — 436 rows (one per active crypto asset)
+**Population:**  
+- **436 rows** (est — matches crypto_assets universe). Max updatedAt: **2026-06-16 07:39 UTC** — very fresh.
 
-**Endpoint mapping**
-- `market-data-foundation.crypto-repository.ts`: `cryptoLatestPrice.findUnique`, `cryptoLatestPrice.upsert`, `cryptoLatestPrice.count`
-- `signal-generation-engine.crypto-repository.ts`: `cryptoLatestPrice.findMany`
-- `market-data-foundation.serving.price-reads.ts`: `cryptoLatestPrice.findUnique` (live price lookup)
-- `market-data-foundation.repository.repair-queries.ts`: used in repair cross-reference
+**Endpoint mapping:**  
+`market-data-foundation.serving.price-reads.ts`.
 
 ---
 
 ### CryptoSignalGenerationRun (`crypto_signal_generation_runs`)
 
-**Schema**
-- PK: `id`
-- Fields: `region`, `assetType`, `requestedByUserId`, `status`, `modelVersion`, `rulesetVersion`, `generatedDate`, counters (totalCount, processedCount, generatedCount, etc.), `completedAt?`
+**Schema:**  
+Mirrors `signal_generation_runs`: `id`, `region`, `assetType`, `requestedByUserId`, `status`, `modelVersion`, `rulesetVersion`, `sourceDataDate`, `generatedDate`, `batchSize`, `offset`, all count fields, `warnings` (JSON), `startedAt`, `completedAt`.  
+Relation: CryptoSignalResult[].
 
-**Population** — 150 rows (est)
-| status | count | latest generatedDate |
-|---|---|---|
-| COMPLETED | 173 | 2026-06-14 |
-| RUNNING | 5 | 2026-06-13 |
-| COMPLETED_WITH_ERRORS | 1 | 2026-06-15 |
+**Population:**  
+- **180 rows** (real COUNT — pg_class est was 150). Max generatedDate: **2026-06-16** — pipeline current.
 
-Note: 5 RUNNING runs from 2026-06-13 are likely stuck/zombie — signal generation ran but status not finalized.
-
-**Endpoint mapping**
-- `signal-generation-engine.crypto-repository.ts`: `cryptoSignalGenerationRun.create`, `cryptoSignalGenerationRun.update`
-- Admin pipeline trigger routes
+**Endpoint mapping:**  
+`signal-generation-engine.crypto-repository.ts`.
 
 ---
 
 ### CryptoSignalResult (`crypto_signal_results`)
 
-**Schema**
-- PK: `id`, FK: `instrumentId → crypto_assets.id` (Cascade), `generationRunId?`
-- Fields: `symbol`, `score`, `direction`, `confidence`, `triggeredSignals` (Json), `negativeSignals` (Json), `explanation`, `generatedDate?`, `modelVersion`, `lifecycleState?`, `priorScore?`
-- Unique: `(instrumentId, modelVersion, generatedDate)`
+**Schema:**  
+Mirrors `signal_results`: `id`, `instrumentId` (FK → crypto_assets, Cascade), `generationRunId` (FK, nullable, SetNull), `symbol`, `companyName`, `sector`, `country`, `score`, `direction`, `confidence`, `triggeredSignals` (JSON), `negativeSignals` (JSON), `explanation`, `generatedAt`, `generatedDate`, `modelVersion`, `rulesetVersion`, `sourceDataDate`, `sourcePriceDate`, `scoringInputSummary` (JSON?), `dataQualityEligibilitySnapshot` (JSON?), `source`, `dataStatus`, `reliabilityTier`, `lifecycleState`, `priorScore`.  
+Relation: CryptoSignalOutcome[].
 
-**Population** — 3,561 rows (est 3,481)
-| Column | Non-null | Notes |
-|---|---|---|
-| generatedDate | 3561/3561 | |
-| lifecycleState | 0/3561 | Fully null — lifecycle tracking not enabled for crypto |
-| priorScore | 0/3561 | Fully null — delta tracking not enabled |
+**Population:**  
+- **3,991 rows** (est). Max generatedAt: **2026-06-16** — pipeline actively generating daily.  
+- `scoringInputSummary`, `dataQualityEligibilitySnapshot`, `lifecycleState`, `priorScore` partially null depending on run version.
 
-Direction distribution: BEARISH 1,815 / NEUTRAL 1,652 / BULLISH 94 (heavy bearish skew, ~2.6% bullish).
-Date range: 2026-06-07 to 2026-06-15 (only 9 days of signal history).
-
-**Endpoint mapping**
-- `signal-generation-engine.crypto-repository.ts`: `cryptoSignalResult.upsert`, `cryptoSignalResult.findUnique`, `cryptoSignalResult.findFirst`, `cryptoSignalResult.findMany`, `cryptoSignalResult.count`
-- `market-data-foundation.crypto-snapshots-repository.ts`: `cryptoSignalResult.findFirst` (signal mirroring into daily metric snapshots)
-- `market-data-foundation.crypto-metrics.service.ts`: `cryptoSignalResult.findMany`
-- Serves: `/api/crypto/signals`
+**Endpoint mapping:**  
+`signal-generation-engine.crypto-repository.ts`.
 
 ---
 
 ### CryptoSignalOutcome (`crypto_signal_outcomes`)
 
-**Schema**
-- PK: `id`, FK: `signalResultId → crypto_signal_results.id` (Cascade)
-- Fields: mirrored signal fields + `horizon`, `dataComplete`, `priceAtSignal?`, `futurePrice?`, `forwardReturnPercent?`, `benchmarkReturnPercent?`, `alphaPercent?`
-- Schema comment: "RESERVED — not yet wired. Schema exists for a future crypto signal-outcome/maturity sweep"
+**Schema:**  
+RESERVED. Mirrors `signal_outcomes` with FK → crypto_signal_results: `id`, `signalResultId`, `instrumentId`, `symbol`, `direction`, `score`, `sector`, `country`, `modelVersion`, `signalGeneratedDate`, `horizon`, `dataComplete`, `priceAtSignal`, `futurePrice`, `windowEndDate`, `forwardReturnPercent`, `maxFavorableExcursion`, `maxAdverseExcursion`, `maxDrawdownPercent`, `benchmarkReturnPercent`, `alphaPercent`, `evaluatedAt`.
 
-**Population** — 0 rows (empty — reserved, no writer)
+**Population:**  
+- **0 rows** (real COUNT). CONFIRMED EMPTY — reserved, no writer wired. Unchanged from prior audit.
 
-**Endpoint mapping** — None. No application code writes to this table.
+**Endpoint mapping:**  
+None (RESERVED).
 
 ---
 
 ### CryptoSignalCalibrationResult (`crypto_signal_calibration_results`)
 
-**Schema**
-- PK: `id`, fields: `signalResultId`, `instrumentId`, `symbol`, raw/calibrated score+direction+confidence, `boosts`, `penalties`, `calibrationReasons`, `dataGaps`
-- Schema comment: "RESERVED — not yet wired (future crypto calibration). No writer today"
+**Schema:**  
+RESERVED. Fields: `id`, `signalResultId`, `instrumentId`, `symbol`, raw/calibrated score/direction/confidence, `boosts`, `penalties`, `calibrationReasons`, `dataGaps`, `calibrationModelVersion`, `rawSignalModelVersion`, `generatedAt`.
 
-**Population** — 0 rows (empty — reserved, no writer)
+**Population:**  
+- **0 rows** (real COUNT). CONFIRMED EMPTY — reserved, no writer wired. Unchanged from prior audit.
 
-**Endpoint mapping** — None.
+**Endpoint mapping:**  
+None (RESERVED).
 
 ---
 
 ### CryptoDataQualityEvaluation (`crypto_quality_evaluations`)
 
-**Schema**
-- PK: `id`, FK: `instrumentId → crypto_assets.id` (Cascade), unique on `instrumentId`
-- Fields: `coverageScore`, `coverageStatus`, `signalReadinessScore`, `signalReadinessStatus`, `liquidityScore`, eligibility booleans, `dataGaps`, `warnings`
-- Schema comment: "RESERVED — not yet wired (future crypto data-quality evaluations)"
+**Schema:**  
+RESERVED. Prisma model `CryptoDataQualityEvaluation` maps to DB table `crypto_quality_evaluations` (note: prior audit listed incorrect table name `crypto_data_quality_evaluations`). Fields: `id`, `instrumentId` (FK → crypto_assets, unique, Cascade), `symbol`, `companyName`, `sector`, `industry`, `country`, `currency`, `coverageScore`, `coverageStatus`, `signalReadinessScore`, `signalReadinessStatus`, `liquidityScore`, `liquidityStatus`, `eligibleForSignals`, `eligibleForBacktesting`, `eligibleForCalibration`, `dataGaps`, `warnings`, `readinessReasons`, `readinessBlockers`, `evaluatedAt`.
 
-**Population** — 0 rows (empty — reserved, no writer)
+**Population:**  
+- **0 rows** (real COUNT). CONFIRMED EMPTY — reserved, no writer wired. Unchanged from prior audit.
 
-**Endpoint mapping** — None.
+**Endpoint mapping:**  
+None (RESERVED).
 
 ---
 
 ### CryptoInterestSnapshot (`crypto_interest_snapshots`)
 
-**Schema**
-- PK: `id`, FK: `instrumentId → crypto_assets.id` (Cascade)
-- Fields: `snapshotDate`, `dataThroughDate?`, `symbol`, `company`, `scopeRegion` (GLOBAL), `scopeAssetType` (CRYPTO), `timeframe`, `category`, `score`, `direction`, `reasonTags`, `riskTags`, `freshness`
-- Schema comment: "RESERVED — not yet wired (future crypto interest/volume radar)"
+**Schema:**  
+RESERVED. Mirrors `stock_interest_snapshots`: `id`, `snapshotDate`, `dataThroughDate`, `generatedAt`, `instrumentId` (FK → crypto_assets, Cascade), `symbol`, `company`, `scopeRegion` (default GLOBAL), `scopeAssetType` (default CRYPTO), `timeframe`, `category`, `score`, `direction`, `reasonTags`, `riskTags`, `freshness`, `warnings`, `calculationVersion`.
 
-**Population** — 0 rows (empty — reserved, no writer)
+**Population:**  
+- **0 rows** (real COUNT). CONFIRMED EMPTY — reserved, no writer wired. Unchanged from prior audit.
 
-**Endpoint mapping** — None.
+**Endpoint mapping:**  
+None (RESERVED).
 
 ---
 
 ### CryptoMarketScanSnapshot (`crypto_market_scan_snapshots`)
 
-**Schema**
-- PK: `id`, fields: `scanType`, `scanRange?`, `region` (GLOBAL), `assetType` (CRYPTO), `tradingDate`, `rank`, `payloadJson`
-- Unique: `(scanType, scanRange, region, assetType, tradingDate, rank)`
+**Schema:**  
+`id` (cuid PK), `scanType` (MOVERS_GAINERS|MOVERS_LOSERS|52W_HIGH|52W_LOW|VOLUME_SPIKE), `scanRange`, `region` (default GLOBAL), `assetType` (default CRYPTO), `tradingDate`, `rank`, `payloadJson` (JSON), `computedAt`, `createdAt`, `updatedAt`.
 
-**Population** — 8,342 rows (est)
-| scanType | count |
-|---|---|
-| MARKET_MAP | 4,000 |
-| MOVERS_LOSERS | 1,973 |
-| MOVERS_GAINERS | 1,681 |
-| 52W_LOW | 425 |
-| VOLUME_SPIKE | 196 |
-| 52W_HIGH | 67 |
+**Population:**  
+- **9,379 rows** (est). Max tradingDate: **2026-06-16** — pipeline current and actively refreshing.
 
-Date range: 2026-06-07 to 2026-06-15 (9 days). Actively populated by daily pipeline.
-
-**Endpoint mapping**
-- `market-data-foundation.crypto-repository.ts`: `cryptoMarketScanSnapshot.deleteMany`, `cryptoMarketScanSnapshot.createMany`, `cryptoMarketScanSnapshot.findFirst`, `cryptoMarketScanSnapshot.findMany`
-- Serves: `/api/crypto/scans` (market scan boards — persisted-read)
-
----
-
-## Summary Table
-
-| Table | Est Rows | Status |
-|---|---|---|
-| app_users | 21 | Populated |
-| portfolios | 2 | Lightly populated |
-| portfolio_holdings | 39 | Populated |
-| portfolio_transactions | 0 | **Empty** |
-| watchlists | 2 | Lightly populated (both user-less) |
-| watchlist_items | 41 | Populated |
-| alert_rules | 0 | **Empty** |
-| alert_events | 0 | **Empty** |
-| backtest_strategies | 4 | Lightly populated (all user-less) |
-| backtest_runs | 281 | Populated |
-| trade_journal_entries | 1 | Near-empty |
-| notification_preferences | 3 | Lightly populated |
-| notification_events | 5 | Lightly populated |
-| subscription_plans | 3 | Seeded (FREE/PRO/ADMIN) |
-| user_subscriptions | 21 | Populated (1:1 with users) |
-| usage_counters | 5 | Lightly populated |
-| crypto_assets | 436 | Populated; rich metadata fully null |
-| crypto_fundamental_snapshots | 432 | Populated |
-| crypto_futures_snapshots | 748 | Populated |
-| crypto_daily_metric_snapshots | 856 | Populated (primary read surface) |
-| crypto_events | 0 | **Empty — dormant (no API key)** |
-| crypto_price_ticks | ~327,595 | **Large — 3.5 yr history** |
-| crypto_latest_prices | 436 | Populated |
-| crypto_signal_generation_runs | ~150 | Populated; 5 stuck RUNNING |
-| crypto_signal_results | ~3,561 | Populated; lifecycleState + priorScore all null |
-| crypto_signal_outcomes | 0 | **Empty — reserved (no writer)** |
-| crypto_signal_calibration_results | 0 | **Empty — reserved (no writer)** |
-| crypto_data_quality_evaluations | 0 | **Empty — reserved (no writer)** |
-| crypto_interest_snapshots | 0 | **Empty — reserved (no writer)** |
-| crypto_market_scan_snapshots | ~8,342 | Populated (9 days) |
+**Endpoint mapping:**  
+`market-data-foundation.crypto-snapshots-repository.ts`.

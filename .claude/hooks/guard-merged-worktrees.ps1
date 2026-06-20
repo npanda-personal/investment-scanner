@@ -27,6 +27,12 @@ try {
             $ref = $line.Substring(7).Trim()              # e.g. refs/heads/my-task
             $norm = $curPath -replace '\\', '/'
             if ($norm -match '/\.claude/worktrees/') {
+                # A dirty worktree (uncommitted or untracked files) is in-progress
+                # work, not "merged & done" — its branch tip may be an ancestor of dev
+                # while live changes remain. Skip it so parallel sessions' active
+                # worktrees never block another session's wrap-up.
+                $dirty = git -C $curPath status --porcelain 2>$null
+                if ($dirty) { continue }
                 git merge-base --is-ancestor $ref dev 2>$null
                 if ($LASTEXITCODE -eq 0) {
                     $branch = $ref -replace '^refs/heads/', ''

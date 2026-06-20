@@ -27,7 +27,7 @@ let isPublishing = false;
 
 export function triggerDemoPublishIfEnabled(summary: DagAlertSummary): void {
   if (process.env.DEMO_AUTO_PUBLISH !== 'true') return;
-  if (summary.region !== 'IN' || summary.assetType !== 'STOCK') return;
+  if (!['IN', 'US'].includes(summary.region) || summary.assetType !== 'STOCK') return;
   if (summary.runStatus !== 'COMPLETED' && summary.runStatus !== 'PARTIAL') return;
 
   if (isPublishing) {

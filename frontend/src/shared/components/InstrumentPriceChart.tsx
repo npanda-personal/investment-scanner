@@ -280,18 +280,21 @@ export default function InstrumentPriceChart({
     ? `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(tvSymbol)}`
     : null;
 
-  const timeframeToggle = (
-    <ToggleButtonGroup
-      size="small"
-      exclusive
-      value={timeframe}
-      onChange={(_event, val: ChartTimeframe | null) => val && setTimeframe(val)}
-      sx={{ '& .MuiToggleButton-root': { px: 1.25, py: 0.25, fontSize: '0.72rem', fontWeight: 600 } }}
-    >
-      <ToggleButton value="1D">1D</ToggleButton>
-      <ToggleButton value="1W">1W</ToggleButton>
-      <ToggleButton value="1M">1M</ToggleButton>
-    </ToggleButtonGroup>
+  const toolbarRight = (
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+      <ToggleButtonGroup
+        size="small"
+        exclusive
+        value={timeframe}
+        onChange={(_event, val: ChartTimeframe | null) => val && setTimeframe(val)}
+        sx={{ '& .MuiToggleButton-root': { px: 1.25, py: 0.25, fontSize: '0.72rem', fontWeight: 600 } }}
+      >
+        <ToggleButton value="1D">1D</ToggleButton>
+        <ToggleButton value="1W">1W</ToggleButton>
+        <ToggleButton value="1M">1M</ToggleButton>
+      </ToggleButtonGroup>
+      {tvHref ? <TvLink href={tvHref} sx={{ position: 'static', opacity: 1 }} /> : null}
+    </Box>
   );
 
   return !instrumentId ? (
@@ -313,13 +316,12 @@ export default function InstrumentPriceChart({
         height,
         overflow: 'hidden',
         position: 'relative',
-        '&:hover .tv-ext-link, & .tv-ext-link:focus-visible': { opacity: 1 },
       }}
     >
       <IndicatorToolbar
         activeIds={activeIndicatorIds}
         onChange={setActiveIndicatorIds}
-        rightSlot={timeframeToggle}
+        rightSlot={toolbarRight}
       />
       <Box sx={{ flex: 1, minHeight: 0 }}>
         <Box ref={mainContainerRef} sx={{ height: '100%', width: '100%' }} />
@@ -329,7 +331,6 @@ export default function InstrumentPriceChart({
           <Box ref={oscRefCallback(def.id)} sx={{ height: '100%', width: '100%' }} />
         </Box>
       ))}
-      {tvHref ? <TvLink href={tvHref} /> : null}
     </Paper>
   );
 }

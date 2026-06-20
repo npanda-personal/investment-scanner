@@ -1,484 +1,364 @@
-# Track C — DB Reconnaissance: Market Data / Instrument Tables
+# Track C — DB Market-Data / Instrument Group (Re-Audit 2026-06-16)
 
-**Date:** 2026-06-15  
-**Scope:** Prisma models + raw-SQL tables in the MARKET-DATA / INSTRUMENT group.  
-**Method:** READ-ONLY. Row counts via `pg_class.reltuples` for large tables; `count(*)` for small ones. Null-density via single-pass aggregates. Readers from `grep -l` over `backend/src/`.
-
----
-
-## Summary Table
-
-| Table | Rows (approx) | Status |
-|---|---|---|
-| price_ticks | ~39.8M | Rich — multi-region historical data |
-| latest_prices | ~16K | Populated, mirrors stocks count |
-| stocks | 15,909 | Populated — US-heavy; sector/industry null for ~75% |
-| instrument_coverage | 1,502 | US-only (curated set); nearly fully populated |
-| source_file_imports | 4,049 | Active, NSE bhavcopy + FnO history |
-| instrument_exchange_identities | **0** | EMPTY — schema exists, no rows |
-| market_delivery_snapshots | 211,446 | Rich — Jan–Jun 2026 NSE delivery data |
-| fundamentals | 15,845 | Populated; peRatio ~94% null; officialResultDate 28% populated |
-| corporate_actions | 426,118 | Very large; amount null ~2.3%, splitRatio ~97.8% null |
-| fx_rates | **0** | EMPTY |
-| market_data_repair_attempts | 819 | Small operational table |
-| market_data_repair_states | 819 | Small; resolvedAt 100% null (all unresolved) |
-| market_data_repair_runs | 28 | Small operational log |
-| market_data_sync_states | 16,155 | Fully populated, all fields non-null |
-| instrument_eligibility | 10,074 | Active; ~5.7% lastPriceDate null |
-| daily_instrument_snapshot | 20,094 | Active; stopLoss/oiBuildup 100% null |
-| snapshot_watermarks | 6 | Very small — only recent dates covered |
-| fo_bhavcopy_contracts | 370,938 | Rich — 2026-06-03 to 06-15 |
-| fo_participant_oi | 28 | Thin — 2026-06-05 to 06-15 (~2 weeks) |
-| fo_option_metrics | 4,641 | Moderate — 2026-06-05 to 06-15 |
-| fo_oi_buildup | 1,512 | Moderate — 2026-06-05 to 06-15 |
-| fii_dii_snapshots | 14 | Very thin — only ~1 week |
-| bulk_block_deals | 827 | Moderate — 2026-06-05 to 06-15 |
-| fno_ban_list | 1,512 | Moderate — 2026-06-08 to 06-16 |
-| us_insider_trades | **does not exist yet** | Created lazily on first ingest run |
-| us_institutional_holdings | **does not exist yet** | Created lazily on first ingest run |
+Covers all Prisma models and raw-SQL tables in the market-data / instrument group.
+Row counts: `pg_class.reltuples` (approx) for large tables; `COUNT(*)` (exact) for small/empty ones.
+Null densities: `COUNT(col)` vs `COUNT(*)` on live data.
 
 ---
 
 ## Prisma Models
 
----
-
 ### 1. `price_ticks` (PriceTick)
 
-**Schema:** `symbol TEXT`, `region TEXT?`, `exchange TEXT?`, `timestamp DATETIME`, `open/high/low/close DECIMAL`, `adjustedClose DECIMAL?`, `volume BIGINT?`, `source TEXT?`, `sourceFileImportId TEXT?` (FK → source_file_imports, SetNull), `dataStatus TEXT DEFAULT 'COMPLETE'`.  
-Unique: `[symbol, timestamp]`. Indexes on `[symbol,timestamp]`, `[region]`, `[sourceFileImportId]`.  
-TimescaleDB hypertable (equity price history — NOT safe for `ALTER TABLE` column changes via standard migration).
+**Columns:** id (cuid PK), symbol, region (nullable), exchange (nullable), timestamp, open, high, low, close, adjustedClose (nullable), volume (nullable, BigInt), source (nullable), sourceFileImportId (FK → source_file_imports, nullable), ingestionTimestamp, lastUpdatedTimestamp, dataStatus.
 
-**Population:**
-- Rows: ~39.8M (pg_class estimate); confirmed 39,773,932 via count(*)
-- region: 100% non-null. Breakdown: US 32.5M, IN 5.5M, EU 1.7M
-- exchange: 99.98% non-null (9,458 null)
-- adjustedClose: 94.8% non-null (~2.05M null — likely IN rows lacking adj close)
-- volume: 99.97% non-null (~12,363 null)
-- source: 100% non-null
-- sourceFileImportId: 13.9% non-null (5.5M rows have file import linkage — IN bhavcopy imports)
-- Date range: 1970-01-02 to 2026-06-15 (the 1970 rows are likely placeholder/legacy; 3 distinct regions)
+**Unique constraint:** `(symbol, timestamp)` — note: no `region` in the key; cross-region collision risk documented in schema (deferred P0).
 
-**Readers:** `market-data-foundation` (price-reads repository, scans, catalog-queries, screener, movers), `market-context-intelligence` (breadth), `signal-generation-engine`, `portfolio-management`, `today-trade-review`, `data-quality-engine`, `backtesting-strategy-lab`
+**Indexes:** `(symbol, timestamp)`, `region`, `sourceFileImportId`.
+
+**Population (exact count):** 39,774,332 rows.
+- `adjustedClose`: 37,725,546 non-null (94.8% populated)
+- `volume`: 39,761,836 non-null (99.97% populated)
+- `region`: 39,774,332 non-null (100% populated)
+- Date range IN: 2014-01-01 → 2026-06-15 (4,016 distinct symbols)
+- Date range US: 1970-01-02 → 2026-06-15 (12,129 distinct symbols); note 1970 epoch dates indicate placeholder/stub entries for some US instruments
+
+**Endpoints/screens:** `market-data-foundation.repository.price.ts`, `market-data-foundation.repository.price-reads.ts`, `market-data-foundation.repository.price-readiness.ts`, `market-data-foundation.analytics.market-data-foundation.serving.price-reads.ts` — feeds signal generation, workbench, backtesting price queries.
 
 ---
 
 ### 2. `latest_prices` (LatestPrice)
 
-**Schema:** `symbol TEXT PK`, `region TEXT?`, `price DECIMAL`, `timestamp DATETIME`, `updatedAt DATETIME @updatedAt`.
+**Columns:** symbol (PK), region (nullable), price, timestamp, updatedAt.
 
-**Population:**
-- Rows: ~16,017 (pg_class)
-- Mirrors stock catalog size. All key fields expected non-null by design.
+**Population (approx):** 16,017 rows; 100% non-null on region.
 
-**Readers:** `market-data-foundation` (price-reads, screener), `signal-generation-engine`, `today-trade-review`, `portfolio-management`
+**Endpoints/screens:** Price reads across all trader-facing pages; queried by portfolio intelligence, workbench, and signal engine for current price context.
 
 ---
 
 ### 3. `stocks` (Stock)
 
-**Schema:** 35+ columns. Key: `id TEXT PK`, `symbol TEXT UNIQUE`, `name TEXT`, `region TEXT`, `exchange TEXT?`, `sector TEXT?`, `industry TEXT?`, `currency TEXT?`, `marketCap DECIMAL?`, `assetType TEXT?`, `instrumentSegment TEXT?`, `derivativesEligible BOOL DEFAULT false`, `isDelisted BOOL DEFAULT false`, `isActive BOOL DEFAULT true`, `dataStatus TEXT DEFAULT 'PARTIAL'`, `lastSuccessfulDataLoadTimestamp DATETIME?`. Multiple relations to child tables.  
-Indexes: `[region,assetType,symbol]`, `[region,assetType,providerSupportStatus,isActive,isDelisted]`.
+**Columns:** id (cuid PK), symbol (unique), name, region, exchange (nullable), country (nullable), sector (nullable), industry (nullable), currency (nullable), marketCap (nullable), assetType (nullable), instrumentSegment (nullable), displaySymbol (nullable), providerSymbol (nullable), sourceSymbol (nullable), catalogSource (nullable), providerSupportStatus (nullable), providerError (nullable), derivativesEligible (bool), underlyingSymbol (nullable), expiryDate (nullable), contractMonth (nullable), lotSize (nullable), contractStatus (nullable), isDelisted (bool), ipoDate (nullable), isin (nullable), source, dataStatus, isActive (bool), lastSuccessfulDataLoadTimestamp (nullable), createdAt, updatedAt. Relations to ~15 downstream models.
 
-**Population:**
-- Rows: 15,909 exact
-- region: 100% non-null. Breakdown: US 12,169 | IN 3,435 | EU 301 | HK 2 | CA 1 | UK 1
-- exchange: 100% non-null
-- sector: 22.1% non-null (3,520/15,909) — 77.9% null; mostly US stocks missing sector
-- industry: 22.2% non-null (3,533) — similarly sparse
-- currency: 99.9% non-null (16 null)
-- marketCap: 25.0% non-null (3,984) — very sparse
-- assetType: 99.9% non-null (16 null)
-- lastSuccessfulDataLoadTimestamp: 22.0% non-null (3,504) — only recently-synced stocks have this
+**Indexes:** `(region, assetType, symbol)`, `(region, assetType, providerSupportStatus, isActive, isDelisted)`.
 
-Notable gaps: sector, industry, marketCap null for ~75–78% of the catalog. US stocks dominate.
+**Population (exact):** 15,909 rows.
+- By region: IN=3,435 | US=12,169 | EU=301 | CA=1 | HK=2 | UK=1
+- `isin`: 3,264 non-null (20.5%) — sparse, mostly IN records
+- `sector`: 3,520 non-null (22.1%) — mostly IN records
+- `marketCap`: 3,984 non-null (25.0%) — majority null especially for US universe
 
-**Readers:** Nearly every module — primary instrument catalog. Key readers: `market-data-foundation` (all sub-repositories), `signal-generation-engine`, `earnings-intelligence`, `data-quality-engine`, `smart-money-intelligence`, `snapshot-assembler`, `portfolio-management`, `today-trade-review`, `stock-research-workbench`, `ai-investment-copilot`
+**Endpoints/screens:** `market-data-foundation.repository.catalog.ts`, `market-data-foundation.repository.catalog-queries.ts` — the universal instrument catalog. Used by virtually every module. `GET /api/v1/market-data/instruments`, `/catalog/search`, stock workbench, signal generation, portfolio management, etc.
 
 ---
 
 ### 4. `instrument_coverage` (InstrumentCoverage)
 
-**Schema:** `id TEXT PK`, `stockId TEXT UNIQUE` (no FK — intentionally decoupled), `symbol TEXT`, `region TEXT`, `isTracked BOOL DEFAULT false`, `trackingTier TEXT?` (CORE|STANDARD), `reason TEXT?` (INDEX|ETF|LIQUIDITY|MANUAL), `liquidityScore DECIMAL?`, `liquidityRank INT?`, `rankedAt DATETIME?`.  
-Indexes: `[region,isTracked]`, `[symbol]`.
+**Columns:** id (cuid PK), stockId (unique), symbol, region, isTracked (bool), trackingTier (nullable), reason (nullable), liquidityScore (nullable Decimal), liquidityRank (nullable Int), rankedAt (nullable), createdAt, updatedAt.
 
-**Population:**
-- Rows: 1,502 exact
-- isTracked: 100% non-null (all rows tracked)
-- trackingTier: 100% non-null
-- reason: 100% non-null
-- liquidityScore: 99.9% non-null (1,500/1,502 — 2 null)
-- liquidityRank: 99.9% non-null (1,500/1,502)
-- rankedAt: 100% non-null
-- All 1,502 rows are US region (US curation only implemented; IN/EU not yet curated through this table)
+**Indexes:** `(region, isTracked)`, `symbol`.
 
-**Readers:** `market-data-foundation` (repository.coverage.ts), `market-data-foundation.quality` (universe-readiness)
+**Population (exact):** 1,502 rows (US-only curated tracked set).
+- `liquidityScore`: 1,500 non-null (99.9% populated)
+- All 1,502 rows are `isTracked=true` (the ranked top-1,500-by-liquidity US set + 2 CORE pinned)
+
+**Endpoints/screens:** `market-data-foundation.repository.coverage.ts` — drives US universe curation; `market-data-foundation.quality.universe-readiness.instruments.ts` enforces `isTracked`-based exclusion of 10,657 untracked US instruments from downstream analysis.
 
 ---
 
 ### 5. `source_file_imports` (SourceFileImport)
 
-**Schema:** `id TEXT PK`, `source TEXT`, `segment TEXT`, `tradingDate DATETIME`, `fileName TEXT`, `fileUrl TEXT?`, `fileHash TEXT`, `fileSize INT?`, `status TEXT`, `rowsRaw INT DEFAULT 0`, `rowsAccepted INT DEFAULT 0`, `rowsRejected INT DEFAULT 0`, `parserVersion TEXT`, `importedAt DATETIME`, `errorMessage TEXT?`.  
-Unique: `[source,segment,tradingDate,fileHash]`. Index: `[source,segment,tradingDate,status]`.  
-Relations: PriceTick[], InstrumentExchangeIdentity[], MarketDeliverySnapshot[].
+**Columns:** id (cuid PK), source, segment, tradingDate, fileName, fileUrl (nullable), fileHash, fileSize (nullable), status, rowsRaw, rowsAccepted, rowsRejected, parserVersion, importedAt, errorMessage (nullable), createdAt, updatedAt. Relations: priceTicks[], instrumentExchangeIdentities[], deliverySnapshots[].
 
-**Population:**
-- Rows: 4,049 exact
-- tradingDate: 100% non-null
-- rowsRaw: 100% non-null
-- fileUrl: 95.8% non-null (3,877/4,049 — 172 null, likely older imports without URL tracking)
-- errorMessage: 15.5% non-null (628 — error records)
+**Unique:** `(source, segment, tradingDate, fileHash)`.
 
-**Readers:** `market-data-foundation` (repository.source-imports.ts)
+**Population (exact):** 4,051 rows.
+- Status breakdown: COMPLETED=3,423 | FAILED=624 | NOT_AVAILABLE=4
+- FAILED rate: 15.4% — notable; 624 import failures on record
+
+**Endpoints/screens:** `market-data-foundation.repository.catalog-queries.ts`, admin pipeline-ops UI (`/admin/pipeline-ops`) to track NSE/BSE file import history.
 
 ---
 
 ### 6. `instrument_exchange_identities` (InstrumentExchangeIdentity)
 
-**Schema:** `id TEXT PK`, `stockId TEXT` (FK → stocks.id, Cascade), `exchange TEXT`, `isin TEXT?`, `exchangeSymbol TEXT`, `securityCode TEXT?`, `securityId TEXT?`, `series TEXT?`, `status TEXT`, `sourceFileImportId TEXT?` (FK → source_file_imports, SetNull).  
-Unique: `[stockId,exchange,exchangeSymbol]`. Indexes: `[exchange,exchangeSymbol]`, `[exchange,isin]`, `[sourceFileImportId]`.
+**Columns:** id (cuid PK), stockId (FK → stocks), exchange, isin (nullable), exchangeSymbol, securityCode (nullable), securityId (nullable), series (nullable), status, sourceFileImportId (nullable FK), createdAt, updatedAt.
 
-**Population:**
-- Rows: **0 — EMPTY**
-- Schema fully defined but no data has been written. The bhavcopy ingest creates these records but none exist in the live DB, suggesting the identity-enrichment step is either skipped in the current pipeline or was never run.
+**Unique:** `(stockId, exchange, exchangeSymbol)`.
 
-**Readers:** `market-data-foundation` (repository.catalog-queries.ts) — joins to this table for exchange-symbol lookups; currently returns empty
+**Population (exact): 0 rows — EMPTY.**
+
+PRIOR FINDING STATUS: **CONFIRMED still empty.** No exchange identity records have been written despite the schema being in place.
+
+**Endpoints/screens:** `market-data-foundation.repository.catalog-queries.ts` — intended to store NSE/BSE per-exchange symbol mappings (ISIN, series, security code). Currently unused/unpopulated.
 
 ---
 
 ### 7. `market_delivery_snapshots` (MarketDeliverySnapshot)
 
-**Schema:** `id TEXT PK`, `stockId TEXT` (FK → stocks.id, Cascade), `symbol TEXT`, `exchange TEXT DEFAULT 'NSE'`, `tradingDate DATETIME`, `tradedQuantity BIGINT?`, `deliverableQuantity BIGINT?`, `deliveryPercent DECIMAL?`, `source TEXT`, `sourceFileImportId TEXT?` (FK → source_file_imports, SetNull).  
-Unique: `[stockId,exchange,tradingDate,source]`. Indexes: `[symbol,tradingDate]`, `[tradingDate,exchange]`, `[sourceFileImportId]`.
+**Columns:** id (cuid PK), stockId (FK → stocks), symbol, exchange (default NSE), tradingDate, tradedQuantity (nullable BigInt), deliverableQuantity (nullable BigInt), deliveryPercent (nullable Decimal), source, sourceFileImportId (nullable FK), createdAt, updatedAt.
 
-**Population:**
-- Rows: 211,446 exact
-- tradedQuantity: 100% non-null
-- deliverableQuantity: 100% non-null
-- deliveryPercent: 100% non-null
-- sourceFileImportId: 100% non-null (all linked to file imports)
-- Date range: 2026-01-14 to 2026-06-15 (5 months of NSE CM delivery data)
+**Unique:** `(stockId, exchange, tradingDate, source)`.
 
-**Readers:** `market-data-foundation` (repository.scans.ts, repository.scans-screener.ts — delivery spike scan), `data-quality-engine`, `signal-generation-engine` (delivery ratio signal)
+**Population (exact):** 211,446 rows.
+- `deliverableQuantity`: 211,446 non-null (100%)
+- `deliveryPercent`: 211,446 non-null (100%)
+- Date range: 2026-01-14 → 2026-06-15 (100 distinct trading dates)
+
+**Endpoints/screens:** `snapshot-assembler.service.ts`, `market-data-foundation.repository.price-reads.ts` — delivery % fed into market-pulse, stock-interest, and smart-money snapshots; displayed on stock workbench delivery panel.
 
 ---
 
 ### 8. `fundamentals` (Fundamental)
 
-**Schema:** `id TEXT PK`, `stockId TEXT` (FK → stocks.id, Cascade), `revenue DECIMAL?`, `eps DECIMAL?`, `netIncome DECIMAL?`, `peRatio DECIMAL?`, `dividendYield DECIMAL?`, `sharesOutstanding BIGINT?`, `marketCap DECIMAL?`, `currency TEXT?`, `periodType TEXT`, `periodEndDate DATETIME`, `officialResultDate DATETIME?`, `source TEXT`, `sourceNote TEXT?`, `validatedBy TEXT?`, `validatedAt DATETIME?`, `dataStatus TEXT DEFAULT 'PARTIAL'`.  
-Unique: `[stockId,periodType,periodEndDate,source]`. Indexes: `[stockId,periodEndDate]`, `[stockId,officialResultDate]`.
+**Columns:** id (cuid PK), stockId (FK → stocks), revenue (nullable), eps (nullable), netIncome (nullable), peRatio (nullable), dividendYield (nullable), sharesOutstanding (nullable), marketCap (nullable), currency (nullable), periodType, periodEndDate, officialResultDate (nullable), source, sourceNote (nullable), sourceUrl (nullable), validatedBy (nullable), validatedAt (nullable), ingestionTimestamp, lastUpdatedTimestamp, dataStatus.
 
-**Population:**
-- Rows: 15,845 exact
-- revenue: 98.5% non-null (15,607/15,845)
-- eps: 99.1% non-null (15,709/15,845)
-- netIncome: 99.5% non-null (15,764)
-- peRatio: 5.9% non-null (938/15,845) — **nearly entirely null** — not sourced for most instruments
-- officialResultDate: 27.7% non-null (4,386) — only populated for IN instruments with NSE board-meeting dates
+**Unique:** `(stockId, periodType, periodEndDate, source)`.
 
-**Readers:** `earnings-intelligence` (primary consumer), `signal-generation-engine` (EPS/growth signals), `data-quality-engine`, `stock-research-workbench`, `ai-investment-copilot`, `market-data-foundation` (serving.fundamentals-reads.ts, repository.fundamentals.ts)
+**Population (approx):** 15,845 rows.
+- `eps`: 15,709 non-null (99.1%)
+- `revenue`: 15,607 non-null (98.5%)
+- `officialResultDate`: 4,386 non-null (27.7%) — majority null; only NSE-calendar-enriched rows have this field set; needed for OFFICIAL_CALENDAR earnings-intelligence categories
+
+**Endpoints/screens:** `market-data-foundation.analytics.market-data-foundation.serving.fundamentals-reads.ts`, `market-data-foundation.yahoo-fundamentals.service.ts`, `stock-research-workbench` — fundamentals panel, earnings intelligence pipeline.
 
 ---
 
 ### 9. `corporate_actions` (CorporateAction)
 
-**Schema:** `id TEXT PK`, `stockId TEXT` (FK → stocks.id, Cascade), `actionType TEXT`, `effectiveDate DATETIME`, `declaredDate DATETIME?`, `paymentDate DATETIME?`, `amount DECIMAL?`, `splitRatio DECIMAL?`, `currency TEXT?`, `source TEXT`, `naturalKey TEXT UNIQUE`, `dataStatus TEXT DEFAULT 'COMPLETE'`.  
-Index: `[stockId,effectiveDate]`.
+**Columns:** id (cuid PK), stockId (FK → stocks), actionType, effectiveDate, declaredDate (nullable), paymentDate (nullable), amount (nullable), splitRatio (nullable), currency (nullable), source, naturalKey (unique), ingestionTimestamp, lastUpdatedTimestamp, dataStatus.
 
-**Population:**
-- Rows: 426,118 exact
-- actionType: 100% non-null
-- amount: 97.7% non-null (416,624) — predominantly dividend records
-- splitRatio: 2.2% non-null (9,494) — only split/bonus records have this
-- Large table — predominantly dividend corporate actions for IN+US
+**Population (exact):** 426,118 rows.
+- Breakdown by actionType: dividend=416,624 | split=5,934 | reverse_split=3,120 | bonus=440
+- Dominant type: dividend (97.8%)
 
-**Readers:** `stock-research-workbench`, `market-data-foundation` (repository.corporate-actions.ts, serving.fundamentals-reads.ts), `signal-generation-engine` (corporate action signal)
+**Endpoints/screens:** `market-data-foundation.repository.corporate-actions.ts` — used in workbench corporate actions panel, signal engine for split-adjustment awareness.
 
 ---
 
 ### 10. `fx_rates` (FxRate)
 
-**Schema:** `id TEXT PK`, `pair TEXT UNIQUE`, `baseCurrency TEXT`, `quoteCurrency TEXT`, `rate DECIMAL`, `rateTimestamp DATETIME`, `source TEXT`, `dataStatus TEXT DEFAULT 'COMPLETE'`.  
-Index: `[baseCurrency,quoteCurrency]`.
+**Columns:** id (cuid PK), pair (unique), baseCurrency, quoteCurrency, rate (Decimal), rateTimestamp, source, ingestionTimestamp, lastUpdatedTimestamp, dataStatus.
 
-**Population:**
-- Rows: **0 — EMPTY**
-- No FX rates have been ingested. Any cross-currency conversion logic that relies on this table is currently non-functional.
+**Population (exact): 0 rows — EMPTY.**
 
-**Readers:** `market-data-foundation` (repository.provider-cleanup.ts references it), `scripts/auditStockDataDuplicates.ts`
+PRIOR FINDING STATUS: **CONFIRMED still empty.** No FX rate data has ever been written. Any multi-currency conversion in the app is either hardcoded or fallback-based.
+
+**Endpoints/screens:** No active consumers observed (table is empty). Intended for future multi-currency portfolio valuation.
 
 ---
 
 ### 11. `market_data_repair_attempts` (MarketDataRepairAttempt)
 
-**Schema:** `id TEXT PK`, `stockId TEXT` (FK → stocks.id, Cascade), `region TEXT`, `assetType TEXT?`, `repairType TEXT`, `status TEXT`, `provider TEXT?`, `attemptedAt DATETIME`, `completedAt DATETIME?`, `fieldsFilledJson JSON?`, `error TEXT?`, `manualRequiredReason TEXT?`.
+**Columns:** id (cuid PK), stockId (FK → stocks), region, assetType (nullable), repairType, status, provider (nullable), attemptedAt, completedAt (nullable), fieldsFilledJson (nullable), error (nullable), manualRequiredReason (nullable), createdAt, updatedAt.
 
-**Population:**
-- Rows: 819 exact
-- completedAt: 100% non-null (all 819 attempts completed)
-- fieldsFilledJson: 100% non-null
-- manualRequiredReason: 100% non-null (all attempts flagged as manual-required, meaning auto-repair succeeded partially but full resolution needs manual work)
+**Population (exact):** 819 rows.
+- `error`: 819 non-null (100%) — all repair attempts have an error field populated
 
-**Readers:** `market-data-foundation` (repository.repair-queries.ts), `market-data-read.api.ts`
+**Endpoints/screens:** `market-data-foundation.repository.repair-queries.ts` — admin market-data health/repair endpoints.
 
 ---
 
 ### 12. `market_data_repair_states` (MarketDataRepairState)
 
-**Schema:** `id TEXT PK`, `stockId TEXT` (FK → stocks.id, Cascade), `region TEXT`, `assetType TEXT?`, `repairType TEXT`, `status TEXT`, `lastAttemptId TEXT?`, `fieldsFilledJson JSON?`, `error TEXT?`, `manualRequiredReason TEXT?`, `nextRetryAt DATETIME?`, `firstDetectedAt DATETIME`, `lastAttemptedAt DATETIME?`, `resolvedAt DATETIME?`.  
-Unique: `[stockId,repairType]`. Indexes: `[region,assetType,repairType,status]`, `[repairType,status,nextRetryAt]`.
+**Columns:** id (cuid PK), stockId (FK → stocks, unique per repairType), region, assetType (nullable), repairType, status, provider (nullable), lastAttemptId (nullable), fieldsFilledJson (nullable), error (nullable), manualRequiredReason (nullable), nextRetryAt (nullable), firstDetectedAt, lastAttemptedAt (nullable), resolvedAt (nullable), createdAt, updatedAt.
 
-**Population:**
-- Rows: 819 exact (one state per stockId+repairType pair)
-- nextRetryAt: 100% non-null (819 — all scheduled for retry)
-- resolvedAt: **0% non-null — 100% null** — no repairs have been fully resolved
-- fieldsFilledJson: 100% non-null
+**Unique:** `(stockId, repairType)`.
 
-**Readers:** `market-data-foundation` (repository.repair-state.ts), `market-data-read.api.ts`
+**Population (exact):** 819 rows.
+- `error`: 819 non-null (100%) — mirrors repair_attempts count exactly
+
+**Endpoints/screens:** `market-data-foundation.repository.repair-queries.ts` — current repair state per instrument per repair type.
 
 ---
 
 ### 13. `market_data_repair_runs` (MarketDataRepairRun)
 
-**Schema:** `id TEXT PK`, `region TEXT`, `assetType TEXT?`, `status TEXT`, `startedAt DATETIME`, `completedAt DATETIME?`, `beforeHealthJson JSON?`, `afterHealthJson JSON?`, `beforeRepairPlanJson JSON?`, `afterRepairPlanJson JSON?`, `actionsJson JSON`, `summaryJson JSON?`, `warningsJson JSON?`, `error TEXT?`.  
-Index: `[region,assetType,status,startedAt]`.
+**Columns:** id (cuid PK), region, assetType (nullable), status, startedAt, completedAt (nullable), beforeHealthJson (nullable), afterHealthJson (nullable), beforeRepairPlanJson (nullable), afterRepairPlanJson (nullable), actionsJson, summaryJson (nullable), warningsJson (nullable), error (nullable), createdAt, updatedAt.
 
-**Population:**
-- Rows: 28 exact
-- completedAt: 100% non-null (all runs completed)
-- beforeHealthJson: 100% non-null
-- Small operational audit log.
+**Population (exact):** 28 rows; all 28 have `completedAt` non-null (all runs completed).
 
-**Readers:** `market-data-foundation` (market-data-read.api.ts — admin endpoints), `repository.repair-state.ts`
+**Endpoints/screens:** `market-data-foundation.repository.repair-queries.ts` — repair run history for admin.
 
 ---
 
 ### 14. `market_data_sync_states` (MarketDataSyncState)
 
-**Schema:** `id TEXT PK`, `region TEXT`, `assetType TEXT`, `scopeType TEXT DEFAULT 'CATALOG'`, `scopeKey TEXT DEFAULT 'DEFAULT'`, `timeframe TEXT DEFAULT '1D'`, `tradingDate DATETIME`, `status TEXT`, `lastCheckedAt DATETIME?`, `lastProviderFetchAt DATETIME?`, `lastRunAt DATETIME?`, `lastInsertedCount INT`, `lastUpdatedCount INT`, `lastNoOpCount INT`, `lastSkippedCount INT`, `lastWarningCount INT`, `lastSummary JSON?`.  
-Unique: `[region,assetType,scopeType,scopeKey,timeframe,tradingDate]`. Index: `[region,assetType,scopeType,timeframe,status]`.
+**Columns:** id (cuid PK), region, assetType, scopeType (default CATALOG), scopeKey (default DEFAULT), timeframe (default 1D), tradingDate, status, lastCheckedAt (nullable), lastProviderFetchAt (nullable), lastRunAt (nullable), lastInsertedCount, lastUpdatedCount, lastNoOpCount, lastSkippedCount, lastWarningCount, lastSummary (nullable), createdAt, updatedAt.
 
-**Population:**
-- Rows: 16,155 exact
-- lastCheckedAt: 100% non-null
-- lastProviderFetchAt: 99.8% non-null (16,128/16,155 — 27 null)
-- lastRunAt: 100% non-null
-- lastSummary: 100% non-null
-- Fully operational — tracks sync state per instrument per trading date.
+**Unique:** `(region, assetType, scopeType, scopeKey, timeframe, tradingDate)`.
 
-**Readers:** `market-data-foundation` (ingestion scheduler, ingestion.v1, endpoints), `pipeline-orchestration`
+**Population (exact):** 16,158 rows.
+- Breakdown by region/assetType: IN/STOCK=15,005 | US/STOCK=1,010 | IN/ETF=124 | IN/INDEX=13 | IN/EQUITY=2 | EU/STOCK=2 | GLOBAL/CRYPTO=2
+
+**Endpoints/screens:** `market-data-foundation.repository.catalog.ts`, admin market-data-foundation UI — daily sync tracking per instrument x date.
 
 ---
 
 ### 15. `instrument_eligibility` (InstrumentEligibility)
 
-**Schema:** `id TEXT PK`, `instrumentId TEXT` (FK → stocks.id, Cascade), `tradingDate DATETIME`, facts: `priceBars INT`, `lastPriceDate DATETIME?`, `staleSessions INT`, `volumeCoveragePct DECIMAL`, `maxGapDays INT`, `liquidityScore INT`, `hasFundamentals BOOL`, `hasSector BOOL`, `hasIndustry BOOL`, `hasCountry BOOL`. Verdicts: `signalEligible BOOL`, `reviewEligible BOOL`, `backtestEligible BOOL`, `calibrationEligible BOOL`. Arrays: `signalReasons`, `reviewReasons`, etc. Summary: `readinessScore INT`, `readinessStatus TEXT` (READY|LIMITED|NOT_READY). Provenance: `policyVersion TEXT`, `computedAt DATETIME`.  
-Unique: `[instrumentId,tradingDate]`. Indexes: `[tradingDate]`, `[tradingDate,signalEligible]`, `[tradingDate,reviewEligible]`.
+**Columns:** id (cuid PK), instrumentId (FK → stocks), tradingDate, priceBars (Int), lastPriceDate (nullable DateTime), staleSessions (Int), volumeCoveragePct (Decimal), maxGapDays (Int), liquidityScore (Int), hasFundamentals (bool), hasSector (bool), hasIndustry (bool), hasCountry (bool), signalEligible (bool), reviewEligible (bool), backtestEligible (bool), calibrationEligible (bool), signalReasons (String[]), reviewReasons (String[]), backtestReasons (String[]), calibrationReasons (String[]), readinessScore (Int), readinessStatus (String), policyVersion (String), computedAt (DateTime), createdAt, updatedAt.
 
-**Population:**
-- Rows: 10,074 exact
-- lastPriceDate: 94.3% non-null (9,497/10,074 — 577 null for instruments with no price data)
-- Date range: 2026-05-29 to 2026-06-15 (~2.5 weeks of daily evaluations)
-- All other columns fully non-null by schema.
+**Unique:** `(instrumentId, tradingDate)`.
 
-**Readers:** `data-quality-engine` (writer + reader), `snapshot-assembler`, `signal-generation-engine`, `signal-calibration-engine`, `strategy-decision-engine`, `trade-plan-risk-engine`, `today-trade-review`, `backtesting-strategy-lab`, `smart-money-intelligence`, `shared/types/eligibility-policy.ts`
+**Population (exact):** 10,123 rows.
+- `lastPriceDate`: 9,546 non-null (94.3%); 577 rows have no price data at all
+- Date range: 2026-05-29 → 2026-06-15
+
+**Endpoints/screens:** `snapshot-assembler.service.ts` — eligibility verdicts are the first section assembled into `daily_instrument_snapshot`; feeds today-trade-review, signal-generation-engine.
 
 ---
 
 ### 16. `daily_instrument_snapshot` (DailyInstrumentSnapshot)
 
-**Schema:** `id TEXT PK`, `instrumentId TEXT` (FK → stocks.id, Cascade), `tradingDate DATETIME`, `snapshotVersion INT DEFAULT 1`, `region TEXT`, `assetType TEXT`. Eligibility fields (6 scalars + 2 arrays). Signals: `signalScore FLOAT?`, `signalDirection TEXT?`, `signalModelVersion TEXT?`. Calibration: `calibratedScore FLOAT?`, `calibrationAuthority TEXT?`. Decision: `strategyDecision TEXT?`, `rulesFired TEXT[]`. Trade plan: `stopLoss DECIMAL?`, `target DECIMAL?`, `rrRatio FLOAT?`, `planStatus TEXT?`. Context: `marketRegime TEXT?`, `breadthPct FLOAT?`, `sectorRelativeStrength FLOAT?`. Derivatives: `oiBuildup TEXT?`, `participantPositioning TEXT?`. Earnings: `earningsProximityDays INT?`. SmartMoney: `smartMoneyCode TEXT?`, `smartMoneyScore FLOAT?`. Provenance: `provenance JSON`, `assembledAt DATETIME`.  
-Unique: `[instrumentId,tradingDate,snapshotVersion]`.
+**Columns:** id (cuid PK), instrumentId (FK → stocks), tradingDate, snapshotVersion (Int), region, assetType, signalEligible/reviewEligible/backtestEligible/calibrationEligible (bool), reviewReasons (String[]), signalReasons (String[]), readinessScore (Int), readinessStatus (String), signalScore (nullable Float), signalDirection (nullable), signalModelVersion (nullable), calibratedScore (nullable Float), calibrationAuthority (nullable), strategyDecision (nullable), rulesFired (String[]), stopLoss (nullable Decimal), target (nullable Decimal), rrRatio (nullable Float), planStatus (nullable), marketRegime (nullable), breadthPct (nullable Float), sectorRelativeStrength (nullable Float), oiBuildup (nullable), participantPositioning (nullable), earningsProximityDays (nullable Int), smartMoneyCode (nullable), smartMoneyScore (nullable Float), provenance (Json), assembledAt, createdAt, updatedAt.
 
-**Population:**
-- Rows: 20,094 exact
-- signalScore: 65.4% non-null (13,143/20,094)
-- calibratedScore: 81.9% non-null (16,465)
-- strategyDecision: 69.7% non-null (14,012)
-- stopLoss: **0% non-null — 100% null** — trade plan section not yet assembled
-- oiBuildup: **0% non-null — 100% null** — derivatives section not yet assembled
-- marketRegime: 100% non-null (20,094) — context section well populated
-- smartMoneyCode: 97.2% non-null (19,534/20,094)
-- earningsProximityDays: not checked but likely sparse
-- Date range: 2026-05-29 to 2026-06-12
+**Unique:** `(instrumentId, tradingDate, snapshotVersion)`.
 
-**Readers:** `snapshot-assembler` (writer), `research-hub` (snapshot-reader), `today-trade-review`, `ai-investment-copilot`, `portfolio-intelligence`, `market-data-foundation` (serving-host)
+**Population (exact):** 20,143 rows.
+- By region/assetType: IN/STOCK=19,857 | US/STOCK=262 | EU/STOCK=24
+- Date range: 2026-05-29 → 2026-06-15
+- `signalScore`: 13,192 non-null (65.5%)
+- `calibratedScore`: 16,477 non-null (81.8%)
+- `marketRegime`: 20,143 non-null (100%)
+- `stopLoss`: **0 non-null (100% null)**
+- `target`: **0 non-null (100% null)**
+- `rrRatio`: **0 non-null (100% null)**
+- `oiBuildup`: **0 non-null (100% null)**
+- `participantPositioning`: **0 non-null (100% null)**
+
+PRIOR FINDING STATUS: **CONFIRMED** — stopLoss/target/rrRatio 100% null; oiBuildup/participantPositioning 100% null. Trade-plan and derivatives sections are NOT being assembled into snapshots.
+
+**Endpoints/screens:** Primary read surface for all trader-facing pages. `today-trade-review.repository.ts`, `ai-investment-copilot`, `portfolio-intelligence`, `market-intelligence.instrument-context.service.ts`.
 
 ---
 
 ### 17. `snapshot_watermarks` (SnapshotWatermark)
 
-**Schema:** `id TEXT PK`, `region TEXT`, `assetType TEXT`, `tradingDate DATETIME`, `snapshotVersion INT`, `rowCount INT`, `assembledAt DATETIME`.  
-Unique: `[region,assetType,tradingDate]`.
+**Columns:** id (cuid PK), region, assetType, tradingDate, snapshotVersion (Int), rowCount (Int), assembledAt.
 
-**Population:**
-- Rows: 6 exact
-- Very sparse — only marks a handful of dates as fully assembled.
-- Date range: 2026-05-29 to 2026-06-12 (same window as DailyInstrumentSnapshot)
+**Unique:** `(region, assetType, tradingDate)`.
 
-**Readers:** `snapshot-assembler` (writer + reader — gate for releasing a trading day), `research-hub`, `today-trade-review`
+**Population (exact):** 8 rows.
+- IN/STOCK: 4 watermarks | US/STOCK: 3 watermarks | EU/STOCK: 1 watermark
 
----
-
-## Raw-SQL Tables
+**Endpoints/screens:** `snapshot-assembler.service.ts` — the read gate preventing consumers from observing mid-pipeline state. Checked before serving `daily_instrument_snapshot`.
 
 ---
 
-### 18. `fo_bhavcopy_contracts`
+## Raw SQL Tables
 
-**Schema:** `(trading_date DATE, instrument_type TEXT, underlying TEXT, expiry_date DATE, strike_price NUMERIC, option_type TEXT)` composite PK. Columns: `settle_price NUMERIC?`, `underlying_price NUMERIC?`, `open_interest BIGINT`, `change_in_oi BIGINT`, `contracts_traded BIGINT`, `turnover_rs NUMERIC?`, `lot_size INT?`, `source TEXT`, `fetched_at TIMESTAMPTZ`.  
-Indexes: `idx_fo_bhav_date_type`, `idx_fo_bhav_underlying_date`.  
-Defined in: `derivatives-intelligence.fo-bhavcopy.service.ts`
+### R1. `fo_participant_oi`
 
-**Population:**
-- Rows: 370,938 exact
-- Date range: 2026-06-03 to 2026-06-15 (~2 weeks)
-- settle_price / underlying_price / turnover_rs / lot_size are nullable by design; most rows likely populated.
+**Columns:** trading_date (date, PK part), participant (text, PK part), future_index_long/short, future_stock_long/short, option_index_call_long/short, option_index_put_long/short, option_stock_call_long/short, option_stock_put_long/short, total_long, total_short (all bigint NOT NULL default 0), source (text), fetched_at (timestamptz). PK: `(trading_date, participant)`.
 
-**Readers:** `derivatives-intelligence` (fo-bhavcopy.service.ts — writer/reader), `market-data-foundation` (repository.scans-screener.ts), `snapshot-assembler` (derivatives section)
+**Population (exact):** 28 rows (7 participants x 4 recent days). Date range: 2026-06-05 → 2026-06-15. NEAR-EMPTY.
+
+**Endpoints/screens:** `derivatives-intelligence.participant-oi.service.ts`, `market-intelligence.instrument-context.service.ts`, `market-context-intelligence.eod-ingest.scheduler.ts`, `snapshot-assembler.service.ts` — intended to populate `participantPositioning` in daily snapshot, but that column is currently 100% null (not flowing through assembler).
 
 ---
 
-### 19. `fo_participant_oi`
+### R2. `fo_option_metrics`
 
-**Schema:** `(trading_date DATE, participant TEXT)` PK. Columns: `future_index_long/short`, `future_stock_long/short`, `option_index_call/put_long/short`, `option_stock_call/put_long/short`, `total_long`, `total_short` (all BIGINT). `source TEXT`, `fetched_at TIMESTAMPTZ`.  
-Defined in: `derivatives-intelligence.participant-oi.service.ts`
+**Columns:** trading_date (date, PK part), underlying (text, PK part), expiry_date (date, PK part), is_market_aggregate (bool), pcr_oi (nullable numeric), total_call_oi / total_put_oi (bigint), max_call_oi_strike / max_put_oi_strike / max_pain_strike (nullable numeric), computed_at (timestamptz). PK: `(trading_date, underlying, expiry_date)`.
 
-**Population:**
-- Rows: 28 exact (~6 participants × ~5 trading days)
-- Date range: 2026-06-05 to 2026-06-15
-- Very thin — only 2 weeks of data; all columns non-nullable.
+**Population (exact):** 4,641 rows. Date range: 2026-06-05 → 2026-06-15.
 
-**Readers:** `derivatives-intelligence` (participant-oi.service.ts), `market-context-intelligence` (eod-ingest.scheduler.ts)
+**Endpoints/screens:** `derivatives-intelligence.option-metrics.service.ts`, `market-intelligence.instrument-context.service.ts`.
 
 ---
 
-### 20. `fo_option_metrics`
+### R3. `fo_oi_buildup`
 
-**Schema:** `(trading_date DATE, underlying TEXT, expiry_date DATE)` PK. Columns: `is_market_aggregate BOOL`, `pcr_oi NUMERIC?`, `total_call_oi BIGINT`, `total_put_oi BIGINT`, `max_call_oi_strike NUMERIC?`, `max_put_oi_strike NUMERIC?`, `max_pain_strike NUMERIC?`, `computed_at TIMESTAMPTZ`.  
-Defined in: `derivatives-intelligence.option-metrics.service.ts`
+**Columns:** trading_date (date, PK part), underlying (text, PK part), instrument_type (text, PK part), total_oi / oi_change (bigint), oi_change_pct / price / price_change_pct (nullable numeric), buildup_label (text default NEUTRAL), derivatives_eligible (bool), computed_at (timestamptz). PK: `(trading_date, underlying, instrument_type)`.
 
-**Population:**
-- Rows: 4,641 exact
-- Date range: 2026-06-05 to 2026-06-15
-- pcr_oi, max_*_strike, max_pain_strike are nullable computed fields.
+**Population (exact):** 1,512 rows. Date range: 2026-06-05 → 2026-06-15.
 
-**Readers:** `derivatives-intelligence` (option-metrics.service.ts)
+**Endpoints/screens:** `derivatives-intelligence.oi-buildup.service.ts`, `market-intelligence.instrument-context.service.ts` — intended to populate `oiBuildup` in daily snapshot, but that column is currently 100% null.
 
 ---
 
-### 21. `fo_oi_buildup`
+### R4. `fo_bhavcopy_contracts`
 
-**Schema:** `(trading_date DATE, underlying TEXT, instrument_type TEXT)` PK. Columns: `total_oi BIGINT`, `oi_change BIGINT`, `oi_change_pct NUMERIC?`, `price NUMERIC?`, `price_change_pct NUMERIC?`, `buildup_label TEXT DEFAULT 'NEUTRAL'`, `derivatives_eligible BOOL`, `computed_at TIMESTAMPTZ`.  
-Defined in: `derivatives-intelligence.oi-buildup.service.ts`
+**Columns:** id (text PK via uuid), trading_date (date), instrument_type (text), underlying (text), expiry_date (date), strike_price (numeric), option_type (text), settle_price / underlying_price / turnover_rs (nullable numeric), open_interest / change_in_oi / contracts_traded (bigint), lot_size (nullable int), source (text), fetched_at (timestamptz). PK: `(trading_date, instrument_type, underlying, expiry_date, strike_price, option_type)`. Indexes: `(trading_date, instrument_type)`, `(underlying, trading_date)`.
 
-**Population:**
-- Rows: 1,512 exact
-- Date range: 2026-06-05 to 2026-06-15
-- buildup_label / derivatives_eligible always non-null (defaults).
+**Population (exact):** 370,938 rows. Date range: 2026-06-03 → 2026-06-15. Most richly populated F&O table.
 
-**Readers:** `derivatives-intelligence` (oi-buildup.service.ts), `snapshot-assembler` (oiBuildup field in DIS), `market-data-foundation` (repository.scans-screener.ts)
+**Endpoints/screens:** `derivatives-intelligence.fo-bhavcopy.service.ts`, `snapshot-assembler.service.ts`.
 
 ---
 
-### 22. `fii_dii_snapshots`
+### R5. `fii_dii_snapshots`
 
-**Schema:** `(trading_date DATE, category TEXT)` PK. Columns: `buy_value_cr NUMERIC`, `sell_value_cr NUMERIC`, `net_value_cr NUMERIC`, `source TEXT`, `fetched_at TIMESTAMPTZ`, `updated_at TIMESTAMPTZ`. All non-nullable.  
-Defined in: `market-context-intelligence.fii-dii.service.ts`
+**Columns:** id (text PK), trading_date (date, PK with category), category (text), buy_value_cr / sell_value_cr / net_value_cr (numeric(14,2)), source (text), fetched_at (timestamptz), updated_at (timestamptz). PK: `(trading_date, category)`.
 
-**Population:**
-- Rows: 14 exact (~7 categories × ~2 days, or 2 categories × 7 days)
-- Date range: 2026-06-05 to 2026-06-15
-- Very thin — only ~1 week of FII/DII participation data.
+**Population (exact):** 14 rows. Date range: 2026-06-05 → 2026-06-15. NEAR-EMPTY (~7 trading days x 2 categories).
 
-**Readers:** `market-context-intelligence` (fii-dii.service.ts, eod-ingest.scheduler.ts), `market-intelligence` (event-feed.service.ts), `market-data-foundation` (repository.scans-screener.ts)
+**Endpoints/screens:** `market-context-intelligence.fii-dii.service.ts`, `market-intelligence.event-feed.service.ts`.
 
 ---
 
-### 23. `bulk_block_deals`
+### R6. `bulk_block_deals`
 
-**Schema:** `(trade_date DATE, symbol TEXT, client_name TEXT, deal_type TEXT, qty BIGINT)` composite PK. Columns: `name TEXT`, `buy_sell TEXT`, `avg_price NUMERIC`, `remarks TEXT?`, `source TEXT`, `fetched_at TIMESTAMPTZ`, `updated_at TIMESTAMPTZ`.  
-Defined in: `market-context-intelligence.bulk-block-deals.service.ts`
+**Columns:** id (text PK), trade_date (date), deal_type (text), symbol (text), name (text), client_name (text), buy_sell (text), qty (bigint), avg_price (numeric(14,4)), remarks (nullable text), source (text), fetched_at (timestamptz), updated_at (timestamptz). PK: `(trade_date, symbol, client_name, deal_type, qty)`.
 
-**Population:**
-- Rows: 827 exact
-- Date range: 2026-06-05 to 2026-06-15
-- remarks: nullable, probably sparse.
+**Population (exact):** 827 rows. Date range: 2026-06-05 → 2026-06-15.
+- `remarks`: 0 non-null (100% null) — never populated by NSE source
 
-**Readers:** `market-context-intelligence` (bulk-block-deals.service.ts), `market-intelligence` (instrument-context.service.ts), `market-data-foundation` (repository.scans-screener.ts)
+**Endpoints/screens:** `market-context-intelligence.bulk-block-deals.service.ts`, `market-intelligence.instrument-context.service.ts`.
 
 ---
 
-### 24. `fno_ban_list`
+### R7. `us_insider_trades`
 
-**Schema:** `(ban_date DATE, symbol TEXT)` PK. Columns: `source TEXT`, `fetched_at TIMESTAMPTZ`.  
-Defined in: `smart-money-intelligence.fno-ban.service.ts`
+**Status: DOES NOT EXIST.** `to_regclass('public.us_insider_trades')` returns NULL.
 
-**Population:**
-- Rows: 1,512 exact (one row per symbol per ban date)
-- Date range: 2026-06-08 to 2026-06-16
-- Fully non-nullable.
-
-**Readers:** `smart-money-intelligence` (fno-ban.service.ts), `today-trade-review` (repository.ts, types.ts), `market-data-foundation` (repository.scans-screener.ts)
+PRIOR FINDING STATUS: **CONFIRMED** — table was never created.
 
 ---
 
-### 25. `us_insider_trades` (raw-SQL, lazy-created)
+### R8. `us_institutional_holdings`
 
-**Schema (from `sec-form4.service.ts` `ensureInsiderTradesTable`):**  
-`id TEXT PK`, `stock_id TEXT?`, `symbol TEXT`, `cik TEXT`, `insider_name TEXT`, `insider_title TEXT?`, `transaction_code TEXT`, `transaction_date DATE`, `shares NUMERIC?`, `price_per_share NUMERIC?`, `value NUMERIC?`, `accession TEXT?`, `source TEXT DEFAULT 'SEC_FORM4'`, `ingested_at TIMESTAMPTZ`.  
-Index: `idx_us_insider_symbol_date (symbol, transaction_date DESC)`.  
-Table is created with `CREATE TABLE IF NOT EXISTS` on first call to `ensureInsiderTradesTable()`.
+**Status: DOES NOT EXIST.** `to_regclass('public.us_institutional_holdings')` returns NULL.
 
-**Population:**
-- Table does **not exist** in the live DB. The SEC Form 4 ingest service (`sec-form4.service.ts`) has never been run against this DB (or was cleared). The `us-institutional.repository.ts` calls `ensureInsiderTradesTable()` lazily — the table will be created on the first read/ingest invocation.
-
-**Readers (once created):** `market-data-foundation` (us-institutional.repository.ts — `getInsiderTradesForSymbol`, `getSmartMoneySummaryForSymbol`)
+PRIOR FINDING STATUS: **CONFIRMED** — table was never created.
 
 ---
 
-### 26. `us_institutional_holdings` (raw-SQL, lazy-created)
+### R9. `fno_ban_list`
 
-**Schema (from `sec-13f.service.ts` `ensureInstitutionalHoldingsTable`):**  
-`id TEXT PK`, `stock_id TEXT?`, `symbol TEXT?`, `cusip TEXT`, `quarter TEXT`, `total_value NUMERIC DEFAULT 0`, `total_shares NUMERIC DEFAULT 0`, `holder_count INT DEFAULT 0`, `top_holders JSONB?`, `source TEXT DEFAULT 'SEC_13F'`, `ingested_at TIMESTAMPTZ`.  
-Index: `idx_us_inst_symbol_quarter (symbol, quarter)`.  
-Table is created with `CREATE TABLE IF NOT EXISTS` on first call to `ensureInstitutionalHoldingsTable()`.
+**Columns:** id (text PK), ban_date (date), symbol (text), source (text), fetched_at (timestamptz). PK: `(ban_date, symbol)`.
 
-**Population:**
-- Table does **not exist** in the live DB. The SEC 13F ingest service has never been run. Lazy-created on first invocation.
+**Population (exact):** 10 rows. Date range: 2026-06-08 → 2026-06-16. NEAR-EMPTY (rolling window only).
 
-**Readers (once created):** `market-data-foundation` (us-institutional.repository.ts — `getInstitutionalHoldingsForSymbol`, `getSmartMoneySummaryForSymbol`)
+**Endpoints/screens:** `smart-money-intelligence.fno-ban.service.ts`, `derivatives-intelligence.catalog-enrichment.service.ts`, `market-data-foundation.repository.conviction.ts`, `market-data-foundation.repository.scans-screener.ts`, `today-trade-review.repository.ts`.
 
 ---
 
-## Key Findings Summary
+## Summary of Prior Findings (Re-Audit Verdict)
 
-### Empty / Non-Existent Tables (highest gap priority)
-1. **`instrument_exchange_identities`** — 0 rows. Schema defined, indexed, referenced by catalog-queries.ts but never populated. NSE identity enrichment step appears skipped.
-2. **`fx_rates`** — 0 rows. No FX rate data ingested at all. Any multi-currency portfolio math relying on this table is broken.
-3. **`us_insider_trades`** — table does not exist. SEC Form 4 ingest never run.
-4. **`us_institutional_holdings`** — table does not exist. SEC 13F ingest never run.
+| Prior Finding | Status |
+|---|---|
+| `fx_rates` EMPTY | CONFIRMED — still 0 rows |
+| `instrument_exchange_identities` EMPTY | CONFIRMED — still 0 rows |
+| `us_insider_trades` DOES NOT EXIST | CONFIRMED — table absent |
+| `us_institutional_holdings` DOES NOT EXIST | CONFIRMED — table absent |
+| `daily_instrument_snapshot.stopLoss/target/rrRatio` 100% null | CONFIRMED — still 0/20,143 non-null |
+| `daily_instrument_snapshot.oiBuildup/participantPositioning` 100% null | CONFIRMED — still 0/20,143 non-null |
 
-### Thin / Very Short Window Tables
-5. **`fo_participant_oi`** — 28 rows, only 2026-06-05 to 06-15. Participant-level OI useful for FII/DII futures analysis but very sparse.
-6. **`fii_dii_snapshots`** — 14 rows, ~1 week only.
-7. **`snapshot_watermarks`** — 6 rows covering 2026-05-29 to 2026-06-12 (daily snapshots only since late May).
-8. **`market_data_repair_runs`** — 28 rows (admin log, expected to be small).
+All six prior findings remain unchanged as of 2026-06-16.
 
-### Rich / Well-Populated Tables
-- **`price_ticks`** — 39.8M rows, US+IN+EU, long history to 1970 (US); solid price history coverage.
-- **`market_delivery_snapshots`** — 211K rows, 5 months Jan–Jun 2026, 100% field coverage.
-- **`corporate_actions`** — 426K rows, predominantly dividend records.
-- **`fo_bhavcopy_contracts`** — 371K rows, 2 weeks of NSE FnO bhavcopy (dense intraday contract data).
-- **`instrument_eligibility`** — 10K rows, actively computed last 2.5 weeks.
-- **`daily_instrument_snapshot`** — 20K rows, assembled daily since May 29.
+---
 
-### Notable Null Patterns in Populated Tables
-- **`stocks.sector/industry`** — ~78% null (only IN instruments have sector from NSE; US sector backfill not complete).
-- **`stocks.marketCap`** — ~75% null.
-- **`stocks.lastSuccessfulDataLoadTimestamp`** — ~78% null (only recently synced instruments).
-- **`fundamentals.peRatio`** — ~94% null (not sourced from any provider systematically).
-- **`fundamentals.officialResultDate`** — ~72% null (only IN stocks with NSE board-meeting records).
-- **`daily_instrument_snapshot.stopLoss / target / rrRatio`** — 100% null (trade plan section not assembled).
-- **`daily_instrument_snapshot.oiBuildup / participantPositioning`** — 100% null (derivatives section not wired into assembler).
-- **`market_data_repair_states.resolvedAt`** — 100% null (no repair cycles have been closed).
+## Notable New / Updated Findings
+
+- **`source_file_imports` FAILED rate:** 624/4,051 records (15.4%) show status=FAILED — elevated failure rate worth monitoring.
+- **US `price_ticks` epoch dates:** some US records have timestamp 1970-01-02 (Unix epoch stub entries).
+- **`fo_participant_oi` near-empty (28 rows):** raw data exists but does NOT flow to `daily_instrument_snapshot.participantPositioning` (100% null there).
+- **`fo_oi_buildup` not flowing:** 1,512 rows exist but `daily_instrument_snapshot.oiBuildup` is still 100% null.
+- **`fno_ban_list` tiny (10 rows):** rolling window only; no archival depth.
+- **`fundamentals.officialResultDate`:** only 27.7% populated (4,386/15,845); limits OFFICIAL_CALENDAR earnings-intelligence categories.
+- **`stocks.isin/sector/marketCap` sparse for US:** 12,169 US stocks mostly null on isin, sector, marketCap — only IN catalog is enriched.
+- **All F&O / raw tables have shallow date range:** all raw SQL tables cover only 2026-06-03 → 2026-06-16 (no historical F&O archive beyond ~2 weeks).
+- **`instrument_eligibility` (10,123 rows) vs `daily_instrument_snapshot` (20,143 rows):** snapshot table has ~2x more rows than eligibility, indicating the snapshot assembler writes multiple snapshotVersions per instrument-date as restates occur.

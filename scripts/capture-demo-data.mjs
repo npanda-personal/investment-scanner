@@ -4,16 +4,23 @@
  * Run LOCALLY against the running backend (localhost:3000):
  *     node scripts/capture-demo-data.mjs
  *
- * It GETs the curated trader-facing endpoints (region=IN, assetType=STOCK),
- * derives a few real ids from the list responses to capture detail pages, POSTs
- * the copilot summaries, and writes each response body to
- * frontend/public/demo-api/<slug>.json plus a manifest.json that maps request
- * path -> { file, status }. The demo axios adapter (frontend/src/demo/demoAdapter.ts)
- * matches on path only, so query params/method don't need to round-trip.
+ * Captures all trader-facing endpoints for IN and US regions (STOCK only),
+ * derives real IDs from list responses to capture detail pages, and writes each
+ * response as a JSON file to frontend/public/demo-api/ plus a manifest.json.
+ *
+ * Manifest key convention:
+ *   - Region-scoped:  "/api/v1/signals/top?region=IN"
+ *   - Compound param: "/api/v1/.../sector-constituents?region=IN&sector=Technology"
+ *   - Non-scoped:     "/api/v1/auth/me"
+ *
+ * The demo adapter (frontend/src/demo/demoAdapter.ts) reads config.params.region
+ * and tries the scoped key first, falling back to the bare path.
  *
  * Auth: reuses the token from the Playwright auth-state file; if missing/expired
- * it performs ONE login (test creds) — the backend rate-limits login, so we never
- * loop. Capture is tolerant: non-2xx responses are logged and skipped.
+ * it performs ONE login (test creds). Capture is tolerant: non-2xx responses are
+ * logged and skipped.
+ *
+ * Excluded: portfolios, watchlists, alerts, notifications, crypto, admin-only.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -27,7 +34,7 @@ const AUTH_STATE_PATH = path.join(ROOT, 'frontend', 'tests', 'ui', 'support', '.
 const BACKEND = process.env.E2E_BACKEND_URL || 'http://localhost:3000';
 const EMAIL = process.env.E2E_EMAIL || 'test@example.com';
 const PASSWORD = process.env.E2E_PASSWORD || 'TestUser123!';
-const SCOPE = { region: 'IN', assetType: 'STOCK' };
+const REGIONS = ['IN', 'US'];
 
 const manifest = {};
 let token = '';
@@ -54,10 +61,10 @@ async function resolveToken() {
     /* no auth-state file */
   }
   if (stored && (await tokenWorks(stored))) {
-    console.log('· reusing Playwright auth-state token');
+    console.log('  reusing Playwright auth-state token');
     return stored;
   }
-  console.log('· stored token missing/expired — performing one login');
+  console.log('  stored token missing/expired — performing one login');
   const res = await fetch(`${BACKEND}/api/v1/auth/login`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -77,14 +84,42 @@ function slug(p) {
   return p.replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '') || 'root';
 }
 
-async function capture(method, p, { params, body } = {}) {
+/**
+ * Capture a single endpoint.
+ * @param {string} method - HTTP method
+ * @param {string} p - API path (e.g. "/api/v1/signals/top")
+ * @param {object} [opts]
+ * @param {object} [opts.params] - extra query params (limit, days, etc.)
+ * @param {object} [opts.body] - POST body
+ * @param {string} [opts.region] - when set, adds region+assetType=STOCK to params
+ *   and uses "path?region=XX" as manifest key; compound params (sector) are appended
+ * @param {string} [opts.manifestKeySuffix] - extra key qualifiers (e.g. "&sector=Tech")
+ */
+async function capture(method, p, { params, body, region, manifestKeySuffix } = {}) {
   const url = new URL(p, BACKEND);
+  const merged = { ...(params || {}) };
+  if (region) {
+    merged.region = region;
+    merged.assetType = 'STOCK';
+  }
   if (method === 'GET') {
-    const merged = { ...SCOPE, ...(params || {}) };
     for (const [k, v] of Object.entries(merged)) {
       if (v != null) url.searchParams.set(k, String(v));
     }
   }
+
+  // Build manifest key
+  let manifestKey = p;
+  if (region) {
+    manifestKey = `${p}?region=${region}${manifestKeySuffix || ''}`;
+  }
+
+  // Build file slug
+  let fileSuffix = '';
+  if (region) fileSuffix += `-region-${region}`;
+  if (manifestKeySuffix) fileSuffix += slug(manifestKeySuffix);
+  const file = `${slug(p)}${fileSuffix}.json`;
+
   try {
     const res = await fetch(url, {
       method,
@@ -92,34 +127,43 @@ async function capture(method, p, { params, body } = {}) {
       body: body ? JSON.stringify(body) : undefined,
     });
     if (!res.ok) {
-      console.warn(`  ✗ ${method} ${p} -> HTTP ${res.status}`);
+      console.warn(`  x ${method} ${manifestKey} -> HTTP ${res.status}`);
       skipped++;
       return null;
     }
     const data = await res.json();
-    const file = `${slug(p)}.json`;
     fs.writeFileSync(path.join(OUT_DIR, file), JSON.stringify(data));
-    manifest[p] = { file, status: res.status };
+    manifest[manifestKey] = { file, status: res.status };
     ok++;
     return data;
   } catch (err) {
-    console.warn(`  ✗ ${method} ${p} -> ${err.message}`);
+    const cause = err.cause ? ` (${err.cause.code || err.cause.message || err.cause})` : '';
+    console.warn(`  x ${method} ${manifestKey} -> ${err.message}${cause}`);
     skipped++;
     return null;
   }
 }
 
-// Pull a list out of common envelope shapes, then collect ids.
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// ---- extraction helpers ----------------------------------------------------
+
 function pickArray(data) {
   if (Array.isArray(data)) return data;
   if (data && typeof data === 'object') {
-    for (const k of ['data', 'items', 'results', 'rows', 'portfolios', 'watchlists', 'signals', 'candidates', 'runs', 'stocks']) {
+    for (const k of [
+      'data', 'items', 'results', 'rows', 'signals', 'candidates', 'runs',
+      'stocks', 'strategies', 'pairs', 'sectors', 'positions', 'entries',
+    ]) {
       if (Array.isArray(data[k])) return data[k];
     }
   }
   return [];
 }
-function extractIds(data, keys, limit) {
+
+function extractField(data, keys, limit) {
   const out = [];
   for (const it of pickArray(data)) {
     if (!it || typeof it !== 'object') continue;
@@ -134,33 +178,47 @@ function extractIds(data, keys, limit) {
   return [...new Set(out)];
 }
 
-// ---- curated endpoint set --------------------------------------------------
+// ---- endpoint lists --------------------------------------------------------
 
-const STATIC_GETS = [
-  // auth + account
+const GLOBAL_GETS = [
   '/api/v1/auth/me',
   '/api/v1/subscription/me',
   '/api/v1/subscription/plans',
   '/api/v1/subscription/features',
-  // market intelligence (Market workspace)
+  '/api/v1/market-context/macro',
+  '/api/v1/fx-rates',
+  '/api/v1/signals/calibration/health',
+  '/api/v1/signals/calibration/model',
+  '/api/v1/signals/position-ledger/health',
+  '/api/v1/trade-plans/health',
+  '/api/v1/trade-plans/model',
+  '/api/v1/strategy/health',
+  '/api/v1/strategy/model',
+  '/api/v1/strategies/health',
+  '/api/v1/strategies/model',
+  '/api/v1/research/health',
+  '/api/v1/copilot/alert-digest',
+];
+
+const SCOPED_GETS = [
+  // market intelligence
   ['/api/v1/market-intelligence/market-pulse', { timeframe: '1d' }],
   '/api/v1/market-intelligence/sectors',
   '/api/v1/market-intelligence/sector-rotation',
   '/api/v1/market-intelligence/stock-interest',
   '/api/v1/market-intelligence/earnings',
   ['/api/v1/market-intelligence/event-feed', { days: 5 }],
-  // market context (posture chip + context surfaces)
+  // market context
   '/api/v1/market-context/summary',
   '/api/v1/market-context/persisted-summary',
   '/api/v1/market-context/persisted-breadth',
   '/api/v1/market-context/regime',
   '/api/v1/market-context/sectors',
   '/api/v1/market-context/breadth',
+  '/api/v1/market-context/countries',
   '/api/v1/market-context/capital-posture',
-  // today's review
-  ['/api/v1/today-review/latest', { enrich: 'true' }],
-  ['/api/v1/today-review/runs', { limit: 10, offset: 0 }],
-  // screener + scans + movers + signals
+  ['/api/v1/market-context/breadth-internals', { days: 60 }],
+  // market data — screener, scans, movers
   ['/api/v1/market-data/screener', { limit: 50 }],
   '/api/v1/market-data/screener/conviction',
   ['/api/v1/market-data/movers', { limit: 20 }],
@@ -169,34 +227,72 @@ const STATIC_GETS = [
   ['/api/v1/market-data/scans/delivery-spike', { limit: 20 }],
   ['/api/v1/market-data/scans/volume-spike', { limit: 20 }],
   '/api/v1/market-data/health',
+  ['/api/v1/market-data/market-map', { limit: 50 }],
+  '/api/v1/market-data/review-readiness-summary',
+  // signals
+  '/api/v1/signals/health',
   ['/api/v1/signals/top', { limit: 50, offset: 0 }],
   ['/api/v1/signals/screener', { limit: 50, offset: 0 }],
   '/api/v1/signals/runs/latest',
-  // research hub
-  '/api/v1/research/overview',
+  ['/api/v1/signals/exit-candidates', { limit: 25 }],
+  // signal quality
+  ['/api/v1/signals/quality/dashboard', { horizon: '20D' }],
+  ['/api/v1/signals/quality/summary', { horizon: '20D' }],
+  ['/api/v1/signals/quality/by-type', { horizon: '20D' }],
+  ['/api/v1/signals/quality/by-sector', { horizon: '20D' }],
+  ['/api/v1/signals/quality/by-score', { horizon: '20D' }],
+  ['/api/v1/signals/quality/by-regime', { horizon: '20D' }],
+  ['/api/v1/signals/quality/by-data-quality', { horizon: '20D' }],
+  ['/api/v1/signals/quality/noisy', { horizon: '20D' }],
+  ['/api/v1/signals/quality/scorecard', { horizon: '20D' }],
+  // signal calibration
+  ['/api/v1/signals/calibration/top', { limit: 25 }],
+  // signal position ledger
+  ['/api/v1/signals/position-ledger/persisted/active', { limit: 25 }],
+  ['/api/v1/signals/position-ledger/persisted/closed', { limit: 25 }],
   // smart money
   '/api/v1/smart-money/health',
   ['/api/v1/smart-money/top', { range: '3M', limit: 20 }],
   ['/api/v1/smart-money/distribution', { range: '3M', limit: 20 }],
   ['/api/v1/smart-money/sectors', { range: '3M' }],
-  '/api/v1/smart-money/fno-ban',
-  // derivatives
-  ['/api/v1/derivatives/oi-buildup', { eligibleOnly: 'true', limit: 20 }],
-  '/api/v1/derivatives/pcr',
-  '/api/v1/derivatives/participant-oi',
-  // lists used both for pages AND to derive detail ids
-  '/api/v1/portfolios',
-  '/api/v1/watchlists',
-  '/api/v1/alerts/rules',
-  '/api/v1/alerts/events',
-  // copilot landing surfaces (GET)
+  // today review
+  ['/api/v1/today-review/latest', { enrich: 'true' }],
+  ['/api/v1/today-review/runs', { limit: 10, offset: 0 }],
+  // trade plans
+  ['/api/v1/trade-plans/candidates', { limit: 50 }],
+  '/api/v1/trade-plans/funnel',
+  // strategy decision engine
+  '/api/v1/strategy/market-gate',
+  ['/api/v1/strategy/candidates', { limit: 25 }],
+  '/api/v1/strategy/exits',
+  // strategies framework
+  '/api/v1/strategies',
+  '/api/v1/strategies/rankings',
+  '/api/v1/strategies/proof-registry',
+  // backtests
+  '/api/v1/backtests/strategies',
+  '/api/v1/backtests/runs',
+  // research + copilot + pipeline
+  '/api/v1/research/overview',
   '/api/v1/copilot/market-brief',
-  '/api/v1/copilot/alert-digest',
+  '/api/v1/pipeline/status',
 ];
 
+const IN_ONLY_GETS = [
+  ['/api/v1/market-context/fii-dii', { days: 5 }],
+  ['/api/v1/market-context/bulk-block-deals', { days: 1 }],
+  '/api/v1/market-context/institutional-activity',
+  '/api/v1/smart-money/fno-ban',
+  ['/api/v1/derivatives/oi-buildup', { eligibleOnly: 'true', limit: 50 }],
+  ['/api/v1/derivatives/option-metrics', { limit: 200 }],
+  '/api/v1/derivatives/pcr',
+  '/api/v1/derivatives/participant-oi',
+  '/api/v1/derivatives/fo-bhavcopy/meta',
+];
+
+// ---- main ------------------------------------------------------------------
+
 async function main() {
-  // Clear stale files individually (removing the dir can EPERM on Windows when a
-  // dev-server file watcher holds it open).
   fs.mkdirSync(OUT_DIR, { recursive: true });
   for (const f of fs.readdirSync(OUT_DIR)) {
     if (f.endsWith('.json')) fs.rmSync(path.join(OUT_DIR, f), { force: true });
@@ -204,65 +300,172 @@ async function main() {
 
   token = await resolveToken();
 
-  console.log('\n[1/4] static + list endpoints');
-  const captured = {};
-  for (const item of STATIC_GETS) {
+  // Per-region captured data for ID extraction
+  const regionData = {};
+
+  const PACE_MS = 50; // small delay between calls to avoid connection pool exhaustion
+
+  // ── Phase 1: non-scoped endpoints ────────────────────────────────────────
+  console.log('\n[1/7] non-scoped endpoints');
+  for (const item of GLOBAL_GETS) {
     const [p, params] = Array.isArray(item) ? item : [item, undefined];
-    captured[p] = await capture('GET', p, { params });
+    await capture('GET', p, { params });
+    await delay(PACE_MS);
   }
 
-  console.log('\n[2/4] deriving detail ids');
-  // Merge across sources (a single list may be empty depending on live data),
-  // then take the first few distinct instrument ids.
-  const instrumentIds = [
-    ...extractIds(captured['/api/v1/market-data/screener'], ['instrumentId', 'id'], 10),
-    ...extractIds(captured['/api/v1/signals/top'], ['instrumentId', 'id'], 10),
-    ...extractIds(captured['/api/v1/signals/screener'], ['instrumentId', 'id'], 10),
-  ].filter(Boolean);
-  const uniqueInstrumentIds = [...new Set(instrumentIds)].slice(0, 3);
-  const portfolioIds = extractIds(captured['/api/v1/portfolios'], ['id', 'portfolioId'], 3);
-  const watchlistIds = extractIds(captured['/api/v1/watchlists'], ['id', 'watchlistId'], 3);
-  const runIds = extractIds(captured['/api/v1/today-review/runs'], ['id', 'runId'], 2);
-  console.log(`  instruments=${uniqueInstrumentIds.length} portfolios=${portfolioIds.length} watchlists=${watchlistIds.length} runs=${runIds.length}`);
+  // ── Phase 2: region-scoped list endpoints ────────────────────────────────
+  for (const region of REGIONS) {
+    console.log(`\n[2/7] region-scoped lists (${region})`);
+    regionData[region] = {};
 
-  console.log('\n[3/4] detail endpoints');
-  for (const id of uniqueInstrumentIds) {
-    await capture('GET', `/api/v1/signals/${id}`);
-    await capture('GET', `/api/v1/signals/${id}/history`, { params: { limit: 20 } });
-    await capture('GET', `/api/v1/signals/${id}/outcomes`, { params: { horizon: '20D' } });
-    await capture('GET', `/api/v1/market-intelligence/instrument-context/${id}`);
-    await capture('GET', `/api/v1/smart-money/stocks/${id}`, { params: { range: '3M' } });
-    await capture('GET', `/api/v1/research/stocks/${id}/workbench`, { params: { range: '1Y' } });
-    await capture('GET', `/api/v1/instruments/${id}`);
-    await capture('GET', `/api/v1/prices/${id}`, { params: { limit: 250 } });
-    await capture('GET', `/api/v1/prices/${id}/latest`);
-    await capture('GET', `/api/v1/fundamentals/${id}`);
-    await capture('GET', `/api/v1/corporate-actions/${id}`);
-  }
-  for (const id of portfolioIds) {
-    await capture('GET', `/api/v1/portfolios/${id}`);
-    await capture('GET', `/api/v1/portfolios/${id}/summary`);
-    await capture('GET', `/api/v1/portfolios/${id}/allocation`);
-    await capture('GET', `/api/v1/portfolios/${id}/transactions`);
-  }
-  for (const id of watchlistIds) {
-    await capture('GET', `/api/v1/watchlists/${id}`, { params: { sort: 'recentlyAdded' } });
-  }
-  for (const id of runIds) {
-    await capture('GET', `/api/v1/today-review/runs/${id}`);
+    for (const item of SCOPED_GETS) {
+      const [p, params] = Array.isArray(item) ? item : [item, undefined];
+      regionData[region][p] = await capture('GET', p, { params, region });
+      await delay(PACE_MS);
+    }
+
+    if (region === 'IN') {
+      console.log(`  + IN-only endpoints`);
+      for (const item of IN_ONLY_GETS) {
+        const [p, params] = Array.isArray(item) ? item : [item, undefined];
+        regionData[region][p] = await capture('GET', p, { params, region });
+        await delay(PACE_MS);
+      }
+    }
   }
 
-  console.log('\n[4/4] copilot POST summaries');
-  if (uniqueInstrumentIds[0]) await capture('POST', '/api/v1/copilot/stock-summary', { body: { instrumentId: uniqueInstrumentIds[0] } });
-  if (portfolioIds[0]) await capture('POST', '/api/v1/copilot/portfolio-summary', { body: { portfolioId: portfolioIds[0] } });
-  if (watchlistIds[0]) await capture('POST', '/api/v1/copilot/watchlist-summary', { body: { watchlistId: watchlistIds[0] } });
+  // ── Phase 3: extract IDs per region ──────────────────────────────────────
+  console.log('\n[3/7] extracting IDs');
+  const regionIds = {};
 
+  for (const region of REGIONS) {
+    const rd = regionData[region];
+
+    // Instrument IDs from 8 sources
+    const instrumentIds = [
+      ...extractField(rd['/api/v1/market-data/screener'], ['instrumentId', 'id'], 10),
+      ...extractField(rd['/api/v1/signals/top'], ['instrumentId', 'id'], 10),
+      ...extractField(rd['/api/v1/signals/screener'], ['instrumentId', 'id'], 10),
+      ...extractField(rd['/api/v1/market-data/movers'], ['instrumentId', 'id'], 5),
+      ...extractField(rd['/api/v1/market-data/screener/conviction'], ['instrumentId', 'id'], 5),
+      ...extractField(rd['/api/v1/smart-money/top'], ['instrumentId', 'id'], 5),
+      ...extractField(rd['/api/v1/signals/calibration/top'], ['instrumentId', 'id'], 5),
+      ...extractField(rd['/api/v1/signals/position-ledger/persisted/active'], ['instrumentId', 'id'], 5),
+    ].filter(Boolean);
+    const uniqueInstrumentIds = [...new Set(instrumentIds)].slice(0, 3);
+
+    // Strategy codes
+    const strategyCodes = extractField(rd['/api/v1/strategies'], ['code', 'strategyCode'], 3);
+
+    // Today review candidate IDs
+    const todayData = rd['/api/v1/today-review/latest'];
+    const candidateIds = extractField(todayData, ['candidateId', 'id'], 3);
+
+    // Today review run IDs
+    const runIds = extractField(rd['/api/v1/today-review/runs'], ['id', 'runId'], 2);
+
+    // Sector names
+    const sectorNames = extractField(rd['/api/v1/market-intelligence/sectors'], ['sector', 'sectorName', 'name'], 3);
+
+    // US ticker symbols (for us-smart-money SEC endpoint)
+    const tickerSymbols = region === 'US'
+      ? extractField(rd['/api/v1/market-data/screener'], ['symbol'], 3)
+      : [];
+
+    regionIds[region] = { uniqueInstrumentIds, strategyCodes, candidateIds, runIds, sectorNames, tickerSymbols };
+    console.log(`  ${region}: instruments=${uniqueInstrumentIds.length} strategies=${strategyCodes.length} candidates=${candidateIds.length} runs=${runIds.length} sectors=${sectorNames.length} tickers=${tickerSymbols.length}`);
+  }
+
+  // ── Phase 4: per-instrument detail ───────────────────────────────────────
+  console.log('\n[4/7] per-instrument detail');
+  for (const region of REGIONS) {
+    const ids = regionIds[region].uniqueInstrumentIds;
+    for (const id of ids) {
+      console.log(`  ${region} instrument ${id}`);
+      // Region-scoped instrument endpoints
+      await capture('GET', `/api/v1/signals/${id}`, { region });
+      await capture('GET', `/api/v1/signals/${id}/history`, { params: { limit: 20 }, region });
+      await capture('GET', `/api/v1/signals/${id}/outcomes`, { params: { horizon: '20D' }, region });
+      await capture('GET', `/api/v1/market-intelligence/instrument-context/${id}`, { region });
+      await capture('GET', `/api/v1/smart-money/stocks/${id}`, { params: { range: '3M' }, region });
+      await capture('GET', `/api/v1/research/stocks/${id}/workbench`, { params: { range: '1Y' }, region });
+      await capture('GET', `/api/v1/trade-plans/${id}`, { region });
+      await capture('GET', `/api/v1/strategy/${id}`, { region });
+      await capture('GET', `/api/v1/strategy/history/${id}`, { region });
+      await capture('GET', `/api/v1/signals/calibration/compare/${id}`, { params: { horizon: '20D' }, region });
+      await capture('GET', `/api/v1/signals/calibration/${id}`, { region });
+      // Non-scoped instrument metadata (capture once per unique ID)
+      await capture('GET', `/api/v1/instruments/${id}`);
+      await capture('GET', `/api/v1/prices/${id}`, { params: { limit: 250 } });
+      await capture('GET', `/api/v1/prices/${id}/latest`);
+      await capture('GET', `/api/v1/fundamentals/${id}`);
+      await capture('GET', `/api/v1/corporate-actions/${id}`);
+      await delay(PACE_MS);
+    }
+  }
+
+  // ── Phase 5: derived-ID detail (per region) ──────────────────────────────
+  console.log('\n[5/7] derived-ID detail');
+  for (const region of REGIONS) {
+    const { strategyCodes, candidateIds, runIds, sectorNames } = regionIds[region];
+
+    for (const code of strategyCodes) {
+      await capture('GET', `/api/v1/strategies/${code}`, { region });
+      await capture('GET', `/api/v1/strategies/${code}/performance`, { region });
+      await capture('GET', `/api/v1/strategies/${code}/proof`, { region });
+    }
+    for (const id of candidateIds) {
+      await capture('GET', `/api/v1/today-review/candidates/${id}`, { region });
+    }
+    for (const id of runIds) {
+      await capture('GET', `/api/v1/today-review/runs/${id}`, { region });
+    }
+    for (const sector of sectorNames) {
+      await capture('GET', '/api/v1/market-intelligence/sector-constituents', {
+        params: { sector },
+        region,
+        manifestKeySuffix: `&sector=${sector}`,
+      });
+    }
+  }
+
+  // ── Phase 6: non-scoped derived detail (once) ────────────────────────────
+  console.log('\n[6/7] non-scoped derived detail');
+
+  // FX rate pairs
+  const fxData = manifest['/api/v1/fx-rates']
+    ? JSON.parse(fs.readFileSync(path.join(OUT_DIR, manifest['/api/v1/fx-rates'].file), 'utf8'))
+    : null;
+  const fxPairs = extractField(fxData, ['pair', 'code'], 3);
+  for (const pair of fxPairs) {
+    await capture('GET', `/api/v1/fx-rates/${pair}`);
+  }
+
+  // US smart money (SEC Form 4 / 13F by ticker)
+  const usTickerSymbols = regionIds['US']?.tickerSymbols || [];
+  for (const symbol of usTickerSymbols) {
+    await capture('GET', `/api/v1/market-data/us-smart-money/${symbol}`, { params: { limit: 50 } });
+  }
+
+  // ── Phase 7: copilot POST summaries (per region) ────────────────────────
+  console.log('\n[7/7] copilot POST summaries');
+  for (const region of REGIONS) {
+    const firstId = regionIds[region].uniqueInstrumentIds[0];
+    if (firstId) {
+      await capture('POST', '/api/v1/copilot/stock-summary', {
+        body: { instrumentId: firstId },
+        region,
+      });
+    }
+  }
+
+  // ── Write manifest ───────────────────────────────────────────────────────
   fs.writeFileSync(path.join(OUT_DIR, 'manifest.json'), JSON.stringify(manifest, null, 2));
-  console.log(`\n✓ captured ${ok} endpoints (${skipped} skipped) -> ${path.relative(ROOT, OUT_DIR)}`);
-  console.log(`  manifest: ${Object.keys(manifest).length} entries`);
+  console.log(`\n=> captured ${ok} endpoints (${skipped} skipped) -> ${path.relative(ROOT, OUT_DIR)}`);
+  console.log(`   manifest: ${Object.keys(manifest).length} entries`);
 }
 
 main().catch((err) => {
-  console.error('\n✗ capture failed:', err.message);
+  console.error('\n=> capture failed:', err.message);
   process.exit(1);
 });

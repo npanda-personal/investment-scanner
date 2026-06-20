@@ -1,351 +1,383 @@
-# Track B — Backend User-Account API Inventory
+# Track B — Backend User-Account & Platform Module Inventory
 
-**Scope:** 14 modules under `backend/src/modules/`
-**URL base prefix:** All endpoints mount under `/api/v1/…` except `research-hub` (`/api/v1/research/…`).
-**Auth mechanism:** Custom HS256 JWT (`Authorization: Bearer <token>`). `requireAuth` middleware injects `req.user`. Fallback default-user ID (`'default-user'`) used when token absent — **no hard 401 on most business routes**.
-**Generated:** 2026-06-15
+**Date:** 2026-06-16  
+**Scope:** 14 modules under `backend/src/modules/`  
+**Base URL prefix for all endpoints:** `/api/v1` (unless noted)
+
+---
+
+## Legend
+
+- **Auth:** `public` = no middleware; `authed` = `requireAuth` JWT middleware; `admin` = requires `x-admin-key` header matching `ADMIN_API_KEY` env var.
+- **Auth Gap:** flagged when a mutating or sensitive endpoint has no `requireAuth`, or when the controller falls back to `'default-user'` even though `requireAuth` is present on the router (indicating the middleware and the fallback are both present — the fallback is dead code but still noteworthy).
+- **Data Origin:** Prisma model names (PascalCase = `prisma.<model>`) or raw-SQL table names (snake_case).
 
 ---
 
 ## 1. auth-identity
 
-Router: `/api/v1` · rate-limited on signup/login
+**Route prefix:** `/api/v1/auth`  
+**Router file:** `auth-identity.router.ts`  
+**Auth implementation:** Custom HMAC-SHA256 JWT, 8-hour TTL. `requireAuth` middleware validates bearer token → sets `req.user`.
 
-| # | METHOD | PATH | Purpose | Request (key fields) | Response (key fields) | Auth | Data Origin |
-|---|--------|------|---------|----------------------|-----------------------|------|-------------|
-| 1 | POST | `/api/v1/auth/signup` | Register new user | `email`, `password`, `name?` | `{ user: {id,email,name,createdAt,lastLoginAt}, accessToken }` | Public (rate-limited) | `AppUser` (Prisma), also creates `UserSubscription` (FREE plan) |
-| 2 | POST | `/api/v1/auth/login` | Authenticate user, return JWT | `email`, `password` | `{ user, accessToken }` | Public (rate-limited) | `AppUser.passwordHash` — scrypt verify |
-| 3 | POST | `/api/v1/auth/logout` | Server-side logout (stateless — returns success only) | — | `{ success: true }` | Auth required | No DB write — JWT is stateless, TTL=8h |
-| 4 | GET | `/api/v1/auth/me` | Fetch current user profile | — | `{ id, email, name, createdAt, updatedAt, lastLoginAt }` | Auth required | `AppUser` |
-| 5 | PATCH | `/api/v1/auth/me` | Update display name | `name?` (max 120 chars) | `{ id, email, name, … }` | Auth required | `AppUser.displayName` |
+| Method | Path | Purpose | Request (key fields) | Response (shape) | Auth | Data Origin |
+|--------|------|---------|----------------------|-----------------|------|-------------|
+| POST | `/api/v1/auth/signup` | Register new user; returns JWT | `{ email, password, name? }` | `{ user: AuthUserDto, accessToken }` | public (rate-limited) | `AppUser` + auto-creates `UserSubscription` (FREE plan) |
+| POST | `/api/v1/auth/login` | Authenticate; returns JWT | `{ email, password }` | `{ user: AuthUserDto, accessToken }` | public (rate-limited) | `AppUser` — updates `lastLoginAt` |
+| POST | `/api/v1/auth/logout` | Invalidate session (stateless — just returns OK) | — | `{ success: true }` | authed | None (no server-side session) |
+| GET | `/api/v1/auth/me` | Return current user profile | — | `AuthUserDto { id, email, name, createdAt, updatedAt, lastLoginAt }` | authed | `AppUser` |
+| PATCH | `/api/v1/auth/me` | Update display name | `{ name? }` | `AuthUserDto` | authed | `AppUser` |
 
 **Notes:**
-- JWT signed with `AUTH_SECRET` env var (random 32-byte secret in dev). No refresh token — tokens expire after 8 hours.
-- `logout` is effectively a no-op (no token blacklist); the client must discard the token.
-- `requireAuth` also exposes `optionalAuth` middleware used by some other modules (not yet wired on any of these 14).
+- JWT secret comes from `AUTH_SECRET` env var; falls back to a randomly-generated per-process key in dev (all tokens are invalidated on restart in dev).
+- Logout is stateless — token is not blacklisted; the client simply discards it.
+- No password-reset or email-verification flows.
 
 ---
 
 ## 2. subscription-billing
 
-Router: `/api/v1` · all routes guarded by `requireAuth`
+**Route prefix:** `/api/v1/subscription`  
+**Router file:** `subscription-billing.router.ts`  
+**Auth:** `router.use(requireAuth)` — entire router is authed.
 
-| # | METHOD | PATH | Purpose | Request (key fields) | Response (key fields) | Auth | Data Origin |
-|---|--------|------|---------|----------------------|-----------------------|------|-------------|
-| 6 | GET | `/api/v1/subscription/me` | Current user's subscription + all feature limits | — | `{ userId, subscription:{planCode,status,startedAt,expiresAt}, plan:{id,code,name}, features:[…] }` | Authed | `UserSubscription`, `SubscriptionPlan`, `Portfolio`/`Watchlist`/`AlertRule` counts, `UsageCounter` |
-| 7 | GET | `/api/v1/subscription/plans` | List available plans | — | `[{id,code,name,active}]` | Authed | `SubscriptionPlan` |
-| 8 | GET | `/api/v1/subscription/usage` | Usage counters for current user | — | `{ userId, counters:[{feature,usageKey,label,used,limit,allowed}] }` | Authed | `UsageCounter`, counts of `Portfolio`/`Watchlist`/`AlertRule` rows |
-| 9 | GET | `/api/v1/subscription/features` | Feature-gate status array | — | `[{feature,usageKey,label,used,limit,allowed}]` | Authed | Same as usage |
-| 10 | GET | `/api/v1/subscription/provider` | Billing provider health | — | `{ enabled:false, provider:'manual', message }` | Authed | **Stubbed** — `SubscriptionBillingProvider.enabled = false`; always returns disabled |
-| 11 | POST | `/api/v1/subscription/change-plan` | Self-service plan change | `{ planCode, status? }` | `{ userId, planCode, status, startedAt, expiresAt, updatedAt }` | Authed | `UserSubscription` upsert |
-| 12 | PATCH | `/api/v1/subscription/users/:userId/plan` | Admin override plan for any user | `X-Admin-Key` header + `{ planCode, status? }` | Same as change-plan | Admin (header key) | `UserSubscription` upsert |
+| Method | Path | Purpose | Request (key fields) | Response (shape) | Auth | Data Origin |
+|--------|------|---------|----------------------|-----------------|------|-------------|
+| GET | `/api/v1/subscription/me` | Current user's subscription, plan, and feature limits | — | `SubscriptionMeDto { userId, subscription, plan, features[] }` | authed | `UserSubscription`, `SubscriptionPlan`, live usage counts |
+| GET | `/api/v1/subscription/plans` | List all available plans | — | `SubscriptionPlanDto[]` | authed | `SubscriptionPlan` |
+| POST | `/api/v1/subscription/change-plan` | Change own plan | `{ planCode: FREE|PRO|ADMIN, status? }` | `UserSubscriptionDto` | authed | `UserSubscription` |
+| GET | `/api/v1/subscription/usage` | Return usage counters for all gated features | — | `UsageDto { userId, counters: FeatureLimitDto[] }` | authed | `UserSubscription` + counts from `Portfolio`, `Watchlist`, `AlertRule`, `UsageCounter` |
+| GET | `/api/v1/subscription/features` | Detailed per-feature limit/usage | — | `FeatureLimitDto[] { feature, usageKey, label, used, limit, allowed }` | authed | Same as usage |
+| GET | `/api/v1/subscription/provider` | Billing provider status | — | `{ status: string, message: string }` | authed | Computed (no external provider wired — always returns stub OK) |
+| PATCH | `/api/v1/subscription/users/:userId/plan` | Admin: change any user's plan | `{ planCode, status? }` + `x-admin-key` header | `UserSubscriptionDto` | authed + `x-admin-key` header | `UserSubscription` |
 
-**Notes:**
-- Endpoint 10 (`/subscription/provider`) is a **stub** — the `SubscriptionBillingProvider` class has `enabled = false` hardcoded; it will never return a real billing provider status.
-- `SUBSCRIPTION_LIMITS_DISABLED=true` in `.env` bypasses all gating (except in test env).
-- Plans: `FREE`, `PRO`, `ADMIN`. No actual payment integration.
+**Auth Gaps / Notes:**
+- `PATCH /subscription/users/:userId/plan` relies on `x-admin-key` header check inside the controller (`requireAdmin(req.headers)`). The router-level `requireAuth` ensures a valid JWT exists, but admin check is a secondary header — not middleware. If `ADMIN_API_KEY` env var is not set, the endpoint throws `403 'Admin API key is not configured'`.
+- Controller uses `currentUserId = req.user?.id || 'default-user'` — the `|| 'default-user'` fallback is dead code when `requireAuth` is active but is a latent security gap if the middleware is bypassed.
+- `SUBSCRIPTION_LIMITS_DISABLED=true` env var bypasses all feature-gate checks (documented dev shortcut; does not apply during tests).
+- `SubscriptionBillingRepository.ensureDefaults()` is called on every `listPlans()` — auto-seeds plans and a `default-user` row; this is a side-effect on reads.
 
 ---
 
 ## 3. watchlist-management
 
-Router: `/api/v1` · all routes guarded by `requireAuth`
+**Route prefix:** `/api/v1/watchlists`  
+**Router file:** `watchlist-management.router.ts`  
+**Auth:** `router.use(requireAuth)` — entire router is authed.
 
-| # | METHOD | PATH | Purpose | Request (key fields) | Response (key fields) | Auth | Data Origin |
-|---|--------|------|---------|----------------------|-----------------------|------|-------------|
-| 13 | GET | `/api/v1/watchlists` | List all watchlists for current user | — | `{ watchlists:[{id,name,description,createdAt,updatedAt}] }` | Authed | `Watchlist` |
-| 14 | POST | `/api/v1/watchlists` | Create new watchlist | `{ name, description? }` | `{ id,name,description,createdAt,updatedAt }` | Authed | `Watchlist` create; subscription gate: `CREATE_WATCHLIST` |
-| 15 | GET | `/api/v1/watchlists/:id` | Get watchlist detail with enriched items | `?sort=recentlyAdded\|signalScoreDesc\|dailyChangeDesc\|dailyChangeAsc\|symbolAsc` | `{ watchlist, items:[enriched], source, generatedAt }` | Authed | `Watchlist`, `WatchlistItem`, live price from `PriceTick` via `MarketDataFoundationService`, signal from `SignalResult` |
-| 16 | PATCH | `/api/v1/watchlists/:id` | Update watchlist metadata | `{ name?, description? }` | `{ id,name,… }` | Authed | `Watchlist` update |
-| 17 | DELETE | `/api/v1/watchlists/:id` | Delete watchlist | — | 204 | Authed | `Watchlist` delete (cascades items) |
-| 18 | POST | `/api/v1/watchlists/:id/items` | Add instrument to watchlist | `{ instrumentId, notes?, tags? }` | `{ id,watchlistId,instrumentId,symbol,companyName,notes,tags,… }` | Authed | `WatchlistItem` create; resolves instrument from `Stock` |
-| 19 | PATCH | `/api/v1/watchlists/:id/items/:itemId` | Update item notes/tags | `{ notes?, tags? }` | Updated item | Authed | `WatchlistItem` update |
-| 20 | DELETE | `/api/v1/watchlists/:id/items/:itemId` | Remove item from watchlist | — | 204 | Authed | `WatchlistItem` deleteMany |
+| Method | Path | Purpose | Request (key fields) | Response (shape) | Auth | Data Origin |
+|--------|------|---------|----------------------|-----------------|------|-------------|
+| GET | `/api/v1/watchlists` | List user's watchlists | — | `{ watchlists: WatchlistDto[] }` | authed | `Watchlist` |
+| POST | `/api/v1/watchlists` | Create watchlist | `{ name, description? }` | `WatchlistDto` | authed | `Watchlist`; checks subscription limit via `UserSubscription` |
+| GET | `/api/v1/watchlists/:id` | Get watchlist with enriched items | `?sort=recentlyAdded|signalScoreDesc|dailyChangeDesc|dailyChangeAsc|symbolAsc` | `WatchlistDetailDto { watchlist, items: WatchlistDashboardItemDto[], source, generatedAt }` | authed | `Watchlist`, `WatchlistItem`; enriched live from `price_ticks` + `signal_results` |
+| PATCH | `/api/v1/watchlists/:id` | Update watchlist metadata | `{ name?, description? }` | `WatchlistDto` | authed | `Watchlist` |
+| DELETE | `/api/v1/watchlists/:id` | Delete watchlist | — | 204 | authed | `Watchlist` |
+| POST | `/api/v1/watchlists/:id/items` | Add instrument to watchlist | `{ instrumentId, notes?, tags? }` | `WatchlistItemDto` | authed | `WatchlistItem`; validates instrument via `instruments` table |
+| PATCH | `/api/v1/watchlists/:id/items/:itemId` | Update watchlist item (notes, tags) | `{ notes?, tags? }` | `WatchlistItemDto` | authed | `WatchlistItem` |
+| DELETE | `/api/v1/watchlists/:id/items/:itemId` | Remove item from watchlist | — | 204 | authed | `WatchlistItem` |
 
 **Notes:**
-- GET detail (15) is a **live-enrichment read**: each item fans out to `MarketDataFoundationService` (price ticks) and `SignalGenerationEngineService` (latest signal). Not persisted-read.
-- `ownerWhere` clause allows both `userId = current` and `userId = null` — unowned watchlists are globally visible.
+- `GET /watchlists/:id` triggers live enrichment (price + signal) on every call — not a persisted-read. Can be slow for large watchlists.
+- `currentUserId` fallback to `'default-user'` is present in controller but dead code when `requireAuth` is active.
 
 ---
 
 ## 4. alerts-monitoring
 
-Router: `/api/v1` · all routes guarded by `requireAuth`
+**Route prefix:** `/api/v1/alerts`  
+**Router file:** `alerts-monitoring.router.ts`  
+**Auth:** `router.use(requireAuth)` — entire router is authed.
 
-| # | METHOD | PATH | Purpose | Request (key fields) | Response (key fields) | Auth | Data Origin |
-|---|--------|------|---------|----------------------|-----------------------|------|-------------|
-| 21 | GET | `/api/v1/alerts/rules` | List alert rules for current user | — | `{ rules:[{id,name,type,scope,instrumentId,portfolioId,watchlistId,condition,enabled,…}] }` | Authed | `AlertRule` |
-| 22 | POST | `/api/v1/alerts/rules` | Create alert rule | `{ name, type, scope, condition, instrumentId?, portfolioId?, watchlistId?, enabled? }` | Created rule | Authed | `AlertRule` create; subscription gate: `CREATE_ALERT` |
-| 23 | GET | `/api/v1/alerts/rules/:id` | Get single alert rule | — | Rule object | Authed | `AlertRule` |
-| 24 | PATCH | `/api/v1/alerts/rules/:id` | Update alert rule | `{ name?, type?, scope?, condition?, enabled?, … }` | Updated rule | Authed | `AlertRule` update |
-| 25 | DELETE | `/api/v1/alerts/rules/:id` | Delete alert rule | — | 204 | Authed | `AlertRule` delete |
-| 26 | POST | `/api/v1/alerts/evaluate` | Evaluate all rules and fire events | — | `{ triggered, skipped, errors }` | Authed | Reads `AlertRule` + live market/signal data; writes `AlertEvent` |
-| 27 | GET | `/api/v1/alerts/events` | List alert events (last 200) | — | `{ events:[{id,alertRuleId,type,severity,title,message,triggeredAt,readAt,dismissedAt,…}] }` | Authed | `AlertEvent` |
-| 28 | PATCH | `/api/v1/alerts/events/:id/read` | Mark event as read | — | Updated event | Authed | `AlertEvent` update `readAt` |
-| 29 | PATCH | `/api/v1/alerts/events/:id/dismiss` | Dismiss event | — | Updated event | Authed | `AlertEvent` update `dismissedAt` + `readAt` |
-| 30 | POST | `/api/v1/alerts/events/mark-all-read` | Mark all unread events as read | — | `{ updated: N }` | Authed | `AlertEvent` updateMany |
-| 31 | GET | `/api/v1/alerts/summary` | Unread + critical event counts | — | `{ unreadCount, criticalCount }` | Authed | `AlertEvent` (computed in-process from full list) |
+| Method | Path | Purpose | Request (key fields) | Response (shape) | Auth | Data Origin |
+|--------|------|---------|----------------------|-----------------|------|-------------|
+| GET | `/api/v1/alerts/rules` | List user's alert rules | — | `{ rules: AlertRuleDto[] }` | authed | `AlertRule` |
+| POST | `/api/v1/alerts/rules` | Create alert rule | `{ name, type, scope, condition, instrumentId?, portfolioId?, watchlistId?, enabled? }` | `AlertRuleDto` | authed | `AlertRule`; checks subscription limit |
+| GET | `/api/v1/alerts/rules/:id` | Get single alert rule | — | `AlertRuleDto` | authed | `AlertRule` |
+| PATCH | `/api/v1/alerts/rules/:id` | Update alert rule | `{ name?, type?, scope?, condition?, enabled? }` | `AlertRuleDto` | authed | `AlertRule` |
+| DELETE | `/api/v1/alerts/rules/:id` | Delete alert rule | — | 204 | authed | `AlertRule` |
+| POST | `/api/v1/alerts/evaluate` | Manually trigger evaluation of all rules for the current user | — | `AlertEvaluationResult` | authed | `AlertRule`, live market data + signals |
+| GET | `/api/v1/alerts/events` | List alert events for the user | — | `{ events: AlertEventDto[] }` | authed | `AlertEvent` |
+| PATCH | `/api/v1/alerts/events/:id/read` | Mark event as read | — | `AlertEventDto` | authed | `AlertEvent` |
+| PATCH | `/api/v1/alerts/events/:id/dismiss` | Dismiss event | — | `AlertEventDto` | authed | `AlertEvent` |
+| POST | `/api/v1/alerts/events/mark-all-read` | Mark all events read | — | `{ count: number }` | authed | `AlertEvent` |
+| GET | `/api/v1/alerts/summary` | Unread/critical count summary | — | `{ unreadCount, criticalCount }` | authed | `AlertEvent` (computed in-memory from listEvents) |
 
 **Notes:**
-- Evaluate (26) is an active side-effectful operation — it pulls latest market/signal data live and writes new `AlertEvent` rows.
-- `ownerWhere` on rules uses `OR [{userId}, null]` — same pattern as watchlists.
-- `AlertEvent` is linked to its rule via FK; `ownedEventWhere` joins through `alertRule`.
+- Alert types: `PRICE_ABOVE`, `PRICE_BELOW`, `DAILY_MOVE_ABOVE`, `DAILY_MOVE_BELOW`, `SIGNAL_SCORE_ABOVE`, `SIGNAL_DIRECTION_CHANGED`, `PORTFOLIO_HOLDING_DRAWDOWN`, `PORTFOLIO_BEARISH_SIGNAL`, `WATCHLIST_SIGNAL_SCORE_ABOVE`, `WATCHLIST_PRICE_ABOVE`, `WATCHLIST_PRICE_BELOW`.
+- `GET /alerts/summary` fetches all events and counts in memory — not a DB aggregate query; can be slow for users with many events.
+- `currentUserId` fallback to `'default-user'` is present but dead code under `requireAuth`.
 
 ---
 
 ## 5. portfolio-management
 
-Router: `/api/v1` · all routes guarded by `requireAuth`
+**Route prefix:** `/api/v1/portfolios`  
+**Router file:** `portfolio-management.router.ts`  
+**Auth:** `router.use(requireAuth)` — entire router is authed.
 
-| # | METHOD | PATH | Purpose | Request (key fields) | Response (key fields) | Auth | Data Origin |
-|---|--------|------|---------|----------------------|-----------------------|------|-------------|
-| 32 | GET | `/api/v1/portfolios` | List all portfolios | — | `{ portfolios:[{id,name,baseCurrency,description,createdAt,updatedAt}] }` | Authed | `Portfolio` |
-| 33 | POST | `/api/v1/portfolios` | Create portfolio | `{ name, baseCurrency, description? }` | Portfolio object | Authed | `Portfolio` create; subscription gate: `CREATE_PORTFOLIO` |
-| 34 | GET | `/api/v1/portfolios/:id` | Get portfolio + holdings + transactions | — | `{ portfolio, holdings:[…], transactions:[…] }` | Authed | `Portfolio`, `PortfolioHolding`, `PortfolioTransaction` |
-| 35 | PATCH | `/api/v1/portfolios/:id` | Update portfolio metadata | `{ name?, baseCurrency?, description? }` | Updated portfolio | Authed | `Portfolio` update |
-| 36 | DELETE | `/api/v1/portfolios/:id` | Delete portfolio | — | 204 | Authed | `Portfolio` delete |
-| 37 | POST | `/api/v1/portfolios/:id/holdings` | Add holding | `{ instrumentId, quantity, averageCost, currency, notes? }` | `{ id,portfolioId,instrumentId,symbol,companyName,quantity,averageCost,currency,… }` | Authed | `PortfolioHolding` create; resolves `Stock` for symbol; touches `Portfolio.updatedAt` |
-| 38 | PATCH | `/api/v1/portfolios/:id/holdings/:holdingId` | Update holding | `{ quantity?, averageCost?, currency?, notes? }` | Updated holding | Authed | `PortfolioHolding` update; touches `Portfolio.updatedAt` |
-| 39 | DELETE | `/api/v1/portfolios/:id/holdings/:holdingId` | Remove holding | — | 204 | Authed | `PortfolioHolding` deleteMany; touches `Portfolio.updatedAt` |
-| 40 | GET | `/api/v1/portfolios/:id/summary` | Portfolio summary (current value, P&L) | — | `{ totalInvested, currentValue, pnl, pnlPercent, holdings:[valuation…] }` | Authed | `PortfolioHolding` + latest price from `PriceTick` (live) |
-| 41 | GET | `/api/v1/portfolios/:id/allocation` | Asset allocation breakdown | — | `{ totalValue, buckets:[{label,value,percent}] }` | Authed | `PortfolioHolding` + live prices |
-| 42 | GET | `/api/v1/portfolios/:id/changes` | Holdings with signal direction change detection | `?lossThreshold` | `{ portfolio, holdingsWithChanges:[…] }` | Authed | `PortfolioHolding`, `SignalResult` (2 most-recent rows), `PriceTick` |
-| 43 | GET | `/api/v1/portfolios/:id/transactions` | List transactions | — | `{ transactions:[{id,type,quantity,price,amount,currency,transactionDate,notes,…}] }` | Authed | `PortfolioTransaction` |
-| 44 | POST | `/api/v1/portfolios/:id/transactions` | Record a transaction | `{ type, currency, transactionDate, instrumentId?, quantity?, price?, amount?, notes? }` | Created transaction | Authed | `PortfolioTransaction` create |
+| Method | Path | Purpose | Request (key fields) | Response (shape) | Auth | Data Origin |
+|--------|------|---------|----------------------|-----------------|------|-------------|
+| GET | `/api/v1/portfolios` | List user's portfolios | — | `{ portfolios: PortfolioDto[] }` | authed | `Portfolio` |
+| POST | `/api/v1/portfolios` | Create portfolio | `{ name, baseCurrency, description? }` | `PortfolioDto` | authed | `Portfolio`; checks subscription limit |
+| GET | `/api/v1/portfolios/:id` | Get portfolio with holdings | — | `{ portfolio: PortfolioDto, holdings: PortfolioHoldingDto[] }` | authed | `Portfolio`, `PortfolioHolding` |
+| PATCH | `/api/v1/portfolios/:id` | Update portfolio | `{ name?, baseCurrency?, description? }` | `PortfolioDto` | authed | `Portfolio` |
+| DELETE | `/api/v1/portfolios/:id` | Delete portfolio | — | 204 | authed | `Portfolio` |
+| POST | `/api/v1/portfolios/:id/holdings` | Add holding | `{ instrumentId, symbol, quantity, averageCost, currency? }` | `PortfolioHoldingDto` | authed | `PortfolioHolding` |
+| PATCH | `/api/v1/portfolios/:id/holdings/:holdingId` | Update holding | `{ quantity?, averageCost? }` | `PortfolioHoldingDto` | authed | `PortfolioHolding` |
+| DELETE | `/api/v1/portfolios/:id/holdings/:holdingId` | Remove holding | — | 204 | authed | `PortfolioHolding` |
+| GET | `/api/v1/portfolios/:id/summary` | Portfolio P&L summary | — | `PortfolioSummaryDto { totalValue, totalCost, totalGainLoss, totalGainLossPct, holdingValuations[] }` | authed | `Portfolio`, `PortfolioHolding`, live price from `price_ticks` |
+| GET | `/api/v1/portfolios/:id/allocation` | Portfolio allocation breakdown | — | `PortfolioAllocationDto { buckets[], holdingValuations[] }` | authed | `Portfolio`, `PortfolioHolding`, `instruments`, live price |
+| GET | `/api/v1/portfolios/:id/changes` | Holdings with recent signal/price changes | `?lossThreshold=<float>` | `PortfolioChangesDto { lossCrossings[], signalFlips[] }` | authed | `Portfolio`, `PortfolioHolding`, `signal_results`, live price |
+| GET | `/api/v1/portfolios/:id/transactions` | List portfolio transactions | — | `{ transactions: PortfolioTransactionDto[] }` | authed | `PortfolioTransaction` |
+| POST | `/api/v1/portfolios/:id/transactions` | Record transaction | `{ type: BUY|SELL|DIVIDEND, quantity, price, executedAt, notes? }` | `PortfolioTransactionDto` | authed | `PortfolioTransaction` |
 
 **Notes:**
-- Summary (40), allocation (41), and changes (42) all perform **live price reads** from `PriceTick` — not persisted-read.
-- Holdings mutation (37–39) bumps `Portfolio.updatedAt` so portfolio-intelligence staleness detection works.
+- Summary, allocation, and changes endpoints perform live price/signal lookups on every call (not persisted-read). May be slow for large portfolios.
+- `currentUserId` fallback to `'default-user'` is dead code under `requireAuth`.
 
 ---
 
 ## 6. portfolio-intelligence
 
-Router: `/api/v1` · all routes guarded by `requireAuth`
+**Route prefix:** `/api/v1/portfolios/:id`  
+**Router file:** `portfolio-intelligence.router.ts`  
+**Auth:** `router.use(requireAuth)` — entire router is authed.
 
-| # | METHOD | PATH | Purpose | Request (key fields) | Response (key fields) | Auth | Data Origin |
-|---|--------|------|---------|----------------------|-----------------------|------|-------------|
-| 45 | GET | `/api/v1/portfolios/:id/intelligence` | Persisted portfolio intelligence snapshot | — | `{ portfolioId, healthScore, status, holdings:[{…intelligence}], marketPosture, summary, generatedAt }` | Authed | `PortfolioIntelligenceSnapshot.payloadJson`; falls back to lazy compute if absent |
-| 46 | POST | `/api/v1/portfolios/:id/intelligence/refresh` | Force-recompute and upsert snapshot | — | Full intelligence object | Authed | Reads `PortfolioHolding`, `DailyInstrumentSnapshot`, `SnapshotWatermark`; writes `PortfolioIntelligenceSnapshot` |
-| 47 | GET | `/api/v1/portfolios/:id/red-flags` | Red flag items from intelligence snapshot | — | `{ redFlags:[{holdingId,symbol,label,severity,reason}] }` | Authed | `PortfolioIntelligenceSnapshot.payloadJson` |
-| 48 | GET | `/api/v1/portfolios/:id/review` | Review action items from intelligence snapshot | — | `{ review:[{…}] }` | Authed | `PortfolioIntelligenceSnapshot.payloadJson` |
+| Method | Path | Purpose | Request (key fields) | Response (shape) | Auth | Data Origin |
+|--------|------|---------|----------------------|-----------------|------|-------------|
+| GET | `/api/v1/portfolios/:id/intelligence` | Persisted-read: portfolio AI intelligence snapshot | — | `PortfolioIntelligenceResponse { overallHealthScore, status, holdingIntelligence[], signalOverlay, marketPosture, redFlags[], review[], ... }` | authed | `PortfolioIntelligenceSnapshot` (payloadJson); falls back to live compute if `PORTFOLIO_SNAPSHOT_READS=0` |
+| POST | `/api/v1/portfolios/:id/intelligence/refresh` | Force recompute + upsert intelligence snapshot | — | `PortfolioIntelligenceResponse` | authed | Recomputes from `PortfolioHolding`, `DailyInstrumentSnapshot`, live signals; writes to `PortfolioIntelligenceSnapshot` |
+| GET | `/api/v1/portfolios/:id/red-flags` | Persisted-read: red flags only | — | `{ redFlags: RedFlag[] }` | authed | `PortfolioIntelligenceSnapshot` |
+| GET | `/api/v1/portfolios/:id/review` | Persisted-read: review items only | — | `{ review: ReviewItem[] }` | authed | `PortfolioIntelligenceSnapshot` |
 
 **Notes:**
-- Endpoints 45, 47, 48 are **persisted-read** — they serve from `portfolio_intelligence_snapshots`. On first call with no snapshot they materialise one lazily.
-- Intelligence data merges `DailyInstrumentSnapshot` (signal/calibration/decision/trade-plan) with `SnapshotWatermark` for staleness detection. Key table: `daily_instrument_snapshots`.
+- `GET /intelligence` lazily materialises the snapshot on first call if none exists — not a pure persisted-read; mutates DB on cache-miss.
+- `PORTFOLIO_SNAPSHOT_READS` env flag (default ON) controls snapshot-first behaviour.
+- All three GET endpoints read from the same `portfolio_intelligence_snapshots` table; `redFlags` and `review` extract sub-fields from `payloadJson`.
 
 ---
 
 ## 7. trade-journal
 
-Router: `/api/v1` · all routes guarded by `requireAuth`
+**Route prefix:** `/api/v1/trade-journal`  
+**Router file:** `trade-journal.router.ts`  
+**Auth:** `router.use(requireAuth)` — entire router is authed.
 
-| # | METHOD | PATH | Purpose | Request (key fields) | Response (key fields) | Auth | Data Origin |
-|---|--------|------|---------|----------------------|-----------------------|------|-------------|
-| 49 | GET | `/api/v1/trade-journal/post-mortem` | Aggregate win/loss stats from all journal entries | — | `{ totalEntries, acted, skipped, watching, winRate, avgReturn, … }` | Authed | `TradeJournalEntry` (persisted reads only) |
-| 50 | POST | `/api/v1/trade-journal` | Create trade journal entry | `{ symbol, direction, decision, reviewedAt, entryPrice?, stopPrice?, targetPrice?, thesis?, conviction?, outcomeStatus?, exitPrice?, exitAt?, notes?, tags? }` | Created entry | Authed | `TradeJournalEntry` create |
-| 51 | GET | `/api/v1/trade-journal` | List journal entries (paginated + filtered) | `?decision, ?outcomeStatus, ?symbol, ?fromDate, ?toDate, ?page, ?pageSize` | `{ entries:[…], total }` | Authed | `TradeJournalEntry` |
-| 52 | GET | `/api/v1/trade-journal/:id` | Get single entry | — | Entry object | Authed | `TradeJournalEntry` |
-| 53 | PATCH | `/api/v1/trade-journal/:id` | Update entry | Partial of create fields | Updated entry | Authed | `TradeJournalEntry` update; auto-computes `realizedReturnPct` from direction+prices |
-| 54 | DELETE | `/api/v1/trade-journal/:id` | Delete entry | — | 204 | Authed | `TradeJournalEntry` delete |
+| Method | Path | Purpose | Request (key fields) | Response (shape) | Auth | Data Origin |
+|--------|------|---------|----------------------|-----------------|------|-------------|
+| GET | `/api/v1/trade-journal/post-mortem` | Aggregated win/loss/skip analysis across all entries | — | `PostMortemSummary { totalEntries, byDecision, byDirection, tagSummary[], avgConviction, ... }` | authed | `TradeJournalEntry` (aggregate) |
+| POST | `/api/v1/trade-journal` | Create journal entry | `{ symbol, direction: LONG|SHORT, decision: ACTED|SKIPPED|WATCHING, reviewedAt, instrumentId?, sourceSignalId?, entryPrice?, stopPrice?, targetPrice?, thesis?, conviction?(1-10), outcomeStatus?, exitPrice?, exitAt?, notes?, tags? }` | `TradeJournalEntryDto` | authed | `TradeJournalEntry` |
+| GET | `/api/v1/trade-journal` | List entries with filters | `?decision=&outcomeStatus=&symbol=&fromDate=&toDate=&page=&pageSize=` | `{ entries: TradeJournalEntryDto[], total }` | authed | `TradeJournalEntry` |
+| GET | `/api/v1/trade-journal/:id` | Get single entry | — | `TradeJournalEntryDto` | authed | `TradeJournalEntry` |
+| PATCH | `/api/v1/trade-journal/:id` | Update entry | Partial of create body | `TradeJournalEntryDto` | authed | `TradeJournalEntry` |
+| DELETE | `/api/v1/trade-journal/:id` | Delete entry | — | 204 | authed | `TradeJournalEntry` |
 
 **Notes:**
-- `realizedReturnPct` is computed automatically on update: LONG = `(exit-entry)/entry`, SHORT = `(entry-exit)/entry`.
-- Route order: `post-mortem` is registered before `/:id` to avoid swallowing by the param route.
-- No external API calls — pure DB read/write.
+- `GET /trade-journal/post-mortem` is registered *before* `GET /trade-journal/:id` to prevent route-parameter shadowing.
+- Tags are stored as JSON array in `TradeJournalEntry.tags`.
+- `currentUserId` fallback to `'default-user'` is dead code under `requireAuth`.
 
 ---
 
 ## 8. notifications-delivery
 
-Router: `/api/v1` · all routes guarded by `requireAuth`
+**Route prefix:** `/api/v1/notifications`  
+**Router file:** `notifications-delivery.router.ts`  
+**Auth:** `router.use(requireAuth)` — entire router is authed.
 
-| # | METHOD | PATH | Purpose | Request (key fields) | Response (key fields) | Auth | Data Origin |
-|---|--------|------|---------|----------------------|-----------------------|------|-------------|
-| 55 | GET | `/api/v1/notifications/preferences` | Get notification preferences | — | `{ id,userId,emailNotificationsEnabled,alertEmailsEnabled,dailyDigestEnabled,weeklyDigestEnabled,quietHoursStart,quietHoursEnd,… }` | Authed | `NotificationPreference` (upsert on first read) |
-| 56 | PATCH | `/api/v1/notifications/preferences` | Update notification preferences | Any subset of preference fields | Updated preferences | Authed | `NotificationPreference` update |
-| 57 | GET | `/api/v1/notifications/events` | List notification events (last 50) | — | `{ events:[{id,type,channel,title,message,status,sentAt,…}] }` | Authed | `NotificationEvent` |
-| 58 | GET | `/api/v1/notifications/provider-status` | Email provider health | — | `{ enabled, provider, message }` | Authed | Computed from `createNotificationProvider()` — reads ENV vars |
-| 59 | POST | `/api/v1/notifications/test-email` | Send test email to current user | — | `{ type, channel, status, sentAt }` | Authed | `AppUser.email` + external email provider (SMTP/Resend/etc.) |
-| 60 | POST | `/api/v1/notifications/send-alert-digest` | Send alert digest email | — | Delivery result | Authed | `AlertEvent` (live) + email provider |
-| 61 | POST | `/api/v1/notifications/send-daily-digest` | Send daily market digest | — | Delivery result | Authed | Copilot market brief + email provider |
-| 62 | POST | `/api/v1/notifications/send-weekly-digest` | Send weekly digest | — | Delivery result | Authed | Alert events + copilot summary + email provider |
-| 63 | GET | `/api/v1/notifications/telegram/status` | Telegram bot configuration status | — | `{ configured, botUsername?, chatId?, message }` | Authed | ENV vars `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` |
-| 64 | GET | `/api/v1/notifications/telegram/setup` | Discover Telegram chat ID from bot updates | — | `{ chatId, firstName, username, hint }` or 404 | Authed | **External: Telegram Bot API** (`/getUpdates`) |
-| 65 | POST | `/api/v1/notifications/telegram/test` | Send Telegram test message | — | `{ status, messageId? }` | Authed | **External: Telegram Bot API** (`/sendMessage`) |
+| Method | Path | Purpose | Request (key fields) | Response (shape) | Auth | Data Origin |
+|--------|------|---------|----------------------|-----------------|------|-------------|
+| GET | `/api/v1/notifications/preferences` | Get user notification preferences | — | `NotificationPreferenceDto { userId, emailEnabled, emailAlerts, emailDailyDigest, emailWeeklyDigest, telegramEnabled, ... }` | authed | `NotificationPreference` (upserted on read) |
+| PATCH | `/api/v1/notifications/preferences` | Update notification preferences | `{ emailEnabled?, emailAlerts?, emailDailyDigest?, emailWeeklyDigest?, telegramEnabled? }` | `NotificationPreferenceDto` | authed | `NotificationPreference` |
+| GET | `/api/v1/notifications/events` | List delivery events for user | — | `{ events: NotificationEventDto[] }` | authed | `NotificationEvent` |
+| GET | `/api/v1/notifications/provider-status` | Email provider operational status | — | `NotificationProviderStatus { configured, provider, status, message }` | authed | Computed (env vars check) |
+| POST | `/api/v1/notifications/test-email` | Send a test email to the user | — | `{ delivered: boolean, message }` | authed | External: email provider (SMTP/SendGrid via `NotificationProvider`) |
+| POST | `/api/v1/notifications/send-alert-digest` | Send alert digest email now | — | `{ delivered: boolean }` | authed | `AlertEvent` → external email |
+| POST | `/api/v1/notifications/send-daily-digest` | Send daily digest email now | — | `{ delivered: boolean }` | authed | Copilot market brief → external email |
+| POST | `/api/v1/notifications/send-weekly-digest` | Send weekly digest email now | — | `{ delivered: boolean }` | authed | AI summary → external email |
+| GET | `/api/v1/notifications/telegram/status` | Telegram bot connection status | — | `TelegramStatus { configured, chatId, botToken, status, message }` | authed | Computed (env vars: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`) |
+| GET | `/api/v1/notifications/telegram/setup` | Auto-discover Telegram chat ID from most recent /start message | — | `{ chatId, username, hint }` or 404 | authed | External: Telegram Bot API (`getUpdates`) |
+| POST | `/api/v1/notifications/telegram/test` | Send a test Telegram message | — | `{ status: SENT|FAILED, messageId?, error? }` | authed | External: Telegram Bot API (`sendMessage`) |
 
-**External API hits:** Endpoints 59–62 hit the configured email provider (SMTP / Resend — ENV-driven). Endpoints 64–65 hit the **Telegram Bot API**.
+**Notes:**
+- External providers: email (SMTP/provider env vars) and Telegram Bot API. Both are fire-and-forget; delivery status is logged to `NotificationEvent`.
+- `GET /telegram/setup` calls Telegram `getUpdates` — requires bot to have received a `/start` message. Returns 404 if no updates found.
+- `currentUserId` fallback to `'default-user'` is dead code under `requireAuth`.
 
 ---
 
 ## 9. today-trade-review
 
-Router: `/api/v1` · all routes guarded by `requireAuth`
+**Route prefix:** `/api/v1/today-review`  
+**Router file:** `today-trade-review.router.ts`  
+**Auth:** Per-route `requireAuth` (not router-level middleware — each route individually applies it).
 
-| # | METHOD | PATH | Purpose | Request (key fields) | Response (key fields) | Auth | Data Origin |
-|---|--------|------|---------|----------------------|-----------------------|------|-------------|
-| 66 | GET | `/api/v1/today-review/latest` | Latest completed review run (persisted-read) | `?region, ?assetType, ?enrich` | `{ run:{id,runDate,status,candidateCounts,candidates:[…]}, groups, … }` | Authed | `TodayReviewRun` + `TodayReviewCandidate`; enriched with `Stock.sector`, `price_ticks` (52w range LATERAL), `fno_ban_list`, `SmartMoneyContextSnapshot` |
-| 67 | GET | `/api/v1/today-review/runs` | List all review runs (paginated) | `?region, ?assetType, ?limit, ?offset` | `{ items:[run…], total }` | Authed | `TodayReviewRun` + `TodayReviewCandidate` |
-| 68 | GET | `/api/v1/today-review/runs/:id` | Get single run by ID | — | Run object with candidates | Authed | `TodayReviewRun`, `TodayReviewCandidate` |
-| 69 | GET | `/api/v1/today-review/candidates/:id` | Get single candidate detail | — | Candidate object with enrichment | Authed | `TodayReviewCandidate` + batch enrichment (sector, 52w, F&O ban, smart money) |
-| 70 | POST | `/api/v1/today-review/run` | Trigger a new review run | `{ region?, assetType? }` | Completed run object (201) | Authed | Reads `DailyInstrumentSnapshot`, signals, strategy decisions, trade plans; writes `TodayReviewRun` + `TodayReviewCandidate` |
+| Method | Path | Purpose | Request (key fields) | Response (shape) | Auth | Data Origin |
+|--------|------|---------|----------------------|-----------------|------|-------------|
+| GET | `/api/v1/today-review/latest` | Persisted-read: most recent completed run + grouped candidates | `?region=&assetType=&limit=&offset=&enrich=` | `TodayReviewRunResponse { run: TodayReviewRunDto, groups: TodayReviewGroupedCandidates }` | authed | `TodayReviewRun`, `TodayReviewCandidate`; enriched at read-time with `price_ticks`, `smart_money_context_snapshots`, `fno_ban_list`, `instruments`, `earnings_events` |
+| GET | `/api/v1/today-review/runs` | List run history | `?region=&assetType=&limit=&offset=` | `TodayReviewRunHistoryResponse { runs: TodayReviewRunDto[], total }` | authed | `TodayReviewRun` |
+| GET | `/api/v1/today-review/runs/:id` | Get specific run with candidates | — | `TodayReviewRunResponse` | authed | `TodayReviewRun`, `TodayReviewCandidate` (enriched) |
+| GET | `/api/v1/today-review/candidates/:id` | Get single candidate detail | — | `TodayReviewCandidateDto` | authed | `TodayReviewCandidate` (enriched) |
+| POST | `/api/v1/today-review/run` | Trigger new review run (pipeline command) | `{ region?, assetType? }` (body or query) | `TodayReviewRunResponse` (201) | authed | Reads from many upstream tables; writes `TodayReviewRun` + `TodayReviewCandidate` |
+
+**Recent refactor notes (today-review dense-table UX refactor — landed in commits 3681ba9/0fc728f):**
+- `direction` and `state` columns were **dropped** from the candidate dense-table view in the frontend; they are still present in `TodayReviewCandidateDto` and returned by the API.
+- Earnings and F&O ban columns were also dropped from the dense table. The underlying fields (`earningsProximity`, `inFnoBan`) are still computed and present in the API response (`enrich=true`). Callers that don't need enrichment can pass `?enrich=false` to skip heavy join queries.
+- `catalogSector`, `range52wPositionPct`, `range52wHigh`, `range52wLow`, `range52wCurrentClose`, `smartMoneyStatus`, `smartMoneyScore` were added as read-time join fields (batch-loaded, not stored in candidate row).
+- No endpoint paths or HTTP methods changed; only the `TodayReviewCandidateDto` response shape gained new fields.
 
 **Notes:**
-- The 52-week range join on candidates uses a raw LATERAL SQL query over `price_ticks` (COALESCE adjustedClose/close, last 252 rows per symbol) to avoid N+1 and window-function full-scan issues.
-- F&O ban data comes from `fno_ban_list` (raw SQL table).
-- Smart money status from `SmartMoneyContextSnapshot`.
-- `enrich=false` param skips all four enrichment queries for fast reads.
-- Fixture runs (seeded test data containing `TEST_CONNECTED_CHAIN` markers in `sourceSnapshot`) are filtered out of `latest`.
+- `POST /today-review/run` is a write-triggering endpoint with only `requireAuth` — no admin gate. Any authenticated user can trigger a full pipeline review run. **Auth gap: should be admin-only or rate-limited.**
+- `?enrich=false` is an opt-out (defaulting to enriched). Without it, reads do multiple batch queries against `price_ticks` (~252-day window), `fno_ban_list`, `smart_money_context_snapshots`, and `earnings_events`.
 
 ---
 
 ## 10. historical-context-snapshots
 
-Router: `/api/v1` · all routes guarded by `requireAuth`
+**Route prefix:** `/api/v1/context-snapshots`  
+**Router file:** `historical-context-snapshots.router.ts`  
+**Auth:** `router.use(requireAuth)` — entire router is authed.
 
-| # | METHOD | PATH | Purpose | Request (key fields) | Response (key fields) | Auth | Data Origin |
-|---|--------|------|---------|----------------------|-----------------------|------|-------------|
-| 71 | POST | `/api/v1/context-snapshots/generate` | Generate and persist snapshots for a date | `{ snapshotDate?, limit?, region?, assetType? }` | `{ snapshotDate, market:{inserted,updated,skipped}, sectors:{…}, countries:{…}, smartMoney:{…}, dataQuality:{…}, warnings }` | Authed | Reads live from `MarketContextIntelligenceService`, `SmartMoneyIntelligenceService`, `DataQualityEngineService`; writes to `MarketContextSnapshot`, `SectorContextSnapshot`, `CountryContextSnapshot`, `SmartMoneyContextSnapshot`, `DataQualitySnapshot` |
-| 72 | GET | `/api/v1/context-snapshots/summary` | Snapshot coverage counts by type | `?region, ?date, ?limit` | `{ market, sectors, countries, smartMoney, dataQuality }` | Authed | `MarketContextSnapshot`, `SectorContextSnapshot`, etc. |
-| 73 | GET | `/api/v1/context-snapshots/market` | Market-level snapshots | `?region, ?date, ?limit` | `{ items:[{snapshotDate,region,regime,regimeScore,breadth…}] }` | Authed | `MarketContextSnapshot` |
-| 74 | GET | `/api/v1/context-snapshots/sectors` | Sector snapshots | `?region, ?date, ?limit, ?sector` | `{ items:[{sector,relativeStrengthScore,…}] }` | Authed | `SectorContextSnapshot` |
-| 75 | GET | `/api/v1/context-snapshots/countries` | Country snapshots | `?region, ?date, ?limit` | `{ items:[{country,…}] }` | Authed | `CountryContextSnapshot` |
-| 76 | GET | `/api/v1/context-snapshots/smart-money` | Smart money snapshots | `?region, ?date, ?limit` | `{ items:[{instrumentId,status,smartMoneyScore,range,…}] }` | Authed | `SmartMoneyContextSnapshot` |
-| 77 | GET | `/api/v1/context-snapshots/coverage` | Snapshot existence/completeness check | `?region, ?date` | Coverage counts per snapshot type | Authed | All snapshot tables |
-| 78 | GET | `/api/v1/context-snapshots/lookup` | Look up context snapshots with lookback | `?date, ?lookbackDays, ?region, ?assetType` | `{ market, sectors, smartMoney, … }` | Authed | `MarketContextSnapshot`, `SectorContextSnapshot`, `SmartMoneyContextSnapshot` |
+| Method | Path | Purpose | Request (key fields) | Response (shape) | Auth | Data Origin |
+|--------|------|---------|----------------------|-----------------|------|-------------|
+| POST | `/api/v1/context-snapshots/generate` | Generate/upsert context snapshots for a date | `{ snapshotDate?, limit?(1-250), region?(default IN), assetType?(default STOCK) }` | `SnapshotGenerateSummary { market, sectors, countries, smartMoney, dataQuality, warnings[] }` | authed | Reads live from `MarketContextIntelligence`, `SmartMoneyIntelligence`, `DataQuality`; writes to `MarketContextSnapshot`, `SectorContextSnapshot`, `CountryContextSnapshot`, `SmartMoneyContextSnapshot`, `DataQualitySnapshot` |
+| GET | `/api/v1/context-snapshots/summary` | Coverage summary across all snapshot types | `?from=&to=&date=&region=&assetType=` | `SnapshotCount[]` | authed | `MarketContextSnapshot`, `SectorContextSnapshot`, `CountryContextSnapshot`, `SmartMoneyContextSnapshot` |
+| GET | `/api/v1/context-snapshots/market` | Market-level snapshots | `?from=&to=&date=&region=&assetType=&limit=` | `{ items: MarketContextSnapshotDto[] }` | authed | `MarketContextSnapshot` |
+| GET | `/api/v1/context-snapshots/sectors` | Sector-level snapshots | `?from=&to=&sector=&region=&assetType=&limit=` | `{ items: SectorContextSnapshotDto[] }` | authed | `SectorContextSnapshot` |
+| GET | `/api/v1/context-snapshots/countries` | Country-level snapshots | `?from=&to=&country=&region=&assetType=&limit=` | `{ items: CountryContextSnapshotDto[] }` | authed | `CountryContextSnapshot` |
+| GET | `/api/v1/context-snapshots/smart-money` | Smart-money accumulation/distribution snapshots | `?from=&to=&instrumentId=&region=&assetType=&limit=` | `{ items: SmartMoneyContextSnapshotDto[] }` | authed | `SmartMoneyContextSnapshot` |
+| GET | `/api/v1/context-snapshots/coverage` | Count of snapshot records by date/type | `?from=&to=&region=&assetType=` | `SnapshotCoverage { market, sectors, countries, smartMoney }` | authed | All snapshot tables (aggregate counts) |
+| GET | `/api/v1/context-snapshots/lookup` | Multi-type lookup for a date+lookback | `?date= (required), ?lookbackDays=(1-60), ?instrumentId=, ?sector=, ?country=, ?region=, ?assetType=` | `SnapshotLookupResult { market[], sectors[], countries[], smartMoney[] }` | authed | All context snapshot tables |
 
 **Notes:**
-- `generate` (71) is the write-side pipeline action — used by `pipeline-orchestration` as the `CONTEXT_SNAPSHOTS` stage.
-- GET endpoints are pure persisted-reads.
+- `POST /generate` calls live intelligence services at request time — not idempotent-safe (upserts). Any authenticated user can trigger snapshot generation. **Auth gap: should be admin-only.**
+- Sector filtering uses a validated sector allowlist (`isKnownSector()`); unknown sectors are skipped with warnings.
 
 ---
 
 ## 11. research-hub
 
-Router: `/api/v1/research` (prefix from `routes.ts`)
+**Route prefix:** `/api/v1/research`  
+**Router file:** `research-hub.router.ts`  
+**Auth:** NO `requireAuth` on either route — **fully public**.
 
-| # | METHOD | PATH | Purpose | Request (key fields) | Response (key fields) | Auth | Data Origin |
-|---|--------|------|---------|----------------------|-----------------------|------|-------------|
-| 79 | GET | `/api/v1/research/overview` | Aggregated research readiness dashboard | `?region, ?assetType, ?live` | `{ marketReadiness, priorities, confirmations, nextAction, whatChanged, actionability, backtestSummary, strategyProof, … }` | Public (no `requireAuth`) | Snapshot-first: `ResearchHubSnapshotReader` → `daily_instrument_snapshots`, `market_context_snapshots`; falls back to live fan-out across strategy/signal/smart-money services |
-| 80 | GET | `/api/v1/research/health` | Research hub health check | — | Health metrics for each dimension | Public (no `requireAuth`) | Computed from multiple upstream services |
+| Method | Path | Purpose | Request (key fields) | Response (shape) | Auth | Data Origin |
+|--------|------|---------|----------------------|-----------------|------|-------------|
+| GET | `/api/v1/research/overview` | Aggregated research-hub overview: market readiness, signal evidence, strategy proof, priorities, actionability | `?region=&assetType=&live=` | `ResearchOverview { marketReadiness, signalEvidence, strategyProof, priorities, actionability, nextActions[], whatChanged, backtestSummary }` | **public** (NO auth) | Snapshot-first reads from `daily_instrument_snapshots`, `pipeline_runs`, `calibration_results`; falls back to live fan-out. Also reads from `TodayReviewRun`, `TradePlanRiskEngine` |
+| GET | `/api/v1/research/health` | Research hub system health check | — | `{ status, dimensions[], timestamp }` | **public** (NO auth) | Computed from upstream service health checks |
 
-**Notes:**
-- **No `requireAuth`** on this router — both endpoints are publicly accessible.
-- `?live=true` forces live fan-out and bypasses snapshot reads.
-- The snapshot reader queries `DailyInstrumentSnapshot`, `MarketContextSnapshot`, and related tables.
+**AUTH GAP — CRITICAL:**
+- Both endpoints have **no `requireAuth`**. The router has no middleware, and no per-route auth guard. Any unauthenticated caller can read the full research overview (market regime, signal evidence, calibration status, strategy proof chains, trade priorities).
+- `?live=true` forces live fan-out instead of snapshot reads — potentially expensive for unauthenticated callers.
 
 ---
 
 ## 12. stock-research-workbench
 
-Router: `/api/v1`
+**Route prefix:** `/api/v1/research/stocks/:instrumentId`  
+**Router file:** `stock-research-workbench.router.ts`  
+**Auth:** NO `requireAuth` on any route — **fully public**.
 
-| # | METHOD | PATH | Purpose | Request (key fields) | Response (key fields) | Auth | Data Origin |
-|---|--------|------|---------|----------------------|-----------------------|------|-------------|
-| 81 | GET | `/api/v1/research/stocks/:instrumentId/workbench` | Full workbench snapshot for instrument (persisted-read) | — | Full workbench payload or 202 if not yet computed | Public (no `requireAuth`) | `WorkbenchSnapshot.payloadJson`; 202 returned when snapshot absent |
-| 82 | GET | `/api/v1/research/stocks/:instrumentId/overview` | Instrument overview (name, sector, last price, signal) | — | `{ symbol, companyName, sector, currentPrice, signalScore, … }` | Public | `Stock`, `PriceTick`, `SignalResult` (live reads) |
-| 83 | GET | `/api/v1/research/stocks/:instrumentId/performance` | Historical price performance | `?range=1w\|1m\|3m\|6m\|1y\|ytd` | `{ prices:[{date,close,adjustedClose}], returns:{period,pct} }` | Public | `PriceTick` |
-| 84 | GET | `/api/v1/research/stocks/:instrumentId/peers` | Peer comparison (persisted-read) | — | `{ peers:[…] }` or 202 | Public | `WorkbenchSnapshot.payloadJson` (peers section) |
-| 85 | GET | `/api/v1/research/stocks/:instrumentId/relative-strength` | Relative strength vs. sector/index | `?range` | `{ rs, … }` | Public | `PriceTick`, computed relative strength |
+| Method | Path | Purpose | Request (key fields) | Response (shape) | Auth | Data Origin |
+|--------|------|---------|----------------------|-----------------|------|-------------|
+| GET | `/api/v1/research/stocks/:instrumentId/overview` | Basic instrument overview (name, sector, live price) | — | `StockOverviewDto { symbol, companyName, sector, exchange, currentPrice, dailyChange, ... }` | **public** (NO auth) | `instruments`; live price from `price_ticks` |
+| GET | `/api/v1/research/stocks/:instrumentId/performance` | Historical price performance metrics | `?range=1M|3M|6M|1Y|2Y|5Y` | `ResearchPerformanceMetrics { ohlcv[], returns, volatility, drawdown }` | **public** (NO auth) | `price_ticks` |
+| GET | `/api/v1/research/stocks/:instrumentId/peers` | Persisted-read: sector peers from workbench snapshot | — | `{ peers: PeerDto[] }` or 202 if not yet computed | **public** (NO auth) | `WorkbenchSnapshot.payloadJson` |
+| GET | `/api/v1/research/stocks/:instrumentId/relative-strength` | Relative strength vs index | `?range=` | `RelativeStrengthDto { values[], benchmarkSymbol }` | **public** (NO auth) | `price_ticks` |
+| GET | `/api/v1/research/stocks/:instrumentId/workbench` | Full persisted workbench snapshot | — | Full `WorkbenchPayload` or 202 (NOT_YET_COMPUTED) or 404 | **public** (NO auth) | `WorkbenchSnapshot.payloadJson` |
 
-**Notes:**
-- **No `requireAuth`** on any of these routes.
-- `workbench` (81) and `peers` (84) are persisted-read from `workbench_snapshots`; return HTTP 202 with `{ _status: 'NOT_YET_COMPUTED' }` when no snapshot exists yet.
-- `overview` (82), `performance` (83), `relative-strength` (85) do live reads from `PriceTick`.
+**AUTH GAP:**
+- All 5 endpoints are public with no `requireAuth`. Unauthenticated callers can read full workbench snapshots (signal scores, calibration, trade plan, sector peers) for any instrument.
+- `peers` and `workbench` return 202 with `{ _status: 'NOT_YET_COMPUTED', message: '...' }` when the snapshot has not been computed — this is a documented sentinel.
 
 ---
 
 ## 13. ai-investment-copilot
 
-Router: `/api/v1` · all routes guarded by `requireAuth`
+**Route prefix:** `/api/v1/copilot`  
+**Router file:** `ai-investment-copilot.router.ts`  
+**Auth:** `router.use(requireAuth)` — entire router is authed.
 
-| # | METHOD | PATH | Purpose | Request (key fields) | Response (key fields) | Auth | Data Origin |
-|---|--------|------|---------|----------------------|-----------------------|------|-------------|
-| 86 | POST | `/api/v1/copilot/stock-summary` | AI-style research summary for a stock | `{ instrumentId }` | `{ instrumentId, symbol, summary:[…], signals, tradePlan, marketContext, disclaimer }` | Authed | Snapshot-first: `DailyInstrumentSnapshot`; falls back to live fan-out (`SignalResult`, `StrategyDecisionEngineService`, `TradePlanRiskEngineService`, `SmartMoneyContextSnapshot`, `MarketContextSnapshot`) |
-| 87 | POST | `/api/v1/copilot/portfolio-summary` | Research summary for a portfolio | `{ portfolioId }` | `{ portfolioId, holdings:[…], summary, disclaimer }` | Authed | `PortfolioIntelligenceSnapshot` + `AlertEvent` + signals |
-| 88 | POST | `/api/v1/copilot/watchlist-summary` | Research summary for a watchlist | `{ watchlistId }` | `{ watchlistId, items:[…], summary, disclaimer }` | Authed | `Watchlist`, `WatchlistItem`, `DailyInstrumentSnapshot` per item |
-| 89 | GET | `/api/v1/copilot/market-brief` | Market regime and sector brief | `?region` | `{ regime, sectors, summary, disclaimer }` | Authed | `MarketContextSnapshot`, `SectorContextSnapshot` |
-| 90 | GET | `/api/v1/copilot/alert-digest` | Digest of current alert events | — | `{ events:[…], summary, disclaimer }` | Authed | `AlertEvent` (live read from `AlertsMonitoringService`) |
+| Method | Path | Purpose | Request (key fields) | Response (shape) | Auth | Data Origin |
+|--------|------|---------|----------------------|-----------------|------|-------------|
+| POST | `/api/v1/copilot/stock-summary` | AI narrative summary for a stock | `{ instrumentId }` | `CopilotSummaryResponse { summary, disclaimer, generatedAt, provenance }` | authed | Snapshot-first: `DailyInstrumentSnapshot`; falls back to live fan-out from `WorkbenchSnapshot`, `signal_results`, `smart_money_context_snapshots`, `market_context` |
+| POST | `/api/v1/copilot/portfolio-summary` | AI narrative summary for a portfolio | `{ portfolioId }` | `CopilotSummaryResponse` | authed | `Portfolio`, `PortfolioHolding`, `PortfolioIntelligenceSnapshot` |
+| POST | `/api/v1/copilot/watchlist-summary` | AI narrative summary for a watchlist | `{ watchlistId }` | `CopilotSummaryResponse` | authed | `Watchlist`, `WatchlistItem`, enriched with signals |
+| GET | `/api/v1/copilot/market-brief` | AI market brief narrative | `?region=` | `CopilotSummaryResponse` | authed | `market_context_intelligence`, `daily_instrument_snapshots` |
+| GET | `/api/v1/copilot/alert-digest` | AI narrative digest of recent unread alerts | — | `CopilotSummaryResponse` | authed | `AlertEvent` (via AlertsMonitoringService) |
 
 **Notes:**
-- All summaries include a hard-coded `disclaimer = 'For research support only, not financial advice.'`.
-- Snapshot reads controlled by `COPILOT_SNAPSHOT_READS` env flag (default ON).
-- Subscription gate: `RUN_COPILOT_SUMMARY` (10/day on FREE, 100/day on PRO, unlimited on ADMIN).
-- No external LLM API — summaries are rule-based template assembly, not generative AI.
+- All summaries include `disclaimer: 'For research support only, not financial advice.'`
+- `COPILOT_SNAPSHOT_READS` env flag (default ON) controls snapshot-first vs live fan-out.
+- Subscription gate: `RUN_COPILOT_SUMMARY` feature (10/day FREE, 100/day PRO, unlimited ADMIN); `assertAllowed` is called before compute; usage tracked in `UsageCounter` table.
+- `currentUserId` fallback to `'default-user'` is dead code under `requireAuth`.
 
 ---
 
 ## 14. pipeline-orchestration
 
-Router: `/api/v1`
+**Route prefix:** `/api/v1/pipeline`  
+**Router file:** `pipeline-orchestration.router.ts`  
+**Auth:** NO `requireAuth` on any route — **fully public**.
 
-| # | METHOD | PATH | Purpose | Request (key fields) | Response (key fields) | Auth | Data Origin |
-|---|--------|------|---------|----------------------|-----------------------|------|-------------|
-| 91 | GET | `/api/v1/pipeline/status` | Current pipeline run status | `?region, ?assetType, ?limit, ?pipelineKey` | `{ runs:[{id,pipelineKey,status,startedAt,finishedAt,stages:[…]}], … }` | Public (no `requireAuth`) | `PipelineRun`, `PipelineStageRun` |
-| 92 | GET | `/api/v1/pipeline/commands/catalog` | Available pipeline commands with availability flags | `?region, ?assetType` | `{ commands:[{key,label,description,available,blockedReason?}] }` | Public | Computed from service constants + DB state checks |
-| 93 | POST | `/api/v1/pipeline/commands` | Execute a pipeline command (admin/operator action) | `{ command, region?, assetType?, … }` | `{ command, status, result }` | Public (`requestedByUserId` defaults to `'local-manual-operator'` when no auth) | Orchestrates all downstream services (market-data-foundation, signal-generation-engine, snapshot-assembler, today-review, etc.); writes `PipelineRun`, `PipelineStageRun` |
+| Method | Path | Purpose | Request (key fields) | Response (shape) | Auth | Data Origin |
+|--------|------|---------|----------------------|-----------------|------|-------------|
+| GET | `/api/v1/pipeline/status` | Pipeline run history and stage status | `?region=&assetType=&timeframe=&pipelineKey=&limit=(1-100)&stageKeys=` | `PipelineStatusSnapshot { runs: PipelineStatusRunDto[], stages: PipelineStatusStageDto[], ... }` | **public** (NO auth) | `PipelineRun`, `PipelineStageRun` |
+| GET | `/api/v1/pipeline/commands/catalog` | Available pipeline command definitions | `?region=&assetType=&timeframe=&pipelineKey=` | `PipelineCommandCatalogResponse { commands: PipelineCommandCatalogItem[], availability: PipelineCommandAvailability }` | **public** (NO auth) | Computed from static command registry |
+| POST | `/api/v1/pipeline/commands` | Execute a pipeline command (triggers data ingestion/processing) | `{ commandKey, region?, assetType?, timeframe?, pipelineKey?, runMode: single_batch|incremental_changed_only|full_latest_trading_date, batchSize?(1-100), offset?, reason?, params? }` | `PipelineCommandResponse { run, stages[], summary }` | **public** (NO auth) | Writes `PipelineRun`, `PipelineStageRun`; drives downstream data pipeline |
 
-**Notes:**
-- **No `requireAuth`** on any pipeline route — this is an operator/admin surface with no JWT enforcement.
-- Command execution (93) is the primary pipeline trigger; it runs all pipeline stages in sequence using the DAG runner.
-- `Cache-Control: no-store` is set on status (91) and catalog (92) responses.
-- `requestedByUserId` extracted from `req.user?.id` but no auth middleware — unauthenticated requests get `'local-manual-operator'` attribution.
+**AUTH GAP — CRITICAL:**
+- All three endpoints have **no `requireAuth`**. The router has no middleware.
+- `POST /pipeline/commands` is a **mutating admin action** (triggers data ingestion, signal generation, market data pulls) with zero authentication. Any unauthenticated HTTP caller can trigger full pipeline runs.
+- The controller falls back to `'local-manual-operator'` for `requestedByUserId` when no `req.user` — confirming there is no auth expectation built in.
+- `force=true` is explicitly blocked in validation (throws 400), but the underlying command execution is otherwise unrestricted.
+- `Cache-Control: no-store` is set on status and catalog reads.
 
 ---
 
 ## Cross-Cutting Findings
 
-### Stubbed / Placeholder Endpoints
-| Endpoint | Issue |
-|---|---|
-| `GET /api/v1/subscription/provider` | Permanently returns `{ enabled: false, provider: 'manual' }` — `SubscriptionBillingProvider.enabled` is hardcoded false. No billing integration. |
+### AUTH GAPS (Ranked by Severity)
 
-### Dead / Unused Endpoints
-None identified — all endpoints are wired and reachable.
+| Severity | Module | Endpoint(s) | Issue |
+|----------|--------|------------|-------|
+| **CRITICAL** | pipeline-orchestration | `POST /api/v1/pipeline/commands` | Unauthenticated mutating endpoint — triggers full data pipeline runs with no auth at all |
+| **CRITICAL** | pipeline-orchestration | `GET /api/v1/pipeline/status`, `GET /api/v1/pipeline/commands/catalog` | Unauthenticated reads of pipeline internals |
+| **CRITICAL** | research-hub | `GET /api/v1/research/overview`, `GET /api/v1/research/health` | Unauthenticated reads of full market intelligence (signals, calibration, strategy proofs) |
+| **HIGH** | stock-research-workbench | All 5 endpoints | Unauthenticated reads of full workbench snapshots (per-instrument signal/calibration/trade-plan data) |
+| **MEDIUM** | today-trade-review | `POST /api/v1/today-review/run` | Any authenticated user can trigger a full review build (should be admin-only or rate-limited) |
+| **MEDIUM** | historical-context-snapshots | `POST /api/v1/context-snapshots/generate` | Any authenticated user can trigger snapshot regeneration (should be admin-only) |
+| **LOW** | subscription-billing | `PATCH /api/v1/subscription/users/:userId/plan` | Admin check is a secondary header inside the controller, not middleware; depends on `ADMIN_API_KEY` env var being set |
+| **INFO** | watchlist, alerts, portfolio-management, portfolio-intelligence, trade-journal, notifications, copilot | All | `currentUserId = req.user?.id \|\| 'default-user'` fallback is dead code when `requireAuth` is active — latent data-isolation gap if middleware is ever bypassed |
 
-### Auth Gaps
-| Surface | Gap |
-|---|---|
-| `research-hub` (79–80) | No `requireAuth` — public read |
-| `stock-research-workbench` (81–85) | No `requireAuth` — public read |
-| `pipeline-orchestration` (91–93) | No auth at all — operator actions are unauthenticated |
-| Most business routes | Fallback `'default-user'` ID when JWT absent — no hard 401 rejection for missing auth |
+### STUBBED / PLACEHOLDER RESPONSES
 
-### External API Calls
-| Module | External Service | Endpoints |
-|---|---|---|
-| notifications-delivery | Telegram Bot API (`api.telegram.org`) | 64, 65 |
-| notifications-delivery | Email provider (SMTP/Resend — ENV-driven) | 59, 60, 61, 62 |
-| watchlist-management | None (prices via internal DB) | — |
+| Module | Endpoint | Issue |
+|--------|---------|-------|
+| subscription-billing | `GET /api/v1/subscription/provider` | Returns computed stub (no real billing provider integrated) — always returns OK-ish status |
+| auth-identity | `POST /api/v1/auth/logout` | Stateless — no token blacklist; client must discard token; "logout" is purely cosmetic on the server side |
 
-### Live vs. Persisted-Read Summary
-| Module | Pattern |
-|---|---|
-| portfolio-intelligence (45,47,48) | Persisted-read (`portfolio_intelligence_snapshots`) |
-| stock-research-workbench (81,84) | Persisted-read (`workbench_snapshots`) — 202 if absent |
-| today-trade-review (66–69) | Persisted-read (`today_review_runs` + enrichment join) |
-| historical-context-snapshots (72–78) | Persisted-read (various snapshot tables) |
-| research-hub (79–80) | Snapshot-first (env-flag), live fallback |
-| ai-investment-copilot (86–90) | Snapshot-first (env-flag), live fallback |
-| watchlist-management GET detail (15) | **Live** — fans out to `PriceTick` + `SignalResult` |
-| portfolio-management summary/allocation/changes (40–42) | **Live** — fans out to `PriceTick` + `SignalResult` |
-| alerts evaluate (26) | **Live** + writes `AlertEvent` |
+### DEAD / UNUSED PATTERNS
 
-### Endpoint Count by Module
-| Module | Count |
-|---|---|
-| auth-identity | 5 |
-| subscription-billing | 7 |
-| watchlist-management | 8 |
-| alerts-monitoring | 11 |
-| portfolio-management | 13 |
-| portfolio-intelligence | 4 |
-| trade-journal | 6 |
-| notifications-delivery | 11 |
-| today-trade-review | 5 |
-| historical-context-snapshots | 8 |
-| research-hub | 2 |
-| stock-research-workbench | 5 |
-| ai-investment-copilot | 5 |
-| pipeline-orchestration | 3 |
-| **Total** | **93** |
+- The `'default-user'` fallback in controllers for watchlist, alerts, portfolio, trade-journal, copilot is unreachable in production because `requireAuth` is applied at the router level. The pattern exists in every module but is dead code. If `requireAuth` is ever removed or bypassed, all user data would silently scope to the same `'default-user'` row — a data isolation failure.
+
+### EXTERNAL API HITS
+
+| Module | External Service | When |
+|--------|-----------------|------|
+| notifications-delivery | Email provider (SMTP/SendGrid, via env vars) | On `test-email`, `send-alert-digest`, `send-daily-digest`, `send-weekly-digest` |
+| notifications-delivery | Telegram Bot API | On `GET /telegram/setup` (`getUpdates`), `POST /telegram/test` (`sendMessage`) |
+
+### SNAPSHOT vs. LIVE-READ SUMMARY
+
+| Module | Read Strategy |
+|--------|--------------|
+| portfolio-intelligence | Snapshot-first (`PortfolioIntelligenceSnapshot`); lazy materialise on first GET; env flag `PORTFOLIO_SNAPSHOT_READS` |
+| ai-investment-copilot | Snapshot-first (`DailyInstrumentSnapshot`); env flag `COPILOT_SNAPSHOT_READS` |
+| stock-research-workbench | Snapshot-first (`WorkbenchSnapshot`); returns 202 if not computed |
+| research-hub | Snapshot-first (`ResearchHubSnapshotReader`); env flag `RESEARCH_HUB_SNAPSHOT_READS` |
+| today-trade-review | Persisted-read (`TodayReviewRun`/`TodayReviewCandidate`); enriched at read-time |
+| historical-context-snapshots | Persisted-read (all context snapshot tables) |
+| watchlist-management | `GET /:id` does live enrichment (price + signal) every call — not persisted |
+| portfolio-management | Summary/allocation/changes do live price+signal lookups every call — not persisted |
+| alerts-monitoring | `GET /alerts/summary` fetches all events in memory, not a DB aggregate |

@@ -1,441 +1,341 @@
-# Frontend Admin Recon — Wave 2 (Operator/Admin Set 2)
-
-**Date:** 2026-06-15  
-**Server:** http://localhost:5173 (shared dev FE)  
-**Scope:** 8 operator/admin screens in the Signals-and-Strategy + Data-Ops admin sections.
-
----
-
-## Tab-Switching Automation Note
-
-MUI `<Tabs>` with `onChange={(_, v) => setActiveTab(v)}` does not respond to `preview_eval` `.click()`, `dispatchEvent`, keyboard arrow keys, or `preview_click` with nth-child selectors when the tab is already scrolled into view. The active tab was stuck on "Wait / Watch" on the Strategy Decision screen for the full session. Content for tabs not visited is documented from source-code reading instead of live browser observation. No JS errors were present.
+# Frontend Admin/Operator Screen Audit — Wave 2
+**Date:** 2026-06-16 (re-audit)  
+**Server:** http://localhost:5181 (ui-userfacing instance)  
+**Scope:** 8 operator/admin screens — Signals & Strategy + Market Data ops  
+**Auth:** test@example.com (token injected via localStorage `investment_scanner_auth_token`)  
+**Region default:** US/STOCK; switched to IN/STOCK for screens requiring NSE data
 
 ---
 
-## 1. Strategy Decision Engine — `/admin/strategy`
+## 1. Signal Position Ledger / Trigger Monitor
+**Route:** `/signal-position-ledger`  
+**Purpose:** Read-only rule-trigger lifecycle evidence — entry candidates and closed history for the active market scope.
 
-**Purpose:** Operator view of rule-based strategy evaluation output. Shows market gate, review candidates (TRADE_CANDIDATE), wait/watch queue, exits/risk alerts, model documentation, evaluation runner, and per-stock lookup.
+### UI Elements
+- Page header: "Trigger Monitor"; subtitle "Read-only rule-trigger lifecycle evidence for the current market scope. Scope: US / STOCK."
+- Summary strip: 67 open entries, 0 closed entries (US/STOCK)
+- 4 stat cards: Entry trigger candidates (67), DQ ready evidence (25), Forward-validation shown (0), Rows with caveats (25)
+- Two tabs: "Entry Trigger Candidates" | "Closed History"
+- Table columns: Stock, Trigger (date + price), Return till date, Evidence (DQ status + Grade), Lifecycle, Rule
+- Controls: "Reload snapshot" button, "Export CSV" button; sortable Trigger and Return columns
+- Pagination: 25 rows per page default
 
-**UI Elements:**
-- Page header with "Run Evaluation" CTA (destructive-class — skipped)
-- Research-support disclaimer alert (always visible)
-- Capital posture chip in top bar: "Posture: Neutral" (from `GET /api/v1/market-context/capital-posture`)
-- 7-tab layout: Market Gate / Review Candidates / Wait-Watch / Exits-Risks / Rules & Model / Evaluate / Stock Lookup
-- Market scope dropdown ("Market: India") in header
+### API Calls
+- `GET /api/v1/signals/position-ledger/persisted/active?region=US&assetType=STOCK&limit=25&offset=0&sortBy=entryTriggerTimestamp&sortDirection=desc`
+- `GET /api/v1/signals/position-ledger/persisted/closed?region=US&assetType=STOCK&limit=25&offset=0&sortBy=entryTriggerTimestamp&sortDirection=desc`
 
-**Tabs observed (Market Gate — default):**
-- Market Condition: MIXED, Gate Status: SELECTIVE
-- Allowed actions listed as bullet points
-- Analysis narrative: "Market conditions are mixed; selectivity is required."
+### Data Notes
+- 67 open entries (AGX, AFRM, AGL, etc.); triggered Jun 12–15 2026
+- Evidence column: "READY" DQ status on all; Grade "N/A" on all
+- Rule column: "Unavailable — —" on all rows
+- `currentReturnPercent: 0` on all rows (latest price = trigger price, same-day triggers)
+- `exitDecision: "INSUFFICIENT_DATA"` on most; `exitStrategyId: "DEFENSIVE_EXIT"` populated even when entry strategy null
+- `calibrationEvidenceStatus: "UNAVAILABLE"` universally; `displayWarnings: ["Forward-validation evidence is unavailable."]`
+- 0 closed entries in Closed History tab
+- API-confirmed nulls per row: `strategyId`, `strategyVersion`, `strategyDecision`, `strategyReadinessLabel`, `strategyRatingGrade`, `entryRuleId`
 
-**Tab: Review Candidates (visited via src read + brief UI):**
-- DataTable with columns: Symbol, Strategy, Decision, Framework, Rating, Readiness, Score, Confidence, Entry Zone, Generated, Actions (Risk Plan link)
-- Data present: RATEGAIN, INSPRISYS, PRUDENT, ANTHEM, ATGL, SOFTTECH, NYKAA, CUB, TCS, BAJEL, SASKEN, PARACABLES, RELIABLE, HAPPYFORGE, and many more
-- All rows show Score=95, Confidence=HIGH, Strategy versions v1.2.0 (SECTOR_LEADER_MOMENTUM / PULLBACK_IN_UPTREND)
-- **Gap:** Rating column shows "UNKNOWN" for all rows; Readiness shows "RESEARCH_ONLY" universally — no differentiated grading
-
-**Tab: Wait / Watch (stuck active — observed live):**
-- Columns: Symbol, Status, Requirement, Reason
-- 58 total rows (1–50 of 58 shown per page), all status=Watch, all requirement="Wait For Confirmation" or "Wait For Pullback"
-- Reasons: "Price-volume accumulation detected.", "Long-term uptrend is intact.", "Multi-week base evidence is available before breakout.", "Stock signal is bullish.", "Price is above SMA50."
-
-**Tab: Exits / Risks (from source):**
-- Columns: Symbol, Risk Level (formatDecision), Review Action, Risk Score, Reasons (first 2 joined with ";")
-- emptyMessage: "No holdings currently flagged for exit review."
-- Uses `exits` state from `GET /api/v1/strategy/exits`
-
-**Tab: Rules & Model (from source):**
-- Shows model version, Market Gate Rules grid, per-strategy detail (thresholds, weights), Language & Safety Standards block
-- Data from `GET /api/v1/strategy/model`
-
-**Tab: Evaluate (from source):**
-- Strategy selector dropdown, batch evaluation runner (POST to `/api/v1/strategy/evaluate` — DESTRUCTIVE, not clicked)
-- Shows evaluatableStrategies list, progress alerts, batch size 100 / 4 workers
-
-**Tab: Stock Lookup (from source):**
-- InstrumentSearchSelect, then shows Decision, Action, Score, scoreBreakdown, Entry Zone (referencePrice / preferredEntryMin / preferredEntryMax), reasons/warnings/blockers
-- From `GET /api/v1/strategy/decisions/:instrumentId`
-
-**API Calls (all 200 OK):**
-- `GET /api/v1/strategy/market-gate?region=IN&assetType=STOCK`
-- `GET /api/v1/strategy/candidates?limit=25&offset=0&decision=TRADE_CANDIDATE&region=IN&assetType=STOCK&sortBy=decisionScore&sortDirection=desc`
-- `GET /api/v1/strategy/candidates?limit=50&decision=WAIT&region=IN&assetType=STOCK`
-- `GET /api/v1/strategy/candidates?limit=50&decision=WATCH&region=IN&assetType=STOCK`
-- `GET /api/v1/strategy/exits?region=IN&assetType=STOCK`
-- `GET /api/v1/strategy/model?region=IN&assetType=STOCK`
-- `GET /api/v1/alerts/events?region=IN&assetType=STOCK`
-- `GET /api/v1/market-context/capital-posture?region=IN&assetType=STOCK`
-
-**Console errors:** None.
-
-**Gaps / Issues:**
-- **Tab switching broken in automation** — MUI Tabs onChange not triggered by any synthetic event in preview_eval context. This is an automation limitation, not a product bug.
-- **Rating column universally "UNKNOWN"** on Review Candidates — strategyRatingGrade null for all TRADE_CANDIDATE rows.
-- "Run Evaluation" CTA is always visible even when market gate is SELECTIVE — no gating of the destructive action in UI.
-- Exits/Risks tab not observed live (empty or requires real portfolio signals).
+### Gaps / Issues
+- **PRIOR FINDING — UNCHANGED:** Strategy join is null on every row. "Rule: Unavailable" and "Grade N/A" persist for all 67 active US/STOCK entries. `entryRuleId`, `strategyId`, `strategyRatingGrade` remain null in the DB. No improvement since last audit.
+- 0 rows with forward-validation evidence (calibration unavailable)
+- 0 closed entries — no lifecycle completions yet
 
 ---
 
-## 2. Strategy Framework — `/admin/strategies`
+## 2. Trade Plan Risk Engine (Legacy)
+**Route:** `/trade-plans`  
+**Purpose:** Legacy trade plan evidence dashboard — generation funnel, paper-readiness blockers, and plan table.
 
-**Purpose:** Registry of all defined strategies (entry, exit, gate, filter, calibration, diagnostic, draft). Shows catalog, proof registry, detail, performance, rankings, and per-stock evaluation.
+### UI Elements
+- Two alert banners: "Evidence only — not trade instructions" (top) + "This legacy page shows generated review evidence only" (secondary)
+- Backtest Proof timeframe selector (default 3Y)
+- "Generate Plans" button (destructive — SKIPPED)
+- Generation Funnel: Raw Bullish Signals 295, Strategy Decisions 150, Eligible Review Candidates 1, Generated Plans 10, Paper Ready 0, Blocked/Watch/Insufficient 10
+- Top Paper Readiness Blockers list (with counts)
+- "Skipped Before Generation" breakdown
+- 4-step Paper Readiness Proof Chain with links to SDE, Strategy Framework, Trade Plan screens
+- Plan table: Symbol, Strategy, Status, Risk, Entry, Stop, Target, R:R, Readiness, Rating, Price, Reason, Actions
 
-**UI Elements:**
-- Page header: "Strategy Framework — 11 configured" with IN/STOCK scope chips
-- Research-support disclaimer alert
-- Info alert about ENTRY strategies being backtest candidates; EXIT/GATE/etc. supporting decisions only
-- 6-tab layout: Catalog / Proof Registry / Detail / Performance / Rankings / Evaluate Stock
+### API Calls
+- `GET /api/v1/trade-plans/candidates?region=US&assetType=STOCK&backtestWindow=3Y`
+- `GET /api/v1/trade-plans/funnel?region=US&assetType=STOCK&backtestWindow=3Y`
+
+### Data Notes
+**Generation funnel (US/STOCK, 3Y):**
+- 295 raw bullish signals → 150 strategy decisions → 1 eligible candidate → 10 generated plans → **0 paper-ready**
+- Top blockers: 10 UNPROVEN strategy rating; 10 LOW decision confidence; 1 invalid plan status; 1 HIGH risk grade; 1 active blocker
+- Skipped breakdown: 97 INSUFFICIENT_DATA, 25 DEFENSIVE_EXIT excluded, 22 AVOID, 19 WATCH, 12 exit/risk-reduction
+- Table body: "No legacy review evidence rows found for US/STOCK" (0–0 of 0 rows displayed)
+
+### Gaps / Issues
+- **PRIOR FINDING — UNCHANGED:** 0 plans are paper-ready. portfolioImpact section is absent entirely (not just blank) — the field is not surfaced anywhere on this page. All 10 generated plans are blocked by UNPROVEN strategy rating + LOW confidence.
+- Funnel explains the blockage cleanly: strategy proof deficit is the root cause.
+
+---
+
+## 3. Strategy Framework
+**Route:** `/strategies`  
+**Purpose:** Reusable deterministic strategy registry — catalog, proof registry, ratings, backtest integration.
+
+### UI Elements
+- Header: "Strategy Framework — 11 configured — US — STOCK"
+- Subtitle: "Reusable deterministic strategy registry for signals, decisions, and backtests."
+- Two info banners about research-only scope and strategy categories
+- Tabs: Catalog | Proof Registry | Detail | Performance | Rankings | Evaluate Stock
 - Category filter buttons: All (11), Entry (5), Exit (1), Gates (1), Filters (1), Risk (0), Calibration (0), Diagnostics (0), Drafts (3)
+- Table columns: Strategy (name + code), Category, Status, Style, Latest rating, Readiness, Actions
+- Row actions: "View" (all); "Backtest in Lab" (active entry strategies only)
 
-**Catalog tab (default, observed live):**
-- DataTable: Strategy name + code, Category, Status, Style, Latest rating, Readiness, Actions (View / Backtest in Lab)
-- 11 strategies total, paginated 10 per page (1–10 of 11)
-- Strategies visible: BREAKDOWN_MOMENTUM (ENTRY/DRAFT), BREAKOUT_CONFIRMATION (ENTRY/ACTIVE), DEFENSIVE_EXIT (EXIT/ACTIVE), LOW_QUALITY_DATA_REJECTION (FILTER/ACTIVE), MEAN_REVERSION_PULLBACK (ENTRY/DRAFT), PULLBACK_IN_UPTREND (ENTRY/ACTIVE), QUALITY_TREND (ENTRY/DRAFT), RISK_OFF_AVOIDANCE (GATE/ACTIVE), SECTOR_LEADER_MOMENTUM (ENTRY/ACTIVE), SMART_MONEY_ACCUMULATION (ENTRY/ACTIVE), TREND_MOMENTUM (ENTRY/ACTIVE)
-- **All strategies show "Unproven" / "Research Only" except TREND_MOMENTUM which shows "Average" / "Watchlist Candidate"**
-- "Backtest in Lab" disabled for DRAFT strategies and non-entry strategies (shows tooltip explaining reason)
+### API Calls
+- `GET /api/v1/strategies?region=US&assetType=STOCK`
 
-**API Calls (all 200 OK):**
-- `GET /api/v1/strategies?region=IN&assetType=STOCK`
-- `GET /api/v1/strategies/TREND_MOMENTUM?region=IN&assetType=STOCK` (Detail tab preloads first strategy)
-- `GET /api/v1/strategies/TREND_MOMENTUM/performance?region=IN&assetType=STOCK`
-- `GET /api/v1/strategies/rankings?timeframe=1Y&region=IN&assetType=STOCK`
-- `GET /api/v1/strategies/proof-registry?timeframe=1Y&region=IN&assetType=STOCK`
-- `GET /api/v1/strategies/TREND_MOMENTUM/proof?timeframe=1Y&region=IN&assetType=STOCK`
+### Data Notes
+**All 11 strategies:**
 
-**Console errors:** None.
+| Name | Status | Rating | Readiness |
+|---|---|---|---|
+| Breakdown Momentum (Short Review) | DRAFT | Unproven | Research Only |
+| Breakout Confirmation | ACTIVE | Unproven + Warnings | Research Only |
+| Defensive Exit Review | ACTIVE | Unproven | Research Only |
+| Low Quality Data Rejection | ACTIVE | Unproven | Research Only |
+| Mean Reversion Pullback | DRAFT | Unproven | Research Only |
+| Pullback in Uptrend | ACTIVE | Unproven + Warnings | Research Only |
+| Quality Trend | DRAFT | Unproven | Research Only |
+| Risk-Off Avoidance | ACTIVE | Unproven | Research Only |
+| Relative Strength Continuation | ACTIVE | Unproven + Warnings | Research Only |
+| Smart Money Accumulation | ACTIVE | Unproven | Research Only |
+| Trend Momentum | ACTIVE | Unproven | Research Only |
 
-**Gaps / Issues:**
-- 10 of 11 strategies are "Unproven" / "Research Only" — only TREND_MOMENTUM has any proof (Average/Watchlist). No GOOD or EXCELLENT proof exists for any strategy.
-- Risk (0), Calibration (0), Diagnostics (0) categories are empty — placeholders only.
-- Detail/Performance/Rankings/Evaluate-Stock tabs not visited live (tab-switch automation limitation as above — source read confirms they use the strategy selector to swap data, calling `GET /api/v1/strategies/:code`, `/performance`, `/proof`).
+- Active ENTRY strategies (eligible for backtests): Breakout Confirmation, Pullback in Uptrend, Relative Strength Continuation, Smart Money Accumulation, Trend Momentum
+- 3 strategies show "Unproven + Warnings" (Breakout Confirmation, Pullback in Uptrend, Relative Strength Continuation)
 
----
-
-## 3. Historical Context Snapshots — `/admin/context-snapshots`
-
-**Purpose:** Manual generation and lookup tool for persisted market regime, breadth, sector, country, and smart-money context snapshots.
-
-**UI Elements:**
-- Page header: "Historical Context Snapshots"
-- "Open Signal Quality Lab" secondary action link
-- Summary stats: Market Snapshots 114, Sector Snapshots 1113, Country Snapshots 114, Smart Money 137,929, Latest Date 6/15/2026
-- "Generate Snapshot" form (DESTRUCTIVE — skipped): scope dropdown, snapshot date picker, smart-money limit field, Generate button
-- Note: "Generation is manual in this version. No scheduler or paid data provider is required."
-- **Lookup Tool** form: Date, Stock/instrument, Sector, Country fields with Lookup button (read-only — non-destructive)
-- Three data tables: Market Regime Snapshots, Sector Snapshots, Country Snapshots (20 rows each + "Show more" button)
-- Region/date breakdown visible for India (IN) spanning 2026-05-24 to 2026-06-15
-
-**Market Regime Snapshots (live data):**
-- Columns: Date, Region, Regime, Score, SMA50
-- Latest: 6/15/2026 IN NEUTRAL 59 62.7%
-- Historical range: NEUTRAL throughout recent weeks; risk-on 5/28–5/30, risk-off 5/31
-
-**Sector Snapshots:**
-- Columns: Date, Region, Sector, Status, Score
-- Today: Technology LEADING 79, Utilities LEADING 71, Industrials LAGGING 69, Energy LAGGING 62, Basic Materials WEAKENING 61, Financial Services LAGGING 58, Communication Services LAGGING 55, Real Estate LAGGING 50, Consumer Defensive WEAKENING 49, Information Technology LAGGING 0
-- **Gap:** Information Technology score = 0 (likely data quality issue / missing signals)
-
-**Country Snapshots:**
-- Columns: Date, Region, Country, Score, Status
-- India: Score 62, Status PARTIAL today
-- Status alternates PARTIAL / COMPLETE — PARTIAL is the norm, suggesting incomplete daily ingest runs
-
-**API Calls (from service file — confirmed via module loads in network log):**
-- `GET /api/v1/context-snapshots/coverage?region=IN&assetType=STOCK`
-- `GET /api/v1/context-snapshots/market?region=IN&assetType=STOCK&limit=100`
-- `GET /api/v1/context-snapshots/sectors?region=IN&assetType=STOCK&limit=100`
-- `GET /api/v1/context-snapshots/countries?region=IN&assetType=STOCK&limit=100`
-
-**Console errors:** None.
-
-**Gaps / Issues:**
-- Country snapshot status is PARTIAL for most dates — indicates daily pipeline rarely completes fully.
-- Information Technology sector score = 0 today (abnormal).
-- Generate Snapshot form is visible and enabled — no workflow guard to prevent accidental re-generation; operator-facing warning only.
+### Gaps / Issues
+- **PRIOR FINDING — UNCHANGED:** All 11 strategies remain Unproven; 0 proven. No strategy has accumulated sufficient backtest evidence to advance beyond UNPROVEN rating. All readiness labels are "Research Only".
 
 ---
 
-## 4. Market Context Intelligence — `/admin/market-context`
+## 4. Strategy Decision Engine
+**Route:** `/strategy`  
+**Purpose:** Strategy-backed review candidates, exit-risk alerts, and market state awareness dashboard.
 
-**Purpose:** Live/persisted market regime, sector rotation, breadth indicators, country strength, macro snapshot, FII/DII activity, and bulk/block deals.
+### UI Elements
+- Header: "Strategy Decision Engine — Strategy-backed review candidates, exit-risk alerts, and market state awareness."
+- "Run Evaluation" button (destructive compute action — SKIPPED)
+- Research support disclaimer banner
+- Tabs: Market Gate | Review Candidates | Wait / Watch | Exits / Risks | Rules & Model | Evaluate | Stock Lookup
+- **Market Gate tab (default):** Market Condition chip (HEALTHY), Gate Status (OPEN), Allowed Actions list, Reasons & Blockers narrative
+- **Review Candidates tab:** Table — Symbol, Strategy, Decision, Framework Rating, Readiness, Score, Confidence, Entry Zone, Generated, Actions (Risk Plan link)
 
-**UI Elements:**
-- Page header: "Market Context Intelligence"
-- "Updated: 6/15/2026, 3:25:22 PM" timestamp + "Refresh" button (triggers live fetch — not clicked)
-- Warning alert: "Market context data is partial. Some indicators may be incomplete or missing."
-- Market Regime section: Score 59, NEUTRAL, PARTIAL (capital posture blurb)
-- Institutional Activity section (collapsible)
-- Sector Rotation: Technology Leading, Utilities Leading, Industrials Lagging, Energy Lagging, Basic Materials Weakening (with 1M/3M/6M % and signal count "Signals 0/0" for all)
-- Breadth Indicators row: Above SMA50 62.7%, Above SMA200 54.9%, A/D Ratio 3.00, 52W High/Low 43/4, Bullish/Bearish 0/0, Price Sample 360, SMA Samples 360/360
-- Breadth by Cap Band table: Large/Mid/Small cap with >SMA50, >SMA200, A/D, N columns
-- Country / Region Strength: India 3M 11.6%, Score 62
-- Macro Snapshot: **UNKNOWN — "Macro providers are not configured yet." / Status MISSING**
-- FII/DII Activity table (5 rows shown): Cash-market net buy/sell, ₹ Crore, Source NSE
-  - Latest (15 Jun): FII +₹200.05 Cr, DII +₹3,189.26 Cr
-- Bulk & Block Deals table: large institutional/HNI trades from NSE
+### API Calls
+- `GET /api/v1/market-context/capital-posture?region=US&assetType=STOCK`
+- Strategy decision data (inferred from component load)
 
-**API Calls (from service file):**
-- `GET /api/v1/market-context/summary` or `/api/v1/market-context/persisted-summary`
-- `GET /api/v1/market-context/persisted-breadth`
-- `GET /api/v1/market-context/capital-posture`
-- `GET /api/v1/market-context/sectors`
-- `GET /api/v1/market-context/breadth`
+### Data Notes
+- Market Condition: HEALTHY; Gate: OPEN; Capital Posture: Risk-On (US/STOCK)
+- Gate analysis: "Market regime is Risk-On and breadth is healthy."
+- Allowed actions: "New long candidates may be reviewed", "Only high-quality setups should be reviewed"
+- **Review Candidates: 1 row** — AGIO, SMART_MONEY_ACCUMULATION v1.2.0, Decision TRADE_CANDIDATE, Framework-backed, UNPROVEN, RESEARCH_ONLY, Score 80, Confidence LOW, Generated 6/13/2026
+- 1 candidate surviving the full funnel from 295 raw signals
 
-**Console errors:** None.
-
-**Gaps / Issues:**
-- **Macro Snapshot is MISSING** — macro data providers not configured; block renders "UNKNOWN / MISSING" placeholder visibly.
-- All sector rotation cards show "Signals 0/0" — no active signal counts flowing into sector rotation display.
-- Status PARTIAL for market context (partial ingest runs).
-- "Bullish / Bearish 0 / 0" breadth indicator — these likely require signal data to populate and are currently empty.
+### Gaps / Issues
+- Sole review candidate (AGIO) has Confidence LOW — gates paper-ready plan generation
+- "Run Evaluation" is a compute trigger — correctly skipped in this audit
 
 ---
 
-## 5. Breadth Internals — `/admin/breadth-internals`
+## 5. Market Context Intelligence
+**Route:** `/market-context`  
+**Purpose:** Market regime, sector rotation, breadth, institutional flows, country strength, macro context.
 
-**Purpose:** Historical market breadth trends over time with Recharts line charts. Key early-warning indicator view for Indian market tops.
+### UI Elements
+**US scope (default):** Graceful empty state — "Market context is not applicable to US equities." Explanation: FII/DII flows and bulk/block deals are NSE India only; no free equivalent for US in this release.
 
-**UI Elements:**
-- Page header: "Breadth Internals — Market breadth trends over time. Breadth divergence is the key early-warning indicator for Indian market tops."
-- Timeframe selector buttons: 14d / 30d / 60d / 90d
-- Latest snapshot: 2026-06-15
-- 4 KPI chips: Above SMA50 62.7%, Above SMA200 54.9%, A/D Ratio 3.00, 52W High/Low 43/4, High-Low Net +39, Regime NEUTRAL (59.0)
-- 5 Recharts line charts: % Above SMA50, % Above SMA200, Advance/Decline Ratio, New 52W Highs vs Lows (bar-style), New High-Low Net, Regime Score
-- Charts span Jul 2023 – Jun 2026 (full history depth)
-- Period Deltas table (2023-07-01 to 2026-06-15): Current vs Period Start vs Change
-  - % Above SMA50: 62.7% vs 75.7% → -13.0%
-  - % Above SMA200: 54.9% vs 65.8% → -10.9%
-  - A/D Ratio: 3.00 vs 1.37 → +1.63
-  - New High-Low Net: 39 vs 30 → +9
-  - Regime Score: 59 vs 82 → -23
-- Footer: "All data sourced from persisted market context snapshots (NSE/BSE). For research purposes only."
+**IN scope (switched for audit):**
+- "Market context data is partial" alert banner
+- Sections: Market Regime, Institutional Activity (FII/DII Net, Bulk/Block Deals, F&O Ban, Sector Flows, F&O OI Buildup), Sector Rotation, Breadth Indicators, Breadth by Cap Band, Country/Region Strength, Macro Snapshot, FII/DII Activity history table, Bulk & Block Deals
+- "Refresh" button for explicit snapshot reload
+- All data labeled "as of 15 Jun 2026 · 1 day old"
 
-**API Calls (from service file — BreadthInternalsEnvelope type):**
-- `GET /api/v1/market-context/breadth-internals?timeframe=30d&region=IN&assetType=STOCK` (or similar with timeframe param)
+### API Calls
+- `GET /api/v1/market-context/capital-posture?region=IN&assetType=STOCK`
+- Multiple sub-endpoints for institutional activity, breadth, sector, country, F&O data
 
-**Console errors:** None.
+### Data Notes (IN scope, 15 Jun 2026)
+- **Market Regime:** NEUTRAL, score 59; 62.7% above SMA50, 54.9% above SMA200, Nifty 50 trend score 46.6
+- **FII/DII Net:** FII +₹200 Cr, DII +₹3,189 Cr; prior 4 days FII all net negative
+- **F&O Ban:** 1 stock — KAYNES
+- **Sector Flows:** Utilities, Financial Services, Industrials ACCUMULATING; IT DISTRIBUTING
+- **F&O OI:** PCR 0.99; 81 Long Buildup, 80 Short Covering
+- **Sector Rotation:** Technology LEADING, Utilities LEADING; all sectors show "Signals 0/0"
+- **Country Strength:** India 3M +11.6%, Score 62
+- **Bulk & Block Deals:** "Bulk/block deal data not yet ingested. Use POST /api/v1/market-context/bulk-block-deals/ingest to fetch from NSE."
+- **Macro Snapshot:** "UNKNOWN — Macro providers are not configured yet. MISSING"
 
-**Gaps / Issues:**
-- Charts fully populated with 3-year history. No missing data or placeholder states observed.
-- Timeframe selector not exercised (non-destructive filter — would re-fetch with different timeframe param). Four buttons visible but not clicked.
-
----
-
-## 6. Backtesting Strategy Lab — `/admin/backtests`
-
-**Purpose:** Daily-close simulation runner against active entry strategies. Supports registered strategy backtests and custom rule backtests. Shows equity curve, monthly return grid, benchmark comparison, and regime/metrics breakdown.
-
-**UI Elements:**
-- Page header: "Backtesting & Strategy Lab — Historical daily-close simulations. Results are not predictions."
-- Scope chips: IN / STOCK
-- CTA: "Run Registered Backtest" (DESTRUCTIVE — skipped)
-- 3-tab layout: Registered Strategy / Custom Rules / Saved Runs
-- **Registered Strategy tab (default):**
-  - Strategy selector: "Trend Momentum" (preselected), dropdown includes evaluatableStrategies
-  - Timeframe selector: 1Y / 3Y / 5Y / 10Y / 15Y (3Y selected by default)
-  - Universe: "All eligible instruments (bounded)"
-  - Capital / Max positions fields
-  - Sliders: Cost % (0–5%), Slippage % (0–5%), Max hold days, Stop loss % (0–50%), Trailing stop % (0–50%), Take profit % (0=disabled)
-  - Run Registered Backtest button
-  - Results (for TREND_MOMENTUM 3Y IN STOCK):
-    - Rating: Average / WATCHLIST_CANDIDATE / PARTIAL
-    - Ending Capital ₹1,09,584, Total Return 9.6%, CAGR 4.3%, Max Drawdown -17.7%
-    - Sharpe -0.20, Sortino -0.23, Calmar 0.24
-    - Win Rate 31.1% (25.7%–37.0%), Trades 254, Profit Factor 1.19, Avg Hold 25 days, Longest Hold 208 days
-  - Benchmark Comparison: NSE_NIFTY_50, Strategy CAGR 4.3% vs Benchmark CAGR 1.3%, Excess CAGR +3.0%
-  - **3 caveat banners shown:**
-    1. SURVIVORSHIP_BIAS_UNIVERSE — universe constructed from today's active instruments only, delisted stocks absent
-    2. PRICE_PROXY_CONTEXT — sectorLeadership/smartMoneyStatus derived from price proxies, not real sector RS or institutional flow
-    3. WARM_UP_DRAG — 9,154 instrument-bars blocked due to warm-up (< 200 bars history)
-  - Equity Curve: Recharts LineChart (Oct 2023 – Jun 2026)
-  - Monthly Returns grid (Year × Month): 2023–2026 annual/monthly breakdown
-  - Regime breakdown table (not observed in detail — source shows regime bucket padding)
-
-**API Calls:**
-- `GET /api/v1/strategies?region=IN&assetType=STOCK` (strategy list for dropdown)
-- `POST /api/v1/backtests/run` (triggered by "Run" button — DESTRUCTIVE, not clicked)
-- `GET /api/v1/backtests/runs?region=IN&assetType=STOCK` (Saved Runs tab)
-- `GET /api/v1/backtests/strategies` (Custom Rules saved strategies)
-
-**Console errors:** None.
-
-**Gaps / Issues:**
-- Results shown are from a previously-run backtest stored in state — the page shows TREND_MOMENTUM results on load without a new run, suggesting the hook auto-loads the latest result from the API.
-- Survivorship bias and price-proxy caveats are prominently displayed (good transparency).
-- Custom Rules tab and Saved Runs tab not exercised.
-- Only TREND_MOMENTUM has meaningful backtest data; other 4 active ENTRY strategies show "Unproven" in the Framework catalog.
+### Gaps / Issues
+- **PRIOR FINDING — UNCHANGED:** Macro Snapshot still "UNKNOWN / Macro providers are not configured yet." No macro data source configured.
+- **PRIOR FINDING — UNCHANGED:** Sector signals still 0/0 across all sectors in Sector Rotation.
+- Bulk & Block Deals section: requires manual ingest trigger — no data present.
 
 ---
 
-## 7. Smart Money Intelligence — `/admin/smart-money`
+## 6. Smart Money Intelligence
+**Route:** `/smart-money`  
+**Purpose:** Price-volume accumulation/distribution scores and sector smart money context. (IN scope for meaningful data.)
 
-**Purpose:** Price-volume accumulation / distribution screening with sector-level aggregation. FnO ban list management.
+### UI Elements
+- Header: "Smart Money Intelligence — as of 15 Jun 2026 · 1 day old"
+- Disclaimer: price-volume proxy only; no institutional ownership or insider filing data
+- "Refresh Snapshots" button (destructive recompute — SKIPPED)
+- Filters: Range selector (3M default), Sector dropdown
+- "Top Accumulation Candidates" table: Symbol, Score (0–100), Daily %, Actions — 857 total rows
+- "Top Distribution Warnings" table: same columns — 231 total rows
+- "Sector Smart Money View" table: Sector, Status, Score, Accum. count, Distrib. count, Unusual Vol. count, Instr. count
 
-**UI Elements:**
-- Page header: "Smart Money Intelligence — Price-volume accumulation, distribution warnings, and sector flow context."
-- "Refresh Snapshots" CTA (DESTRUCTIVE — skipped)
-- Disclaimer: scores based on price-volume only; NSE/BSE free data does not include institutional-ownership filings or insider disclosures
-- Filters: Range (3M selected), Sector dropdown, Reset button
-- **Top Accumulation Candidates table** (857 total, 10 shown per page):
-  - Columns: Symbol (name + sector), Score, Daily %, Actions
-  - Top 10 all score=100 ACCUMULATION: ABSLMC, AHCL, APARINDS, BANDHANBNK, EBGNG, MAHABANK, MSTCLTD, NGLFINECHEM, RBLBANK, SAYAJIHOTL
-  - Pagination: 1–10 of 857
-- **Top Distribution Warnings table** (231 total, 10 shown):
-  - BANG, HITECHGEAR, TCS (score 0 — unusual), PGHH (1), SAURASHCEM (3), SHANTI (3), EIDPARRY (4), MEDICAMEQ (5), GTPL (6), RKEC (6)
-  - **Note:** TCS showing score=0 DISTRIBUTION with -35.9% daily move is notable
-- **Sector Smart Money View table:**
-  - Columns: Sector, Status, Score, Accum., Distrib., Unusual Vol., Instr.
-  - All sectors showing "Accumulation" status (55–61 range) except Unknown (Neutral 54) and Communication Services (Neutral 50)
-  - Financial Services: 227 instruments, 52 accum / 11 distrib / 70 unusual vol
-  - Industrials: 439 instruments, 115 accum / 23 distrib / 107 unusual vol
-- FnO ban list section (from source: `fetchFnoBanList()` and `ingestFnoBanList()`)
-- Range filter (1M/3M/6M) and Sector filter both functional
-
-**API Calls:**
+### API Calls
 - `GET /api/v1/smart-money/top?limit=10&offset=0&range=3M&region=IN&assetType=STOCK`
 - `GET /api/v1/smart-money/distribution?limit=10&offset=0&range=3M&region=IN&assetType=STOCK`
 - `GET /api/v1/smart-money/sectors?range=3M&region=IN&assetType=STOCK`
-- `GET /api/v1/smart-money/fno-ban`
-- `GET /api/v1/smart-money/health`
 
-**Console errors:** None.
+### Data Notes
+- Top accumulation (score 100): ABSLAM, AHCL, APARINDS, BANDHANBNK, EBGNG, MAHABANK, MSTCLTD, NGLFI, RBLBANK, SAYAJIHOTL
+- Distribution leaders: BANG (score 0, -3.3%), HITECHGEAR (score 0, -0.0%), TCS (score 0, -35.9% **displayed**)
+- API for TCS: `dailyChangePercent: -0.3585` (decimal fraction ≈ -0.036%), `smartMoneyScore: 0`, `dataStatus: "PARTIAL"`
+- Sector view: all 11 sectors ACCUMULATING or NEUTRAL; scores 54–61
 
-**Gaps / Issues:**
-- **TCS showing score=0 DISTRIBUTION with -35.9% daily move** — this is a significant outlier that may indicate a data quality issue (ex-date or corporate action, or genuine data error).
-- Ownership data status is "MISSING" per the source component's guard clause (NSE free data doesn't include institutional filings).
-- All sectors uniformly show "Accumulation" with scores in 55–61 range — very narrow spread suggesting the accumulation scoring is not differentiating meaningfully across sectors.
-- FnoBan ingest button in the component is DESTRUCTIVE — not clicked.
-
----
-
-## 8. Trade Plan Risk Engine — `/admin/trade-plans`
-
-**Purpose:** Legacy trade plan evidence page. Shows generated review evidence rows (NOT trade recommendations). Includes paper-readiness proof chain and funnel diagnostics. References "use Today Review and Signal Position Ledger for the current trusted signal workflow."
-
-**UI Elements:**
-- Prominent alert banner (two versions): "Evidence only — not trade instructions" and "This legacy page shows generated review evidence only."
-- Tab layout: Legacy Trade Plan Evidence / Backtest Proof
-- Filters: Paper Review Candidate (readiness filter), Backtest Proof timeframe selector, Generate Plans button (DESTRUCTIVE — skipped)
-- Note: "Backtest proof timeframe affects proof, rating, and paper-readiness checks. Entry, stop, target, and position sizing are current-market risk levels"
-- **Funnel diagnostics** (Generation Funnel IN/STOCK): Review-candidate only, Readiness filter, Proof filters
-- **Legacy Evidence Rows table** (3 rows shown, 1–3 of 3):
-  - Columns: Symbol, Strategy, Status, Risk, Entry (range), Stop, Target, R:R, Readiness, Rating, Price, Reason, Actions (View)
-  - PREMIERENE TREND_MOMENTUM VALID LOW INR 1,069.30–1,090.90 Stop 952.38 Target 1,335.54 2.0R Paper Review Good Price 1,080.10
-  - RISHAB TREND_MOMENTUM VALID LOW INR 507.33–517.57 Stop 481.54 Target 574.28 2.0R Paper Review Good Price 512.45
-  - KRN TREND_MOMENTUM VALID MEDIUM INR 1,204.63–1,228.97 Stop 995.05 Target 1,660.30 2.0R Paper Review Good Price 1,216.80
-- **Very small result set (3 rows)** — paper-readiness filter is highly restrictive
-
-**portfolioImpact null finding (from DB recon + source):**
-- `TradePlanResultDto.portfolioImpact: PortfolioImpact | null` — type definition confirms nullable
-- `TradePlanDetail.tsx` line 184: guards with `{plan.portfolioImpact ? (...)}`
-- The table view (`TradePlanTable.tsx`) does not render portfolioImpact — only shown in detail view
-- **Per DB recon, 99.6% of trade_plan_results rows have portfolioImpact null** → detail pages will show the portfolioImpact section blank for virtually all plans
-
-**API Calls (all 200 OK):**
-- `GET /api/v1/trade-plans/candidates?region=IN&assetType=STOCK&limit=25&offset=0&paperReadyOnly=true&paperReadinessStatus=READY_FOR_PAPER_REVIEW&sortBy=generatedAt&sortDirection=desc`
-- `GET /api/v1/trade-plans/funnel?region=IN&assetType=STOCK`
-
-**Console errors:** None.
-
-**Gaps / Issues:**
-- **Only 3 rows pass paper-readiness filter** — the funnel is highly restrictive; "Generate Plans" would need to run to see more.
-- **portfolioImpact is null for ~99.6% of rows** — the detail page's Portfolio Impact section will be empty for nearly all plans.
-- Page has two warning banners calling itself "legacy" — suggests this page is being deprecated in favor of Signal Position Ledger / Today Review.
-- Backtest Proof tab and proof-chain visualization not observed live.
+### Gaps / Issues
+- **PRIOR FINDING — CLARIFIED/NEW BUG CONFIRMED:** TCS score=0 is correct (DISTRIBUTION classification). However, the **-35.9% daily display is a confirmed formatting bug**: API returns `dailyChangePercent` as a decimal ratio (-0.3585 ≈ -0.036%) but the UI renders it as -35.9%, treating a fractional value as if it were a percent already multiplied by 100. Actual daily change is approximately -0.04%.
+- `dataStatus: "PARTIAL"` on multiple distribution stocks — expected given free-data source limitations.
 
 ---
 
-## 9. Signal Position Ledger — `/admin/signal-position-ledger`
+## 7. Backtesting & Strategy Lab
+**Route:** `/backtests`  
+**Purpose:** Historical daily-close simulations against registered strategies with configurable parameters.
 
-**Purpose:** Read-only rule-trigger lifecycle evidence (entry triggers, return tracking, exit signals). Named "Trigger Monitor" in the page header. Operator diagnostic view for signal lifecycle.
+### UI Elements
+- Header: "Backtesting & Strategy Lab — Historical daily-close simulations. Results are not predictions."
+- Scope: IN / STOCK
+- "Run Registered Backtest" button (destructive — SKIPPED)
+- Tabs: Registered Strategy | Custom Rules | Saved Runs
+- Parameter inputs: Strategy selector, Timeframe (3Y default), Universe, Initial capital, Max positions
+- Realistic assumptions: Cost %, Slippage %, Max hold days, Stop loss %, Trailing stop %, Take profit %
+- Results panel (persisted run for Trend Momentum, 3Y, IN/STOCK): headline metrics, benchmark comparison, caveats, equity curve chart, monthly returns table, performance by regime, exit breakdown, trade log
 
-**UI Elements:**
-- Page header: "Trigger Monitor — Read-only rule-trigger lifecycle evidence for the current market scope. Scope: IN / STOCK."
-- Secondary actions: "Reload snapshot" button + "Export CSV" button
-- Summary strip (4 KPI chips): Entry trigger candidates 1,110 (IN/STOCK total), DQ ready evidence 22 (visible rows), Forward-validation shown 0 (visible rows), Rows with caveats 25 (open details)
-- 2-tab layout: Entry Trigger Candidates / Closed History
-- **Entry Trigger Candidates table** (1,110 total active rows, 25 per page):
-  - Columns: Stock (symbol + full company name), Trigger (date @ price), Return till date, Evidence (DQ status + Grade), Lifecycle (health state), Rule (strategyId - entryRuleId)
-  - All 25 visible rows show: Evidence = READY / Grade N/A, Lifecycle = "Risk warning", Rule = "Unavailable - —"
-  - Return till date: "+0%" for most rows; "Unavailable" for a few (ALGOQUANT, ARIS, ARSSBL — status LIMITED)
-  - Rows sorted by entryTriggerTimestamp desc — all entries dated Jun 15, 2026
-- Row click opens a modal with full entry trigger detail (Dialog)
-- **Closed History tab** (0 closed entries per summary strip)
+### API Calls
+- `GET /api/v1/strategies?region=IN&assetType=STOCK`
+- Backtest results endpoint (inferred from persisted result display)
 
-**API Calls (both 200 OK):**
-- `GET /api/v1/signals/position-ledger/persisted/active?region=IN&assetType=STOCK&limit=25&offset=0&sortBy=entryTriggerTimestamp&sortDirection=desc`
-- `GET /api/v1/signals/position-ledger/persisted/closed?region=IN&assetType=STOCK&limit=25&offset=0&sortBy=entryTriggerTimestamp&sortDirection=desc`
+### Data Notes (Trend Momentum, 3Y, IN/STOCK, 254 trades):
+- Ending Capital ₹1,09,584; Total Return 9.6%; CAGR 4.3%; Max Drawdown -17.7%
+- Sharpe -0.20; Sortino -0.23; Calmar 0.24; Win Rate 31.1% (CI 25.7%–37.0%); Profit Factor 1.19
+- Rating: "Average — WATCHLIST_CANDIDATE — PARTIAL"
+- vs Benchmark (NSE Nifty 50 CAGR 1.3%): Excess CAGR +3.0%
+- Performance by regime: Risk-On CAGR -5.4% (poor), Neutral CAGR +12.6% (good), Risk-Off/Unknown N/A
+- Exit breakdown: Strategy exit 90.6%, trailing stop 4.3%, end-of-test forced 3.5%
+- Universe bounded: 50 of 2937 instruments (runtime safety cap)
+- 3 caveats displayed: SURVIVORSHIP_BIAS_UNIVERSE, PRICE_PROXY_CONTEXT, WARM_UP_DRAG
 
-**Console errors:** None.
-
-**Gaps / Issues:**
-- **Rule column shows "Unavailable - —" for all 25 visible rows** — `row.strategyId` is null/undefined for all entry trigger candidates. This means the signal lifecycle records are not linked to a strategy or entry rule, making the "Rule" column uninformative.
-- **Grade N/A for all rows** — `row.strategyRatingGrade` is null for all visible entries.
-- **0 closed entries** — no historical lifecycle evidence exists yet; the Closed History tab will render the empty-state message.
-- **DQ ready evidence: only 22 of 1,110 rows** — very low data quality coverage (2%). The "Visible rows" KPI for forward-validation = 0, meaning no rows have passed forward-validation yet.
-- **Caveats on 25 rows** — likely the rows where `currentReturnStatus !== 'CURRENT'` or LIMITED evidence.
-- Return till date = +0% for most entries (all triggered today, 2026-06-15 — no meaningful return yet).
-- The Prisma delegate concern from the task brief does not manifest as a 500 error — API returns 200 with data. The strategyId/entryRuleId null issue is the more visible data quality gap.
+### Gaps / Issues
+- Rating "Average / WATCHLIST_CANDIDATE" with negative Sharpe — insufficient evidence for PROVEN status
+- Monthly returns 2023 (Jun–Dec): all 0.0% — warm-up period, no trades taken
 
 ---
 
-## Summary Table
+## 8. Historical Context Snapshots
+**Route:** `/context-snapshots`  
+**Purpose:** View, generate, and look up persisted market regime/breadth/sector/country/smart-money snapshots by date/stock/sector.
 
-| Screen | Path | API Calls | Data State | Notable Gaps |
-|---|---|---|---|---|
-| Strategy Decision Engine | `/admin/strategy` | 8 endpoints (all 200) | Active data for all tabs | Tab switching frozen in automation; Rating=UNKNOWN on all candidates |
-| Strategy Framework | `/admin/strategies` | 6 endpoints (all 200) | 11 strategies, 10 Unproven | Risk/Calibration/Diagnostics categories empty |
-| Historical Context Snapshots | `/admin/context-snapshots` | 4 endpoints | 114 market, 1113 sector, 114 country snaps | Most dates PARTIAL; IT sector score=0 today |
-| Market Context Intelligence | `/admin/market-context` | 5 endpoints | Live data present; PARTIAL status | Macro snapshot MISSING; Sector signals 0/0; Bullish/Bearish 0/0 |
-| Breadth Internals | `/admin/breadth-internals` | 1 endpoint (breadth-internals) | Full 3Y history in charts | No gaps observed |
-| Backtesting Strategy Lab | `/admin/backtests` | 2+ endpoints | TREND_MOMENTUM 3Y results loaded | Only 1 of 5 active strategies has backtest data |
-| Smart Money Intelligence | `/admin/smart-money` | 5 endpoints | 857 accum / 231 distrib | TCS score=0 anomaly; ownership data MISSING |
-| Trade Plans (Legacy) | `/admin/trade-plans` | 2 endpoints (both 200) | 3 rows pass paper-readiness | portfolioImpact null ~99.6%; page self-labeled "legacy" |
-| Signal Position Ledger | `/admin/signal-position-ledger` | 2 endpoints (both 200) | 1,110 active / 0 closed | strategyId null on all rows; Grade N/A; 0 forward-validation |
+### UI Elements
+- Header: "Historical Context Snapshots — for IN / STOCK"
+- "Open Signal Quality Lab" button-link
+- 5 stat cards: Market Snapshots (114), Sector Snapshots (1,113), Country Snapshots (114), Smart Money (137,929), Latest Date 6/15/2026
+- "Generate Snapshot" panel: date picker, smart-money limit input, "Generate" button (destructive — SKIPPED)
+- Lookup Tool: Date, Stock/instrument, Sector, Country inputs + "Lookup" button
+- Market Regime Snapshots table: 20 rows visible, "Show more (80 remaining)"
+- Sector Snapshots table: 20 rows visible, "Show more (80 remaining)"
+- Country Snapshots table
 
-## Destructive Controls Skipped
+### API Calls
+- `GET /api/v1/context-snapshots/coverage?region=IN&assetType=STOCK`
+- `GET /api/v1/context-snapshots/market?limit=100&region=IN&assetType=STOCK`
+- `GET /api/v1/context-snapshots/sectors?limit=100&region=IN&assetType=STOCK`
+- `GET /api/v1/context-snapshots/countries?limit=100&region=IN&assetType=STOCK`
 
-- **Strategy Decision → "Run Evaluation"** (POST batch evaluation across universe)
-- **Historical Context Snapshots → "Generate Snapshot"** (POST to context-snapshots/generate)
-- **Market Context → "Refresh"** (live re-fetch + snapshot write)
-- **Backtesting Lab → "Run Registered Backtest"** (POST to /api/v1/backtests/run)
-- **Smart Money → "Refresh Snapshots"** (POST to /api/v1/smart-money/run)
-- **Trade Plans → "Generate Plans"** (POST batch plan generation)
-- **Signal Position Ledger** has no generate/run button — Reload snapshot and Export CSV are read-only operations
+### Data Notes
+- 114 daily market snapshots (healthy history depth); 1,113 sector snapshots; 137,929 smart money records
+- Regime history (latest 20): NEUTRAL dominant since late May; RISK_ON: Jun 4, May 25–30; RISK_OFF: May 31 (score 25, SMA50 N/A)
+- Sector on 6/15: Technology LEADING 79, Utilities LEADING 71, Industrials LAGGING 69, Information Technology score **0** (anomaly)
+- Country: India score 62, status PARTIAL
 
-## Distinct API Paths Covered
+### Gaps / Issues
+- "Information Technology" sector score of 0 on 6/15 is suspicious alongside "Technology" sector at 79 — possible sector label duplication/remapping issue (two labels covering overlapping instruments).
+- Lookup tool present but requires manual input — not exercised in this read-only audit.
+
+---
+
+## 9. Breadth Internals
+**Route:** `/breadth-internals`  
+**Purpose:** Market breadth trends over configurable lookback periods for divergence detection.
+
+### UI Elements
+- Header: "Breadth Internals — Market breadth trends over time. Breadth divergence is the key early-warning indicator for Indian market tops."
+- Lookback buttons: 14d | 30d | 60d | 90d
+- Latest snapshot date: 2026-06-15
+- 6 stat cards: Above SMA50 (62.7%), Above SMA200 (54.9%), A/D Ratio (3.00), 52W High/Low (43/4), High-Low Net (+39), Regime NEUTRAL 59.0
+- 6 sparkline charts with percentile bands: % Above SMA50, % Above SMA200, A/D Ratio, 52W Highs vs Lows, High-Low Net, Regime Score
+- Period Deltas table: Current vs Period Start vs Change
+
+### API Calls
+- `GET /api/v1/market-context/breadth-internals?days=60&region=IN&assetType=STOCK`
+
+### Data Notes
+- Period deltas (2023-07-01 to 2026-06-15): SMA50% −13.0%, SMA200% −10.9%, A/D +1.63, Regime Score −23
+- Charts render with full percentile bands; all 4 lookback controls functional
+- Latest point Jun 15: SMA50 at ~24.8th percentile, SMA200 at ~31st percentile, A/D at 2.33 (moderate)
+
+### Gaps / Issues
+- No notable issues. Screen renders fully with rich historical chart data.
+- IN scope only (no US equivalent by design).
+
+---
+
+## Re-Audit Focus — Prior Findings Status
+
+| Finding | Prior State | Current State (2026-06-16) |
+|---|---|---|
+| Signal/Trigger Monitor — strategyId null ("Rule: Unavailable", "Grade N/A") | All rows null | **UNCHANGED** — `strategyId`, `strategyRatingGrade`, `entryRuleId` null on all 67 active US/STOCK rows |
+| Trade Plans — portfolioImpact blank | 99.6% null in DB | **UNCHANGED** — portfolioImpact section absent entirely; 0 of 10 plans paper-ready |
+| Strategy Framework — Unproven count | All Unproven | **UNCHANGED** — all 11 strategies remain Unproven (0 proven) |
+| Market Context — Macro Snapshot | "providers not configured" | **UNCHANGED** — "UNKNOWN / Macro providers are not configured yet." |
+| Market Context — Sector signals | 0/0 | **UNCHANGED** — all sectors show "Signals 0/0" in Sector Rotation |
+| Smart Money — TCS score=0 with large negative daily | score=0, -35.9% displayed | **BUG CONFIRMED** — score=0 is correct (DISTRIBUTION). API returns `dailyChangePercent: -0.3585` (fractional ≈ -0.036%) but UI renders -35.9%, double-multiplying by 100. |
+
+---
+
+## Distinct API Paths Observed
 
 ```
-GET  /api/v1/strategy/market-gate
-GET  /api/v1/strategy/candidates
-GET  /api/v1/strategy/exits
-GET  /api/v1/strategy/model
+GET  /api/v1/auth/me
+GET  /api/v1/signals/position-ledger/persisted/active
+GET  /api/v1/signals/position-ledger/persisted/closed
+GET  /api/v1/trade-plans/candidates
+GET  /api/v1/trade-plans/funnel
 GET  /api/v1/strategies
-GET  /api/v1/strategies/:code
-GET  /api/v1/strategies/:code/performance
-GET  /api/v1/strategies/:code/proof
-GET  /api/v1/strategies/rankings
-GET  /api/v1/strategies/proof-registry
+GET  /api/v1/market-context/capital-posture
+GET  /api/v1/market-context/breadth-internals
+GET  /api/v1/smart-money/top
+GET  /api/v1/smart-money/distribution
+GET  /api/v1/smart-money/sectors
 GET  /api/v1/context-snapshots/coverage
 GET  /api/v1/context-snapshots/market
 GET  /api/v1/context-snapshots/sectors
 GET  /api/v1/context-snapshots/countries
-GET  /api/v1/market-context/capital-posture
-GET  /api/v1/market-context/summary (or /persisted-summary)
-GET  /api/v1/market-context/persisted-breadth
-GET  /api/v1/market-context/sectors
-GET  /api/v1/market-context/breadth
-GET  /api/v1/market-context/breadth-internals
-GET  /api/v1/backtests/runs
-GET  /api/v1/backtests/strategies
-GET  /api/v1/smart-money/top
-GET  /api/v1/smart-money/distribution
-GET  /api/v1/smart-money/sectors
-GET  /api/v1/smart-money/fno-ban
-GET  /api/v1/smart-money/health
-GET  /api/v1/trade-plans/candidates
-GET  /api/v1/trade-plans/funnel
-GET  /api/v1/signals/position-ledger/persisted/active
-GET  /api/v1/signals/position-ledger/persisted/closed
 GET  /api/v1/alerts/events
+GET  /api/v1/instruments
 ```
+
+## Destructive Controls Skipped
+- `/strategy` → "Run Evaluation" (batch strategy decision recompute)
+- `/trade-plans` → "Generate Plans" (batch trade plan generation)
+- `/backtests` → "Run Registered Backtest" (backtest execution)
+- `/context-snapshots` → "Generate Snapshot" (snapshot generation)
+- `/smart-money` → "Refresh Snapshots" (smart money recompute)
