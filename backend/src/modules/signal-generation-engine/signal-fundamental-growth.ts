@@ -183,7 +183,7 @@ export function fundamentalPeHistoryVotes(
   const currentPe = num(latest.pe_ratio);
   if (currentPe === null || currentPe <= 0) return { signals, negativeSignals };
 
-  const validPes = records.map((r) => num(r.pe_ratio)).filter((p): p is number => p !== null && p > 0);
+  const validPes = records.filter((r) => r !== latest).map((r) => num(r.pe_ratio)).filter((p): p is number => p !== null && p > 0);
   if (validPes.length < 3) return { signals, negativeSignals };
 
   validPes.sort((a, b) => a - b);
