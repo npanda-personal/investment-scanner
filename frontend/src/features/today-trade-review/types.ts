@@ -167,6 +167,12 @@ export interface TodayReviewCandidate {
   range52wLow?: number | null;
   /** Latest adjusted close used for the range position (read-time). */
   range52wCurrentClose?: number | null;
+  /** Previous trading-day adjusted close (read-time). */
+  previousClose?: number | null;
+  /** Today's change % vs previous close. */
+  dayChangePercent?: number | null;
+  /** Today's volume / 20-day average volume ratio (read-time). */
+  volumeRatio?: number | null;
   /**
    * NR-100: Whether the symbol is on the latest F&O ban list, joined at READ time.
    * False/absent = not in ban (honest default).

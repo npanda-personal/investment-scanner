@@ -76,7 +76,7 @@ export function EmptyTabState({ tab, run, groups }: { tab: keyof TodayReviewGrou
   const scanFunnel: Partial<TodayReviewScanFunnel> = run.scanFunnel || sourceSnapshot.scanFunnel || {};
 
   if (tab === 'longReview') {
-    const regimeIsQuiet = runRegime === 'RISK_OFF' || runRegime === 'NEUTRAL';
+    const regimeIsQuiet = runRegime === 'RISK_OFF' || runRegime === 'NEUTRAL' || runRegime === null;
     if (regimeIsQuiet && watchCount > 0) {
       return (
         <Typography color="text.secondary">

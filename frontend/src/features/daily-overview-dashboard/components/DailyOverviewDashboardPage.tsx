@@ -56,7 +56,7 @@ export function DailyOverviewDashboardPage() {
   const moverSummary = marketMovers?.ranges.find((item) => item.range === moverRange) ?? null;
   const hotStocks = useMemo(() => {
     const candidateByInstrumentId = new Map(
-      [...todayReviewGroups.bullishReview, ...todayReviewGroups.bearishReview]
+      [...todayReviewGroups.bullishReview, ...todayReviewGroups.bearishReview, ...todayReviewGroups.exitRiskReview, ...todayReviewGroups.watchOnly]
         .map((item) => [item.instrumentId, item] as const),
     );
     return [...(moverSummary?.gainers ?? []), ...(moverSummary?.losers ?? [])]
@@ -67,7 +67,7 @@ export function DailyOverviewDashboardPage() {
       .filter((item) => item.candidate)
       .sort((left, right) => Math.abs(right.mover.returnPercent) - Math.abs(left.mover.returnPercent))
       .slice(0, 6);
-  }, [moverSummary?.gainers, moverSummary?.losers, todayReviewGroups.bearishReview, todayReviewGroups.bullishReview]);
+  }, [moverSummary?.gainers, moverSummary?.losers, todayReviewGroups.bearishReview, todayReviewGroups.bullishReview, todayReviewGroups.exitRiskReview, todayReviewGroups.watchOnly]);
 
   if (profile.isCrypto) {
     return (
@@ -276,7 +276,10 @@ export function DailyOverviewDashboardPage() {
 
         <Paper variant="outlined" sx={{ p: 2 }}>
           <Stack spacing={1.5}>
-            <Typography variant="h6">Sector Strength</Typography>
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Typography variant="h6">Sector Strength</Typography>
+              <StalenessBadge asOf={marketContext?.updatedAt} label="Market context" />
+            </Stack>
             {dashboard.deferred.marketContext.error && !dashboard.deferred.marketContext.loading && (
               <SectionError message={dashboard.deferred.marketContext.error} onRetry={() => void dashboard.refresh()} />
             )}

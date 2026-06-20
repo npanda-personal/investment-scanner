@@ -158,6 +158,12 @@ export interface TodayReviewCandidateDto {
   range52wLow?: number | null;
   /** Latest adjusted close used for the range position (read-time, from price_ticks). */
   range52wCurrentClose?: number | null;
+  /** Previous trading-day adjusted close (read-time, from price_ticks). */
+  previousClose?: number | null;
+  /** Today's change % vs previous close: (current - prev) / prev * 100. */
+  dayChangePercent?: number | null;
+  /** Today's volume / 20-day average volume ratio (read-time, from price_ticks). */
+  volumeRatio?: number | null;
   /**
    * NR-100: Whether the symbol is on the latest F&O ban list (fno_ban_list table).
    * Joined at READ time — one batch query for all candidates in the run.

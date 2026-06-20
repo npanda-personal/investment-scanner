@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { humanizeCode } from '@/shared/format/enumLabels';
+import { money } from '@/shared/format/money';
 import type {
   TodayReviewCandidate,
   TodayReviewCandidateDataQualitySnapshot,
@@ -34,7 +35,11 @@ export type SortKey =
   | 'earnings'
   | 'smartMoney'
   | 'fnoBan'
-  | 'range52w';
+  | 'range52w'
+  | 'price'
+  | 'dayChange'
+  | 'volume'
+  | 'subState';
 
 export interface CandidateColumn {
   id: SortKey;
@@ -127,24 +132,24 @@ export function formatNumber(value?: number | null) {
   return new Intl.NumberFormat().format(Number(value || 0));
 }
 
-export function formatCurrency(value?: number | null) {
+export function formatCurrency(value?: number | null, currency?: string | null) {
   if (typeof value !== 'number' || !Number.isFinite(value)) return 'Unavailable';
-  return `INR ${value.toFixed(2)}`;
+  return money(value, currency);
 }
 
-export function formatEntry(plan: any) {
+export function formatEntry(plan: any, currency?: string | null) {
   if (!plan?.entryZone) return 'Unavailable';
-  const min = formatCurrency(Number(plan.entryZone.preferredEntryMin));
-  const max = formatCurrency(Number(plan.entryZone.preferredEntryMax));
+  const min = formatCurrency(Number(plan.entryZone.preferredEntryMin), currency);
+  const max = formatCurrency(Number(plan.entryZone.preferredEntryMax), currency);
   return `${min} - ${max}`;
 }
 
-export function formatStop(plan: any, candidate?: TodayReviewCandidate) {
+export function formatStop(plan: any, candidate?: TodayReviewCandidate, currency?: string | null) {
   if (candidate?.blockers?.[0]) return safeReviewText(candidate.blockers[0]);
   if (!plan?.stopLoss) return 'Unavailable';
   const stopPrice = Number(plan.stopLoss.price);
   const entryRef = Number(plan.entryZone?.preferredEntryMin || plan.entryZone?.preferredEntryMax || 0);
-  const stopText = formatCurrency(stopPrice);
+  const stopText = formatCurrency(stopPrice, currency);
   const ruleText = safeReviewText(plan.invalidationRules?.[0] || 'Invalidation unavailable');
   const isLong = !candidate?.direction || candidate.direction === 'LONG' || String(candidate?.state ?? '').includes('LONG');
   const isShort = candidate?.direction === 'SHORT' || String(candidate?.state ?? '').includes('SHORT');
@@ -276,9 +281,8 @@ export function tierContextForCandidate(candidate: TodayReviewCandidate): Candid
   const automation = tiers?.automation;
 
   const dailyReviewStatus: TierStatus = dailyReview?.status || 'MISSING';
-  const automationStatus: TierStatus = automation ? 'BLOCKED' : 'MISSING';
+  const automationStatus: TierStatus = automation?.status || 'MISSING';
   const missingTierBlocker = 'Data quality tier context is missing; confidence is shown conservatively.';
-  const upstreamAutomationStatus = automation?.status || null;
 
   return {
     dailyReview: {
@@ -288,12 +292,8 @@ export function tierContextForCandidate(candidate: TodayReviewCandidate): Candid
     },
     automation: {
       status: automationStatus,
-      label: automation ? 'Automation: BLOCKED' : '—',
-      reason: !automation
-        ? 'Automation tier not available; trading is not enabled.'
-        : upstreamAutomationStatus !== 'BLOCKED'
-          ? `Upstream tier reported ${upstreamAutomationStatus}; automated trading is not enabled in this phase.`
-          : automation.reasons?.[0] || 'Automated trading is not enabled.',
+      label: automation ? `Automation: ${automationStatus}` : '—',
+      reason: automation?.reasons?.[0] || (automation ? null : 'Automation tier not available; trading is not enabled.'),
     },
     blocker: !tiers
       ? missingTierBlocker

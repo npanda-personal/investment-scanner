@@ -25,7 +25,7 @@ import { AddToWatchlistDialog } from '@/features/watchlist-management';
 import { CreateAlertDialog } from '@/features/alerts-monitoring';
 import { useTodayReviewCandidate } from '../hooks/useTodayReview';
 import type { TodayReviewCandidate, TodayReviewCandidateDataQualitySnapshot } from '../types';
-
+import { formatCurrency, safeReviewText, stateLabel } from './todayReviewTableFormat';
 export function TodayReviewCandidateDetailPage() {
   const { candidateId } = useParams();
   const { candidate, loading, error, reload } = useTodayReviewCandidate(candidateId);
@@ -360,15 +360,6 @@ function tierDetailLabel(status: DetailTierStatus, reason: string | null) {
   return reason ? `${status} (${reason})` : status;
 }
 
-function stateLabel(value: string) {
-  return value.toLowerCase().split('_').map((part) => part[0]?.toUpperCase() + part.slice(1)).join(' ');
-}
-
-function formatCurrency(value?: number | null) {
-  if (typeof value !== 'number' || !Number.isFinite(value)) return 'Unavailable';
-  return `INR ${value.toFixed(2)}`;
-}
-
 function formatEntry(plan: any) {
   if (!plan?.entryZone) return 'Unavailable';
   return `${formatCurrency(Number(plan.entryZone.preferredEntryMin))} - ${formatCurrency(Number(plan.entryZone.preferredEntryMax))}`;
@@ -534,29 +525,3 @@ function buildPriceBehaviourText(candidate: TodayReviewCandidate): string | null
   return `${first}, ${rest.join('; ')}.`;
 }
 
-function safeReviewText(value: string) {
-  return String(value || '')
-    .replace(/PAPER_TEST_CANDIDATE/g, 'RESEARCH_REVIEW_CANDIDATE')
-    .replace(/READY_FOR_PAPER_REVIEW/g, 'RESEARCH_REVIEW_READY')
-    .replace(/Trade-plan proof-chain snapshot supports paper-review research\./gi, 'Exit and invalidation evidence is available for research review.')
-    .replace(/Paper review readiness is BLOCKED by the trade-plan snapshot\./gi, 'Exit/invalidation evidence is BLOCKED by the risk snapshot.')
-    .replace(/Reward\/risk is below the paper review threshold\./gi, 'Exit/invalidation evidence is incomplete for research review.')
-    .replace(/Reward\/risk is incomplete for paper review\./gi, 'Exit/invalidation evidence is incomplete for research review.')
-    .replace(/Trade-plan snapshot/gi, 'Exit/invalidation evidence snapshot')
-    .replace(/Trade plan has active blockers/gi, 'Exit/invalidation evidence has active blockers')
-    .replace(/Trade plan status/gi, 'Risk snapshot status')
-    .replace(/Trade plan/gi, 'Risk evidence')
-    .replace(/trade plan/gi, 'risk evidence')
-    .replace(/trade-plan/gi, 'risk-evidence')
-    .replace(/Stop loss/gi, 'Invalidation level')
-    .replace(/stop loss/gi, 'invalidation level')
-    .replace(/stop level/gi, 'invalidation level')
-    .replace(/paper-readiness/gi, 'research-readiness')
-    .replace(/paper review/gi, 'research review')
-    .replace(/paper-review/gi, 'research-review')
-    .replace(/reward\/risk/gi, 'exit/invalidation evidence')
-    .replace(/modeled reward/gi, 'modeled compatibility range')
-    .replace(/target\/reward/gi, 'exit/invalidation')
-    .replace(/target price/gi, 'compatibility price')
-    .replace(/price target/gi, 'compatibility price');
-}
