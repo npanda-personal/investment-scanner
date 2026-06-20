@@ -100,7 +100,7 @@ export default function ScreenerPage() {
   const [generatedAt, setGeneratedAt] = useState<string | null>(null);
   const [count, setCount] = useState<number | null>(null);
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(25);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
 
   // Debounce timer
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
