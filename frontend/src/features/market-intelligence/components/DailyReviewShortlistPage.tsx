@@ -109,6 +109,9 @@ export function DailyReviewShortlistPage() {
         </Stack>
       )}
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+      {!loading && !error && !data && (
+        <Alert severity="info" sx={{ mb: 2 }}>No shortlist data available for this session.</Alert>
+      )}
       {!loading && !error && data && <DailyReviewShortlistContent data={data} />}
     </Box>
   );

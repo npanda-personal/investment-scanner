@@ -170,7 +170,7 @@ export function TodayReviewPage() {
                 {activeCandidates.length === 0 ? (
                   <EmptyTabState tab={tab} run={run} groups={groups} />
                 ) : (
-                  <CandidateTable candidates={activeCandidates} run={run} activeTab={tab} />
+                  <CandidateTable key={tab} candidates={activeCandidates} run={run} activeTab={tab} />
                 )}
               </CardContent>
             </Card>
