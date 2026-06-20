@@ -24,7 +24,10 @@ import {
   CrosshairMode,
   LineStyle,
   type IChartApi,
+  type ISeriesApi,
+  type SeriesType,
   type LogicalRange,
+  type MouseEventParams,
 } from 'lightweight-charts';
 import { fetchInstrumentPrices } from '@/features/market-data-foundation/api/marketDataFoundationService';
 import IndicatorToolbar from '@/shared/indicators/IndicatorToolbar';
@@ -43,6 +46,8 @@ interface InstrumentPriceChartProps {
 const UP = '#26a69a';
 const DOWN = '#ef5350';
 const OSC_HEIGHT = 120;
+const INDICATOR_STORAGE_KEY = 'chart_active_indicators';
+const TIMEFRAME_STORAGE_KEY = 'chart_timeframe';
 
 export default function InstrumentPriceChart({
   instrumentId,
@@ -60,8 +65,24 @@ export default function InstrumentPriceChart({
 
   const [candles, setCandles] = useState<OHLCVBar[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [activeIndicatorIds, setActiveIndicatorIds] = useState<IndicatorId[]>(DEFAULT_INDICATORS);
-  const [timeframe, setTimeframe] = useState<ChartTimeframe>('1D');
+  const [activeIndicatorIds, setActiveIndicatorIds] = useState<IndicatorId[]>(() => {
+    try {
+      const stored = localStorage.getItem(INDICATOR_STORAGE_KEY);
+      return stored ? JSON.parse(stored) : DEFAULT_INDICATORS;
+    } catch { return DEFAULT_INDICATORS; }
+  });
+  const [timeframe, setTimeframe] = useState<ChartTimeframe>(() => {
+    const stored = localStorage.getItem(TIMEFRAME_STORAGE_KEY);
+    return stored === '1W' || stored === '1M' ? stored : '1D';
+  });
+
+  useEffect(() => {
+    localStorage.setItem(INDICATOR_STORAGE_KEY, JSON.stringify(activeIndicatorIds));
+  }, [activeIndicatorIds]);
+
+  useEffect(() => {
+    localStorage.setItem(TIMEFRAME_STORAGE_KEY, timeframe);
+  }, [timeframe]);
 
   const displayBars = useMemo(
     () => (candles ? aggregateBars(candles, timeframe) : null),
@@ -190,6 +211,8 @@ export default function InstrumentPriceChart({
     mainChart.timeScale().fitContent();
 
     // ── Oscillator charts ───────────────────────────────────────────────────
+    type ChartPair = [IChartApi, ISeriesApi<SeriesType>];
+    const chartPairs: ChartPair[] = [[mainChart, candleSeries]];
     const oscCharts: IChartApi[] = [];
 
     activeOscillators.forEach((def, oscIdx) => {
@@ -224,6 +247,7 @@ export default function InstrumentPriceChart({
         refLine.setData(displayBars.map((b) => ({ time: b.time, value: ref.value })));
       }
 
+      let firstOscSeries: ISeriesApi<SeriesType> | null = null;
       for (const s of result.series) {
         const series = oscChart.addLineSeries({
           color: s.color,
@@ -235,7 +259,9 @@ export default function InstrumentPriceChart({
           crosshairMarkerVisible: true,
         });
         series.setData(s.data);
+        if (!firstOscSeries) firstOscSeries = series;
       }
+      if (firstOscSeries) chartPairs.push([oscChart, firstOscSeries]);
 
       oscChart.priceScale('right').applyOptions({
         scaleMargins: { top: 0.08, bottom: 0.08 },
@@ -267,7 +293,29 @@ export default function InstrumentPriceChart({
       for (const osc of oscCharts) osc.timeScale().setVisibleLogicalRange(initialRange);
     }
 
+    // ── Crosshair sync ─────────────────────────────────────────────────────
+    const crosshairHandlers: Array<[IChartApi, (p: MouseEventParams) => void]> = [];
+    for (const [srcChart, _srcSeries] of chartPairs) {
+      const handler = (params: MouseEventParams) => {
+        if (syncing.current) return;
+        syncing.current = true;
+        try {
+          for (const [tgtChart, tgtSeries] of chartPairs) {
+            if (tgtChart === srcChart) continue;
+            if (params.time) {
+              tgtChart.setCrosshairPosition(NaN, params.time, tgtSeries);
+            } else {
+              tgtChart.clearCrosshairPosition();
+            }
+          }
+        } finally { syncing.current = false; }
+      };
+      srcChart.subscribeCrosshairMove(handler);
+      crosshairHandlers.push([srcChart, handler]);
+    }
+
     return () => {
+      for (const [chart, handler] of crosshairHandlers) chart.unsubscribeCrosshairMove(handler);
       mainChart.remove();
       mainChartRef.current = null;
       for (const osc of oscCharts) osc.remove();
