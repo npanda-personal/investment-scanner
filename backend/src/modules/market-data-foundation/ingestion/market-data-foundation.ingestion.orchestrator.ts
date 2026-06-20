@@ -73,7 +73,7 @@ export class RegionSyncOrchestrator {
       }
     }
 
-    const batchSize = Math.max(1, Math.min(options.batchSize ?? 25, 250));
+    const batchSize = Math.max(1, Math.min(options.batchSize ?? 25, 2000));
 
     if (this.shouldUseExchangeDailyImportPath(region, assetType)) {
       const summary: ScheduledRegionSyncSummary = {
@@ -217,9 +217,8 @@ export class RegionSyncOrchestrator {
         : await usEquityIngestionService.backfillPrices({ region, symbols, lookbackDays });
 
       const changedInstrumentIds = this.host.instrumentIdsForImportedSymbols(tasks, backfill.changedSymbols);
-      const downstreamInstrumentIds = changedInstrumentIds.length > 0
-        ? changedInstrumentIds
-        : this.host.instrumentIdsForImportedSymbols(tasks, symbols);
+      const allBatchInstrumentIds = this.host.instrumentIdsForImportedSymbols(tasks, symbols);
+      const downstreamInstrumentIds = allBatchInstrumentIds;
 
       summary.instrumentsProcessed = backfill.symbolsProcessed;
       summary.rowsReceived = backfill.barsReceived;
@@ -231,7 +230,7 @@ export class RegionSyncOrchestrator {
       summary.warnings = backfill.warnings.slice(0, 10);
       summary.changedInstrumentIds = changedInstrumentIds;
       summary.downstreamInstrumentIds = downstreamInstrumentIds;
-      summary.downstreamEligibilitySource = changedInstrumentIds.length > 0 ? 'region_provider_backfill' : null;
+      summary.downstreamEligibilitySource = downstreamInstrumentIds.length > 0 ? 'region_provider_backfill' : null;
       summary.changedInstrumentCount = changedInstrumentIds.length;
       summary.dqStageEligible = changedInstrumentIds.length > 0;
       summary.sourceFingerprint = this.host.scheduledRegionSourceFingerprint({
@@ -244,8 +243,8 @@ export class RegionSyncOrchestrator {
         downstreamInstrumentIds,
       });
 
-      if (backfill.changedSymbols.length > 0) {
-        await this.host.updateStockLoadTimestampsForSymbols(backfill.changedSymbols);
+      if (symbols.length > 0) {
+        await this.host.updateStockLoadTimestampsForSymbols(symbols);
       }
 
       await this.host.repository.upsertSyncState({ region, assetType, tradingDate, status: 'SYNCED', summary, lastCheckedAt: now, lastProviderFetchAt: now });

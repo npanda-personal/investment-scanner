@@ -8,7 +8,7 @@
  * "fresh". This module computes both the numeric session count and the boolean
  * from one code path so they are always consistent.
  */
-import { expectedLatestTradingDate, tradingSessionsBetween } from '../market-data-foundation';
+import { expectedLatestTradingDate, getMarketSessionConfig, tradingSessionsBetween } from '../market-data-foundation';
 import type { DataQualityConfig } from './data-quality-engine.config';
 
 const DAY_MS = 86_400_000;
@@ -74,7 +74,8 @@ export function computeStaleness(
 
   // tradingSessionsBetween counts both endpoints — subtract 1 so a price ON the
   // expected date is 0 sessions behind.
-  const { count } = tradingSessionsBetween(config.calendarRegion, latestDateStr, expectedDate);
+  const sessionConfig = getMarketSessionConfig(config.calendarRegion);
+  const { count } = tradingSessionsBetween(config.calendarRegion, latestDateStr, expectedDate, { holidays: sessionConfig?.holidays });
   const sessionsBehind = Math.max(0, count - 1);
   return {
     staleSessions: sessionsBehind,
