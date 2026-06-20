@@ -328,6 +328,7 @@ export function SectorRotationPage() {
 
   const sectors = data?.sectors ?? [];
   const quadrants: RotationQuadrant[] = ['LEADING', 'IMPROVING', 'WEAKENING', 'LAGGING'];
+  const [warningsExpanded, setWarningsExpanded] = useState(false);
 
   if (!profile.capabilities.hasSectors) {
     return (
@@ -340,8 +341,6 @@ export function SectorRotationPage() {
       </Box>
     );
   }
-
-  const [warningsExpanded, setWarningsExpanded] = useState(false);
 
   return (
     <Box className="page-container page-container--hub">
