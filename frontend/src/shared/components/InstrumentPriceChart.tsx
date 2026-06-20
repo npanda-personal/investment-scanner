@@ -300,7 +300,7 @@ export default function InstrumentPriceChart({
 
     // ── Crosshair sync ─────────────────────────────────────────────────────
     const crosshairHandlers: Array<[IChartApi, (p: MouseEventParams) => void]> = [];
-    for (const [srcChart] of chartPairs) {
+    for (const [srcChart, _srcSeries] of chartPairs) {
       const handler = (params: MouseEventParams) => {
         if (crosshairSyncing.current) return;
         crosshairSyncing.current = true;

@@ -116,7 +116,7 @@ export default function UnifiedStockPage() {
       ) : (
         <Grid container spacing={2}>
           <Grid item xs={12} lg={8}>
-            <InstrumentDetailPage />
+            <InstrumentDetailPage activeTab={activeTab} />
           </Grid>
           <Grid item xs={12} lg={4}>
             <MarketContextRail instrumentId={id} symbol={symbol} derivativesEligible={derivativesEligible} />

@@ -90,7 +90,12 @@ const safeSource = (instrumentSource: string | null | undefined, priceSource?: s
   return src;
 };
 
-const InstrumentDetailPage: React.FC = () => {
+interface InstrumentDetailPageProps {
+  /** When rendered inside UnifiedStockPage, the active tab controls which sections are shown. */
+  activeTab?: 'overview' | 'prices' | 'fundamentals' | string;
+}
+
+const InstrumentDetailPage: React.FC<InstrumentDetailPageProps> = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { scope, profile } = useMarketScope();

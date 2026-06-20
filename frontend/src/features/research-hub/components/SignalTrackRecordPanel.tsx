@@ -236,7 +236,9 @@ export const SignalTrackRecordPanel: FC = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {filteredSummary.map((s) => <SummaryRow key={s.horizon} row={s} benchmarkLabel={profile.benchmarkLabel} />)}
+              {filteredSummary.length === 0 && selectedHorizon ? (
+                <TableRow><TableCell colSpan={6}><Typography variant="body2" color="text.secondary" sx={{ py: 1 }}>No data for {selectedHorizon} horizon.</Typography></TableCell></TableRow>
+              ) : filteredSummary.map((s) => <SummaryRow key={s.horizon} row={s} benchmarkLabel={profile.benchmarkLabel} />)}
             </TableBody>
           </Table>
 

@@ -144,6 +144,8 @@ function EquitySignalsHistoryTab({ instrumentId }: { instrumentId?: string }) {
     return <Alert severity="warning">{error}</Alert>;
   }
 
+  const primaryAggregate = horizonAggregates.find((a) => a.horizon === '20D')?.aggregate ?? null;
+  const confidence = primaryAggregate ? sampleConfidence(primaryAggregate.directionalSampleSize) : null;
   const hasAnyOutcomes = horizonAggregates.some((a) => a.aggregate !== null);
 
   return (
@@ -184,16 +186,22 @@ function EquitySignalsHistoryTab({ instrumentId }: { instrumentId?: string }) {
 
       {/* Multi-horizon track record */}
       <Paper variant="outlined" sx={{ p: 2 }}>
-        <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>Track Record</Typography>
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+          <Typography variant="subtitle2" fontWeight={700}>Track Record</Typography>
+          {confidence && (
+            <Tooltip title={`Based on ${primaryAggregate?.directionalSampleSize ?? 0} directional signals with completed 20D outcomes. HIGH ≥ 100, MEDIUM ≥ 30, LOW < 30.`}>
+              <Chip label={`${confidence} confidence`} size="small" color={confidenceChipColor(confidence)} variant="outlined" />
+            </Tooltip>
+          )}
+        </Stack>
         <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
           Win rate and average forward return across horizons. Returns are absolute, not benchmark-adjusted.
         </Typography>
 
         {hasAnyOutcomes ? (
-          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(3, 1fr)', md: `repeat(${HORIZONS.length}, 1fr)` }, gap: 2 }}>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(3, 1fr)', md: `repeat(${HORIZONS.length}, 1fr)` }, gap: 2 }}>
             {HORIZONS.map((h) => {
               const agg = horizonAggregates.find((a) => a.horizon === h)?.aggregate;
-              const conf = agg?.directionalSampleSize != null ? sampleConfidence(agg.directionalSampleSize) : null;
               return (
                 <Box key={h} sx={{ textAlign: 'center' }}>
                   <Typography variant="caption" color="text.secondary" fontWeight={700}>{h}</Typography>
@@ -202,9 +210,7 @@ function EquitySignalsHistoryTab({ instrumentId }: { instrumentId?: string }) {
                     {formatPct(agg?.avgForwardReturn)}
                   </Typography>
                   {agg?.matureCount != null && (
-                    <Tooltip title={`${agg.matureCount} completed outcomes. Confidence: ${conf ?? '—'} (HIGH ≥ 100, MEDIUM ≥ 30, LOW < 30).`}>
-                      <Chip label={`${agg.matureCount} signals`} size="small" variant="outlined" color={confidenceChipColor(conf)} sx={{ mt: 0.5, fontSize: '0.65rem', height: 20 }} />
-                    </Tooltip>
+                    <Typography variant="caption" color="text.secondary" display="block">{agg.matureCount} signals</Typography>
                   )}
                 </Box>
               );

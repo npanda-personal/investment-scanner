@@ -1,5 +1,5 @@
 import type { TodayReviewCandidate, TodayReviewCandidateDataQualitySnapshot } from '../types';
-import { formatCurrency, safeReviewText, stateLabel } from './todayReviewTableFormat';
+import { formatCurrency, formatEntry, safeReviewText, stateLabel } from './todayReviewTableFormat';
 
 export type DetailTierStatus = 'READY' | 'LIMITED' | 'BLOCKED' | 'MISSING';
 
@@ -56,14 +56,9 @@ export function tierDetailLabel(status: DetailTierStatus, reason: string | null)
   return reason ? `${status} (${reason})` : status;
 }
 
-export function formatEntry(plan: any) {
-  if (!plan?.entryZone) return 'Unavailable';
-  return `${formatCurrency(Number(plan.entryZone.preferredEntryMin))} - ${formatCurrency(Number(plan.entryZone.preferredEntryMax))}`;
-}
-
-export function formatEntryTrigger(candidate: TodayReviewCandidate, plan: any) {
+export function formatEntryTrigger(candidate: TodayReviewCandidate, plan: any, currency?: string | null) {
   const trigger = safeReviewText(plan?.entryTrigger || '');
-  const entry = formatEntry(plan);
+  const entry = formatEntry(plan, currency);
   if (trigger && entry !== 'Unavailable') return `${trigger}; entry context ${entry}`;
   if (trigger) return trigger;
   if (entry !== 'Unavailable') return `Entry context ${entry}`;
@@ -75,11 +70,11 @@ export function formatExitCondition(plan: any) {
   return exitRule ? safeReviewText(exitRule) : 'Exit condition unavailable in this snapshot.';
 }
 
-export function formatInvalidationCondition(plan: any, candidate?: TodayReviewCandidate) {
+export function formatInvalidationCondition(plan: any, candidate?: TodayReviewCandidate, currency?: string | null) {
   if (!plan?.stopLoss) return 'Unavailable';
   const stopPrice = Number(plan.stopLoss.price);
   const entryRef = Number(plan.entryZone?.preferredEntryMin || plan.entryZone?.preferredEntryMax || 0);
-  const stopText = formatCurrency(stopPrice);
+  const stopText = formatCurrency(stopPrice, currency);
   const ruleText = safeReviewText(plan.invalidationRules?.[0] || 'Invalidation unavailable');
   const isLong = !candidate?.direction || candidate.direction === 'LONG' || String(candidate?.state).includes('LONG');
   const isShort = candidate?.direction === 'SHORT' || String(candidate?.state).includes('SHORT');
@@ -103,7 +98,7 @@ export function formatReadinessLabel(value?: string | null) {
 
 export function formatDecisionLabel(value?: string | null) {
   return safeReviewText(value || 'Unavailable')
-    .replace(/TRADE_CANDIDATE/g, 'REVIEW_CANDIDATE')
+    .replace(/TRADE_CANDIDATE/gi, 'REVIEW_CANDIDATE')
     .replace(/_/g, ' ');
 }
 

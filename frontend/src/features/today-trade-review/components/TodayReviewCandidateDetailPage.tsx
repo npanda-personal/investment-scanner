@@ -23,6 +23,7 @@ import { Link as RouterLink, useParams } from 'react-router-dom';
 import { PageHeader } from '@/shared/components/PageHeader';
 import { AddToWatchlistDialog } from '@/features/watchlist-management';
 import { CreateAlertDialog } from '@/features/alerts-monitoring';
+import { useMarketScope } from '@/contexts/MarketScopeContext';
 import { useTodayReviewCandidate } from '../hooks/useTodayReview';
 import type { TodayReviewCandidate, TodayReviewCandidateDataQualitySnapshot } from '../types';
 import { safeReviewText, stateLabel } from './todayReviewTableFormat';
@@ -42,9 +43,11 @@ import {
   reasonCategoryLabel,
   reasonSourceLabel,
 } from './todayReviewCandidateDetailFormat';
+
 export function TodayReviewCandidateDetailPage() {
   const { candidateId } = useParams();
   const { candidate, loading, error, reload } = useTodayReviewCandidate(candidateId);
+  const { profile } = useMarketScope();
   const [watchlistOpen, setWatchlistOpen] = useState(false);
   const [alertOpen, setAlertOpen] = useState(false);
 
@@ -124,9 +127,9 @@ export function TodayReviewCandidateDetailPage() {
               <Fact label="Direction" value={stateLabel(candidate.direction)} />
               <Fact label="Setup type" value={candidate.setupType || candidate.strategyCode} />
               <Fact label="Confidence score (conservative view)" value={confidence} />
-              <Fact label="Entry trigger context" value={formatEntryTrigger(candidate, plan)} />
+              <Fact label="Entry trigger context" value={formatEntryTrigger(candidate, plan, profile.currency)} />
               <Fact label="Exit condition" value={formatExitCondition(plan)} />
-              <Fact label="Invalidation condition" value={formatInvalidationCondition(plan, candidate)} />
+              <Fact label="Invalidation condition" value={formatInvalidationCondition(plan, candidate, profile.currency)} />
               <Fact label="Data quality status" value={dataQualityStatus(dataQuality)} />
               <Fact label="Failure condition" value={safeReviewText(candidate.blockers[0] || plan?.invalidationRules?.[0] || 'Evidence weakens or invalidation is reached.')} />
               <Fact label="Do nothing unless" value={safeReviewText(plan?.doNothingUnless || (candidate.state === 'LONG_REVIEW' ? 'The entry trigger, invalidation condition, proof, and data quality remain valid.' : 'Blockers or data gaps are resolved in a later review.'))} />
@@ -233,9 +236,9 @@ export function TodayReviewCandidateDetailPage() {
           <FactStack items={[
             ['Snapshot status', formatReadinessLabel(plan?.planStatus)],
             ['Risk warning', plan?.riskGrade || 'Unavailable'],
-            ['Entry trigger context', formatEntryTrigger(candidate, plan)],
+            ['Entry trigger context', formatEntryTrigger(candidate, plan, profile.currency)],
             ['Exit condition', formatExitCondition(plan)],
-            ['Invalidation condition', formatInvalidationCondition(plan, candidate)],
+            ['Invalidation condition', formatInvalidationCondition(plan, candidate, profile.currency)],
           ]} />
         </Panel>
       </Grid>

@@ -68,7 +68,7 @@ export function DailyOverviewDashboardPage() {
       .sort((left, right) => Math.abs(right.mover.returnPercent) - Math.abs(left.mover.returnPercent));
   }, [moverSummary?.gainers, moverSummary?.losers, todayReviewGroups.bearishReview, todayReviewGroups.bullishReview, todayReviewGroups.exitRiskReview, todayReviewGroups.watchOnly]);
   const [showAllHotStocks, setShowAllHotStocks] = useState(false);
-  const visibleHotStocks = hotStocks.slice(0, showAllHotStocks ? 20 : 6);
+  const visibleHotStocks = showAllHotStocks ? hotStocks : hotStocks.slice(0, 6);
 
   if (profile.isCrypto) {
     return (
