@@ -62,26 +62,31 @@ export default function InstrumentPriceChart({
   const oscContainerRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const oscChartRefs = useRef<Map<string, IChartApi>>(new Map());
   const syncing = useRef(false);
+  const crosshairSyncing = useRef(false);
 
   const [candles, setCandles] = useState<OHLCVBar[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [activeIndicatorIds, setActiveIndicatorIds] = useState<IndicatorId[]>(() => {
     try {
       const stored = localStorage.getItem(INDICATOR_STORAGE_KEY);
-      return stored ? JSON.parse(stored) : DEFAULT_INDICATORS;
+      if (!stored) return DEFAULT_INDICATORS;
+      const ids = JSON.parse(stored);
+      return Array.isArray(ids) ? ids.filter((id: string) => id in INDICATOR_REGISTRY) : DEFAULT_INDICATORS;
     } catch { return DEFAULT_INDICATORS; }
   });
   const [timeframe, setTimeframe] = useState<ChartTimeframe>(() => {
-    const stored = localStorage.getItem(TIMEFRAME_STORAGE_KEY);
-    return stored === '1W' || stored === '1M' ? stored : '1D';
+    try {
+      const stored = localStorage.getItem(TIMEFRAME_STORAGE_KEY);
+      return stored === '1W' || stored === '1M' ? stored : '1D';
+    } catch { return '1D'; }
   });
 
   useEffect(() => {
-    localStorage.setItem(INDICATOR_STORAGE_KEY, JSON.stringify(activeIndicatorIds));
+    try { localStorage.setItem(INDICATOR_STORAGE_KEY, JSON.stringify(activeIndicatorIds)); } catch { /* private browsing */ }
   }, [activeIndicatorIds]);
 
   useEffect(() => {
-    localStorage.setItem(TIMEFRAME_STORAGE_KEY, timeframe);
+    try { localStorage.setItem(TIMEFRAME_STORAGE_KEY, timeframe); } catch { /* private browsing */ }
   }, [timeframe]);
 
   const displayBars = useMemo(
@@ -297,18 +302,19 @@ export default function InstrumentPriceChart({
     const crosshairHandlers: Array<[IChartApi, (p: MouseEventParams) => void]> = [];
     for (const [srcChart, _srcSeries] of chartPairs) {
       const handler = (params: MouseEventParams) => {
-        if (syncing.current) return;
-        syncing.current = true;
+        if (crosshairSyncing.current) return;
+        crosshairSyncing.current = true;
         try {
           for (const [tgtChart, tgtSeries] of chartPairs) {
             if (tgtChart === srcChart) continue;
             if (params.time) {
+              // NaN price: crosshair snaps to the series value at the given time
               tgtChart.setCrosshairPosition(NaN, params.time, tgtSeries);
             } else {
               tgtChart.clearCrosshairPosition();
             }
           }
-        } finally { syncing.current = false; }
+        } finally { crosshairSyncing.current = false; }
       };
       srcChart.subscribeCrosshairMove(handler);
       crosshairHandlers.push([srcChart, handler]);
