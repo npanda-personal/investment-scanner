@@ -65,9 +65,10 @@ export function DailyOverviewDashboardPage() {
         candidate: candidateByInstrumentId.get(mover.instrumentId) ?? null,
       }))
       .filter((item) => item.candidate)
-      .sort((left, right) => Math.abs(right.mover.returnPercent) - Math.abs(left.mover.returnPercent))
-      .slice(0, 6);
+      .sort((left, right) => Math.abs(right.mover.returnPercent) - Math.abs(left.mover.returnPercent));
   }, [moverSummary?.gainers, moverSummary?.losers, todayReviewGroups.bearishReview, todayReviewGroups.bullishReview, todayReviewGroups.exitRiskReview, todayReviewGroups.watchOnly]);
+  const [showAllHotStocks, setShowAllHotStocks] = useState(false);
+  const visibleHotStocks = hotStocks.slice(0, showAllHotStocks ? 20 : 6);
 
   if (profile.isCrypto) {
     return (
@@ -254,7 +255,7 @@ export function DailyOverviewDashboardPage() {
                   <Alert severity="info">No mover and signal-candidate overlap is available for {moverRange}.</Alert>
                 )}
                 <Grid container spacing={1}>
-                  {hotStocks.map((item) => (
+                  {visibleHotStocks.map((item) => (
                     <Grid key={`${item.mover.instrumentId}-${item.candidate?.id}`} item xs={12} sm={6} md={4} lg={2}>
                       <Paper variant="outlined" sx={{ p: 1.25, height: '100%' }}>
                         <Stack spacing={0.5}>
@@ -269,6 +270,11 @@ export function DailyOverviewDashboardPage() {
                     </Grid>
                   ))}
                 </Grid>
+                {hotStocks.length > 6 && (
+                  <Button size="small" onClick={() => setShowAllHotStocks((v) => !v)} sx={{ mt: 0.5, alignSelf: 'flex-start' }}>
+                    {showAllHotStocks ? `Show less` : `Show all ${hotStocks.length} overlaps`}
+                  </Button>
+                )}
               </Stack>
             </Paper>
           </Grid>

@@ -37,10 +37,7 @@ import {
 /**
  * A3 + one-liner template: primary columns are answer-first and each render on a
  * single line. The Symbol cell is intentionally just the ticker + workspace link;
- * Company, Smart money and 52w position are their own dedicated columns
- * (previously stacked vertically inside the Symbol cell). Direction/State,
- * Earnings and F&O ban are intentionally not shown as columns (the tabs already
- * group by review state; earnings/F&O-ban remain available as filter toggles).
+ * Company, Smart money and 52w position are their own dedicated columns.
  */
 export function buildCandidateColumns(
   runRegime: string | null,
@@ -213,6 +210,28 @@ export function buildCandidateColumns(
       render: (candidate) => <EllipsisCell fullText={marketLabel(candidate, runRegime)} />,
     },
     {
+      id: 'earnings',
+      label: 'Earnings',
+      width: 110,
+      primary: true,
+      value: (candidate) => candidate.earningsProximity?.daysToResult ?? 999,
+      render: (candidate) => {
+        const ep = candidate.earningsProximity;
+        if (ep?.daysToResult == null) return <EllipsisCell fullText="—" />;
+        const days = ep.daysToResult;
+        const color = days <= 5 ? 'warning.main' : 'text.secondary';
+        const tip = ep.resultDateLabel ? `${ep.resultDateLabel}: ${ep.resultDate ?? 'TBD'}` : undefined;
+        const text = `Results in ${days}d`;
+        return tip ? (
+          <Tooltip title={tip} arrow enterDelay={200}>
+            <Typography component="span" color={color} sx={{ fontSize: 'inherit', fontWeight: days <= 5 ? 700 : 400 }}>{text}</Typography>
+          </Tooltip>
+        ) : (
+          <Typography component="span" color={color} sx={{ fontSize: 'inherit' }}>{text}</Typography>
+        );
+      },
+    },
+    {
       id: 'volume',
       label: 'Vol',
       width: 80,
@@ -260,7 +279,7 @@ export function buildCandidateColumns(
       id: 'board',
       label: 'Source',
       width: 230,
-      primary: false,
+      primary: activeTab === 'exitRiskReview' || activeTab === 'specialCases',
       value: (candidate) => `${boardSectionLabel(candidate)} ${boardSourceLabel(candidate)} ${humanizeEmbedded(candidate.boardReason) || ''}`,
       render: (candidate) => <EllipsisCell fullText={`${boardSectionLabel(candidate)} / ${boardSourceLabel(candidate)} - ${humanizeEmbedded(candidate.boardReason) || 'Standard selection.'}`} />,
     },
@@ -326,6 +345,16 @@ export function buildCandidateColumns(
       value: (candidate) => safeReviewText(blockerLabel(candidate)),
       render: (candidate) => <EllipsisCell fullText={safeReviewText(blockerLabel(candidate))} />,
     },
+    {
+      id: 'fnoBan',
+      label: 'F&O Ban',
+      width: 80,
+      primary: activeTab === 'blocked',
+      value: (candidate) => (candidate.inFnoBan ? 1 : 0),
+      render: (candidate) => candidate.inFnoBan
+        ? <Chip label="Banned" size="small" color="error" sx={chipNoWrapSx} />
+        : <EllipsisCell fullText="—" />,
+    },
   ];
 }
 
@@ -337,6 +366,8 @@ export const todayReviewExportColumns: Array<{ label: string; value: (candidate:
   { label: 'Price', value: (candidate) => candidate.range52wCurrentClose },
   { label: 'Change %', value: (candidate) => candidate.dayChangePercent },
   { label: 'Vol Ratio', value: (candidate) => candidate.volumeRatio },
+  { label: 'Earnings Days', value: (candidate) => candidate.earningsProximity?.daysToResult },
+  { label: 'F&O Banned', value: (candidate) => candidate.inFnoBan ? 'Yes' : '' },
   { label: 'State', value: (candidate) => stateLabel(candidate.state) },
   { label: 'Setup', value: (candidate) => candidate.setupType || candidate.strategyCode },
   { label: 'Board Section', value: (candidate) => boardSectionLabel(candidate) },

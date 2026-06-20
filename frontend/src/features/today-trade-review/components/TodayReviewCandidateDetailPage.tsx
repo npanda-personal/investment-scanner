@@ -25,7 +25,23 @@ import { AddToWatchlistDialog } from '@/features/watchlist-management';
 import { CreateAlertDialog } from '@/features/alerts-monitoring';
 import { useTodayReviewCandidate } from '../hooks/useTodayReview';
 import type { TodayReviewCandidate, TodayReviewCandidateDataQualitySnapshot } from '../types';
-import { formatCurrency, safeReviewText, stateLabel } from './todayReviewTableFormat';
+import { safeReviewText, stateLabel } from './todayReviewTableFormat';
+import {
+  detailTierContext,
+  detailConfidenceDisplay,
+  tierDetailLabel,
+  formatEntryTrigger,
+  formatExitCondition,
+  formatInvalidationCondition,
+  dataQualityStatus,
+  formatReadinessLabel,
+  formatDecisionLabel,
+  formatNumber,
+  formatPercent,
+  formatDateTime,
+  reasonCategoryLabel,
+  reasonSourceLabel,
+} from './todayReviewCandidateDetailFormat';
 export function TodayReviewCandidateDetailPage() {
   const { candidateId } = useParams();
   const { candidate, loading, error, reload } = useTodayReviewCandidate(candidateId);
@@ -305,134 +321,6 @@ function ReasonList({ reasons }: { reasons: Array<{ code: string; label: string;
   );
 }
 
-type DetailTierStatus = 'READY' | 'LIMITED' | 'BLOCKED' | 'MISSING';
-
-interface DetailTier {
-  status: DetailTierStatus;
-  reason: string | null;
-}
-
-interface DetailTierContext {
-  dailyReview: DetailTier;
-  signal: DetailTier;
-  backtest: DetailTier;
-  calibration: DetailTier;
-  automation: DetailTier;
-  missingTierContext: boolean;
-}
-
-function detailTierContext(dataQuality: TodayReviewCandidateDataQualitySnapshot | null): DetailTierContext {
-  const tiers = dataQuality?.useCaseTiers;
-  const missingTierContext = !tiers?.dailyReview || !tiers?.automation;
-
-  const normalizeTier = (
-    tier: { status: 'READY' | 'LIMITED' | 'BLOCKED'; reasons: string[] } | undefined,
-  ): DetailTier => ({
-    status: tier?.status || 'MISSING',
-    reason: tier?.reasons?.[0] || (tier ? null : 'Missing from snapshot'),
-  });
-
-  const automationTier = normalizeTier(tiers?.automation);
-  return {
-    dailyReview: normalizeTier(tiers?.dailyReview),
-    signal: normalizeTier(tiers?.signal),
-    backtest: normalizeTier(tiers?.backtest),
-    calibration: normalizeTier(tiers?.calibration),
-    automation: {
-      status: tiers?.automation ? 'BLOCKED' : 'MISSING',
-      reason: !tiers?.automation
-        ? 'Missing from snapshot; policy remains blocked.'
-        : tiers.automation.status !== 'BLOCKED'
-          ? `Upstream tier reported ${tiers.automation.status}; automated trading is not enabled in this phase.`
-          : automationTier.reason || 'Automated trading is not enabled.',
-    },
-    missingTierContext,
-  };
-}
-
-function detailConfidenceDisplay(score: number, missingTierContext: boolean) {
-  if (!missingTierContext) return String(score);
-  const conservative = Math.max(0, Math.round(Number(score || 0) * 0.8));
-  return `${conservative} (from ${score}; conservative view — data quality tiers missing)`;
-}
-
-function tierDetailLabel(status: DetailTierStatus, reason: string | null) {
-  return reason ? `${status} (${reason})` : status;
-}
-
-function formatEntry(plan: any) {
-  if (!plan?.entryZone) return 'Unavailable';
-  return `${formatCurrency(Number(plan.entryZone.preferredEntryMin))} - ${formatCurrency(Number(plan.entryZone.preferredEntryMax))}`;
-}
-
-function formatEntryTrigger(candidate: TodayReviewCandidate, plan: any) {
-  const trigger = safeReviewText(plan?.entryTrigger || '');
-  const entry = formatEntry(plan);
-  if (trigger && entry !== 'Unavailable') return `${trigger}; entry context ${entry}`;
-  if (trigger) return trigger;
-  if (entry !== 'Unavailable') return `Entry context ${entry}`;
-  return safeReviewText(candidate.reasonSummary || 'Unavailable');
-}
-
-function formatExitCondition(plan: any) {
-  const exitRule = plan?.exitRules?.[0] || plan?.exitConditions?.[0];
-  return exitRule ? safeReviewText(exitRule) : 'Exit condition unavailable in this snapshot.';
-}
-
-function formatInvalidationCondition(plan: any, candidate?: TodayReviewCandidate) {
-  if (!plan?.stopLoss) return 'Unavailable';
-  const stopPrice = Number(plan.stopLoss.price);
-  const entryRef = Number(plan.entryZone?.preferredEntryMin || plan.entryZone?.preferredEntryMax || 0);
-  const stopText = formatCurrency(stopPrice);
-  const ruleText = safeReviewText(plan.invalidationRules?.[0] || 'Invalidation unavailable');
-  const isLong = !candidate?.direction || candidate.direction === 'LONG' || String(candidate?.state).includes('LONG');
-  const isShort = candidate?.direction === 'SHORT' || String(candidate?.state).includes('SHORT');
-  const suspectStop =
-    (isLong && entryRef > 0 && stopPrice > 0 && stopPrice < entryRef * 0.6) ||
-    (isShort && entryRef > 0 && stopPrice > 0 && stopPrice > entryRef * 1.4);
-  const warning = suspectStop ? ' ⚠ Possible unadjusted stop — verify' : '';
-  return `${stopText}; ${ruleText}${warning}`;
-}
-
-function dataQualityStatus(dataQuality: TodayReviewCandidateDataQualitySnapshot | null) {
-  if (!dataQuality) return 'Missing';
-  return [dataQuality.coverageStatus, dataQuality.signalReadinessStatus, dataQuality.liquidityStatus]
-    .filter(Boolean)
-    .join(' / ') || 'Unavailable';
-}
-
-function formatReadinessLabel(value?: string | null) {
-  return safeReviewText(value || 'Unavailable').replace(/_/g, ' ');
-}
-
-function formatDecisionLabel(value?: string | null) {
-  return safeReviewText(value || 'Unavailable')
-    .replace(/TRADE_CANDIDATE/g, 'REVIEW_CANDIDATE')
-    .replace(/_/g, ' ');
-}
-
-function formatNumber(value?: number) {
-  return typeof value === 'number' && Number.isFinite(value) ? value.toFixed(1) : 'Unavailable';
-}
-
-function formatPercent(value?: number) {
-  return typeof value === 'number' && Number.isFinite(value) ? `${(value * 100).toFixed(1)}%` : 'Unavailable';
-}
-
-function formatDateTime(value?: string | null) {
-  if (!value) return 'Unavailable';
-  return new Date(value).toLocaleString();
-}
-
-function reasonCategoryLabel(category: string) {
-  if (category === 'TRADE_PLAN_PROOF_CHAIN') return 'Exit/invalidation evidence';
-  return stateLabel(category);
-}
-
-function reasonSourceLabel(sourceModule: string) {
-  if (/trade plan/i.test(sourceModule)) return 'Today Review evidence';
-  return sourceModule;
-}
 
 /**
  * Assembles a deterministic "Price behaviour" sentence from fields already
