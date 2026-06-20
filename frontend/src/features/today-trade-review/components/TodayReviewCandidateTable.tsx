@@ -28,7 +28,8 @@ import {
 } from '@mui/material';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { TodayReviewCandidate, TodayReviewRun } from '../types';
+import { useMarketScope } from '@/contexts/MarketScopeContext';
+import type { TodayReviewCandidate, TodayReviewGroups, TodayReviewRun } from '../types';
 import { buildCandidateColumns, downloadTodayReviewCsv } from './todayReviewColumns';
 import {
   compareValues,
@@ -42,8 +43,9 @@ import {
   type SortKey,
 } from './todayReviewTableFormat';
 
-export function CandidateTable({ candidates, run }: { candidates: TodayReviewCandidate[]; run: TodayReviewRun | null }) {
+export function CandidateTable({ candidates, run, activeTab }: { candidates: TodayReviewCandidate[]; run: TodayReviewRun | null; activeTab?: keyof TodayReviewGroups }) {
   const navigate = useNavigate();
+  const { profile } = useMarketScope();
   const runRegime: string | null = run ? ((sourceSnapshotForRun(run) as any).marketContext?.regime?.regime ?? null) : null;
   const [query, setQuery] = useState('');
   const [gradeFilter, setGradeFilter] = useState('ALL');
@@ -100,7 +102,7 @@ export function CandidateTable({ candidates, run }: { candidates: TodayReviewCan
     stateFilter,
   ]);
 
-  const allColumns = useMemo(() => buildCandidateColumns(runRegime), [runRegime]);
+  const allColumns = useMemo(() => buildCandidateColumns(runRegime, profile.currency, activeTab), [runRegime, profile.currency, activeTab]);
 
   const columns = useMemo(
     () => allColumns.filter((col) => col.primary || showSecondaryColumns),

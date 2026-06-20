@@ -205,52 +205,48 @@ export class TodayTradeReviewRepository implements TodayReviewRepositoryContract
    * Returns a map of symbol → { high52w, low52w, currentClose, positionPct }.
    * A symbol is absent from the map only when it has no price history in the DB.
    */
-  private async load52wRanges(symbols: string[]): Promise<Map<string, { high52w: number; low52w: number; currentClose: number; positionPct: number }>> {
+  private async load52wRanges(symbols: string[]): Promise<Map<string, {
+    high52w: number; low52w: number; currentClose: number; positionPct: number;
+    previousClose: number | null; dayChangePercent: number | null; volumeRatio: number | null;
+  }>> {
     if (symbols.length === 0) return new Map();
-    // Use a single windowed query: for each symbol, select the latest 252 rows
-    // ordered by timestamp DESC and compute max/min adjusted-close + latest close.
-    // COALESCE(adjustedClose, close) ensures we fall back to raw close when
-    // adjustedClose is not populated (older ingested rows).
-    // Use a LATERAL that pulls ONLY the latest 252 rows per symbol via the
-    // (symbol, timestamp) index, instead of a window function over each symbol's full history.
-    // On a 39.7M-row price_ticks the old window read ~81k rows (all history for ~40 candidates)
-    // and ran ~1.8s isolated (20s+ under concurrent DB load → Daily Review page timeout); this
-    // reads ~10k rows and runs ~35ms, with identical high/low/current values (verified).
-    const rowsClean = await this.db.$queryRaw<Array<{
-      symbol: string;
-      high52w: number;
-      low52w: number;
-      current_close: number;
+    // LATERAL pulls latest 252 rows per symbol via (symbol,timestamp) index; ~35ms for ~40 symbols.
+    const rows = await this.db.$queryRaw<Array<{
+      symbol: string; high52w: number; low52w: number;
+      current_close: number; previous_close: number | null;
+      latest_volume: number | null; avg_volume_20d: number | null;
     }>>(Prisma.sql`
-      SELECT
-        s.symbol,
-        MAX(p.adj_close)::float8 AS high52w,
-        MIN(p.adj_close)::float8 AS low52w,
-        (array_agg(p.adj_close ORDER BY p.ts DESC))[1]::float8 AS current_close
+      SELECT s.symbol,
+        MAX(p.adj_close)::float8 AS high52w, MIN(p.adj_close)::float8 AS low52w,
+        (array_agg(p.adj_close ORDER BY p.ts DESC))[1]::float8 AS current_close,
+        (array_agg(p.adj_close ORDER BY p.ts DESC))[2]::float8 AS previous_close,
+        (array_agg(p.vol ORDER BY p.ts DESC))[1]::float8 AS latest_volume,
+        (SELECT AVG(v) FROM unnest((array_agg(p.vol ORDER BY p.ts DESC))[2:21]) AS v)::float8 AS avg_volume_20d
       FROM unnest(${symbols}::text[]) AS s(symbol)
       CROSS JOIN LATERAL (
-        SELECT
-          COALESCE(pt."adjustedClose", pt.close)::float8 AS adj_close,
-          pt.timestamp AS ts
+        SELECT COALESCE(pt."adjustedClose", pt.close)::float8 AS adj_close,
+          COALESCE(pt.volume, 0)::float8 AS vol, pt.timestamp AS ts
         FROM price_ticks pt
         WHERE pt.symbol = s.symbol
           AND UPPER(COALESCE(pt."dataStatus", 'COMPLETE')) = 'COMPLETE'
           AND UPPER(COALESCE(pt.source, '')) NOT LIKE 'TEST\\_%'
-        ORDER BY pt.timestamp DESC
-        LIMIT 252
+        ORDER BY pt.timestamp DESC LIMIT 252
       ) p
       GROUP BY s.symbol
     `);
-
-    const map = new Map<string, { high52w: number; low52w: number; currentClose: number; positionPct: number }>();
-    for (const row of rowsClean) {
-      const high = Number(row.high52w);
-      const low = Number(row.low52w);
-      const current = Number(row.current_close);
+    type RangeEntry = { high52w: number; low52w: number; currentClose: number; positionPct: number; previousClose: number | null; dayChangePercent: number | null; volumeRatio: number | null };
+    const map = new Map<string, RangeEntry>();
+    for (const row of rows) {
+      const high = Number(row.high52w), low = Number(row.low52w), current = Number(row.current_close);
       if (!isFinite(high) || !isFinite(low) || !isFinite(current)) continue;
       const range = high - low;
       const positionPct = range > 0 ? Math.max(0, Math.min(100, ((current - low) / range) * 100)) : 0;
-      map.set(row.symbol, { high52w: high, low52w: low, currentClose: current, positionPct });
+      const prev = row.previous_close !== null ? Number(row.previous_close) : null;
+      const dayChangePercent = prev && isFinite(prev) && prev > 0 ? ((current - prev) / prev) * 100 : null;
+      const latVol = row.latest_volume !== null ? Number(row.latest_volume) : null;
+      const avgVol = row.avg_volume_20d !== null ? Number(row.avg_volume_20d) : null;
+      const volumeRatio = latVol && avgVol && avgVol > 0 ? latVol / avgVol : null;
+      map.set(row.symbol, { high52w: high, low52w: low, currentClose: current, positionPct, previousClose: prev, dayChangePercent, volumeRatio });
     }
     return map;
   }
@@ -333,7 +329,7 @@ export class TodayTradeReviewRepository implements TodayReviewRepositoryContract
     // get a fast read; toCandidateDto leaves the corresponding fields null/false when maps are absent.
     const candidateRecords: any[] = record.candidates || [];
     let catalogSectorMap: Map<string, string | null> | undefined;
-    let range52wMap: Map<string, { high52w: number; low52w: number; currentClose: number; positionPct: number }> | undefined;
+    let range52wMap: Map<string, { high52w: number; low52w: number; currentClose: number; positionPct: number; previousClose: number | null; dayChangePercent: number | null; volumeRatio: number | null }> | undefined;
     let fnoBanSet: Set<string> | undefined;
     let smartMoneyMap: Map<string, { status: 'ACCUMULATION' | 'DISTRIBUTION' | 'NEUTRAL'; score: number }> | undefined;
     if (options.enrich !== false) {
@@ -381,7 +377,7 @@ export class TodayTradeReviewRepository implements TodayReviewRepositoryContract
   private toCandidateDto(
     record: any,
     catalogSectorMap?: Map<string, string | null>,
-    range52wMap?: Map<string, { high52w: number; low52w: number; currentClose: number; positionPct: number }>,
+    range52wMap?: Map<string, { high52w: number; low52w: number; currentClose: number; positionPct: number; previousClose: number | null; dayChangePercent: number | null; volumeRatio: number | null }>,
     fnoBanSet?: Set<string>,
     smartMoneyMap?: Map<string, { status: 'ACCUMULATION' | 'DISTRIBUTION' | 'NEUTRAL'; score: number }>,
   ): TodayReviewCandidateDto {
@@ -426,14 +422,14 @@ export class TodayTradeReviewRepository implements TodayReviewRepositoryContract
       boardContractVersion: boardMetadata?.contractVersion || null,
       earningsProximity,
       catalogSector,
-      // 52-week range position joined at READ time from price_ticks (no N+1).
       range52wPositionPct: range52w ? range52w.positionPct : null,
       range52wHigh: range52w ? range52w.high52w : null,
       range52wLow: range52w ? range52w.low52w : null,
       range52wCurrentClose: range52w ? range52w.currentClose : null,
-      // NR-100: F&O ban flag (batch join from fno_ban_list at read time).
+      previousClose: range52w ? range52w.previousClose : null,
+      dayChangePercent: range52w ? range52w.dayChangePercent : null,
+      volumeRatio: range52w ? range52w.volumeRatio : null,
       inFnoBan,
-      // NR-101: Smart-money status + score (batch join from smart_money_context_snapshots at read time).
       smartMoneyStatus: smEntry ? smEntry.status : null,
       smartMoneyScore: smEntry ? smEntry.score : null,
       createdAt: record.createdAt?.toISOString(),

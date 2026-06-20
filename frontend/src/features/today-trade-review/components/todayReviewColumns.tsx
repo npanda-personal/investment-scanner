@@ -2,7 +2,8 @@ import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import { Chip, Link, Stack, Tooltip, Typography } from '@mui/material';
 import { Link as RouterLink } from 'react-router-dom';
 import { humanizeCode, humanizeEmbedded } from '@/shared/format/enumLabels';
-import type { TodayReviewCandidate } from '../types';
+import { changeColor, money } from '@/shared/format/money';
+import type { TodayReviewCandidate, TodayReviewGroups } from '../types';
 import {
   EllipsisCell,
   RangePositionIndicator,
@@ -41,7 +42,11 @@ import {
  * Earnings and F&O ban are intentionally not shown as columns (the tabs already
  * group by review state; earnings/F&O-ban remain available as filter toggles).
  */
-export function buildCandidateColumns(runRegime: string | null): CandidateColumn[] {
+export function buildCandidateColumns(
+  runRegime: string | null,
+  currency?: string | null,
+  activeTab?: keyof TodayReviewGroups | null,
+): CandidateColumn[] {
   return [
     // --- Primary columns ---
     {
@@ -94,6 +99,35 @@ export function buildCandidateColumns(runRegime: string | null): CandidateColumn
       primary: true,
       value: (candidate) => candidate.companyName || '',
       render: (candidate) => <EllipsisCell fullText={candidate.companyName || '—'} />,
+    },
+    {
+      id: 'price',
+      label: 'Price',
+      width: 100,
+      align: 'right',
+      primary: true,
+      value: (candidate) => candidate.range52wCurrentClose ?? -1,
+      render: (candidate) => (
+        <EllipsisCell fullText={money(candidate.range52wCurrentClose, currency)} align="right" strong />
+      ),
+    },
+    {
+      id: 'dayChange',
+      label: 'Change',
+      width: 80,
+      align: 'right',
+      primary: true,
+      value: (candidate) => candidate.dayChangePercent ?? 0,
+      render: (candidate) => {
+        const pct = candidate.dayChangePercent;
+        if (pct === null || pct === undefined) return <EllipsisCell fullText="—" align="right" />;
+        const sign = pct > 0 ? '+' : '';
+        return (
+          <Typography component="span" color={changeColor(pct)} sx={{ fontWeight: 600, fontSize: 'inherit' }}>
+            {sign}{pct.toFixed(2)}%
+          </Typography>
+        );
+      },
     },
     {
       id: 'confidence',
@@ -151,16 +185,16 @@ export function buildCandidateColumns(runRegime: string | null): CandidateColumn
       label: 'Entry zone',
       width: 190,
       primary: true,
-      value: (candidate) => formatEntry(candidate.tradePlanSnapshot as any),
-      render: (candidate) => <EllipsisCell fullText={formatEntry(candidate.tradePlanSnapshot as any)} />,
+      value: (candidate) => formatEntry(candidate.tradePlanSnapshot as any, currency),
+      render: (candidate) => <EllipsisCell fullText={formatEntry(candidate.tradePlanSnapshot as any, currency)} />,
     },
     {
       id: 'exit',
       label: 'Invalidation',
       width: 240,
       primary: true,
-      value: (candidate) => formatStop(candidate.tradePlanSnapshot as any, candidate),
-      render: (candidate) => <EllipsisCell fullText={formatStop(candidate.tradePlanSnapshot as any, candidate)} />,
+      value: (candidate) => formatStop(candidate.tradePlanSnapshot as any, candidate, currency),
+      render: (candidate) => <EllipsisCell fullText={formatStop(candidate.tradePlanSnapshot as any, candidate, currency)} />,
     },
     {
       id: 'sector',
@@ -177,6 +211,40 @@ export function buildCandidateColumns(runRegime: string | null): CandidateColumn
       primary: true,
       value: (candidate) => marketLabel(candidate, runRegime),
       render: (candidate) => <EllipsisCell fullText={marketLabel(candidate, runRegime)} />,
+    },
+    {
+      id: 'volume',
+      label: 'Vol',
+      width: 80,
+      align: 'right',
+      primary: true,
+      value: (candidate) => candidate.volumeRatio ?? -1,
+      render: (candidate) => {
+        const ratio = candidate.volumeRatio;
+        if (ratio === null || ratio === undefined) return <EllipsisCell fullText="—" align="right" />;
+        const color = ratio >= 1.5 ? 'success.main' : ratio < 0.8 ? 'error.main' : 'text.primary';
+        const tip = ratio >= 2 ? `Volume: ${ratio.toFixed(2)}x of 20-day average — unusual volume` : `${ratio.toFixed(2)}x of 20-day avg volume`;
+        return (
+          <Tooltip title={tip} arrow enterDelay={200}>
+            <Typography component="span" color={color} sx={{ fontWeight: 600, fontSize: 'inherit' }}>
+              {ratio.toFixed(1)}x
+            </Typography>
+          </Tooltip>
+        );
+      },
+    },
+    {
+      id: 'subState',
+      label: 'Status',
+      width: 130,
+      primary: activeTab === 'watchOnly',
+      value: (candidate) => candidate.state,
+      render: (candidate) => {
+        const state = candidate.state?.toUpperCase() ?? '';
+        if (state.includes('UNPROVEN')) return <Chip label="Unproven" size="small" color="warning" sx={chipNoWrapSx} />;
+        if (state.includes('INSUFFICIENT')) return <Chip label="Insufficient data" size="small" color="error" sx={chipNoWrapSx} />;
+        return <Chip label="Watch" size="small" color="info" sx={chipNoWrapSx} />;
+      },
     },
 
     // --- Secondary (operator / "More") columns ---
@@ -254,7 +322,7 @@ export function buildCandidateColumns(runRegime: string | null): CandidateColumn
       id: 'blocker',
       label: 'Blocker',
       width: 300,
-      primary: false,
+      primary: activeTab === 'blocked',
       value: (candidate) => safeReviewText(blockerLabel(candidate)),
       render: (candidate) => <EllipsisCell fullText={safeReviewText(blockerLabel(candidate))} />,
     },
@@ -266,6 +334,9 @@ export const todayReviewExportColumns: Array<{ label: string; value: (candidate:
   { label: 'Rank', value: (candidate) => candidate.rank },
   { label: 'Symbol', value: (candidate) => candidate.symbol },
   { label: 'Company', value: (candidate) => candidate.companyName },
+  { label: 'Price', value: (candidate) => candidate.range52wCurrentClose },
+  { label: 'Change %', value: (candidate) => candidate.dayChangePercent },
+  { label: 'Vol Ratio', value: (candidate) => candidate.volumeRatio },
   { label: 'State', value: (candidate) => stateLabel(candidate.state) },
   { label: 'Setup', value: (candidate) => candidate.setupType || candidate.strategyCode },
   { label: 'Board Section', value: (candidate) => boardSectionLabel(candidate) },
