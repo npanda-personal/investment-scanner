@@ -32,6 +32,7 @@ import { tradePlanRiskEngineRoutes } from '@/features/trade-plan-risk-engine';
 import { todayTradeReviewRoutes } from '@/features/today-trade-review';
 import { pipelineOpsRoutes } from '@/features/pipeline-ops';
 import { signalPositionLedgerRoutes } from '@/features/signal-position-ledger';
+import { tradeJournalRoutes } from '@/features/trade-journal';
 // DailyOverviewDashboardPage import removed — /daily-overview now redirects to /today-review
 // (it is a duplicated tab in TodayReviewPage).
 
@@ -117,6 +118,7 @@ export const appRoutes: RouteObject[] = [
           ...watchlistManagementRoutes,
           ...alertsMonitoringRoutes,
           ...aiInvestmentCopilotRoutes,
+          ...tradeJournalRoutes,
           ...notificationsDeliveryRoutes,
           // /daily-overview is a duplicated tab inside TodayReviewPage — redirect for deep-link compat.
           { path: 'daily-overview', element: <Navigate to="/today-review" replace /> },

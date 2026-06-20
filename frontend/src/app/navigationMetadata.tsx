@@ -12,6 +12,7 @@ import StarBorderIcon from '@mui/icons-material/StarBorder';
 import TodayIcon from '@mui/icons-material/Today';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import FilterAltIcon from '@mui/icons-material/FilterAlt';
+import MenuBookIcon from '@mui/icons-material/MenuBook';
 import WorkspacesIcon from '@mui/icons-material/Workspaces';
 
 export type NavItem = {
@@ -72,6 +73,7 @@ export const navGroups: NavGroup[] = [
       { path: '/portfolios', label: 'Portfolios', icon: <AccountBalanceWalletIcon />, matchPrefixes: ['/portfolios/'] },
       { path: '/alerts', label: 'Alerts', icon: <NotificationsNoneIcon /> },
       { path: '/instrument-workspace', label: 'Instrument', icon: <AssessmentIcon />, matchPrefixes: ['/stocks/', '/research/stocks/'] },
+      { path: '/journal', label: 'Trade Journal', icon: <MenuBookIcon /> },
       { path: '/copilot', label: 'Copilot', icon: <AutoAwesomeIcon /> },
     ],
   },
