@@ -12,6 +12,7 @@ import {
   TableCell,
   TableContainer,
   TableHead,
+  TablePagination,
   TableRow,
   TableSortLabel,
   Tooltip,
@@ -99,6 +100,8 @@ export default function ConvictionPage() {
   const [onlyFnoEligible, setOnlyFnoEligible] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>('signalScore');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
 
   const runQuery = useCallback(async (fnoOnly: boolean) => {
     setLoading(true);
@@ -109,6 +112,7 @@ export default function ConvictionPage() {
       setFunnel(result.funnel ?? null);
       setWarnings(result.warnings);
       setGeneratedAt(result.generatedAt);
+      setPage(0);
     } catch (err: any) {
       setError(err?.response?.data?.error || err?.message || 'Conviction screen failed to load');
       setRows([]);
@@ -130,6 +134,7 @@ export default function ConvictionPage() {
       setSortKey(key);
       setSortDir('desc');
     }
+    setPage(0);
   };
 
   if (profile.isCrypto) {
@@ -148,6 +153,7 @@ export default function ConvictionPage() {
   }
 
   const sortedRows = sortRows(rows, sortKey, sortDir);
+  const pagedRows = sortedRows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
   const convictionSource: WorkspaceSource = {
     label: 'Conviction',
     items: sortedRows.map((r) => ({ instrumentId: r.instrumentId, symbol: r.symbol, companyName: r.companyName })),
@@ -237,7 +243,7 @@ export default function ConvictionPage() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {sortedRows.map((row) => (
+              {pagedRows.map((row) => (
                 <TableRow key={row.instrumentId} hover>
                   <TableCell>
                     <StockWorkspaceLink instrumentId={row.instrumentId} symbol={row.symbol} source={convictionSource} />
@@ -259,6 +265,18 @@ export default function ConvictionPage() {
               ))}
             </TableBody>
           </Table>
+          <TablePagination
+            component="div"
+            count={sortedRows.length}
+            page={page}
+            onPageChange={(_e, newPage) => setPage(newPage)}
+            rowsPerPage={rowsPerPage}
+            onRowsPerPageChange={(e) => {
+              setRowsPerPage(parseInt(e.target.value, 10));
+              setPage(0);
+            }}
+            rowsPerPageOptions={[10, 25, 50]}
+          />
         </TableContainer>
       )}
     </Box>
