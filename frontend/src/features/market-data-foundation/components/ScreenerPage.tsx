@@ -46,34 +46,8 @@ import {
   FnoScreenerBodyCells,
 } from './screener/ScreenerCells';
 
-// ---------------------------------------------------------------------------
-// Known NSE sectors for the sector dropdown
-// ---------------------------------------------------------------------------
-
-const KNOWN_SECTORS = [
-  'AUTOMOBILE AND AUTO COMPONENTS',
-  'CAPITAL GOODS',
-  'CHEMICALS',
-  'CONSTRUCTION',
-  'CONSTRUCTION MATERIALS',
-  'CONSUMER DURABLES',
-  'CONSUMER SERVICES',
-  'DIVERSIFIED',
-  'FAST MOVING CONSUMER GOODS',
-  'FINANCIAL SERVICES',
-  'FOREST MATERIALS',
-  'HEALTHCARE',
-  'INFORMATION TECHNOLOGY',
-  'MEDIA ENTERTAINMENT AND PUBLICATION',
-  'METALS AND MINING',
-  'OIL GAS AND CONSUMABLE FUELS',
-  'POWER',
-  'REALTY',
-  'SERVICES',
-  'TELECOMMUNICATION',
-  'TEXTILES',
-  'UTILITIES',
-];
+import { KNOWN_SECTORS } from './screener-constants';
+import { type SortKey, sortScreenerRows, SortHead } from './screener-sort';
 
 // ---------------------------------------------------------------------------
 // Default filter state
@@ -101,6 +75,9 @@ export default function ScreenerPage() {
   const [count, setCount] = useState<number | null>(null);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [sortKey, setSortKey] = useState<SortKey>('signalScore');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const handleSort = (k: SortKey) => { if (k === sortKey) { setSortDir(d => d === 'asc' ? 'desc' : 'asc'); } else { setSortKey(k); setSortDir('desc'); } setPage(0); };
 
   // Debounce timer
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -161,11 +138,10 @@ export default function ScreenerPage() {
     );
   }
 
-  // Source list for the Stock Workspace rail — the full screened set, so the rail lets
-  // the user step through every match without leaving the chart.
+  const sortedRows = sortScreenerRows(rows, sortKey, sortDir);
   const screenerSource: WorkspaceSource = {
     label: 'Screener',
-    items: rows.map((r) => ({ instrumentId: r.instrumentId, symbol: r.symbol, companyName: r.companyName })),
+    items: sortedRows.map((r) => ({ instrumentId: r.instrumentId, symbol: r.symbol, companyName: r.companyName })),
   };
 
   return (
@@ -396,25 +372,25 @@ export default function ScreenerPage() {
           <Table size="small">
             <TableHead>
               <TableRow>
-                <TableCell>Symbol</TableCell>
+                <SortHead label="Symbol" colKey="symbol" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                 <TableCell>Company</TableCell>
-                <TableCell align="right">Price</TableCell>
+                <SortHead label="Price" colKey="price" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="right" />
                 <TableCell>Signal</TableCell>
-                <TableCell align="right">Score</TableCell>
-                <TableCell align="center">Move</TableCell>
-                <TableCell align="right">RS Rating</TableCell>
+                <SortHead label="Score" colKey="signalScore" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="right" />
+                <SortHead label="Move" colKey="scoreDeltaPrev" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="center" />
+                <SortHead label="RS Rating" colKey="rsPercentile" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="right" />
                 <TableCell>Factors</TableCell>
                 <TableCell align="center">Trend</TableCell>
                 <TableCell>Sector</TableCell>
                 <TableCell>Cap Band</TableCell>
-                {hasDelivery && <TableCell align="right">Delivery %</TableCell>}
-                <TableCell align="right">52W Pos %</TableCell>
+                {hasDelivery && <SortHead label="Delivery %" colKey="deliveryPct" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="right" />}
+                <SortHead label="52W Pos %" colKey="range52wPositionPct" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="right" />
                 {hasDelivery && <TableCell>F&O Ban</TableCell>}
                 {hasDelivery && <FnoScreenerHeaderCells />}
               </TableRow>
             </TableHead>
             <TableBody>
-              {rows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((row) => (
+              {sortedRows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((row) => (
                 <TableRow key={row.instrumentId} hover>
                   <TableCell>
                     <SymbolLink instrumentId={row.instrumentId} symbol={row.symbol} source={screenerSource} />
@@ -481,7 +457,7 @@ export default function ScreenerPage() {
           </Table>
           <TablePagination
             component="div"
-            count={rows.length}
+            count={sortedRows.length}
             page={page}
             onPageChange={(_e, newPage) => setPage(newPage)}
             rowsPerPage={rowsPerPage}
