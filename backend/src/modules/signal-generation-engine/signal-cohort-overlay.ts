@@ -61,8 +61,14 @@ export interface CohortMetric {
  * resolved lazily in `resolveQualityCohortReader`.
  */
 export interface QualityCohortReader {
-  cohortHitRates(query: { horizon: string; modelVersion?: string }): Promise<CohortMetric[]>;
+  cohortHitRates(query: { horizon: string; modelVersion?: string; countries?: string[] }): Promise<CohortMetric[]>;
 }
+
+const REGION_TO_COUNTRIES: Record<string, string[]> = {
+  IN: ['India'],
+  US: ['US'],
+  EU: ['AT', 'BE', 'DE', 'ES', 'FI', 'FR', 'IT', 'NL', 'PT'],
+};
 
 /** Lazy-resolve the production cohort reader without a static import cycle. */
 export function resolveQualityCohortReader(): QualityCohortReader | null {
@@ -93,7 +99,7 @@ const emptyCohort = (horizon: string) => ({
  */
 export async function attachCohortMetrics(
   signals: SignalResultDto[],
-  opts: { reader?: QualityCohortReader | null; horizon?: string; modelVersion?: string } = {},
+  opts: { reader?: QualityCohortReader | null; horizon?: string; modelVersion?: string; region?: string } = {},
 ): Promise<SignalResultDto[]> {
   if (signals.length === 0) return signals;
   const reader = opts.reader === undefined ? resolveQualityCohortReader() : opts.reader;
@@ -101,10 +107,11 @@ export async function attachCohortMetrics(
   if (!reader) return signals.map((s) => ({ ...s, ...emptyCohort(horizon) }));
 
   const modelVersion = opts.modelVersion ?? (signals[0] as any)?.modelVersion ?? (signals[0] as any)?.model_version ?? undefined;
+  const countries = opts.region ? REGION_TO_COUNTRIES[opts.region] : undefined;
 
   let rows: CohortMetric[];
   try {
-    rows = await reader.cohortHitRates({ horizon, modelVersion });
+    rows = await reader.cohortHitRates({ horizon, modelVersion, countries });
   } catch {
     return signals.map((s) => ({ ...s, ...emptyCohort(horizon) }));
   }

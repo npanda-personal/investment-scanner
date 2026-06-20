@@ -35,6 +35,8 @@ export interface CohortHitRateQuery {
   horizon: QualityHorizon;
   /** Restrict to a single engine model version (e.g. 'signal-engine-v4'). */
   modelVersion?: string;
+  /** Filter by country value(s) in signal_outcomes (e.g. 'India', 'US'). Omit for global pooling. */
+  countries?: string[];
 }
 
 /** CANONICAL score-bucket CASE — must match signal-quality-lab.repository.groupExpressions. */
@@ -56,8 +58,8 @@ export class SignalQualityCohortRepository {
   /**
    * Win-rate / sample / avg-return for EVERY (direction × score-bucket) cohort within a
    * single horizon, over mature persisted outcomes.  One query; the caller indexes the
-   * result by `${direction}:${scoreBucket}`.  Pooled across regions for the given model
-   * version (region stratification is a follow-up — see module docs).
+   * result by `${direction}:${scoreBucket}`.  Optionally filtered by country (region
+   * stratification); omit `countries` to pool globally.
    *
    * Win = (BULLISH AND forwardReturn > 0) OR (BEARISH AND forwardReturn < 0); NEUTRAL rows
    * count toward sampleSize/avgReturn but never toward winRate/directionalSampleSize.
@@ -67,6 +69,9 @@ export class SignalQualityCohortRepository {
     if (!/^[0-9A-Za-z]+$/.test(query.horizon)) throw new Error(`Invalid horizon: ${query.horizon}`);
     const modelFilter = query.modelVersion && /^[0-9A-Za-z._-]+$/.test(query.modelVersion)
       ? `AND "modelVersion" = '${query.modelVersion}'`
+      : '';
+    const countryFilter = query.countries?.length
+      ? `AND country IN (${query.countries.filter((c) => /^[A-Za-z ]+$/.test(c)).map((c) => `'${c}'`).join(',')})`
       : '';
 
     const sql = `
@@ -84,6 +89,7 @@ export class SignalQualityCohortRepository {
       WHERE "dataComplete" = true
         AND horizon = '${query.horizon}'
         ${modelFilter}
+        ${countryFilter}
       GROUP BY direction, score_bucket
     `;
 

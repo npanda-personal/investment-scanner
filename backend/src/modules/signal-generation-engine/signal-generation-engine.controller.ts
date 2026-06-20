@@ -67,10 +67,10 @@ export class SignalGenerationEngineController {
    * response unchanged on empty/missing data. Crypto responses are not annotated (no equity
    * outcome cohort applies to the isolated crypto plane).
    */
-  private async withCohortMetrics<T extends { signals?: any[]; items?: any[] }>(response: T): Promise<T> {
+  private async withCohortMetrics<T extends { signals?: any[]; items?: any[] }>(response: T, region?: string): Promise<T> {
     const items = response?.items ?? response?.signals ?? [];
     if (!Array.isArray(items) || items.length === 0) return response;
-    const enriched = await attachCohortMetrics(items);
+    const enriched = await attachCohortMetrics(items, { region });
     return { ...response, signals: enriched, items: enriched };
   }
 
@@ -105,7 +105,7 @@ export class SignalGenerationEngineController {
       if (isCryptoScope({ region: query.region, assetType: query.assetType })) {
         return res.json(await this.cryptoTopResponse(query));
       }
-      return res.json(await this.withCohortMetrics(await this.service.topSignals(query)));
+      return res.json(await this.withCohortMetrics(await this.service.topSignals(query), query.region));
     } catch (error) {
       console.error('Signal top endpoint error:', error);
       return res.status(500).json({ error: 'Failed to load top signals' });
@@ -128,7 +128,7 @@ export class SignalGenerationEngineController {
       if (isCryptoScope({ region: query.region, assetType: query.assetType })) {
         return res.json({ scope: { region: 'GLOBAL', assetType: 'CRYPTO' }, signals: [], items: [], notApplicable: true });
       }
-      return res.json(await this.withCohortMetrics(await this.service.exitCandidates(query)));
+      return res.json(await this.withCohortMetrics(await this.service.exitCandidates(query), query.region));
     } catch (error) {
       console.error('Signal exit-candidates endpoint error:', error);
       return res.status(500).json({ error: 'Failed to load exit candidates' });
@@ -146,7 +146,7 @@ export class SignalGenerationEngineController {
       if (isCryptoScope({ region: query.region, assetType: query.assetType })) {
         return res.json({ scope: { region: 'GLOBAL', assetType: 'CRYPTO' }, signals: [], items: [], notApplicable: true });
       }
-      return res.json(await this.withCohortMetrics(await this.service.lifecycleSignals(query)));
+      return res.json(await this.withCohortMetrics(await this.service.lifecycleSignals(query), query.region));
     } catch (error) {
       console.error('Signal lifecycle endpoint error:', error);
       return res.status(500).json({ error: 'Failed to load lifecycle signals' });
@@ -220,7 +220,7 @@ export class SignalGenerationEngineController {
       if (isCryptoScope({ region: query.region, assetType: query.assetType })) {
         return res.json(await this.cryptoTopResponse(query));
       }
-      return res.json(await this.withCohortMetrics(await this.service.screener(query)));
+      return res.json(await this.withCohortMetrics(await this.service.screener(query), query.region));
     } catch (error) {
       console.error('Signal screener endpoint error:', error);
       return res.status(500).json({ error: 'Failed to load signal screener' });
