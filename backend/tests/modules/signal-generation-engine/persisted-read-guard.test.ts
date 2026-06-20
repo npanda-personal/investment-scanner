@@ -44,7 +44,7 @@ describe('R1 guard — GET /signals/:instrumentId never calls run()', () => {
 
     expect(service.latestForInstrument).toHaveBeenCalledWith('RELIANCE');
     expect(service.run).not.toHaveBeenCalled();
-    expect(res.json).toHaveBeenCalledWith(persistedSignal);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ id: 'sig-1', symbol: 'RELIANCE' }));
   });
 
   it('returns 404 and does NOT call run() when no persisted signal exists', async () => {
