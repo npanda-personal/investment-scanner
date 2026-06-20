@@ -108,11 +108,19 @@ describe('attachCohortMetrics', () => {
     expect(received.countries).toBeUndefined();
   });
 
-  it('maps US region to US country code', async () => {
+  it('maps US region to United States country name', async () => {
     let received: any = null;
     const reader = readerOf([], (q) => { received = q; });
     await attachCohortMetrics([sig({ direction: 'BULLISH', score: 75 } as any)], { reader, region: 'US' });
-    expect(received.countries).toEqual(['US']);
+    expect(received.countries).toEqual(['United States']);
+  });
+
+  it('maps EU region to full country names', async () => {
+    let received: any = null;
+    const reader = readerOf([], (q) => { received = q; });
+    await attachCohortMetrics([sig({ direction: 'BULLISH', score: 75 } as any)], { reader, region: 'EU' });
+    expect(received.countries).toEqual(expect.arrayContaining(['Germany', 'France', 'Italy']));
+    expect(received.countries).toHaveLength(9);
   });
 
   it('returns [] for an empty signal list', async () => {

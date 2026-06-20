@@ -66,8 +66,8 @@ export interface QualityCohortReader {
 
 const REGION_TO_COUNTRIES: Record<string, string[]> = {
   IN: ['India'],
-  US: ['US'],
-  EU: ['AT', 'BE', 'DE', 'ES', 'FI', 'FR', 'IT', 'NL', 'PT'],
+  US: ['United States'],
+  EU: ['Austria', 'Belgium', 'Germany', 'Spain', 'Finland', 'France', 'Italy', 'Netherlands', 'Portugal'],
 };
 
 /** Lazy-resolve the production cohort reader without a static import cycle. */
