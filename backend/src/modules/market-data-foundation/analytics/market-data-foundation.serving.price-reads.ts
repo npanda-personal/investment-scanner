@@ -14,6 +14,7 @@ import type { PaginationOptions } from '../market-data-foundation.types';
 import { isWatermarkGateEnabled, getWatermarkDate } from './market-data-read.api';
 import { isCryptoScope } from '../../../shared/data-access/market-repository-router';
 import { tradingDateForRegion } from '../ingestion/market-data-foundation.market-session';
+import { computeAdjustmentFactor } from '../persistence/market-data-foundation.repository.helpers';
 
 // Reduced from 100 to 50 so each raw-SQL batch returns at most ~50 × 420 ≈ 21 000 rows,
 // keeping individual queries small and reducing connection-hold time (pool-safety).
@@ -76,7 +77,7 @@ export class PriceReadsService {
     return {
       instrument_id: stock.id,
       symbol: stock.symbol,
-      adjustment_strategy: 'adjusted_close is not persisted; close is returned as adjusted_close for MVP display.',
+      adjustment_strategy: 'Corporate-action-adjusted OHLCV computed from adjustedClose/close factor; raw values when no adjustment data.',
       source: prices[0]?.source || 'database',
       ingestion_timestamp: prices[0]?.ingestionTimestamp instanceof Date ? prices[0].ingestionTimestamp.toISOString() : null,
       last_updated_timestamp: prices[0]?.lastUpdatedTimestamp instanceof Date ? prices[0].lastUpdatedTimestamp.toISOString() : null,
@@ -88,13 +89,18 @@ export class PriceReadsService {
         const dateKey = price.timestamp instanceof Date
           ? price.timestamp.toISOString().split('T')[0]
           : String(price.timestamp).split('T')[0];
+        const adjClose = price.adjustedClose !== null ? Number(price.adjustedClose) : Number(price.close);
         return {
           date: price.timestamp,
           open: Number(price.open),
           high: Number(price.high),
           low: Number(price.low),
           close: Number(price.close),
-          adjusted_close: price.adjustedClose !== null ? Number(price.adjustedClose) : Number(price.close),
+          adjusted_close: adjClose,
+          adjusted_open: price.adjustedOpen != null ? Number(price.adjustedOpen) : Number(price.open),
+          adjusted_high: price.adjustedHigh != null ? Number(price.adjustedHigh) : Number(price.high),
+          adjusted_low: price.adjustedLow != null ? Number(price.adjustedLow) : Number(price.low),
+          adjusted_volume: price.adjustedVolume != null ? Number(price.adjustedVolume) : (price.volume !== null ? Number(price.volume) : null),
           volume: price.volume !== null ? Number(price.volume) : null,
           /** Delivery% for this specific trading day (null when absent). */
           delivery_percent: deliveryByDate.has(dateKey) ? deliveryByDate.get(dateKey) ?? null : null,
@@ -177,17 +183,26 @@ export class PriceReadsService {
       };
     }
 
+    const factor = computeAdjustmentFactor(price.close, price.adjustedClose);
+    const rawOpen = price.open !== null ? Number(price.open) : null;
+    const rawHigh = price.high !== null ? Number(price.high) : null;
+    const rawLow = price.low !== null ? Number(price.low) : null;
+    const rawVolume = price.volume !== null ? Number(price.volume) : null;
     return {
       instrument_id: stock.id,
       symbol: stock.symbol,
       latest: {
         date: price.timestamp,
-        open: price.open !== null ? Number(price.open) : null,
-        high: price.high !== null ? Number(price.high) : null,
-        low: price.low !== null ? Number(price.low) : null,
+        open: rawOpen,
+        high: rawHigh,
+        low: rawLow,
         close: Number(price.close),
         adjusted_close: price.adjustedClose !== null ? Number(price.adjustedClose) : Number(price.close),
-        volume: price.volume !== null ? Number(price.volume) : null,
+        adjusted_open: rawOpen !== null ? Number((rawOpen * factor).toFixed(4)) : null,
+        adjusted_high: rawHigh !== null ? Number((rawHigh * factor).toFixed(4)) : null,
+        adjusted_low: rawLow !== null ? Number((rawLow * factor).toFixed(4)) : null,
+        adjusted_volume: rawVolume !== null ? Number((rawVolume / factor).toFixed(0)) : null,
+        volume: rawVolume,
         source: price.source || 'database',
         ingestion_timestamp: price.ingestionTimestamp instanceof Date ? price.ingestionTimestamp.toISOString() : new Date().toISOString(),
         last_updated_timestamp: price.lastUpdatedTimestamp instanceof Date ? price.lastUpdatedTimestamp.toISOString() : new Date().toISOString(),
@@ -285,14 +300,25 @@ export class PriceReadsService {
       if (!instrumentId) continue;
       const bucket = byInstrumentId.get(instrumentId);
       if (!bucket || bucket.length >= safeLimit) continue;
+      const rawOpen = Number(price.open);
+      const rawHigh = Number(price.high);
+      const rawLow = Number(price.low);
+      const rawClose = Number(price.close);
+      const adjClose = price.adjustedClose !== null ? Number(price.adjustedClose) : rawClose;
+      const rawVolume = price.volume !== null ? Number(price.volume) : null;
+      const factor = computeAdjustmentFactor(price.close, price.adjustedClose);
       bucket.push({
         date: price.timestamp,
-        open: Number(price.open),
-        high: Number(price.high),
-        low: Number(price.low),
-        close: Number(price.close),
-        adjusted_close: price.adjustedClose !== null ? Number(price.adjustedClose) : Number(price.close),
-        volume: price.volume !== null ? Number(price.volume) : null,
+        open: rawOpen,
+        high: rawHigh,
+        low: rawLow,
+        close: rawClose,
+        adjusted_close: adjClose,
+        adjusted_open: Number((rawOpen * factor).toFixed(4)),
+        adjusted_high: Number((rawHigh * factor).toFixed(4)),
+        adjusted_low: Number((rawLow * factor).toFixed(4)),
+        adjusted_volume: rawVolume !== null ? Number((rawVolume / factor).toFixed(0)) : null,
+        volume: rawVolume,
         source: price.source || 'database',
         ingestion_timestamp: price.ingestionTimestamp instanceof Date ? price.ingestionTimestamp.toISOString() : new Date().toISOString(),
         last_updated_timestamp: price.lastUpdatedTimestamp instanceof Date ? price.lastUpdatedTimestamp.toISOString() : new Date().toISOString(),
