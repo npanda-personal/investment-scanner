@@ -136,3 +136,66 @@ export function fundamentalGrowthVotes(
 
   return { signals, negativeSignals };
 }
+
+// ── Phase 2: margin trend + PE self-history votes ──────────────────────────────
+const MARGIN_EXPANSION_THRESHOLD = 0.03;
+const PE_BELOW_OWN_HISTORY_RATIO = 0.20;
+const PE_ABOVE_OWN_HISTORY_RATIO = 0.40;
+
+export function fundamentalMarginTrendVotes(
+  latest: any,
+  records: any[],
+): { signals: SignalItem[]; negativeSignals: SignalItem[] } {
+  const signals: SignalItem[] = [];
+  const negativeSignals: SignalItem[] = [];
+  if (!latest || !Array.isArray(records)) return { signals, negativeSignals };
+
+  const prior = yoyComparable(records, latest);
+  if (!prior) return { signals, negativeSignals };
+
+  const rev = num(latest.revenue);
+  const ni = num(latest.net_income);
+  const priorRev = num(prior.revenue);
+  const priorNi = num(prior.net_income);
+  if (rev === null || ni === null || priorRev === null || priorNi === null) return { signals, negativeSignals };
+  if (rev <= 0 || priorRev <= 0) return { signals, negativeSignals };
+
+  const margin = ni / rev;
+  const priorMargin = priorNi / priorRev;
+  const delta = margin - priorMargin;
+
+  if (delta >= MARGIN_EXPANSION_THRESHOLD) {
+    signals.push({ code: 'MARGIN_EXPANSION_YOY', label: `net margin expanded ${(delta * 100).toFixed(1)}pp YoY`, category: 'FUNDAMENTAL' });
+  } else if (delta <= -MARGIN_EXPANSION_THRESHOLD) {
+    negativeSignals.push({ code: 'MARGIN_CONTRACTION_YOY', label: `net margin contracted ${(Math.abs(delta) * 100).toFixed(1)}pp YoY`, category: 'FUNDAMENTAL' });
+  }
+  return { signals, negativeSignals };
+}
+
+export function fundamentalPeHistoryVotes(
+  latest: any,
+  records: any[],
+): { signals: SignalItem[]; negativeSignals: SignalItem[] } {
+  const signals: SignalItem[] = [];
+  const negativeSignals: SignalItem[] = [];
+  if (!latest || !Array.isArray(records)) return { signals, negativeSignals };
+
+  const currentPe = num(latest.pe_ratio);
+  if (currentPe === null || currentPe <= 0) return { signals, negativeSignals };
+
+  const validPes = records.map((r) => num(r.pe_ratio)).filter((p): p is number => p !== null && p > 0);
+  if (validPes.length < 3) return { signals, negativeSignals };
+
+  validPes.sort((a, b) => a - b);
+  const mid = Math.floor(validPes.length / 2);
+  const median = validPes.length % 2 === 0 ? (validPes[mid - 1] + validPes[mid]) / 2 : validPes[mid];
+  if (median <= 0) return { signals, negativeSignals };
+
+  const ratio = (currentPe - median) / median;
+  if (ratio <= -PE_BELOW_OWN_HISTORY_RATIO) {
+    signals.push({ code: 'PE_BELOW_OWN_HISTORY', label: `P/E ${currentPe.toFixed(1)} is ${(Math.abs(ratio) * 100).toFixed(0)}% below own median (${median.toFixed(1)})`, category: 'FUNDAMENTAL' });
+  } else if (ratio >= PE_ABOVE_OWN_HISTORY_RATIO) {
+    negativeSignals.push({ code: 'PE_ABOVE_OWN_HISTORY', label: `P/E ${currentPe.toFixed(1)} is ${(ratio * 100).toFixed(0)}% above own median (${median.toFixed(1)})`, category: 'FUNDAMENTAL' });
+  }
+  return { signals, negativeSignals };
+}

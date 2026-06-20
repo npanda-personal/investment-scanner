@@ -9,6 +9,8 @@
 import {
   yoyComparable,
   fundamentalGrowthVotes,
+  fundamentalMarginTrendVotes,
+  fundamentalPeHistoryVotes,
 } from '../../../src/modules/signal-generation-engine/signal-fundamental-growth';
 
 /**
@@ -21,12 +23,14 @@ const daysAgo = (d: number) => new Date(anchor.getTime() - d * 24 * 60 * 60 * 10
 const rec = (
   period_type: 'QUARTERLY' | 'ANNUAL',
   daysBeforeAnchor: number,
-  fields: { revenue?: number | null; eps?: number | null } = {},
+  fields: { revenue?: number | null; eps?: number | null; net_income?: number | null; pe_ratio?: number | null } = {},
 ) => ({
   period_type,
   period_end_date: daysAgo(daysBeforeAnchor).toISOString(),
   revenue: fields.revenue ?? null,
   eps: fields.eps ?? null,
+  net_income: fields.net_income ?? null,
+  pe_ratio: fields.pe_ratio ?? null,
 });
 
 describe('yoyComparable — same-periodType, ~1yr-prior matcher', () => {
@@ -128,6 +132,148 @@ describe('fundamentalGrowthVotes — revenue/EPS YoY thresholds', () => {
     const latest = rec('QUARTERLY', 0, { revenue: 200, eps: 5 });
     const records = [latest, rec('QUARTERLY', 91, { revenue: 100, eps: 1 })]; // only prior quarter
     const { signals, negativeSignals } = fundamentalGrowthVotes(latest, records);
+    expect(signals).toHaveLength(0);
+    expect(negativeSignals).toHaveLength(0);
+  });
+});
+
+describe('fundamentalMarginTrendVotes — net margin expansion/contraction YoY', () => {
+  const marginPair = (latestFields: any, priorFields: any) => {
+    const latest = rec('QUARTERLY', 0, latestFields);
+    const prior = rec('QUARTERLY', 365, priorFields);
+    return { latest, records: [latest, rec('QUARTERLY', 91), prior] };
+  };
+
+  it('fires MARGIN_EXPANSION_YOY when margin expands ≥3pp', () => {
+    const { latest, records } = marginPair(
+      { revenue: 100, net_income: 15 },
+      { revenue: 100, net_income: 10 },
+    );
+    const { signals, negativeSignals } = fundamentalMarginTrendVotes(latest, records);
+    expect(signals).toHaveLength(1);
+    expect(signals[0].code).toBe('MARGIN_EXPANSION_YOY');
+    expect(signals[0].label).toContain('5.0pp');
+    expect(signals[0].category).toBe('FUNDAMENTAL');
+    expect(negativeSignals).toHaveLength(0);
+  });
+
+  it('fires MARGIN_CONTRACTION_YOY when margin contracts ≥3pp', () => {
+    const { latest, records } = marginPair(
+      { revenue: 100, net_income: 5 },
+      { revenue: 100, net_income: 12 },
+    );
+    const { signals, negativeSignals } = fundamentalMarginTrendVotes(latest, records);
+    expect(signals).toHaveLength(0);
+    expect(negativeSignals).toHaveLength(1);
+    expect(negativeSignals[0].code).toBe('MARGIN_CONTRACTION_YOY');
+  });
+
+  it('stays silent in the neutral band (<3pp change)', () => {
+    const { latest, records } = marginPair(
+      { revenue: 100, net_income: 11 },
+      { revenue: 100, net_income: 10 },
+    );
+    const { signals, negativeSignals } = fundamentalMarginTrendVotes(latest, records);
+    expect(signals).toHaveLength(0);
+    expect(negativeSignals).toHaveLength(0);
+  });
+
+  it('skips when revenue is zero or negative', () => {
+    const { latest, records } = marginPair(
+      { revenue: 0, net_income: 5 },
+      { revenue: 100, net_income: 10 },
+    );
+    const { signals, negativeSignals } = fundamentalMarginTrendVotes(latest, records);
+    expect(signals).toHaveLength(0);
+    expect(negativeSignals).toHaveLength(0);
+  });
+
+  it('skips when net_income is null on either side', () => {
+    const { latest, records } = marginPair(
+      { revenue: 100, net_income: null },
+      { revenue: 100, net_income: 10 },
+    );
+    const { signals, negativeSignals } = fundamentalMarginTrendVotes(latest, records);
+    expect(signals).toHaveLength(0);
+    expect(negativeSignals).toHaveLength(0);
+  });
+});
+
+describe('fundamentalPeHistoryVotes — PE vs own historical median', () => {
+  it('fires PE_BELOW_OWN_HISTORY when current PE is ≥20% below median', () => {
+    const latest = rec('QUARTERLY', 0, { pe_ratio: 8 });
+    const records = [
+      latest,
+      rec('QUARTERLY', 91, { pe_ratio: 15 }),
+      rec('QUARTERLY', 182, { pe_ratio: 14 }),
+      rec('QUARTERLY', 273, { pe_ratio: 16 }),
+    ];
+    const { signals, negativeSignals } = fundamentalPeHistoryVotes(latest, records);
+    expect(signals).toHaveLength(1);
+    expect(signals[0].code).toBe('PE_BELOW_OWN_HISTORY');
+    expect(signals[0].category).toBe('FUNDAMENTAL');
+    expect(negativeSignals).toHaveLength(0);
+  });
+
+  it('fires PE_ABOVE_OWN_HISTORY when current PE is ≥40% above median', () => {
+    const latest = rec('QUARTERLY', 0, { pe_ratio: 30 });
+    const records = [
+      latest,
+      rec('QUARTERLY', 91, { pe_ratio: 15 }),
+      rec('QUARTERLY', 182, { pe_ratio: 14 }),
+      rec('QUARTERLY', 273, { pe_ratio: 16 }),
+    ];
+    const { signals, negativeSignals } = fundamentalPeHistoryVotes(latest, records);
+    expect(signals).toHaveLength(0);
+    expect(negativeSignals).toHaveLength(1);
+    expect(negativeSignals[0].code).toBe('PE_ABOVE_OWN_HISTORY');
+  });
+
+  it('stays silent when PE is near the median', () => {
+    const latest = rec('QUARTERLY', 0, { pe_ratio: 15 });
+    const records = [
+      latest,
+      rec('QUARTERLY', 91, { pe_ratio: 14 }),
+      rec('QUARTERLY', 182, { pe_ratio: 16 }),
+      rec('QUARTERLY', 273, { pe_ratio: 15 }),
+    ];
+    const { signals, negativeSignals } = fundamentalPeHistoryVotes(latest, records);
+    expect(signals).toHaveLength(0);
+    expect(negativeSignals).toHaveLength(0);
+  });
+
+  it('requires at least 3 valid PE values (skips with fewer)', () => {
+    const latest = rec('QUARTERLY', 0, { pe_ratio: 5 });
+    const records = [latest, rec('QUARTERLY', 91, { pe_ratio: 20 })];
+    const { signals, negativeSignals } = fundamentalPeHistoryVotes(latest, records);
+    expect(signals).toHaveLength(0);
+    expect(negativeSignals).toHaveLength(0);
+  });
+
+  it('ignores zero/negative PE values when computing median', () => {
+    const latest = rec('QUARTERLY', 0, { pe_ratio: 8 });
+    const records = [
+      latest,
+      rec('QUARTERLY', 91, { pe_ratio: -5 }),
+      rec('QUARTERLY', 182, { pe_ratio: 0 }),
+      rec('QUARTERLY', 273, { pe_ratio: 15 }),
+      rec('QUARTERLY', 365, { pe_ratio: 14 }),
+      rec('QUARTERLY', 456, { pe_ratio: 16 }),
+    ];
+    const { signals } = fundamentalPeHistoryVotes(latest, records);
+    expect(signals).toHaveLength(1);
+    expect(signals[0].code).toBe('PE_BELOW_OWN_HISTORY');
+  });
+
+  it('skips when current PE is null or ≤0', () => {
+    const latest = rec('QUARTERLY', 0, { pe_ratio: -3 });
+    const records = [
+      latest,
+      rec('QUARTERLY', 91, { pe_ratio: 15 }),
+      rec('QUARTERLY', 182, { pe_ratio: 14 }),
+      rec('QUARTERLY', 273, { pe_ratio: 16 }),
+    ];
+    const { signals, negativeSignals } = fundamentalPeHistoryVotes(latest, records);
     expect(signals).toHaveLength(0);
     expect(negativeSignals).toHaveLength(0);
   });

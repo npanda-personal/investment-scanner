@@ -88,6 +88,10 @@ const FAMILY_BY_CODE: Readonly<Record<string, FactorFamily>> = {
   REVENUE_DECLINE_YOY: 'GROWTH',
   EPS_GROWTH_YOY: 'GROWTH',
   EPS_DECLINE_YOY: 'GROWTH',
+  MARGIN_EXPANSION_YOY: 'GROWTH',
+  MARGIN_CONTRACTION_YOY: 'GROWTH',
+  PE_BELOW_OWN_HISTORY: 'VALUATION',
+  PE_ABOVE_OWN_HISTORY: 'VALUATION',
 };
 
 export function familyForCode(code: string): FactorFamily {
