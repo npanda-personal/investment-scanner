@@ -220,9 +220,17 @@ export class ScreenerRepository {
       -- Bulk 52-week high/low across all result symbols in one price_ticks scan instead
       -- of one LATERAL per row. WHERE IN (ranked symbols) + static NOW() time bound lets
       -- the planner use a single grouped scan (~12k rows) rather than 50 sequential
-      -- per-symbol index scans (~2.5s measured → ~120ms measured). Uses NOW() as the
-      -- window anchor (≈ latest-price-date for active stocks; negligible difference for
-      -- the positioning metric).
+      -- per-symbol index scans (~2.5s measured → ~120ms measured).
+      --
+      -- Window note: no upper-bound is applied (unlike the full path at line ~326 which
+      -- uses "< lp.price_ts"). Today's tick is therefore included in the high/low. For a
+      -- stock printing a new 52-week high today, range52wPositionPct = exactly 100.0%
+      -- (vs the full path which may return slightly above 100% for the same stock because
+      -- lp.price > prior-day high52w). The inclusive-today semantics are intentionally
+      -- accepted here: 100% is the correct reading for a new-high stock, and per-symbol
+      -- upper-bound anchoring would require a costly extra CTE scan per symbol (negating
+      -- the performance gain). For stale/illiquid names the window slides forward from
+      -- price_ts toward NOW() by at most a few days — negligible for active screener use.
       range_data AS MATERIALIZED (
         SELECT
           pt.symbol,
