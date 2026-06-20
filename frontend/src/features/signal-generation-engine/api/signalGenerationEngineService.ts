@@ -13,8 +13,8 @@ export async function fetchSignalScreener(query: SignalQuery = {}): Promise<Pagi
   return response.data;
 }
 
-export async function fetchInstrumentSignal(instrumentId: string): Promise<SignalResult> {
-  const response = await axios.get<SignalResult>(`${API_BASE}/${instrumentId}`);
+export async function fetchInstrumentSignal(instrumentId: string, region?: string): Promise<SignalResult> {
+  const response = await axios.get<SignalResult>(`${API_BASE}/${instrumentId}`, { params: region ? { region } : undefined });
   return response.data;
 }
 

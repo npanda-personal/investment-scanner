@@ -2,19 +2,16 @@ import React from 'react';
 import { Alert, Box, Chip, CircularProgress, IconButton, Paper, Tooltip, Typography } from '@mui/material';
 import { LaunchOutlined } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
+import { useMarketScope } from '@/contexts/MarketScopeContext';
 import { useInstrumentSignal } from '../hooks/useInstrumentSignal';
 import { SignalBadge } from './SignalBadge';
 
-// Mirrors the backend canonical threshold DEFAULT_STALENESS_DAYS
-// (backend/src/modules/signal-generation-engine/signal-asof.ts). The backend's
-// isStaleAsOf() measures staleness from the underlying price date, so we anchor on
-// sourcePriceDate (falling back to generated_at) — a signal built on >5-day-old data
-// reflects an older market, not today's.
 const SIGNAL_STALENESS_DAYS = 5;
 
 export const SignalWidget: React.FC<{ instrumentId?: string }> = ({ instrumentId }) => {
   const navigate = useNavigate();
-  const { signal, loading, error } = useInstrumentSignal(instrumentId);
+  const { scope } = useMarketScope();
+  const { signal, loading, error } = useInstrumentSignal(instrumentId, scope.region);
 
   if (!instrumentId) return null;
 
