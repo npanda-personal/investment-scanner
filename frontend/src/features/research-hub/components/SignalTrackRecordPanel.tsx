@@ -13,6 +13,8 @@ import {
   TableCell,
   TableHead,
   TableRow,
+  ToggleButton,
+  ToggleButtonGroup,
   Tooltip,
   Typography,
 } from '@mui/material';
@@ -130,6 +132,7 @@ export const SignalTrackRecordPanel: FC = () => {
   const [summary, setSummary] = useState<ScorecardSummary[]>([]);
   const [rows, setRows] = useState<ScorecardRow[]>([]);
   const [breakdownOpen, setBreakdownOpen] = useState(false);
+  const [selectedHorizon, setSelectedHorizon] = useState<string | null>(null);
 
   const load = useCallback(() => {
     if (!shouldRender) return;
@@ -156,6 +159,8 @@ export const SignalTrackRecordPanel: FC = () => {
   const totalSamples = summary.reduce((acc, s) => Math.max(acc, s.directionalSampleSize), 0);
   const hasData = summary.length > 0 && totalSamples > 0;
   const allLow = summary.length > 0 && summary.every((s) => s.directionalSampleSize < WIN_RATE_CONFIDENCE_MEDIUM_THRESHOLD);
+  const filteredSummary = selectedHorizon ? summary.filter((s) => s.horizon === selectedHorizon) : summary;
+  const filteredRows = selectedHorizon ? rows.filter((r) => r.horizon === selectedHorizon) : rows;
 
   return (
     <Paper variant="outlined" sx={{ p: 3 }}>
@@ -169,6 +174,20 @@ export const SignalTrackRecordPanel: FC = () => {
           <Chip size="small" label="Low sample — interpret with caution" color="warning" sx={{ fontSize: '0.65rem' }} />
         )}
       </Stack>
+
+      {!loading && hasData && (
+        <ToggleButtonGroup
+          size="small"
+          exclusive
+          value={selectedHorizon}
+          onChange={(_e, val: string | null) => setSelectedHorizon(val)}
+          sx={{ mb: 1.5 }}
+        >
+          {HORIZONS_ORDER.map((h) => (
+            <ToggleButton key={h} value={h} sx={{ px: 1.5, py: 0.25, fontSize: '0.7rem' }}>{h}</ToggleButton>
+          ))}
+        </ToggleButtonGroup>
+      )}
 
       {loading && (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}><CircularProgress size={28} /></Box>
@@ -217,11 +236,11 @@ export const SignalTrackRecordPanel: FC = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {summary.map((s) => <SummaryRow key={s.horizon} row={s} benchmarkLabel={profile.benchmarkLabel} />)}
+              {filteredSummary.map((s) => <SummaryRow key={s.horizon} row={s} benchmarkLabel={profile.benchmarkLabel} />)}
             </TableBody>
           </Table>
 
-          {rows.length > 0 && (
+          {filteredRows.length > 0 && (
             <>
               <Box
                 sx={{ display: 'flex', alignItems: 'center', gap: 0.5, cursor: 'pointer', mb: 0.5 }}
@@ -248,7 +267,7 @@ export const SignalTrackRecordPanel: FC = () => {
                   </TableHead>
                   <TableBody>
                     {HORIZONS_ORDER.flatMap((horizon) =>
-                      rows
+                      filteredRows
                         .filter((r) => r.horizon === horizon)
                         .sort((a, b) => a.groupKey.localeCompare(b.groupKey))
                         .map((r) => <BreakdownRow key={`${r.horizon}-${r.groupKey}`} row={r} />),
