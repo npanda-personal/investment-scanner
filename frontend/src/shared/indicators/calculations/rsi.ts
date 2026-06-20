@@ -31,7 +31,7 @@ export function rsi(closes: number[], period = 14): (number | null)[] {
 /**
  * Stochastic RSI.
  * Applies the stochastic formula to RSI values, then double-smooths into %K and %D.
- * Output values are scaled 0–100.
+ * Output values are in the 0–1 range (caller scales to 0–100 for display).
  */
 export function stochRsi(
   closes: number[],
