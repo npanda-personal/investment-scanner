@@ -1509,12 +1509,10 @@ export class SignalGenerationEngineService {
         ).catch(() => new Map())
         : Promise.resolve(new Map()),
     ]);
-    return {
-      instrumentsById: new Map((instruments as any[]).map((instrument) => [instrument.id, instrument])),
-      priceWindowsByInstrumentId: priceWindows instanceof Map ? priceWindows : new Map(),
-      fundamentalsByInstrumentId: fundamentals instanceof Map ? fundamentals : new Map(),
-      strategyPerformanceCache: new Map(),
-    };
+    const fundMap: Map<string, any> = fundamentals instanceof Map ? fundamentals : new Map();
+    if (asOfDate) for (const [k, v] of fundMap) if (v?.records?.length) fundMap.set(k, { ...v, records: Scoring.filterFundamentalsAsOf(v.records, asOfDate, FUNDAMENTAL_PUBLIC_LAG_DAYS) });
+    const instsMap = new Map((instruments as any[]).map((i) => [i.id, i]));
+    return { instrumentsById: instsMap, priceWindowsByInstrumentId: priceWindows instanceof Map ? priceWindows : new Map(), fundamentalsByInstrumentId: fundMap, strategyPerformanceCache: new Map() };
   }
 
   private async getFundamentalsForGeneration(instrumentId: string, marketScope: Pick<SignalRunRequest, 'region' | 'assetType'>, useFullResearchContext: boolean, asOf?: Date, publicLagDays: number = FUNDAMENTAL_PUBLIC_LAG_DAYS) {
