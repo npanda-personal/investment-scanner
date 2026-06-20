@@ -69,6 +69,16 @@ export const SignalCard: React.FC<{ signal: SignalResult }> = ({ signal }) => {
           )}
         </Box>
         <Typography variant="caption" color="text.secondary">Confidence: {signal.confidence}</Typography>
+        {signal.cohortWinRate != null && (
+          <Tooltip title={`Past outcomes — not a forecast. ${Math.round(signal.cohortWinRate * 100)}% win-rate over ${signal.cohortMetricsHorizon ?? '20D'} (n=${signal.cohortDirectionalSampleSize ?? 0}).`} arrow>
+            <Typography variant="caption" sx={{
+              color: (signal.cohortWinRateConfidence === 'LOW') ? 'text.secondary' : Math.round(signal.cohortWinRate * 100) >= 55 ? 'success.main' : Math.round(signal.cohortWinRate * 100) >= 45 ? 'text.primary' : 'error.main',
+              cursor: 'help', display: 'block',
+            }}>
+              Track record: {Math.round(signal.cohortWinRate * 100)}% (n={signal.cohortDirectionalSampleSize ?? 0})
+            </Typography>
+          </Tooltip>
+        )}
         <Box sx={{ mt: 1, display: 'flex', gap: 1, alignItems: 'baseline', flexWrap: 'wrap' }}>
           <Typography fontWeight={700}>{formatPrice(signal.currentPrice, signal.currency)}</Typography>
           <Typography color={priceTone(signal.dailyChangePercent)} variant="body2">

@@ -174,9 +174,9 @@ export class SignalGenerationEngineController {
       // every stock even when a calibration row existed. Returns null when nothing trusted is persisted.
       const result = await this.service.latestForInstrument(instrumentId);
       if (!result) return res.status(404).json({ error: 'No persisted signal found for this instrument. Run signal generation via POST /signals/run to populate.' });
-      // Cohort overlay is attached on the LIST endpoints (table/drawer) only; the single-instrument
-      // read stays a verbatim persisted-read. SignalWidget/SignalCard cohort display is a follow-up.
-      return res.json(result);
+      const region = first(req.query?.region) as string | undefined;
+      const [enriched] = await attachCohortMetrics([result], { region });
+      return res.json(enriched);
     } catch (error) {
       console.error('Signal instrument endpoint error:', error);
       return res.status(500).json({ error: 'Failed to load signal' });
