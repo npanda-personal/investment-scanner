@@ -1,3 +1,4 @@
+import axios from 'axios';
 import {
   Alert,
   Box,
@@ -79,33 +80,45 @@ export default function ScreenerPage() {
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const handleSort = (k: SortKey) => { if (k === sortKey) { setSortDir(d => d === 'asc' ? 'desc' : 'asc'); } else { setSortKey(k); setSortDir('desc'); } setPage(0); };
 
-  // Debounce timer
+  // Debounce timer and in-flight request cancellation
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   const runQuery = useCallback((f: ScreenerFilters) => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
       setLoading(true);
       setError(null);
       try {
-        const result = await fetchScreener(f);
+        const result = await fetchScreener(f, controller.signal);
         setRows(result.results);
         setWarnings(result.warnings);
         setGeneratedAt(result.generatedAt);
         setCount(result.count);
       } catch (err: any) {
+        if (axios.isCancel(err) || controller.signal.aborted) return;
         setError(err?.response?.data?.error || err?.message || 'Screener query failed');
         setRows([]);
         setCount(null);
       } finally {
-        setLoading(false);
+        // Only the currently-active request may clear loading; aborted requests skip this.
+        if (abortRef.current === controller) {
+          abortRef.current = null;
+          setLoading(false);
+        }
       }
     }, 350);
   }, []);
 
   useEffect(() => {
     runQuery(filters);
-    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      abortRef.current?.abort();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters]);
 

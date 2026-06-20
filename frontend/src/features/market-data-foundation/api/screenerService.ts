@@ -3,7 +3,7 @@ import type { ScreenerFilters, ScreenerResult } from '../types';
 
 const API_BASE = '/api/v1/market-data/screener';
 
-export async function fetchScreener(filters: ScreenerFilters = {}): Promise<ScreenerResult> {
+export async function fetchScreener(filters: ScreenerFilters = {}, signal?: AbortSignal): Promise<ScreenerResult> {
   const params: Record<string, string | number | boolean> = {};
   if (filters.signalDirection) params.signalDirection = filters.signalDirection;
   if (filters.minScore != null) params.minScore = filters.minScore;
@@ -16,6 +16,6 @@ export async function fetchScreener(filters: ScreenerFilters = {}): Promise<Scre
   if (filters.onlyDerivativesEligible != null) params.onlyDerivativesEligible = filters.onlyDerivativesEligible;
   if (filters.limit != null) params.limit = filters.limit;
 
-  const response = await axios.get<ScreenerResult>(API_BASE, { params });
+  const response = await axios.get<ScreenerResult>(API_BASE, { params, signal });
   return response.data;
 }
