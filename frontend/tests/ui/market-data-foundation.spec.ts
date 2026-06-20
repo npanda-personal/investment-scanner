@@ -36,42 +36,6 @@ async function mockCatalogPageShell(page: Page, sources: any[] = []) {
   });
 }
 
-const catalogSyncStatus = (overrides: Record<string, unknown> = {}) => ({
-  success: true,
-  runId: 'catalog-sync-test',
-  status: 'RUNNING',
-  message: 'Catalog sync is running.',
-  region: 'IN',
-  assetType: 'STOCK',
-  scopeType: 'CATALOG',
-  batchSize: 25,
-  workerCount: 1,
-  workerConcurrency: 2,
-  delayBetweenBatchesMs: 3000,
-  maxBatches: 20,
-  totalCount: 100,
-  processedCount: 0,
-  currentBatchNumber: 1,
-  batchesPlanned: 4,
-  batchesExecuted: 0,
-  succeededCount: 0,
-  failedCount: 0,
-  skippedCount: 0,
-  noOpCount: 0,
-  rowsReceived: 0,
-  rowsInserted: 0,
-  rowsUpdated: 0,
-  rowsSkipped: 0,
-  warningCount: 0,
-  warnings: [],
-  recentErrors: [],
-  hasMore: true,
-  percentComplete: 0,
-  startedAt: '2026-05-13T10:15:00.000Z',
-  updatedAt: '2026-05-13T10:15:00.000Z',
-  completedAt: null,
-  ...overrides,
-});
 
 test.describe('Market Data Foundation UI', () => {
   test.beforeEach(async ({ page }) => {

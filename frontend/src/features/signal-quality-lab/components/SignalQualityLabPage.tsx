@@ -36,8 +36,7 @@ import type { QualityFilters, QualityHorizon, QualityMetricGroup, SignalHistoryI
 import { signal_quality_lab_batch_request_workers_count, signal_quality_lab_batch_size } from '../config';
 
 const horizons: QualityHorizon[] = ['1D', '5D', '10D', '20D', '60D'];
-const qualityTabs = ['overview', 'performance', 'noise', 'instrument'] as const;
-type QualityTab = typeof qualityTabs[number];
+type QualityTab = 'overview' | 'performance' | 'noise' | 'instrument';
 function percent(value: number | null | undefined): string;
 function percent(value: number | null | undefined, tooltip: string): string | React.ReactElement;
 function percent(value: number | null | undefined, tooltip?: string): string | React.ReactElement {

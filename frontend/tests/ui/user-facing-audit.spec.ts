@@ -517,7 +517,6 @@ test('user-facing screen audit crawl', async ({ page }) => {
   fs.writeFileSync(path.join(OUT, '_console_errors.txt'), consoleErrors.join('\n'));
   fs.writeFileSync(path.join(OUT, '_unhealthy.txt'), unhealthy.join('\n'));
 
-  // eslint-disable-next-line no-console
   console.log(
     `\n=== UI AUDIT: ${unhealthy.length}/${totalEntries} entries flagged ===\n` +
     (unhealthy.join('\n') || 'all OK') +
