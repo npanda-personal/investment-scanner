@@ -91,7 +91,36 @@ describe('attachCohortMetrics', () => {
     let received: any = null;
     const reader = readerOf([], (q) => { received = q; });
     await attachCohortMetrics([sig({ direction: 'BULLISH', score: 75, modelVersion: 'signal-engine-v4' } as any)], { reader, horizon: '10D' });
-    expect(received).toEqual({ horizon: '10D', modelVersion: 'signal-engine-v4' });
+    expect(received).toEqual({ horizon: '10D', modelVersion: 'signal-engine-v4', countries: undefined });
+  });
+
+  it('passes region-mapped countries to the reader for region stratification', async () => {
+    let received: any = null;
+    const reader = readerOf([], (q) => { received = q; });
+    await attachCohortMetrics([sig({ direction: 'BULLISH', score: 75, modelVersion: 'signal-engine-v4' } as any)], { reader, region: 'IN' });
+    expect(received.countries).toEqual(['India']);
+  });
+
+  it('passes undefined countries when region is omitted (global pooling)', async () => {
+    let received: any = null;
+    const reader = readerOf([], (q) => { received = q; });
+    await attachCohortMetrics([sig({ direction: 'BULLISH', score: 75, modelVersion: 'signal-engine-v4' } as any)], { reader });
+    expect(received.countries).toBeUndefined();
+  });
+
+  it('maps US region to United States country name', async () => {
+    let received: any = null;
+    const reader = readerOf([], (q) => { received = q; });
+    await attachCohortMetrics([sig({ direction: 'BULLISH', score: 75 } as any)], { reader, region: 'US' });
+    expect(received.countries).toEqual(['United States']);
+  });
+
+  it('maps EU region to full country names', async () => {
+    let received: any = null;
+    const reader = readerOf([], (q) => { received = q; });
+    await attachCohortMetrics([sig({ direction: 'BULLISH', score: 75 } as any)], { reader, region: 'EU' });
+    expect(received.countries).toEqual(expect.arrayContaining(['Germany', 'France', 'Italy']));
+    expect(received.countries).toHaveLength(9);
   });
 
   it('returns [] for an empty signal list', async () => {
