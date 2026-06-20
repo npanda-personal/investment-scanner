@@ -461,6 +461,7 @@ export interface SignalPricePoint {
   close: number;
   adjusted_close: number;
   volume: number | null;
+  adjusted_open?: number | null;
   /** Corporate-action-adjusted high — present when the price read layer supplies it.
    *  Falls back to raw `high` in indicators when absent (safe fallback). */
   adjusted_high?: number | null;

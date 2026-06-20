@@ -1750,6 +1750,7 @@ export class SignalGenerationEngineService {
         // Pass through adjusted OHLCV from the price read layer when present.  Indicators
         // use `adjusted_high ?? high`, `adjusted_low ?? low`, `adjusted_volume ?? volume`
         // so callers without adjusted_h/l/v degrade gracefully to raw values.
+        adjusted_open: toOptionalNumber(price.adjusted_open),
         adjusted_high: toOptionalNumber(price.adjusted_high),
         adjusted_low: toOptionalNumber(price.adjusted_low),
         adjusted_volume: price.adjusted_volume !== null && price.adjusted_volume !== undefined
