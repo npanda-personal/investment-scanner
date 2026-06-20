@@ -1,230 +1,261 @@
-import React, { useEffect, useState } from 'react';
+import { type FC, useCallback, useEffect, useState } from 'react';
 import {
   Alert,
   Box,
   Chip,
   CircularProgress,
+  Collapse,
   Divider,
-  Grid,
   Paper,
   Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
+  Tooltip,
   Typography,
 } from '@mui/material';
-import { HistoryOutlined } from '@mui/icons-material';
-import { fetchSignalQualitySummary } from '@/features/signal-quality-lab';
-import type { EvidenceUsability, QualitySummary } from '@/features/signal-quality-lab';
+import { ExpandLess, ExpandMore, HistoryOutlined } from '@mui/icons-material';
+import { fetchSignalScorecard } from '@/features/signal-quality-lab/api/signalQualityLabService';
+import type { ScorecardRow, ScorecardSummary, WinRateConfidence } from '@/features/signal-quality-lab/types';
+import { changeColor } from '@/shared/format/money';
+import { useMarketScope } from '@/contexts/MarketScopeContext';
 
-// Win rates and returns from the API are 0-1 ratios — multiply by 100 for display.
-function fmtPct(value: number | null | undefined): string {
+const WIN_RATE_CONFIDENCE_MEDIUM_THRESHOLD = 30;
+
+function pct(value: number | null | undefined): string {
   if (value === null || value === undefined) return '—';
   return `${(value * 100).toFixed(1)}%`;
 }
 
-function fmtSigned(value: number | null | undefined): string {
+function retPct(value: number | null | undefined): string {
   if (value === null || value === undefined) return '—';
-  const pct = (value * 100).toFixed(1);
-  return value >= 0 ? `+${pct}%` : `${pct}%`;
+  const sign = value > 0 ? '+' : '';
+  return `${sign}${value.toFixed(2)}%`;
 }
 
-type EvidenceConfig = {
-  color: 'success' | 'warning' | 'error' | 'default';
-  label: string;
-  hideNumbers: boolean;
+function confidenceColor(c: WinRateConfidence | null | undefined): 'success' | 'warning' | 'error' | 'default' {
+  if (c === 'HIGH') return 'success';
+  if (c === 'MEDIUM') return 'warning';
+  if (c === 'LOW') return 'error';
+  return 'default';
+}
+
+function confidenceTooltip(c: WinRateConfidence | null | undefined, samples: number): string {
+  if (c === 'HIGH') return `High confidence — ${samples} directional samples.`;
+  if (c === 'MEDIUM') return `Medium confidence — ${samples} directional samples.`;
+  if (c === 'LOW') return `Low confidence — ${samples} directional samples. Interpret with caution.`;
+  return 'No data';
+}
+
+function tierLabel(samples: number): string {
+  if (samples >= 100) return 'Reliable';
+  if (samples >= 30) return 'Indicative';
+  return 'Preliminary';
+}
+
+function tierColor(samples: number): 'success' | 'warning' | 'error' {
+  if (samples >= 100) return 'success';
+  if (samples >= 30) return 'warning';
+  return 'error';
+}
+
+const HORIZONS_ORDER = ['1D', '5D', '10D', '20D', '60D'];
+
+const SummaryRow: FC<{ row: ScorecardSummary; benchmarkLabel: string }> = ({ row, benchmarkLabel }) => {
+  const low = row.winRateConfidence === 'LOW' || row.directionalSampleSize < WIN_RATE_CONFIDENCE_MEDIUM_THRESHOLD;
+  return (
+    <TableRow hover>
+      <TableCell><Typography variant="body2" fontWeight={600}>{row.horizon}</Typography></TableCell>
+      <TableCell align="right"><Typography variant="body2" color="text.secondary">{row.directionalSampleSize.toLocaleString()}</Typography></TableCell>
+      <TableCell align="right">
+        <Tooltip title={confidenceTooltip(row.winRateConfidence, row.directionalSampleSize)} arrow>
+          <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, opacity: low ? 0.6 : 1 }}>
+            <Typography variant="body2" fontWeight={low ? 400 : 600} color={low ? 'text.secondary' : changeColor(row.winRate != null ? row.winRate - 0.5 : null)}>
+              {pct(row.winRate)}
+            </Typography>
+            <Chip label={row.winRateConfidence ?? '—'} size="small" color={confidenceColor(row.winRateConfidence)} sx={{ height: 18, fontSize: '0.65rem' }} />
+          </Box>
+        </Tooltip>
+      </TableCell>
+      <TableCell align="right"><Typography variant="body2" color={changeColor(row.avgReturnPercent)}>{retPct(row.avgReturnPercent)}</Typography></TableCell>
+      <TableCell align="right">
+        {row.avgAlphaPercent == null ? (
+          <Tooltip title={`${benchmarkLabel} data not yet available for this horizon`} arrow>
+            <Typography variant="body2" color="text.disabled" sx={{ cursor: 'help' }}>—</Typography>
+          </Tooltip>
+        ) : (
+          <Typography variant="body2" color={changeColor(row.avgAlphaPercent)}>{retPct(row.avgAlphaPercent)}</Typography>
+        )}
+      </TableCell>
+      <TableCell align="center">
+        <Chip label={tierLabel(row.directionalSampleSize)} size="small" color={tierColor(row.directionalSampleSize)} variant="outlined" sx={{ fontSize: '0.65rem' }} />
+      </TableCell>
+    </TableRow>
+  );
 };
 
-function evidenceConfig(usability: EvidenceUsability | undefined): EvidenceConfig {
-  switch (usability) {
-    case 'USABLE':
-      return { color: 'success', label: 'Good evidence', hideNumbers: false };
-    case 'LIMITED':
-      return { color: 'warning', label: 'Limited evidence (small sample)', hideNumbers: false };
-    case 'UNAVAILABLE':
-    default:
-      return { color: 'error', label: 'Not enough history yet', hideNumbers: true };
-  }
-}
+const BreakdownRow: FC<{ row: ScorecardRow }> = ({ row }) => {
+  const low = row.winRateConfidence === 'LOW' || row.directionalSampleSize < WIN_RATE_CONFIDENCE_MEDIUM_THRESHOLD;
+  return (
+    <TableRow hover sx={{ '& td': { py: 0.5 } }}>
+      <TableCell sx={{ pl: 4 }}><Typography variant="caption" color="text.secondary">{row.groupKey}</Typography></TableCell>
+      <TableCell align="right"><Typography variant="caption" color="text.secondary">{row.directionalSampleSize.toLocaleString()}</Typography></TableCell>
+      <TableCell align="right">
+        <Typography variant="caption" color={low ? 'text.secondary' : changeColor(row.winRate != null ? row.winRate - 0.5 : null)} sx={{ opacity: low ? 0.6 : 1 }}>
+          {pct(row.winRate)}
+        </Typography>
+      </TableCell>
+      <TableCell align="right"><Typography variant="caption" color={changeColor(row.avgReturnPercent)}>{retPct(row.avgReturnPercent)}</Typography></TableCell>
+      <TableCell align="right">
+        {row.avgAlphaPercent == null ? (
+          <Typography variant="caption" color="text.disabled">—</Typography>
+        ) : (
+          <Typography variant="caption" color={changeColor(row.avgAlphaPercent)}>{retPct(row.avgAlphaPercent)}</Typography>
+        )}
+      </TableCell>
+      <TableCell />
+    </TableRow>
+  );
+};
 
-const MetricTile: React.FC<{
-  label: string;
-  value: string;
-  tone?: 'success' | 'warning' | 'error';
-}> = ({ label, value, tone }) => (
-  <Box>
-    <Typography variant="caption" color="text.secondary" display="block">
-      {label}
-    </Typography>
-    <Typography
-      variant="h6"
-      fontWeight={700}
-      color={tone ? `${tone}.main` : 'text.primary'}
-      sx={{ mt: 0.25 }}
-    >
-      {value}
-    </Typography>
-  </Box>
-);
+export const SignalTrackRecordPanel: FC = () => {
+  const { profile, scope } = useMarketScope();
+  const trackRecordRegion = String(scope.region || '').toUpperCase();
+  const shouldRender = !profile.isCrypto && (!trackRecordRegion || trackRecordRegion === 'IN');
 
-export const SignalTrackRecordPanel: React.FC = () => {
-  const [summary, setSummary] = useState<QualitySummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [summary, setSummary] = useState<ScorecardSummary[]>([]);
+  const [rows, setRows] = useState<ScorecardRow[]>([]);
+  const [breakdownOpen, setBreakdownOpen] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
+  const load = useCallback(() => {
+    if (!shouldRender) return;
     setLoading(true);
     setError(null);
-    fetchSignalQualitySummary('20D')
+    fetchSignalScorecard({ groupBy: 'direction' })
       .then((data) => {
-        if (!cancelled) {
-          setSummary(data);
-          setLoading(false);
-        }
+        const ordered = [...(data.summary ?? [])].sort(
+          (a, b) => HORIZONS_ORDER.indexOf(a.horizon) - HORIZONS_ORDER.indexOf(b.horizon),
+        );
+        setSummary(ordered);
+        setRows(data.rows ?? []);
       })
       .catch((err: unknown) => {
-        if (!cancelled) {
-          const message =
-            err instanceof Error ? err.message : 'Failed to load signal track record.';
-          setError(message);
-          setLoading(false);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+        setError(err instanceof Error ? err.message : 'Failed to load signal track record.');
+      })
+      .finally(() => setLoading(false));
+  }, [shouldRender]);
 
-  const evidence = evidenceConfig(summary?.evidenceUsability);
+  useEffect(() => { load(); }, [load]);
+
+  if (!shouldRender) return null;
+
+  const totalSamples = summary.reduce((acc, s) => Math.max(acc, s.directionalSampleSize), 0);
+  const hasData = summary.length > 0 && totalSamples > 0;
+  const allLow = summary.length > 0 && summary.every((s) => s.directionalSampleSize < WIN_RATE_CONFIDENCE_MEDIUM_THRESHOLD);
 
   return (
     <Paper variant="outlined" sx={{ p: 3 }}>
-      {/* Header */}
       <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 2 }}>
         <HistoryOutlined color="action" />
-        <Typography variant="h6" fontWeight={700}>
-          Signal Track Record (last 20 trading days)
-        </Typography>
-        {summary && (
-          <Chip
-            size="small"
-            label={evidence.label}
-            color={evidence.color}
-            variant="outlined"
-          />
+        <Typography variant="h6" fontWeight={700}>Signal Track Record</Typography>
+        {!loading && hasData && (
+          <Chip size="small" label={`${totalSamples.toLocaleString()} samples`} variant="outlined" sx={{ fontSize: '0.65rem' }} />
+        )}
+        {!loading && allLow && (
+          <Chip size="small" label="Low sample — interpret with caution" color="warning" sx={{ fontSize: '0.65rem' }} />
         )}
       </Stack>
 
       {loading && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
-          <CircularProgress size={28} />
-        </Box>
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}><CircularProgress size={28} /></Box>
       )}
 
-      {!loading && error && (
-        <Alert severity="warning" sx={{ mb: 1 }}>
-          {error}
-        </Alert>
+      {!loading && error && <Alert severity="warning" sx={{ mb: 1 }}>{error}</Alert>}
+
+      {!loading && !error && !hasData && (
+        <Typography variant="body2" color="text.secondary" sx={{ py: 2 }}>
+          Not enough signal history yet to show track record metrics. Check back after more signals have matured.
+        </Typography>
       )}
 
-      {!loading && !error && summary && summary.evidenceUsability === 'UNAVAILABLE' && (
-        <Box sx={{ py: 2 }}>
-          <Typography variant="body2" color="text.secondary">
-            Not enough signal history yet to show track record metrics. Check back after more
-            signals have had 20 trading days to mature.
-          </Typography>
-        </Box>
-      )}
-
-      {!loading && !error && summary && summary.evidenceUsability !== 'UNAVAILABLE' && (
+      {!loading && !error && hasData && (
         <>
-          <Grid container spacing={3} sx={{ mb: 2 }}>
-            <Grid item xs={6} sm={3}>
-              <MetricTile
-                label="Bullish win rate"
-                value={fmtPct(summary.overallBullishWinRate)}
-                tone={
-                  summary.overallBullishWinRate !== null && summary.overallBullishWinRate >= 0.55
-                    ? 'success'
-                    : summary.overallBullishWinRate !== null && summary.overallBullishWinRate < 0.45
-                    ? 'error'
-                    : undefined
-                }
-              />
-            </Grid>
-            <Grid item xs={6} sm={3}>
-              <MetricTile
-                label="Bearish win rate"
-                value={fmtPct(summary.overallBearishWinRate)}
-                tone={
-                  summary.overallBearishWinRate !== null && summary.overallBearishWinRate >= 0.55
-                    ? 'success'
-                    : summary.overallBearishWinRate !== null && summary.overallBearishWinRate < 0.45
-                    ? 'error'
-                    : undefined
-                }
-              />
-            </Grid>
-            <Grid item xs={6} sm={3}>
-              <MetricTile
-                label="Avg 20-day return"
-                value={fmtSigned(summary.average20DReturn)}
-                tone={
-                  summary.average20DReturn !== null && summary.average20DReturn > 0
-                    ? 'success'
-                    : summary.average20DReturn !== null && summary.average20DReturn < 0
-                    ? 'error'
-                    : undefined
-                }
-              />
-            </Grid>
-            <Grid item xs={6} sm={3}>
-              <MetricTile
-                label="Sample size"
-                value={
-                  summary.evaluatedSignals > 0
-                    ? `${summary.evaluatedSignals} / ${summary.matureSignals}`
-                    : `${summary.matureSignals} mature`
-                }
-              />
-            </Grid>
-          </Grid>
+          {allLow && (
+            <Alert severity="warning" sx={{ mb: 1.5 }}>
+              All horizons have fewer than {WIN_RATE_CONFIDENCE_MEDIUM_THRESHOLD} directional samples.
+              Win rates at this sample depth are preliminary — do not rely on them for sizing decisions.
+            </Alert>
+          )}
 
-          {(summary.bestPerformingSignalType || summary.worstPerformingSignalType) && (
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+            Alpha = signal return minus same-horizon {profile.benchmarkLabel} return. Green = outperformed; red = underperformed.
+          </Typography>
+
+          <Table size="small" sx={{ mb: 1.5 }}>
+            <TableHead>
+              <TableRow>
+                <TableCell>Horizon</TableCell>
+                <TableCell align="right">
+                  <Tooltip title="Directional signal outcomes with complete forward price data" arrow><span>Samples</span></Tooltip>
+                </TableCell>
+                <TableCell align="right">
+                  <Tooltip title="Bullish win = forward return > 0; bearish win = forward return < 0. Badge reflects sample depth." arrow><span>Win Rate</span></Tooltip>
+                </TableCell>
+                <TableCell align="right">
+                  <Tooltip title="Average forward return % over the horizon window" arrow><span>Avg Return</span></Tooltip>
+                </TableCell>
+                <TableCell align="right">
+                  <Tooltip title={`Signal return minus ${profile.benchmarkLabel} return over the same horizon`} arrow>
+                    <span>Alpha vs {profile.benchmarkLabel}</span>
+                  </Tooltip>
+                </TableCell>
+                <TableCell align="center">Tier</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {summary.map((s) => <SummaryRow key={s.horizon} row={s} benchmarkLabel={profile.benchmarkLabel} />)}
+            </TableBody>
+          </Table>
+
+          {rows.length > 0 && (
             <>
-              <Divider sx={{ my: 1.5 }} />
-              <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>
-                {summary.bestPerformingSignalType && (
-                  <Typography variant="caption" color="text.secondary">
-                    Best signal type:{' '}
-                    <Box component="span" fontWeight={700} color="success.main">
-                      {summary.bestPerformingSignalType}
-                    </Box>
-                  </Typography>
-                )}
-                {summary.worstPerformingSignalType && (
-                  <Typography variant="caption" color="text.secondary">
-                    Worst signal type:{' '}
-                    <Box component="span" fontWeight={700} color="error.main">
-                      {summary.worstPerformingSignalType}
-                    </Box>
-                  </Typography>
-                )}
-                {summary.bestSector && (
-                  <Typography variant="caption" color="text.secondary">
-                    Best sector:{' '}
-                    <Box component="span" fontWeight={700} color="success.main">
-                      {summary.bestSector}
-                    </Box>
-                  </Typography>
-                )}
-                {summary.worstSector && (
-                  <Typography variant="caption" color="text.secondary">
-                    Worst sector:{' '}
-                    <Box component="span" fontWeight={700} color="error.main">
-                      {summary.worstSector}
-                    </Box>
-                  </Typography>
-                )}
-              </Stack>
+              <Box
+                sx={{ display: 'flex', alignItems: 'center', gap: 0.5, cursor: 'pointer', mb: 0.5 }}
+                onClick={() => setBreakdownOpen((v) => !v)}
+                role="button"
+                aria-expanded={breakdownOpen}
+              >
+                <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                  {breakdownOpen ? 'Hide' : 'Show'} breakdown by direction
+                </Typography>
+                {breakdownOpen ? <ExpandLess fontSize="small" sx={{ color: 'text.secondary', fontSize: 14 }} /> : <ExpandMore fontSize="small" sx={{ color: 'text.secondary', fontSize: 14 }} />}
+              </Box>
+              <Collapse in={breakdownOpen} unmountOnExit>
+                <Table size="small" sx={{ mb: 1 }}>
+                  <TableHead>
+                    <TableRow sx={{ '& th': { py: 0.5 } }}>
+                      <TableCell sx={{ pl: 4 }}>Direction</TableCell>
+                      <TableCell align="right"><Typography variant="caption">Samples</Typography></TableCell>
+                      <TableCell align="right"><Typography variant="caption">Win Rate</Typography></TableCell>
+                      <TableCell align="right"><Typography variant="caption">Avg Return</Typography></TableCell>
+                      <TableCell align="right"><Typography variant="caption">Alpha</Typography></TableCell>
+                      <TableCell />
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {HORIZONS_ORDER.flatMap((horizon) =>
+                      rows
+                        .filter((r) => r.horizon === horizon)
+                        .sort((a, b) => a.groupKey.localeCompare(b.groupKey))
+                        .map((r) => <BreakdownRow key={`${r.horizon}-${r.groupKey}`} row={r} />),
+                    )}
+                  </TableBody>
+                </Table>
+              </Collapse>
             </>
           )}
         </>
@@ -232,7 +263,7 @@ export const SignalTrackRecordPanel: React.FC = () => {
 
       <Divider sx={{ mt: 2, mb: 1.5 }} />
       <Typography variant="caption" color="text.disabled" display="block">
-        For research support only, not financial advice.
+        For research support only, not financial advice. Past performance does not guarantee future results.
       </Typography>
     </Paper>
   );
