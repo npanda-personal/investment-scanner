@@ -13,8 +13,10 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  Tooltip,
   Typography,
 } from '@mui/material';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import {
   Line,
   LineChart,
@@ -36,8 +38,9 @@ import {
   type V1PricesResponse,
 } from '../api/marketDataFoundationService';
 import { PageHeader } from '@/shared/components';
+import { FreshnessChip } from '@/shared/components';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
-import { compactByProfile, currencySymbol, money, stripSuffix } from '@/shared/format/money';
+import { changeColor, compactByProfile, currencySymbol, money, stripSuffix } from '@/shared/format/money';
 
 type ChipColor = 'default' | 'success' | 'warning' | 'error' | 'info';
 
@@ -112,7 +115,7 @@ const InstrumentDetailPage: React.FC<InstrumentDetailPageProps> = () => {
       const [instrumentResult, latestResult, pricesResult, fundamentalsResult, actionsResult] = await Promise.all([
         fetchInstrument(id, { region: scope.region, assetType: scope.assetType }),
         fetchInstrumentLatestPrice(id, { region: scope.region, assetType: scope.assetType }),
-        fetchInstrumentPrices(id, 120, { region: scope.region, assetType: scope.assetType }),
+        fetchInstrumentPrices(id, 365, { region: scope.region, assetType: scope.assetType }),
         fetchInstrumentFundamentals(id, { region: scope.region, assetType: scope.assetType }),
         fetchInstrumentCorporateActions(id, { region: scope.region, assetType: scope.assetType }),
       ]);
@@ -153,6 +156,14 @@ const InstrumentDetailPage: React.FC<InstrumentDetailPageProps> = () => {
   const sourceStatus = latestPriceRecord?.data_status || latest?.data_status || prices?.data_status || instrument?.data_status || null;
   const freshnessStatus = instrument?.price_readiness || (dataThrough ? sourceStatus : 'MISSING_LATEST_PRICE');
 
+  const dailyChange = useMemo(() => {
+    const p = prices?.prices;
+    if (!p || p.length < 2) return null;
+    const curr = p[0].close, prev = p[1].close;
+    if (!Number.isFinite(curr) || !Number.isFinite(prev) || prev === 0) return null;
+    return { abs: curr - prev, pct: (curr - prev) / prev };
+  }, [prices]);
+
   if (loading) {
     return (
       <Box sx={{ p: 3, display: 'flex', justifyContent: 'center' }}>
@@ -182,6 +193,11 @@ const InstrumentDetailPage: React.FC<InstrumentDetailPageProps> = () => {
           </Button>
         }
       />
+      {(instrument.sector || instrument.industry) && (
+        <Typography variant="body2" color="text.secondary" sx={{ mt: -1, mb: 1 }}>
+          {[instrument.sector, instrument.industry].filter(Boolean).join(' · ')}
+        </Typography>
+      )}
 
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>{error}</Alert>}
       <Alert severity="info" sx={{ mb: 2 }}>
@@ -192,6 +208,12 @@ const InstrumentDetailPage: React.FC<InstrumentDetailPageProps> = () => {
         <Paper sx={{ p: 2 }}>
           <Typography variant="overline" color="text.secondary">Latest Price</Typography>
           <Typography variant="h5">{latest?.latest ? money(latest.latest.close, instrument.currency) : 'N/A'}</Typography>
+          {dailyChange && (
+            <Typography variant="body2" sx={{ color: changeColor(dailyChange.pct) }}>
+              {dailyChange.abs >= 0 ? '+' : ''}{money(dailyChange.abs, instrument.currency)}
+              {' '}({dailyChange.pct >= 0 ? '+' : ''}{(dailyChange.pct * 100).toFixed(2)}%)
+            </Typography>
+          )}
           <Typography variant="caption" color="text.secondary">{latest?.latest ? formatDate(latest.latest.date) : 'No price data'}</Typography>
           <PriceRangeBand prices={prices?.prices ?? []} currency={instrument.currency} />
         </Paper>
@@ -215,24 +237,39 @@ const InstrumentDetailPage: React.FC<InstrumentDetailPageProps> = () => {
           </Paper>
         )}
         <Paper sx={{ p: 2 }}>
-          <Typography variant="overline" color="text.secondary">Metadata</Typography>
-          <Typography variant="body2">Source: {safeSource(instrument.source, latestPriceRecord?.source, profile.isCrypto)}</Typography>
-          <Typography variant="body2">Updated: {formatDateTime(instrument.last_updated_timestamp)}</Typography>
+          <Typography variant="overline" color="text.secondary">Market Cap</Typography>
+          <Typography variant="h5">{instrument.market_cap ? compactByProfile(instrument.market_cap, { currency: instrument.currency || 'INR' }) : 'N/A'}</Typography>
+          {instrument.ipo_date && (
+            <Typography variant="caption" color="text.secondary">Listed: {formatDate(instrument.ipo_date)}</Typography>
+          )}
         </Paper>
       </Box>
 
       <Paper sx={{ p: 2, mb: 3 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap', alignItems: 'flex-start' }}>
           <Box>
-            <Typography variant="overline" color="text.secondary">Data Coverage</Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+              <Typography variant="overline" color="text.secondary">Data Coverage</Typography>
+              <Button size="small" startIcon={loading ? <CircularProgress size={14} /> : <RefreshIcon />} onClick={() => loadDetail()} disabled={loading}>
+                Refresh
+              </Button>
+            </Box>
             <Typography variant="h6">Data through: {formatOptionalDate(dataThrough)}</Typography>
             <Typography variant="body2" color="text.secondary">Expected latest session: {formatOptionalDate(expectedThrough)}</Typography>
             <Typography variant="body2" color="text.secondary">Last updated: {formatOptionalDateTime(latestUpdatedAt)}</Typography>
+            <Typography variant="body2" color="text.secondary">Source: {safeSource(instrument.source, latestPriceRecord?.source, profile.isCrypto)}</Typography>
           </Box>
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, justifyContent: { xs: 'flex-start', md: 'flex-end' } }}>
-            <Chip label={`Freshness: ${formatStatusLabel(freshnessStatus)}`} size="small" color={statusChipColor(freshnessStatus)} variant="outlined" />
-            <Chip label={`Source: ${formatStatusLabel(persistedSource)}`} size="small" variant="outlined" />
-            <Chip label={`Source status: ${formatStatusLabel(sourceStatus)}`} size="small" color={statusChipColor(sourceStatus)} variant="outlined" />
+            <FreshnessChip dataThrough={dataThrough} latestTradingDay={expectedThrough} label="Price data" />
+            <Tooltip title="How current the latest price data is relative to the expected trading session.">
+              <Chip label={`Freshness: ${formatStatusLabel(freshnessStatus)}`} size="small" color={statusChipColor(freshnessStatus)} variant="outlined" />
+            </Tooltip>
+            <Tooltip title="The data provider used for this instrument's price history.">
+              <Chip label={`Source: ${formatStatusLabel(persistedSource)}`} size="small" variant="outlined" />
+            </Tooltip>
+            <Tooltip title="Whether the latest data from this source is complete, partial, or has errors.">
+              <Chip label={`Source status: ${formatStatusLabel(sourceStatus)}`} size="small" color={statusChipColor(sourceStatus)} variant="outlined" />
+            </Tooltip>
           </Box>
         </Box>
       </Paper>
@@ -240,8 +277,11 @@ const InstrumentDetailPage: React.FC<InstrumentDetailPageProps> = () => {
       <Paper sx={{ p: 2, mb: 3 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
           <Typography variant="h6">Historical Prices</Typography>
-          {/* Crypto has no splits/dividends → no adjustment caveat. */}
-          {!profile.isCrypto && <Chip label="Prices shown are split/bonus-adjusted." size="small" variant="outlined" />}
+          {prices?.adjustment_strategy && (
+            <Tooltip title={prices.adjustment_strategy}>
+              <Chip label="Adjusted" size="small" variant="outlined" />
+            </Tooltip>
+          )}
         </Box>
         {chartData.length > 0 ? (
           <Box sx={{ height: 320 }}>

@@ -78,9 +78,13 @@ export function SignalsHistoryTab({ instrumentId }: { instrumentId?: string }) {
   return <EquitySignalsHistoryTab instrumentId={instrumentId} />;
 }
 
+const HORIZONS = ['1D', '5D', '10D', '20D', '60D'] as const;
+
+type HorizonAggregate = { horizon: string; aggregate: InstrumentOutcomeAggregate | null };
+
 function EquitySignalsHistoryTab({ instrumentId }: { instrumentId?: string }) {
   const [history, setHistory] = useState<SignalHistoryRow[]>([]);
-  const [aggregate, setAggregate] = useState<InstrumentOutcomeAggregate | null>(null);
+  const [horizonAggregates, setHorizonAggregates] = useState<HorizonAggregate[]>([]);
   const [loading, setLoading] = useState(!!instrumentId);
   const [error, setError] = useState<string | null>(null);
   const [latestSignal, setLatestSignal] = useState<SignalHistoryRow | null>(null);
@@ -94,16 +98,22 @@ function EquitySignalsHistoryTab({ instrumentId }: { instrumentId?: string }) {
     setLoading(true);
     setError(null);
 
+    const outcomePromises = HORIZONS.map((h) =>
+      fetchInstrumentOutcomes(instrumentId, h)
+        .then((r) => ({ horizon: h, aggregate: r.aggregate ?? null }))
+        .catch(() => ({ horizon: h, aggregate: null })),
+    );
+
     Promise.all([
       fetchInstrumentSignalHistory(instrumentId),
-      fetchInstrumentOutcomes(instrumentId, '20D'),
+      ...outcomePromises,
     ])
-      .then(([histRes, outRes]) => {
+      .then(([histRes, ...outcomeResults]) => {
         if (canceled) return;
-        const items = histRes.items ?? [];
+        const items = (histRes as { items?: SignalHistoryRow[] }).items ?? [];
         setHistory(items);
         setLatestSignal(items[0] ?? null);
-        setAggregate(outRes.aggregate ?? null);
+        setHorizonAggregates(outcomeResults as HorizonAggregate[]);
         setLoading(false);
       })
       .catch((err) => {
@@ -134,7 +144,9 @@ function EquitySignalsHistoryTab({ instrumentId }: { instrumentId?: string }) {
     return <Alert severity="warning">{error}</Alert>;
   }
 
-  const confidence = aggregate ? sampleConfidence(aggregate.directionalSampleSize) : null;
+  const primaryAggregate = horizonAggregates.find((a) => a.horizon === '20D')?.aggregate ?? null;
+  const confidence = primaryAggregate ? sampleConfidence(primaryAggregate.directionalSampleSize) : null;
+  const hasAnyOutcomes = horizonAggregates.some((a) => a.aggregate !== null);
 
   return (
     <Stack spacing={2}>
@@ -172,56 +184,37 @@ function EquitySignalsHistoryTab({ instrumentId }: { instrumentId?: string }) {
         </Paper>
       )}
 
-      {/* Track record strip */}
+      {/* Multi-horizon track record */}
       <Paper variant="outlined" sx={{ p: 2 }}>
         <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
-          <Typography variant="subtitle2" fontWeight={700}>
-            Track Record (20-day horizon)
-          </Typography>
+          <Typography variant="subtitle2" fontWeight={700}>Track Record</Typography>
           {confidence && (
-            <Tooltip title={`Based on ${aggregate?.directionalSampleSize ?? 0} directional signals with completed outcomes. HIGH ≥ 100, MEDIUM ≥ 30, LOW < 30.`}>
-              <Chip
-                label={`${confidence} confidence`}
-                size="small"
-                color={confidenceChipColor(confidence)}
-                variant="outlined"
-              />
+            <Tooltip title={`Based on ${primaryAggregate?.directionalSampleSize ?? 0} directional signals with completed 20D outcomes. HIGH ≥ 100, MEDIUM ≥ 30, LOW < 30.`}>
+              <Chip label={`${confidence} confidence`} size="small" color={confidenceChipColor(confidence)} variant="outlined" />
             </Tooltip>
           )}
         </Stack>
+        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
+          Win rate and average forward return across horizons. Returns are absolute, not benchmark-adjusted.
+        </Typography>
 
-        {aggregate ? (
-          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 2 }}>
-            <Box>
-              <Typography variant="caption" color="text.secondary">Win Rate</Typography>
-              <Typography variant="h6">{formatWinRate(aggregate.winRate)}</Typography>
-              <Typography variant="caption" color="text.secondary">
-                {aggregate.directionalSampleSize} directional signals
-              </Typography>
-            </Box>
-            <Box>
-              <Typography variant="caption" color="text.secondary">Avg Forward Return</Typography>
-              <Typography
-                variant="h6"
-                color={
-                  aggregate.avgForwardReturn === null ? 'text.primary'
-                    : aggregate.avgForwardReturn >= 0 ? 'success.main'
-                    : 'error.main'
-                }
-              >
-                {formatPct(aggregate.avgForwardReturn)}
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                Absolute return, not vs benchmark
-              </Typography>
-            </Box>
-            <Box>
-              <Typography variant="caption" color="text.secondary">Completed Signals</Typography>
-              <Typography variant="h6">{aggregate.matureCount}</Typography>
-              <Typography variant="caption" color="text.secondary">
-                with price data
-              </Typography>
-            </Box>
+        {hasAnyOutcomes ? (
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(3, 1fr)', md: `repeat(${HORIZONS.length}, 1fr)` }, gap: 2 }}>
+            {HORIZONS.map((h) => {
+              const agg = horizonAggregates.find((a) => a.horizon === h)?.aggregate;
+              return (
+                <Box key={h} sx={{ textAlign: 'center' }}>
+                  <Typography variant="caption" color="text.secondary" fontWeight={700}>{h}</Typography>
+                  <Typography variant="h6">{formatWinRate(agg?.winRate)}</Typography>
+                  <Typography variant="caption" color={agg?.avgForwardReturn != null ? (agg.avgForwardReturn >= 0 ? 'success.main' : 'error.main') : 'text.secondary'}>
+                    {formatPct(agg?.avgForwardReturn)}
+                  </Typography>
+                  {agg?.matureCount != null && (
+                    <Typography variant="caption" color="text.secondary" display="block">{agg.matureCount} signals</Typography>
+                  )}
+                </Box>
+              );
+            })}
           </Box>
         ) : (
           <Typography variant="body2" color="text.secondary">
