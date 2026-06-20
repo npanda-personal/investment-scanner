@@ -1,7 +1,7 @@
 import { Box, Chip, Stack, Tooltip, Typography } from '@mui/material';
 import type { ReactNode } from 'react';
 import { humanizeCode } from '@/shared/format/enumLabels';
-import type { TodayReviewCandidate, TodayReviewEarningsProximity } from '../types';
+import type { TodayReviewCandidate } from '../types';
 import {
   range52wFromCandidate,
   sectorAlignment,
@@ -78,64 +78,6 @@ export function TierChip({ tier }: { tier: TierCellContext }) {
   );
 }
 
-/**
- * Small amber chip shown on candidate list rows when results are within the
- * earnings-blackout window. Only renders when structured earningsProximity is present.
- */
-export function EarningsProximityChip({ earningsProximity }: { earningsProximity?: TodayReviewEarningsProximity | null }) {
-  if (!earningsProximity || earningsProximity.daysToResult === null) return null;
-  const days = earningsProximity.daysToResult;
-  const label = days === 0 ? 'Earnings today' : days === 1 ? 'Earnings in 1d' : `Earnings in ${days}d`;
-  const dateStr = earningsProximity.resultDate ? earningsProximity.resultDate.slice(0, 10) : null;
-  const sourceLabel = earningsProximity.resultDateLabel ?? (earningsProximity.resultDateSource === 'OFFICIAL_CALENDAR' ? 'Official' : 'Estimated');
-  const tooltip = dateStr
-    ? `${label} (${dateStr}) [${sourceLabel}] — earnings reaction window. Consider waiting for post-result price discovery.`
-    : `${label} [${sourceLabel}] — earnings reaction window. Consider waiting for post-result price discovery.`;
-  return (
-    <Tooltip title={tooltip} arrow enterDelay={200}>
-      <Chip
-        label={label}
-        size="small"
-        sx={{
-          bgcolor: 'warning.light',
-          color: 'warning.contrastText',
-          fontWeight: 700,
-          fontSize: 10,
-          height: 18,
-          '& .MuiChip-label': { px: 0.75 },
-        }}
-      />
-    </Tooltip>
-  );
-}
-
-/**
- * NR-100: Small amber "F&O Ban" chip — shown only when inFnoBan is true.
- * Derivatives trading is restricted for this symbol (OI > 95% MWPL).
- */
-export function FnoBanChip({ inFnoBan }: { inFnoBan?: boolean }) {
-  if (!inFnoBan) return null;
-  return (
-    <Tooltip
-      title="F&O ban: this symbol's derivatives open-interest has crossed 95% of the market-wide position limit. New F&O positions are restricted until OI drops below the threshold — elevated derivatives risk."
-      arrow
-      enterDelay={200}
-    >
-      <Chip
-        label="F&O Ban"
-        size="small"
-        sx={{
-          bgcolor: 'warning.main',
-          color: 'warning.contrastText',
-          fontWeight: 700,
-          fontSize: 10,
-          height: 18,
-          '& .MuiChip-label': { px: 0.75 },
-        }}
-      />
-    </Tooltip>
-  );
-}
 
 /**
  * NR-101: Small chip showing the smart-money accumulation/distribution status.

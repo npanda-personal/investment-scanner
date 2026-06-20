@@ -104,9 +104,15 @@ export function buildCandidateColumns(
       align: 'right',
       primary: true,
       value: (candidate) => candidate.range52wCurrentClose ?? -1,
-      render: (candidate) => (
-        <EllipsisCell fullText={money(candidate.range52wCurrentClose, currency)} align="right" strong />
-      ),
+      render: (candidate) => {
+        const priceText = money(candidate.range52wCurrentClose, currency);
+        const prevClose = candidate.previousClose != null ? `Prev close: ${money(candidate.previousClose, currency)}` : undefined;
+        return prevClose ? (
+          <Tooltip title={prevClose} arrow enterDelay={200}><span><EllipsisCell fullText={priceText} align="right" strong /></span></Tooltip>
+        ) : (
+          <EllipsisCell fullText={priceText} align="right" strong />
+        );
+      },
     },
     {
       id: 'dayChange',

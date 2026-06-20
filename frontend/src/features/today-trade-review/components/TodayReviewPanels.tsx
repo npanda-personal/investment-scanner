@@ -60,7 +60,7 @@ export function PostureStrip({
       )}
       <Typography variant="body2" color="text.secondary">·</Typography>
       <Typography variant="body2" color="text.secondary">
-        {totals.long} candidates · {totals.watch} watch · {totals.blocked} excluded
+        {totals.long} candidates{totals.exit > 0 ? ` · ${totals.exit} exit risk` : ''} · {totals.watch} watch · {totals.blocked} excluded
       </Typography>
     </Stack>
   );
