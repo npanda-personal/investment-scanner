@@ -126,6 +126,8 @@ export function createCacheWarmAdapter(services: CacheWarmStageServices): Pipeli
             const summary = await services.marketContextService.latestPersistedSummary(contextRegion);
             if (summary) {
               await cacheService.setJson(marketContextSummaryKey(contextRegion), summary);
+            } else {
+              await cacheService.delete(marketContextSummaryKey(contextRegion));
             }
           },
         },

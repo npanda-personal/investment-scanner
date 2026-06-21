@@ -93,25 +93,25 @@ describe('DQE remediation — real volume facts (Phase 4)', () => {
 });
 
 describe('DQE remediation — honest missing-verdict reason (Phase 2)', () => {
-  it('filterByVerdict excludes no-verdict instruments with ELIGIBILITY_NOT_COMPUTED', async () => {
+  it('filterByVerdict includes no-verdict instruments by default (WARN_AND_PROCESS) with READY status', async () => {
     const repository = { findEligibilityRows: jest.fn().mockResolvedValue([]) };
     const svc = new DataQualityEngineService(repository as any, {} as any, null);
 
     const result = await svc.filterByVerdict(['missing-1'], 'signal');
 
-    expect(result.excludedInstrumentIds).toEqual(['missing-1']);
-    expect(result.reasonsByInstrumentId['missing-1']).toEqual(['ELIGIBILITY_NOT_COMPUTED']);
+    expect(result.eligibleInstrumentIds).toContain('missing-1');
+    expect(result.excludedInstrumentIds).toHaveLength(0);
+    expect(result.readinessStatusByInstrumentId['missing-1']).toBe('READY');
   });
 
-  it('filterByVerdict includes no-verdict instruments when missingQualityBehavior is WARN_AND_PROCESS', async () => {
+  it('filterByVerdict excludes no-verdict instruments when missingQualityBehavior is SKIP', async () => {
     const repository = { findEligibilityRows: jest.fn().mockResolvedValue([]) };
     const svc = new DataQualityEngineService(repository as any, {} as any, null);
 
-    const result = await svc.filterByVerdict(['missing-1'], 'signal', undefined, 'WARN_AND_PROCESS');
+    const result = await svc.filterByVerdict(['missing-1'], 'signal', undefined, 'SKIP');
 
-    expect(result.eligibleInstrumentIds).toContain('missing-1');
-    expect(result.excludedInstrumentIds).toHaveLength(0);
-    expect(result.readinessStatusByInstrumentId['missing-1']).toBeUndefined();
+    expect(result.excludedInstrumentIds).toEqual(['missing-1']);
+    expect(result.reasonsByInstrumentId['missing-1']).toEqual(['ELIGIBILITY_NOT_COMPUTED']);
   });
 
   it('filterByVerdict surfaces signalReadinessStatus per instrument (so the persisted signal snapshot can satisfy the trusted-read predicate)', async () => {

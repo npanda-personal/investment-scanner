@@ -1,6 +1,7 @@
 import type { RouteObject } from 'react-router-dom';
 import { TodayHomePage } from './components/TodayHomePage';
 import { TodayReviewCandidateDetailPage } from './components/TodayReviewCandidateDetailPage';
+import { TodayReviewRunDetailPage } from './components/TodayReviewRunDetailPage';
 import { TodayReviewRunHistoryPage } from './components/TodayReviewRunHistoryPage';
 
 export const todayTradeReviewRoutes: RouteObject[] = [
@@ -8,4 +9,5 @@ export const todayTradeReviewRoutes: RouteObject[] = [
   { path: '/today-review', element: <TodayHomePage /> },
   { path: '/today-review/candidates/:candidateId', element: <TodayReviewCandidateDetailPage /> },
   { path: '/today-review/runs', element: <TodayReviewRunHistoryPage /> },
+  { path: '/today-review/runs/:runId', element: <TodayReviewRunDetailPage /> },
 ];

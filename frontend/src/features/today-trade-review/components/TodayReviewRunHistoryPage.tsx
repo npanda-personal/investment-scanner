@@ -4,6 +4,7 @@ import {
   Box,
   Chip,
   CircularProgress,
+  Link,
   Stack,
   Table,
   TableBody,
@@ -14,6 +15,7 @@ import {
   TableRow,
   Typography,
 } from '@mui/material';
+import { Link as RouterLink } from 'react-router-dom';
 import { PageHeader } from '@/shared/components/PageHeader';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
 import { useTodayReviewRuns } from '../hooks/useTodayReviewRuns';
@@ -97,9 +99,9 @@ export function TodayReviewRunHistoryPage() {
                 {runs.map((run) => (
                   <TableRow key={run.id} hover>
                     <TableCell>
-                      <Typography variant="body2" fontWeight={600}>
-                        {formatDate(run.runDate)}
-                      </Typography>
+                      <Link component={RouterLink} to={`/today-review/runs/${run.id}`} underline="hover">
+                        <Typography variant="body2" fontWeight={600}>{formatDate(run.runDate)}</Typography>
+                      </Link>
                     </TableCell>
                     <TableCell><Chip label={run.status} size="small" color={statusColor(run.status)} /></TableCell>
                     <TableCell><Chip label={run.trustStatus} size="small" color={trustColor(run.trustStatus)} variant="outlined" /></TableCell>

@@ -30,6 +30,8 @@ export class MarketContextIntelligenceController {
       const persisted = await this.cache.cacheReadThrough(
         marketContextSummaryKey(region),
         () => this.service.latestPersistedSummary(region),
+        undefined,
+        (v) => v != null && (v as any).regime != null,
       );
       if (!persisted) {
         return {

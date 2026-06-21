@@ -112,8 +112,9 @@ two stores can never disagree by construction (see `evaluateInstrument`, which s
 
 Downstream modules must consume `filterByVerdict` / `getEligibility` (verdict authority)
 or `filterEligibleInstruments` (reads the derived legacy booleans) instead of
-re-deriving readiness rules. A missing verdict row is excluded with the honest reason
-`ELIGIBILITY_NOT_COMPUTED` (not `NO_LATEST_PRICE`).
+re-deriving readiness rules. A missing verdict row defaults to `WARN_AND_PROCESS`
+(included with READY status); callers can pass `missingQualityBehavior: 'SKIP'` to
+exclude with the honest reason `ELIGIBILITY_NOT_COMPUTED`.
 
 ## Business Logic & Data Sources
 

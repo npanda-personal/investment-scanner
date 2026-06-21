@@ -137,7 +137,7 @@ export class DataQualityEngineService {
     const allowed = options.allowedReadinessStatuses || (options.includeLimited ? ['READY', 'LIMITED'] : ['READY']);
     const minScore = options.minSignalReadinessScore ?? 70;
     const skipUnusable = options.skipUnusable ?? true;
-    const missingBehavior = options.missingQualityBehavior ?? 'SKIP';
+    const missingBehavior = options.missingQualityBehavior ?? 'WARN_AND_PROCESS';
     // When asOf is provided, override staleness check in eligibility (historical runs should not be blocked by today's stale flag)
     const asOfMs = asOf ? asOf.getTime() : null;
     const eligible: string[] = [];
@@ -840,7 +840,7 @@ export class DataQualityEngineService {
     for (const instrumentId of instrumentIds) {
       const row = byId.get(instrumentId);
       if (!row) {
-        if ((missingQualityBehavior ?? 'SKIP') === 'WARN_AND_PROCESS') { eligibleInstrumentIds.push(instrumentId); }
+        if ((missingQualityBehavior ?? 'WARN_AND_PROCESS') === 'WARN_AND_PROCESS') { eligibleInstrumentIds.push(instrumentId); readinessStatusByInstrumentId[instrumentId] = 'READY'; }
         else { excludedInstrumentIds.push(instrumentId); reasonsByInstrumentId[instrumentId] = ['ELIGIBILITY_NOT_COMPUTED']; }
         continue;
       }

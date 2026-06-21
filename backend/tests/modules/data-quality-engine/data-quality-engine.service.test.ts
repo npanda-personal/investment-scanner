@@ -246,7 +246,7 @@ describe('data quality engine service', () => {
     expect(result.missingQualityEvaluationCount).toBe(1);
   });
 
-  it('fails closed for missing quality evaluations by default', async () => {
+  it('includes missing quality evaluations by default (WARN_AND_PROCESS)', async () => {
     const setup = service({
       repository: {
         latestForInstruments: jest.fn().mockResolvedValue([
@@ -257,8 +257,8 @@ describe('data quality engine service', () => {
 
     const result = await setup.instance.filterEligibleInstruments(['ready', 'missing']);
 
-    expect(result.eligibleInstrumentIds).toEqual(['ready']);
-    expect(result.excludedInstrumentIds).toEqual(['missing']);
+    expect(result.eligibleInstrumentIds).toEqual(['ready', 'missing']);
+    expect(result.excludedInstrumentIds).toEqual([]);
     expect(result.missingQualityEvaluationCount).toBe(1);
     expect(result.warnings).toEqual(['missing: missing data quality evaluation']);
   });
@@ -556,30 +556,25 @@ describe('data quality engine service', () => {
   });
 
   it('trading-session staleness: price dated 5 calendar days ago (over Diwali 4-day cluster) is NOT stale — only ~1 session behind', () => {
-    // Simulate: today is a Wednesday, price is from previous Thursday (5 calendar
-    // days ago, but Fri was holiday, Sat/Sun weekend, Mon holiday, Tue holiday
-    // in a Diwali-like cluster → only 0–1 trading sessions behind).
-    // We approximate this by using a price dated 5 calendar days ago and
-    // an instrument without region (defaults to IN weekend-only).
-    // With the old 7-day threshold this would be NOT stale; with the new
-    // 3-session threshold it also should NOT be stale (5 calendar days ≤ 3 sessions
-    // if most were non-trading).  The exact count depends on today's day-of-week,
-    // so we use a date 4 calendar days ago (guaranteed ≤ 3 trading sessions on
-    // any week that spans a weekend, e.g. Thu price evaluated on Mon = 2 sessions).
-    const recentEnoughDate = new Date(Date.now() - 4 * 86_400_000).toISOString();
+    // Pin to Wednesday 2026-06-18: 4 days back = Saturday 2026-06-14 → 2 sessions behind (Mon+Tue before Wed) → NOT stale.
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2026-06-18T12:00:00Z'));
+    const recentEnoughDate = new Date(Date.now() - 4 * 86_400_000).toISOString(); // = 2026-06-14
     const recentPrice = { ...prices(1)[0], date: recentEnoughDate, volume: 1_000_000 };
-    const result = service().instance.evaluateInstrument(
-      instrument({ region: 'IN', required_history_status: 'COMPLETE', listing_date_status: 'PRESENT_OLDER_THAN_15Y_USED_15Y' }),
-      prices(260),
-      recentPrice,
-      [{ eps: 1 }],
-      [{ action_type: 'dividend' }],
-      true
-    );
-    // 4 calendar days ago spans at most 3 trading sessions (Thu→Mon: Thu,Fri,Mon)
-    // so this should NOT be stale
-    expect(result.dataGaps).not.toContain('latest price is stale.');
-    expect(result.eligibleForSignals).toBe(true);
+    try {
+      const result = service().instance.evaluateInstrument(
+        instrument({ region: 'IN', required_history_status: 'COMPLETE', listing_date_status: 'PRESENT_OLDER_THAN_15Y_USED_15Y' }),
+        prices(260),
+        recentPrice,
+        [{ eps: 1 }],
+        [{ action_type: 'dividend' }],
+        true
+      );
+      expect(result.dataGaps).not.toContain('latest price is stale.');
+      expect(result.eligibleForSignals).toBe(true);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('trading-session staleness: null latest price records gap and stale check falls back to price array date', () => {
