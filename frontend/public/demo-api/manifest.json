@@ -779,52 +779,56 @@
     "file": "api-v1-corporate-actions-cmo8zr8ur003ow5ek0t7ag5ss.json",
     "status": 200
   },
-  "/api/v1/signals/cmq4uohlr01m3w5r07sufsfvq/history?region=US": {
-    "file": "api-v1-signals-cmq4uohlr01m3w5r07sufsfvq-history-region-US.json",
+  "/api/v1/signals/cmq4uojhi01sbw5r0ik7g02o3/history?region=US": {
+    "file": "api-v1-signals-cmq4uojhi01sbw5r0ik7g02o3-history-region-US.json",
     "status": 200
   },
-  "/api/v1/signals/cmq4uohlr01m3w5r07sufsfvq/outcomes?region=US": {
-    "file": "api-v1-signals-cmq4uohlr01m3w5r07sufsfvq-outcomes-region-US.json",
+  "/api/v1/signals/cmq4uojhi01sbw5r0ik7g02o3/outcomes?region=US": {
+    "file": "api-v1-signals-cmq4uojhi01sbw5r0ik7g02o3-outcomes-region-US.json",
     "status": 200
   },
-  "/api/v1/market-intelligence/instrument-context/cmq4uohlr01m3w5r07sufsfvq?region=US": {
-    "file": "api-v1-market-intelligence-instrument-context-cmq4uohlr01m3w5r07sufsfvq-region-US.json",
+  "/api/v1/market-intelligence/instrument-context/cmq4uojhi01sbw5r0ik7g02o3?region=US": {
+    "file": "api-v1-market-intelligence-instrument-context-cmq4uojhi01sbw5r0ik7g02o3-region-US.json",
     "status": 200
   },
-  "/api/v1/smart-money/stocks/cmq4uohlr01m3w5r07sufsfvq?region=US": {
-    "file": "api-v1-smart-money-stocks-cmq4uohlr01m3w5r07sufsfvq-region-US.json",
+  "/api/v1/smart-money/stocks/cmq4uojhi01sbw5r0ik7g02o3?region=US": {
+    "file": "api-v1-smart-money-stocks-cmq4uojhi01sbw5r0ik7g02o3-region-US.json",
     "status": 200
   },
-  "/api/v1/research/stocks/cmq4uohlr01m3w5r07sufsfvq/workbench?region=US": {
-    "file": "api-v1-research-stocks-cmq4uohlr01m3w5r07sufsfvq-workbench-region-US.json",
+  "/api/v1/research/stocks/cmq4uojhi01sbw5r0ik7g02o3/workbench?region=US": {
+    "file": "api-v1-research-stocks-cmq4uojhi01sbw5r0ik7g02o3-workbench-region-US.json",
     "status": 200
   },
-  "/api/v1/strategy/cmq4uohlr01m3w5r07sufsfvq?region=US": {
-    "file": "api-v1-strategy-cmq4uohlr01m3w5r07sufsfvq-region-US.json",
+  "/api/v1/strategy/cmq4uojhi01sbw5r0ik7g02o3?region=US": {
+    "file": "api-v1-strategy-cmq4uojhi01sbw5r0ik7g02o3-region-US.json",
     "status": 200
   },
-  "/api/v1/strategy/history/cmq4uohlr01m3w5r07sufsfvq?region=US": {
-    "file": "api-v1-strategy-history-cmq4uohlr01m3w5r07sufsfvq-region-US.json",
+  "/api/v1/strategy/history/cmq4uojhi01sbw5r0ik7g02o3?region=US": {
+    "file": "api-v1-strategy-history-cmq4uojhi01sbw5r0ik7g02o3-region-US.json",
     "status": 200
   },
-  "/api/v1/instruments/cmq4uohlr01m3w5r07sufsfvq": {
-    "file": "api-v1-instruments-cmq4uohlr01m3w5r07sufsfvq.json",
+  "/api/v1/signals/calibration/cmq4uojhi01sbw5r0ik7g02o3?region=US": {
+    "file": "api-v1-signals-calibration-cmq4uojhi01sbw5r0ik7g02o3-region-US.json",
     "status": 200
   },
-  "/api/v1/prices/cmq4uohlr01m3w5r07sufsfvq": {
-    "file": "api-v1-prices-cmq4uohlr01m3w5r07sufsfvq.json",
+  "/api/v1/instruments/cmq4uojhi01sbw5r0ik7g02o3": {
+    "file": "api-v1-instruments-cmq4uojhi01sbw5r0ik7g02o3.json",
     "status": 200
   },
-  "/api/v1/prices/cmq4uohlr01m3w5r07sufsfvq/latest": {
-    "file": "api-v1-prices-cmq4uohlr01m3w5r07sufsfvq-latest.json",
+  "/api/v1/prices/cmq4uojhi01sbw5r0ik7g02o3": {
+    "file": "api-v1-prices-cmq4uojhi01sbw5r0ik7g02o3.json",
     "status": 200
   },
-  "/api/v1/fundamentals/cmq4uohlr01m3w5r07sufsfvq": {
-    "file": "api-v1-fundamentals-cmq4uohlr01m3w5r07sufsfvq.json",
+  "/api/v1/prices/cmq4uojhi01sbw5r0ik7g02o3/latest": {
+    "file": "api-v1-prices-cmq4uojhi01sbw5r0ik7g02o3-latest.json",
     "status": 200
   },
-  "/api/v1/corporate-actions/cmq4uohlr01m3w5r07sufsfvq": {
-    "file": "api-v1-corporate-actions-cmq4uohlr01m3w5r07sufsfvq.json",
+  "/api/v1/fundamentals/cmq4uojhi01sbw5r0ik7g02o3": {
+    "file": "api-v1-fundamentals-cmq4uojhi01sbw5r0ik7g02o3.json",
+    "status": 200
+  },
+  "/api/v1/corporate-actions/cmq4uojhi01sbw5r0ik7g02o3": {
+    "file": "api-v1-corporate-actions-cmq4uojhi01sbw5r0ik7g02o3.json",
     "status": 200
   },
   "/api/v1/signals/cmq3utzj300p2w5owy0tbo1ra/history?region=US": {
@@ -879,52 +883,52 @@
     "file": "api-v1-corporate-actions-cmq3utzj300p2w5owy0tbo1ra.json",
     "status": 200
   },
-  "/api/v1/signals/cmq4upgs404d5w5r0trcsfdno/history?region=US": {
-    "file": "api-v1-signals-cmq4upgs404d5w5r0trcsfdno-history-region-US.json",
+  "/api/v1/signals/cmq4uohlr01m3w5r07sufsfvq/history?region=US": {
+    "file": "api-v1-signals-cmq4uohlr01m3w5r07sufsfvq-history-region-US.json",
     "status": 200
   },
-  "/api/v1/signals/cmq4upgs404d5w5r0trcsfdno/outcomes?region=US": {
-    "file": "api-v1-signals-cmq4upgs404d5w5r0trcsfdno-outcomes-region-US.json",
+  "/api/v1/signals/cmq4uohlr01m3w5r07sufsfvq/outcomes?region=US": {
+    "file": "api-v1-signals-cmq4uohlr01m3w5r07sufsfvq-outcomes-region-US.json",
     "status": 200
   },
-  "/api/v1/market-intelligence/instrument-context/cmq4upgs404d5w5r0trcsfdno?region=US": {
-    "file": "api-v1-market-intelligence-instrument-context-cmq4upgs404d5w5r0trcsfdno-region-US.json",
+  "/api/v1/market-intelligence/instrument-context/cmq4uohlr01m3w5r07sufsfvq?region=US": {
+    "file": "api-v1-market-intelligence-instrument-context-cmq4uohlr01m3w5r07sufsfvq-region-US.json",
     "status": 200
   },
-  "/api/v1/smart-money/stocks/cmq4upgs404d5w5r0trcsfdno?region=US": {
-    "file": "api-v1-smart-money-stocks-cmq4upgs404d5w5r0trcsfdno-region-US.json",
+  "/api/v1/smart-money/stocks/cmq4uohlr01m3w5r07sufsfvq?region=US": {
+    "file": "api-v1-smart-money-stocks-cmq4uohlr01m3w5r07sufsfvq-region-US.json",
     "status": 200
   },
-  "/api/v1/research/stocks/cmq4upgs404d5w5r0trcsfdno/workbench?region=US": {
-    "file": "api-v1-research-stocks-cmq4upgs404d5w5r0trcsfdno-workbench-region-US.json",
+  "/api/v1/research/stocks/cmq4uohlr01m3w5r07sufsfvq/workbench?region=US": {
+    "file": "api-v1-research-stocks-cmq4uohlr01m3w5r07sufsfvq-workbench-region-US.json",
     "status": 200
   },
-  "/api/v1/strategy/cmq4upgs404d5w5r0trcsfdno?region=US": {
-    "file": "api-v1-strategy-cmq4upgs404d5w5r0trcsfdno-region-US.json",
+  "/api/v1/strategy/cmq4uohlr01m3w5r07sufsfvq?region=US": {
+    "file": "api-v1-strategy-cmq4uohlr01m3w5r07sufsfvq-region-US.json",
     "status": 200
   },
-  "/api/v1/strategy/history/cmq4upgs404d5w5r0trcsfdno?region=US": {
-    "file": "api-v1-strategy-history-cmq4upgs404d5w5r0trcsfdno-region-US.json",
+  "/api/v1/strategy/history/cmq4uohlr01m3w5r07sufsfvq?region=US": {
+    "file": "api-v1-strategy-history-cmq4uohlr01m3w5r07sufsfvq-region-US.json",
     "status": 200
   },
-  "/api/v1/instruments/cmq4upgs404d5w5r0trcsfdno": {
-    "file": "api-v1-instruments-cmq4upgs404d5w5r0trcsfdno.json",
+  "/api/v1/instruments/cmq4uohlr01m3w5r07sufsfvq": {
+    "file": "api-v1-instruments-cmq4uohlr01m3w5r07sufsfvq.json",
     "status": 200
   },
-  "/api/v1/prices/cmq4upgs404d5w5r0trcsfdno": {
-    "file": "api-v1-prices-cmq4upgs404d5w5r0trcsfdno.json",
+  "/api/v1/prices/cmq4uohlr01m3w5r07sufsfvq": {
+    "file": "api-v1-prices-cmq4uohlr01m3w5r07sufsfvq.json",
     "status": 200
   },
-  "/api/v1/prices/cmq4upgs404d5w5r0trcsfdno/latest": {
-    "file": "api-v1-prices-cmq4upgs404d5w5r0trcsfdno-latest.json",
+  "/api/v1/prices/cmq4uohlr01m3w5r07sufsfvq/latest": {
+    "file": "api-v1-prices-cmq4uohlr01m3w5r07sufsfvq-latest.json",
     "status": 200
   },
-  "/api/v1/fundamentals/cmq4upgs404d5w5r0trcsfdno": {
-    "file": "api-v1-fundamentals-cmq4upgs404d5w5r0trcsfdno.json",
+  "/api/v1/fundamentals/cmq4uohlr01m3w5r07sufsfvq": {
+    "file": "api-v1-fundamentals-cmq4uohlr01m3w5r07sufsfvq.json",
     "status": 200
   },
-  "/api/v1/corporate-actions/cmq4upgs404d5w5r0trcsfdno": {
-    "file": "api-v1-corporate-actions-cmq4upgs404d5w5r0trcsfdno.json",
+  "/api/v1/corporate-actions/cmq4uohlr01m3w5r07sufsfvq": {
+    "file": "api-v1-corporate-actions-cmq4uohlr01m3w5r07sufsfvq.json",
     "status": 200
   },
   "/api/v1/strategies/BREAKDOWN_MOMENTUM?region=IN": {
@@ -1019,12 +1023,12 @@
     "file": "api-v1-strategies-DEFENSIVE-EXIT-proof-region-US.json",
     "status": 200
   },
-  "/api/v1/today-review/runs/cmql2wqtf0000w5mkkzcrskqj?region=US": {
-    "file": "api-v1-today-review-runs-cmql2wqtf0000w5mkkzcrskqj-region-US.json",
+  "/api/v1/today-review/runs/cmqnq8vt91woqw5745rufapta?region=US": {
+    "file": "api-v1-today-review-runs-cmqnq8vt91woqw5745rufapta-region-US.json",
     "status": 200
   },
-  "/api/v1/today-review/runs/cmqjxyu8i00xww588pu38nnxf?region=US": {
-    "file": "api-v1-today-review-runs-cmqjxyu8i00xww588pu38nnxf-region-US.json",
+  "/api/v1/today-review/runs/cmql2wqtf0000w5mkkzcrskqj?region=US": {
+    "file": "api-v1-today-review-runs-cmql2wqtf0000w5mkkzcrskqj-region-US.json",
     "status": 200
   },
   "/api/v1/market-intelligence/sector-constituents?region=US&sector=Technology": {
@@ -1039,16 +1043,16 @@
     "file": "api-v1-market-intelligence-sector-constituents-region-USsector-Financials.json",
     "status": 200
   },
-  "/api/v1/market-data/us-smart-money/ECG": {
-    "file": "api-v1-market-data-us-smart-money-ECG.json",
+  "/api/v1/market-data/us-smart-money/ENTG": {
+    "file": "api-v1-market-data-us-smart-money-ENTG.json",
     "status": 200
   },
   "/api/v1/market-data/us-smart-money/BAH": {
     "file": "api-v1-market-data-us-smart-money-BAH.json",
     "status": 200
   },
-  "/api/v1/market-data/us-smart-money/MHK": {
-    "file": "api-v1-market-data-us-smart-money-MHK.json",
+  "/api/v1/market-data/us-smart-money/ECG": {
+    "file": "api-v1-market-data-us-smart-money-ECG.json",
     "status": 200
   },
   "/api/v1/copilot/stock-summary?region=IN": {

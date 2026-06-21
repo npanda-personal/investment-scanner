@@ -1,1 +1,1 @@
-{"status":"missing","source":"https://www.nseindia.com/api/snapshot-capital-market-largedeal","asOf":null,"fetchedAt":"2026-06-21T11:42:20.429Z","rows":[],"message":"No bulk/block deal data persisted yet. Run POST /api/v1/market-context/bulk-block-deals/ingest."}
+{"status":"missing","source":"https://www.nseindia.com/api/snapshot-capital-market-largedeal","asOf":null,"fetchedAt":"2026-06-21T11:56:54.544Z","rows":[],"message":"No bulk/block deal data persisted yet. Run POST /api/v1/market-context/bulk-block-deals/ingest."}
