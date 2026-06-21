@@ -196,12 +196,7 @@ export class SignalPositionLedgerService {
 
     return {
       ledgerKey: this.lifecycleKey({
-        // Prefer the region explicitly written on the trigger contract.
-        // Fall back to the signal instrument's region when available (e.g. a
-        // US signal whose triggerContract.region was not populated at write time).
-        // 'IN' is kept only as the last resort to preserve existing behaviour for
-        // legacy IN rows.  The real fix is to ensure signal generation writes
-        // triggerContract.region='US' for US signals (data-op, handled separately).
+        // Region: trigger contract → signal instrument → legacy 'IN' fallback.
         region: triggerContract.region || (signal as any).region || 'IN',
         assetType: triggerContract.asset_class || 'STOCK',
         instrumentId: signal.instrument_id,
@@ -268,17 +263,13 @@ export class SignalPositionLedgerService {
     if (trigger.trigger_price_evidence?.status !== 'SOURCE_PROVEN') return false;
     if (typeof trigger.trigger_price !== 'number' || !Number.isFinite(trigger.trigger_price)) return false;
     if (!trigger.trigger_timestamp) return false;
-    // strategy_id / strategy_version / entry_rule_id are required for the full strategy-framework
-    // path (PATH A).  Lifecycle-entry contracts (PATH B) intentionally omit these — the
-    // trigger price is still SOURCE_PROVEN from a persisted price tick; allow them through.
+    // PATH B lifecycle-entry contracts omit strategy_id — still SOURCE_PROVEN.
     return true;
   }
 
   private isPublishableActiveCandidate(row: SignalPositionLedgerActiveRow): boolean {
     if (row.triggerType !== 'bullish_entry_trigger') return false;
-    // PATH A rows carry strategyDecision=ENTRY_CANDIDATE from a fresh strategy evaluation.
-    // PATH B rows (lifecycle-entry) carry strategyDecision=null since no live evaluation ran;
-    // they are still publishable — the signal's persisted lifecycleState=ENTRY is the gate.
+    // PATH B rows have null strategyDecision (no live eval) — still publishable.
     if (row.strategyDecision !== null && row.strategyDecision !== 'ENTRY_CANDIDATE') return false;
     if (row.currentDataQualityStatus !== 'READY') return false;
     if (row.status === 'EXIT_TRIGGERED' || row.healthState === 'EXIT_TRIGGERED') return false;
@@ -557,10 +548,7 @@ export class SignalPositionLedgerService {
         state.totalCount = Math.max(state.totalCount, page.totalCount, page.offset + page.items.length);
         state.processedCount += page.items.length;
 
-        // PATH A — strategy-framework enrichment path (original path).
-        // For signals that pass isTrustedSourceSignal, run a full strategy evaluation
-        // to get ENTRY_CANDIDATE + SOURCE_PROVEN trigger price.  This is expensive
-        // (500-tick history per signal) so we only run it for the pre-filtered set.
+        // PATH A — strategy-framework enrichment (expensive, pre-filtered set only).
         const trusted = page.items.filter((signal) => this.isTrustedSourceSignal(signal));
         state.skippedCount += page.items.length - trusted.length;
         const enriched = trusted.length > 0
@@ -569,8 +557,6 @@ export class SignalPositionLedgerService {
 
         const candidates: SignalPositionLedgerActiveCandidate[] = [];
 
-        // Collect PATH A candidates first so we know which instruments PATH A published
-        // before deciding PATH B eligibility below.
         for (const signal of enriched) {
           if (!this.isTrustedEnrichedSignal(signal)) {
             state.skippedCount += 1;
@@ -588,21 +574,9 @@ export class SignalPositionLedgerService {
           candidates.push({ signal, triggerContract: trigger });
         }
 
-        // PATH B — lifecycle-entry path.
-        // For BULLISH signals with lifecycleState=ENTRY (fresh entry) or ACTIVE (ongoing
-        // tracked position not yet in the ledger) that did NOT produce a valid candidate
-        // via PATH A, build a trigger contract from the persisted price at the signal's
-        // sourcePriceDate.  This covers the full ACTIVE+ENTRY universe without live
-        // strategy re-evaluation.  Signals already represented in state.rows (either
-        // loaded from DB or added by PATH A) are excluded to avoid double-processing.
-        //
-        // IMPORTANT: only exclude instruments PATH A actually PUBLISHED (pushed into
-        // `candidates`), not the full enriched set.  PATH A enriches all trusted signals
-        // but only publishes those with an ENTRY_CANDIDATE strategy match; signals that
-        // were enriched-but-discarded (no ENTRY_CANDIDATE) must still be eligible for
-        // PATH B so the full lifecycle-ENTRY/ACTIVE universe is covered.
+        // PATH B — lifecycle-entry path (persisted-price trigger, no live strategy eval).
+        // Only exclude instruments PATH A actually PUBLISHED, not the full enriched set.
         const pathAPublishedIds = new Set(candidates.map((c) => c.signal.instrument_id));
-        // Use instrumentId for ledger membership check since ledgerKey is different.
         const ledgerInstruments = new Set([
           ...[...state.rows.values()].map((r) => r.instrumentId),
           ...[...state.closedRows.values()].map((r) => r.instrumentId),
@@ -865,7 +839,7 @@ export class SignalPositionLedgerService {
   ): Promise<SignalPositionLedgerActiveRow | null> {
     const exitDecision = snapshots.exitDecision;
     if (!exitDecision) return null;
-    if (this.hasInvalidationEvidence(exitDecision)) return this.invalidatedRow(row, snapshots);
+    if (this.hasInvalidationEvidence(exitDecision)) return await this.invalidatedRow(row, snapshots, query);
     if (exitDecision.decision === 'EXIT_CANDIDATE') return this.exitLifecycleRow(row, snapshots, query);
     if (this.hasRiskWarningEvidence(exitDecision)) return this.riskWarningRow(row, snapshots);
     return null;
@@ -877,7 +851,7 @@ export class SignalPositionLedgerService {
     query: Pick<SignalPositionLedgerActiveQuery, 'region' | 'assetType'>,
   ): Promise<SignalPositionLedgerActiveRow> {
     const exitDecision = snapshots.exitDecision;
-    const exitDate = exitDecision?.generatedAt || new Date().toISOString();
+    const exitDate = exitDecision?.generatedDate || exitDecision?.generatedAt || new Date().toISOString();
     const exitPrice = await this.exitPrice(row.instrumentId, exitDate, query);
     const closePrice = this.sourceProvenClosePrice(exitPrice);
     const exitEvidence = this.exitEvidenceForDecision(exitDecision);
@@ -919,20 +893,20 @@ export class SignalPositionLedgerService {
     };
   }
 
-  private invalidatedRow(row: SignalPositionLedgerActiveRow, snapshots: SignalPositionLedgerRowSnapshots): SignalPositionLedgerActiveRow {
+  private async invalidatedRow(row: SignalPositionLedgerActiveRow, snapshots: SignalPositionLedgerRowSnapshots, query: Pick<SignalPositionLedgerActiveQuery, 'region' | 'assetType'>): Promise<SignalPositionLedgerActiveRow> {
     const exitDecision = snapshots.exitDecision;
+    const exitDate = exitDecision?.generatedDate || exitDecision?.generatedAt || new Date().toISOString();
+    const ep = await this.exitPrice(row.instrumentId, exitDate, query);
+    const cp = this.sourceProvenClosePrice(ep);
+    const ret = cp !== null && row.entryTriggerPrice > 0 ? Number((((cp - row.entryTriggerPrice) / row.entryTriggerPrice) * 100).toFixed(4)) : row.currentReturnPercent;
     return {
-      ...this.withCurrentEvidence(row, snapshots),
-      ...this.exitEvidenceForDecision(exitDecision),
-      status: 'INVALIDATED',
-      healthState: null,
-      lifecycleEvidenceStatus: 'INVALIDATED',
-      closePriceStatus: 'UNAVAILABLE',
-      exitTriggerPrice: null,
-      invalidationSourceDecisionId: exitDecision?.id ?? null,
-      invalidationRuleIds: exitDecision?.invalidationRulesTriggered ?? [],
-      invalidationTimestamp: exitDecision?.generatedAt ?? new Date().toISOString(),
-      closedAt: null,
+      ...this.withCurrentEvidence(row, snapshots), ...this.exitEvidenceForDecision(exitDecision),
+      status: 'INVALIDATED', healthState: null, lifecycleEvidenceStatus: 'INVALIDATED',
+      closePriceStatus: cp !== null ? 'SOURCE_PROVEN' : 'UNAVAILABLE', exitTriggerPrice: cp, exitTriggerTimestamp: exitDate,
+      currentReturnPercent: cp !== null ? ret : row.currentReturnPercent, currentReturnStatus: cp !== null ? 'CURRENT' : row.currentReturnStatus,
+      latestTrustedPriceDate: ep?.date ?? row.latestTrustedPriceDate, latestTrustedPrice: cp ?? row.latestTrustedPrice,
+      invalidationSourceDecisionId: exitDecision?.id ?? null, invalidationRuleIds: exitDecision?.invalidationRulesTriggered ?? [],
+      invalidationTimestamp: exitDecision?.generatedAt ?? new Date().toISOString(), closedAt: cp !== null ? exitDate : null,
     };
   }
 
@@ -948,22 +922,12 @@ export class SignalPositionLedgerService {
     };
   }
 
-  private async exitPrice(
-    instrumentId: string,
-    exitDate: string,
-    query: Pick<SignalPositionLedgerActiveQuery, 'region' | 'assetType'>,
-  ): Promise<SignalPositionLatestPriceSnapshot | null> {
-    const repositoryWithExitPrice = this.repository as SignalPositionLedgerRepository & {
-      priceAtOrBeforeInstrumentId?: (
-        instrumentId: string,
-        date: Date,
-        scope: Pick<SignalPositionLedgerActiveQuery, 'region' | 'assetType'>,
-      ) => Promise<SignalPositionLatestPriceSnapshot | null>;
-    };
-    if (typeof repositoryWithExitPrice.priceAtOrBeforeInstrumentId !== 'function') return null;
+  private async exitPrice(instrumentId: string, exitDate: string, query: Pick<SignalPositionLedgerActiveQuery, 'region' | 'assetType'>): Promise<SignalPositionLatestPriceSnapshot | null> {
+    const repo = this.repository as any;
+    if (typeof repo.priceAtOrBeforeInstrumentId !== 'function') return null;
     const date = new Date(exitDate);
     if (!Number.isFinite(date.getTime())) return null;
-    return await repositoryWithExitPrice.priceAtOrBeforeInstrumentId(instrumentId, date, query) ?? null;
+    return await repo.priceAtOrBeforeInstrumentId(instrumentId, date, query) ?? null;
   }
 
   private sourceProvenClosePrice(price: SignalPositionLatestPriceSnapshot | null): number | null {
@@ -1014,18 +978,11 @@ export class SignalPositionLedgerService {
   }
 
   /**
-   * Close-price evidence resolver — runs ONLY inside runIncrementalRefresh
-   * (the POST refresh / scheduled stage path).  Never called from GET endpoints.
-   *
-   * For each EXIT_TRIGGERED row still in state.rows, fetches the FIRST price
-   * tick on or after the exit trigger date (next-bar fill semantics, matching
-   * the backtest convention).  If a source-proven tick exists, advances the row
-   * to CLOSED with realizedReturn.  If no tick exists yet, leaves it
-   * EXIT_TRIGGERED — honest pending, no fabricated close price.
-   *
-   * Batches the price lookup (one repository call for all EXIT_TRIGGERED rows)
-   * to avoid per-row round-trips and stay within Prisma pool=10 / Postgres
-   * max_connections=20.
+   * Close-price evidence resolver — runs ONLY inside runIncrementalRefresh.
+   * For each EXIT_TRIGGERED row, fetches the FIRST price tick on/after the exit
+   * trigger date (next-bar fill). Advances to CLOSED with realizedReturn if a
+   * source-proven tick exists; otherwise leaves EXIT_TRIGGERED (honest pending).
+   * Batched to avoid per-row round-trips.
    */
   private async resolveExitTriggeredRows(
     state: LedgerRefreshState,
@@ -1034,7 +991,6 @@ export class SignalPositionLedgerService {
     const exitTriggeredRows = [...state.rows.values()].filter((row) => row.status === 'EXIT_TRIGGERED');
     if (exitTriggeredRows.length === 0) return;
 
-    // Build the batch input: one entry per EXIT_TRIGGERED row.
     const batchEntries = exitTriggeredRows.flatMap((row) => {
       const ts = row.exitTriggerTimestamp;
       if (!ts) return [];
@@ -1045,24 +1001,15 @@ export class SignalPositionLedgerService {
 
     if (batchEntries.length === 0) return;
 
-    const repositoryWithBatch = this.repository as SignalPositionLedgerRepository & {
-      firstPriceAtOrAfterBatch?: (
-        entries: Array<{ instrumentId: string; exitDate: Date }>,
-        scope: Pick<SignalPositionLedgerActiveQuery, 'region' | 'assetType'>,
-      ) => Promise<Map<string, SignalPositionLatestPriceSnapshot>>;
-    };
-    if (typeof repositoryWithBatch.firstPriceAtOrAfterBatch !== 'function') return;
-
-    const priceMap = await repositoryWithBatch.firstPriceAtOrAfterBatch(batchEntries, query);
+    const repo = this.repository as any;
+    if (typeof repo.firstPriceAtOrAfterBatch !== 'function') return;
+    const priceMap = await repo.firstPriceAtOrAfterBatch(batchEntries, query);
 
     for (const row of exitTriggeredRows) {
       const closePriceSnapshot = priceMap.get(row.instrumentId) ?? null;
       const closePrice = this.sourceProvenClosePrice(closePriceSnapshot);
 
-      if (closePrice === null) {
-        // No source-proven post-exit tick yet — leave as EXIT_TRIGGERED (honest pending).
-        continue;
-      }
+      if (closePrice === null) continue;
 
       const realizedReturnPercent = row.entryTriggerPrice > 0
         ? Number((((closePrice - row.entryTriggerPrice) / row.entryTriggerPrice) * 100).toFixed(4))

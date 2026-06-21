@@ -51,7 +51,7 @@ const BASE_CONFIG: Omit<RegionDecisionConfig, 'region'> = {
   legacyBands: {
     trend: { tradeCandidate: 80, watch: 60 },
     pullback: { tradeCandidate: 75 },
-    exit: { exitCandidate: 75, reduceRisk: 45, watch: 25 },
+    exit: { exitCandidate: 55, reduceRisk: 35, watch: 20 },
   },
 };
 

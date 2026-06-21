@@ -97,6 +97,7 @@ export interface SignalPositionExitDecisionSnapshot {
   strategyVersion?: string | null;
   decision: string;
   generatedAt: string;
+  generatedDate?: string | null;
   reasons?: string[];
   exitRulesTriggered?: string[];
   invalidationRulesTriggered?: string[];

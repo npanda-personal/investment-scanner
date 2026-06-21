@@ -623,15 +623,15 @@ describe('SignalPositionLedgerService', () => {
 
     expect(active.totalCount).toBe(0);
     expect(closed.totalCount).toBe(0);
-    expect(repository.priceAtOrBeforeInstrumentId).not.toHaveBeenCalled();
+    expect(repository.priceAtOrBeforeInstrumentId).toHaveBeenCalled();
     expect(repository.closeLedgerRow).toHaveBeenCalledWith(expect.objectContaining({
       status: 'INVALIDATED',
       lifecycleEvidenceStatus: 'INVALIDATED',
       invalidationSourceDecisionId: 'decision-invalidated-exit-1',
       invalidationRuleIds: ['SUPPORT_INVALIDATED'],
-      closePriceStatus: 'UNAVAILABLE',
-      exitTriggerPrice: null,
-      closedAt: null,
+      closePriceStatus: 'SOURCE_PROVEN',
+      exitTriggerPrice: 92,
+      closedAt: '2026-05-27T00:00:00.000Z',
     }));
   });
 

@@ -292,12 +292,10 @@ export class SignalPositionLedgerRepository {
         orderBy: [{ instrumentId: 'asc' }, { generatedAt: 'desc' }],
         distinct: ['instrumentId'],
         select: {
-          id: true,
-          instrumentId: true,
-          strategy: true,
-          strategyVersion: true,
+          id: true, instrumentId: true,
+          strategy: true, strategyVersion: true,
           decision: true,
-          generatedAt: true,
+          generatedAt: true, generatedDate: true,
           reasons: true,
           exitRulesTriggered: true,
           invalidationRulesTriggered: true,
@@ -335,11 +333,11 @@ export class SignalPositionLedgerRepository {
       const current = snapshots.get(exitDecision.instrumentId);
       if (!current) continue;
       current.exitDecision = {
-        id: exitDecision.id ?? null,
-        strategy: exitDecision.strategy,
+        id: exitDecision.id ?? null, strategy: exitDecision.strategy,
         strategyVersion: exitDecision.strategyVersion ?? null,
         decision: exitDecision.decision,
         generatedAt: exitDecision.generatedAt.toISOString(),
+        generatedDate: exitDecision.generatedDate?.toISOString() ?? null,
         reasons: Array.isArray(exitDecision.reasons) ? exitDecision.reasons.map(String) : [],
         exitRulesTriggered: Array.isArray(exitDecision.exitRulesTriggered) ? exitDecision.exitRulesTriggered.map(String) : [],
         invalidationRulesTriggered: Array.isArray(exitDecision.invalidationRulesTriggered) ? exitDecision.invalidationRulesTriggered.map(String) : [],
@@ -481,11 +479,9 @@ export class SignalPositionLedgerRepository {
       },
       orderBy: { generatedAt: 'desc' },
       select: {
-        id: true,
-        strategy: true,
-        strategyVersion: true,
+        id: true, strategy: true, strategyVersion: true,
         decision: true,
-        generatedAt: true,
+        generatedAt: true, generatedDate: true,
         reasons: true,
         exitRulesTriggered: true,
         invalidationRulesTriggered: true,
@@ -494,11 +490,11 @@ export class SignalPositionLedgerRepository {
     if (!latest) return null;
 
     return {
-      id: latest.id ?? null,
-      strategy: latest.strategy,
+      id: latest.id ?? null, strategy: latest.strategy,
       strategyVersion: latest.strategyVersion ?? null,
       decision: latest.decision,
       generatedAt: latest.generatedAt.toISOString(),
+      generatedDate: latest.generatedDate?.toISOString() ?? null,
       reasons: Array.isArray(latest.reasons) ? latest.reasons.map(String) : [],
       exitRulesTriggered: Array.isArray(latest.exitRulesTriggered) ? latest.exitRulesTriggered.map(String) : [],
       invalidationRulesTriggered: Array.isArray(latest.invalidationRulesTriggered) ? latest.invalidationRulesTriggered.map(String) : [],
