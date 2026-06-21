@@ -80,24 +80,30 @@ export function createCacheWarmAdapter(services: CacheWarmStageServices): Pipeli
           name: 'stock-interest',
           warm: async () => {
             const scope = parseStockInterestScope({ region, assetType });
-            await cacheService.setJson(stockInterestKey(scope), await services.stockInterestService.latestSnapshot(scope));
+            const siSnap = await services.stockInterestService.latestSnapshot(scope);
+            if (siSnap && siSnap.availability !== 'EMPTY') {
+              await cacheService.setJson(stockInterestKey(scope), siSnap);
+            }
           },
         },
         {
           name: 'sector-rotation',
           warm: async () => {
             const scope = { region: (region || 'IN').toUpperCase(), assetType: (assetType || 'STOCK').toUpperCase() };
-            await cacheService.setJson(
-              sectorRotationKey(scope),
-              await services.marketContextService.latestSectorIntelligenceSnapshot(scope),
-            );
+            const srSnap = await services.marketContextService.latestSectorIntelligenceSnapshot(scope);
+            if (srSnap && srSnap.status !== 'missing') {
+              await cacheService.setJson(sectorRotationKey(scope), srSnap);
+            }
           },
         },
         {
           name: 'today-review',
           warm: async () => {
             const query = parseTodayReviewQuery({ region, assetType });
-            await cacheService.setJson(todayReviewKey(query), await services.todayReviewService.latest(query));
+            const trSnap = await services.todayReviewService.latest(query);
+            if (trSnap && trSnap.run !== null) {
+              await cacheService.setJson(todayReviewKey(query), trSnap);
+            }
           },
         },
         {
@@ -120,7 +126,10 @@ export function createCacheWarmAdapter(services: CacheWarmStageServices): Pipeli
               assetType: (assetType || 'STOCK').toUpperCase(),
               timeframe: (ctx.timeframe || '1d').toLowerCase(),
             };
-            await cacheService.setJson(marketPulseKey(scope), await services.marketPulseService.latestSnapshot(scope));
+            const mpSnap = await services.marketPulseService.latestSnapshot(scope);
+            if (mpSnap && mpSnap.availability !== 'EMPTY') {
+              await cacheService.setJson(marketPulseKey(scope), mpSnap);
+            }
           },
         },
       ];
