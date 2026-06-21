@@ -75,6 +75,8 @@ export class MarketIntelligenceController {
       return res.json(await this.cache.cacheReadThrough(
         stockInterestKey(scope),
         () => this.stockInterestService.latestSnapshot(scope),
+        undefined,
+        (v: any) => v?.availability !== 'EMPTY',
       ));
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to load Stock Interest snapshot';
@@ -122,6 +124,8 @@ export class MarketIntelligenceController {
       const envelope = await this.cache.cacheReadThrough(
         sectorRotationKey({ region, assetType }),
         () => this.marketContextService.latestSectorIntelligenceSnapshot({ region, assetType }),
+        undefined,
+        (v: any) => v?.status !== 'missing' && (v?.sectors?.length ?? 0) > 0,
       );
 
       if (envelope.sectors.length === 0) {
