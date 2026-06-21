@@ -41,9 +41,9 @@ export interface RegionDecisionConfig {
 }
 
 /**
- * Baseline configuration. These numbers reproduce the previous in-service
- * constants 1:1 (SELECTIVE_MIN_SCORE = 75, trend 80/60, pullback 75,
- * exit 75/45/25, model watch/wait 50/40).
+ * Baseline configuration (SELECTIVE_MIN_SCORE = 75, trend 80/60, pullback 75,
+ * exit 55/35/20 — lowered from 75/45/25 after phantom portfolio risk removal,
+ * model watch/wait 50/40).
  */
 const BASE_CONFIG: Omit<RegionDecisionConfig, 'region'> = {
   selectiveMinScore: 75,

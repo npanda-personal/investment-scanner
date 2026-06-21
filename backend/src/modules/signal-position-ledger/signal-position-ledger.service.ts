@@ -889,7 +889,7 @@ export class SignalPositionLedgerService {
       latestTrustedPrice: closePrice,
       exitTriggerPrice: closePrice,
       closePriceStatus: 'SOURCE_PROVEN',
-      closedAt: new Date().toISOString(),
+      closedAt: exitDate,
     };
   }
 
