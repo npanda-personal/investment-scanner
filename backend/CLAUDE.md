@@ -32,5 +32,5 @@ Lane ownership details: `docs/agents/team-and-lanes.md`.
 
 ## Dev & test
 
-- Dev server: `$env:TS_NODE_TRANSPILE_ONLY='1'; npm run dev` (env var required)
+- Dev server: `$env:TS_NODE_TRANSPILE_ONLY='1'; $env:NODE_OPTIONS='--max-old-space-size=4096'; npm run dev` (both env vars required; NODE_OPTIONS also in `nodemon.json`)
 - Tests: jest (`npm test`); CI = Node 20, `prisma generate` + `db push` + build + test

@@ -202,7 +202,7 @@ export class RegionSyncOrchestrator {
       };
       await this.host.repository.upsertSyncState({ region, assetType, tradingDate, status: 'PENDING', summary, lastCheckedAt: now });
 
-      const tasks = await this.host.repository.listActiveStockSyncTasks({ region, assetType }, batchSize);
+      const tasks = await this.host.repository.listActiveStockSyncTasks({ region, assetType });
       const symbols = tasks.map((task) => task.symbol).filter(Boolean);
       // Small forward lookback so a single tick captures the latest completed candle
       // plus a few prior days (covers weekends/holidays); full history is seeded offline.

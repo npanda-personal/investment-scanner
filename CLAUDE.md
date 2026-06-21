@@ -15,7 +15,7 @@ Research-support market intelligence app (localhost-first, zero-incremental-cost
 
 ## Commands (Windows / PowerShell)
 
-- Backend dev: `cd backend; $env:TS_NODE_TRANSPILE_ONLY='1'; npm run dev` — the env var is REQUIRED (god-file type debt makes type-checked ts-node unusable)
+- Backend dev: `cd backend; $env:TS_NODE_TRANSPILE_ONLY='1'; $env:NODE_OPTIONS='--max-old-space-size=4096'; npm run dev` — both env vars REQUIRED (TS_NODE for type debt; NODE_OPTIONS for pipeline memory safety, also set via `backend/nodemon.json`)
 - After any backend `npm install`: `npx prisma generate`
 - Frontend dev: `cd frontend; npm run dev`
 - Docker: `docker compose up -d` (add `--profile cache` / `--profile tools` for redis/pgadmin)

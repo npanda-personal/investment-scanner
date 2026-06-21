@@ -242,12 +242,24 @@ describe('fundamentalPeHistoryVotes — PE vs own historical median', () => {
     expect(negativeSignals).toHaveLength(0);
   });
 
-  it('requires at least 3 valid PE values (skips with fewer)', () => {
+  it('requires at least 2 valid PE values (skips with fewer)', () => {
     const latest = rec('QUARTERLY', 0, { pe_ratio: 5 });
     const records = [latest, rec('QUARTERLY', 91, { pe_ratio: 20 })];
     const { signals, negativeSignals } = fundamentalPeHistoryVotes(latest, records);
     expect(signals).toHaveLength(0);
     expect(negativeSignals).toHaveLength(0);
+  });
+
+  it('fires PE_BELOW_OWN_HISTORY with exactly 2 valid historical PEs', () => {
+    const latest = rec('QUARTERLY', 0, { pe_ratio: 8 });
+    const records = [
+      latest,
+      rec('QUARTERLY', 91, { pe_ratio: 15 }),
+      rec('QUARTERLY', 182, { pe_ratio: 14 }),
+    ];
+    const { signals } = fundamentalPeHistoryVotes(latest, records);
+    expect(signals).toHaveLength(1);
+    expect(signals[0].code).toBe('PE_BELOW_OWN_HISTORY');
   });
 
   it('ignores zero/negative PE values when computing median', () => {
