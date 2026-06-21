@@ -25,7 +25,7 @@ const NULL_RUN_TODAY_REVIEW = { run: null, groups: {}, scope: {} };
 const EMPTY_MARKET_PULSE = { availability: 'EMPTY', scope: {}, snapshot: null };
 
 const makeServices = (over: Record<string, unknown> = {}) => ({
-  convictionService: { conviction: jest.fn().mockResolvedValue({ count: 0, results: [] }) },
+  convictionService: { conviction: jest.fn().mockResolvedValue({ count: 3, results: [{}] }) },
   stockInterestService: { latestSnapshot: jest.fn().mockResolvedValue(READY_STOCK_INTEREST) },
   marketContextService: {
     latestSectorIntelligenceSnapshot: jest.fn().mockResolvedValue(READY_SECTOR_ROTATION),
@@ -68,6 +68,7 @@ describe('CACHE_WARM adapter', () => {
 
   it('deletes stale keys and skips writes for empty-availability envelopes', async () => {
     const services = makeServices({
+      convictionService: { conviction: jest.fn().mockResolvedValue({ count: 0, results: [] }) },
       stockInterestService: { latestSnapshot: jest.fn().mockResolvedValue(EMPTY_STOCK_INTEREST) },
       marketContextService: {
         latestSectorIntelligenceSnapshot: jest.fn().mockResolvedValue(MISSING_SECTOR_ROTATION),
@@ -80,11 +81,10 @@ describe('CACHE_WARM adapter', () => {
 
     const result = await adapter.run(makeCtx() as any);
 
-    // conviction (always written) + market-context-summary (non-null) = 2 writes.
+    // Only market-context-summary writes (non-null summary); all 5 guarded endpoints delete their keys.
     expect(result.status).toBe('COMPLETED');
-    expect(services.cacheService.setJson).toHaveBeenCalledTimes(2);
-    // Each of the 4 empty endpoints must delete its key to evict any stale READY data.
-    expect(services.cacheService.delete).toHaveBeenCalledTimes(4);
+    expect(services.cacheService.setJson).toHaveBeenCalledTimes(1);
+    expect(services.cacheService.delete).toHaveBeenCalledTimes(5);
   });
 
   it('degrades to PARTIAL (never FAILED) when one endpoint throws', async () => {
