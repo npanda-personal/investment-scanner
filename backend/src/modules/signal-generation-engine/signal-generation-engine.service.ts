@@ -300,8 +300,8 @@ export class SignalGenerationEngineService {
 
     if (useDataQualityFilter) {
       const filtered = await (asOfDate
-        ? this.dataQualityService.filterByVerdict(resolvedInstrumentIds, 'signal', asOfDate)
-        : this.dataQualityService.filterByVerdict(resolvedInstrumentIds, 'signal')
+        ? this.dataQualityService.filterByVerdict(resolvedInstrumentIds, 'signal', asOfDate, request.missingQualityBehavior)
+        : this.dataQualityService.filterByVerdict(resolvedInstrumentIds, 'signal', undefined, request.missingQualityBehavior)
       ).catch((error: any) => {
         if (asOfDate) {
           // Fix #7 (DQ asOf no-snapshot): For historical/backfill runs there may be no

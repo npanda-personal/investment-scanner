@@ -103,6 +103,17 @@ describe('DQE remediation — honest missing-verdict reason (Phase 2)', () => {
     expect(result.reasonsByInstrumentId['missing-1']).toEqual(['ELIGIBILITY_NOT_COMPUTED']);
   });
 
+  it('filterByVerdict includes no-verdict instruments when missingQualityBehavior is WARN_AND_PROCESS', async () => {
+    const repository = { findEligibilityRows: jest.fn().mockResolvedValue([]) };
+    const svc = new DataQualityEngineService(repository as any, {} as any, null);
+
+    const result = await svc.filterByVerdict(['missing-1'], 'signal', undefined, 'WARN_AND_PROCESS');
+
+    expect(result.eligibleInstrumentIds).toContain('missing-1');
+    expect(result.excludedInstrumentIds).toHaveLength(0);
+    expect(result.readinessStatusByInstrumentId['missing-1']).toBeUndefined();
+  });
+
   it('filterByVerdict surfaces signalReadinessStatus per instrument (so the persisted signal snapshot can satisfy the trusted-read predicate)', async () => {
     const row = {
       instrumentId: 'in-1', tradingDate: new Date('2026-06-17'), priceBars: 300,

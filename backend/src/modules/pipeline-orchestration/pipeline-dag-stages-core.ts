@@ -252,7 +252,7 @@ export function createCoreStageAdapters(services: CoreStageServices): PipelineSt
           offset: 0,
           requestedByUserId: 'system',
           useDataQualityFilter: true,
-          missingQualityBehavior: 'SKIP',
+          missingQualityBehavior: 'WARN_AND_PROCESS',
           skipUnusable: true,
           includeLimited: false,
           providerThrottleMs: 0,

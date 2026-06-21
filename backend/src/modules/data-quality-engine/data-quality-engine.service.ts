@@ -824,7 +824,7 @@ export class DataQualityEngineService {
   async filterByVerdict(
     instrumentIds: string[],
     verdict: VerdictKey,
-    tradingDate?: Date,
+    tradingDate?: Date, missingQualityBehavior?: 'WARN_AND_PROCESS' | 'SKIP',
   ): Promise<FilterByVerdictResult> {
     if (instrumentIds.length === 0) {
       return { eligibleInstrumentIds: [], excludedInstrumentIds: [], reasonsByInstrumentId: {}, readinessStatusByInstrumentId: {} };
@@ -840,10 +840,8 @@ export class DataQualityEngineService {
     for (const instrumentId of instrumentIds) {
       const row = byId.get(instrumentId);
       if (!row) {
-        // No persisted eligibility verdict — exclude with an honest reason (not
-        // NO_LATEST_PRICE, which would imply a price-data problem).
-        excludedInstrumentIds.push(instrumentId);
-        reasonsByInstrumentId[instrumentId] = ['ELIGIBILITY_NOT_COMPUTED'];
+        if ((missingQualityBehavior ?? 'SKIP') === 'WARN_AND_PROCESS') { eligibleInstrumentIds.push(instrumentId); }
+        else { excludedInstrumentIds.push(instrumentId); reasonsByInstrumentId[instrumentId] = ['ELIGIBILITY_NOT_COMPUTED']; }
         continue;
       }
       if (row.readinessStatus) readinessStatusByInstrumentId[instrumentId] = row.readinessStatus;
