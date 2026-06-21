@@ -83,6 +83,8 @@ export function createCacheWarmAdapter(services: CacheWarmStageServices): Pipeli
             const siSnap = await services.stockInterestService.latestSnapshot(scope);
             if (siSnap && siSnap.availability !== 'EMPTY') {
               await cacheService.setJson(stockInterestKey(scope), siSnap);
+            } else {
+              await cacheService.delete(stockInterestKey(scope));
             }
           },
         },
@@ -93,6 +95,8 @@ export function createCacheWarmAdapter(services: CacheWarmStageServices): Pipeli
             const srSnap = await services.marketContextService.latestSectorIntelligenceSnapshot(scope);
             if (srSnap && srSnap.status !== 'missing') {
               await cacheService.setJson(sectorRotationKey(scope), srSnap);
+            } else {
+              await cacheService.delete(sectorRotationKey(scope));
             }
           },
         },
@@ -103,6 +107,8 @@ export function createCacheWarmAdapter(services: CacheWarmStageServices): Pipeli
             const trSnap = await services.todayReviewService.latest(query);
             if (trSnap && trSnap.run !== null) {
               await cacheService.setJson(todayReviewKey(query), trSnap);
+            } else {
+              await cacheService.delete(todayReviewKey(query));
             }
           },
         },
@@ -129,6 +135,8 @@ export function createCacheWarmAdapter(services: CacheWarmStageServices): Pipeli
             const mpSnap = await services.marketPulseService.latestSnapshot(scope);
             if (mpSnap && mpSnap.availability !== 'EMPTY') {
               await cacheService.setJson(marketPulseKey(scope), mpSnap);
+            } else {
+              await cacheService.delete(marketPulseKey(scope));
             }
           },
         },

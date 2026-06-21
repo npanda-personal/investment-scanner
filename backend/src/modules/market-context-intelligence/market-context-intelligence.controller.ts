@@ -102,6 +102,8 @@ export class MarketContextIntelligenceController {
     return this.respond(res, () => this.cache.cacheReadThrough(
       marketPulseKey(scope),
       () => this.marketPulseService.latestSnapshot(scope),
+      undefined,
+      (v: any) => v?.availability !== 'EMPTY',
     ));
   };
 

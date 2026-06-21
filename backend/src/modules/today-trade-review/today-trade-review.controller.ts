@@ -16,6 +16,8 @@ export class TodayTradeReviewController {
       return res.json(await this.cache.cacheReadThrough(
         todayReviewKey(query),
         () => this.service.latest(query),
+        undefined,
+        (v: any) => v?.run !== null,
       ));
     } catch (error) {
       return this.error(res, error, 'Failed to load latest Today review.');

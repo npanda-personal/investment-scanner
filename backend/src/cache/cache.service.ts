@@ -65,18 +65,21 @@ export class CacheService {
   /**
    * Return the cached value for `key`, or run `producer`, cache its result, and return it.
    * A null/undefined producer result is returned but never cached (avoids pinning empty pages).
+   * Pass `shouldCache` to add domain-level checks (e.g. skip caching an `availability:'EMPTY'`
+   * envelope that is truthy but carries no real data).
    */
   async cacheReadThrough<T>(
     key: string,
     producer: () => Promise<T>,
     ttlSeconds: number = DEFAULT_TTL_SECONDS,
+    shouldCache?: (value: T) => boolean,
   ): Promise<T> {
     const cached = await this.getJson<T>(key);
     if (cached !== null) {
       return cached;
     }
     const fresh = await producer();
-    if (fresh !== null && fresh !== undefined) {
+    if (fresh !== null && fresh !== undefined && (!shouldCache || shouldCache(fresh))) {
       await this.setJson(key, fresh, ttlSeconds);
     }
     return fresh;
