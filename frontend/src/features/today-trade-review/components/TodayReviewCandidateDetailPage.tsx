@@ -249,6 +249,12 @@ export function TodayReviewCandidateDetailPage() {
           ['Calibration support', signals?.calibration?.calibratedDirection || 'Unavailable'],
           ['Smart-money support', signals?.smartMoney?.status || 'Unavailable'],
           ['Readiness evidence', explainability?.upstreamEvidence?.readiness ? 'Available' : 'Unavailable'],
+          ['Signal evidence', explainability?.upstreamEvidence?.signalEvidence
+            ? `Available — ${(explainability.upstreamEvidence.signalEvidence as any).direction || 'direction N/A'}, score ${(explainability.upstreamEvidence.signalEvidence as any).score ?? 'N/A'}`
+            : 'Unavailable'],
+          ['Calibration readiness', explainability?.upstreamEvidence?.calibrationReadiness
+            ? `Available — ${(explainability.upstreamEvidence.calibrationReadiness as any).calibratedDirection || 'direction N/A'}, status ${(explainability.upstreamEvidence.calibrationReadiness as any).evidenceStatus ?? 'N/A'}`
+            : 'Unavailable'],
           ['Strategy proof evidence', explainability?.upstreamEvidence?.strategyProof ? 'Available' : 'Unavailable'],
           ['Exit/invalidation evidence', explainability?.upstreamEvidence?.tradePlanProofChain ? 'Available' : 'Unavailable'],
         ]} />

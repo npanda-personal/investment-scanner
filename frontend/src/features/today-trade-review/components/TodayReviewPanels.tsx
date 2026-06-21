@@ -254,6 +254,28 @@ export function CoveragePanel({ run }: { run: TodayReviewRun }) {
             <Typography variant="caption">Watch/unproven: {formatNumber((scanFunnel.watchOnly || 0) + (scanFunnel.unproven || 0))}</Typography>
             <Typography variant="caption">Blocked: {formatNumber(scanFunnel.blocked)}</Typography>
           </Stack>
+          {(scanFunnel.strategyCandidatesSeen != null || scanFunnel.noSetup != null) && (
+            <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} useFlexGap flexWrap="wrap">
+              {scanFunnel.strategyCandidatesSeen != null && <Typography variant="caption">Strategy candidates seen: {formatNumber(scanFunnel.strategyCandidatesSeen)}</Typography>}
+              {scanFunnel.strategyCandidatesEligible != null && <Typography variant="caption">Eligible: {formatNumber(scanFunnel.strategyCandidatesEligible)}</Typography>}
+              {scanFunnel.strategyCandidatesExcluded != null && <Typography variant="caption">Excluded: {formatNumber(scanFunnel.strategyCandidatesExcluded)}</Typography>}
+              {scanFunnel.outsideTrustedUniverse != null && <Typography variant="caption">Outside universe: {formatNumber(scanFunnel.outsideTrustedUniverse)}</Typography>}
+              {scanFunnel.noSetup != null && <Typography variant="caption">No setup: {formatNumber(scanFunnel.noSetup)}</Typography>}
+            </Stack>
+          )}
+          {scanFunnel.topNoPromotionReasons && Object.keys(scanFunnel.topNoPromotionReasons).length > 0 && (
+            <>
+              <Typography variant="caption" color="text.secondary" fontWeight={600}>Top exclusion reasons (Lite path)</Typography>
+              <Stack direction="row" spacing={0.5} useFlexGap flexWrap="wrap">
+                {Object.entries(scanFunnel.topNoPromotionReasons)
+                  .sort(([, a], [, b]) => b - a)
+                  .slice(0, 10)
+                  .map(([reason, count]) => (
+                    <Chip key={reason} label={`${humanizeCode(reason)}: ${count}`} size="small" variant="outlined" />
+                  ))}
+              </Stack>
+            </>
+          )}
           {warnings.slice(0, 3).map((warning: string, warningIndex: number) => (
             <Typography key={`warning-${warningIndex}-${warning}`} variant="caption" color="text.secondary">{warning}</Typography>
           ))}

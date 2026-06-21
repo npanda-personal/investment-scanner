@@ -1,10 +1,13 @@
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import HistoryIcon from '@mui/icons-material/History';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import {
   Accordion,
   AccordionDetails,
   AccordionSummary,
   Alert,
   Box,
+  Button,
   Card,
   CardContent,
   Chip,
@@ -16,6 +19,7 @@ import {
   Typography,
 } from '@mui/material';
 import { useMemo, useState } from 'react';
+import { Link as RouterLink } from 'react-router-dom';
 import { PageHeader } from '@/shared/components/PageHeader';
 import { NotApplicableForAssetClass } from '@/shared/components/NotApplicableForAssetClass';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
@@ -51,7 +55,7 @@ const groupTabs: Array<{ key: keyof TodayReviewGroups; label: string }> = [
 
 export function TodayReviewPage() {
   const { profile } = useMarketScope();
-  const { data, loading, error, scope } = useTodayReview();
+  const { data, loading, error, scope, runReview, running } = useTodayReview();
   const [tab, setTab] = useState<keyof TodayReviewGroups>('longReview');
   const run = data?.run || null;
   const groups = data?.groups || emptyGroups();
@@ -144,13 +148,29 @@ export function TodayReviewPage() {
         {run && (
           <>
             {/* A1: Market posture strip — answer-first, single line */}
-            <PostureStrip
-              text={postureStripText}
-              dataThroughLabel={dataThroughLabel}
-              runRegime={runRegime}
-              postureLabel={postureLabel}
-              totals={totals}
-            />
+            <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between" flexWrap="wrap" useFlexGap>
+              <PostureStrip
+                text={postureStripText}
+                dataThroughLabel={dataThroughLabel}
+                runRegime={runRegime}
+                postureLabel={postureLabel}
+                totals={totals}
+              />
+              <Stack direction="row" spacing={1}>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  disabled={running || loading}
+                  startIcon={running ? <CircularProgress size={16} /> : <RefreshIcon />}
+                  onClick={() => void runReview()}
+                >
+                  {running ? 'Running...' : 'Re-run review'}
+                </Button>
+                <Button size="small" variant="text" startIcon={<HistoryIcon />} component={RouterLink} to="/today-review/runs">
+                  History
+                </Button>
+              </Stack>
+            </Stack>
 
             {/* Only show a compact degraded warning above the fold if genuinely broken */}
             {degradedWarningText && (
