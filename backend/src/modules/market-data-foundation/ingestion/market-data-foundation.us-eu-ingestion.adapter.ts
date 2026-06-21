@@ -55,7 +55,6 @@ export class FreeProviderIngestionAdapter implements RegionIngestionAdapter {
       barsUpdated: backfill.barsUpdated,
       barsSkipped: backfill.barsSkipped,
       changedSymbols: backfill.changedSymbols,
-      processedSymbols: backfill.processedSymbols,
       warnings: backfill.warnings,
     };
   }

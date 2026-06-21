@@ -41,6 +41,7 @@ export class UniverseInstrumentsService {
       providerSupportStatus: options.providerSupportStatus,
       derivativesEligible: options.derivativesEligible,
       search: options.search,
+      symbol: options.symbol,
     };
     // Crypto scope → isolated crypto_assets plane (mapped to the same V1Instrument shape).
     if (isCryptoScope(requestOptions)) {

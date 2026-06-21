@@ -128,6 +128,7 @@ export interface PaginationOptions {
   providerSupportStatus?: string;
   derivativesEligible?: boolean;
   search?: string;
+  symbol?: string;
 }
 
 export interface ValidationResult<T> {

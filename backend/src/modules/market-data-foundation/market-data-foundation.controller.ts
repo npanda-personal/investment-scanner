@@ -994,7 +994,7 @@ export class MarketDataFoundationController {
       const catalogSource = req.query.catalogSource as string | undefined;
       const providerSupportStatus = req.query.providerSupportStatus as string | undefined;
       const derivativesEligible = this.parseOptionalBoolean(req.query.derivativesEligible);
-      const result = await this.service.listInstruments({ page, pageSize, sortBy, sortOrder, region, country, exchange, assetType, instrumentSegment, currency, sector, industry, dataStatus, catalogSource, providerSupportStatus, derivativesEligible, search });
+      const result = await this.service.listInstruments({ page, pageSize, sortBy, sortOrder, region, country, exchange, assetType, instrumentSegment, currency, sector, industry, dataStatus, catalogSource, providerSupportStatus, derivativesEligible, search, symbol: (req.query.symbol as string | undefined)?.trim() || undefined });
       return res.json(result);
     } catch (error) {
       console.error('Error listing instruments:', error);

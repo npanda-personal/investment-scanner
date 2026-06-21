@@ -27,12 +27,16 @@ export class CatalogQueriesRepository {
       providerSupportStatus,
       derivativesEligible,
       search,
+      symbol,
     } = options;
     const skip = (page - 1) * pageSize;
-    
+
     // Combine explicit region filter with other filters
     const where: Prisma.StockWhereInput = stockWhere({ region, assetType, instrumentSegment });
 
+    if (symbol) {
+      where.symbol = { equals: symbol.trim(), mode: 'insensitive' };
+    }
     if (country) {
       where.country = { contains: country.trim(), mode: 'insensitive' };
     }
@@ -66,7 +70,7 @@ export class CatalogQueriesRepository {
         derivativesEligibleWhere(derivativesEligible),
       ];
     }
-    if (search) {
+    if (search && !symbol) {
       where.AND = [
         ...this.asAndArray(where.AND),
         {

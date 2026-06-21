@@ -54,7 +54,6 @@ export interface RegionDailySyncResult {
   readonly barsUpdated: number;
   readonly barsSkipped: number;
   readonly changedSymbols: string[];
-  readonly processedSymbols?: string[];
   readonly warnings: string[];
 }
 
