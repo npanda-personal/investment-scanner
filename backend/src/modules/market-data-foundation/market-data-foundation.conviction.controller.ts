@@ -39,6 +39,8 @@ export class MarketDataFoundationConvictionController {
       const result = await this.cache.cacheReadThrough(
         convictionKey({ region, assetType, onlyFnoEligible }),
         () => this.service.conviction({ region, assetType, onlyFnoEligible }),
+        undefined,
+        (v: any) => (v?.count ?? 0) > 0,
       );
       return res.json(result);
     } catch (error) {

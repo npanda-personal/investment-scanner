@@ -73,7 +73,12 @@ export function createCacheWarmAdapter(services: CacheWarmStageServices): Pipeli
               assetType: assetType?.trim().toUpperCase() || undefined,
               onlyFnoEligible: false,
             };
-            await cacheService.setJson(convictionKey(opts), await services.convictionService.conviction(opts));
+            const cvResult = await services.convictionService.conviction(opts);
+            if (cvResult && cvResult.count > 0) {
+              await cacheService.setJson(convictionKey(opts), cvResult);
+            } else {
+              await cacheService.delete(convictionKey(opts));
+            }
           },
         },
         {
