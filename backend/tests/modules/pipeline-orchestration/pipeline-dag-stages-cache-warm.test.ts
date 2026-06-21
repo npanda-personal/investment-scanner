@@ -33,7 +33,7 @@ const makeServices = (over: Record<string, unknown> = {}) => ({
   },
   marketPulseService: { latestSnapshot: jest.fn().mockResolvedValue(READY_MARKET_PULSE) },
   todayReviewService: { latest: jest.fn().mockResolvedValue(READY_TODAY_REVIEW) },
-  cacheService: { isEnabled: jest.fn().mockReturnValue(true), setJson: jest.fn().mockResolvedValue(undefined) },
+  cacheService: { isEnabled: jest.fn().mockReturnValue(true), setJson: jest.fn().mockResolvedValue(undefined), delete: jest.fn().mockResolvedValue(undefined) },
   ...over,
 });
 
@@ -46,7 +46,7 @@ describe('CACHE_WARM adapter', () => {
   });
 
   it('skips immediately when the cache is disabled', async () => {
-    const services = makeServices({ cacheService: { isEnabled: () => false, setJson: jest.fn() } });
+    const services = makeServices({ cacheService: { isEnabled: () => false, setJson: jest.fn(), delete: jest.fn() } });
     const adapter = createCacheWarmAdapter(services as any);
 
     const result = await adapter.run(makeCtx() as any);
@@ -66,7 +66,7 @@ describe('CACHE_WARM adapter', () => {
     expect(services.cacheService.setJson).toHaveBeenCalledTimes(6);
   });
 
-  it('skips write for each endpoint that returns an empty-availability envelope', async () => {
+  it('deletes stale keys and skips writes for empty-availability envelopes', async () => {
     const services = makeServices({
       stockInterestService: { latestSnapshot: jest.fn().mockResolvedValue(EMPTY_STOCK_INTEREST) },
       marketContextService: {
@@ -80,10 +80,11 @@ describe('CACHE_WARM adapter', () => {
 
     const result = await adapter.run(makeCtx() as any);
 
-    // conviction (always written) + market-context-summary (non-null) = 2 writes;
-    // stock-interest, sector-rotation, today-review, market-pulse are all skipped.
+    // conviction (always written) + market-context-summary (non-null) = 2 writes.
     expect(result.status).toBe('COMPLETED');
     expect(services.cacheService.setJson).toHaveBeenCalledTimes(2);
+    // Each of the 4 empty endpoints must delete its key to evict any stale READY data.
+    expect(services.cacheService.delete).toHaveBeenCalledTimes(4);
   });
 
   it('degrades to PARTIAL (never FAILED) when one endpoint throws', async () => {
