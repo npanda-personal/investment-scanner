@@ -157,7 +157,7 @@ Rules:
 - caller: `PipelineOrchestrationService.runScheduledDataQualityStage()` after scheduled DQ completes with `COMPLETED`;
 - trigger type: `scheduled`;
 - input set: the same sorted, unique changed instrument ids from the current scheduled Market Data pass;
-- adapter: `SignalGenerationEngineService.run()` with explicit `instrumentIds`, `useDataQualityFilter=true`, `missingQualityBehavior=SKIP`, `skipUnusable=true`, `includeLimited=false`, and `providerThrottleMs=0`;
+- adapter: `SignalGenerationEngineService.run()` with explicit `instrumentIds`, `useDataQualityFilter=true`, `missingQualityBehavior=WARN_AND_PROCESS` (instruments lacking a persisted eligibility row are included but not marked READY/trusted), `skipUnusable=true`, `includeLimited=false`, and `providerThrottleMs=0`;
 - partial DQ completion does not fan out because the DQ response does not yet expose the exact successfully evaluated instrument subset;
 - idempotency key: deterministic key over scope, data-through date, upstream DQ output fingerprint, changed-set fingerprint, and raw-signals stage version;
 - manual Pipeline Ops `RAW_SIGNALS_GENERATE_SCOPE` remains deferred; this change does not make raw signal generation a manual command;
