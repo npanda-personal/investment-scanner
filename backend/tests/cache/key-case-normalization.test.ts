@@ -20,7 +20,7 @@ const capturingCache = () => {
     keys,
     cacheReadThrough: jest.fn(async (key: string, producer: () => Promise<unknown>) => {
       keys.push(key);
-      return producer();
+      return { data: await producer(), cacheHit: false };
     }),
   };
 };

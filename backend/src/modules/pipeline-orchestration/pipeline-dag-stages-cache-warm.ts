@@ -82,6 +82,22 @@ export function createCacheWarmAdapter(services: CacheWarmStageServices): Pipeli
           },
         },
         {
+          name: 'conviction-fno',
+          warm: async () => {
+            const opts = {
+              region: normalizeMarketRegion(region),
+              assetType: assetType?.trim().toUpperCase() || undefined,
+              onlyFnoEligible: true,
+            };
+            const cvResult = await services.convictionService.conviction(opts);
+            if (cvResult && cvResult.count > 0) {
+              await cacheService.setJson(convictionKey(opts), cvResult);
+            } else {
+              await cacheService.delete(convictionKey(opts));
+            }
+          },
+        },
+        {
           name: 'stock-interest',
           warm: async () => {
             const scope = parseStockInterestScope({ region, assetType });
@@ -109,6 +125,18 @@ export function createCacheWarmAdapter(services: CacheWarmStageServices): Pipeli
           name: 'today-review',
           warm: async () => {
             const query = parseTodayReviewQuery({ region, assetType });
+            const trSnap = await services.todayReviewService.latest(query);
+            if (trSnap && trSnap.run !== null) {
+              await cacheService.setJson(todayReviewKey(query), trSnap);
+            } else {
+              await cacheService.delete(todayReviewKey(query));
+            }
+          },
+        },
+        {
+          name: 'today-review-lite',
+          warm: async () => {
+            const query = { ...parseTodayReviewQuery({ region, assetType }), enrich: false as const };
             const trSnap = await services.todayReviewService.latest(query);
             if (trSnap && trSnap.run !== null) {
               await cacheService.setJson(todayReviewKey(query), trSnap);

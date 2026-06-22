@@ -5,6 +5,7 @@ const response = () => {
   const res: any = {};
   res.status = jest.fn().mockReturnValue(res);
   res.json = jest.fn().mockReturnValue(res);
+  res.setHeader = jest.fn().mockReturnValue(res);
   return res;
 };
 
@@ -12,7 +13,7 @@ describe('MarketDataFoundationConvictionController read-through cache', () => {
   it('serves the cached payload on hit without calling the service', async () => {
     const service = { conviction: jest.fn() };
     const cached = { results: ['cached'] };
-    const cache = { cacheReadThrough: jest.fn(async () => cached) };
+    const cache = { cacheReadThrough: jest.fn(async () => ({ data: cached, cacheHit: true })) };
     const controller = new MarketDataFoundationConvictionController(service as any, cache as any);
     const res = response();
 
@@ -30,7 +31,7 @@ describe('MarketDataFoundationConvictionController read-through cache', () => {
     const cache = {
       cacheReadThrough: jest.fn(async (key: string, producer: () => Promise<unknown>) => {
         usedKey = key;
-        return producer();
+        return { data: await producer(), cacheHit: false };
       }),
     };
     const controller = new MarketDataFoundationConvictionController(service as any, cache as any);

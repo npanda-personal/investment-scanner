@@ -8,6 +8,11 @@ export interface RedisLike {
   del(...keys: string[]): Promise<number>;
 }
 
+export interface CacheReadResult<T> {
+  data: T;
+  cacheHit: boolean;
+}
+
 /** Safety net so a skipped/failed pipeline run can't serve infinitely-stale data (~36h). */
 const DEFAULT_TTL_SECONDS = 36 * 60 * 60;
 
@@ -73,16 +78,16 @@ export class CacheService {
     producer: () => Promise<T>,
     ttlSeconds: number = DEFAULT_TTL_SECONDS,
     shouldCache?: (value: T) => boolean,
-  ): Promise<T> {
+  ): Promise<CacheReadResult<T>> {
     const cached = await this.getJson<T>(key);
     if (cached !== null) {
-      return cached;
+      return { data: cached, cacheHit: true };
     }
     const fresh = await producer();
     if (fresh !== null && fresh !== undefined && (!shouldCache || shouldCache(fresh))) {
       await this.setJson(key, fresh, ttlSeconds);
     }
-    return fresh;
+    return { data: fresh, cacheHit: false };
   }
 }
 
