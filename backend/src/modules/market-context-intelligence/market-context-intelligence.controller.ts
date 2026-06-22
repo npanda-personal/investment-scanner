@@ -27,7 +27,7 @@ export class MarketContextIntelligenceController {
     const region = this.contextRegion(req).toUpperCase();
     return this.respond(res, async () => {
       // Cache the expensive persisted read; the cheap envelope shaping below runs on cached data.
-      const { data: persisted, cacheHit } = await this.cache.cacheReadThrough(
+      const { data: persisted, cacheHit } = await this.cache.cacheReadThroughWithMeta(
         marketContextSummaryKey(region),
         () => this.service.latestPersistedSummary(region),
         undefined,
@@ -103,7 +103,7 @@ export class MarketContextIntelligenceController {
       timeframe: (this.timeframe(req) || '1d').toLowerCase(),
     };
     return this.respond(res, async () => {
-      const { data, cacheHit } = await this.cache.cacheReadThrough(
+      const { data, cacheHit } = await this.cache.cacheReadThroughWithMeta(
         marketPulseKey(scope),
         () => this.marketPulseService.latestSnapshot(scope),
         undefined,

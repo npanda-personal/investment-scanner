@@ -106,6 +106,24 @@ export class CacheService {
     }
     return fresh;
   }
+
+  /** Same as `cacheReadThrough` but also returns whether the value came from cache (`cacheHit`). */
+  async cacheReadThroughWithMeta<T>(
+    key: string,
+    producer: () => Promise<T>,
+    ttlSeconds: number = DEFAULT_TTL_SECONDS,
+    shouldCache?: (value: T) => boolean,
+  ): Promise<{ data: T; cacheHit: boolean }> {
+    const cached = await this.getJson<T>(key);
+    if (cached !== null) {
+      return { data: cached, cacheHit: true };
+    }
+    const fresh = await producer();
+    if (fresh !== null && fresh !== undefined && (!shouldCache || shouldCache(fresh))) {
+      await this.setJson(key, fresh, ttlSeconds);
+    }
+    return { data: fresh, cacheHit: false };
+  }
 }
 
 /** Shared singleton used by controllers; injectable (with a default) into the pipeline stage. */

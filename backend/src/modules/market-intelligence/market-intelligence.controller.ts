@@ -72,7 +72,7 @@ export class MarketIntelligenceController {
     try {
       res.setHeader('Cache-Control', 'no-store');
       const scope = parseStockInterestScope(req.query as Record<string, unknown>);
-      const { data, cacheHit } = await this.cache.cacheReadThrough(
+      const { data, cacheHit } = await this.cache.cacheReadThroughWithMeta(
         stockInterestKey(scope),
         () => this.stockInterestService.latestSnapshot(scope),
         undefined,
@@ -123,7 +123,7 @@ export class MarketIntelligenceController {
       const region = (typeof req.query.region === 'string' ? req.query.region.trim() || 'IN' : 'IN').toUpperCase();
       const assetType = (typeof req.query.assetType === 'string' ? req.query.assetType.trim() || 'STOCK' : 'STOCK').toUpperCase();
 
-      const { data: envelope, cacheHit } = await this.cache.cacheReadThrough(
+      const { data: envelope, cacheHit } = await this.cache.cacheReadThroughWithMeta(
         sectorRotationKey({ region, assetType }),
         () => this.marketContextService.latestSectorIntelligenceSnapshot({ region, assetType }),
         undefined,

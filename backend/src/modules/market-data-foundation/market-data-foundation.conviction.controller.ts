@@ -36,7 +36,7 @@ export class MarketDataFoundationConvictionController {
         ?.trim()
         .toUpperCase() || undefined;
       const onlyFnoEligible = this.parseBoolean(req.query.onlyFnoEligible);
-      const { data, cacheHit } = await this.cache.cacheReadThrough(
+      const { data, cacheHit } = await this.cache.cacheReadThroughWithMeta(
         convictionKey({ region, assetType, onlyFnoEligible }),
         () => this.service.conviction({ region, assetType, onlyFnoEligible }),
         undefined,

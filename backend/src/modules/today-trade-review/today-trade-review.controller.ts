@@ -13,7 +13,7 @@ export class TodayTradeReviewController {
   latest = async (req: Request, res: Response) => {
     try {
       const query = parseTodayReviewQuery(req.query);
-      const { data, cacheHit } = await this.cache.cacheReadThrough(
+      const { data, cacheHit } = await this.cache.cacheReadThroughWithMeta(
         todayReviewKey(query),
         () => this.service.latest(query),
         undefined,
