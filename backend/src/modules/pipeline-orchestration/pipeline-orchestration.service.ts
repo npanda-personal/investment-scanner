@@ -56,7 +56,7 @@ import type {
   PipelineStatusStageDto,
 } from './pipeline-orchestration.types';
 import { PIPELINE_COMMAND_KEYS } from './pipeline-orchestration.types';
-
+import { executeForceCancelCommand } from './pipeline-orchestration.force-cancel';
 const LEDGER_VERSION = 'pipeline-ledger-v1';
 const ACTIVE_STATUSES = new Set(['PENDING', 'RUNNING']);
 const TERMINAL_STATUSES = new Set(['COMPLETED', 'PARTIAL', 'FAILED', 'SKIPPED', 'BLOCKED', 'ABANDONED']);
@@ -126,7 +126,7 @@ const PIPELINE_COMMAND_POLICIES: PipelineCommandPolicy[] = [
   commandPolicy('PIPELINE_RETRY_FAILED_STAGE', 'PIPELINE', 16, 'Pipeline', 'Retry failed stage or run', 'ENABLED', null),
   commandPolicy('PIPELINE_DAG_RETRY', 'PIPELINE', 16, 'Pipeline', 'DAG retry â€” re-run failed stages via DAG runner', 'ENABLED', null, ['full_latest_trading_date', 'incremental_changed_only'], 100),
   commandPolicy('PIPELINE_DRAIN_ALL_BATCHES', 'PIPELINE', 16, 'Pipeline', 'Drain all batches', 'FORBIDDEN', 'First slice allows one batch per request only.'),
-  commandPolicy('PIPELINE_CANCEL_ACTIVE', 'PIPELINE', 16, 'Pipeline', 'Cancel active run', 'FORBIDDEN', 'No background worker cancellation contract exists for this slice.'),
+  commandPolicy('PIPELINE_CANCEL_ACTIVE', 'PIPELINE', 16, 'Pipeline', 'Cancel active run', 'ENABLED', null),
 ];
 
 const PIPELINE_COMMAND_POLICY_MAP = new Map(PIPELINE_COMMAND_POLICIES.map((policy) => [policy.commandKey, policy]));
@@ -553,7 +553,7 @@ export class PipelineOrchestrationService {
     if (request.commandKey === 'PIPELINE_RETRY_FAILED_STAGE') {
       return this.executeRetryFailedStageCommand(request, context, policy, now);
     }
-
+    if (request.commandKey === 'PIPELINE_CANCEL_ACTIVE') return executeForceCancelCommand(request);
     const serverIdempotencyKey = this.commandIdempotencyKey(request);
     const stageIdempotencyKey = serverIdempotencyKey;
     const runIdempotencyKey = `${serverIdempotencyKey}:run`;

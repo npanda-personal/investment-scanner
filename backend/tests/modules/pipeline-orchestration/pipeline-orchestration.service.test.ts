@@ -512,6 +512,7 @@ describe('PipelineOrchestrationService', () => {
       'MARKET_DATA_MANUAL_VERIFIED_FUNDAMENTALS_IMPORT',
       'PIPELINE_RETRY_FAILED_STAGE',
       'PIPELINE_DAG_RETRY',
+      'PIPELINE_CANCEL_ACTIVE',
     ]);
     expect(catalog.commands.find((item) => item.commandKey === 'PIPELINE_RUN_ALL')).toMatchObject({
       availability: 'ENABLED',
