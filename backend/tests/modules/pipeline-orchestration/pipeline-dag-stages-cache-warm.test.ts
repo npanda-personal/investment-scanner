@@ -29,11 +29,11 @@ const makeServices = (over: Record<string, unknown> = {}) => ({
   stockInterestService: { latestSnapshot: jest.fn().mockResolvedValue(READY_STOCK_INTEREST) },
   marketContextService: {
     latestSectorIntelligenceSnapshot: jest.fn().mockResolvedValue(READY_SECTOR_ROTATION),
-    latestPersistedSummary: jest.fn().mockResolvedValue({ updatedAt: 'x' }),
+    latestPersistedSummary: jest.fn().mockResolvedValue({ updatedAt: 'x', regime: 'BULLISH' }),
   },
   marketPulseService: { latestSnapshot: jest.fn().mockResolvedValue(READY_MARKET_PULSE) },
   todayReviewService: { latest: jest.fn().mockResolvedValue(READY_TODAY_REVIEW) },
-  cacheService: { isEnabled: jest.fn().mockReturnValue(true), setJson: jest.fn().mockResolvedValue(undefined), delete: jest.fn().mockResolvedValue(undefined) },
+  cacheService: { isEnabled: jest.fn().mockReturnValue(true), setJson: jest.fn().mockResolvedValue(undefined), delete: jest.fn().mockResolvedValue(undefined), deleteByPrefix: jest.fn().mockResolvedValue(0) },
   ...over,
 });
 
@@ -46,7 +46,7 @@ describe('CACHE_WARM adapter', () => {
   });
 
   it('skips immediately when the cache is disabled', async () => {
-    const services = makeServices({ cacheService: { isEnabled: () => false, setJson: jest.fn(), delete: jest.fn() } });
+    const services = makeServices({ cacheService: { isEnabled: () => false, setJson: jest.fn(), delete: jest.fn(), deleteByPrefix: jest.fn() } });
     const adapter = createCacheWarmAdapter(services as any);
 
     const result = await adapter.run(makeCtx() as any);
@@ -55,15 +55,15 @@ describe('CACHE_WARM adapter', () => {
     expect((services.cacheService as any).setJson).not.toHaveBeenCalled();
   });
 
-  it('warms every endpoint when data is present → COMPLETED with 6 writes', async () => {
+  it('warms every endpoint when data is present → COMPLETED with 8 writes', async () => {
     const services = makeServices();
     const adapter = createCacheWarmAdapter(services as any);
 
     const result = await adapter.run(makeCtx() as any);
 
     expect(result.status).toBe('COMPLETED');
-    expect(result.succeededCount).toBe(6);
-    expect(services.cacheService.setJson).toHaveBeenCalledTimes(6);
+    expect(result.succeededCount).toBe(8);
+    expect(services.cacheService.setJson).toHaveBeenCalledTimes(8);
   });
 
   it('deletes stale keys and skips writes for empty-availability envelopes', async () => {
@@ -81,10 +81,23 @@ describe('CACHE_WARM adapter', () => {
 
     const result = await adapter.run(makeCtx() as any);
 
-    // Only market-context-summary writes (non-null summary); all 5 guarded endpoints delete their keys.
+    // All 8 tasks hit the delete path (empty/missing data + no regime on summary).
     expect(result.status).toBe('COMPLETED');
-    expect(services.cacheService.setJson).toHaveBeenCalledTimes(1);
-    expect(services.cacheService.delete).toHaveBeenCalledTimes(5);
+    expect(services.cacheService.setJson).toHaveBeenCalledTimes(0);
+    expect(services.cacheService.delete).toHaveBeenCalledTimes(8);
+  });
+
+  it('invalidates screener, movers and signals-top keys before warming', async () => {
+    const services = makeServices();
+    const adapter = createCacheWarmAdapter(services as any);
+
+    await adapter.run(makeCtx() as any);
+
+    const { deleteByPrefix } = services.cacheService as any;
+    expect(deleteByPrefix).toHaveBeenCalledTimes(3);
+    expect(deleteByPrefix).toHaveBeenCalledWith(expect.stringContaining('screener'));
+    expect(deleteByPrefix).toHaveBeenCalledWith(expect.stringContaining('movers'));
+    expect(deleteByPrefix).toHaveBeenCalledWith(expect.stringContaining('signals-top'));
   });
 
   it('degrades to PARTIAL (never FAILED) when one endpoint throws', async () => {
@@ -96,8 +109,8 @@ describe('CACHE_WARM adapter', () => {
     const result = await adapter.run(makeCtx() as any);
 
     expect(result.status).toBe('PARTIAL');
-    expect(result.failedCount).toBe(1);
-    expect(result.succeededCount).toBe(5);
+    expect(result.failedCount).toBe(2);
+    expect(result.succeededCount).toBe(6);
     expect(result.warnings?.[0]).toContain('conviction');
   });
 });

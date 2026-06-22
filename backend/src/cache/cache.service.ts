@@ -6,11 +6,7 @@ export interface RedisLike {
   get(key: string): Promise<string | null>;
   set(key: string, value: string, mode: 'EX', ttlSeconds: number): Promise<unknown>;
   del(...keys: string[]): Promise<number>;
-}
-
-export interface CacheReadResult<T> {
-  data: T;
-  cacheHit: boolean;
+  scan(cursor: string, matchToken: 'MATCH', pattern: string, countToken: 'COUNT', count: number): Promise<[string, string[]]>;
 }
 
 /** Safety net so a skipped/failed pipeline run can't serve infinitely-stale data (~36h). */
@@ -67,6 +63,27 @@ export class CacheService {
     }
   }
 
+  /** Cursor-scan delete of all keys matching `prefix*`. Safe on large key spaces (no KEYS command). */
+  async deleteByPrefix(prefix: string): Promise<number> {
+    const client = this.getClient();
+    if (!client) return 0;
+    let deleted = 0;
+    let cursor = '0';
+    try {
+      do {
+        const [nextCursor, keys] = await client.scan(cursor, 'MATCH', `${prefix}*`, 'COUNT', 100);
+        cursor = nextCursor;
+        if (keys.length > 0) {
+          await client.del(...(keys as [string, ...string[]]));
+          deleted += keys.length;
+        }
+      } while (cursor !== '0');
+    } catch (error) {
+      console.error('[cache] deleteByPrefix failed', prefix, (error as Error)?.message);
+    }
+    return deleted;
+  }
+
   /**
    * Return the cached value for `key`, or run `producer`, cache its result, and return it.
    * A null/undefined producer result is returned but never cached (avoids pinning empty pages).
@@ -78,16 +95,16 @@ export class CacheService {
     producer: () => Promise<T>,
     ttlSeconds: number = DEFAULT_TTL_SECONDS,
     shouldCache?: (value: T) => boolean,
-  ): Promise<CacheReadResult<T>> {
+  ): Promise<T> {
     const cached = await this.getJson<T>(key);
     if (cached !== null) {
-      return { data: cached, cacheHit: true };
+      return cached;
     }
     const fresh = await producer();
     if (fresh !== null && fresh !== undefined && (!shouldCache || shouldCache(fresh))) {
       await this.setJson(key, fresh, ttlSeconds);
     }
-    return { data: fresh, cacheHit: false };
+    return fresh;
   }
 }
 

@@ -7,6 +7,8 @@ import {
   CryptoSignalGenerationRepository,
   cryptoSignalGenerationRepository,
 } from './signal-generation-engine.crypto-repository';
+import { cacheService } from '../../cache/cache.service';
+import { signalsTopKey } from '../../cache/cache-keys';
 
 type CryptoSignalRow = Awaited<ReturnType<CryptoSignalGenerationRepository['latestForInstrument']>>;
 
@@ -101,11 +103,18 @@ export class SignalGenerationEngineController {
   top = async (req: Request, res: Response) => {
     try {
       const query = parseSignalQuery(req.query);
-      // Route crypto scope to the isolated crypto_* signal plane (persisted-read).
-      if (isCryptoScope({ region: query.region, assetType: query.assetType })) {
-        return res.json(await this.cryptoTopResponse(query));
-      }
-      return res.json(await this.withCohortMetrics(await this.service.topSignals(query), query.region));
+      const result = await cacheService.cacheReadThrough(
+        signalsTopKey(query),
+        async () => {
+          if (isCryptoScope({ region: query.region, assetType: query.assetType })) {
+            return this.cryptoTopResponse(query);
+          }
+          return this.withCohortMetrics(await this.service.topSignals(query), query.region);
+        },
+        undefined,
+        (v: any) => (v?.totalCount ?? v?.total ?? 0) > 0,
+      );
+      return res.json(result);
     } catch (error) {
       console.error('Signal top endpoint error:', error);
       return res.status(500).json({ error: 'Failed to load top signals' });

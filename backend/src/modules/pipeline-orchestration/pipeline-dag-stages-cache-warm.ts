@@ -29,6 +29,9 @@ import {
   todayReviewKey,
   marketContextSummaryKey,
   marketPulseKey,
+  screenerKeyPrefix,
+  marketMoversKeyPrefix,
+  signalsTopKeyPrefix,
 } from '../../cache/cache-keys';
 import type { PipelineStageAdapter, StageContext, StageResult } from './pipeline-dag.types';
 
@@ -60,6 +63,14 @@ export function createCacheWarmAdapter(services: CacheWarmStageServices): Pipeli
       }
 
       const { region, assetType } = ctx;
+
+      // Invalidate all filter combinations for read-through endpoints — controllers re-warm on next request.
+      const screenerDeleted = await cacheService.deleteByPrefix(screenerKeyPrefix);
+      ctx.log(`[cache] invalidated ${screenerDeleted} screener cache keys`);
+      const moversDeleted = await cacheService.deleteByPrefix(marketMoversKeyPrefix);
+      ctx.log(`[cache] invalidated ${moversDeleted} movers cache keys`);
+      const signalsTopDeleted = await cacheService.deleteByPrefix(signalsTopKeyPrefix);
+      ctx.log(`[cache] invalidated ${signalsTopDeleted} signals-top cache keys`);
 
       // Each task mirrors EXACTLY what the matching controller passes to its service + key-builder,
       // so the warmed key equals the key the FE will look up. Reusing parseStockInterestScope /
@@ -114,7 +125,7 @@ export function createCacheWarmAdapter(services: CacheWarmStageServices): Pipeli
           warm: async () => {
             const scope = { region: (region || 'IN').toUpperCase(), assetType: (assetType || 'STOCK').toUpperCase() };
             const srSnap = await services.marketContextService.latestSectorIntelligenceSnapshot(scope);
-            if (srSnap && srSnap.status !== 'missing') {
+            if (srSnap && srSnap.status !== 'missing' && (srSnap.sectors?.length ?? 0) > 0) {
               await cacheService.setJson(sectorRotationKey(scope), srSnap);
             } else {
               await cacheService.delete(sectorRotationKey(scope));
@@ -152,7 +163,7 @@ export function createCacheWarmAdapter(services: CacheWarmStageServices): Pipeli
             // otherwise region || 'GLOBAL'.
             const contextRegion = assetType?.trim().toUpperCase() === 'CRYPTO' ? 'CRYPTO' : (region || 'GLOBAL').toUpperCase();
             const summary = await services.marketContextService.latestPersistedSummary(contextRegion);
-            if (summary) {
+            if (summary && (summary as any).regime != null) {
               await cacheService.setJson(marketContextSummaryKey(contextRegion), summary);
             } else {
               await cacheService.delete(marketContextSummaryKey(contextRegion));

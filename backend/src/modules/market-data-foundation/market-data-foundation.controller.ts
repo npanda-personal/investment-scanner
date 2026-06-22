@@ -2,6 +2,8 @@ import type { Request, Response } from 'express';
 import { MarketDataFoundationService } from './market-data-foundation.service';
 import { normalizeMarketRegion } from '../../shared/utils/market-scope';
 import { getMarketDataFoundationScheduler } from './ingestion/market-data-foundation.scheduler';
+import { cacheService } from '../../cache/cache.service';
+import { screenerKey, marketMoversKey } from '../../cache/cache-keys';
 
 export class MarketDataFoundationController {
   constructor(private readonly service = new MarketDataFoundationService()) {}
@@ -712,30 +714,16 @@ export class MarketDataFoundationController {
   screener = async (req: Request, res: Response) => {
     try {
       const signalDirection = typeof req.query.signalDirection === 'string' ? req.query.signalDirection.toUpperCase() : undefined;
-      const validDirections = ['BULLISH', 'BEARISH', 'NEUTRAL'];
-      if (signalDirection && !validDirections.includes(signalDirection)) {
-        return res.status(400).json({ error: `signalDirection must be one of: ${validDirections.join(', ')}` });
+      if (signalDirection && !['BULLISH', 'BEARISH', 'NEUTRAL'].includes(signalDirection)) {
+        return res.status(400).json({ error: `signalDirection must be one of: BULLISH, BEARISH, NEUTRAL` });
       }
       const capBand = typeof req.query.capBand === 'string' ? req.query.capBand.toUpperCase() : undefined;
-      const validCapBands = ['LARGE', 'MID', 'SMALL'];
-      if (capBand && !validCapBands.includes(capBand)) {
-        return res.status(400).json({ error: `capBand must be one of: ${validCapBands.join(', ')}` });
+      if (capBand && !['LARGE', 'MID', 'SMALL'].includes(capBand)) {
+        return res.status(400).json({ error: `capBand must be one of: LARGE, MID, SMALL` });
       }
       const { region, assetType } = this.getMarketFilter(req);
-      return res.json(await this.service.screener({
-        region,
-        assetType,
-        signalDirection,
-        minScore: this.numberParam(req, 'minScore'),
-        minRsPercentile: this.numberParam(req, 'minRsPercentile'),
-        sector: typeof req.query.sector === 'string' ? req.query.sector : undefined,
-        capBand: capBand as 'LARGE' | 'MID' | 'SMALL' | undefined,
-        minDeliveryPct: this.numberParam(req, 'minDeliveryPct'),
-        min52wPositionPct: this.numberParam(req, 'min52wPositionPct'),
-        excludeFnoBan: this.parseOptionalBoolean(req.query.excludeFnoBan),
-        onlyDerivativesEligible: this.parseOptionalBoolean(req.query.onlyDerivativesEligible),
-        limit: this.numberParam(req, 'limit'),
-      }));
+      const opts = { region, assetType, signalDirection, minScore: this.numberParam(req, 'minScore'), minRsPercentile: this.numberParam(req, 'minRsPercentile'), sector: typeof req.query.sector === 'string' ? req.query.sector : undefined, capBand: capBand as 'LARGE' | 'MID' | 'SMALL' | undefined, minDeliveryPct: this.numberParam(req, 'minDeliveryPct'), min52wPositionPct: this.numberParam(req, 'min52wPositionPct'), excludeFnoBan: this.parseOptionalBoolean(req.query.excludeFnoBan), onlyDerivativesEligible: this.parseOptionalBoolean(req.query.onlyDerivativesEligible), limit: this.numberParam(req, 'limit') };
+      return res.json(await cacheService.cacheReadThrough(screenerKey(opts), () => this.service.screener(opts), undefined, (v: any) => (v?.count ?? 0) > 0));
     } catch (error) {
       console.error('Screener error:', error);
       return res.status(500).json({ error: 'Screener query failed' });
@@ -745,12 +733,8 @@ export class MarketDataFoundationController {
   marketMovers = async (req: Request, res: Response) => {
     try {
       const { region, assetType } = this.getMarketFilter(req);
-      return res.json(await this.service.marketMovers({
-        region,
-        assetType,
-        limit: this.numberParam(req, 'limit'),
-        range: typeof req.query.range === 'string' ? req.query.range : undefined,
-      }));
+      const opts = { region, assetType, limit: this.numberParam(req, 'limit'), range: typeof req.query.range === 'string' ? req.query.range : undefined };
+      return res.json(await cacheService.cacheReadThrough(marketMoversKey(opts), () => this.service.marketMovers(opts)));
     } catch (error) {
       console.error('Market movers error:', error);
       return res.status(500).json({ error: 'Market movers summary failed' });

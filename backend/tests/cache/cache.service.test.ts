@@ -15,6 +15,7 @@ const makeClient = () => {
       }
       return removed;
     }),
+    scan: jest.fn(async () => ['0', []] as [string, string[]]),
   };
 };
 
@@ -34,7 +35,7 @@ describe('CacheService', () => {
 
     const result = await svc.cacheReadThrough('k', producer);
 
-    expect(result).toEqual({ data: { a: 1 }, cacheHit: true });
+    expect(result).toEqual({ a: 1 });
     expect(producer).not.toHaveBeenCalled();
   });
 
@@ -45,7 +46,7 @@ describe('CacheService', () => {
 
     const result = await svc.cacheReadThrough('k', producer);
 
-    expect(result).toEqual({ data: { a: 2 }, cacheHit: false });
+    expect(result).toEqual({ a: 2 });
     expect(producer).toHaveBeenCalledTimes(1);
     expect(client.set).toHaveBeenCalledWith('k', JSON.stringify({ a: 2 }), 'EX', expect.any(Number));
   });
@@ -62,7 +63,7 @@ describe('CacheService', () => {
 
     const result = await svc.cacheReadThrough('k', producer);
 
-    expect(result).toEqual({ data: { ok: true }, cacheHit: false });
+    expect(result).toEqual({ ok: true });
     expect(producer).toHaveBeenCalledTimes(1);
   });
 
@@ -72,7 +73,7 @@ describe('CacheService', () => {
 
     const result = await svc.cacheReadThrough('k', async () => null);
 
-    expect(result).toEqual({ data: null, cacheHit: false });
+    expect(result).toBeNull();
     expect(client.set).not.toHaveBeenCalled();
   });
 
@@ -82,7 +83,7 @@ describe('CacheService', () => {
 
     const result = await svc.cacheReadThrough('k', producer);
 
-    expect(result).toEqual({ data: 'x', cacheHit: false });
+    expect(result).toBe('x');
     expect(producer).toHaveBeenCalledTimes(1);
   });
 
@@ -107,5 +108,50 @@ describe('CacheService', () => {
     const svc = new CacheService(() => client as any);
     await svc.delete();
     expect(client.del).not.toHaveBeenCalled();
+  });
+
+  it('deleteByPrefix: deletes all keys matching prefix in single scan pass', async () => {
+    const client = makeClient();
+    client.scan.mockResolvedValueOnce(['0', ['cache:v1:screener:a', 'cache:v1:screener:b']]);
+    const svc = new CacheService(() => client as any);
+
+    const count = await svc.deleteByPrefix('cache:v1:screener:');
+
+    expect(count).toBe(2);
+    expect(client.scan).toHaveBeenCalledWith('0', 'MATCH', 'cache:v1:screener:*', 'COUNT', 100);
+    expect(client.del).toHaveBeenCalledWith('cache:v1:screener:a', 'cache:v1:screener:b');
+  });
+
+  it('deleteByPrefix: iterates cursor until exhausted (multi-page)', async () => {
+    const client = makeClient();
+    client.scan
+      .mockResolvedValueOnce(['nextcursor', ['key1']])
+      .mockResolvedValueOnce(['0', ['key2']]);
+    const svc = new CacheService(() => client as any);
+
+    const count = await svc.deleteByPrefix('cache:v1:movers:');
+
+    expect(count).toBe(2);
+    expect(client.scan).toHaveBeenCalledTimes(2);
+    expect(client.del).toHaveBeenCalledTimes(2);
+  });
+
+  it('deleteByPrefix: returns 0 and swallows error on Redis failure', async () => {
+    const client = makeClient();
+    client.scan.mockRejectedValueOnce(new Error('redis timeout'));
+    const svc = new CacheService(() => client as any);
+
+    const count = await svc.deleteByPrefix('cache:v1:screener:');
+
+    expect(count).toBe(0);
+    expect(console.error).toHaveBeenCalled();
+  });
+
+  it('deleteByPrefix: no-ops when cache is disabled', async () => {
+    const svc = new CacheService(() => null);
+
+    const count = await svc.deleteByPrefix('cache:v1:screener:');
+
+    expect(count).toBe(0);
   });
 });

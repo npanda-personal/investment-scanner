@@ -40,3 +40,46 @@ export const marketContextSummaryKey = (region: string): string =>
 
 export const marketPulseKey = (s: { region: string; assetType: string; timeframe: string }): string =>
   `${PREFIX}:market-pulse:region=${val(s.region)}:assetType=${val(s.assetType)}:timeframe=${val(s.timeframe)}`;
+
+export const screenerKeyPrefix = `${PREFIX}:screener:`;
+export const screenerKey = (s: {
+  region?: string; assetType?: string; signalDirection?: string;
+  minScore?: number; minRsPercentile?: number; sector?: string;
+  capBand?: string; minDeliveryPct?: number; min52wPositionPct?: number;
+  excludeFnoBan?: boolean; onlyDerivativesEligible?: boolean; limit?: number;
+}): string =>
+  `${screenerKeyPrefix}region=${val(s.region)}:assetType=${val(s.assetType)}` +
+  `:dir=${val(s.signalDirection)}:minScore=${val(s.minScore)}` +
+  `:minRsP=${val(s.minRsPercentile)}:sector=${val(s.sector)}` +
+  `:cap=${val(s.capBand)}:minDel=${val(s.minDeliveryPct)}` +
+  `:min52w=${val(s.min52wPositionPct)}:exFno=${val(!!s.excludeFnoBan)}` +
+  `:onlyDrv=${val(!!s.onlyDerivativesEligible)}:limit=${val(s.limit)}`;
+
+export const marketMoversKeyPrefix = `${PREFIX}:movers:`;
+export const marketMoversKey = (s: {
+  region?: string; assetType?: string; limit?: number; range?: string;
+}): string =>
+  `${marketMoversKeyPrefix}region=${val(s.region)}:assetType=${val(s.assetType)}` +
+  `:limit=${val(s.limit)}:range=${val(s.range)}`;
+
+export const signalsTopKeyPrefix = `${PREFIX}:signals-top:`;
+export const signalsTopKey = (q: {
+  region?: string; assetType?: string; direction?: string; minScore?: number;
+  sector?: string; confidence?: string; lifecycleState?: string;
+  limit?: number; offset?: number; sortBy?: string; sortDirection?: string;
+  strategyCode?: string; modelVersion?: string; signalType?: string;
+  includeStrategyMatches?: boolean; onlyStrategyEligible?: boolean;
+  excludeNoiseFiltered?: boolean; hasStrategyMatch?: boolean;
+  hasBlockedStrategies?: boolean; frameworkBackedDecisionAvailable?: boolean;
+  excludeSme?: boolean; reliabilityTier?: string; country?: string; search?: string;
+}): string =>
+  `${signalsTopKeyPrefix}region=${val(q.region)}:assetType=${val(q.assetType)}` +
+  `:dir=${val(q.direction)}:minScore=${val(q.minScore)}:sector=${val(q.sector)}` +
+  `:conf=${val(q.confidence)}:life=${val(q.lifecycleState)}:limit=${val(q.limit)}` +
+  `:offset=${val(q.offset)}:sortBy=${val(q.sortBy)}:sortDir=${val(q.sortDirection)}` +
+  `:st=${val(q.strategyCode)}:mv=${val(q.modelVersion)}:sig=${val(q.signalType)}` +
+  `:ise=${val(!!q.includeStrategyMatches)}:ose=${val(!!q.onlyStrategyEligible)}` +
+  `:enf=${val(!!q.excludeNoiseFiltered)}:hsm=${val(!!q.hasStrategyMatch)}` +
+  `:hbs=${val(!!q.hasBlockedStrategies)}:fbd=${val(!!q.frameworkBackedDecisionAvailable)}` +
+  `:exs=${val(!!q.excludeSme)}:rt=${val(q.reliabilityTier)}` +
+  `:co=${val(q.country)}:search=${val(q.search)}`;
