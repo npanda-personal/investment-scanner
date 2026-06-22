@@ -130,6 +130,7 @@ export interface CryptoAssetFundamental {
   revenue_24h_usd: number | null;
   revenue_30d_usd: number | null;
   annualized_revenue_usd: number | null;
+  staking_apy_pct: number | null;
   coverage_status: string | null;
 }
 

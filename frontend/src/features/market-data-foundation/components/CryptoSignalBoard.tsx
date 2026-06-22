@@ -361,6 +361,12 @@ export default function CryptoSignalBoard() {
                         {row.name}
                       </Typography>
                     )}
+                    {(row.near_52w_high || row.near_52w_low) && (
+                      <Box sx={{ display: 'flex', gap: 0.5, mt: 0.25 }}>
+                        {row.near_52w_high && <Chip label="52w H" size="small" color="success" sx={{ fontSize: '0.6rem', height: 18 }} />}
+                        {row.near_52w_low && <Chip label="52w L" size="small" color="error" sx={{ fontSize: '0.6rem', height: 18 }} />}
+                      </Box>
+                    )}
                   </TableCell>
                   <TableCell align="right">{row.rank ?? '—'}</TableCell>
                   <TableCell align="right">{row.market_cap != null ? compact(row.market_cap, 'USD') : '—'}</TableCell>
