@@ -1,4 +1,5 @@
 /// <reference types="@types/jest" />
+jest.mock('../../../src/cache/redis', () => ({ getRedisClient: () => null }));
 import type { Server } from 'http';
 
 const mockLatestSectorIntelligenceSnapshot = jest.fn();
@@ -67,6 +68,9 @@ async function withAppServer(assertions: (baseUrl: string) => Promise<void>) {
   try {
     await assertions(`http://127.0.0.1:${address.port}`);
   } finally {
+    // closeAllConnections() flushes keep-alive sockets so server.close() resolves immediately
+    // instead of waiting for the TCP keep-alive timeout (~30-60s) to expire.
+    (server as any).closeAllConnections?.();
     await new Promise<void>((resolve, reject) => {
       server.close((error) => error ? reject(error) : resolve());
     });
@@ -82,6 +86,9 @@ async function getJson(baseUrl: string, path: string): Promise<{ status: number;
 }
 
 describe('mounted Market Intelligence read routes', () => {
+  // withAppServer boots a full Express app — cold module load + keep-alive cleanup needs room
+  jest.setTimeout(15000);
+
   beforeEach(() => {
     jest.clearAllMocks();
     mockLatestSectorIntelligenceSnapshot.mockResolvedValue({
