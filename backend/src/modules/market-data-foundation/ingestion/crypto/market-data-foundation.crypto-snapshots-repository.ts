@@ -88,7 +88,9 @@ export interface CryptoDailyMetricBoardOptions {
   minConfidence?: string; // HIGH/MEDIUM/LOW
   volumeSpikeOnly?: boolean;
   near52wHigh?: boolean;
+  near52wLow?: boolean;
   goldenCrossOnly?: boolean;
+  deathCrossOnly?: boolean;
   limit?: number;
 }
 
@@ -282,7 +284,9 @@ export class CryptoSnapshotsRepository {
     }
     if (opts.volumeSpikeOnly) where.volumeSpike = true;
     if (opts.near52wHigh) where.near52wHigh = true;
+    if (opts.near52wLow) where.near52wLow = true;
     if (opts.goldenCrossOnly) where.crossState = 'GOLDEN';
+    if (opts.deathCrossOnly) where.crossState = 'DEATH';
     // minConfidence is an ordinal floor (LOW<MEDIUM<HIGH) over a fixed enum, so it maps
     // to an exact `in` set — applied in SQL (before take) so the limit isn't truncated
     // by a later in-memory filter. Still a pure read (no computation).

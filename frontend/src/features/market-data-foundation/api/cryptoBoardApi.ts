@@ -74,7 +74,9 @@ export interface CryptoBoardParams {
   minConfidence?: CryptoBoardConfidence;
   volumeSpikeOnly?: boolean;
   near52wHigh?: boolean;
+  near52wLow?: boolean;
   goldenCrossOnly?: boolean;
+  deathCrossOnly?: boolean;
   limit?: number;
 }
 
@@ -87,7 +89,9 @@ export async function fetchCryptoBoard(params: CryptoBoardParams = {}): Promise<
   if (params.minConfidence) query.minConfidence = params.minConfidence;
   if (params.volumeSpikeOnly) query.volumeSpikeOnly = true;
   if (params.near52wHigh) query.near52wHigh = true;
+  if (params.near52wLow) query.near52wLow = true;
   if (params.goldenCrossOnly) query.goldenCrossOnly = true;
+  if (params.deathCrossOnly) query.deathCrossOnly = true;
   if (params.limit != null) query.limit = params.limit;
 
   const response = await axios.get<CryptoBoardResponse>(`${API_BASE}/board`, { params: query });

@@ -289,14 +289,40 @@ export default function CryptoSignalBoard() {
                 control={
                   <Checkbox
                     size="small"
+                    checked={params.near52wLow ?? false}
+                    onChange={(e) => {
+                      if (e.target.checked) setParam('near52wLow', true);
+                      else clearParam('near52wLow');
+                    }}
+                  />
+                }
+                label={<Typography variant="body2">Near 52-week low</Typography>}
+              />
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    size="small"
                     checked={params.goldenCrossOnly ?? false}
                     onChange={(e) => {
-                      if (e.target.checked) setParam('goldenCrossOnly', true);
+                      if (e.target.checked) { setParam('goldenCrossOnly', true); clearParam('deathCrossOnly'); }
                       else clearParam('goldenCrossOnly');
                     }}
                   />
                 }
                 label={<Typography variant="body2">Golden cross only</Typography>}
+              />
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    size="small"
+                    checked={params.deathCrossOnly ?? false}
+                    onChange={(e) => {
+                      if (e.target.checked) { setParam('deathCrossOnly', true); clearParam('goldenCrossOnly'); }
+                      else clearParam('deathCrossOnly');
+                    }}
+                  />
+                }
+                label={<Typography variant="body2">Death cross only</Typography>}
               />
             </Box>
           </Grid>

@@ -37,6 +37,11 @@ export class MarketDataFoundationCryptoBoardController {
   /** GET /market-data/crypto/board — latest persisted daily-metric board. */
   board = async (req: Request, res: Response) => {
     try {
+      const goldenCrossOnly = this.parseBoolean(req.query.goldenCrossOnly);
+      const deathCrossOnly = this.parseBoolean(req.query.deathCrossOnly);
+      if (goldenCrossOnly && deathCrossOnly) {
+        return res.status(400).json({ error: 'goldenCrossOnly and deathCrossOnly are mutually exclusive' });
+      }
       const sortOrderRaw = this.parseString(req.query.sortOrder)?.toLowerCase();
       const result = await this.service.cryptoReads.getCryptoDailyMetricBoard({
         sortBy: this.parseString(req.query.sortBy),
@@ -46,7 +51,9 @@ export class MarketDataFoundationCryptoBoardController {
         minConfidence: this.parseString(req.query.minConfidence),
         volumeSpikeOnly: this.parseBoolean(req.query.volumeSpikeOnly),
         near52wHigh: this.parseBoolean(req.query.near52wHigh),
-        goldenCrossOnly: this.parseBoolean(req.query.goldenCrossOnly),
+        near52wLow: this.parseBoolean(req.query.near52wLow),
+        goldenCrossOnly,
+        deathCrossOnly,
         limit: this.parseNumber(req.query.limit),
       });
       return res.json({
