@@ -77,6 +77,7 @@ export interface CryptoDailyMetricSnapshotRow {
   fundingRatePct?: number | null;
   openInterestUsd?: number | null;
   quoteVolume24h?: number | null;
+  stakingApyPct?: number | null;
   calculationVersion?: string;
 }
 
@@ -109,6 +110,7 @@ const BOARD_SORT_COLUMNS: Record<string, string> = {
   fundingRatePct: 'fundingRatePct',
   rsVsBtcPct: 'rsVsBtcPct',
   pctChange30d: 'pctChange30d',
+  stakingApyPct: 'stakingApyPct',
 };
 
 /** Confidence ranking for a minConfidence floor filter. */
@@ -252,6 +254,7 @@ export class CryptoSnapshotsRepository {
         fundingRatePct: row.fundingRatePct ?? null,
         openInterestUsd: toDecimal(row.openInterestUsd),
         quoteVolume24h: toDecimal(row.quoteVolume24h),
+        stakingApyPct: row.stakingApyPct ?? null,
         calculationVersion: row.calculationVersion ?? 'crypto-metrics-v1',
       };
       await this.prisma.cryptoDailyMetricSnapshot.upsert({
@@ -347,6 +350,7 @@ export class CryptoSnapshotsRepository {
     fundingRatePct: number | null;
     openInterestUsd: Prisma.Decimal | null;
     quoteVolume24h: Prisma.Decimal | null;
+    stakingApyPct?: number | null;
     calculationVersion: string;
     dataStatus: string;
   }): Record<string, unknown> {
@@ -383,6 +387,7 @@ export class CryptoSnapshotsRepository {
       funding_rate_pct: r.fundingRatePct,
       open_interest_usd: toNum(r.openInterestUsd),
       quote_volume_24h: toNum(r.quoteVolume24h),
+      staking_apy_pct: r.stakingApyPct,
       calculation_version: r.calculationVersion,
       data_status: r.dataStatus,
     };

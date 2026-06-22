@@ -33,6 +33,7 @@ import { todayTradeReviewRoutes } from '@/features/today-trade-review';
 import { pipelineOpsRoutes } from '@/features/pipeline-ops';
 import { signalPositionLedgerRoutes } from '@/features/signal-position-ledger';
 import { tradeJournalRoutes } from '@/features/trade-journal';
+import CryptoEventsPage from '@/features/market-data-foundation/components/CryptoEventsPage';
 // DailyOverviewDashboardPage import removed — /daily-overview now redirects to /today-review
 // (it is a duplicated tab in TodayReviewPage).
 
@@ -122,6 +123,8 @@ export const appRoutes: RouteObject[] = [
           ...notificationsDeliveryRoutes,
           // /daily-overview is a duplicated tab inside TodayReviewPage — redirect for deep-link compat.
           { path: 'daily-overview', element: <Navigate to="/today-review" replace /> },
+          // Crypto events page — available under crypto scope.
+          { path: 'crypto/events', element: <CryptoEventsPage /> },
           // /crypto route kept for URL stability; redirects to "/" while crypto scope is inactive.
           { path: 'crypto', element: <Navigate to="/" replace /> },
           ...protectedAuthIdentityRoutes,

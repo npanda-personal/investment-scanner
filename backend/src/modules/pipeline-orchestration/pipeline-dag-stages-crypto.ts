@@ -163,7 +163,36 @@ export function buildCryptoPipelineDagAdapters(): PipelineStageAdapter[] {
       } catch {
         // Non-fatal: regime/breadth already persisted; F&G is a bonus gauge.
       }
-      return ok(1, [], { fearGreed: fgNote });
+      // Patch CoinGecko global stats onto the same snapshot (independent of F&G).
+      let globalNote = 'coingecko-global unavailable';
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const { cryptoMetricsService } = require('../market-data-foundation/ingestion/crypto/market-data-foundation.crypto-metrics.service');
+        const stats = await cryptoMetricsService.getCoinGeckoGlobalStats();
+        if (stats && stats.btcDominancePct != null) {
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const prisma = require('../../db/prisma').default;
+          const latest = await prisma.marketContextSnapshot.findFirst({
+            where: { region: 'CRYPTO' },
+            orderBy: { snapshotDate: 'desc' },
+            select: { id: true },
+          });
+          if (latest) {
+            await prisma.marketContextSnapshot.update({
+              where: { id: latest.id },
+              data: {
+                btcDominancePct: stats.btcDominancePct,
+                totalCryptoMarketCapUsd: stats.totalMarketCapUsd,
+                totalCrypto24hVolumeUsd: stats.total24hVolumeUsd,
+              },
+            });
+            globalNote = `btcDom ${stats.btcDominancePct?.toFixed(1)}%`;
+          }
+        }
+      } catch {
+        // Non-fatal: regime/breadth + F&G already persisted; global stats are a bonus.
+      }
+      return ok(1, [], { fearGreed: fgNote, coinGeckoGlobal: globalNote });
     }),
 
     makeStage('CRYPTO_DAILY_METRICS', [...CRYPTO_DAG_EDGES.CRYPTO_DAILY_METRICS], async (ctx) => {

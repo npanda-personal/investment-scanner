@@ -89,6 +89,7 @@ const SORTABLE_COLS: SortableCol[] = [
   { key: 'signalScore', label: 'Signal', align: 'center' },
   { key: 'rsi14', label: 'RSI14', align: 'right' },
   { key: 'distanceFromAthPct', label: 'From ATH', align: 'right' },
+  { key: 'stakingApyPct', label: 'Staking APY', align: 'right' },
 ];
 
 const DEFAULT_PARAMS: CryptoBoardParams = {
@@ -406,6 +407,7 @@ export default function CryptoSignalBoard() {
                   <TableCell align="center"><DirectionChip direction={row.signal_direction} score={row.signal_score} confidence={row.signal_confidence} /></TableCell>
                   <TableCell align="right">{num(row.rsi14)}</TableCell>
                   <TableCell align="right">{pct(row.distance_from_ath_pct)}</TableCell>
+                  <TableCell align="right">{row.staking_apy_pct != null ? `${row.staking_apy_pct.toFixed(2)}%` : '—'}</TableCell>
                   <TableCell align="right">{row.price != null ? money(row.price, 'USD') : '—'}</TableCell>
                   {hasVolumeInterest && (
                     <TableCell align="center">

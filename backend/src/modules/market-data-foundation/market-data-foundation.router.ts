@@ -3,6 +3,7 @@ import { MarketDataFoundationController } from './market-data-foundation.control
 import { MarketDataFoundationCryptoBoardController } from './market-data-foundation.crypto-board.controller';
 import { MarketDataFoundationConvictionController } from './market-data-foundation.conviction.controller';
 import { MarketDataFoundationUsSmartMoneyController } from './market-data-foundation.us-smart-money.controller';
+import { MarketDataFoundationCryptoEventsController } from './market-data-foundation.crypto-events.controller';
 
 export const createMarketDataFoundationRouter = (
   controller = new MarketDataFoundationController()
@@ -55,13 +56,16 @@ export const createMarketDataV1Router = (
   controller = new MarketDataFoundationController(),
   cryptoBoardController = new MarketDataFoundationCryptoBoardController(),
   convictionController = new MarketDataFoundationConvictionController(),
-  usSmartMoneyController = new MarketDataFoundationUsSmartMoneyController()
+  usSmartMoneyController = new MarketDataFoundationUsSmartMoneyController(),
+  cryptoEventsController = new MarketDataFoundationCryptoEventsController()
 ) => {
   const router = express.Router();
 
   // Crypto persisted-read board + asset detail (CRYPTO_DAILY_METRICS stage output).
   router.get('/market-data/crypto/board', cryptoBoardController.board);
   router.get('/market-data/crypto/assets/:id/detail', cryptoBoardController.assetDetail);
+  // Crypto events skeleton — persisted-read of crypto_events (populated by ingestion when API key is set).
+  router.get('/market-data/crypto/events', cryptoEventsController.board);
 
   router.get('/market-data/scheduler/status', controller.schedulerStatus);
   router.get('/market-data/health', controller.health);

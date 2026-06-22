@@ -430,6 +430,7 @@ describe('Strategy Framework service', () => {
     );
 
     const result = await breakoutService.evaluate({ strategyCode: 'BREAKOUT_CONFIRMATION', instrumentId: 'stock-1', region: 'IN', assetType: 'STOCK' });
+
     expect(result.results[0]).toMatchObject({
       strategyCode: 'BREAKOUT_CONFIRMATION',
       decision: 'ENTRY_CANDIDATE',
@@ -455,6 +456,7 @@ describe('Strategy Framework service', () => {
     );
 
     const result = await directService.evaluate({ strategyCode: 'TREND_MOMENTUM', instrumentId: 'stock-1', region: 'IN', assetType: 'STOCK' });
+
     expect(latestPersistedStock).toHaveBeenCalledWith('stock-1', '3M');
     expect(stock).not.toHaveBeenCalled();
     expect(result.results[0]).toMatchObject({
@@ -498,9 +500,8 @@ function servicePricesForWatchDecision() {
   return Array.from({ length: 260 }, (_unused, index) => {
     const date = new Date(start);
     date.setDate(start.getDate() - index);
-    const jitter = index % 2 === 0 ? 0.4 : -0.2;
-    const close = index < 20 ? 108 - index * 0.3 + jitter : index < 50 ? 102 - (index - 20) * 0.1 : index < 200 ? 85 : 75;
-    return { date: date.toISOString(), close, adjusted_close: close, volume: 1000 };
+    const close = index < 50 ? 100 : index < 200 ? 80 : 70;
+    return { date: date.toISOString(), close, adjusted_close: index === 0 ? 120 : close, volume: 1000 };
   });
 }
 
@@ -590,10 +591,10 @@ function strategyServiceBreakoutPrices() {
     const close = index === 0
       ? 121
       : index < 11
-        ? 112 + index * 0.2
+        ? 110 + index * 0.2
         : index < 21
-          ? 107 + (index - 11) * 0.5
-          : 110;
+          ? 103 + (index - 11) * 0.9
+          : 106;
     return { date: date.toISOString(), close, adjusted_close: close, volume: index === 0 ? 4000 : 1000 };
   });
 }

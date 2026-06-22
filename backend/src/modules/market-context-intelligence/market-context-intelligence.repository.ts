@@ -386,7 +386,7 @@ export class MarketContextIntelligenceRepository {
       explanation: [market.explanation || ''],
       updatedAt: market.updatedAt.toISOString(),
       dataStatus: market.dataStatus as any,
-      fearGreedIndex: market.fearGreedIndex ?? null, fearGreedLabel: market.fearGreedLabel ?? null,
+      fearGreedIndex: market.fearGreedIndex ?? null, fearGreedLabel: market.fearGreedLabel ?? null, btcDominancePct: (market as any).btcDominancePct ?? null, totalCryptoMarketCapUsd: (market as any).totalCryptoMarketCapUsd ?? null, totalCrypto24hVolumeUsd: (market as any).totalCrypto24hVolumeUsd ?? null,
     };
   }
 

@@ -10,7 +10,7 @@ import { fetchDailyOverviewMarketMovers } from '@/features/daily-overview-dashbo
 import type { MarketMoverRow } from '@/features/daily-overview-dashboard/types';
 import { fetchMarketContextSummary } from '@/features/market-context-intelligence';
 import type { MarketContextSummary } from '@/features/market-context-intelligence';
-import { money } from '@/shared/format/money';
+import { compact, money } from '@/shared/format/money';
 import { NotApplicableForAssetClass } from '@/shared/components/NotApplicableForAssetClass';
 import { fetchCryptoBoard, type CryptoBoardRow } from '../api/cryptoBoardApi';
 
@@ -103,6 +103,7 @@ const CryptoMarketOverviewPage: React.FC = () => {
       )}
 
       <MarketRegimeWidget />
+      <GlobalMarketStatsPanel summary={summary} />
 
       {error && <Alert severity="warning" sx={{ mb: 2 }}>{error}</Alert>}
       {loading ? (
@@ -270,6 +271,40 @@ const FearGreedGauge: React.FC<{ summary: MarketContextSummary | null }> = ({ su
           Contrarian sentiment gauge · daily reading from a free source (alternative.me)
         </Typography>
       </Box>
+    </Paper>
+  );
+};
+
+/**
+ * Global market stats panel — persisted-read of BTC dominance + total crypto market cap
+ * + 24h volume from CoinGecko /global (free, keyless). Populated by CRYPTO_MARKET_CONTEXT
+ * pipeline stage; renders an informative empty state until the pipeline runs.
+ */
+const GlobalMarketStatsPanel: React.FC<{ summary: MarketContextSummary | null }> = ({ summary }) => {
+  const btcDom = summary?.btcDominancePct;
+  const cap = summary?.totalCryptoMarketCapUsd;
+  const vol = summary?.totalCrypto24hVolumeUsd;
+  if (btcDom == null && cap == null && vol == null) {
+    return (
+      <Paper sx={{ p: 2, mt: 2 }}>
+        <Typography variant="h6" sx={{ mb: 1 }}>Global Market Stats</Typography>
+        <Typography color="text.secondary">
+          Global market data is not available yet. The crypto pipeline populates this on its next run.
+        </Typography>
+      </Paper>
+    );
+  }
+  return (
+    <Paper sx={{ p: 2, mt: 2 }}>
+      <Typography variant="h6" sx={{ mb: 1 }}>Global Market Stats</Typography>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(3, 1fr)' }, gap: 2 }}>
+        <Stat label="BTC Dominance" value={btcDom != null ? `${btcDom.toFixed(1)}%` : '—'} />
+        <Stat label="Total Crypto Cap" value={cap != null ? compact(cap, 'USD') : '—'} />
+        <Stat label="24h Volume" value={vol != null ? compact(vol, 'USD') : '—'} />
+      </Box>
+      <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+        Source: CoinGecko · updated daily by the crypto pipeline
+      </Typography>
     </Paper>
   );
 };

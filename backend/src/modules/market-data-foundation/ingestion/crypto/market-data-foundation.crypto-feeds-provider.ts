@@ -421,3 +421,38 @@ export async function fetchDefiLlamaFundamentals(
 
   return { rows, warnings };
 }
+
+// ── CoinGecko global market stats ────────────────────────────────────────────
+
+export interface CoinGeckoGlobalStats {
+  btcDominancePct: number | null;
+  totalMarketCapUsd: number | null;
+  total24hVolumeUsd: number | null;
+}
+
+/**
+ * Fetch global crypto market stats from CoinGecko (keyless, free).
+ * Returns null on any failure — degrades gracefully so one dead feed
+ * cannot abort the pipeline stage that consumes it.
+ */
+export async function fetchCoinGeckoGlobal(): Promise<CoinGeckoGlobalStats | null> {
+  const base = getCryptoEndpoints().coingeckoBase.url;
+  try {
+    const raw = (await fetchJson(`${base}/global`)) as {
+      data?: {
+        market_cap_percentage?: Record<string, number>;
+        total_market_cap?: Record<string, number>;
+        total_volume?: Record<string, number>;
+      };
+    };
+    const d = raw?.data;
+    if (!d) return null;
+    return {
+      btcDominancePct: toFiniteNumber(d.market_cap_percentage?.btc),
+      totalMarketCapUsd: toFiniteNumber(d.total_market_cap?.usd),
+      total24hVolumeUsd: toFiniteNumber(d.total_volume?.usd),
+    };
+  } catch {
+    return null;
+  }
+}

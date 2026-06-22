@@ -11,6 +11,8 @@ import {
   fetchCryptoFearGreed,
   fetchBinanceFuturesSnapshots,
   fetchDefiLlamaFundamentals,
+  fetchCoinGeckoGlobal,
+  type CoinGeckoGlobalStats,
 } from './market-data-foundation.crypto-feeds-provider';
 import { sma, rsi, macd, bollingerPercentB } from '../../../signal-generation-engine';
 import type { SignalPricePoint } from '../../../signal-generation-engine';
@@ -184,6 +186,7 @@ export class CryptoMetricsService {
         rsVsBtcPct,
         tvlUsd: fund?.tvlUsd ?? null,
         tvlChange7dPct: fund?.tvlChange7dPct ?? null,
+        stakingApyPct: fund?.stakingApyPct ?? null,
         fundingRatePct: fut?.fundingRatePct ?? null,
         openInterestUsd: fut?.openInterestUsd ?? null,
         quoteVolume24h,
@@ -226,6 +229,11 @@ export class CryptoMetricsService {
     return { index: fg?.value ?? null, label: fg?.classification ?? null };
   }
 
+  /** Fetch CoinGecko global stats (BTC dominance + total cap + 24h volume). */
+  async getCoinGeckoGlobalStats(): Promise<CoinGeckoGlobalStats | null> {
+    return fetchCoinGeckoGlobal();
+  }
+
   // ── Latest-snapshot lookups (mirrored into the daily-metric board) ──────────
 
   private async latestSignalsByInstrument(): Promise<Map<string, { score: number; direction: string; confidence: string }>> {
@@ -240,17 +248,18 @@ export class CryptoMetricsService {
     return map;
   }
 
-  private async latestFundamentalsByInstrument(): Promise<Map<string, { tvlUsd: number | null; tvlChange7dPct: number | null }>> {
+  private async latestFundamentalsByInstrument(): Promise<Map<string, { tvlUsd: number | null; tvlChange7dPct: number | null; stakingApyPct: number | null }>> {
     const rows = await this.repo.prisma.cryptoFundamentalSnapshot.findMany({
       orderBy: { snapshotDate: 'desc' },
-      select: { instrumentId: true, tvlUsd: true, tvlChange7dPct: true },
+      select: { instrumentId: true, tvlUsd: true, tvlChange7dPct: true, stakingApyPct: true },
     });
-    const map = new Map<string, { tvlUsd: number | null; tvlChange7dPct: number | null }>();
+    const map = new Map<string, { tvlUsd: number | null; tvlChange7dPct: number | null; stakingApyPct: number | null }>();
     for (const r of rows) {
       if (!map.has(r.instrumentId)) {
         map.set(r.instrumentId, {
           tvlUsd: r.tvlUsd !== null && r.tvlUsd !== undefined ? Number(r.tvlUsd) : null,
           tvlChange7dPct: r.tvlChange7dPct ?? null,
+          stakingApyPct: r.stakingApyPct ?? null,
         });
       }
     }

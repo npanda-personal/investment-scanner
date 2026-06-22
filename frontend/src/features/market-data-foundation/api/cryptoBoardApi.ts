@@ -27,7 +27,8 @@ export type CryptoBoardSortBy =
   | 'openInterestUsd'
   | 'fundingRatePct'
   | 'rsVsBtcPct'
-  | 'pctChange30d';
+  | 'pctChange30d'
+  | 'stakingApyPct';
 
 /** One persisted board row (snake_case as served by the backend). */
 export interface CryptoBoardRow {
@@ -58,6 +59,7 @@ export interface CryptoBoardRow {
   funding_rate_pct: number | null;
   open_interest_usd: number | null;
   quote_volume_24h: number | null;
+  staking_apy_pct: number | null;
 }
 
 export interface CryptoBoardResponse {

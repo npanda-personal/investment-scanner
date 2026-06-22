@@ -95,6 +95,10 @@ export interface MarketContextSummary {
   // Crypto Fear & Greed (alternative.me, free). Populated for region=CRYPTO only; null otherwise.
   fearGreedIndex?: number | null;
   fearGreedLabel?: string | null;
+  // CoinGecko /global stats (free, keyless). Populated for region=CRYPTO only; null otherwise.
+  btcDominancePct?: number | null;
+  totalCryptoMarketCapUsd?: number | null;
+  totalCrypto24hVolumeUsd?: number | null;
 }
 
 // ─── NR-104: Breadth Internals time series ───────────────────────────────────

@@ -14,7 +14,7 @@ describe('Strategy Framework evaluator', () => {
     const result = new StrategyFrameworkEvaluator(strategy).evaluateEntry({
       instrumentId: 'stock-1',
       symbol: 'TEST',
-      latestPrice: 110,
+      latestPrice: 120,
       sma50: 100,
       sma200: 80,
       rawSignal: { score: 82, direction: 'BULLISH' } as any,
@@ -201,7 +201,6 @@ describe('Strategy Framework evaluator', () => {
       symbol: 'TEST',
       latestPrice: 121,
       sma50: 110,
-      sma200: 80,
       high52Week: 120,
       averageVolume20: 1000,
       bars: latestFirstBreakoutBars(2500, 100),
@@ -221,7 +220,7 @@ describe('Strategy Framework evaluator', () => {
   it('keeps active entry minScore thresholds reachable with complete evidence fixtures', () => {
     const fixtures: Record<string, any> = {
       TREND_MOMENTUM: {
-        latestPrice: 110,
+        latestPrice: 120,
         sma50: 100,
         sma200: 80,
         rawSignal: { score: 82, direction: 'BULLISH' },
@@ -249,7 +248,6 @@ describe('Strategy Framework evaluator', () => {
       BREAKOUT_CONFIRMATION: {
         latestPrice: 121,
         sma50: 110,
-        sma200: 80,
         high52Week: 120,
         averageVolume20: 1000,
         bars: latestFirstBreakoutBars(2500),
@@ -262,9 +260,8 @@ describe('Strategy Framework evaluator', () => {
         smartMoneyStatus: 'ACCUMULATION',
       },
       SMART_MONEY_ACCUMULATION: {
-        latestPrice: 110,
+        latestPrice: 120,
         sma50: 100,
-        sma200: 80,
         averageVolume20: 1000,
         smartMoneyStatus: 'ACCUMULATION',
         smartMoneyScore: 78,
@@ -276,7 +273,7 @@ describe('Strategy Framework evaluator', () => {
         sectorRelativeStrengthScore: 72,
       },
       SECTOR_LEADER_MOMENTUM: {
-        latestPrice: 110,
+        latestPrice: 120,
         sma50: 100,
         sma200: 80,
         rawSignal: { score: 82, direction: 'BULLISH' },
@@ -469,7 +466,7 @@ describe('Strategy Framework evaluator', () => {
     const entry = new StrategyFrameworkEvaluator(registry.get('TREND_MOMENTUM')!).evaluateEntry({
       instrumentId: 'stock-1',
       symbol: 'TEST',
-      latestPrice: 110,
+      latestPrice: 120,
       sma50: 100,
       sma200: 80,
       rawSignal: { score: 82, direction: 'BULLISH' } as any,
