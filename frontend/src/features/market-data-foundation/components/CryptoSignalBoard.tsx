@@ -304,7 +304,7 @@ export default function CryptoSignalBoard() {
                     size="small"
                     checked={params.goldenCrossOnly ?? false}
                     onChange={(e) => {
-                      if (e.target.checked) setParam('goldenCrossOnly', true);
+                      if (e.target.checked) { setParam('goldenCrossOnly', true); clearParam('deathCrossOnly'); }
                       else clearParam('goldenCrossOnly');
                     }}
                   />
@@ -317,7 +317,7 @@ export default function CryptoSignalBoard() {
                     size="small"
                     checked={params.deathCrossOnly ?? false}
                     onChange={(e) => {
-                      if (e.target.checked) setParam('deathCrossOnly', true);
+                      if (e.target.checked) { setParam('deathCrossOnly', true); clearParam('goldenCrossOnly'); }
                       else clearParam('deathCrossOnly');
                     }}
                   />
