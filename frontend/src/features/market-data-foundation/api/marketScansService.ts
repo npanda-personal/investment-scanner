@@ -4,6 +4,7 @@ import type {
   MarketScanSummaryDeliverySpike,
   MarketScanSummaryVolumeSpike,
 } from '../types';
+import type { MarketScanSummaryPotentialMovers } from '../types.potential-movers';
 
 const API_BASE = '/api/v1/market-data/scans';
 
@@ -39,5 +40,16 @@ export async function fetchMarketScanDeliverySpike(params: MarketScanSpikeParams
 
 export async function fetchMarketScanVolumeSpike(params: MarketScanSpikeParams = {}): Promise<MarketScanSummaryVolumeSpike> {
   const response = await axios.get<MarketScanSummaryVolumeSpike>(`${API_BASE}/volume-spike`, { params });
+  return response.data;
+}
+
+export interface MarketScanPotentialMoversParams {
+  region?: string;
+  assetType?: string;
+  limit?: number;
+}
+
+export async function fetchMarketScanPotentialMovers(params: MarketScanPotentialMoversParams = {}): Promise<MarketScanSummaryPotentialMovers> {
+  const response = await axios.get<MarketScanSummaryPotentialMovers>(`${API_BASE}/potential-movers`, { params });
   return response.data;
 }

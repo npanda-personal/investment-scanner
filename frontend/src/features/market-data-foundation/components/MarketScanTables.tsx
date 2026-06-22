@@ -29,6 +29,7 @@ import type {
   MarketScanRowDeliverySpike,
   MarketScanRowVolumeSpike,
 } from '../types';
+import type { MarketScanRowPotentialMovers } from '../types.potential-movers';
 
 function SectorChip({ sector }: { sector: string | null }) {
   if (!sector) return <Typography variant="body2" color="text.disabled">—</Typography>;
@@ -231,6 +232,77 @@ export function TableDeliverySpike({ rows, page, rowsPerPage, onPageChange, onRo
                 </TableCell>
                 <TableCell align="right">
                   <Typography variant="body2" color="text.secondary">{row.lookbackBars}</Typography>
+                </TableCell>
+                <TableCell>
+                  <SignalChip direction={row.signalDirection} score={row.signalScore} />
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
+      <TablePagination
+        component="div"
+        count={rows.length}
+        page={page}
+        rowsPerPage={rowsPerPage}
+        rowsPerPageOptions={[10, 25, 50, 100]}
+        onPageChange={(_e, newPage) => onPageChange(newPage)}
+        onRowsPerPageChange={(e) => onRowsPerPageChange(parseInt(e.target.value, 10))}
+      />
+    </>
+  );
+}
+
+export function TablePotentialMovers({ rows, currency, page, rowsPerPage, onPageChange, onRowsPerPageChange }: { rows: MarketScanRowPotentialMovers[]; currency?: string } & PaginationProps) {
+  if (!rows.length) {
+    return <EmptyState message="No potential-mover candidates found. Check that recent price data has been ingested." />;
+  }
+  const source = sourceFrom('Potential Movers', rows);
+  const visibleRows = rows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+  return (
+    <>
+      <TableContainer>
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+              <TableCell>Symbol</TableCell>
+              <TableCell>Company</TableCell>
+              <TableCell>Sector</TableCell>
+              <TableCell align="right">Price</TableCell>
+              <TableCell align="right">Day Chg %</TableCell>
+              <TableCell align="right">3-Day Move %</TableCell>
+              <TableCell align="right">Avg Vol 20</TableCell>
+              <TableCell>Signal</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {visibleRows.map((row) => (
+              <TableRow key={row.instrumentId} hover>
+                <TableCell>
+                  <StockWorkspaceLink instrumentId={row.instrumentId} symbol={row.symbol} source={source} />
+                </TableCell>
+                <TableCell>
+                  <Tooltip title={row.companyName}>
+                    <Typography variant="body2" noWrap sx={{ maxWidth: 180 }}>{row.companyName}</Typography>
+                  </Tooltip>
+                </TableCell>
+                <TableCell><SectorChip sector={row.sector} /></TableCell>
+                <TableCell align="right">
+                  <Typography variant="body2" fontWeight={600}>{money(row.latestClose, currency)}</Typography>
+                </TableCell>
+                <TableCell align="right">
+                  <Typography variant="body2" color={pctColor(row.dailyChangePct)} fontWeight={700}>
+                    {formatPct(row.dailyChangePct)}
+                  </Typography>
+                </TableCell>
+                <TableCell align="right">
+                  <Typography variant="body2" color={pctColor(row.move3dPct)}>
+                    {formatPct(row.move3dPct)}
+                  </Typography>
+                </TableCell>
+                <TableCell align="right">
+                  <Typography variant="body2" color="text.secondary">{formatVolume(row.avgVolume20)}</Typography>
                 </TableCell>
                 <TableCell>
                   <SignalChip direction={row.signalDirection} score={row.signalScore} />
