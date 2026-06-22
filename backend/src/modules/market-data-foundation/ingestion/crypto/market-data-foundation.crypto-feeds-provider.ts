@@ -256,6 +256,7 @@ export interface CryptoFundamentalRow {
   revenue24hUsd: number | null;
   revenue30dUsd: number | null;
   annualizedRevenueUsd: number | null;
+  stakingApyPct: number | null;
   coverageStatus: 'FULL' | 'NONE';
 }
 
@@ -353,6 +354,30 @@ export async function fetchDefiLlamaFundamentals(
     warnings.push(`DefiLlama /overview/fees?dataType=dailyRevenue fetch failed (revenue left null): ${(error as Error).message}`);
   }
 
+  // Staking/yield APY from DefiLlama yields API — best-effort, keyed by project slug.
+  const stakingApyBySlug = new Map<string, number>();
+  try {
+    const yieldsBase = getCryptoEndpoints().defillamaYieldsBase.url;
+    const pools = (await fetchJson(`${yieldsBase}/pools`)) as {
+      data?: Array<{ project?: string; apy?: number; tvlUsd?: number }>;
+    };
+    const bestTvl = new Map<string, number>();
+    for (const pool of pools?.data ?? []) {
+      const proj = String(pool?.project ?? '').trim().toLowerCase();
+      if (!proj) continue;
+      const apy = toFiniteNumber(pool.apy);
+      if (apy == null || apy <= 0) continue;
+      const tvl = toFiniteNumber(pool.tvlUsd) ?? 0;
+      const prevTvl = bestTvl.get(proj) ?? -1;
+      if (tvl > prevTvl) {
+        stakingApyBySlug.set(proj, apy);
+        bestTvl.set(proj, tvl);
+      }
+    }
+  } catch (error) {
+    warnings.push(`DefiLlama /pools (yields) fetch failed (staking APY left null): ${(error as Error).message}`);
+  }
+
   // For a given base ticker keep the largest-TVL protocol match (handles ticker
   // collisions where multiple protocols share a symbol).
   const bestByBase = new Map<string, DefiLlamaProtocol>();
@@ -389,6 +414,7 @@ export async function fetchDefiLlamaFundamentals(
       revenue24hUsd: rev24h,
       revenue30dUsd: rev ? toFiniteNumber(rev.total30d) ?? (rev24h != null ? rev24h * 30 : null) : null,
       annualizedRevenueUsd: rev24h != null ? rev24h * 365 : null,
+      stakingApyPct: stakingApyBySlug.get(String(p.slug ?? '').trim().toLowerCase()) ?? null,
       coverageStatus: 'FULL',
     });
   }

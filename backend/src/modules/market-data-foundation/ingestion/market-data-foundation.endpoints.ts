@@ -208,6 +208,7 @@ export interface CryptoEndpoints {
   readonly binanceFuturesDataBase: ResolvedEndpoint;
   readonly coinpaprikaBase: ResolvedEndpoint;
   readonly defillamaBase: ResolvedEndpoint;
+  readonly defillamaYieldsBase: ResolvedEndpoint;
   readonly fearGreedBase: ResolvedEndpoint;
 }
 
@@ -219,6 +220,7 @@ export const getCryptoEndpoints = (): CryptoEndpoints => ({
   binanceFuturesDataBase: resolveBase('BINANCE_FUTURES_DATA_BASE', 'https://fapi.binance.com/futures/data'),
   coinpaprikaBase: resolveBase('COINPAPRIKA_API_BASE', 'https://api.coinpaprika.com/v1'),
   defillamaBase: resolveBase('DEFILLAMA_API_BASE', 'https://api.llama.fi'),
+  defillamaYieldsBase: resolveBase('DEFILLAMA_YIELDS_BASE', 'https://yields.llama.fi'),
   // alternative.me Crypto Fear & Greed Index. Keyless, free.
   fearGreedBase: resolveBase('CRYPTO_FEARGREED_API_BASE', 'https://api.alternative.me'),
 });

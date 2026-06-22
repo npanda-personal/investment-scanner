@@ -29,6 +29,7 @@ export interface CryptoFundamentalSnapshotRow {
   revenue24hUsd?: number | null;
   revenue30dUsd?: number | null;
   annualizedRevenueUsd?: number | null;
+  stakingApyPct?: number | null;
   coverageStatus?: 'FULL' | 'PARTIAL' | 'NONE';
 }
 
@@ -163,6 +164,7 @@ export class CryptoSnapshotsRepository {
         revenue24hUsd: toDecimal(row.revenue24hUsd),
         revenue30dUsd: toDecimal(row.revenue30dUsd),
         annualizedRevenueUsd: toDecimal(row.annualizedRevenueUsd),
+        stakingApyPct: row.stakingApyPct ?? null,
         coverageStatus: row.coverageStatus ?? 'NONE',
       };
       await this.prisma.cryptoFundamentalSnapshot.upsert({
@@ -444,6 +446,7 @@ export class CryptoSnapshotsRepository {
             revenue_24h_usd: toNum(fundamental.revenue24hUsd),
             revenue_30d_usd: toNum(fundamental.revenue30dUsd),
             annualized_revenue_usd: toNum(fundamental.annualizedRevenueUsd),
+            staking_apy_pct: fundamental.stakingApyPct ?? null,
             coverage_status: fundamental.coverageStatus,
           }
         : null,

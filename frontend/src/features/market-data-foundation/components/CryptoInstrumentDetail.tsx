@@ -213,11 +213,14 @@ export default function CryptoInstrumentDetail({ instrumentId }: { instrumentId?
           {fundamental ? (
             <Stack spacing={1}>
               <Stat label="TVL" value={usdCompact(fundamental.tvl_usd)} />
+              <Stat label="TVL Change 1d" value={pct(fundamental.tvl_change_1d_pct)} />
               <Stat label="TVL Change 7d" value={pct(fundamental.tvl_change_7d_pct)} />
               <Stat label="Fees 24h" value={usdCompact(fundamental.fees_24h_usd)} />
               <Stat label="Fees 7d" value={usdCompact(fundamental.fees_7d_usd)} />
               <Stat label="Revenue 24h" value={usdCompact(fundamental.revenue_24h_usd)} />
               <Stat label="Revenue 30d" value={usdCompact(fundamental.revenue_30d_usd)} />
+              <Stat label="Ann. Revenue" value={usdCompact(fundamental.annualized_revenue_usd)} />
+              <Stat label="Staking APY" value={fundamental.staking_apy_pct != null ? `${fundamental.staking_apy_pct.toFixed(2)}%` : '—'} />
               <Stat label="Category" value={fundamental.category ?? '—'} />
               {fundamental.chains && fundamental.chains.length > 0 && (
                 <Box>
