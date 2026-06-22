@@ -36,6 +36,12 @@ export interface CryptoFuturesSnapshotRow {
   symbol: string;
   fundingRatePct?: number | null;
   openInterestUsd?: number | null;
+  longShortRatioGlobal?: number | null;
+  longAccountPct?: number | null;
+  shortAccountPct?: number | null;
+  topTraderLongShortRatio?: number | null;
+  topTraderPositionRatio?: number | null;
+  takerBuySellRatio?: number | null;
 }
 
 export interface CryptoDailyMetricSnapshotRow {
@@ -96,6 +102,10 @@ const BOARD_SORT_COLUMNS: Record<string, string> = {
   rsi14: 'rsi14',
   distanceFromAthPct: 'distanceFromAthPct',
   quoteVolume24h: 'quoteVolume24h',
+  openInterestUsd: 'openInterestUsd',
+  fundingRatePct: 'fundingRatePct',
+  rsVsBtcPct: 'rsVsBtcPct',
+  pctChange30d: 'pctChange30d',
 };
 
 /** Confidence ranking for a minConfidence floor filter. */
@@ -181,6 +191,12 @@ export class CryptoSnapshotsRepository {
         symbol: row.symbol.trim().toUpperCase(),
         fundingRatePct: row.fundingRatePct ?? null,
         openInterestUsd: toDecimal(row.openInterestUsd),
+        longShortRatioGlobal: row.longShortRatioGlobal ?? null,
+        longAccountPct: row.longAccountPct ?? null,
+        shortAccountPct: row.shortAccountPct ?? null,
+        topTraderLongShortRatio: row.topTraderLongShortRatio ?? null,
+        topTraderPositionRatio: row.topTraderPositionRatio ?? null,
+        takerBuySellRatio: row.takerBuySellRatio ?? null,
       };
       await this.prisma.cryptoFuturesSnapshot.upsert({
         where: { instrumentId_snapshotDate: { instrumentId, snapshotDate: day } },
@@ -436,6 +452,12 @@ export class CryptoSnapshotsRepository {
             snapshot_date: futures.snapshotDate.toISOString().slice(0, 10),
             funding_rate_pct: futures.fundingRatePct,
             open_interest_usd: toNum(futures.openInterestUsd),
+            long_short_ratio_global: futures.longShortRatioGlobal,
+            long_account_pct: futures.longAccountPct,
+            short_account_pct: futures.shortAccountPct,
+            top_trader_long_short_ratio: futures.topTraderLongShortRatio,
+            top_trader_position_ratio: futures.topTraderPositionRatio,
+            taker_buy_sell_ratio: futures.takerBuySellRatio,
           }
         : null,
       signal: signal

@@ -139,6 +139,12 @@ export interface CryptoFuturesRow {
   symbol: string; // perp symbol, equals the spot canonical symbol (BTCUSDT)
   fundingRatePct: number | null; // lastFundingRate * 100
   openInterestUsd: number | null; // openInterest * markPrice
+  longShortRatioGlobal: number | null;
+  longAccountPct: number | null;
+  shortAccountPct: number | null;
+  topTraderLongShortRatio: number | null;
+  topTraderPositionRatio: number | null;
+  takerBuySellRatio: number | null;
 }
 
 /**
@@ -151,6 +157,7 @@ export async function fetchBinanceFuturesSnapshots(
   symbols: string[],
 ): Promise<{ rows: CryptoFuturesRow[]; warnings: string[] }> {
   const base = getCryptoEndpoints().binanceFuturesBase.url;
+  const dataBase = getCryptoEndpoints().binanceFuturesDataBase.url;
   const rows: CryptoFuturesRow[] = [];
   const warnings: string[] = [];
   const unique = [...new Set(symbols.map((s) => s.trim().toUpperCase()).filter(Boolean))];
@@ -179,10 +186,47 @@ export async function fetchBinanceFuturesSnapshots(
         }
       }
 
+      // Long/short ratios + taker flow from /futures/data/ (best-effort per symbol)
+      let longShortRatioGlobal: number | null = null;
+      let longAccountPct: number | null = null;
+      let shortAccountPct: number | null = null;
+      let topTraderLongShortRatio: number | null = null;
+      let topTraderPositionRatio: number | null = null;
+      let takerBuySellRatio: number | null = null;
+      try {
+        const dataParams = `symbol=${encodeURIComponent(symbol)}&period=1d&limit=1`;
+        const [globalRaw, topAcctRaw, topPosRaw, takerRaw] = await Promise.all([
+          fetchJson(`${dataBase}/globalLongShortAccountRatio?${dataParams}`),
+          fetchJson(`${dataBase}/topLongShortAccountRatio?${dataParams}`),
+          fetchJson(`${dataBase}/topLongShortPositionRatio?${dataParams}`),
+          fetchJson(`${dataBase}/takerlongshortRatio?${dataParams}`),
+        ]);
+        const g = Array.isArray(globalRaw) ? (globalRaw as Record<string, unknown>[])[0] : null;
+        const ta = Array.isArray(topAcctRaw) ? (topAcctRaw as Record<string, unknown>[])[0] : null;
+        const tp = Array.isArray(topPosRaw) ? (topPosRaw as Record<string, unknown>[])[0] : null;
+        const tk = Array.isArray(takerRaw) ? (takerRaw as Record<string, unknown>[])[0] : null;
+        if (g) {
+          longShortRatioGlobal = toFiniteNumber(g.longShortRatio);
+          longAccountPct = toFiniteNumber(g.longAccount);
+          shortAccountPct = toFiniteNumber(g.shortAccount);
+        }
+        if (ta) topTraderLongShortRatio = toFiniteNumber(ta.longShortRatio);
+        if (tp) topTraderPositionRatio = toFiniteNumber(tp.longShortRatio);
+        if (tk) takerBuySellRatio = toFiniteNumber(tk.buySellRatio);
+      } catch {
+        // 4xx = no data for this symbol (spot-only or unlisted); skip silently
+      }
+
       rows.push({
         symbol,
         fundingRatePct: lastFundingRate !== null ? lastFundingRate * 100 : null,
         openInterestUsd,
+        longShortRatioGlobal,
+        longAccountPct,
+        shortAccountPct,
+        topTraderLongShortRatio,
+        topTraderPositionRatio,
+        takerBuySellRatio,
       });
     } catch (error) {
       const status = (error as { status?: number })?.status;

@@ -82,6 +82,10 @@ const SORTABLE_COLS: SortableCol[] = [
   { key: 'quoteVolume24h', label: 'Vol 24h', align: 'right' },
   { key: 'pctChange1d', label: '24h', align: 'right' },
   { key: 'pctChange7d', label: '7d', align: 'right' },
+  { key: 'pctChange30d', label: '30d', align: 'right' },
+  { key: 'openInterestUsd', label: 'OI', align: 'right' },
+  { key: 'fundingRatePct', label: 'Funding %', align: 'right' },
+  { key: 'rsVsBtcPct', label: 'RS/BTC', align: 'right' },
   { key: 'signalScore', label: 'Signal', align: 'center' },
   { key: 'rsi14', label: 'RSI14', align: 'right' },
   { key: 'distanceFromAthPct', label: 'From ATH', align: 'right' },
@@ -336,7 +340,6 @@ export default function CryptoSignalBoard() {
                 <TableCell align="right">Price</TableCell>
                 {hasVolumeInterest && <TableCell align="center">Vol Spike</TableCell>}
                 <TableCell>Cross</TableCell>
-                <TableCell align="right">Funding %</TableCell>
                 <TableCell align="right">TVL</TableCell>
               </TableRow>
             </TableHead>
@@ -364,6 +367,10 @@ export default function CryptoSignalBoard() {
                   <TableCell align="right">{row.quote_volume_24h != null ? compact(row.quote_volume_24h, 'USD') : '—'}</TableCell>
                   <TableCell align="right" sx={{ color: pctColor(row.pct_change_1d) }}>{pct(row.pct_change_1d)}</TableCell>
                   <TableCell align="right" sx={{ color: pctColor(row.pct_change_7d) }}>{pct(row.pct_change_7d)}</TableCell>
+                  <TableCell align="right" sx={{ color: pctColor(row.pct_change_30d) }}>{pct(row.pct_change_30d)}</TableCell>
+                  <TableCell align="right">{row.open_interest_usd != null ? compact(row.open_interest_usd, 'USD') : '—'}</TableCell>
+                  <TableCell align="right">{num(row.funding_rate_pct, 4)}</TableCell>
+                  <TableCell align="right" sx={{ color: pctColor(row.rs_vs_btc_pct) }}>{pct(row.rs_vs_btc_pct)}</TableCell>
                   <TableCell align="center"><DirectionChip direction={row.signal_direction} score={row.signal_score} confidence={row.signal_confidence} /></TableCell>
                   <TableCell align="right">{num(row.rsi14)}</TableCell>
                   <TableCell align="right">{pct(row.distance_from_ath_pct)}</TableCell>
@@ -380,7 +387,6 @@ export default function CryptoSignalBoard() {
                       ? <Chip label={row.cross_state} size="small" variant="outlined" sx={{ fontSize: '0.65rem' }} />
                       : <Typography variant="body2" color="text.disabled">—</Typography>}
                   </TableCell>
-                  <TableCell align="right">{num(row.funding_rate_pct, 4)}</TableCell>
                   <TableCell align="right">{row.tvl_usd != null ? compact(row.tvl_usd, 'USD') : '—'}</TableCell>
                 </TableRow>
               ))}

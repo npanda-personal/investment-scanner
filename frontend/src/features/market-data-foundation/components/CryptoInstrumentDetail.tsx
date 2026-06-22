@@ -240,6 +240,12 @@ export default function CryptoInstrumentDetail({ instrumentId }: { instrumentId?
             <Stack spacing={1}>
               <Stat label="Funding Rate" value={num(futures.funding_rate_pct, 4)} />
               <Stat label="Open Interest" value={usdCompact(futures.open_interest_usd)} />
+              <Stat label="L/S Ratio (All)" value={num(futures.long_short_ratio_global, 2)} />
+              <Stat label="Long Accounts" value={futures.long_account_pct != null ? `${(futures.long_account_pct * 100).toFixed(1)}%` : '—'} />
+              <Stat label="Short Accounts" value={futures.short_account_pct != null ? `${(futures.short_account_pct * 100).toFixed(1)}%` : '—'} />
+              <Stat label="L/S Ratio (Top Traders)" value={num(futures.top_trader_long_short_ratio, 2)} />
+              <Stat label="Position Ratio (Top)" value={num(futures.top_trader_position_ratio, 2)} />
+              <Stat label="Taker Buy/Sell" value={num(futures.taker_buy_sell_ratio, 2)} />
             </Stack>
           ) : (
             <Typography variant="body2" color="text.secondary">No futures data tracked for this asset.</Typography>

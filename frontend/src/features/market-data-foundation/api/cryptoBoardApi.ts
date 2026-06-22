@@ -23,7 +23,11 @@ export type CryptoBoardSortBy =
   | 'volumeSpike'
   | 'rsi14'
   | 'distanceFromAthPct'
-  | 'quoteVolume24h';
+  | 'quoteVolume24h'
+  | 'openInterestUsd'
+  | 'fundingRatePct'
+  | 'rsVsBtcPct'
+  | 'pctChange30d';
 
 /** One persisted board row (snake_case as served by the backend). */
 export interface CryptoBoardRow {
@@ -133,6 +137,12 @@ export interface CryptoAssetFutures {
   snapshot_date: string;
   funding_rate_pct: number | null;
   open_interest_usd: number | null;
+  long_short_ratio_global: number | null;
+  long_account_pct: number | null;
+  short_account_pct: number | null;
+  top_trader_long_short_ratio: number | null;
+  top_trader_position_ratio: number | null;
+  taker_buy_sell_ratio: number | null;
 }
 
 /** A signal-evidence entry is either a plain string or a {code,label,category} object. */

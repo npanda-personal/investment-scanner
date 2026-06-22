@@ -1888,6 +1888,12 @@ model CryptoFuturesSnapshot {
   snapshotDate    DateTime // UTC day of the snapshot
   fundingRatePct  Float? // last funding rate as a percent (e.g. 0.01 = 0.01%/8h)
   openInterestUsd Decimal? // notional open interest in USD
+  longShortRatioGlobal      Float?
+  longAccountPct            Float?
+  shortAccountPct           Float?
+  topTraderLongShortRatio   Float?
+  topTraderPositionRatio    Float?
+  takerBuySellRatio         Float?
   source          String      @default("BINANCE_FUTURES")
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
