@@ -131,6 +131,8 @@ export class CryptoMetricsService {
       const points = this.toPricePoints(ticks);
       const price = points[0].adjusted_close;
       const dataThroughDate = new Date(points[0].date);
+      const latestTick = ticks[ticks.length - 1];
+      const quoteVolume24h = latestTick.quoteVolume != null ? Number(latestTick.quoteVolume) : null;
 
       // Distance from ATH (catalog athPrice; null when missing).
       const athPrice = asset.athPrice !== null && asset.athPrice !== undefined ? Number(asset.athPrice) : null;
@@ -184,6 +186,7 @@ export class CryptoMetricsService {
         tvlChange7dPct: fund?.tvlChange7dPct ?? null,
         fundingRatePct: fut?.fundingRatePct ?? null,
         openInterestUsd: fut?.openInterestUsd ?? null,
+        quoteVolume24h,
         calculationVersion: 'crypto-metrics-v1',
       });
     }

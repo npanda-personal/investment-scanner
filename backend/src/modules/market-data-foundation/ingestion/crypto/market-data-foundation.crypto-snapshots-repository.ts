@@ -26,6 +26,9 @@ export interface CryptoFundamentalSnapshotRow {
   tvlChange7dPct?: number | null;
   fees24hUsd?: number | null;
   fees7dUsd?: number | null;
+  revenue24hUsd?: number | null;
+  revenue30dUsd?: number | null;
+  annualizedRevenueUsd?: number | null;
   coverageStatus?: 'FULL' | 'PARTIAL' | 'NONE';
 }
 
@@ -66,6 +69,7 @@ export interface CryptoDailyMetricSnapshotRow {
   tvlChange7dPct?: number | null;
   fundingRatePct?: number | null;
   openInterestUsd?: number | null;
+  quoteVolume24h?: number | null;
   calculationVersion?: string;
 }
 
@@ -91,6 +95,7 @@ const BOARD_SORT_COLUMNS: Record<string, string> = {
   volumeSpike: 'volumeSpike',
   rsi14: 'rsi14',
   distanceFromAthPct: 'distanceFromAthPct',
+  quoteVolume24h: 'quoteVolume24h',
 };
 
 /** Confidence ranking for a minConfidence floor filter. */
@@ -145,6 +150,9 @@ export class CryptoSnapshotsRepository {
         tvlChange7dPct: row.tvlChange7dPct ?? null,
         fees24hUsd: toDecimal(row.fees24hUsd),
         fees7dUsd: toDecimal(row.fees7dUsd),
+        revenue24hUsd: toDecimal(row.revenue24hUsd),
+        revenue30dUsd: toDecimal(row.revenue30dUsd),
+        annualizedRevenueUsd: toDecimal(row.annualizedRevenueUsd),
         coverageStatus: row.coverageStatus ?? 'NONE',
       };
       await this.prisma.cryptoFundamentalSnapshot.upsert({
@@ -223,6 +231,7 @@ export class CryptoSnapshotsRepository {
         tvlChange7dPct: row.tvlChange7dPct ?? null,
         fundingRatePct: row.fundingRatePct ?? null,
         openInterestUsd: toDecimal(row.openInterestUsd),
+        quoteVolume24h: toDecimal(row.quoteVolume24h),
         calculationVersion: row.calculationVersion ?? 'crypto-metrics-v1',
       };
       await this.prisma.cryptoDailyMetricSnapshot.upsert({
@@ -315,6 +324,7 @@ export class CryptoSnapshotsRepository {
     tvlChange7dPct: number | null;
     fundingRatePct: number | null;
     openInterestUsd: Prisma.Decimal | null;
+    quoteVolume24h: Prisma.Decimal | null;
     calculationVersion: string;
     dataStatus: string;
   }): Record<string, unknown> {
@@ -350,6 +360,7 @@ export class CryptoSnapshotsRepository {
       tvl_change_7d_pct: r.tvlChange7dPct,
       funding_rate_pct: r.fundingRatePct,
       open_interest_usd: toNum(r.openInterestUsd),
+      quote_volume_24h: toNum(r.quoteVolume24h),
       calculation_version: r.calculationVersion,
       data_status: r.dataStatus,
     };
@@ -414,6 +425,9 @@ export class CryptoSnapshotsRepository {
             tvl_change_7d_pct: fundamental.tvlChange7dPct,
             fees_24h_usd: toNum(fundamental.fees24hUsd),
             fees_7d_usd: toNum(fundamental.fees7dUsd),
+            revenue_24h_usd: toNum(fundamental.revenue24hUsd),
+            revenue_30d_usd: toNum(fundamental.revenue30dUsd),
+            annualized_revenue_usd: toNum(fundamental.annualizedRevenueUsd),
             coverage_status: fundamental.coverageStatus,
           }
         : null,

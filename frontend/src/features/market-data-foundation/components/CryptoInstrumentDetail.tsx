@@ -171,6 +171,9 @@ export default function CryptoInstrumentDetail({ instrumentId }: { instrumentId?
           <Stat label="From ATH" value={pct(metrics?.distance_from_ath_pct)} />
           <Stat label="RS vs BTC" value={pct(metrics?.rs_vs_btc_pct)} />
           <Stat label="Market Cap" value={usdCompact(metrics?.market_cap)} />
+          <Stat label="Volume 24h" value={usdCompact(metrics?.quote_volume_24h)} />
+          <Stat label="Vol/MCap" value={metrics?.quote_volume_24h != null && metrics?.market_cap != null && metrics.market_cap > 0
+            ? `${(metrics.quote_volume_24h / metrics.market_cap * 100).toFixed(2)}%` : '—'} />
           <Stat label="Volume Spike" value={metrics?.volume_spike ? 'Yes' : 'No'} />
         </StatGrid>
       </Paper>
@@ -212,7 +215,20 @@ export default function CryptoInstrumentDetail({ instrumentId }: { instrumentId?
               <Stat label="TVL" value={usdCompact(fundamental.tvl_usd)} />
               <Stat label="TVL Change 7d" value={pct(fundamental.tvl_change_7d_pct)} />
               <Stat label="Fees 24h" value={usdCompact(fundamental.fees_24h_usd)} />
+              <Stat label="Fees 7d" value={usdCompact(fundamental.fees_7d_usd)} />
+              <Stat label="Revenue 24h" value={usdCompact(fundamental.revenue_24h_usd)} />
+              <Stat label="Revenue 30d" value={usdCompact(fundamental.revenue_30d_usd)} />
               <Stat label="Category" value={fundamental.category ?? '—'} />
+              {fundamental.chains && fundamental.chains.length > 0 && (
+                <Box>
+                  <Typography variant="caption" color="text.secondary">Chains</Typography>
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
+                    {fundamental.chains.map((chain) => (
+                      <Chip key={chain} label={chain} size="small" variant="outlined" sx={{ fontSize: '0.65rem' }} />
+                    ))}
+                  </Box>
+                </Box>
+              )}
             </Stack>
           ) : (
             <Typography variant="body2" color="text.secondary">No DeFi fundamentals tracked for this asset.</Typography>
