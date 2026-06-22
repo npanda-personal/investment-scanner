@@ -1003,9 +1003,9 @@ export class SignalPositionLedgerService {
       const closePriceSnapshot = priceMap.get(row.instrumentId) ?? null;
       const closePrice = this.sourceProvenClosePrice(closePriceSnapshot);
       if (closePrice === null) continue;
-      const adjE = adjMap.get(row.instrumentId) ?? row.entryTriggerPrice;
-      const { pct: realizedReturnPercent, status: retSt } = adjustedReturn(adjE, closePrice, null);
-      const closedRow: SignalPositionLedgerActiveRow = {
+      const adjE = adjMap.has(row.instrumentId) ? adjMap.get(row.instrumentId)! : row.entryTriggerPrice;
+      if (adjE === null) { this.repository.upsertActiveLedgerRow({ ...row, currentReturnPercent: null, currentReturnStatus: 'UNAVAILABLE' } as any); continue; }
+      const { pct: realizedReturnPercent, status: retSt } = adjustedReturn(adjE, closePrice, null); const closedRow: SignalPositionLedgerActiveRow = {
         ...row,
         status: 'CLOSED',
         lifecycleEvidenceStatus: 'CLOSED',
