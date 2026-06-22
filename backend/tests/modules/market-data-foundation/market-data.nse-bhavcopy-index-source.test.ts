@@ -20,7 +20,7 @@ import {
   buildBhavcopyCsvUrl,
   NSE_INDEX_EOD_SOURCE,
   NSE_INDEX_EOD_SYMBOL,
-} from '../../../src/modules/market-data-foundation/market-data-foundation.nse-bhavcopy-index-source';
+} from '../../../src/modules/market-data-foundation/ingestion/india/market-data-foundation.nse-bhavcopy-index-source';
 
 // ---------------------------------------------------------------------------
 // Helpers

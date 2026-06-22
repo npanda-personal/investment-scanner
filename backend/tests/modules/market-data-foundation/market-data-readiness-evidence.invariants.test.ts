@@ -1,10 +1,10 @@
 /// <reference types="@types/jest" />
-import { parseIndianExchangeEodCsv } from '../../../src/modules/market-data-foundation/market-data-foundation.exchange-eod-adapter';
-import { classifyInstrumentUniverseReadiness } from '../../../src/modules/market-data-foundation/market-data-foundation.universe';
+import { parseIndianExchangeEodCsv } from '../../../src/modules/market-data-foundation/ingestion/india/market-data-foundation.exchange-eod-adapter';
+import { classifyInstrumentUniverseReadiness } from '../../../src/modules/market-data-foundation/ingestion/market-data-foundation.universe';
 import {
   partitionHistoricalPrices,
   validateHistoricalPrice,
-} from '../../../src/modules/market-data-foundation/market-data-foundation.validation';
+} from '../../../src/modules/market-data-foundation/ingestion/market-data-foundation.validation';
 import type { HistoricalPrice } from '../../../src/modules/market-data-foundation/market-data-foundation.types';
 
 const expectedLatestTradingDate = '2026-05-15';

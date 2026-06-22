@@ -45,6 +45,8 @@ export interface UsPriceBackfillSummary {
   symbolsWithActions: number;
   /** Symbols whose backfill inserted or updated at least one bar (for DQ downstream). */
   changedSymbols: string[];
+  /** Symbols whose fetch+store completed without error (superset of changedSymbols). */
+  processedSymbols: string[];
   /** Symbols whose fetch/store threw (isolated — did not abort the run). */
   symbolsFailed: number;
   /** Epoch/pre-listing artifact bars dropped at ingest (data hygiene). */
@@ -213,6 +215,7 @@ export class UsEquityIngestionService {
       corporateActionsUpserted: 0,
       symbolsWithActions: 0,
       changedSymbols: [],
+      processedSymbols: [],
       symbolsFailed: 0,
       barsDroppedStale: 0,
       aborted: false,
@@ -276,6 +279,7 @@ export class UsEquityIngestionService {
         const bars = floorYear > 0 ? rawBars.filter((b) => b.date.getUTCFullYear() >= floorYear) : rawBars;
         summary.barsDroppedStale += rawBars.length - bars.length;
         summary.symbolsProcessed += 1;
+        summary.processedSymbols.push(target.symbol);
         if (bars.length === 0) {
           summary.symbolsWithNoData += 1;
           options.onSymbolComplete?.(target.symbol, { index: myIndex, total, bars: 0, actions: 0, hadData: false, ok: true });

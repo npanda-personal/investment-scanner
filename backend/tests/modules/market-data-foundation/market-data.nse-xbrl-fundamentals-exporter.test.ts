@@ -13,7 +13,7 @@ import {
   parseNseXbrlFundamentalFacts,
   selectPreferredNseFinancialResults,
   toManualVerifiedFundamentalsCsv,
-} from '../../../src/modules/market-data-foundation/market-data-foundation.nse-xbrl-fundamentals-exporter';
+} from '../../../src/modules/market-data-foundation/ingestion/india/market-data-foundation.nse-xbrl-fundamentals-exporter';
 
 describe('NSE XBRL fundamentals CSV exporter', () => {
   it('extracts revenue, net income, and EPS from an NSE-style XBRL fixture', () => {

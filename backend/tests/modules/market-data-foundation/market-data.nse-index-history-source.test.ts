@@ -8,7 +8,7 @@ import {
   NSE_INDEX_EOD_SOURCE,
   NSE_INDEX_EOD_SYMBOL,
   NSE_INDEX_HISTORY_BASE_URL,
-} from '../../../src/modules/market-data-foundation/market-data-foundation.nse-index-history-source';
+} from '../../../src/modules/market-data-foundation/ingestion/india/market-data-foundation.nse-index-history-source';
 
 // ---------------------------------------------------------------------------
 // Helpers

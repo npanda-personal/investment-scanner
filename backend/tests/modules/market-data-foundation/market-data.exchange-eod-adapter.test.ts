@@ -6,7 +6,7 @@ import {
   computeIndianExchangeEodSourceFingerprint,
   mapIndianExchangeEodRows,
   parseIndianExchangeEodCsv,
-} from '../../../src/modules/market-data-foundation/market-data-foundation.exchange-eod-adapter';
+} from '../../../src/modules/market-data-foundation/ingestion/india/market-data-foundation.exchange-eod-adapter';
 
 describe('Indian exchange EOD adapter', () => {
   it('parses NSE security bhavdata rows into no-suffix canonical HistoricalPrice rows with source names', () => {

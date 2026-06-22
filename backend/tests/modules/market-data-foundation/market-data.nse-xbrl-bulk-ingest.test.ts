@@ -6,8 +6,8 @@
  * no real database.
  */
 import { MarketDataFoundationService } from '../../../src/modules/market-data-foundation/market-data-foundation.service';
-import { toManualVerifiedFundamentalsCsv } from '../../../src/modules/market-data-foundation/market-data-foundation.nse-xbrl-fundamentals-exporter';
-import type { ManualVerifiedFundamentalsCsvRow } from '../../../src/modules/market-data-foundation/market-data-foundation.nse-xbrl-fundamentals-exporter';
+import { toManualVerifiedFundamentalsCsv } from '../../../src/modules/market-data-foundation/ingestion/india/market-data-foundation.nse-xbrl-fundamentals-exporter';
+import type { ManualVerifiedFundamentalsCsvRow } from '../../../src/modules/market-data-foundation/ingestion/india/market-data-foundation.nse-xbrl-fundamentals-exporter';
 
 // ---------------------------------------------------------------------------
 // Helpers to build canned rows / CSV

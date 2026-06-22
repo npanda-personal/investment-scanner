@@ -14,7 +14,7 @@ import {
   type NseCorporateActionRow,
   type CorporateActionDbInput,
   type ParsedCorporateAction,
-} from '../../../src/modules/market-data-foundation/market-data-foundation.corporate-actions-source';
+} from '../../../src/modules/market-data-foundation/ingestion/india/market-data-foundation.corporate-actions-source';
 
 // ---------------------------------------------------------------------------
 // Helpers

@@ -1,10 +1,10 @@
 /// <reference types="@types/jest" />
 import { MarketDataFoundationRepository } from '../../../src/modules/market-data-foundation/market-data-foundation.repository';
-import { classifyInstrumentUniverseReadiness } from '../../../src/modules/market-data-foundation/market-data-foundation.universe';
+import { classifyInstrumentUniverseReadiness } from '../../../src/modules/market-data-foundation/ingestion/market-data-foundation.universe';
 import {
   partitionHistoricalPrices,
   validateHistoricalPrice,
-} from '../../../src/modules/market-data-foundation/market-data-foundation.validation';
+} from '../../../src/modules/market-data-foundation/ingestion/market-data-foundation.validation';
 import type { HistoricalPrice } from '../../../src/modules/market-data-foundation/market-data-foundation.types';
 
 const expectedLatestTradingDate = '2026-05-15';

@@ -1,7 +1,7 @@
 import {
   fetchCryptoUniverse,
   fetchCryptoHistory,
-} from '../../../src/modules/market-data-foundation/market-data-foundation.crypto-provider';
+} from '../../../src/modules/market-data-foundation/ingestion/crypto/market-data-foundation.crypto-provider';
 
 /**
  * Fixture-based tests — global fetch is mocked so NO live network calls are made.

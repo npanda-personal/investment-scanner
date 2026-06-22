@@ -1,7 +1,7 @@
 import {
   parseYahooChart,
   parseYahooEvents,
-} from '../../../src/modules/market-data-foundation/market-data-foundation.yahoo-eod-provider';
+} from '../../../src/modules/market-data-foundation/ingestion/market-data-foundation.yahoo-eod-provider';
 
 /**
  * Pure-parser tests for the Yahoo chart response — prices AND the

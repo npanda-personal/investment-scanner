@@ -4,7 +4,7 @@ import {
   AdjustmentAction,
   RawBar,
   DISCONTINUITY_TYPES,
-} from '../../../src/modules/market-data-foundation/market-data-foundation.corporate-adjustment';
+} from '../../../src/modules/market-data-foundation/ingestion/india/market-data-foundation.corporate-adjustment';
 
 // ---------------------------------------------------------------------------
 // Helpers

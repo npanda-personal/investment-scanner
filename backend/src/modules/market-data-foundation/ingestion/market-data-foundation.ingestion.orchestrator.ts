@@ -243,8 +243,9 @@ export class RegionSyncOrchestrator {
         downstreamInstrumentIds,
       });
 
-      if (symbols.length > 0) {
-        await this.host.updateStockLoadTimestampsForSymbols(symbols);
+      const timestampSymbols = backfill.processedSymbols ?? symbols;
+      if (timestampSymbols.length > 0) {
+        await this.host.updateStockLoadTimestampsForSymbols(timestampSymbols);
       }
 
       await this.host.repository.upsertSyncState({ region, assetType, tradingDate, status: 'SYNCED', summary, lastCheckedAt: now, lastProviderFetchAt: now });

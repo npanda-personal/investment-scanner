@@ -16,12 +16,12 @@
 import {
   parseNseCorporateActions,
   type NseCorporateActionRow,
-} from '../../../src/modules/market-data-foundation/market-data-foundation.corporate-actions-source';
+} from '../../../src/modules/market-data-foundation/ingestion/india/market-data-foundation.corporate-actions-source';
 
 import {
   computeAdjustedCloses,
   type AdjustmentAction,
-} from '../../../src/modules/market-data-foundation/market-data-foundation.corporate-adjustment';
+} from '../../../src/modules/market-data-foundation/ingestion/india/market-data-foundation.corporate-adjustment';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -518,7 +518,7 @@ describe('decimalKey natural-key format reconciliation', () => {
    */
   it('integer ratio produces no trailing zeros or decimal point', () => {
     // 1:1 bonus → splitRatio = 2 → key segment should be "2" (not "2.0" or "2.00000000")
-    const { buildCorporateActionNaturalKey } = require('../../../src/modules/market-data-foundation/market-data-foundation.corporate-actions-source');
+    const { buildCorporateActionNaturalKey } = require('../../../src/modules/market-data-foundation/ingestion/india/market-data-foundation.corporate-actions-source');
     const key = buildCorporateActionNaturalKey('stock-123', {
       actionType: 'bonus',
       effectiveDate: d('2023-10-15'),
@@ -532,7 +532,7 @@ describe('decimalKey natural-key format reconciliation', () => {
   });
 
   it('decimal ratio preserves significant decimal digits', () => {
-    const { buildCorporateActionNaturalKey } = require('../../../src/modules/market-data-foundation/market-data-foundation.corporate-actions-source');
+    const { buildCorporateActionNaturalKey } = require('../../../src/modules/market-data-foundation/ingestion/india/market-data-foundation.corporate-actions-source');
     // 2:1 bonus → splitRatio = 1.5 → "1.5" (not "1.50000000")
     const key = buildCorporateActionNaturalKey('stock-123', {
       actionType: 'bonus',
@@ -546,7 +546,7 @@ describe('decimalKey natural-key format reconciliation', () => {
   });
 
   it('null/undefined produces "null" key segment', () => {
-    const { buildCorporateActionNaturalKey } = require('../../../src/modules/market-data-foundation/market-data-foundation.corporate-actions-source');
+    const { buildCorporateActionNaturalKey } = require('../../../src/modules/market-data-foundation/ingestion/india/market-data-foundation.corporate-actions-source');
     const key = buildCorporateActionNaturalKey('stock-123', {
       actionType: 'bonus',
       effectiveDate: d('2023-10-15'),
@@ -561,7 +561,7 @@ describe('decimalKey natural-key format reconciliation', () => {
   });
 
   it('matches the repository decimalKey format for an 8-decimal amount', () => {
-    const { buildCorporateActionNaturalKey } = require('../../../src/modules/market-data-foundation/market-data-foundation.corporate-actions-source');
+    const { buildCorporateActionNaturalKey } = require('../../../src/modules/market-data-foundation/ingestion/india/market-data-foundation.corporate-actions-source');
     // dividend Rs 0.125 → "0.125" (not "0.12500000")
     const key = buildCorporateActionNaturalKey('stock-123', {
       actionType: 'dividend',
