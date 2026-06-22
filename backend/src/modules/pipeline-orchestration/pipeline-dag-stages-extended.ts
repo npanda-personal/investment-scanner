@@ -20,6 +20,7 @@
  *    being swallowed as in the legacy PIPELINE_RUN_ALL path.
  */
 
+import { DAG_STAGE_RULES_VERSION } from './pipeline-dag-stages-core';
 import { MarketContextIntelligenceService, MarketPulseSnapshotService } from '../market-context-intelligence';
 import { MarketDataFoundationService } from '../market-data-foundation/market-data-foundation.service';
 import { ResearchHubService } from '../research-hub';
@@ -167,7 +168,7 @@ function makeStrategyDecisionAdapter(svc: StrategyDecisionEngineService): Pipeli
   return {
     key: 'STRATEGY_DECISION',
     stageOrder: 9,
-    stageVersion: 'dag-v1',
+    stageVersion: `dag-v1-rules-${DAG_STAGE_RULES_VERSION}`,
     dependsOn: [],
     supportsInstrumentScope: true,
     async run(ctx: StageContext): Promise<StageResult> {
@@ -332,7 +333,7 @@ function makeSignalPositionLedgerAdapter(svc: SignalPositionLedgerService): Pipe
   return {
     key: 'SIGNAL_POSITION_LEDGER',
     stageOrder: 13,
-    stageVersion: 'dag-v1',
+    stageVersion: `dag-v1-rules-${DAG_STAGE_RULES_VERSION}`,
     dependsOn: [],
     supportsInstrumentScope: false,
     async run(ctx: StageContext): Promise<StageResult> {

@@ -24,6 +24,10 @@ import { SignalGenerationEngineService } from '../signal-generation-engine';
 import { SmartMoneyIntelligenceService } from '../smart-money-intelligence';
 import type { PipelineStageAdapter, StageContext, StageResult } from './pipeline-dag.types';
 
+// Bump alongside strategy-framework version bumps so the DAG idempotency key
+// changes on deploy, preventing stale cached results for the current trading date.
+export const DAG_STAGE_RULES_VERSION = '1.3.0';
+
 // ---------------------------------------------------------------------------
 // CoreStageServices — the subset of services needed by this file.
 // Match property names / types from PipelineOrchestrationService constructor.
@@ -218,7 +222,7 @@ export function createCoreStageAdapters(services: CoreStageServices): PipelineSt
   const rawSignalsAdapter: PipelineStageAdapter = {
     key: 'RAW_SIGNALS',
     stageOrder: 3,
-    stageVersion: 'dag-v1',
+    stageVersion: `dag-v1-rules-${DAG_STAGE_RULES_VERSION}`,
     dependsOn: [],
     supportsInstrumentScope: true,
     async run(ctx: StageContext): Promise<StageResult> {
