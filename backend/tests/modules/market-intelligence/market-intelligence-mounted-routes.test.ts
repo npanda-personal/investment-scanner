@@ -87,7 +87,7 @@ async function getJson(baseUrl: string, path: string): Promise<{ status: number;
 
 describe('mounted Market Intelligence read routes', () => {
   // withAppServer boots a full Express app — cold module load + keep-alive cleanup needs room
-  jest.setTimeout(15000);
+  beforeAll(() => { jest.setTimeout(15000); });
 
   beforeEach(() => {
     jest.clearAllMocks();

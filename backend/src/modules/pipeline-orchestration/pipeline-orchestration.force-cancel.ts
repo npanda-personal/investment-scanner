@@ -19,11 +19,11 @@ export async function executeForceCancelCommand(request: PipelineCommandRequest)
     const runIds = activeRuns.map((r: { id: string }) => r.id);
     await prisma.pipelineStageRun.updateMany({
       where: { pipelineRunId: { in: runIds }, status: { in: ['RUNNING', 'PENDING'] } },
-      data: { status: 'CANCELLED', completedAt: now, leaseOwner: null, leaseExpiresAt: null, errors: ['cancelled by operator'] },
+      data: { status: 'ABANDONED', completedAt: now, leaseOwner: null, leaseExpiresAt: null, errors: ['abandoned by operator via PIPELINE_CANCEL_ACTIVE'] },
     });
     const result = await prisma.pipelineRun.updateMany({
       where: { id: { in: runIds } },
-      data: { status: 'CANCELLED', completedAt: now, updatedAt: now },
+      data: { status: 'ABANDONED', completedAt: now, updatedAt: now },
     });
     cancelled = result.count;
   }
