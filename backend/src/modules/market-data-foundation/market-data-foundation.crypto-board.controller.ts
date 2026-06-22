@@ -46,7 +46,9 @@ export class MarketDataFoundationCryptoBoardController {
         minConfidence: this.parseString(req.query.minConfidence),
         volumeSpikeOnly: this.parseBoolean(req.query.volumeSpikeOnly),
         near52wHigh: this.parseBoolean(req.query.near52wHigh),
+        near52wLow: this.parseBoolean(req.query.near52wLow),
         goldenCrossOnly: this.parseBoolean(req.query.goldenCrossOnly),
+        deathCrossOnly: this.parseBoolean(req.query.deathCrossOnly),
         limit: this.parseNumber(req.query.limit),
       });
       return res.json({

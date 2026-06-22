@@ -36,6 +36,8 @@ const CryptoMarketOverviewPage: React.FC = () => {
   const [moverWarnings, setMoverWarnings] = useState<string[]>([]);
   const [summary, setSummary] = useState<MarketContextSummary | null>(null);
   const [volumeSpikes, setVolumeSpikes] = useState<CryptoBoardRow[]>([]);
+  const [near52wHighRows, setNear52wHighRows] = useState<CryptoBoardRow[]>([]);
+  const [near52wLowRows, setNear52wLowRows] = useState<CryptoBoardRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -51,8 +53,10 @@ const CryptoMarketOverviewPage: React.FC = () => {
       hasVolumeInterest
         ? fetchCryptoBoard({ volumeSpikeOnly: true, sortBy: 'pctChange1d', sortOrder: 'desc', limit: 10 }).catch(() => null)
         : Promise.resolve(null),
+      fetchCryptoBoard({ near52wHigh: true, sortBy: 'marketCap', sortOrder: 'desc', limit: 10 }).catch(() => null),
+      fetchCryptoBoard({ near52wLow: true, sortBy: 'marketCap', sortOrder: 'desc', limit: 10 }).catch(() => null),
     ])
-      .then(([topSignals, movers, contextSummary, spikes]) => {
+      .then(([topSignals, movers, contextSummary, spikes, highRows, lowRows]) => {
         if (cancelled) return;
         setSignals((topSignals.signals ?? []) as SignalResult[]);
         const range = movers?.ranges?.[0];
@@ -61,6 +65,8 @@ const CryptoMarketOverviewPage: React.FC = () => {
         setMoverWarnings(range?.warnings ?? []);
         setSummary(contextSummary ?? null);
         setVolumeSpikes(spikes?.rows ?? []);
+        setNear52wHighRows(highRows?.rows ?? []);
+        setNear52wLowRows(lowRows?.rows ?? []);
       })
       .catch(() => { if (!cancelled) setError('Failed to load crypto market overview.'); })
       .finally(() => { if (!cancelled) setLoading(false); });
@@ -109,6 +115,11 @@ const CryptoMarketOverviewPage: React.FC = () => {
           </Box>
 
           {hasVolumeInterest && <VolumeSpikeStrip rows={volumeSpikes} />}
+
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 3 }}>
+            <Near52wStrip title="Near 52-Week Highs" rows={near52wHighRows} color="success" />
+            <Near52wStrip title="Near 52-Week Lows" rows={near52wLowRows} color="error" />
+          </Box>
 
           <Paper sx={{ p: 2 }}>
             <Typography variant="h6" sx={{ mb: 1 }}>Top Coins by Signal</Typography>
@@ -281,6 +292,29 @@ const VolumeSpikeStrip: React.FC<{ rows: CryptoBoardRow[] }> = ({ rows }) => (
             to={`/stocks/${row.instrument_id}`}
             clickable
             color="warning"
+            variant="outlined"
+            label={`${row.symbol} ${pct(row.pct_change_1d)}`}
+          />
+        ))}
+      </Box>
+    )}
+  </Paper>
+);
+
+const Near52wStrip: React.FC<{ title: string; rows: CryptoBoardRow[]; color: 'success' | 'error' }> = ({ title, rows, color }) => (
+  <Paper sx={{ p: 2 }}>
+    <Typography variant="h6" sx={{ mb: 1 }}>{title}</Typography>
+    {rows.length === 0 ? (
+      <Typography color="text.secondary">None flagged in the latest snapshot.</Typography>
+    ) : (
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+        {rows.map((row) => (
+          <Chip
+            key={row.instrument_id}
+            component={Link}
+            to={`/stocks/${row.instrument_id}`}
+            clickable
+            color={color}
             variant="outlined"
             label={`${row.symbol} ${pct(row.pct_change_1d)}`}
           />
