@@ -34,7 +34,7 @@ describe('CacheService', () => {
 
     const result = await svc.cacheReadThrough('k', producer);
 
-    expect(result).toEqual({ a: 1 });
+    expect(result).toEqual({ data: { a: 1 }, cacheHit: true });
     expect(producer).not.toHaveBeenCalled();
   });
 
@@ -45,7 +45,7 @@ describe('CacheService', () => {
 
     const result = await svc.cacheReadThrough('k', producer);
 
-    expect(result).toEqual({ a: 2 });
+    expect(result).toEqual({ data: { a: 2 }, cacheHit: false });
     expect(producer).toHaveBeenCalledTimes(1);
     expect(client.set).toHaveBeenCalledWith('k', JSON.stringify({ a: 2 }), 'EX', expect.any(Number));
   });
@@ -62,7 +62,7 @@ describe('CacheService', () => {
 
     const result = await svc.cacheReadThrough('k', producer);
 
-    expect(result).toEqual({ ok: true });
+    expect(result).toEqual({ data: { ok: true }, cacheHit: false });
     expect(producer).toHaveBeenCalledTimes(1);
   });
 
@@ -72,7 +72,7 @@ describe('CacheService', () => {
 
     const result = await svc.cacheReadThrough('k', async () => null);
 
-    expect(result).toBeNull();
+    expect(result).toEqual({ data: null, cacheHit: false });
     expect(client.set).not.toHaveBeenCalled();
   });
 
@@ -82,7 +82,7 @@ describe('CacheService', () => {
 
     const result = await svc.cacheReadThrough('k', producer);
 
-    expect(result).toBe('x');
+    expect(result).toEqual({ data: 'x', cacheHit: false });
     expect(producer).toHaveBeenCalledTimes(1);
   });
 

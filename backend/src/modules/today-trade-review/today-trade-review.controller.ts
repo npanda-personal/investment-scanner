@@ -13,12 +13,14 @@ export class TodayTradeReviewController {
   latest = async (req: Request, res: Response) => {
     try {
       const query = parseTodayReviewQuery(req.query);
-      return res.json(await this.cache.cacheReadThrough(
+      const { data, cacheHit } = await this.cache.cacheReadThrough(
         todayReviewKey(query),
         () => this.service.latest(query),
         undefined,
         (v: any) => v?.run !== null,
-      ));
+      );
+      res.setHeader('X-Cache', cacheHit ? 'HIT' : 'MISS');
+      return res.json(data);
     } catch (error) {
       return this.error(res, error, 'Failed to load latest Today review.');
     }

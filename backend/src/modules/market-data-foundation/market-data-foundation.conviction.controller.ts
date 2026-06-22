@@ -36,13 +36,14 @@ export class MarketDataFoundationConvictionController {
         ?.trim()
         .toUpperCase() || undefined;
       const onlyFnoEligible = this.parseBoolean(req.query.onlyFnoEligible);
-      const result = await this.cache.cacheReadThrough(
+      const { data, cacheHit } = await this.cache.cacheReadThrough(
         convictionKey({ region, assetType, onlyFnoEligible }),
         () => this.service.conviction({ region, assetType, onlyFnoEligible }),
         undefined,
         (v: any) => (v?.count ?? 0) > 0,
       );
-      return res.json(result);
+      res.setHeader('X-Cache', cacheHit ? 'HIT' : 'MISS');
+      return res.json(data);
     } catch (error) {
       console.error('Conviction screener error:', error);
       return res.status(500).json({ error: 'Conviction screener query failed' });

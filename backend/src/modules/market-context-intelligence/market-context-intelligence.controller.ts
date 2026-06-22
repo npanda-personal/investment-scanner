@@ -27,12 +27,13 @@ export class MarketContextIntelligenceController {
     const region = this.contextRegion(req).toUpperCase();
     return this.respond(res, async () => {
       // Cache the expensive persisted read; the cheap envelope shaping below runs on cached data.
-      const persisted = await this.cache.cacheReadThrough(
+      const { data: persisted, cacheHit } = await this.cache.cacheReadThrough(
         marketContextSummaryKey(region),
         () => this.service.latestPersistedSummary(region),
         undefined,
         (v) => v != null && (v as any).regime != null,
       );
+      res.setHeader('X-Cache', cacheHit ? 'HIT' : 'MISS');
       if (!persisted) {
         return {
           status: 'missing',
@@ -101,12 +102,16 @@ export class MarketContextIntelligenceController {
       assetType: (this.assetType(req) || 'STOCK').toUpperCase(),
       timeframe: (this.timeframe(req) || '1d').toLowerCase(),
     };
-    return this.respond(res, () => this.cache.cacheReadThrough(
-      marketPulseKey(scope),
-      () => this.marketPulseService.latestSnapshot(scope),
-      undefined,
-      (v: any) => v?.availability !== 'EMPTY',
-    ));
+    return this.respond(res, async () => {
+      const { data, cacheHit } = await this.cache.cacheReadThrough(
+        marketPulseKey(scope),
+        () => this.marketPulseService.latestSnapshot(scope),
+        undefined,
+        (v: any) => v?.availability !== 'EMPTY',
+      );
+      res.setHeader('X-Cache', cacheHit ? 'HIT' : 'MISS');
+      return data;
+    });
   };
 
   marketPulseHistory = async (req: Request, res: Response) => {

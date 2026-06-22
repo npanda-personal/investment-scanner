@@ -72,12 +72,14 @@ export class MarketIntelligenceController {
     try {
       res.setHeader('Cache-Control', 'no-store');
       const scope = parseStockInterestScope(req.query as Record<string, unknown>);
-      return res.json(await this.cache.cacheReadThrough(
+      const { data, cacheHit } = await this.cache.cacheReadThrough(
         stockInterestKey(scope),
         () => this.stockInterestService.latestSnapshot(scope),
         undefined,
         (v: any) => v?.availability !== 'EMPTY',
-      ));
+      );
+      res.setHeader('X-Cache', cacheHit ? 'HIT' : 'MISS');
+      return res.json(data);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to load Stock Interest snapshot';
       return res.status(500).json({
@@ -121,12 +123,13 @@ export class MarketIntelligenceController {
       const region = (typeof req.query.region === 'string' ? req.query.region.trim() || 'IN' : 'IN').toUpperCase();
       const assetType = (typeof req.query.assetType === 'string' ? req.query.assetType.trim() || 'STOCK' : 'STOCK').toUpperCase();
 
-      const envelope = await this.cache.cacheReadThrough(
+      const { data: envelope, cacheHit } = await this.cache.cacheReadThrough(
         sectorRotationKey({ region, assetType }),
         () => this.marketContextService.latestSectorIntelligenceSnapshot({ region, assetType }),
         undefined,
         (v: any) => v?.status !== 'missing' && (v?.sectors?.length ?? 0) > 0,
       );
+      res.setHeader('X-Cache', cacheHit ? 'HIT' : 'MISS');
 
       if (envelope.sectors.length === 0) {
         const result: SectorRotationEnvelope = {
