@@ -1940,6 +1940,7 @@ model CryptoDailyMetricSnapshot {
   tvlChange7dPct     Float?
   fundingRatePct     Float?
   openInterestUsd    Decimal?
+  quoteVolume24h     Decimal?
   calculationVersion String      @default("crypto-metrics-v1")
   dataStatus         String      @default("COMPLETE")
   createdAt          DateTime    @default(now())

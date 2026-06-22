@@ -79,6 +79,7 @@ interface SortableCol {
 const SORTABLE_COLS: SortableCol[] = [
   { key: 'rank', label: 'Rank', align: 'right' },
   { key: 'marketCap', label: 'Market Cap', align: 'right' },
+  { key: 'quoteVolume24h', label: 'Vol 24h', align: 'right' },
   { key: 'pctChange1d', label: '24h', align: 'right' },
   { key: 'pctChange7d', label: '7d', align: 'right' },
   { key: 'signalScore', label: 'Signal', align: 'center' },
@@ -360,6 +361,7 @@ export default function CryptoSignalBoard() {
                   </TableCell>
                   <TableCell align="right">{row.rank ?? '—'}</TableCell>
                   <TableCell align="right">{row.market_cap != null ? compact(row.market_cap, 'USD') : '—'}</TableCell>
+                  <TableCell align="right">{row.quote_volume_24h != null ? compact(row.quote_volume_24h, 'USD') : '—'}</TableCell>
                   <TableCell align="right" sx={{ color: pctColor(row.pct_change_1d) }}>{pct(row.pct_change_1d)}</TableCell>
                   <TableCell align="right" sx={{ color: pctColor(row.pct_change_7d) }}>{pct(row.pct_change_7d)}</TableCell>
                   <TableCell align="center"><DirectionChip direction={row.signal_direction} score={row.signal_score} confidence={row.signal_confidence} /></TableCell>

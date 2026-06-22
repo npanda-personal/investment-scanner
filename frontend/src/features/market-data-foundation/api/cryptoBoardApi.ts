@@ -22,7 +22,8 @@ export type CryptoBoardSortBy =
   | 'pctChange7d'
   | 'volumeSpike'
   | 'rsi14'
-  | 'distanceFromAthPct';
+  | 'distanceFromAthPct'
+  | 'quoteVolume24h';
 
 /** One persisted board row (snake_case as served by the backend). */
 export interface CryptoBoardRow {
@@ -52,6 +53,7 @@ export interface CryptoBoardRow {
   tvl_usd: number | null;
   funding_rate_pct: number | null;
   open_interest_usd: number | null;
+  quote_volume_24h: number | null;
 }
 
 export interface CryptoBoardResponse {
@@ -121,6 +123,9 @@ export interface CryptoAssetFundamental {
   tvl_change_7d_pct: number | null;
   fees_24h_usd: number | null;
   fees_7d_usd: number | null;
+  revenue_24h_usd: number | null;
+  revenue_30d_usd: number | null;
+  annualized_revenue_usd: number | null;
   coverage_status: string | null;
 }
 

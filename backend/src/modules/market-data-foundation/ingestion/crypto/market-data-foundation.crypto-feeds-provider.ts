@@ -209,6 +209,9 @@ export interface CryptoFundamentalRow {
   tvlChange7dPct: number | null;
   fees24hUsd: number | null;
   fees7dUsd: number | null;
+  revenue24hUsd: number | null;
+  revenue30dUsd: number | null;
+  annualizedRevenueUsd: number | null;
   coverageStatus: 'FULL' | 'NONE';
 }
 
@@ -227,6 +230,7 @@ interface DefiLlamaFeesRow {
   name?: string;
   total24h?: number;
   total7d?: number;
+  total30d?: number;
 }
 
 /**
@@ -291,6 +295,20 @@ export async function fetchDefiLlamaFundamentals(
     warnings.push(`DefiLlama /overview/fees fetch failed (fees left null): ${(error as Error).message}`);
   }
 
+  // Revenue overview (same endpoint with dataType=dailyRevenue) — best-effort.
+  const revenueByName = new Map<string, DefiLlamaFeesRow>();
+  try {
+    const rev = (await fetchJson(
+      `${base}/overview/fees?excludeTotalDataChart=true&excludeTotalDataChartBreakdown=true&dataType=dailyRevenue`,
+    )) as { protocols?: DefiLlamaFeesRow[] };
+    for (const r of rev?.protocols ?? []) {
+      const name = String(r?.name ?? '').trim();
+      if (name) revenueByName.set(name.toUpperCase(), r);
+    }
+  } catch (error) {
+    warnings.push(`DefiLlama /overview/fees?dataType=dailyRevenue fetch failed (revenue left null): ${(error as Error).message}`);
+  }
+
   // For a given base ticker keep the largest-TVL protocol match (handles ticker
   // collisions where multiple protocols share a symbol).
   const bestByBase = new Map<string, DefiLlamaProtocol>();
@@ -312,6 +330,8 @@ export async function fetchDefiLlamaFundamentals(
     const p = bestByBase.get(base2);
     if (!p) continue; // non-DeFi coin → no row (keep it simple, coverage explicit by absence)
     const fees = p.name ? feesByName.get(p.name.trim().toUpperCase()) : undefined;
+    const rev = p.name ? revenueByName.get(p.name.trim().toUpperCase()) : undefined;
+    const rev24h = rev ? toFiniteNumber(rev.total24h) : null;
     rows.push({
       symbol: canonical,
       defillamaSlug: String(p.slug ?? '').trim() || null,
@@ -322,6 +342,9 @@ export async function fetchDefiLlamaFundamentals(
       tvlChange7dPct: toFiniteNumber(p.change_7d),
       fees24hUsd: fees ? toFiniteNumber(fees.total24h) : null,
       fees7dUsd: fees ? toFiniteNumber(fees.total7d) : null,
+      revenue24hUsd: rev24h,
+      revenue30dUsd: rev ? toFiniteNumber(rev.total30d) ?? (rev24h != null ? rev24h * 30 : null) : null,
+      annualizedRevenueUsd: rev24h != null ? rev24h * 365 : null,
       coverageStatus: 'FULL',
     });
   }
