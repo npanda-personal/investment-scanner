@@ -17,21 +17,24 @@ import type {
   MarketScanSummaryDeliverySpike,
   MarketScanSummaryVolumeSpike,
 } from '../types';
+import type { MarketScanSummaryPotentialMovers } from '../types.potential-movers';
 import {
   fetchMarketScan52wHigh,
   fetchMarketScan52wLow,
   fetchMarketScanDeliverySpike,
   fetchMarketScanVolumeSpike,
+  fetchMarketScanPotentialMovers,
 } from '../api/marketScansService';
-import { Table52w, TableDeliverySpike, TableVolumeSpike } from './MarketScanTables';
+import { Table52w, TableDeliverySpike, TableVolumeSpike, TablePotentialMovers } from './MarketScanTables';
 
-type TabId = '52w-high' | '52w-low' | 'delivery-spike' | 'volume-spike';
+type TabId = '52w-high' | '52w-low' | 'delivery-spike' | 'volume-spike' | 'potential-movers';
 
 const TABS: { id: TabId; label: string }[] = [
   { id: '52w-high', label: '52W Highs' },
   { id: '52w-low', label: '52W Lows' },
   { id: 'delivery-spike', label: 'Delivery Spikes' },
   { id: 'volume-spike', label: 'Volume Spikes' },
+  { id: 'potential-movers', label: 'Potential Movers' },
 ];
 
 function ScanWarning({ warnings }: { warnings: string[] }) {
@@ -61,8 +64,11 @@ function ScanWarning({ warnings }: { warnings: string[] }) {
 
 export default function MarketScansPage() {
   const { scope, profile } = useMarketScope();
-  // Delivery-spike is NSE-delivery-based — not applicable to crypto.
-  const visibleTabs = TABS.filter((t) => t.id !== 'delivery-spike' || profile.capabilities.hasDelivery);
+  // Delivery-spike and potential-movers are equity-only — not applicable to crypto.
+  const visibleTabs = TABS.filter((t) =>
+    (t.id !== 'delivery-spike' || profile.capabilities.hasDelivery) &&
+    (t.id !== 'potential-movers' || !profile.isCrypto)
+  );
   const [activeTab, setActiveTab] = useState<TabId>('52w-high');
 
   // Shared pagination state — reset to page 0 whenever the active tab changes.
@@ -81,18 +87,21 @@ export default function MarketScansPage() {
   const [data52wLow, setData52wLow] = useState<MarketScanSummary52w | null>(null);
   const [dataDelivery, setDataDelivery] = useState<MarketScanSummaryDeliverySpike | null>(null);
   const [dataVolume, setDataVolume] = useState<MarketScanSummaryVolumeSpike | null>(null);
+  const [dataPotentialMovers, setDataPotentialMovers] = useState<MarketScanSummaryPotentialMovers | null>(null);
 
   const [loading, setLoading] = useState<Record<TabId, boolean>>({
     '52w-high': false,
     '52w-low': false,
     'delivery-spike': false,
     'volume-spike': false,
+    'potential-movers': false,
   });
   const [errors, setErrors] = useState<Record<TabId, string | null>>({
     '52w-high': null,
     '52w-low': null,
     'delivery-spike': null,
     'volume-spike': null,
+    'potential-movers': null,
   });
 
   const loadTab = useCallback(async (tab: TabId) => {
@@ -120,6 +129,11 @@ export default function MarketScansPage() {
           setDataVolume(result);
           break;
         }
+        case 'potential-movers': {
+          const result = await fetchMarketScanPotentialMovers({ region: scope.region, assetType: scope.assetType, limit: 50 });
+          setDataPotentialMovers(result);
+          break;
+        }
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to load scan data';
@@ -136,6 +150,7 @@ export default function MarketScansPage() {
     setData52wLow(null);
     setDataDelivery(null);
     setDataVolume(null);
+    setDataPotentialMovers(null);
     setActiveTab((prev) => (visibleTabs.some((t) => t.id === prev) ? prev : '52w-high'));
     setPage(0);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -143,11 +158,12 @@ export default function MarketScansPage() {
 
   // Load active tab on first render and on tab switch if not yet loaded
   useEffect(() => {
-    const alreadyLoaded = {
+    const alreadyLoaded: Record<TabId, boolean> = {
       '52w-high': data52wHigh !== null,
       '52w-low': data52wLow !== null,
       'delivery-spike': dataDelivery !== null,
       'volume-spike': dataVolume !== null,
+      'potential-movers': dataPotentialMovers !== null,
     };
     if (!alreadyLoaded[activeTab] && !loading[activeTab]) {
       void loadTab(activeTab);
@@ -162,12 +178,14 @@ export default function MarketScansPage() {
     // Show loading indicator while fetching OR while data has not yet been
     // requested (useEffect fires after first render, so there is a single
     // frame where loading=false but data=null — treat that as "loading" too).
-    const tabDataReady = {
+    const tabDataReadyMap: Record<TabId, boolean> = {
       '52w-high': data52wHigh !== null,
       '52w-low': data52wLow !== null,
       'delivery-spike': dataDelivery !== null,
       'volume-spike': dataVolume !== null,
-    }[activeTab];
+      'potential-movers': dataPotentialMovers !== null,
+    };
+    const tabDataReady = tabDataReadyMap[activeTab];
     if (isLoading || (!tabDataReady && !error)) return <LinearProgress sx={{ mt: 1 }} />;
     if (error) {
       return (
@@ -209,17 +227,26 @@ export default function MarketScansPage() {
             <TableVolumeSpike rows={dataVolume.results} page={page} rowsPerPage={rowsPerPage} onPageChange={handlePageChange} onRowsPerPageChange={handleRowsPerPageChange} />
           </>
         );
+      case 'potential-movers':
+        if (!dataPotentialMovers) return null;
+        return (
+          <>
+            <ScanWarning warnings={dataPotentialMovers.warnings} />
+            <TablePotentialMovers rows={dataPotentialMovers.results} currency={profile.currency} page={page} rowsPerPage={rowsPerPage} onPageChange={handlePageChange} onRowsPerPageChange={handleRowsPerPageChange} />
+          </>
+        );
       default:
         return null;
     }
   }
 
-  const currentResultCount = {
+  const currentResultCount: Record<TabId, number | null> = {
     '52w-high': data52wHigh?.results.length ?? null,
     '52w-low': data52wLow?.results.length ?? null,
     'delivery-spike': dataDelivery?.results.length ?? null,
     'volume-spike': dataVolume?.results.length ?? null,
-  }[activeTab];
+    'potential-movers': dataPotentialMovers?.results.length ?? null,
+  };
 
   return (
     <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 1400, mx: 'auto' }}>
@@ -250,9 +277,10 @@ export default function MarketScansPage() {
             {activeTab === '52w-low' && `${profile.isCrypto ? 'Coins' : 'Stocks'} within 5% of their 52-week low (breakdown watch)`}
             {activeTab === 'delivery-spike' && 'Stocks with latest delivery% materially above recent rolling average (institutional-interest proxy)'}
             {activeTab === 'volume-spike' && `${profile.isCrypto ? 'Coins' : 'Stocks'} with latest volume materially above recent rolling average`}
+            {activeTab === 'potential-movers' && 'Stocks showing 3 consecutive rising closes above SMA20 — pre-momentum accumulation pattern'}
           </Typography>
-          {currentResultCount !== null && !isLoading && (
-            <Chip label={`${currentResultCount} results`} size="small" color="default" />
+          {currentResultCount[activeTab] !== null && !isLoading && (
+            <Chip label={`${currentResultCount[activeTab]} results`} size="small" color="default" />
           )}
         </Stack>
 

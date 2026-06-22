@@ -53,7 +53,17 @@ export function applyAdditionalEntryNoise(
   opts?: { skipRsi?: boolean },
 ): void {
   if (!opts?.skipRsi && typeof context.rsi === 'number' && context.rsi > 80) {
-    block(state, 'RSI_OVERBOUGHT', 'RSI is above 80; overbought conditions block entry.');
+    // In a confirmed uptrend (golden cross + price above SMA50), high RSI signals
+    // trend continuation rather than mean-reversion risk — skip the block.
+    const inConfirmedUptrend =
+      typeof context.sma50 === 'number' &&
+      typeof context.sma200 === 'number' &&
+      typeof context.latestPrice === 'number' &&
+      context.sma50 > context.sma200 &&
+      context.latestPrice > context.sma50;
+    if (!inConfirmedUptrend) {
+      block(state, 'RSI_OVERBOUGHT', 'RSI is above 80; overbought conditions block entry.');
+    }
   }
   if (typeof context.return20d === 'number' && context.return20d < -0.05) {
     block(state, 'NEGATIVE_RECENT_MOMENTUM', 'Negative 20-day momentum blocks entry.');

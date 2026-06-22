@@ -4,6 +4,7 @@ import { MarketDataFoundationCryptoBoardController } from './market-data-foundat
 import { MarketDataFoundationConvictionController } from './market-data-foundation.conviction.controller';
 import { MarketDataFoundationUsSmartMoneyController } from './market-data-foundation.us-smart-money.controller';
 import { MarketDataFoundationCryptoEventsController } from './market-data-foundation.crypto-events.controller';
+import { MarketDataFoundationPotentialMoversController } from './market-data-foundation.potential-movers.controller';
 
 export const createMarketDataFoundationRouter = (
   controller = new MarketDataFoundationController()
@@ -57,7 +58,8 @@ export const createMarketDataV1Router = (
   cryptoBoardController = new MarketDataFoundationCryptoBoardController(),
   convictionController = new MarketDataFoundationConvictionController(),
   usSmartMoneyController = new MarketDataFoundationUsSmartMoneyController(),
-  cryptoEventsController = new MarketDataFoundationCryptoEventsController()
+  cryptoEventsController = new MarketDataFoundationCryptoEventsController(),
+  potentialMoversController = new MarketDataFoundationPotentialMoversController()
 ) => {
   const router = express.Router();
 
@@ -78,6 +80,7 @@ export const createMarketDataV1Router = (
   router.get('/market-data/scans/52w-low', controller.marketScan52wLow);
   router.get('/market-data/scans/delivery-spike', controller.marketScanDeliverySpike);
   router.get('/market-data/scans/volume-spike', controller.marketScanVolumeSpike);
+  router.get('/market-data/scans/potential-movers', potentialMoversController.marketScanPotentialMovers);
   router.get('/market-data/screener', controller.screener);
   // Conviction tab: signal × smart-money confluence across 1W/1M/3M/6M (own controller — god-files are shrink-only).
   router.get('/market-data/screener/conviction', convictionController.conviction);

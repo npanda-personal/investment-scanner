@@ -1,4 +1,5 @@
 ﻿import { StrategyFrameworkEvaluator, StrategyFrameworkRegistry } from '../../../src/modules/strategy-framework';
+import { applyAdditionalEntryNoise } from '../../../src/modules/strategy-framework/strategy-framework.additional-dimensions';
 
 describe('Strategy Framework evaluator', () => {
   const registry = new StrategyFrameworkRegistry();
@@ -631,3 +632,61 @@ function inputSatisfied(input: string, declared: Set<string>) {
   if (input === 'sma') return declared.has('sma50') || declared.has('sma200');
   return false;
 }
+
+// ---------------------------------------------------------------------------
+// RSI overbought gate — uptrend-exception (strategy-framework.additional-dimensions.ts)
+// ---------------------------------------------------------------------------
+
+describe('applyAdditionalEntryNoise — RSI overbought uptrend exception', () => {
+  function makeState() {
+    return {
+      score: 0,
+      reasons: [] as string[],
+      blockers: [] as string[],
+      warnings: [] as string[],
+      dataGaps: [] as string[],
+      entryRulesPassed: [] as string[],
+      exitRulesTriggered: [] as string[],
+      invalidationRulesTriggered: [] as string[],
+      noiseFiltersTriggered: [] as string[],
+    };
+  }
+  type TestState = ReturnType<typeof makeState>;
+  const blockFn = (state: TestState, code: string) => { state.blockers.push(code); };
+
+  it('blocks entry when RSI > 80 with no trend context (missing SMAs)', () => {
+    const state = makeState();
+    applyAdditionalEntryNoise({ rsi: 85 } as any, state, blockFn);
+    expect(state.blockers).toContain('RSI_OVERBOUGHT');
+  });
+
+  it('blocks entry when RSI > 80 in a weak trend (no golden cross)', () => {
+    const state = makeState();
+    applyAdditionalEntryNoise({ rsi: 85, sma50: 90, sma200: 100, latestPrice: 95 } as any, state, blockFn);
+    expect(state.blockers).toContain('RSI_OVERBOUGHT');
+  });
+
+  it('blocks entry when RSI > 80 with golden cross but price below SMA50', () => {
+    const state = makeState();
+    applyAdditionalEntryNoise({ rsi: 85, sma50: 100, sma200: 80, latestPrice: 90 } as any, state, blockFn);
+    expect(state.blockers).toContain('RSI_OVERBOUGHT');
+  });
+
+  it('does NOT block when RSI > 80 in confirmed uptrend (golden cross + price above SMA50)', () => {
+    const state = makeState();
+    applyAdditionalEntryNoise({ rsi: 85, sma50: 100, sma200: 80, latestPrice: 115 } as any, state, blockFn);
+    expect(state.blockers).not.toContain('RSI_OVERBOUGHT');
+  });
+
+  it('does not block when RSI <= 80 regardless of trend context', () => {
+    const state = makeState();
+    applyAdditionalEntryNoise({ rsi: 79, sma50: 90, sma200: 100, latestPrice: 85 } as any, state, blockFn);
+    expect(state.blockers).not.toContain('RSI_OVERBOUGHT');
+  });
+
+  it('still blocks when skipRsi=true even with RSI > 80', () => {
+    const state = makeState();
+    applyAdditionalEntryNoise({ rsi: 90, sma50: 100, sma200: 80, latestPrice: 120 } as any, state, blockFn, { skipRsi: true });
+    expect(state.blockers).not.toContain('RSI_OVERBOUGHT');
+  });
+});

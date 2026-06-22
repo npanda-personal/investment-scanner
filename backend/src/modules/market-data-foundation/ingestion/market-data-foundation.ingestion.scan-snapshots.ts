@@ -11,6 +11,7 @@
 import type { MarketDataIngestionHost } from './market-data-foundation.ingestion-host';
 import type { MarketMoverRange } from '../market-data-foundation.types';
 import { MARKET_MOVERS_SNAPSHOT_COUNT } from '../persistence/market-data-foundation.repository.constants';
+import { PotentialMoversRepository } from '../persistence/market-data-foundation.repository.scans-potential-movers';
 
 const MARKET_MOVER_LOOKBACK_DAYS: Record<MarketMoverRange, number> = {
   '1D': 1,
@@ -141,6 +142,15 @@ export class ScanSnapshotWriterService {
       rows.forEach((r, i) => allRows.push({ scanType: 'VOLUME_SPIKE', scanRange: null, ...scope, tradingDate, rank: i + 1, payloadJson: r as unknown as object, computedAt: now }));
     } catch (err) {
       errors.push(`volume-spike: ${err instanceof Error ? err.message : String(err)}`);
+    }
+
+    // ---- potential-movers ----
+    try {
+      const potentialMoversRepo = new PotentialMoversRepository(this.host.repository.prisma);
+      const rows = await potentialMoversRepo.scanPotentialMovers({ ...scope, minAvgVolume: 5000, limit: 50 });
+      rows.forEach((r, i) => allRows.push({ scanType: 'POTENTIAL_MOVERS', scanRange: null, ...scope, tradingDate, rank: i + 1, payloadJson: r as unknown as object, computedAt: now }));
+    } catch (err) {
+      errors.push(`potential-movers: ${err instanceof Error ? err.message : String(err)}`);
     }
 
     if (allRows.length === 0) {

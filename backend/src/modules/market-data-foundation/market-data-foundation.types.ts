@@ -57,6 +57,8 @@ export type {
   MarketScanSummaryDeliverySpike,
   MarketScanRowVolumeSpike,
   MarketScanSummaryVolumeSpike,
+  MarketScanRowPotentialMovers,
+  MarketScanSummaryPotentialMovers,
   OfficialEodBulkSyncEvidence,
 } from './types/market-data-foundation.types.scans';
 
