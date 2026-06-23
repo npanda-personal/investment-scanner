@@ -1208,20 +1208,27 @@ function StockInterestTable({ rows }: { rows: StockInterestSnapshot[] }) {
 }
 
 function ResultDateCell({ resultDate, resultDateLabel }: { resultDate: string | null; resultDateLabel?: 'Official' | 'TBA' | 'Estimated' | null }) {
-  // No announced date (TBA, legacy estimates, or missing basis): never show a
-  // computed/fabricated date as if it were real.
-  if (resultDateLabel !== 'Official' || !resultDate) {
+  // Show a date only for an Official calendar date or a Phase 3 honest cadence
+  // Estimate (clearly badged so it is never mistaken for an announced date).  TBA,
+  // legacy estimates, or a missing basis show "Date TBA" — never a fabricated date.
+  if (resultDate && (resultDateLabel === 'Official' || resultDateLabel === 'Estimated')) {
+    const isEstimated = resultDateLabel === 'Estimated';
     return (
-      <Typography variant="body2" color="text.secondary" component="span">
-        Date TBA
-      </Typography>
+      <Stack direction="row" spacing={0.5} alignItems="center">
+        <span>{formatDate(resultDate)}</span>
+        <Chip
+          label={isEstimated ? 'Estimated' : 'Official'}
+          size="small"
+          variant="outlined"
+          color={isEstimated ? 'warning' : 'success'}
+        />
+      </Stack>
     );
   }
   return (
-    <Stack direction="row" spacing={0.5} alignItems="center">
-      <span>{formatDate(resultDate)}</span>
-      <Chip label="Official" size="small" variant="outlined" color="success" />
-    </Stack>
+    <Typography variant="body2" color="text.secondary" component="span">
+      Date TBA
+    </Typography>
   );
 }
 
@@ -1255,6 +1262,33 @@ function SignalCell({ signal }: { signal?: EarningsIntelligenceSnapshot['signal'
   );
 }
 
+// Compact numeric-technicals posture for an earnings row (Phase 3).  Descriptive
+// readings derived from persisted price/delivery history — research-support framing,
+// never a buy/sell call.  All-null (warm-up not met / short history) renders a dash.
+function TechnicalsCell({ row }: { row: EarningsIntelligenceSnapshot }) {
+  const { rsi14, smaPosture, pricePosition52w, adx14, deliveryPercent } = row;
+  const hasAny = [rsi14, smaPosture, pricePosition52w, adx14, deliveryPercent].some((value) => value !== null && value !== undefined);
+  if (!hasAny) return <Box component="span" sx={{ color: 'text.disabled' }}>—</Box>;
+  const postureColor: 'success' | 'error' | 'default' = smaPosture === 'ABOVE_50_200'
+    ? 'success'
+    : smaPosture === 'BELOW_50_200'
+      ? 'error'
+      : 'default';
+  const tooltip = [
+    rsi14 != null ? `RSI(14): ${formatOptional(rsi14)}` : null,
+    smaPosture ? `SMA posture: ${humanizeCode(smaPosture)}` : null,
+    pricePosition52w != null ? `52-week position: ${formatOptional(pricePosition52w)}%` : null,
+    adx14 != null ? `ADX(14): ${formatOptional(adx14)}` : null,
+    deliveryPercent != null ? `Delivery: ${formatOptional(deliveryPercent)}%` : null,
+  ].filter(Boolean).join('\n');
+  const label = `RSI ${rsi14 != null ? formatOptional(rsi14) : '—'}${pricePosition52w != null ? ` · ${formatOptional(pricePosition52w)}% 52w` : ''}`;
+  return (
+    <Tooltip title={<span style={{ whiteSpace: 'pre-line' }}>{tooltip}</span>} arrow>
+      <Chip size="small" color={postureColor} variant="outlined" label={label} sx={{ fontWeight: 600 }} />
+    </Tooltip>
+  );
+}
+
 function EarningsTable({ rows }: { rows: EarningsIntelligenceSnapshot[] }) {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
@@ -1283,6 +1317,7 @@ function EarningsTable({ rows }: { rows: EarningsIntelligenceSnapshot[] }) {
             <TableCell align="right">Rev Growth</TableCell>
             <TableCell align="right">Profit Growth</TableCell>
             <TableCell align="right">Consistency</TableCell>
+            <TableCell>Technicals</TableCell>
             <TableCell>Signal</TableCell>
             <TableCell>Reasons</TableCell>
             {showAllColumns && (
@@ -1315,6 +1350,7 @@ function EarningsTable({ rows }: { rows: EarningsIntelligenceSnapshot[] }) {
                 <TableCell align="right" sx={numericCellSx}>{formatPercentPoints(row.revenueGrowth)}</TableCell>
                 <TableCell align="right" sx={numericCellSx}>{formatPercentPoints(row.profitGrowth)}</TableCell>
                 <TableCell align="right" sx={numericCellSx}>{formatOptional(row.consistencyScore)}</TableCell>
+                <TableCell sx={{ whiteSpace: 'nowrap' }}><TechnicalsCell row={row} /></TableCell>
                 <TableCell sx={{ whiteSpace: 'nowrap' }}><SignalCell signal={row.signal} /></TableCell>
                 <TableCell><ReasonTags tags={row.reasonTags.map(humanizeCode)} /></TableCell>
                 {showAllColumns && (

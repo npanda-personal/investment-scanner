@@ -92,6 +92,9 @@ export class EarningsIntelligenceRepository {
         symbol: row.symbol,
         timestamp: row.timestamp,
         close: Number(row.price),
+        // LatestPrice carries only a close — no intraday range for the technicals.
+        high: null,
+        low: null,
         adjustedClose: Number(row.price),
         volume: null,
       } as EarningsPricePointInput)),
@@ -206,6 +209,11 @@ export class EarningsIntelligenceRepository {
       warnings: row.warnings,
       freshness: row.freshness,
       categories: row.categories,
+      rsi14: row.rsi14,
+      smaPosture: row.smaPosture,
+      pricePosition52w: row.pricePosition52w,
+      adx14: row.adx14,
+      deliveryPercent: row.deliveryPercent,
       calculationVersion: CALCULATION_VERSION,
     };
   }
@@ -247,6 +255,8 @@ export class EarningsIntelligenceRepository {
       symbol: row.symbol,
       timestamp: row.timestamp,
       close: Number(row.close),
+      high: row.high !== null && row.high !== undefined ? Number(row.high) : null,
+      low: row.low !== null && row.low !== undefined ? Number(row.low) : null,
       adjustedClose: row.adjustedClose !== null ? Number(row.adjustedClose) : null,
       volume: row.volume !== null ? Number(row.volume) : null,
     };
@@ -312,6 +322,11 @@ export class EarningsIntelligenceRepository {
       warnings,
       freshness: record.freshness,
       categories: stringArray(record.categories).filter(isEarningsIntelligenceCategory) as EarningsIntelligenceCategory[],
+      rsi14: nullableNumber(record.rsi14),
+      smaPosture: record.smaPosture ?? null,
+      pricePosition52w: nullableNumber(record.pricePosition52w),
+      adx14: nullableNumber(record.adx14),
+      deliveryPercent: nullableNumber(record.deliveryPercent),
     };
   }
 
