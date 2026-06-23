@@ -417,58 +417,17 @@ export class SignalPositionLedgerRepository {
   }
 
   async latestPriceByInstrumentId(instrumentId: string, scope: Pick<SignalPositionLedgerActiveQuery, 'region' | 'assetType'>): Promise<SignalPositionLatestPriceSnapshot | null> {
-    const stock = await this.db.stock.findFirst({
-      where: {
-        id: instrumentId,
-        ...this.stockScopeWhere(scope.region, scope.assetType),
-      },
-      select: {
-        symbol: true,
-      },
-    });
+    const stock = await this.db.stock.findFirst({ where: { id: instrumentId, ...this.stockScopeWhere(scope.region, scope.assetType) }, select: { symbol: true } });
     if (!stock) return null;
-
-    const latest = await this.db.priceTick.findFirst({
-      where: { symbol: stock.symbol },
-      orderBy: { timestamp: 'desc' },
-      select: {
-        timestamp: true,
-        close: true,
-        adjustedClose: true,
-        dataStatus: true,
-        source: true,
-      },
-    });
+    const latest = await this.db.priceTick.findFirst({ where: { symbol: stock.symbol }, orderBy: { timestamp: 'desc' }, select: { timestamp: true, close: true, adjustedClose: true, dataStatus: true, source: true } });
     if (!latest) return null;
-
-    return {
-      date: latest.timestamp.toISOString(),
-      close: Number(latest.close),
-      adjustedClose: latest.adjustedClose !== null ? Number(latest.adjustedClose) : Number(latest.close),
-      dataStatus: latest.dataStatus || 'MISSING',
-      source: latest.source || null,
-    };
+    return { date: latest.timestamp.toISOString(), close: Number(latest.close), adjustedClose: latest.adjustedClose !== null ? Number(latest.adjustedClose) : Number(latest.close), dataStatus: latest.dataStatus || 'MISSING', source: latest.source || null };
   }
 
   async latestDataQualityByInstrumentId(instrumentId: string): Promise<SignalPositionDataQualitySnapshot | null> {
-    const latest = await this.db.dataQualityEvaluation.findFirst({
-      where: { instrumentId },
-      orderBy: { evaluatedAt: 'desc' },
-      select: {
-        signalReadinessStatus: true,
-        coverageStatus: true,
-        liquidityStatus: true,
-        evaluatedAt: true,
-      },
-    });
+    const latest = await this.db.dataQualityEvaluation.findFirst({ where: { instrumentId }, orderBy: { evaluatedAt: 'desc' }, select: { signalReadinessStatus: true, coverageStatus: true, liquidityStatus: true, evaluatedAt: true } });
     if (!latest) return null;
-
-    return {
-      signalReadinessStatus: latest.signalReadinessStatus,
-      coverageStatus: latest.coverageStatus,
-      liquidityStatus: latest.liquidityStatus,
-      lastEvaluatedAt: latest.evaluatedAt.toISOString(),
-    };
+    return { signalReadinessStatus: latest.signalReadinessStatus, coverageStatus: latest.coverageStatus, liquidityStatus: latest.liquidityStatus, lastEvaluatedAt: latest.evaluatedAt.toISOString() };
   }
 
   async latestExitDecisionByInstrumentId(instrumentId: string): Promise<SignalPositionExitDecisionSnapshot | null> {
@@ -502,50 +461,58 @@ export class SignalPositionLedgerRepository {
   }
 
   async priceAtOrBeforeInstrumentId(instrumentId: string, date: Date, scope: Pick<SignalPositionLedgerActiveQuery, 'region' | 'assetType'>): Promise<SignalPositionLatestPriceSnapshot | null> {
-    const stock = await this.db.stock.findFirst({
-      where: {
-        id: instrumentId,
-        ...this.stockScopeWhere(scope.region, scope.assetType),
-      },
-      select: { symbol: true },
-    });
+    const stock = await this.db.stock.findFirst({ where: { id: instrumentId, ...this.stockScopeWhere(scope.region, scope.assetType) }, select: { symbol: true } });
     if (!stock) return null;
-
-    const latest = await this.db.priceTick.findFirst({
-      where: {
-        symbol: stock.symbol,
-        timestamp: { lte: date },
-      },
-      orderBy: { timestamp: 'desc' },
-      select: {
-        timestamp: true,
-        close: true,
-        adjustedClose: true,
-        dataStatus: true,
-        source: true,
-      },
-    });
+    const latest = await this.db.priceTick.findFirst({ where: { symbol: stock.symbol, timestamp: { lte: date } }, orderBy: { timestamp: 'desc' }, select: { timestamp: true, close: true, adjustedClose: true, dataStatus: true, source: true } });
     if (!latest) return null;
-
-    return {
-      date: latest.timestamp.toISOString(),
-      close: Number(latest.close),
-      adjustedClose: latest.adjustedClose !== null ? Number(latest.adjustedClose) : Number(latest.close),
-      dataStatus: latest.dataStatus || 'MISSING',
-      source: latest.source || null,
-    };
+    return { date: latest.timestamp.toISOString(), close: Number(latest.close), adjustedClose: latest.adjustedClose !== null ? Number(latest.adjustedClose) : Number(latest.close), dataStatus: latest.dataStatus || 'MISSING', source: latest.source || null };
   }
 
   /**
-   * Batch next-bar fill: for each (instrumentId → exitDate) pair, fetch the
-   * FIRST price tick with timestamp >= exitDate (strictly after-or-equal, next-bar
-   * semantics).  Returns a Map keyed by instrumentId.  Instruments with no
-   * post-exit tick are absent from the result — callers must treat missing keys
-   * as "no evidence yet" and leave the row EXIT_TRIGGERED.
-   *
-   * The lookup is batched (one symbol IN-query + one priceTick IN-query) so
-   * many EXIT_TRIGGERED rows do not fan out into per-row round-trips.
+   * Per (instrumentId, entryDate), the FIRST candle date on/after entry where a
+   * DEFENSIVE_EXIT close criterion was met — resolved separately for the two
+   * close reasons so a closed position is backdated to the day its criterion was
+   * actually met (the candle date), not the day the refresh happened to run:
+   *  - exitDate:         earliest generatedDate where the decision is
+   *                      EXIT_CANDIDATE/REDUCE_RISK OR any exit rule triggered.
+   *  - invalidationDate: earliest generatedDate where any invalidation rule triggered.
+   * Either field is null when that criterion was never met in the window.
    */
+  async firstCloseEvidenceDates(
+    entries: Array<{ instrumentId: string; entryDate: string }>,
+  ): Promise<Map<string, { exitDate: string | null; invalidationDate: string | null }>> {
+    if (entries.length === 0) return new Map();
+    const ids = entries.map((e) => e.instrumentId), dates = entries.map((e) => e.entryDate);
+    const rows: Array<{ instrumentId: string; exitDate: Date | null; invalidationDate: Date | null }> =
+      await this.db.$queryRawUnsafe(`
+      SELECT sub."instrumentId",
+        MIN(sdr."generatedDate") FILTER (
+          WHERE sdr.decision IN ('EXIT_CANDIDATE','REDUCE_RISK')
+            OR jsonb_array_length(COALESCE(sdr."exitRulesTriggered"::jsonb, '[]'::jsonb)) > 0
+        ) AS "exitDate",
+        MIN(sdr."generatedDate") FILTER (
+          WHERE jsonb_array_length(COALESCE(sdr."invalidationRulesTriggered"::jsonb, '[]'::jsonb)) > 0
+        ) AS "invalidationDate"
+      -- entryDate cast to plain timestamp (not timestamptz) so the comparison to
+      -- sdr."generatedDate" (timestamp WITHOUT time zone) is naive-to-naive and
+      -- independent of the DB session TimeZone. UTC-ISO inputs ('…Z') parse to the
+      -- same UTC wall-clock under ::timestamp.
+      FROM unnest($1::text[], $2::timestamp[]) AS sub("instrumentId", "entryDate")
+      JOIN strategy_decision_results sdr ON sdr."instrumentId" = sub."instrumentId"
+        AND sdr.strategy = 'DEFENSIVE_EXIT' AND sdr."generatedDate" >= sub."entryDate"
+      GROUP BY sub."instrumentId"
+    `, ids, dates);
+    const result = new Map<string, { exitDate: string | null; invalidationDate: string | null }>();
+    for (const r of rows) {
+      result.set(r.instrumentId, {
+        exitDate: r.exitDate ? new Date(r.exitDate).toISOString() : null,
+        invalidationDate: r.invalidationDate ? new Date(r.invalidationDate).toISOString() : null,
+      });
+    }
+    return result;
+  }
+
+  /** Batch next-bar fill: first price tick >= exitDate per instrument. */
   async firstPriceAtOrAfterBatch(
     entries: Array<{ instrumentId: string; exitDate: Date }>,
     scope: Pick<SignalPositionLedgerActiveQuery, 'region' | 'assetType'>,
@@ -566,67 +533,61 @@ export class SignalPositionLedgerRepository {
     if (stocks.length === 0) return result;
 
     const instrumentIdToSymbol = new Map(stocks.map((s: { id: string; symbol: string }) => [s.id, s.symbol]));
-    const symbolToInstrumentId = new Map(stocks.map((s: { id: string; symbol: string }) => [s.symbol, s.id]));
-    const symbols = Array.from(symbolToInstrumentId.keys());
 
-    // Per-instrument minimum exit date — find earliest exit date across all entries
-    // so the single priceTick query covers all of them.
-    const minExitDate = entries.reduce<Date | null>((min, e) => {
-      if (!Number.isFinite(e.exitDate.getTime())) return min;
-      return min === null || e.exitDate < min ? e.exitDate : min;
-    }, null);
+    // Resolve in-scope entries to (instrumentId, symbol, exitDate), keeping the
+    // earliest exit date per instrument when an id appears more than once.
+    const byId = new Map<string, { symbol: string; exitDate: Date }>();
+    for (const e of entries) {
+      const symbol = instrumentIdToSymbol.get(e.instrumentId);
+      if (!symbol || !Number.isFinite(e.exitDate.getTime())) continue;
+      const existing = byId.get(e.instrumentId);
+      if (!existing || e.exitDate < existing.exitDate) byId.set(e.instrumentId, { symbol, exitDate: e.exitDate });
+    }
+    if (byId.size === 0) return result;
 
-    if (!minExitDate) return result;
+    const ids = Array.from(byId.keys());
+    const syms = ids.map((id) => byId.get(id)!.symbol);
+    const dates = ids.map((id) => byId.get(id)!.exitDate.toISOString());
 
-    // Fetch all ticks for the symbols on/after the earliest exit date.
-    // Order asc so the FIRST row per symbol is the next-bar fill candidate.
-    const ticks = await this.db.priceTick.findMany({
-      where: {
-        symbol: { in: symbols },
-        timestamp: { gte: minExitDate },
-      },
-      orderBy: [{ symbol: 'asc' }, { timestamp: 'asc' }],
-      select: {
-        symbol: true,
-        timestamp: true,
-        close: true,
-        adjustedClose: true,
-        dataStatus: true,
-        source: true,
-      },
-    });
+    // One DISTINCT ON query returns the single earliest tick on-or-after each
+    // instrument's own exit date (next-bar fill). Bounded per symbol — replaces
+    // the prior unbounded findMany that pulled full forward history into JS.
+    const rows: Array<{
+      instrumentId: string;
+      timestamp: Date;
+      close: unknown;
+      adjustedClose: unknown;
+      dataStatus: string | null;
+      source: string | null;
+    }> = await this.db.$queryRawUnsafe(
+      `
+      SELECT DISTINCT ON (sub."instrumentId")
+        sub."instrumentId", pt.timestamp, pt.close, pt."adjustedClose", pt."dataStatus", pt.source
+      FROM unnest($1::text[], $2::text[], $3::timestamptz[]) AS sub("instrumentId", symbol, exit_date)
+      JOIN price_ticks pt ON pt.symbol = sub.symbol AND pt.timestamp >= sub.exit_date
+      ORDER BY sub."instrumentId", pt.timestamp ASC
+      `,
+      ids,
+      syms,
+      dates,
+    );
 
-    // For each tick, keep the first (earliest) one per symbol that is >= the
-    // per-instrument exit date.
-    const seenSymbols = new Set<string>();
-    for (const tick of ticks) {
-      if (seenSymbols.has(tick.symbol)) continue;
-      const instrumentId = symbolToInstrumentId.get(tick.symbol);
-      if (!instrumentId) continue;
-      const entry = entries.find((e) => e.instrumentId === instrumentId);
-      if (!entry) continue;
-      if (!Number.isFinite(entry.exitDate.getTime())) continue;
-      if (tick.timestamp < entry.exitDate) continue;
-      seenSymbols.add(tick.symbol);
-      result.set(instrumentId, {
-        date: tick.timestamp.toISOString(),
-        close: Number(tick.close),
-        adjustedClose: tick.adjustedClose !== null ? Number(tick.adjustedClose) : Number(tick.close),
-        dataStatus: tick.dataStatus || 'MISSING',
-        source: tick.source || null,
+    for (const r of rows) {
+      const close = Number(r.close);
+      const adjusted = r.adjustedClose !== null && r.adjustedClose !== undefined ? Number(r.adjustedClose) : close;
+      result.set(r.instrumentId, {
+        date: new Date(r.timestamp).toISOString(),
+        close,
+        adjustedClose: adjusted,
+        dataStatus: r.dataStatus || 'MISSING',
+        source: r.source || null,
       });
     }
 
-    void instrumentIdToSymbol; // referenced above via find — suppress unused warning
     return result;
   }
 
-  /**
-   * Batch lookup of the price tick at or before a given date for a set of instruments.
-   * Used to build lifecycle-entry trigger contracts from persisted price data without
-   * running the expensive full strategy-framework evaluation path.
-   * Returns a Map keyed by instrumentId → price snapshot (or absent if none found).
-   */
+  /** Batch price tick at-or-before date per instrument. */
   async priceAtDateBatch(
     entries: Array<{ instrumentId: string; date: Date }>,
     scope: Pick<SignalPositionLedgerActiveQuery, 'region' | 'assetType'>,
@@ -645,53 +606,58 @@ export class SignalPositionLedgerRepository {
     if (stocks.length === 0) return result;
 
     const idToSymbol = new Map(stocks.map((s: { id: string; symbol: string }) => [s.id, s.symbol]));
-    const symbolToId = new Map(stocks.map((s: { id: string; symbol: string }) => [s.symbol, s.id]));
-    const symbols = Array.from(symbolToId.keys());
 
-    // Find the earliest date across all entries so we query one tick range.
-    const minDate = entries.reduce<Date | null>((min, e) => {
-      if (!Number.isFinite(e.date.getTime())) return min;
-      return min === null || e.date < min ? e.date : min;
-    }, null);
-    if (!minDate) return result;
+    // Resolve in-scope entries to (instrumentId, symbol, date), keeping the
+    // latest requested date per instrument when an id appears more than once.
+    const byId = new Map<string, { symbol: string; date: Date }>();
+    for (const e of entries) {
+      const symbol = idToSymbol.get(e.instrumentId);
+      if (!symbol || !Number.isFinite(e.date.getTime())) continue;
+      const existing = byId.get(e.instrumentId);
+      if (!existing || existing.date < e.date) byId.set(e.instrumentId, { symbol, date: e.date });
+    }
+    if (byId.size === 0) return result;
 
-    // Fetch all ticks at or before max needed date, ordered desc per symbol.
-    // We then take the first (latest-on-or-before) tick per symbol.
-    const ticks = await this.db.priceTick.findMany({
-      where: {
-        symbol: { in: symbols },
-        timestamp: { lte: new Date(Math.max(...entries.map((e) => e.date.getTime()))) },
-      },
-      orderBy: [{ symbol: 'asc' }, { timestamp: 'desc' }],
-      select: {
-        symbol: true,
-        timestamp: true,
-        close: true,
-        adjustedClose: true,
-        dataStatus: true,
-        source: true,
-      },
-    });
+    const ids = Array.from(byId.keys());
+    const syms = ids.map((id) => byId.get(id)!.symbol);
+    const dates = ids.map((id) => byId.get(id)!.date.toISOString());
 
-    const seenSymbols = new Set<string>();
-    for (const tick of ticks) {
-      if (seenSymbols.has(tick.symbol)) continue;
-      const instrumentId = symbolToId.get(tick.symbol);
-      if (!instrumentId) continue;
-      const entry = entries.find((e) => e.instrumentId === instrumentId);
-      if (!entry || !Number.isFinite(entry.date.getTime())) continue;
-      if (tick.timestamp > entry.date) continue; // respect per-instrument date bound
-      seenSymbols.add(tick.symbol);
-      result.set(instrumentId, {
-        date: tick.timestamp.toISOString(),
-        close: Number(tick.close),
-        adjustedClose: tick.adjustedClose !== null ? Number(tick.adjustedClose) : Number(tick.close),
-        dataStatus: tick.dataStatus || 'MISSING',
-        source: tick.source || null,
+    // One DISTINCT ON query returns the single latest tick on-or-before each
+    // instrument's own date. Bounded per symbol, so no full-history fetch and
+    // no cross-region symbol-collision over-fetch (the prior unbounded findMany
+    // pulled every matching tick into JS and could blow up napi serialization).
+    const rows: Array<{
+      instrumentId: string;
+      timestamp: Date;
+      close: unknown;
+      adjustedClose: unknown;
+      dataStatus: string | null;
+      source: string | null;
+    }> = await this.db.$queryRawUnsafe(
+      `
+      SELECT DISTINCT ON (sub."instrumentId")
+        sub."instrumentId", pt.timestamp, pt.close, pt."adjustedClose", pt."dataStatus", pt.source
+      FROM unnest($1::text[], $2::text[], $3::timestamptz[]) AS sub("instrumentId", symbol, max_date)
+      JOIN price_ticks pt ON pt.symbol = sub.symbol AND pt.timestamp <= sub.max_date
+      ORDER BY sub."instrumentId", pt.timestamp DESC
+      `,
+      ids,
+      syms,
+      dates,
+    );
+
+    for (const r of rows) {
+      const close = Number(r.close);
+      const adjusted = r.adjustedClose !== null && r.adjustedClose !== undefined ? Number(r.adjustedClose) : close;
+      result.set(r.instrumentId, {
+        date: new Date(r.timestamp).toISOString(),
+        close,
+        adjustedClose: adjusted,
+        dataStatus: r.dataStatus || 'MISSING',
+        source: r.source || null,
       });
     }
 
-    void idToSymbol; // suppress unused-variable warning
     return result;
   }
 

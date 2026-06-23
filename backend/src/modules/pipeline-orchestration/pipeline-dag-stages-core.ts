@@ -26,7 +26,7 @@ import type { PipelineStageAdapter, StageContext, StageResult } from './pipeline
 
 // Bump alongside strategy-framework version bumps so the DAG idempotency key
 // changes on deploy, preventing stale cached results for the current trading date.
-export const DAG_STAGE_RULES_VERSION = '1.3.0';
+export const DAG_STAGE_RULES_VERSION = '1.4.0';
 
 // ---------------------------------------------------------------------------
 // CoreStageServices — the subset of services needed by this file.

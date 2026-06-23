@@ -138,6 +138,7 @@ describe('SignalPositionLedgerService', () => {
       loadLatestMaterializedSnapshot: jest.fn(),
       listLatestSignals: jest.fn(),
       saveMaterializedSnapshot: jest.fn(),
+      firstCloseEvidenceDates: jest.fn().mockResolvedValue(new Map()),
       upsertActiveLedgerRow: jest.fn(),
       closeLedgerRow: jest.fn(),
       listAllLedgerRows: jest.fn(),
@@ -193,6 +194,7 @@ describe('SignalPositionLedgerService', () => {
       loadLatestMaterializedSnapshot: jest.fn(),
       listLatestSignals: jest.fn(),
       saveMaterializedSnapshot: jest.fn(),
+      firstCloseEvidenceDates: jest.fn().mockResolvedValue(new Map()),
       upsertActiveLedgerRow: jest.fn(),
       closeLedgerRow: jest.fn(),
       listAllLedgerRows: jest.fn(),
@@ -302,6 +304,7 @@ describe('SignalPositionLedgerService', () => {
           exitDecision: null,
         }],
       ])),
+      firstCloseEvidenceDates: jest.fn().mockResolvedValue(new Map()),
       upsertActiveLedgerRow: jest.fn(),
       closeLedgerRow: jest.fn(),
     };
@@ -369,6 +372,7 @@ describe('SignalPositionLedgerService', () => {
         dataStatus: 'COMPLETE',
         source: 'database',
       }),
+      firstCloseEvidenceDates: jest.fn().mockResolvedValue(new Map()),
       upsertActiveLedgerRow: jest.fn(),
       closeLedgerRow: jest.fn(),
     };
@@ -397,6 +401,104 @@ describe('SignalPositionLedgerService', () => {
       lifecycleEvidenceStatus: 'CLOSED',
     });
     expect(repository.closeLedgerRow).toHaveBeenCalledWith(expect.objectContaining({ status: 'CLOSED' }));
+  });
+
+  it('backdates the exit to the candle date the criteria was first met, not the refresh-run date', async () => {
+    const existing = activeLedgerRow({ instrumentId: 'stock-1', symbol: 'ABC' });
+    const FIRST_MET = '2026-05-31T00:00:00.000Z'; // exit criteria first met
+    const TODAY = '2026-06-23T00:00:00.000Z';      // latest (refresh-run) decision
+    const repository = {
+      listAllLedgerRows: jest.fn()
+        .mockResolvedValueOnce([existing])
+        .mockResolvedValueOnce([]),
+      listLatestSignals: jest.fn().mockResolvedValue({
+        items: [], totalCount: 0, limit: 100, offset: 0, nextOffset: null, hasMore: false,
+      }),
+      latestSnapshotsByInstrumentIds: jest.fn().mockResolvedValue(new Map([
+        ['stock-1', {
+          latestPrice: { date: TODAY, close: 130, adjustedClose: 130, dataStatus: 'COMPLETE', source: 'database' },
+          quality: { signalReadinessStatus: 'READY', coverageStatus: 'GOOD', liquidityStatus: 'LIQUID', lastEvaluatedAt: TODAY },
+          exitDecision: {
+            id: 'decision-latest', strategy: 'DEFENSIVE_EXIT', strategyVersion: '1.2.0',
+            decision: 'REDUCE_RISK', generatedAt: TODAY,
+            reasons: ['Relative strength decayed.'],
+            exitRulesTriggered: ['RELATIVE_STRENGTH_DECAY_EXIT'], invalidationRulesTriggered: [],
+          },
+        }],
+      ])),
+      // Close price must be resolved at/before the historical exit date.
+      priceAtOrBeforeInstrumentId: jest.fn().mockResolvedValue({
+        date: FIRST_MET, close: 95, adjustedClose: 95, dataStatus: 'COMPLETE', source: 'database',
+      }),
+      firstCloseEvidenceDates: jest.fn().mockResolvedValue(new Map([
+        ['stock-1', { exitDate: FIRST_MET, invalidationDate: null }],
+      ])),
+      upsertActiveLedgerRow: jest.fn(),
+      closeLedgerRow: jest.fn(),
+    };
+    const signalService = { enrichSignals: jest.fn() };
+    const service = new SignalPositionLedgerService(repository as any, signalService as any);
+    const query = { region: 'IN', assetType: 'STOCK', limit: 25, offset: 0 };
+
+    await service.refreshActiveRows(query, { force: true, wait: true });
+    const closed = await service.listClosedRows(query);
+
+    expect(closed.totalCount).toBe(1);
+    expect(closed.items[0]).toMatchObject({
+      status: 'CLOSED',
+      exitTriggerTimestamp: FIRST_MET,
+      closedAt: FIRST_MET,
+      exitTriggerPrice: 95, // price at the historical exit date, not the 130 latest price
+      closePriceStatus: 'SOURCE_PROVEN',
+    });
+    // Close price was looked up at/before the historical date, not today.
+    const priceCallDate = repository.priceAtOrBeforeInstrumentId.mock.calls[0][1] as Date;
+    expect(new Date(priceCallDate).toISOString()).toBe(FIRST_MET);
+  });
+
+  it('does not backdate a close to a stale pre-entry decision (re-entry fallback guard)', async () => {
+    // Re-entry case: an earlier exit decision predates this fresh entry trigger.
+    // firstCloseEvidenceDates (date-filtered to on/after entry) finds nothing, so the
+    // latest-decision fallback runs — but its decision is BEFORE entry, so closing here
+    // would backdate the close before the position's own entry. It must stay ACTIVE.
+    const existing = activeLedgerRow({ instrumentId: 'stock-1', symbol: 'ABC', entryTriggerTimestamp: '2026-05-20T00:00:00.000Z' });
+    const STALE = '2026-01-10T00:00:00.000Z'; // pre-entry exit decision
+    const repository = {
+      listAllLedgerRows: jest.fn()
+        .mockResolvedValueOnce([existing])
+        .mockResolvedValueOnce([]),
+      listLatestSignals: jest.fn().mockResolvedValue({
+        items: [], totalCount: 0, limit: 100, offset: 0, nextOffset: null, hasMore: false,
+      }),
+      latestSnapshotsByInstrumentIds: jest.fn().mockResolvedValue(new Map([
+        ['stock-1', {
+          latestPrice: { date: '2026-05-27T00:00:00.000Z', close: 130, adjustedClose: 130, dataStatus: 'COMPLETE', source: 'database' },
+          quality: { signalReadinessStatus: 'READY', coverageStatus: 'GOOD', liquidityStatus: 'LIQUID', lastEvaluatedAt: '2026-05-27T00:00:00.000Z' },
+          exitDecision: {
+            id: 'decision-stale-preentry', strategy: 'DEFENSIVE_EXIT', strategyVersion: '1.2.0',
+            decision: 'EXIT_CANDIDATE', generatedAt: STALE, generatedDate: STALE,
+            reasons: ['Old exit before this entry.'],
+            exitRulesTriggered: ['PRICE_BELOW_SMA50'], invalidationRulesTriggered: [],
+          },
+        }],
+      ])),
+      priceAtOrBeforeInstrumentId: jest.fn().mockResolvedValue(null),
+      firstCloseEvidenceDates: jest.fn().mockResolvedValue(new Map()),
+      upsertActiveLedgerRow: jest.fn(),
+      closeLedgerRow: jest.fn(),
+    };
+    const signalService = { enrichSignals: jest.fn() };
+    const service = new SignalPositionLedgerService(repository as any, signalService as any);
+    const query = { region: 'IN', assetType: 'STOCK', limit: 25, offset: 0 };
+
+    await service.refreshActiveRows(query, { force: true, wait: true });
+    const active = await service.listActiveRows(query);
+    const closed = await service.listClosedRows(query);
+
+    expect(closed.totalCount).toBe(0);
+    expect(active.totalCount).toBe(1);
+    expect(active.items[0]).toMatchObject({ status: 'ACTIVE' });
+    expect(repository.closeLedgerRow).not.toHaveBeenCalled();
   });
 
   it('keeps an active row exit-triggered when close price evidence is missing', async () => {
@@ -430,6 +532,7 @@ describe('SignalPositionLedgerService', () => {
         }],
       ])),
       priceAtOrBeforeInstrumentId: jest.fn().mockResolvedValue(null),
+      firstCloseEvidenceDates: jest.fn().mockResolvedValue(new Map()),
       upsertActiveLedgerRow: jest.fn(),
       closeLedgerRow: jest.fn(),
     };
@@ -495,6 +598,7 @@ describe('SignalPositionLedgerService', () => {
         dataStatus: 'PARTIAL',
         source: 'database',
       }),
+      firstCloseEvidenceDates: jest.fn().mockResolvedValue(new Map()),
       upsertActiveLedgerRow: jest.fn(),
       closeLedgerRow: jest.fn(),
     };
@@ -550,6 +654,7 @@ describe('SignalPositionLedgerService', () => {
           },
         }],
       ])),
+      firstCloseEvidenceDates: jest.fn().mockResolvedValue(new Map()),
       upsertActiveLedgerRow: jest.fn(),
       closeLedgerRow: jest.fn(),
     };
@@ -609,6 +714,7 @@ describe('SignalPositionLedgerService', () => {
         dataStatus: 'COMPLETE',
         source: 'database',
       }),
+      firstCloseEvidenceDates: jest.fn().mockResolvedValue(new Map()),
       upsertActiveLedgerRow: jest.fn(),
       closeLedgerRow: jest.fn(),
     };
@@ -664,6 +770,7 @@ describe('SignalPositionLedgerService', () => {
           },
         }],
       ])),
+      firstCloseEvidenceDates: jest.fn().mockResolvedValue(new Map()),
       upsertActiveLedgerRow: jest.fn(),
       closeLedgerRow: jest.fn(),
     };
@@ -687,7 +794,7 @@ describe('SignalPositionLedgerService', () => {
     expect(repository.closeLedgerRow).not.toHaveBeenCalled();
   });
 
-  it('maps weak non-terminal exit rule evidence to risk warning', async () => {
+  it('books a pending exit (EXIT_TRIGGERED) for non-terminal exit-rule evidence when no proven exit price', async () => {
     const existing = activeLedgerRow({ instrumentId: 'stock-1', symbol: 'ABC' });
     const repository = {
       listAllLedgerRows: jest.fn()
@@ -717,6 +824,7 @@ describe('SignalPositionLedgerService', () => {
           },
         }],
       ])),
+      firstCloseEvidenceDates: jest.fn().mockResolvedValue(new Map()),
       upsertActiveLedgerRow: jest.fn(),
       closeLedgerRow: jest.fn(),
     };
@@ -731,9 +839,9 @@ describe('SignalPositionLedgerService', () => {
     expect(active.totalCount).toBe(1);
     expect(closed.totalCount).toBe(0);
     expect(active.items[0]).toMatchObject({
-      status: 'RISK_WARNING',
-      healthState: 'RISK_WARNING',
-      lifecycleEvidenceStatus: 'RISK_WARNING',
+      status: 'EXIT_TRIGGERED',
+      healthState: 'EXIT_TRIGGERED',
+      lifecycleEvidenceStatus: 'EXIT_TRIGGERED',
       exitRuleIds: ['RELATIVE_STRENGTH_DECAY_EXIT'],
       exitSourceDecisionId: 'decision-weak-exit-1',
       closePriceStatus: 'UNAVAILABLE',
@@ -742,7 +850,7 @@ describe('SignalPositionLedgerService', () => {
     expect(repository.closeLedgerRow).not.toHaveBeenCalled();
   });
 
-  it('replays risk-warning transitions idempotently without duplicate lifecycle rows', async () => {
+  it('replays pending-exit transitions idempotently without duplicate lifecycle rows', async () => {
     const existing = activeLedgerRow({ instrumentId: 'stock-1', symbol: 'ABC' });
     const activeRows = new Map<string, any>([[existing.ledgerKey, existing]]);
     const repository = {
@@ -773,6 +881,7 @@ describe('SignalPositionLedgerService', () => {
           },
         }],
       ])),
+      firstCloseEvidenceDates: jest.fn().mockResolvedValue(new Map()),
       upsertActiveLedgerRow: jest.fn(async (row: any) => activeRows.set(row.ledgerKey, row)),
       closeLedgerRow: jest.fn(),
     };
@@ -790,8 +899,8 @@ describe('SignalPositionLedgerService', () => {
     expect(active.totalCount).toBe(1);
     expect(active.items[0]).toMatchObject({
       ledgerKey: existing.ledgerKey,
-      status: 'RISK_WARNING',
-      lifecycleEvidenceStatus: 'RISK_WARNING',
+      status: 'EXIT_TRIGGERED',
+      lifecycleEvidenceStatus: 'EXIT_TRIGGERED',
     });
     expect(repository.closeLedgerRow).not.toHaveBeenCalled();
   });
@@ -945,7 +1054,7 @@ describe('SignalPositionLedgerService', () => {
     expect(result.items).toHaveLength(0);
   });
 
-  it('keeps active entry rows on risk warning because only exit triggers close them', async () => {
+  it('does not open a new entry that already carries risk evidence (only strong bull candidates stay open)', async () => {
     const repository = {
       listLatestSignals: jest.fn().mockResolvedValue({
         items: [trustedSignal],
@@ -983,14 +1092,8 @@ describe('SignalPositionLedgerService', () => {
     await service.refreshActiveRows(query, { force: true, wait: true });
     const result = await service.listActiveRows(query);
 
-    expect(result.totalCount).toBe(1);
-    expect(result.items[0]).toMatchObject({
-      symbol: 'ABC',
-      healthState: 'RISK_WARNING',
-      status: 'RISK_WARNING',
-      lifecycleEvidenceStatus: 'RISK_WARNING',
-      closePriceStatus: 'UNAVAILABLE',
-    });
+    expect(result.totalCount).toBe(0);
+    expect(result.items).toHaveLength(0);
   });
 
   it('ignores unsupported decision values in lifecycle health mapping', async () => {
@@ -1435,6 +1538,7 @@ describe('SignalPositionLedgerService — close-price evidence resolver (EXIT_TR
         items: [], totalCount: 0, limit: 100, offset: 0, nextOffset: null, hasMore: false,
       }),
       latestSnapshotsByInstrumentIds: jest.fn().mockResolvedValue(new Map()),
+      firstCloseEvidenceDates: jest.fn().mockResolvedValue(new Map()),
       firstPriceAtOrAfterBatch: jest.fn().mockResolvedValue(
         new Map([['stock-et', {
           date: '2026-05-28T00:00:00.000Z',
@@ -1493,6 +1597,7 @@ describe('SignalPositionLedgerService — close-price evidence resolver (EXIT_TR
         items: [], totalCount: 0, limit: 100, offset: 0, nextOffset: null, hasMore: false,
       }),
       latestSnapshotsByInstrumentIds: jest.fn().mockResolvedValue(new Map()),
+      firstCloseEvidenceDates: jest.fn().mockResolvedValue(new Map()),
       // No tick found: empty map
       firstPriceAtOrAfterBatch: jest.fn().mockResolvedValue(new Map()),
       upsertActiveLedgerRow: jest.fn(),
@@ -1530,6 +1635,7 @@ describe('SignalPositionLedgerService — close-price evidence resolver (EXIT_TR
         items: [], totalCount: 0, limit: 100, offset: 0, nextOffset: null, hasMore: false,
       }),
       latestSnapshotsByInstrumentIds: jest.fn().mockResolvedValue(new Map()),
+      firstCloseEvidenceDates: jest.fn().mockResolvedValue(new Map()),
       firstPriceAtOrAfterBatch: jest.fn().mockResolvedValue(
         new Map([['stock-ret', {
           date: '2026-05-29T00:00:00.000Z',
@@ -1567,6 +1673,7 @@ describe('SignalPositionLedgerService — close-price evidence resolver (EXIT_TR
       listLatestSignals: jest.fn(),
       listAllLedgerRows: jest.fn(),
       saveMaterializedSnapshot: jest.fn(),
+      firstCloseEvidenceDates: jest.fn().mockResolvedValue(new Map()),
       upsertActiveLedgerRow: jest.fn(),
       closeLedgerRow: jest.fn(),
     };
@@ -1593,6 +1700,7 @@ describe('SignalPositionLedgerService — close-price evidence resolver (EXIT_TR
         items: [], totalCount: 0, limit: 100, offset: 0, nextOffset: null, hasMore: false,
       }),
       latestSnapshotsByInstrumentIds: jest.fn().mockResolvedValue(new Map()),
+      firstCloseEvidenceDates: jest.fn().mockResolvedValue(new Map()),
       firstPriceAtOrAfterBatch,
       upsertActiveLedgerRow: jest.fn(),
       closeLedgerRow: jest.fn(),

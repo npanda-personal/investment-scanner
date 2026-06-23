@@ -808,6 +808,17 @@ export class SignalPositionLedgerService {
       seedActiveRows = await (repositoryWithLedger as any).listLegacyMaterializedRows(query);
       for (const row of seedActiveRows) await this.persistActiveRow(row);
     }
+    // Owner policy (2026-06-23): RISK_WARNING is a defunct resting status — nothing
+    // rests there. Normalize any stale RISK_WARNING carried over from the prior policy
+    // to ACTIVE once, at load, so no downstream branch (touched re-entry, untouched,
+    // current-evidence carry-through) can persist a row still resting in it.
+    for (const row of seedActiveRows) {
+      if (row.status === 'RISK_WARNING') {
+        row.status = 'ACTIVE';
+        row.healthState = null;
+        row.lifecycleEvidenceStatus = 'ACTIVE_ENTRY';
+      }
+    }
     const byStock = new Map<string, SignalPositionLedgerActiveRow>();
     for (const row of seedActiveRows) {
       const key = this.stockKey(row.symbol);
@@ -832,26 +843,84 @@ export class SignalPositionLedgerService {
     };
   }
 
+  /**
+   * Owner policy (2026-06-23): historical close evidence is authoritative.
+   * A position that EVER met a close criterion since entry is closed AS OF the
+   * candle date the criterion was FIRST met — not the refresh-run date, and
+   * regardless of whether the latest decision looks clean again ("anything
+   * satisfying the exit criteria on a date should be closed"). A later
+   * re-qualification opens a fresh entry trigger (new ledgerKey), so closing
+   * here never forfeits a re-entry. Invalidation is classified ahead of exit
+   * when it was met first. When no historical evidence is found we fall back to
+   * the latest snapshot decision (and its date) so edge cases still resolve.
+   *
+   * `evidence` is the batched firstCloseEvidenceDates result for this row; when
+   * omitted (few-row paths) it is resolved per-row.
+   */
   private async lifecycleRow(
     row: SignalPositionLedgerActiveRow,
     snapshots: SignalPositionLedgerRowSnapshots,
     query: Pick<SignalPositionLedgerActiveQuery, 'region' | 'assetType'>,
+    evidence?: { exitDate: string | null; invalidationDate: string | null },
   ): Promise<SignalPositionLedgerActiveRow | null> {
+    const ev = evidence ?? await this.firstCloseEvidence(row);
     const exitDecision = snapshots.exitDecision;
+
+    // 1) Authoritative historical evidence — date the close to the first day met.
+    if (ev.invalidationDate && (!ev.exitDate || ev.invalidationDate <= ev.exitDate)) {
+      return await this.invalidatedRow(row, snapshots, query, ev.invalidationDate);
+    }
+    if (ev.exitDate) {
+      return await this.exitLifecycleRow(row, snapshots, query, ev.exitDate);
+    }
+
+    // 2) Fallback: no historical evidence found — honor the latest snapshot decision.
     if (!exitDecision) return null;
-    if (this.hasInvalidationEvidence(exitDecision)) return await this.invalidatedRow(row, snapshots, query);
-    if (exitDecision.decision === 'EXIT_CANDIDATE') return this.exitLifecycleRow(row, snapshots, query);
-    if (this.hasRiskWarningEvidence(exitDecision)) return this.riskWarningRow(row, snapshots);
+    const latestDate = exitDecision.generatedDate || exitDecision.generatedAt || new Date().toISOString();
+    // Guard: the latest snapshot decision is NOT date-filtered relative to entry, so a
+    // stale pre-entry exit/invalidation (e.g. a re-entry after an earlier exit) would
+    // otherwise backdate the close before the position's own entry. Only let the
+    // fallback close when its decision is on/after entry; the SQL evidence is the
+    // authoritative source for on/after-entry closes.
+    if (row.entryTriggerTimestamp && latestDate < row.entryTriggerTimestamp) {
+      return null;
+    }
+    if (this.hasInvalidationEvidence(exitDecision)) {
+      return await this.invalidatedRow(row, snapshots, query, latestDate);
+    }
+    if (exitDecision.decision === 'EXIT_CANDIDATE' || this.hasRiskWarningEvidence(exitDecision)) {
+      return await this.exitLifecycleRow(row, snapshots, query, latestDate);
+    }
     return null;
+  }
+
+  /**
+   * The candle date a close criterion was first met for this position (on/after
+   * its entry) — used to backdate the exit, not the refresh-run date. Returns
+   * nulls when the repository/method or entry timestamp is unavailable.
+   */
+  private async firstCloseEvidence(
+    row: SignalPositionLedgerActiveRow,
+  ): Promise<{ exitDate: string | null; invalidationDate: string | null }> {
+    const repo = this.repository as any;
+    if (typeof repo.firstCloseEvidenceDates !== 'function' || !row.entryTriggerTimestamp) {
+      return { exitDate: null, invalidationDate: null };
+    }
+    const map = await repo.firstCloseEvidenceDates([
+      { instrumentId: row.instrumentId, entryDate: row.entryTriggerTimestamp },
+    ]);
+    return map.get(row.instrumentId) ?? { exitDate: null, invalidationDate: null };
   }
 
   private async exitLifecycleRow(
     row: SignalPositionLedgerActiveRow,
     snapshots: SignalPositionLedgerRowSnapshots,
     query: Pick<SignalPositionLedgerActiveQuery, 'region' | 'assetType'>,
+    exitDate: string,
   ): Promise<SignalPositionLedgerActiveRow> {
     const exitDecision = snapshots.exitDecision;
-    const exitDate = exitDecision?.generatedDate || exitDecision?.generatedAt || new Date().toISOString();
+    // exitDate is the candle date the exit criteria was first met (resolved by
+    // lifecycleRow). The close price is resolved at/before that date.
     const exitPriceSnap = await this.exitPrice(row.instrumentId, exitDate, query);
     const closePrice = this.sourceProvenClosePrice(exitPriceSnap);
     const exitEvidence = this.exitEvidenceForDecision(exitDecision);
@@ -892,8 +961,10 @@ export class SignalPositionLedgerService {
     };
   }
 
-  private async invalidatedRow(row: SignalPositionLedgerActiveRow, snapshots: SignalPositionLedgerRowSnapshots, query: Pick<SignalPositionLedgerActiveQuery, 'region' | 'assetType'>): Promise<SignalPositionLedgerActiveRow> {
-    const exitDecision = snapshots.exitDecision, exitDate = exitDecision?.generatedDate || exitDecision?.generatedAt || new Date().toISOString();
+  private async invalidatedRow(row: SignalPositionLedgerActiveRow, snapshots: SignalPositionLedgerRowSnapshots, query: Pick<SignalPositionLedgerActiveQuery, 'region' | 'assetType'>, exitDate: string): Promise<SignalPositionLedgerActiveRow> {
+    const exitDecision = snapshots.exitDecision;
+    // exitDate is the candle date invalidation was first met (resolved by
+    // lifecycleRow); close price resolved at/before that date.
     const ep = await this.exitPrice(row.instrumentId, exitDate, query), cp = this.sourceProvenClosePrice(ep);
     const adjE = await adjustedEntryPrice(this.repository as any, row.instrumentId, row.entryTriggerTimestamp, row.entryTriggerPrice, query, cp);
     const ret = adjE !== null && adjE > 0 && cp !== null ? Number((((cp - adjE) / adjE) * 100).toFixed(4)) : adjE === null ? null : row.currentReturnPercent;
@@ -904,19 +975,7 @@ export class SignalPositionLedgerService {
       currentReturnPercent: cp !== null ? ret : row.currentReturnPercent, currentReturnStatus: cp !== null && adjE !== null ? 'CURRENT' : adjE === null ? 'UNAVAILABLE' : row.currentReturnStatus,
       latestTrustedPriceDate: ep?.date ?? row.latestTrustedPriceDate, latestTrustedPrice: cp ?? row.latestTrustedPrice,
       invalidationSourceDecisionId: exitDecision?.id ?? null, invalidationRuleIds: exitDecision?.invalidationRulesTriggered ?? [],
-      invalidationTimestamp: exitDecision?.generatedAt ?? new Date().toISOString(), closedAt: cp !== null ? exitDate : null,
-    };
-  }
-
-  private riskWarningRow(row: SignalPositionLedgerActiveRow, snapshots: SignalPositionLedgerRowSnapshots): SignalPositionLedgerActiveRow {
-    return {
-      ...this.withCurrentEvidence(row, snapshots),
-      ...this.exitEvidenceForDecision(snapshots.exitDecision),
-      status: 'RISK_WARNING',
-      healthState: 'RISK_WARNING',
-      lifecycleEvidenceStatus: 'RISK_WARNING',
-      closePriceStatus: 'UNAVAILABLE',
-      closedAt: null,
+      invalidationTimestamp: exitDate, closedAt: cp !== null ? exitDate : null,
     };
   }
 
@@ -950,9 +1009,16 @@ export class SignalPositionLedgerService {
       triggerContract: {} as any,
     })), query);
     const adjMap = await adjustedEntryPricesBatch(this.repository as any, untouched.map((r) => ({ instrumentId: r.instrumentId, entryTimestamp: r.entryTriggerTimestamp, storedEntryPrice: r.entryTriggerPrice })), query);
+    // Batch historical close evidence for all untouched rows (the bulk close path).
+    const repo = this.repository as any;
+    const evidenceMap: Map<string, { exitDate: string | null; invalidationDate: string | null }> =
+      typeof repo.firstCloseEvidenceDates === 'function'
+        ? await repo.firstCloseEvidenceDates(untouched.map((r) => ({ instrumentId: r.instrumentId, entryDate: r.entryTriggerTimestamp })))
+        : new Map();
     for (const row of untouched) {
       const rowSnapshots = snapshots.get(row.instrumentId) ?? this.emptySnapshots();
-      const lifecycleRow = await this.lifecycleRow(row, rowSnapshots, query);
+      const evidence = evidenceMap.get(row.instrumentId) ?? { exitDate: null, invalidationDate: null };
+      const lifecycleRow = await this.lifecycleRow(row, rowSnapshots, query, evidence);
       if (lifecycleRow?.status === 'CLOSED' || lifecycleRow?.status === 'INVALIDATED') {
         await this.persistTerminalRow(lifecycleRow);
         state.rows.delete(lifecycleRow.ledgerKey);
@@ -964,6 +1030,16 @@ export class SignalPositionLedgerService {
         const adjE = adjMap.get(row.instrumentId), useRow = adjE != null && adjE !== row.entryTriggerPrice ? { ...row, entryTriggerPrice: adjE } : row;
         const refreshed = this.withCurrentEvidence(adjE === null ? row : useRow, rowSnapshots);
         if (adjE === null) { refreshed.currentReturnPercent = null; refreshed.currentReturnStatus = 'UNAVAILABLE'; }
+        // Owner policy (2026-06-23): RISK_WARNING is a defunct resting status. A position
+        // that lifecycleRow leaves open (no current exit/invalidation evidence) is a
+        // continuing position and rests as ACTIVE. Any stale RISK_WARNING carried over
+        // from the prior policy is normalized here so nothing rests in RISK_WARNING.
+        // Data degradation stays visible via currentDataQualityStatus/currentReturnStatus.
+        if (refreshed.status === 'RISK_WARNING') {
+          refreshed.status = 'ACTIVE';
+          refreshed.healthState = null;
+          refreshed.lifecycleEvidenceStatus = 'ACTIVE_ENTRY';
+        }
         await this.persistActiveRow(refreshed);
         state.rows.set(refreshed.ledgerKey, refreshed);
       }
@@ -1015,7 +1091,11 @@ export class SignalPositionLedgerService {
         latestTrustedPrice: closePrice,
         currentReturnPercent: realizedReturnPercent,
         currentReturnStatus: retSt,
-        closedAt: new Date().toISOString(),
+        // Close DATE must reflect the candle the exit criterion was met, never the
+        // refresh-run date. (The fill price is the first source-proven tick on/after
+        // that candle, since no at/before price existed — that is why this row was
+        // EXIT_TRIGGERED — but the close date stays historical.)
+        closedAt: row.exitTriggerTimestamp ?? closePriceSnapshot!.date,
       };
 
       await this.persistTerminalRow(closedRow);
