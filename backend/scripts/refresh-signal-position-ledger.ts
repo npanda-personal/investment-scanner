@@ -3,6 +3,7 @@
  * Run: npx ts-node --transpile-only scripts/refresh-signal-position-ledger.ts
  */
 import { SignalPositionLedgerService } from '../src/modules/signal-position-ledger';
+import { runScript } from './_run-script';
 
 async function main() {
   const svc = new SignalPositionLedgerService();
@@ -18,10 +19,6 @@ async function main() {
   console.log('materializedRowCount:', progress.materializedRowCount);
   if (progress.warnings.length) console.log('warnings:', progress.warnings);
   if (progress.errors.length) console.log('errors:', progress.errors);
-  process.exit(0);
 }
 
-main().catch((e) => {
-  console.error('Refresh failed:', e.message ?? e);
-  process.exit(1);
-});
+runScript(main);

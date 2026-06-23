@@ -1,5 +1,6 @@
 /** READ-ONLY probe: how many distinct Binance spot base assets per USD-pegged quote. */
 import { fetchBinanceSpotPairs } from '../src/modules/market-data-foundation/market-data-foundation.crypto-provider';
+import { runScript } from './_run-script';
 
 async function main() {
   const pairs = await fetchBinanceSpotPairs();
@@ -20,4 +21,4 @@ async function main() {
   console.log('[probe] distinct base assets across all USD-quotes:', baseUnion.size);
 }
 
-main().catch((e) => { console.error(e); process.exitCode = 1; });
+runScript(main);

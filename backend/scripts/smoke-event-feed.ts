@@ -3,6 +3,7 @@
  * Run: npx ts-node scripts/smoke-event-feed.ts
  */
 import { getEventFeed } from '../src/modules/market-intelligence/event-feed.service';
+import { runScript } from './_run-script';
 
 async function main() {
   console.log('=== Market Events Smoke Test ===\n');
@@ -35,11 +36,6 @@ async function main() {
   for (const [type, count] of Object.entries(byType)) {
     console.log(`  ${type}: ${count}`);
   }
-
-  process.exit(0);
 }
 
-main().catch((err) => {
-  console.error('Smoke test failed:', err);
-  process.exit(1);
-});
+runScript(main);

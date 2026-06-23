@@ -7,6 +7,7 @@
  *   npx ts-node scripts/crypto-universe-dryrun.ts --limit=500
  */
 import { fetchCryptoUniverse } from '../src/modules/market-data-foundation/market-data-foundation.crypto-provider';
+import { runScript } from './_run-script';
 
 async function main() {
   const limitArg = process.argv.slice(2).find((a) => a.startsWith('--limit='));
@@ -27,7 +28,4 @@ async function main() {
   console.log(`[dryrun] warnings:`); warnings.forEach((w) => console.log('   -', w));
 }
 
-main().catch((e) => {
-  console.error('[dryrun] error:', e);
-  process.exitCode = 1;
-});
+runScript(main);

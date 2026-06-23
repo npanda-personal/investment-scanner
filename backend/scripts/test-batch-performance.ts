@@ -1,4 +1,5 @@
 import { TradePlanRiskEngineService } from '../src/modules/trade-plan-risk-engine/trade-plan-risk-engine.service';
+import { runScript } from './_run-script';
 
 async function run() {
   console.log('Testing Batch Generate Performance...');
@@ -43,4 +44,4 @@ async function run() {
   service.generatePlan = originalGenerate;
 }
 
-run().catch(console.error);
+runScript(run);

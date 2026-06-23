@@ -4,6 +4,7 @@
  * Usage: npx ts-node --transpile-only scripts/seed-market-scan-snapshots.ts [--region US] [--asset-type STOCK]
  */
 import { MarketDataFoundationService } from '../src/modules/market-data-foundation/market-data-foundation.service';
+import { runScript } from './_run-script';
 
 function parseArgs(argv: string[]) {
   const args = { region: 'IN', assetType: 'STOCK' };
@@ -37,10 +38,6 @@ async function main() {
       console.log('[verify] first 52w-high result:', scan52wHigh.results[0]);
     }
   }
-  process.exit(0);
 }
 
-main().catch((e) => {
-  console.error('[seed] FATAL:', e);
-  process.exit(1);
-});
+runScript(main);

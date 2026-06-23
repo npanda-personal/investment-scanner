@@ -3,6 +3,7 @@ import {
   NseXbrlFundamentalsCsvExporter,
   normalizeSymbols,
 } from '../src/modules/market-data-foundation/market-data-foundation.nse-xbrl-fundamentals-exporter';
+import { runScript } from './_run-script';
 
 interface CliOptions {
   symbols: string[];
@@ -81,7 +82,4 @@ const readNonNegativeInteger = (value: string | undefined, fallback: number): nu
   return Number.isInteger(parsed) && parsed >= 0 ? parsed : fallback;
 };
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exitCode = 1;
-});
+runScript(main);

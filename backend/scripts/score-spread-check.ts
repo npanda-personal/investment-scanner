@@ -13,6 +13,8 @@
  *   cd backend && npx ts-node --transpile-only scripts/score-spread-check.ts
  */
 
+import { runScript } from './_run-script';
+
 // ── Inline the scoring constants (mirrors signal-generation-engine.service.ts) ──
 
 const TECHNICAL_WEIGHT   = 0.4;
@@ -124,6 +126,8 @@ const cases: Case[] = [
 ];
 
 // ── Run ────────────────────────────────────────────────────────────────────────
+
+runScript(async () => {
 
 console.log('\n── v3 Conviction Gradient: Score Spread Check ────────────────────────────────');
 console.log('');
@@ -324,7 +328,9 @@ if (allPassed && monoPass && bearMonoPass && guardCheck) {
   console.log('ALL CHECKS PASSED');
 } else {
   console.log('SOME CHECKS FAILED — review output above');
-  process.exit(1);
+  throw new Error('score-spread-check: one or more checks failed');
 }
 console.log('─'.repeat(100));
 console.log('');
+
+}); // runScript
