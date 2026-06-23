@@ -24,9 +24,18 @@ function resolveRepoRoot(): string {
 
 // In-process guard so overlapping pipeline completions don't stack publishes.
 let isPublishing = false;
+// One-time log so an OFF flag is diagnosable instead of silently no-op'ing on
+// every pipeline completion (the failure mode that hid a stale demo for days).
+let loggedDisabled = false;
 
 export function triggerDemoPublishIfEnabled(summary: DagAlertSummary): void {
-  if (process.env.DEMO_AUTO_PUBLISH !== 'true') return;
+  if (process.env.DEMO_AUTO_PUBLISH !== 'true') {
+    if (!loggedDisabled) {
+      console.log('[DemoPublish] disabled (DEMO_AUTO_PUBLISH != "true") — skipping auto-publish on pipeline completion');
+      loggedDisabled = true;
+    }
+    return;
+  }
   if (!['IN', 'US'].includes(summary.region) || summary.assetType !== 'STOCK') return;
   if (summary.runStatus !== 'COMPLETED' && summary.runStatus !== 'PARTIAL') return;
 
