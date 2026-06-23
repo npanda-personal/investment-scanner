@@ -80,6 +80,64 @@ const earningsTabs = [
   { label: 'Result Reaction History', value: 'RESULT_REACTION_HISTORY' },
   { label: 'Earnings Watchlist', value: 'EARNINGS_WATCHLIST' },
 ];
+
+// The FE flattens every backend category bucket into one list and the generic
+// RadarPage filters that single list per tab — so without this, every tab
+// inherits the same flatten order (UPCOMING-first) and the overlapping stocks
+// lead all of them with identical rows.  This sorts each tab's already-filtered
+// rows by that tab's OWN relevance so the tabs no longer lead the same way.
+// Membership is unchanged — a stock can still appear under several tabs.
+const num = (value: number | null | undefined, fallback: number): number =>
+  typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+
+// Forward-date reliability tier (mirrors the backend upcoming bucket order):
+// official board-meeting date > estimated-from-cadence > no/past date.
+function earningsUpcomingTier(row: EarningsIntelligenceSnapshot): number {
+  if (row.daysToResult === null || row.daysToResult === undefined) return 0;
+  if (row.resultDateSource === 'OFFICIAL_CALENDAR') return 2;
+  if (row.resultDateSource === 'ESTIMATED_FROM_CADENCE') return 1;
+  return 0;
+}
+
+function orderEarningsRowsForTab(
+  rows: EarningsIntelligenceSnapshot[],
+  tab: string,
+): EarningsIntelligenceSnapshot[] {
+  const sorted = [...rows];
+  const FAR = Number.MAX_SAFE_INTEGER;
+  switch (tab) {
+    case 'UPCOMING_RESULTS':
+    case 'PRE_RESULT_INTEREST':
+      // Soonest, most-reliable forward date first.
+      return sorted.sort((a, b) =>
+        earningsUpcomingTier(b) - earningsUpcomingTier(a)
+        || num(a.daysToResult, FAR) - num(b.daysToResult, FAR)
+        || num(b.consistencyScore, 0) - num(a.consistencyScore, 0));
+    case 'RESULT_WINNERS':
+      // Strongest reported result first (biggest profit growth).
+      return sorted.sort((a, b) =>
+        num(b.profitGrowth, -FAR) - num(a.profitGrowth, -FAR)
+        || num(b.accelerationScore, 0) - num(a.accelerationScore, 0));
+    case 'RESULT_DISAPPOINTMENTS':
+      // Weakest reported result first (steepest profit decline).
+      return sorted.sort((a, b) =>
+        num(a.profitGrowth, FAR) - num(b.profitGrowth, FAR)
+        || num(a.accelerationScore, 0) - num(b.accelerationScore, 0));
+    case 'RESULT_REACTION_HISTORY':
+      // Most recent reported result first.
+      return sorted.sort((a, b) => (b.resultDate ?? '').localeCompare(a.resultDate ?? ''));
+    case 'EARNINGS_WATCHLIST':
+      // Highest result-consistency quality first; many rows saturate the
+      // quality scores, so break ties toward the most recent result.
+      return sorted.sort((a, b) =>
+        num(b.consistencyScore, -FAR) - num(a.consistencyScore, -FAR)
+        || num(b.accelerationScore, 0) - num(a.accelerationScore, 0)
+        || (b.resultDate ?? '').localeCompare(a.resultDate ?? ''));
+    default:
+      return sorted;
+  }
+}
+
 const compounderTabs = [
   { label: 'Consistent Growth', value: 'CONSISTENT_GROWTH' },
   { label: 'Quality + Growth', value: 'QUALITY_GROWTH' },
@@ -219,6 +277,7 @@ export function EarningsIntelligencePage() {
       error={view.error}
       missingTitle="Earnings Intelligence data not available yet."
       getRowCategories={(row) => (row as EarningsIntelligenceSnapshot).categories}
+      orderRowsForTab={(rows, tab) => orderEarningsRowsForTab(rows as EarningsIntelligenceSnapshot[], tab) as typeof rows}
       renderTable={(rows) => <EarningsTable rows={rows as EarningsIntelligenceSnapshot[]} />}
       tabEmptyMessages={EARNINGS_EMPTY_MESSAGES}
     />
@@ -471,6 +530,7 @@ function RadarPage<T>({
   getRowCategories,
   renderTable,
   tabEmptyMessages,
+  orderRowsForTab,
 }: {
   title: string;
   subtitle: string;
@@ -484,11 +544,15 @@ function RadarPage<T>({
   renderTable: (rows: T[]) => ReactNode;
   /** Optional per-tab empty-state messages keyed by tab value. */
   tabEmptyMessages?: Record<string, string>;
+  /** Optional per-tab sort applied to the already-filtered rows so each tab
+   *  leads with its own most-relevant rows instead of the shared flatten order. */
+  orderRowsForTab?: (rows: T[], tabValue: string) => T[];
 }) {
   const [activeTab, setActiveTab] = useState(tabs[0]?.value ?? '');
   const activeLabel = tabs.find((tab) => tab.value === activeTab)?.label ?? activeTab;
   const rows = envelope?.snapshot ?? [];
-  const filteredRows = rows.filter((row) => getRowCategories(row).includes(activeTab));
+  const matchedRows = rows.filter((row) => getRowCategories(row).includes(activeTab));
+  const filteredRows = orderRowsForTab ? orderRowsForTab(matchedRows, activeTab) : matchedRows;
   const emptyMessage = tabEmptyMessages?.[activeTab]
     ?? `No ${activeLabel} rows in stored data.`;
 
