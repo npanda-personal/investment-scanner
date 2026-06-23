@@ -81,7 +81,7 @@ async function main() {
 
   // 4. Commit (scoped) + push.
   const today = new Date().toISOString().slice(0, 10);
-  await git('commit', '-m', `chore(demo): auto-refresh demo data (data through ${today})`, '--', DEMO_DIR);
+  await git('commit', '-m', `chore(demo): refresh US/IN/Crypto data (data through ${today})`, '--', DEMO_DIR);
   console.log(`· committed; pushing to origin/${TARGET_BRANCH}…`);
   await git('push', 'origin', TARGET_BRANCH);
   console.log('✓ demo data published — Pages will redeploy.');
