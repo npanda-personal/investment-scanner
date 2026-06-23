@@ -4,6 +4,7 @@
  * Holidays/weekends simply fail to download → logged and skipped.
  */
 import { MarketDataFoundationService } from '../src/modules/market-data-foundation/market-data-foundation.service';
+import { runScript } from './_run-script';
 
 async function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
@@ -45,7 +46,6 @@ async function main() {
 
   console.log('\n=== SUMMARY ===');
   for (const r of results) console.log(`${r.date} | ${r.status} | ${r.detail}`);
-  process.exit(0);
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+runScript(main);

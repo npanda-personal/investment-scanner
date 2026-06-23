@@ -7,6 +7,7 @@
  */
 import { MarketPulseSnapshotService } from '../src/modules/market-context-intelligence/market-pulse-snapshot.service';
 import { SignalQualityLabService } from '../src/modules/signal-quality-lab/signal-quality-lab.service';
+import { runScript } from './_run-script';
 
 async function main() {
   const pulse = new MarketPulseSnapshotService();
@@ -33,7 +34,6 @@ async function main() {
     if (batch > 500) { console.log('safety stop at 500 batches'); break; }
   }
   console.log('done');
-  process.exit(0);
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+runScript(main);

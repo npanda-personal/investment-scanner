@@ -8,6 +8,7 @@
 import { NseXbrlFundamentalsCsvExporter } from '../src/modules/market-data-foundation/market-data-foundation.nse-xbrl-fundamentals-exporter';
 import os from 'os';
 import path from 'path';
+import { runScript } from './_run-script';
 
 async function main() {
   const symbols = ['RELIANCE', 'TCS', 'INFY'];
@@ -35,4 +36,4 @@ async function main() {
   console.log('\nSanity check (approx absolute INR, recent quarter): RELIANCE revenue ~2.3-2.5e12, TCS ~6.0-6.5e11, INFY ~3.8-4.2e11');
 }
 
-main().catch((e) => { console.error('VERIFY FAILED:', e?.message || e); process.exitCode = 1; });
+runScript(main);
