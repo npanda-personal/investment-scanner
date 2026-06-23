@@ -138,6 +138,18 @@ export interface EarningsIntelligenceSnapshot {
   riskTags: string[];
   warnings?: string[];
   freshness?: string | null;
+  stockId?: string;
+  /** Current trading signal joined read-time; null = no trusted signal, undefined = join skipped. */
+  signal?: EarningsSignalSummary | null;
+}
+
+export interface EarningsSignalSummary {
+  direction: string;
+  score: number;
+  confidence: string;
+  lifecycleState: string | null;
+  triggerPrice: number | null;
+  generatedDate: string | null;
 }
 
 export interface CompounderSnapshot {

@@ -266,7 +266,9 @@ export async function fetchStockInterestRadarSnapshot(scope: MarketScope): Promi
 
 export async function fetchEarningsIntelligenceSnapshot(scope: MarketScope): Promise<SnapshotEnvelope<EarningsIntelligenceSnapshot[]>> {
   try {
-    const response = await axios.get<BackendEarningsResponse>(`${API_BASE}/earnings`, { params: params(scope) });
+    // Request the backend max (100) per category so the tables show meaningful
+    // breadth rather than the default 25.  "N of M" header surfaces any cap.
+    const response = await axios.get<BackendEarningsResponse>(`${API_BASE}/earnings`, { params: { ...params(scope), limit: 100 } });
     const body = response.data;
     const categoryRows = Object.values(body.categories || {}).flat();
     const sourceRows = categoryRows.length > 0 ? categoryRows : body.items || [];

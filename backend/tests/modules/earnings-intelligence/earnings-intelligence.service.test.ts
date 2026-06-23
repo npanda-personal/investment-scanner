@@ -29,6 +29,7 @@ function fundamental(
 function persistedRow(categories: EarningsSnapshotDto['categories']): EarningsSnapshotDto {
   return {
     id: 'earnings-1',
+    stockId: 'stock-1',
     snapshotDate: '2026-06-01T00:00:00.000Z',
     dataThroughDate: '2026-05-31T00:00:00.000Z',
     symbol: 'AAA',
@@ -106,6 +107,67 @@ describe('EarningsIntelligenceService', () => {
     expect(winner.periodEndDate?.toISOString()).toBe('2026-03-31T00:00:00.000Z');
     expect(winner.validatedAt?.toISOString()).toBe('2026-05-11T00:00:00.000Z');
     expect(winner.warnings).toEqual([]);
+  });
+
+  it('classifies a conflicting result into exactly one bucket and tags MIXED_RESULT', () => {
+    const service = new EarningsIntelligenceService({} as any);
+    // Strong revenue/profit growth + positive price reaction (winner gates) BUT a
+    // material EPS decline (disappointment gate): the two guardrails both fire.
+    const snapshot = service.calculateSnapshot({
+      stockId: 'stock-1',
+      symbol: 'AAA',
+      region: 'IN',
+      assetType: 'STOCK',
+      snapshotDate: new Date('2026-06-01T00:00:00.000Z'),
+      dataThroughDate: null,
+      fundamentals: [
+        fundamental('2026-03-31', 130, 18, 0.9, {
+          officialResultDate: new Date('2026-05-10T00:00:00.000Z'),
+          validatedAt: new Date('2026-05-11T00:00:00.000Z'),
+        }),
+        fundamental('2025-03-31', 100, 10, 1.0),
+      ],
+      prices: [
+        { symbol: 'AAA', timestamp: new Date('2026-05-08T00:00:00.000Z'), close: 100, adjustedClose: 100, volume: 1000 },
+        { symbol: 'AAA', timestamp: new Date('2026-05-16T00:00:00.000Z'), close: 106, adjustedClose: 106, volume: 1200 },
+      ],
+      deliverySnapshots: [],
+    });
+
+    // Net evidence leans positive → Winner; never both tabs at once.
+    expect(snapshot.categories).toContain('RESULT_WINNERS');
+    expect(snapshot.categories).not.toContain('RESULT_DISAPPOINTMENTS');
+    expect(snapshot.reasonTags).toContain('MIXED_RESULT');
+  });
+
+  it('routes a conflicting result to Disappointment when the miss dominates (magnitude-aware)', () => {
+    const service = new EarningsIntelligenceService({} as any);
+    // Small revenue/profit gains + a positive reaction satisfy the winner gates,
+    // but a 40% EPS collapse dominates on magnitude → Disappointment, tagged mixed.
+    const snapshot = service.calculateSnapshot({
+      stockId: 'stock-1',
+      symbol: 'AAA',
+      region: 'IN',
+      assetType: 'STOCK',
+      snapshotDate: new Date('2026-06-01T00:00:00.000Z'),
+      dataThroughDate: null,
+      fundamentals: [
+        fundamental('2026-03-31', 108, 11, 0.6, {
+          officialResultDate: new Date('2026-05-10T00:00:00.000Z'),
+          validatedAt: new Date('2026-05-11T00:00:00.000Z'),
+        }),
+        fundamental('2025-03-31', 100, 10, 1.0),
+      ],
+      prices: [
+        { symbol: 'AAA', timestamp: new Date('2026-05-08T00:00:00.000Z'), close: 100, adjustedClose: 100, volume: 1000 },
+        { symbol: 'AAA', timestamp: new Date('2026-05-16T00:00:00.000Z'), close: 106, adjustedClose: 106, volume: 1200 },
+      ],
+      deliverySnapshots: [],
+    });
+
+    expect(snapshot.categories).toContain('RESULT_DISAPPOINTMENTS');
+    expect(snapshot.categories).not.toContain('RESULT_WINNERS');
+    expect(snapshot.reasonTags).toContain('MIXED_RESULT');
   });
 
   it('reports DATE_TBA (never fabricates a forward date) and keeps estimated rows out of UPCOMING_RESULTS', () => {
@@ -388,7 +450,9 @@ describe('EarningsIntelligenceService', () => {
         dataThroughDate: '2026-05-31',
       }),
     };
-    const service = new EarningsIntelligenceService(repository as any);
+    // Disable the read-time signal join (null reader) so this unit test stays
+    // pure — no real signal engine / DB access.
+    const service = new EarningsIntelligenceService(repository as any, undefined, null);
 
     const response = await service.latest({ region: 'IN', assetType: 'STOCK', limit: 10, category: 'RESULT_WINNERS' }, new Date('2026-06-01T06:00:00.000Z'));
 
@@ -400,6 +464,85 @@ describe('EarningsIntelligenceService', () => {
     });
     expect(response.categories.RESULT_WINNERS).toHaveLength(1);
     expect(response.items[0].symbol).toBe('AAA');
+  });
+
+  it('joins the latest trusted signal onto each row at read time', async () => {
+    const repository = {
+      latestSnapshot: jest.fn().mockResolvedValue({
+        rows: [persistedRow(['RESULT_WINNERS', 'EARNINGS_WATCHLIST'])],
+        truncated: false,
+        snapshotDate: '2026-06-01',
+        dataThroughDate: '2026-05-31',
+      }),
+    };
+    const signalReader = {
+      latestPersistedForInstruments: jest.fn().mockResolvedValue([
+        {
+          instrument_id: 'stock-1',
+          symbol: 'AAA',
+          score: 71,
+          calibratedScore: 80,
+          direction: 'BULLISH',
+          confidence: 'HIGH',
+          lifecycleState: 'ENTRY',
+          triggerPrice: 1234.5,
+          generated_at: '2026-05-30T00:00:00.000Z',
+        },
+      ]),
+    };
+    const service = new EarningsIntelligenceService(repository as any, undefined, signalReader as any);
+
+    const response = await service.latest({ region: 'IN', assetType: 'STOCK', limit: 10 }, new Date('2026-06-01T06:00:00.000Z'));
+
+    expect(signalReader.latestPersistedForInstruments).toHaveBeenCalledWith(['stock-1']);
+    expect(response.items[0].signal).toEqual({
+      direction: 'BULLISH',
+      score: 80, // calibrated preferred over raw
+      confidence: 'HIGH',
+      lifecycleState: 'ENTRY',
+      triggerPrice: 1234.5,
+      generatedDate: '2026-05-30T00:00:00.000Z',
+    });
+    // Same row reference is shared with the category bucket.
+    expect(response.categories.RESULT_WINNERS[0].signal?.direction).toBe('BULLISH');
+  });
+
+  it('sets signal=null for rows with no trusted signal and never blocks the read', async () => {
+    const repository = {
+      latestSnapshot: jest.fn().mockResolvedValue({
+        rows: [persistedRow(['RESULT_WINNERS'])],
+        truncated: false,
+        snapshotDate: '2026-06-01',
+        dataThroughDate: '2026-05-31',
+      }),
+    };
+    const signalReader = { latestPersistedForInstruments: jest.fn().mockResolvedValue([]) };
+    const service = new EarningsIntelligenceService(repository as any, undefined, signalReader as any);
+
+    const response = await service.latest({ region: 'IN', assetType: 'STOCK', limit: 10 }, new Date('2026-06-01T06:00:00.000Z'));
+
+    expect(response.items[0].signal).toBeNull();
+  });
+
+  it('leaves signal undefined and warns (not null) when the signal join throws', async () => {
+    const repository = {
+      latestSnapshot: jest.fn().mockResolvedValue({
+        rows: [persistedRow(['RESULT_WINNERS'])],
+        truncated: false,
+        snapshotDate: '2026-06-01',
+        dataThroughDate: '2026-05-31',
+      }),
+    };
+    const signalReader = {
+      latestPersistedForInstruments: jest.fn().mockRejectedValue(new Error('signal store down')),
+    };
+    const service = new EarningsIntelligenceService(repository as any, undefined, signalReader as any);
+
+    const response = await service.latest({ region: 'IN', assetType: 'STOCK', limit: 10 }, new Date('2026-06-01T06:00:00.000Z'));
+
+    // undefined (join failed) is distinct from null (no trusted signal).
+    expect(response.items[0].signal).toBeUndefined();
+    expect(response.warnings.some((w) => w.toLowerCase().includes('signal enrichment failed'))).toBe(true);
   });
 
   // ── CB-44: official date preferred; estimated clearly labeled ────────────────
@@ -597,7 +740,7 @@ describe('EarningsIntelligenceService', () => {
         dataThroughDate: '2026-05-31',
       }),
     };
-    const service = new EarningsIntelligenceService(repository as any);
+    const service = new EarningsIntelligenceService(repository as any, undefined, null);
 
     const response = await service.latest({ region: 'MARS', assetType: 'STOCK', limit: 10 }, new Date('2026-06-01T06:00:00.000Z'));
 

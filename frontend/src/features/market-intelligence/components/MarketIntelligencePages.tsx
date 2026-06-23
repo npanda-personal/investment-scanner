@@ -1225,6 +1225,36 @@ function ResultDateCell({ resultDate, resultDateLabel }: { resultDate: string | 
   );
 }
 
+// Compact read-time signal posture for an earnings row.  Research-support framing:
+// a candidate posture for review, never a buy/sell call.  null = no trusted signal
+// for this instrument; undefined = the signal join was skipped for this snapshot.
+function SignalCell({ signal }: { signal?: EarningsIntelligenceSnapshot['signal'] }) {
+  if (signal === undefined) return <Box component="span" sx={{ color: 'text.disabled' }}>—</Box>;
+  if (signal === null) return <Box component="span" sx={{ color: 'text.disabled' }}>No signal</Box>;
+  const dir = (signal.direction || '').toUpperCase();
+  const color: 'success' | 'error' | 'default' = dir === 'BULLISH' ? 'success' : dir === 'BEARISH' ? 'error' : 'default';
+  const dirLabel = dir ? dir.charAt(0) + dir.slice(1).toLowerCase() : 'Neutral';
+  const lifecycle = signal.lifecycleState ? humanizeCode(signal.lifecycleState) : null;
+  const tooltip = [
+    `Direction: ${dirLabel}`,
+    `Signal quality: ${formatOptional(signal.score)}`,
+    `Confidence: ${signal.confidence ? humanizeCode(signal.confidence) : '—'}`,
+    lifecycle ? `Lifecycle: ${lifecycle}` : null,
+    signal.triggerPrice != null ? `Trigger reference: ${money(signal.triggerPrice)}` : null,
+  ].filter(Boolean).join('\n');
+  return (
+    <Tooltip title={<span style={{ whiteSpace: 'pre-line' }}>{tooltip}</span>} arrow>
+      <Chip
+        size="small"
+        color={color}
+        variant="outlined"
+        label={`${dirLabel} · ${formatOptional(signal.score)}${lifecycle ? ` · ${lifecycle}` : ''}`}
+        sx={{ fontWeight: 600 }}
+      />
+    </Tooltip>
+  );
+}
+
 function EarningsTable({ rows }: { rows: EarningsIntelligenceSnapshot[] }) {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
@@ -1253,6 +1283,7 @@ function EarningsTable({ rows }: { rows: EarningsIntelligenceSnapshot[] }) {
             <TableCell align="right">Rev Growth</TableCell>
             <TableCell align="right">Profit Growth</TableCell>
             <TableCell align="right">Consistency</TableCell>
+            <TableCell>Signal</TableCell>
             <TableCell>Reasons</TableCell>
             {showAllColumns && (
               <>
@@ -1284,6 +1315,7 @@ function EarningsTable({ rows }: { rows: EarningsIntelligenceSnapshot[] }) {
                 <TableCell align="right" sx={numericCellSx}>{formatPercentPoints(row.revenueGrowth)}</TableCell>
                 <TableCell align="right" sx={numericCellSx}>{formatPercentPoints(row.profitGrowth)}</TableCell>
                 <TableCell align="right" sx={numericCellSx}>{formatOptional(row.consistencyScore)}</TableCell>
+                <TableCell sx={{ whiteSpace: 'nowrap' }}><SignalCell signal={row.signal} /></TableCell>
                 <TableCell><ReasonTags tags={row.reasonTags.map(humanizeCode)} /></TableCell>
                 {showAllColumns && (
                   <>

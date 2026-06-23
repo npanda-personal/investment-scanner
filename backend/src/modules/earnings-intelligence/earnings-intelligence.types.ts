@@ -63,8 +63,25 @@ export interface EarningsIntelligenceRefreshResult {
   categories: Record<EarningsIntelligenceCategory, number>;
 }
 
+/**
+ * Compact view of the stock's CURRENT trading signal, joined read-time from the
+ * persisted signal-generation-engine snapshot (no live generation).  Present only
+ * when a TRUSTED signal exists for the instrument; null/absent otherwise.
+ * Research-support framing: a candidate posture for review, never a buy/sell call.
+ */
+export interface EarningsSignalSummary {
+  direction: 'BULLISH' | 'NEUTRAL' | 'BEARISH' | string;
+  score: number;
+  confidence: 'LOW' | 'MEDIUM' | 'HIGH' | string;
+  lifecycleState: 'ENTRY' | 'ACTIVE' | 'EXIT' | 'EXPIRED' | string | null;
+  triggerPrice: number | null;
+  generatedDate: string | null;
+}
+
 export interface EarningsSnapshotDto {
   id: string;
+  /** Instrument id (Stock.id) — used to join signals/technicals; also lets the UI deep-link. */
+  stockId: string;
   snapshotDate: string;
   dataThroughDate: string | null;
   symbol: string;
@@ -97,6 +114,13 @@ export interface EarningsSnapshotDto {
   warnings: string[];
   freshness: EarningsFreshness | string;
   categories: EarningsIntelligenceCategory[];
+  /**
+   * Current trading signal for this instrument, joined read-time from the
+   * persisted signal snapshot.  null when no trusted signal exists (e.g. the
+   * instrument is outside current signal coverage).  Undefined only if the
+   * signal join was skipped/failed for the whole response (see warnings).
+   */
+  signal?: EarningsSignalSummary | null;
 }
 
 export interface EarningsIntelligenceResponse {

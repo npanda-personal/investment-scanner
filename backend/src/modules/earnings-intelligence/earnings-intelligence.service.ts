@@ -1,5 +1,7 @@
 import { EarningsIntelligenceRepository } from './earnings-intelligence.repository';
 import { addTradingSessions } from '../market-data-foundation';
+import { SignalGenerationEngineService } from '../signal-generation-engine';
+import type { SignalResultDto } from '../signal-generation-engine';
 import { CALCULATION_VERSION } from './earnings-intelligence.constants';
 import {
   EARNINGS_INTELLIGENCE_CATEGORIES,
@@ -36,10 +38,20 @@ import type {
   EarningsPricePointInput,
   EarningsProvenanceSummary,
   EarningsResultDateSource,
+  EarningsSignalSummary,
   EarningsSnapshotCalculationInput,
   EarningsSnapshotDto,
   EarningsSnapshotUpsertInput,
 } from './earnings-intelligence.types';
+
+/**
+ * Minimal read surface the earnings module needs from the signal engine.
+ * Declared structurally so tests can inject a stub and so the dependency stays
+ * one-directional (earnings → signals, never the reverse).
+ */
+export interface EarningsSignalReader {
+  latestPersistedForInstruments(instrumentIds: string[]): Promise<SignalResultDto[]>;
+}
 
 export class EarningsIntelligenceService {
   /**
@@ -49,10 +61,36 @@ export class EarningsIntelligenceService {
    *                        engine is region-aware out of the box, but any caller
    *                        can supply bespoke tuning without touching the engine.
    */
+  /**
+   * Lazily-resolved signal reader.  `undefined` = not yet resolved (build the
+   * production default on first use); `null` = explicitly disabled (skip the join).
+   */
+  private signalReader: EarningsSignalReader | null | undefined;
+
   constructor(
     private readonly repository = new EarningsIntelligenceRepository(),
-    private readonly resolveConfig: EarningsRegionConfigResolver = getEarningsRegionConfig
-  ) {}
+    private readonly resolveConfig: EarningsRegionConfigResolver = getEarningsRegionConfig,
+    signalReader?: EarningsSignalReader | null,
+  ) {
+    this.signalReader = signalReader;
+  }
+
+  /**
+   * Resolve the signal reader on first use.  Defaults to the real
+   * SignalGenerationEngineService (constructed lazily so its heavy dependency
+   * graph is not built at module import time).  A construction failure degrades
+   * gracefully to "no signal join" rather than breaking the earnings read.
+   */
+  private getSignalReader(): EarningsSignalReader | null {
+    if (this.signalReader === undefined) {
+      try {
+        this.signalReader = new SignalGenerationEngineService();
+      } catch {
+        this.signalReader = null;
+      }
+    }
+    return this.signalReader;
+  }
 
   private regionConfig(region: string): EarningsRegionConfig {
     return this.resolveConfig(region);
@@ -125,6 +163,15 @@ export class EarningsIntelligenceService {
       items = latest.rows.slice(0, normalized.limit);
     }
 
+    // Read-time signal join.  Bounded to ONLY the rows actually serialized to the
+    // client (items + the capped category buckets) — never the full up-to-5000-row
+    // fetch — so the per-instrument signal lookups stay proportional to the page,
+    // not the universe (connection-pool safety).  Mutates the shared row objects in
+    // place, so signals appear in both `items` and the buckets.  Joins an
+    // already-persisted table (preserves the persisted-read rule) and degrades
+    // gracefully — missing signals never block the read.
+    const signalWarnings = await this.attachSignals(this.collectDisplayRows(items, categories));
+
     return {
       scope: { region: normalized.region, assetType: normalized.assetType },
       snapshotDate: latest.snapshotDate,
@@ -133,8 +180,70 @@ export class EarningsIntelligenceService {
       freshness: this.responseFreshness(latest.rows),
       categories,
       items,
-      warnings: [...scopeWarnings, ...this.responseWarnings(latest.rows, latest.truncated)],
+      warnings: [...scopeWarnings, ...this.responseWarnings(latest.rows, latest.truncated), ...signalWarnings],
       provenance: this.provenanceSummary(latest.rows),
+    };
+  }
+
+  /**
+   * Attach the latest TRUSTED trading signal to each row, joined read-time from
+   * the persisted signal snapshot.  Mutates rows in place.  On success, rows
+   * without a trusted signal get `signal: null`; on a join failure the field is
+   * left undefined and a single warning is returned (whole-response provenance).
+   */
+  /**
+   * Unique set (by object reference) of the rows actually returned to the client:
+   * the `items` list plus every category bucket.  Used to bound the signal join to
+   * the page rather than the full fetched row set.
+   */
+  private collectDisplayRows(
+    items: EarningsSnapshotDto[],
+    categories: Record<string, EarningsSnapshotDto[]>,
+  ): EarningsSnapshotDto[] {
+    const seen = new Set<EarningsSnapshotDto>(items);
+    for (const bucket of Object.values(categories)) {
+      for (const row of bucket) seen.add(row);
+    }
+    return [...seen];
+  }
+
+  private async attachSignals(rows: EarningsSnapshotDto[]): Promise<string[]> {
+    if (rows.length === 0) return [];
+    const reader = this.getSignalReader();
+    if (!reader) {
+      for (const row of rows) row.signal = null;
+      return ['Signal enrichment is unavailable; signals are not shown for this snapshot.'];
+    }
+    const ids = Array.from(new Set(rows.map((row) => row.stockId).filter((id): id is string => !!id)));
+    if (ids.length === 0) {
+      for (const row of rows) row.signal = null;
+      return [];
+    }
+    try {
+      const signals = await reader.latestPersistedForInstruments(ids);
+      const byInstrument = new Map<string, SignalResultDto>();
+      for (const signal of signals) byInstrument.set(signal.instrument_id, signal);
+      for (const row of rows) {
+        const match = byInstrument.get(row.stockId);
+        row.signal = match ? this.toSignalSummary(match) : null;
+      }
+      return [];
+    } catch {
+      // Leave `signal` undefined (distinct from null = "no trusted signal") so
+      // the UI can tell "join failed" from "no signal exists".
+      return ['Signal enrichment failed for this snapshot; results are shown without signals.'];
+    }
+  }
+
+  private toSignalSummary(signal: SignalResultDto): EarningsSignalSummary {
+    return {
+      direction: signal.direction,
+      // Prefer the calibrated score (the trusted-read score) when present.
+      score: signal.calibratedScore ?? signal.score,
+      confidence: signal.confidence,
+      lifecycleState: signal.lifecycleState ?? null,
+      triggerPrice: signal.triggerPrice ?? null,
+      generatedDate: signal.generatedDate ?? signal.generated_at ?? null,
     };
   }
 
@@ -278,11 +387,21 @@ export class EarningsIntelligenceService {
     });
     const preResultPriceMove = this.priceMove(input.prices, config.preResultPriceMoveLookbackBars);
     const freshness = this.freshness(input.snapshotDate, latest, config);
+    // Single source of truth for the post-result classification.  A row can trip
+    // BOTH the winner and disappointment guardrails (e.g. strong growth but a
+    // negative price reaction); resolve it to exactly ONE bucket via net evidence
+    // so no row appears in both tabs, and flag the genuinely-mixed case.
+    const recentResult = officialRecentResult || derived.applies;
+    const reactionForGates = officialRecentResult ? priceReaction : derived.priceReaction;
+    const resultClass = this.classifyResult({
+      recentResult, revenueGrowth, profitGrowth, epsGrowth, marginTrend,
+      consistencyScore, accelerationScore, priceReaction: reactionForGates,
+    });
     const reasonTags = this.reasonTags({
       latest, revenueGrowth, profitGrowth, epsGrowth, marginTrend, consistencyScore, accelerationScore,
       deliveryInterest, priceReaction, preResultPriceMove, derivedRecentResult: derived.applies,
       upcoming: resultDateSource === 'OFFICIAL_CALENDAR' && daysToResult !== null && daysToResult >= 0,
-      resultDateSource, config,
+      mixedResult: resultClass.mixed, resultDateSource, config,
     });
     const riskTags = this.riskTags({
       latest, quarterlyCount: quarterly.length, annualCount: annual.length, ttmCount: ttm.length, freshness,
@@ -293,9 +412,9 @@ export class EarningsIntelligenceService {
     const warnings = rowWarningsForSource(resultDateSource);
     const categories = this.categories({
       snapshotDate: input.snapshotDate, resultDate, resultDateSource, daysToResult,
-      revenueGrowth, profitGrowth, epsGrowth, marginTrend, consistencyScore, accelerationScore,
-      deliveryInterest, priceReaction, preResultPriceMove, freshness, config,
-      derivedRecentResult: derived.applies, derivedPriceReaction: derived.priceReaction,
+      consistencyScore, accelerationScore, deliveryInterest, priceReaction,
+      preResultPriceMove, freshness, config,
+      winner: resultClass.winner, disappointment: resultClass.disappointment,
     });
     const dataThroughDate = maxDate([
       input.dataThroughDate,
@@ -386,26 +505,13 @@ export class EarningsIntelligenceService {
 
   private categories(input: {
     snapshotDate: Date; resultDate: Date | null; resultDateSource: EarningsResultDateSource; daysToResult: number | null;
-    revenueGrowth: number | null; profitGrowth: number | null; epsGrowth: number | null; marginTrend: number | null;
     consistencyScore: number; accelerationScore: number; deliveryInterest: boolean; priceReaction: number | null;
     preResultPriceMove: number | null; freshness: EarningsFreshness; config: EarningsRegionConfig;
-    // Derived recent-result path (set only when the official path did NOT yield a
-    // recent past result).  Feeds ONLY the winner/disappointment gates below — never
-    // UPCOMING_RESULTS, PRE_RESULT_INTEREST, or RESULT_REACTION_HISTORY.
-    derivedRecentResult: boolean; derivedPriceReaction: number | null;
+    // Pre-resolved, mutually-exclusive post-result classification (see classifyResult).
+    winner: boolean; disappointment: boolean;
   }): EarningsIntelligenceCategory[] {
     const categories: EarningsIntelligenceCategory[] = [];
     const hasAuthoritativeResultDate = input.resultDateSource === 'OFFICIAL_CALENDAR';
-    // Only official result dates qualify for the recent-result window and
-    // UPCOMING_RESULTS.  DATE_TBA / ESTIMATED_FROM_PERIOD_CADENCE rows must NOT
-    // appear in UPCOMING_RESULTS as if they had a known date.
-    const hasUsableResultDate = hasAuthoritativeResultDate;
-    const officialRecentResult = Boolean(hasUsableResultDate && input.resultDate && this.daysBetween(input.resultDate, input.snapshotDate) <= input.config.recentResultWindowDays && input.resultDate <= input.snapshotDate);
-    // A recent result for WINNER/DISAPPOINTMENT classification comes from EITHER the
-    // unchanged official-past path (IN) OR the derived estimated path (US).  The
-    // price reaction used by the gates follows whichever path supplied the date.
-    const recentResult = officialRecentResult || input.derivedRecentResult;
-    const reactionForGates = officialRecentResult ? input.priceReaction : input.derivedPriceReaction;
     const upcoming = input.daysToResult !== null
       && input.daysToResult >= 0
       && input.daysToResult <= input.config.upcomingWindowDays
@@ -414,14 +520,65 @@ export class EarningsIntelligenceService {
     if (upcoming && (input.deliveryInterest || (input.preResultPriceMove !== null && input.preResultPriceMove >= input.config.preResultPriceMoveThresholdPercent))) {
       categories.push('PRE_RESULT_INTEREST');
     }
-    if (recentResult && this.isWinner({ ...input, priceReaction: reactionForGates })) categories.push('RESULT_WINNERS');
-    if (recentResult && this.isDisappointment({ ...input, priceReaction: reactionForGates })) categories.push('RESULT_DISAPPOINTMENTS');
+    // Winner and disappointment are mutually exclusive (resolved upstream) so a
+    // row never contradicts itself across the two tabs.
+    if (input.winner) categories.push('RESULT_WINNERS');
+    if (input.disappointment) categories.push('RESULT_DISAPPOINTMENTS');
     if (input.priceReaction !== null && hasAuthoritativeResultDate) categories.push('RESULT_REACTION_HISTORY');
     if (input.freshness !== 'MISSING' && (input.consistencyScore >= 70 || input.accelerationScore >= 70 || categories.includes('PRE_RESULT_INTEREST') || categories.includes('RESULT_WINNERS'))) {
       categories.push('EARNINGS_WATCHLIST');
     }
     if (input.freshness !== 'MISSING' && categories.length === 0) categories.push('EARNINGS_WATCHLIST');
     return [...new Set(categories)];
+  }
+
+  /**
+   * Resolve the post-result classification to a single bucket.  Both the winner
+   * and disappointment guardrails can fire for the same row (strong growth that
+   * still sold off, or two strong metrics alongside one sharp decline).  When
+   * they conflict, the dominant side wins by net evidence (signed growth metrics
+   * + margin direction + price-reaction direction) and `mixed` is set so the row
+   * can be tagged MIXED_RESULT.  Returns {false,false,false} when no recent
+   * result is in scope.
+   */
+  private classifyResult(input: {
+    recentResult: boolean;
+    revenueGrowth: number | null; profitGrowth: number | null; epsGrowth: number | null;
+    marginTrend: number | null; consistencyScore: number; accelerationScore: number; priceReaction: number | null;
+  }): { winner: boolean; disappointment: boolean; mixed: boolean } {
+    if (!input.recentResult) return { winner: false, disappointment: false, mixed: false };
+    const winner = this.isWinner(input);
+    const disappointment = this.isDisappointment(input);
+    if (winner && disappointment) {
+      const net = this.netResultScore(input);
+      return net >= 0
+        ? { winner: true, disappointment: false, mixed: true }
+        : { winner: false, disappointment: true, mixed: true };
+    }
+    return { winner, disappointment, mixed: false };
+  }
+
+  /**
+   * Net *magnitude-aware* evidence for a mixed result.  Sign alone is misleading:
+   * a row needs >= 2 positive growth metrics to be a winner at all, so a sign-only
+   * sum could never go negative — a -30% EPS collapse beside two small positives
+   * would wrongly read as a winner.  Each growth metric and the price reaction is
+   * therefore clamped to a sane band (so one extreme outlier can't dominate, but a
+   * large miss still outweighs small gains) and summed; margin trend adds a small
+   * tilt.  >= 0 leans winner, < 0 leans disappointment.
+   */
+  private netResultScore(input: {
+    revenueGrowth: number | null; profitGrowth: number | null; epsGrowth: number | null;
+    marginTrend: number | null; priceReaction: number | null;
+  }): number {
+    const clamp = (value: number, bound: number) => Math.max(-bound, Math.min(bound, value));
+    let net = 0;
+    for (const value of [input.revenueGrowth, input.profitGrowth, input.epsGrowth]) {
+      if (value !== null) net += clamp(value, 50);
+    }
+    if (input.priceReaction !== null) net += clamp(input.priceReaction, 15);
+    if (input.marginTrend !== null) net += clamp(input.marginTrend, 10);
+    return net;
   }
 
   private isWinner(input: {
@@ -458,6 +615,8 @@ export class EarningsIntelligenceService {
     preResultPriceMove: number | null; upcoming: boolean;
     /** Recent result classified via the estimated period-cadence date (US path). */
     derivedRecentResult: boolean;
+    /** Set when the result tripped BOTH winner and disappointment guardrails. */
+    mixedResult: boolean;
     resultDateSource: EarningsResultDateSource;
     config: EarningsRegionConfig;
   }): string[] {
@@ -477,6 +636,7 @@ export class EarningsIntelligenceService {
     if (input.deliveryInterest) tags.push('PRE_RESULT_DELIVERY_INTEREST');
     if (input.preResultPriceMove !== null && input.preResultPriceMove >= input.config.preResultPriceMoveThresholdPercent) tags.push('PRE_RESULT_PRICE_INTEREST');
     if (input.priceReaction !== null && input.priceReaction >= 2) tags.push('POSITIVE_RESULT_REACTION');
+    if (input.mixedResult) tags.push('MIXED_RESULT'); // tripped both winner and disappointment guardrails
     if (input.upcoming) tags.push('RESULT_WINDOW_ESTIMATED_FROM_PERSISTED_PERIODS');
     if (input.derivedRecentResult) tags.push('RECENT_RESULT_ESTIMATED_FROM_PERIOD_CADENCE'); // timed from period end + lag, not official
     if (input.resultDateSource === 'OFFICIAL_CALENDAR') tags.push('OFFICIAL_RESULT_DATE');
