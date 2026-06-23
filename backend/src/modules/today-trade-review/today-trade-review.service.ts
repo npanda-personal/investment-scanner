@@ -12,6 +12,8 @@ import { StrategyDecisionEngineService, type StrategyDecisionDto } from '../stra
 import { TradePlanRiskEngineService, type TradePlanResultDto } from '../trade-plan-risk-engine';
 import { SnapshotAssemblerRepository } from '../snapshot-assembler';
 import type { ComposedSnapshotRow, ProvenanceStatus } from '../snapshot-assembler';
+import { cacheService, type CacheService } from '../../cache/cache.service';
+import { todayReviewKey } from '../../cache/cache-keys';
 import { TodayTradeReviewRepository } from './today-trade-review.repository';
 import type {
   TodayReviewBoardSection,
@@ -56,6 +58,13 @@ const EXIT_LIMIT = 20;
 const TRUSTED_REVIEW_PAGE_SIZE = 250;
 const TRUSTED_REVIEW_SCAN_ORDERING = 'recentVolumeDesc_priceHistoryCompleteness_latestFreshness_symbol';
 const TRUSTED_REVIEW_UNAVAILABLE_WARNING = 'Trusted Review Universe unavailable or not ready; Today Review cannot publish candidates.';
+/**
+ * A run wedged in RUNNING (process crash / interrupted boot) is invisible to GET /latest (which
+ * only returns COMPLETED/PARTIAL) yet still occupies its runDate, so it can mask newer data until
+ * a same-key run overwrites it. Any RUNNING run older than this is reaped to FAILED at the next
+ * run() so zombies self-heal instead of accumulating. Generous vs the few-minute real runtime.
+ */
+const STALE_RUNNING_REAP_MS = 2 * 60 * 60 * 1000; // 2h
 const TODAY_REVIEW_BOARD_CONTRACT_VERSION = 'today-review-board-v1';
 const TODAY_REVIEW_BOARD_TOTAL_LIMIT = 40;
 const TODAY_REVIEW_BOARD_QUOTAS: Record<TodayReviewBoardSection, number> = {
@@ -118,7 +127,8 @@ export class TodayTradeReviewService {
      * Cycle-safe: injected at construction or resolved via lazy-require of the SPECIFIC file
      * (never the market-context-intelligence index, which imports signal-generation-engine).
      */
-    private readonly capitalPostureService?: CapitalPostureServiceLike | null
+    private readonly capitalPostureService?: CapitalPostureServiceLike | null,
+    private readonly cache: CacheService = cacheService
   ) {}
 
   async run(request: TodayReviewRunRequest = {}): Promise<TodayReviewRunResponse> {
@@ -129,6 +139,9 @@ export class TodayTradeReviewService {
     const sourceSnapshot: TodayReviewSourceSnapshot = {
       generatedAt: startedAt.toISOString(),
     };
+    // Self-heal any prior wedged RUNNING run before starting a fresh one, so a zombie can't keep
+    // masking newer data. Non-fatal — a sweep failure must never block the run.
+    await this.reapStaleRunningRuns(startedAt);
     const startedRun = await this.repository.markRunStarted({
       runDate,
       region: scope.region,
@@ -173,6 +186,7 @@ export class TodayTradeReviewService {
         sourceSnapshot,
         candidates,
       });
+      await this.invalidateLatestCache(scope);
       // Load snapshot watermark (additive — never blocks the run)
       const snapshotAssembledAt = await this.loadSnapshotAssembledAt(scope, runDate);
       return this.toRunResponse(completed, scope, marketPosture, snapshotAssembledAt);
@@ -188,7 +202,41 @@ export class TodayTradeReviewService {
         sourceSnapshot,
         candidates: [],
       });
+      await this.invalidateLatestCache(scope);
       return this.toRunResponse(failed, scope);
+    }
+  }
+
+  /**
+   * GET /today-review/latest is served through the Redis page-cache, but a manual or scheduled
+   * run() is NOT a pipeline command — so the pipeline's command-level invalidation never fires for
+   * it, and a freshly completed run would stay hidden behind a stale cached envelope until TTL or
+   * the next CACHE_WARM. Bust both enrich variants for this scope so the new run surfaces at once.
+   * Keys mirror the read path (controller) and the CACHE_WARM stage. Non-fatal: the cache is an
+   * accelerator, never allowed to fail a run.
+   */
+  private async invalidateLatestCache(scope: { region: string; assetType: string }): Promise<void> {
+    if (!this.cache.isEnabled()) return;
+    try {
+      await this.cache.delete(
+        todayReviewKey({ region: scope.region, assetType: scope.assetType }),
+        todayReviewKey({ region: scope.region, assetType: scope.assetType, enrich: false }),
+      );
+    } catch (error) {
+      console.warn('[TodayReview] page-cache invalidation failed (non-fatal):', error);
+    }
+  }
+
+  /** Reap RUNNING runs older than STALE_RUNNING_REAP_MS to FAILED; swallow errors (best-effort). */
+  private async reapStaleRunningRuns(now: Date): Promise<void> {
+    try {
+      const cutoff = new Date(now.getTime() - STALE_RUNNING_REAP_MS);
+      const reaped = await this.repository.failStaleRunningRuns({ cutoff, finishedAt: now });
+      if (reaped > 0) {
+        console.warn(`[TodayReview] reaped ${reaped} stale RUNNING run(s) older than ${STALE_RUNNING_REAP_MS}ms`);
+      }
+    } catch (error) {
+      console.warn('[TodayReview] stale-run reap failed (non-fatal):', error);
     }
   }
 

@@ -55,6 +55,18 @@ class MemoryRepo implements TodayReviewRepository {
     return run;
   }
 
+  async failStaleRunningRuns(input: { cutoff: Date; finishedAt: Date }): Promise<number> {
+    let count = 0;
+    for (const run of this.runs.values()) {
+      if (run.status === 'RUNNING' && new Date(run.startedAt).getTime() < input.cutoff.getTime()) {
+        run.status = 'FAILED';
+        run.finishedAt = input.finishedAt.toISOString();
+        count += 1;
+      }
+    }
+    return count;
+  }
+
   async completeRun(input: {
     runId: string; status: TodayReviewRunStatus; dataThroughDate: Date | null;
     finishedAt: Date; warnings: string[]; candidateCounts: Record<string, number>;

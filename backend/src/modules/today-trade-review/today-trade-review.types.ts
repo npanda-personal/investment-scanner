@@ -352,6 +352,12 @@ export interface TodayReviewRepository {
     sourceSnapshot: TodayReviewSourceSnapshot | Record<string, unknown>;
     candidates: TodayReviewCandidateDto[];
   }): Promise<TodayReviewRunDto>;
+  /**
+   * Mark every run still wedged in RUNNING whose startedAt is older than `cutoff` as FAILED.
+   * Self-heals zombie runs left by an interrupted/crashed run() so they stop masking newer data.
+   * Returns the number of rows reaped.
+   */
+  failStaleRunningRuns(input: { cutoff: Date; finishedAt: Date }): Promise<number>;
   latest(region: string, assetType: string, options?: { enrich?: boolean }): Promise<TodayReviewRunDto | null>;
   getRun(id: string): Promise<TodayReviewRunDto | null>;
   listRuns(query: Required<Pick<TodayReviewQuery, 'region' | 'assetType' | 'limit' | 'offset'>>): Promise<{ items: TodayReviewRunDto[]; total: number }>;
