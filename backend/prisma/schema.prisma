@@ -231,6 +231,16 @@ model EarningsIntelligenceSnapshot {
   revenueGrowth      Float?
   profitGrowth       Float?
   epsGrowth          Float?
+  // Phase 2 QoQ/YoY growth split. Legacy *Growth fields above alias the QoQ values;
+  // YoY is null when no true year-ago comparable exists. growthComparisonBasis names
+  // the basis of the legacy alias ('QOQ' or null).
+  revenueGrowthQoQ   Float?
+  profitGrowthQoQ    Float?
+  epsGrowthQoQ       Float?
+  revenueGrowthYoY   Float?
+  profitGrowthYoY    Float?
+  epsGrowthYoY       Float?
+  growthComparisonBasis String?
   marginTrend        Float?
   consistencyScore   Float
   accelerationScore  Float

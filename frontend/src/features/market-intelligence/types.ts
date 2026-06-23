@@ -127,9 +127,21 @@ export interface EarningsIntelligenceSnapshot {
   periodEndDate?: string | null;
   validatedAt?: string | null;
   daysToResult?: number | null;
+  /** Legacy growth fields — alias of the QoQ figures below (see growthComparisonBasis). */
   revenueGrowth: number | null;
   profitGrowth: number | null;
   epsGrowth: number | null;
+  /**
+   * Phase 2 — QoQ (vs prior quarter) and YoY (vs same quarter last year) growth.
+   * YoY is null when no true year-ago comparable exists yet.
+   */
+  revenueGrowthQoQ?: number | null;
+  profitGrowthQoQ?: number | null;
+  epsGrowthQoQ?: number | null;
+  revenueGrowthYoY?: number | null;
+  profitGrowthYoY?: number | null;
+  epsGrowthYoY?: number | null;
+  growthComparisonBasis?: string | null;
   marginTrend: number | null;
   consistencyScore: number | null;
   accelerationScore: number | null;

@@ -1314,8 +1314,8 @@ function EarningsTable({ rows }: { rows: EarningsIntelligenceSnapshot[] }) {
             <TableCell>Symbol</TableCell>
             <TableCell>Result Date</TableCell>
             <TableCell align="right">Days To Result</TableCell>
-            <TableCell align="right">Rev Growth</TableCell>
-            <TableCell align="right">Profit Growth</TableCell>
+            <TableCell align="right" title="Quarter-over-quarter: latest vs the most recent prior quarter">Rev QoQ</TableCell>
+            <TableCell align="right" title="Quarter-over-quarter: latest vs the most recent prior quarter">Profit QoQ</TableCell>
             <TableCell align="right">Consistency</TableCell>
             <TableCell>Technicals</TableCell>
             <TableCell>Signal</TableCell>
@@ -1325,7 +1325,10 @@ function EarningsTable({ rows }: { rows: EarningsIntelligenceSnapshot[] }) {
                 <TableCell>Date Source</TableCell>
                 <TableCell>Period End</TableCell>
                 <TableCell>Validated At</TableCell>
-                <TableCell align="right">EPS Growth</TableCell>
+                <TableCell align="right" title="Quarter-over-quarter: latest vs the most recent prior quarter">EPS QoQ</TableCell>
+                <TableCell align="right" title="Year-over-year vs the same quarter last year; blank when no year-ago comparable is present yet">Rev YoY</TableCell>
+                <TableCell align="right" title="Year-over-year vs the same quarter last year; blank when no year-ago comparable is present yet">Profit YoY</TableCell>
+                <TableCell align="right" title="Year-over-year vs the same quarter last year; blank when no year-ago comparable is present yet">EPS YoY</TableCell>
                 <TableCell align="right">Margin Trend</TableCell>
                 <TableCell align="right">Acceleration</TableCell>
                 <TableCell>Freshness</TableCell>
@@ -1347,8 +1350,8 @@ function EarningsTable({ rows }: { rows: EarningsIntelligenceSnapshot[] }) {
                   <ResultDateCell resultDate={row.resultDate} resultDateLabel={row.resultDateLabel} />
                 </TableCell>
                 <TableCell align="right" sx={numericCellSx}>{formatOptional(row.daysToResult)}</TableCell>
-                <TableCell align="right" sx={numericCellSx}>{formatPercentPoints(row.revenueGrowth)}</TableCell>
-                <TableCell align="right" sx={numericCellSx}>{formatPercentPoints(row.profitGrowth)}</TableCell>
+                <TableCell align="right" sx={numericCellSx}>{formatPercentPoints(row.revenueGrowthQoQ ?? row.revenueGrowth)}</TableCell>
+                <TableCell align="right" sx={numericCellSx}>{formatPercentPoints(row.profitGrowthQoQ ?? row.profitGrowth)}</TableCell>
                 <TableCell align="right" sx={numericCellSx}>{formatOptional(row.consistencyScore)}</TableCell>
                 <TableCell sx={{ whiteSpace: 'nowrap' }}><TechnicalsCell row={row} /></TableCell>
                 <TableCell sx={{ whiteSpace: 'nowrap' }}><SignalCell signal={row.signal} /></TableCell>
@@ -1363,7 +1366,10 @@ function EarningsTable({ rows }: { rows: EarningsIntelligenceSnapshot[] }) {
                     </TableCell>
                     <TableCell sx={{ whiteSpace: 'nowrap' }}>{formatDate(row.periodEndDate)}</TableCell>
                     <TableCell sx={{ whiteSpace: 'nowrap' }}>{formatDate(row.validatedAt)}</TableCell>
-                    <TableCell align="right" sx={numericCellSx}>{formatPercentPoints(row.epsGrowth)}</TableCell>
+                    <TableCell align="right" sx={numericCellSx}>{formatPercentPoints(row.epsGrowthQoQ ?? row.epsGrowth)}</TableCell>
+                    <TableCell align="right" sx={numericCellSx}>{formatPercentPoints(row.revenueGrowthYoY ?? null)}</TableCell>
+                    <TableCell align="right" sx={numericCellSx}>{formatPercentPoints(row.profitGrowthYoY ?? null)}</TableCell>
+                    <TableCell align="right" sx={numericCellSx}>{formatPercentPoints(row.epsGrowthYoY ?? null)}</TableCell>
                     <TableCell align="right" sx={numericCellSx}>{formatPercentPoints(row.marginTrend)}</TableCell>
                     <TableCell align="right" sx={numericCellSx}>{formatOptional(row.accelerationScore)}</TableCell>
                     <TableCell sx={{ whiteSpace: 'nowrap' }}>{row.freshness || '—'}</TableCell>

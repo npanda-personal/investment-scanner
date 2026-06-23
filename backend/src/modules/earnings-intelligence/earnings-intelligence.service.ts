@@ -360,7 +360,11 @@ export class EarningsIntelligenceService {
     const primarySeries = latest
       ? fundamentals.filter((record) => classifyPeriod(record.periodType) === latestClass)
       : [];
-    const comparison = latest ? this.findComparisonRecord(latest, fundamentals) : null;
+    // Phase 2 — two distinct comparables instead of one ambiguous record:
+    //   priorQuarter — most-recent prior comparable (dense) → QoQ + the legacy alias.
+    //   yearAgo      — same quarter one year ago, or null → YoY (no silent fallback).
+    const priorQuarter = latest ? this.findPriorQuarter(latest, fundamentals) : null;
+    const yearAgo = latest ? this.findYearAgoRecord(latest, fundamentals) : null;
     const periodEndDate = latest ? safeUtcDay(latest.periodEndDate) : null;
     const validatedAt = latest ? safeUtcDay(latest.validatedAt ?? null) : null;
     const expectedResultDate = latest ? this.expectedResultDate(latest, latestClass, config) : null;
@@ -368,10 +372,20 @@ export class EarningsIntelligenceService {
     const resultDate = dateResolution.resultDate;
     const resultDateSource = dateResolution.resultDateSource;
     const daysToResult = dateResolution.daysToResult;
-    const revenueGrowth = this.growth(latest?.revenue ?? null, comparison?.revenue ?? null);
-    const profitGrowth = this.growth(latest?.netIncome ?? null, comparison?.netIncome ?? null);
-    const epsGrowth = this.growth(latest?.eps ?? null, comparison?.eps ?? null);
-    const marginTrend = this.marginTrend(latest, comparison);
+    // QoQ (vs prior quarter) drives the legacy alias and all downstream scoring —
+    // it is the dense, current basis.  YoY is computed independently and stays null
+    // when no true year-ago comparable exists.
+    const revenueGrowthQoQ = this.growth(latest?.revenue ?? null, priorQuarter?.revenue ?? null);
+    const profitGrowthQoQ = this.growth(latest?.netIncome ?? null, priorQuarter?.netIncome ?? null);
+    const epsGrowthQoQ = this.growth(latest?.eps ?? null, priorQuarter?.eps ?? null);
+    const revenueGrowthYoY = this.growth(latest?.revenue ?? null, yearAgo?.revenue ?? null);
+    const profitGrowthYoY = this.growth(latest?.netIncome ?? null, yearAgo?.netIncome ?? null);
+    const epsGrowthYoY = this.growth(latest?.eps ?? null, yearAgo?.eps ?? null);
+    const revenueGrowth = revenueGrowthQoQ;
+    const profitGrowth = profitGrowthQoQ;
+    const epsGrowth = epsGrowthQoQ;
+    const growthComparisonBasis = priorQuarter ? 'QOQ' : null;
+    const marginTrend = this.marginTrend(latest, priorQuarter);
     const consistencyScore = this.calculateConsistencyScore(primarySeries);
     const accelerationScore = this.calculateAccelerationScore(primarySeries);
     const deliveryInterest = this.deliveryInterest(input.deliverySnapshots, config);
@@ -440,6 +454,13 @@ export class EarningsIntelligenceService {
       revenueGrowth,
       profitGrowth,
       epsGrowth,
+      revenueGrowthQoQ,
+      profitGrowthQoQ,
+      epsGrowthQoQ,
+      revenueGrowthYoY,
+      profitGrowthYoY,
+      epsGrowthYoY,
+      growthComparisonBasis,
       marginTrend,
       consistencyScore,
       accelerationScore,
@@ -744,23 +765,45 @@ export class EarningsIntelligenceService {
     return 'STALE';
   }
 
-  private findComparisonRecord(latest: EarningsFundamentalInput, records: EarningsFundamentalInput[]): EarningsFundamentalInput | null {
+  /**
+   * Same-period-type records strictly older than `latest`, newest-first.  Shared by
+   * the QoQ (most-recent prior) and YoY (year-ago match) selectors so both look at
+   * an identical, like-against-like candidate set.
+   */
+  private sameTypePriorsDesc(latest: EarningsFundamentalInput, records: EarningsFundamentalInput[]): EarningsFundamentalInput[] {
     const latestPeriodEnd = safeUtcDay(latest.periodEndDate);
-    if (!latestPeriodEnd) return null;
-    const sameType = records
+    if (!latestPeriodEnd) return [];
+    return records
       .filter((record) => {
         const recordPeriodEnd = safeUtcDay(record.periodEndDate);
         return Boolean(recordPeriodEnd && record.id !== latest.id && record.periodType === latest.periodType && recordPeriodEnd < latestPeriodEnd);
       })
       .sort((left, right) => this.dateTime(right.periodEndDate) - this.dateTime(left.periodEndDate));
-    const samePeriodLastYear = sameType.find((record) => {
+  }
+
+  /**
+   * QoQ comparable: the most-recent prior period of the same type — the dense,
+   * always-available basis used for the legacy growth alias and downstream scoring.
+   */
+  private findPriorQuarter(latest: EarningsFundamentalInput, records: EarningsFundamentalInput[]): EarningsFundamentalInput | null {
+    return this.sameTypePriorsDesc(latest, records)[0] ?? null;
+  }
+
+  /**
+   * YoY comparable: the same calendar period one year ago (same month, 300–430d
+   * back).  Returns null when no true year-ago record exists — the caller then
+   * reports YoY = null rather than silently falling back to the prior quarter.
+   */
+  private findYearAgoRecord(latest: EarningsFundamentalInput, records: EarningsFundamentalInput[]): EarningsFundamentalInput | null {
+    const latestPeriodEnd = safeUtcDay(latest.periodEndDate);
+    if (!latestPeriodEnd) return null;
+    return this.sameTypePriorsDesc(latest, records).find((record) => {
       const recordPeriodEnd = safeUtcDay(record.periodEndDate);
       if (!recordPeriodEnd) return false;
       const monthMatches = recordPeriodEnd.getUTCMonth() === latestPeriodEnd.getUTCMonth();
       const diffDays = this.daysBetween(recordPeriodEnd, latestPeriodEnd);
       return monthMatches && diffDays >= 300 && diffDays <= 430;
-    });
-    return samePeriodLastYear || sameType[0] || null;
+    }) ?? null;
   }
 
   private expectedResultDate(latest: EarningsFundamentalInput, periodClass: EarningsPeriodClass, config: EarningsRegionConfig): Date | null {
