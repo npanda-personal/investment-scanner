@@ -395,14 +395,13 @@ export class SignalPositionLedgerService {
     };
   }
 
+  // Owner policy 2026-06-23: REDUCE_RISK no longer rests in the defunct RISK_WARNING (see loadExistingLedgerState) — genuine on/after-entry exit evidence is closed by lifecycleRow, otherwise the position rests ACTIVE.
   private healthStateForDecision(decision?: string | null): SignalPositionLedgerActiveRow['healthState'] {
     if (decision === 'EXIT_CANDIDATE') return 'EXIT_TRIGGERED';
-    if (decision === 'REDUCE_RISK') return 'RISK_WARNING';
     return null;
   }
 
   private statusForHealthState(healthState: SignalPositionLedgerActiveRow['healthState']): SignalPositionLedgerActiveRow['status'] {
-    if (healthState === 'RISK_WARNING') return 'RISK_WARNING';
     if (healthState === 'EXIT_TRIGGERED') return 'EXIT_TRIGGERED';
     return 'ACTIVE';
   }
