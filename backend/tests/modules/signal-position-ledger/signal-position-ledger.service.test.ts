@@ -1096,6 +1096,61 @@ describe('SignalPositionLedgerService', () => {
     expect(result.items).toHaveLength(0);
   });
 
+  it('rests a new entry ACTIVE (never RISK_WARNING) when its REDUCE_RISK decision predates entry with no on/after-entry close evidence', async () => {
+    // Owner policy 2026-06-23: RISK_WARNING is a defunct resting status. Entry is
+    // 2026-05-26; the latest DEFENSIVE_EXIT is a STALE pre-entry REDUCE_RISK (2026-05-20)
+    // and firstCloseEvidenceDates finds nothing on/after entry — so lifecycleRow returns
+    // null (the line-885 guard refuses to backdate a close before entry). The new entry
+    // must therefore rest ACTIVE, not be stamped RISK_WARNING by toActiveRow.
+    const repository = {
+      listLatestSignals: jest.fn().mockResolvedValue({
+        items: [trustedSignal],
+        totalCount: 1,
+        limit: 100,
+        offset: 0,
+        nextOffset: null,
+        hasMore: false,
+      }),
+      latestPriceByInstrumentId: jest.fn().mockResolvedValue({
+        date: new Date().toISOString(),
+        close: 101,
+        adjustedClose: 101,
+        dataStatus: 'COMPLETE',
+        source: 'database',
+      }),
+      latestDataQualityByInstrumentId: jest.fn().mockResolvedValue({
+        signalReadinessStatus: 'READY',
+        coverageStatus: 'GOOD',
+        liquidityStatus: 'LIQUID',
+        lastEvaluatedAt: new Date().toISOString(),
+      }),
+      latestExitDecisionByInstrumentId: jest.fn().mockResolvedValue({
+        strategy: 'DEFENSIVE_EXIT',
+        decision: 'REDUCE_RISK',
+        generatedAt: '2026-05-20T00:00:00.000Z',
+        generatedDate: '2026-05-20T00:00:00.000Z',
+      }),
+      firstCloseEvidenceDates: jest.fn().mockResolvedValue(new Map()),
+    };
+    const signalService = {
+      enrichSignals: jest.fn().mockResolvedValue([{ ...trustedSignal, triggerContract: sourceProvenTrigger }]),
+    };
+    const service = new SignalPositionLedgerService(repository as any, signalService as any);
+
+    const query = { region: 'IN', assetType: 'STOCK', limit: 25, offset: 0 };
+    await service.refreshActiveRows(query, { force: true, wait: true });
+    const result = await service.listActiveRows(query);
+
+    expect(result.totalCount).toBe(1);
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0].status).toBe('ACTIVE');
+    expect(result.items[0].status).not.toBe('RISK_WARNING');
+    expect(result.items[0]).toMatchObject({
+      healthState: null,
+      lifecycleEvidenceStatus: 'ACTIVE_ENTRY',
+    });
+  });
+
   it('ignores unsupported decision values in lifecycle health mapping', async () => {
     const repository = {
       listLatestSignals: jest.fn().mockResolvedValue({
