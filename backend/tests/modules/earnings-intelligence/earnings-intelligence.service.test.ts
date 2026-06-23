@@ -42,6 +42,13 @@ function persistedRow(categories: EarningsSnapshotDto['categories']): EarningsSn
     revenueGrowth: 20,
     profitGrowth: 30,
     epsGrowth: 25,
+    revenueGrowthQoQ: 20,
+    profitGrowthQoQ: 30,
+    epsGrowthQoQ: 25,
+    revenueGrowthYoY: null,
+    profitGrowthYoY: null,
+    epsGrowthYoY: null,
+    growthComparisonBasis: 'QOQ',
     marginTrend: 1.5,
     consistencyScore: 100,
     accelerationScore: 75,
@@ -792,5 +799,64 @@ describe('EarningsIntelligenceService', () => {
 
     expect(response.warnings.some((w) => w.includes('no dedicated Earnings Intelligence configuration'))).toBe(true);
     expect(response.scope.region).toBe('MARS');
+  });
+});
+
+describe('EarningsIntelligenceService — Phase 2 QoQ/YoY growth split', () => {
+  const baseInput = {
+    stockId: 'stock-1',
+    symbol: 'SPLITCO',
+    region: 'IN' as const,
+    assetType: 'STOCK' as const,
+    snapshotDate: new Date('2026-05-15T00:00:00.000Z'),
+    dataThroughDate: null,
+    prices: [],
+    deliverySnapshots: [],
+  };
+
+  it('computes QoQ vs the prior quarter and YoY vs the year-ago quarter as distinct figures; legacy fields alias QoQ', () => {
+    const service = new EarningsIntelligenceService({} as any);
+    const snapshot = service.calculateSnapshot({
+      ...baseInput,
+      fundamentals: [
+        fundamental('2026-03-31', 1320, 156, 13.2), // latest
+        fundamental('2025-12-31', 1200, 130, 12),   // prior quarter → QoQ basis
+        fundamental('2025-03-31', 1100, 120, 11),   // same quarter last year → YoY basis
+      ],
+    });
+
+    // QoQ: vs 2025-12-31
+    expect(snapshot.revenueGrowthQoQ).toBe(10);
+    expect(snapshot.profitGrowthQoQ).toBe(20);
+    expect(snapshot.epsGrowthQoQ).toBe(10);
+    // YoY: vs 2025-03-31 (a genuine year-ago comparable) — distinct from QoQ
+    expect(snapshot.revenueGrowthYoY).toBe(20);
+    expect(snapshot.profitGrowthYoY).toBe(30);
+    expect(snapshot.epsGrowthYoY).toBe(20);
+    // Legacy fields are the QoQ alias; basis names it.
+    expect(snapshot.revenueGrowth).toBe(snapshot.revenueGrowthQoQ);
+    expect(snapshot.profitGrowth).toBe(snapshot.profitGrowthQoQ);
+    expect(snapshot.epsGrowth).toBe(snapshot.epsGrowthQoQ);
+    expect(snapshot.growthComparisonBasis).toBe('QOQ');
+  });
+
+  it('reports YoY = null when no true year-ago comparable exists (no silent prior-quarter fallback)', () => {
+    const service = new EarningsIntelligenceService({} as any);
+    const snapshot = service.calculateSnapshot({
+      ...baseInput,
+      fundamentals: [
+        fundamental('2026-03-31', 1320, 156, 13.2), // latest
+        fundamental('2025-12-31', 1200, 130, 12),   // only a prior quarter — no year-ago row
+      ],
+    });
+
+    // QoQ still computed against the prior quarter…
+    expect(snapshot.revenueGrowthQoQ).toBe(10);
+    expect(snapshot.revenueGrowth).toBe(10);
+    expect(snapshot.growthComparisonBasis).toBe('QOQ');
+    // …but YoY is honestly null rather than masquerading as the prior-quarter figure.
+    expect(snapshot.revenueGrowthYoY).toBeNull();
+    expect(snapshot.profitGrowthYoY).toBeNull();
+    expect(snapshot.epsGrowthYoY).toBeNull();
   });
 });

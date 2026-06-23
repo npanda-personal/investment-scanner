@@ -109,9 +109,29 @@ export interface EarningsSnapshotDto {
   periodEndDate: string | null;
   validatedAt: string | null;
   daysToResult: number | null;
+  /**
+   * Legacy growth fields — now an alias for the QoQ figures below.  Kept so existing
+   * consumers (scoring/classification, persisted snapshots) keep working during the
+   * transition; `growthComparisonBasis` documents what basis these represent.
+   */
   revenueGrowth: number | null;
   profitGrowth: number | null;
   epsGrowth: number | null;
+  /**
+   * Phase 2 — fundamentals growth split into two honest bases:
+   *   QoQ — vs the most recent prior comparable quarter (dense; ~1,900 IN stocks).
+   *   YoY — vs the same quarter one year ago; **null when no true year-ago comparable
+   *         exists** (no silent prior-quarter fallback masquerading as YoY).
+   * `growthComparisonBasis` names the basis of the legacy alias above ('QOQ', or null
+   * when no comparable at all).
+   */
+  revenueGrowthQoQ: number | null;
+  profitGrowthQoQ: number | null;
+  epsGrowthQoQ: number | null;
+  revenueGrowthYoY: number | null;
+  profitGrowthYoY: number | null;
+  epsGrowthYoY: number | null;
+  growthComparisonBasis: string | null;
   marginTrend: number | null;
   consistencyScore: number;
   accelerationScore: number;
