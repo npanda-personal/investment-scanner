@@ -117,6 +117,18 @@ class MemoryTodayReviewRepository implements TodayReviewRepository {
     return run;
   }
 
+  async failStaleRunningRuns(input: { cutoff: Date; finishedAt: Date }): Promise<number> {
+    let count = 0;
+    for (const run of this.runs.values()) {
+      if (run.status === 'RUNNING' && new Date(run.startedAt).getTime() < input.cutoff.getTime()) {
+        run.status = 'FAILED';
+        run.finishedAt = input.finishedAt.toISOString();
+        count += 1;
+      }
+    }
+    return count;
+  }
+
   async latest(region: string, assetType: string): Promise<TodayReviewRunDto | null> {
     return [...this.runs.values()].find((run) => run.region === region && run.assetType === assetType && ['COMPLETED', 'PARTIAL'].includes(run.status)) || null;
   }
@@ -599,6 +611,51 @@ describe('TodayTradeReviewService', () => {
     expect(first.run?.id).toBe(second.run?.id);
     expect(repository.runs.size).toBe(1);
     expect(second.run?.candidateCounts.LONG_REVIEW).toBe(1);
+  });
+
+  it('busts both today-review page-cache keys for the scope when a run completes (cache enabled)', async () => {
+    const del = jest.fn().mockResolvedValue(undefined);
+    const cache = { isEnabled: () => true, delete: del } as unknown as import('../../../src/cache/cache.service').CacheService;
+    const service = new TodayTradeReviewService(new MemoryTodayReviewRepository(), services(), () => fixedNow, null, cache);
+
+    await service.run({ region: 'IN', assetType: 'STOCK' });
+
+    expect(del).toHaveBeenCalledTimes(1);
+    expect(del).toHaveBeenCalledWith(
+      'cache:v1:today-review:region=IN:assetType=STOCK:enrich=1:limit=_:offset=_',
+      'cache:v1:today-review:region=IN:assetType=STOCK:enrich=0:limit=_:offset=_',
+    );
+  });
+
+  it('does not touch the page-cache when caching is disabled', async () => {
+    const del = jest.fn().mockResolvedValue(undefined);
+    const cache = { isEnabled: () => false, delete: del } as unknown as import('../../../src/cache/cache.service').CacheService;
+    const service = new TodayTradeReviewService(new MemoryTodayReviewRepository(), services(), () => fixedNow, null, cache);
+
+    await service.run({ region: 'IN', assetType: 'STOCK' });
+
+    expect(del).not.toHaveBeenCalled();
+  });
+
+  it('reaps a stale RUNNING run to FAILED before starting a fresh run', async () => {
+    const repository = new MemoryTodayReviewRepository();
+    // Seed a zombie: a different runDate left wedged in RUNNING with a startedAt well over 2h old.
+    const zombie = await repository.markRunStarted({
+      runDate: new Date('2026-05-01T00:00:00.000Z'),
+      region: 'IN',
+      assetType: 'STOCK',
+      startedAt: new Date('2026-05-01T00:00:00.000Z'),
+      warnings: [],
+      sourceSnapshot: {},
+    });
+    expect(zombie.status).toBe('RUNNING');
+
+    const service = new TodayTradeReviewService(repository, services(), () => fixedNow);
+    await service.run({ region: 'IN', assetType: 'STOCK' });
+
+    const reaped = await repository.getRun(zombie.id);
+    expect(reaped?.status).toBe('FAILED');
+    expect(reaped?.finishedAt).toBe(fixedNow.toISOString());
   });
 
   it('uses persisted bulk evidence for candidate enrichment when available', async () => {

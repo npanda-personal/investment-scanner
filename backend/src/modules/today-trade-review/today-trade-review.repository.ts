@@ -62,6 +62,14 @@ export class TodayTradeReviewRepository implements TodayReviewRepositoryContract
     return this.toRunDto(record);
   }
 
+  async failStaleRunningRuns(input: { cutoff: Date; finishedAt: Date }): Promise<number> {
+    const result = await this.db.todayReviewRun.updateMany({
+      where: { status: 'RUNNING', startedAt: { lt: input.cutoff } },
+      data: { status: 'FAILED', finishedAt: input.finishedAt },
+    });
+    return result.count;
+  }
+
   async completeRun(input: {
     runId: string;
     status: TodayReviewRunStatus;
