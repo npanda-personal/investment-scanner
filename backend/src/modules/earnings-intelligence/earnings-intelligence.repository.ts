@@ -289,6 +289,7 @@ export class EarningsIntelligenceRepository {
 
     return {
       id: record.id,
+      stockId: record.stockId,
       snapshotDate: this.iso(record.snapshotDate) ?? '',
       dataThroughDate: this.iso(record.dataThroughDate),
       symbol: record.symbol,
