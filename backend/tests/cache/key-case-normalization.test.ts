@@ -16,11 +16,19 @@ const response = () => {
 
 const capturingCache = () => {
   const keys: string[] = [];
+  // The read-through controllers call cacheReadThroughWithMeta (it also reports cacheHit for the
+  // X-Cache header); mirror that here so the mock captures the key the controller actually builds.
+  // cacheReadThrough is kept for parity with the real CacheService surface.
+  const capture = async (key: string, producer: () => Promise<unknown>) => {
+    keys.push(key);
+    return { data: await producer(), cacheHit: false };
+  };
   return {
     keys,
+    cacheReadThroughWithMeta: jest.fn(capture),
     cacheReadThrough: jest.fn(async (key: string, producer: () => Promise<unknown>) => {
       keys.push(key);
-      return { data: await producer(), cacheHit: false };
+      return producer();
     }),
   };
 };
