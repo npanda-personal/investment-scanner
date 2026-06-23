@@ -40,10 +40,8 @@ import type {
   SignalTriggerPriceEvidence,
 } from './signal-generation-engine.types';
 import { withTriggerContract } from './signal-trigger-contract';
-import {
-  classifyLifecycle,
-  DEFAULT_LIFECYCLE_THRESHOLDS,
-} from './signal-lifecycle';
+import { applyDefensiveExitEntryGate, loadDefensiveExitEvidence, type DefensiveExitEvidence } from './signal-defensive-exit-gate';
+import { classifyLifecycle, DEFAULT_LIFECYCLE_THRESHOLDS } from './signal-lifecycle';
 import {
   signal_generation_engine_batch_size,
   signal_generation_engine_max_workers_count,
@@ -74,6 +72,7 @@ type SignalGenerationBatchContext = {
   priceWindowsByInstrumentId: Map<string, any[]>;
   fundamentalsByInstrumentId: Map<string, any>;
   strategyPerformanceCache: Map<string, Promise<StrategyPerformanceSummaryDto | null>>;
+  defensiveExitDecisionsByInstrumentId: Map<string, DefensiveExitEvidence>;
 };
 
 type StrategyFrameworkSignalGenerationService = {
@@ -547,7 +546,9 @@ export class SignalGenerationEngineService {
       { prices, relativeToPeers, fundamental: latestFundamental, fundamentalRecords: fundamentalsResponse?.records ?? null, peerAveragePe, peerAverageYield },
       scoringConfig,
     );
-    const { score, direction, triggeredSignals, negativeSignals, totalEvaluated } = scoreOutcome;
+    const { score, triggeredSignals, negativeSignals, totalEvaluated } = scoreOutcome;
+    // Entry gate: demote a bullish entry to NEUTRAL when the instrument is already under an active DEFENSIVE_EXIT posture (see signal-defensive-exit-gate).
+    const direction = applyDefensiveExitEntryGate(scoreOutcome.direction, asOfDate, options.batchContext?.defensiveExitDecisionsByInstrumentId?.get(instrumentId), negativeSignals);
     const rawConfidence = this.confidenceFor(prices, latestFundamental, totalEvaluated, asOfDate ?? undefined, scoreOutcome.components?.effectiveDisplacement ?? scoreOutcome.components?.displacement ?? null);
 
     // ── Regime gate (bearish/short suppression) ────────────────────────────────
@@ -1492,7 +1493,7 @@ export class SignalGenerationEngineService {
     const serviceAny = this.marketDataService as any;
     const marketScope = { region: request.region, assetType: request.assetType };
     const asOfDate = request.asOfDate ? this.normalizeUtcDay(new Date(request.asOfDate)) : undefined;
-    const [instruments, priceWindows, fundamentals] = await Promise.all([
+    const [instruments, priceWindows, fundamentals, defensiveExit] = await Promise.all([
       typeof serviceAny.getInstrumentsByIds === 'function'
         ? serviceAny.getInstrumentsByIds(instrumentIds).catch(() => [])
         : Promise.resolve([]),
@@ -1508,11 +1509,11 @@ export class SignalGenerationEngineService {
           : serviceAny.storedFundamentalsByInstrumentIds(instrumentIds, marketScope)
         ).catch(() => new Map())
         : Promise.resolve(new Map()),
+      loadDefensiveExitEvidence(instrumentIds),
     ]);
     const fundMap: Map<string, any> = fundamentals instanceof Map ? fundamentals : new Map();
     if (asOfDate) for (const [k, v] of fundMap) if (v?.records?.length) fundMap.set(k, { ...v, records: Scoring.filterFundamentalsAsOf(v.records, asOfDate, FUNDAMENTAL_PUBLIC_LAG_DAYS) });
-    const instsMap = new Map((instruments as any[]).map((i) => [i.id, i]));
-    return { instrumentsById: instsMap, priceWindowsByInstrumentId: priceWindows instanceof Map ? priceWindows : new Map(), fundamentalsByInstrumentId: fundMap, strategyPerformanceCache: new Map() };
+    return { instrumentsById: new Map((instruments as any[]).map((i) => [i.id, i])), priceWindowsByInstrumentId: priceWindows instanceof Map ? priceWindows : new Map(), fundamentalsByInstrumentId: fundMap, strategyPerformanceCache: new Map(), defensiveExitDecisionsByInstrumentId: defensiveExit as Map<string, DefensiveExitEvidence> };
   }
 
   private async getFundamentalsForGeneration(instrumentId: string, marketScope: Pick<SignalRunRequest, 'region' | 'assetType'>, useFullResearchContext: boolean, asOf?: Date, publicLagDays: number = FUNDAMENTAL_PUBLIC_LAG_DAYS) {
