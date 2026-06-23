@@ -571,17 +571,18 @@ describe('earnings-intelligence service — officialResultDate flow', () => {
     expect(snapshot.warnings).toEqual([]);
   });
 
-  it('result date is DATE_TBA (no fabricated date) when officialResultDate is absent', () => {
+  it('result date is DATE_TBA (no fabricated date) when officialResultDate is absent and the period is overdue', () => {
     const svc = new EarningsIntelligenceService({} as any);
 
-    // No official date → the engine must NOT fabricate a forward date; it reports
-    // DATE_TBA and keeps the row out of the official-only result categories.
+    // No official date and the cadence projection (2024-06-30 + 45d = 2024-08-14)
+    // is already in the past at this snapshot → the engine must NOT surface a stale
+    // estimate; it reports DATE_TBA and stays out of the official-only categories.
     const snapshot = svc.calculateSnapshot({
       stockId: 'stock-3',
       symbol: 'NOOFFICIAL',
       region: 'IN',
       assetType: 'STOCK',
-      snapshotDate: new Date('2024-07-15T00:00:00.000Z'),
+      snapshotDate: new Date('2024-10-15T00:00:00.000Z'),
       dataThroughDate: null,
       fundamentals: [
         fund('2024-03-31', { validatedAt: new Date('2024-05-10T00:00:00.000Z') }),

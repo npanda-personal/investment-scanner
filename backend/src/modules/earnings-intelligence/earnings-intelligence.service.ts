@@ -18,6 +18,7 @@ import {
 import { addDays, addMonths, dateTime, daysBetween, maxDate, round2, safeUtcDay, startOfUtcDay } from './earnings-intelligence.date-utils';
 import { resultDateLabelFor, rowWarningsForSource } from './earnings-intelligence.presentation';
 import { deriveRecentResult } from './earnings-intelligence.derived-result';
+import { computeEarningsTechnicals } from './earnings-intelligence.technicals';
 import {
   DEFAULT_EARNINGS_REGION,
   getEarningsRegionConfig,
@@ -400,13 +401,13 @@ export class EarningsIntelligenceService {
     const reasonTags = this.reasonTags({
       latest, revenueGrowth, profitGrowth, epsGrowth, marginTrend, consistencyScore, accelerationScore,
       deliveryInterest, priceReaction, preResultPriceMove, derivedRecentResult: derived.applies,
-      upcoming: resultDateSource === 'OFFICIAL_CALENDAR' && daysToResult !== null && daysToResult >= 0,
+      upcoming: (resultDateSource === 'OFFICIAL_CALENDAR' || resultDateSource === 'ESTIMATED_FROM_CADENCE') && daysToResult !== null && daysToResult >= 0,
       mixedResult: resultClass.mixed, resultDateSource, config,
     });
     const riskTags = this.riskTags({
       latest, quarterlyCount: quarterly.length, annualCount: annual.length, ttmCount: ttm.length, freshness,
       revenueGrowth, profitGrowth, epsGrowth, marginTrend, consistencyScore, priceReaction, prices: input.prices,
-      estimatedResultDate: resultDateSource === 'DATE_TBA' || resultDateSource === 'ESTIMATED_FROM_PERIOD_CADENCE',
+      estimatedResultDate: resultDateSource === 'DATE_TBA' || resultDateSource === 'ESTIMATED_FROM_PERIOD_CADENCE' || resultDateSource === 'ESTIMATED_FROM_CADENCE',
       authoritativeResultDate: resultDateSource === 'OFFICIAL_CALENDAR',
     });
     const warnings = rowWarningsForSource(resultDateSource);
@@ -416,14 +417,10 @@ export class EarningsIntelligenceService {
       preResultPriceMove, freshness, config,
       winner: resultClass.winner, disappointment: resultClass.disappointment,
     });
-    const dataThroughDate = maxDate([
-      input.dataThroughDate,
-      latest?.validatedAt ?? null,
-      latest?.lastUpdatedTimestamp ?? null,
-      latest?.periodEndDate ?? null,
-      input.prices[0]?.timestamp ?? null,
-      input.deliverySnapshots[0]?.tradingDate ?? null,
-    ]);
+    // Numeric technicals bundle (Phase 3) from the already-loaded price/delivery
+    // history — no extra reads.  Each field degrades to null on a short warm-up.
+    const technicals = computeEarningsTechnicals(input.prices, input.deliverySnapshots);
+    const dataThroughDate = maxDate([input.dataThroughDate, latest?.validatedAt ?? null, latest?.lastUpdatedTimestamp ?? null, latest?.periodEndDate ?? null, input.prices[0]?.timestamp ?? null, input.deliverySnapshots[0]?.tradingDate ?? null]);
 
     const resultDateLabel: EarningsSnapshotUpsertInput['resultDateLabel'] = resultDateLabelFor(resultDateSource);
 
@@ -451,6 +448,7 @@ export class EarningsIntelligenceService {
       warnings,
       freshness,
       categories,
+      ...technicals,
     };
   }
 
@@ -512,10 +510,15 @@ export class EarningsIntelligenceService {
   }): EarningsIntelligenceCategory[] {
     const categories: EarningsIntelligenceCategory[] = [];
     const hasAuthoritativeResultDate = input.resultDateSource === 'OFFICIAL_CALENDAR';
+    // A forward result date — official OR the Phase 3 honest cadence estimate — can
+    // populate UPCOMING_RESULTS / PRE_RESULT_INTEREST so those tabs are not empty
+    // year-round.  RESULT_REACTION_HISTORY stays gated on the official date only.
+    const hasForwardResultDate = input.resultDateSource === 'OFFICIAL_CALENDAR'
+      || input.resultDateSource === 'ESTIMATED_FROM_CADENCE';
     const upcoming = input.daysToResult !== null
       && input.daysToResult >= 0
       && input.daysToResult <= input.config.upcomingWindowDays
-      && input.resultDateSource === 'OFFICIAL_CALENDAR';
+      && hasForwardResultDate;
     if (upcoming) categories.push('UPCOMING_RESULTS');
     if (upcoming && (input.deliveryInterest || (input.preResultPriceMove !== null && input.preResultPriceMove >= input.config.preResultPriceMoveThresholdPercent))) {
       categories.push('PRE_RESULT_INTEREST');
@@ -788,41 +791,28 @@ export class EarningsIntelligenceService {
     const officialResultDate = safeUtcDay(latest.officialResultDate ?? null);
     if (officialResultDate) {
       const daysToResult = this.daysBetween(snapshotDate, officialResultDate);
-      return {
-        resultDate: officialResultDate,
-        resultDateSource: 'OFFICIAL_CALENDAR',
-        daysToResult: daysToResult >= 0 ? daysToResult : null,
-      };
+      return { resultDate: officialResultDate, resultDateSource: 'OFFICIAL_CALENDAR', daysToResult: daysToResult >= 0 ? daysToResult : null };
     }
 
-    // Do NOT emit a row-level resultDate from period cadence.  Return DATE_TBA so
-    // the UI shows "Date TBA" rather than a fabricated date that would give every
-    // stock with the same period end the same fake date.  The expectedResultDate
-    // is computed internally only to confirm an estimate is *possible*.
+    // Phase 3: emit an honest forward estimate projected from the persisted period
+    // cadence (periodEnd + cadence + lag), surfaced with an "Estimated" badge.  Only
+    // when the projection is still in the future; a past projection means the result
+    // is overdue with no official date, which stays DATE_TBA (no fabricated date).
     if (expectedResultDate) {
-      return {
-        resultDate: null,
-        resultDateSource: 'DATE_TBA',
-        daysToResult: null,
-      };
+      const daysToResult = this.daysBetween(snapshotDate, expectedResultDate);
+      return daysToResult >= 0
+        ? { resultDate: expectedResultDate, resultDateSource: 'ESTIMATED_FROM_CADENCE', daysToResult }
+        : { resultDate: null, resultDateSource: 'DATE_TBA', daysToResult: null };
     }
 
     const periodEndDate = safeUtcDay(latest.periodEndDate);
     if (periodEndDate) {
-      return {
-        resultDate: periodEndDate,
-        resultDateSource: 'PERIOD_END_DATE_FALLBACK',
-        daysToResult: null,
-      };
+      return { resultDate: periodEndDate, resultDateSource: 'PERIOD_END_DATE_FALLBACK', daysToResult: null };
     }
 
     const validatedAt = safeUtcDay(latest.validatedAt ?? null);
     if (validatedAt) {
-      return {
-        resultDate: validatedAt,
-        resultDateSource: 'VALIDATED_AT_FALLBACK',
-        daysToResult: null,
-      };
+      return { resultDate: validatedAt, resultDateSource: 'VALIDATED_AT_FALLBACK', daysToResult: null };
     }
 
     return { resultDate: null, resultDateSource: 'UNKNOWN', daysToResult: null };
@@ -858,15 +848,17 @@ export class EarningsIntelligenceService {
     for (const category of EARNINGS_INTELLIGENCE_CATEGORIES) {
       const categoryRows = rows.filter((row) => row.categories.includes(category));
       if (category === 'UPCOMING_RESULTS') {
-        // Order: (1) official dates first (has daysToResult), soonest first;
-        // (2) DATE_TBA / legacy estimated rows at the end;
-        // (3) consistencyScore desc as tiebreak within each group.
+        // Order by date-provenance tier, then soonest first within a tier:
+        //   (2) official dates first (most reliable), soonest first;
+        //   (1) Phase 3 ESTIMATED_FROM_CADENCE dates next, soonest first;
+        //   (0) DATE_TBA / legacy estimated (no forward date) at the end;
+        // consistencyScore desc breaks ties within each tier.
         grouped[category] = categoryRows
           .sort((left, right) => {
-            const leftHasDate = left.resultDateSource === 'OFFICIAL_CALENDAR' && left.daysToResult !== null ? 1 : 0;
-            const rightHasDate = right.resultDateSource === 'OFFICIAL_CALENDAR' && right.daysToResult !== null ? 1 : 0;
-            if (leftHasDate !== rightHasDate) return rightHasDate - leftHasDate; // official first
-            if (leftHasDate && rightHasDate) {
+            const leftTier = this.upcomingDateTier(left);
+            const rightTier = this.upcomingDateTier(right);
+            if (leftTier !== rightTier) return rightTier - leftTier; // higher tier first
+            if (leftTier > 0) {
               const daysDiff = (left.daysToResult as number) - (right.daysToResult as number);
               if (daysDiff !== 0) return daysDiff; // soonest first
             }
@@ -878,6 +870,18 @@ export class EarningsIntelligenceService {
       }
     }
     return grouped;
+  }
+
+  /**
+   * Date-provenance tier used to order UPCOMING_RESULTS: official forward dates
+   * (2) rank above Phase 3 cadence estimates (1), which rank above rows with no
+   * forward date (0).  Only rows with a non-null daysToResult can be "dated".
+   */
+  private upcomingDateTier(row: EarningsSnapshotDto): number {
+    if (row.daysToResult === null) return 0;
+    if (row.resultDateSource === 'OFFICIAL_CALENDAR') return 2;
+    if (row.resultDateSource === 'ESTIMATED_FROM_CADENCE') return 1;
+    return 0;
   }
 
   private countCategories(rows: EarningsSnapshotDto[]): Record<EarningsIntelligenceCategory, number> {

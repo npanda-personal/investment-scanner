@@ -14,8 +14,9 @@ import type { EarningsResultDateSource } from './earnings-intelligence.types';
  * without decoding the enum.  Only authoritative ("Official") and not-yet-announced
  * ("TBA") states get a label; fallback/unknown sources are unlabelled (null).
  */
-export function resultDateLabelFor(source: string): 'Official' | 'TBA' | null {
+export function resultDateLabelFor(source: string): 'Official' | 'TBA' | 'Estimated' | null {
   if (source === 'OFFICIAL_CALENDAR') return 'Official';
+  if (source === 'ESTIMATED_FROM_CADENCE') return 'Estimated';
   if (source === 'DATE_TBA') return 'TBA';
   return null;
 }
@@ -38,6 +39,9 @@ export function rowWarningsForSource(source: EarningsResultDateSource): string[]
   if (source === 'DATE_TBA' || source === 'ESTIMATED_FROM_PERIOD_CADENCE') {
     warnings.push('RESULT_DATE_NOT_ANNOUNCED');
   }
+  // Phase 3 honest forward estimate: a calm provenance code so the row carries a
+  // date+daysToResult but the trader sees it is projected, not officially announced.
+  if (source === 'ESTIMATED_FROM_CADENCE') warnings.push('RESULT_DATE_ESTIMATED_FROM_CADENCE');
   if (source === 'PERIOD_END_DATE_FALLBACK') warnings.push('RESULT_DATE_USES_PERIOD_END_DATE_FALLBACK');
   if (source === 'VALIDATED_AT_FALLBACK') warnings.push('RESULT_DATE_USES_VALIDATED_AT_FALLBACK');
   if (source === 'UNKNOWN') warnings.push('RESULT_DATE_SOURCE_UNKNOWN');

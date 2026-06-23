@@ -39,6 +39,9 @@ export type {
 export {
   sma,
   rsi,
+  adx,
+  periodHigh,
+  periodLow,
   macd,
   bollingerPercentB,
 } from './signal-indicators';

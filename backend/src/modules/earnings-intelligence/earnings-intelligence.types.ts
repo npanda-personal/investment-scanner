@@ -11,6 +11,10 @@ export type EarningsFreshness = 'FRESH' | 'PARTIAL' | 'STALE' | 'MISSING';
 export type EarningsResultDateSource =
   | 'OFFICIAL_CALENDAR'
   | 'DATE_TBA'
+  // Honest forward estimate (Phase 3): periodEnd + cadence + lag, surfaced with an
+  // "Estimated" badge.  Distinct from the legacy ESTIMATED_FROM_PERIOD_CADENCE
+  // value, which the read path still downgrades to DATE_TBA for back-compat.
+  | 'ESTIMATED_FROM_CADENCE'
   | 'ESTIMATED_FROM_PERIOD_CADENCE'
   | 'PERIOD_END_DATE_FALLBACK'
   | 'VALIDATED_AT_FALLBACK'
@@ -94,11 +98,13 @@ export interface EarningsSnapshotDto {
    *
    * Values:
    *   "Official"   — resultDateSource === 'OFFICIAL_CALENDAR'
+   *   "Estimated"  — resultDateSource === 'ESTIMATED_FROM_CADENCE' (projected from
+   *                  the persisted period cadence; resultDate/daysToResult present)
    *   "TBA"        — resultDateSource === 'DATE_TBA' (no official date available;
    *                  resultDate will be null)
    *   null         — fallback/unknown sources where label is not meaningful
    */
-  resultDateLabel: 'Official' | 'TBA' | null;
+  resultDateLabel: 'Official' | 'TBA' | 'Estimated' | null;
   resultDateSource: EarningsResultDateSource | string;
   periodEndDate: string | null;
   validatedAt: string | null;
@@ -121,6 +127,17 @@ export interface EarningsSnapshotDto {
    * signal join was skipped/failed for the whole response (see warnings).
    */
   signal?: EarningsSignalSummary | null;
+  /**
+   * Numeric technicals bundle (Phase 3), computed at refresh from the persisted
+   * price/delivery history.  Each field is independently nullable when its warm-up
+   * window is not met (or, for deliveryPercent, outside India).  Descriptive
+   * posture only — research-support framing, never a buy/sell call.
+   */
+  rsi14: number | null;
+  smaPosture: string | null;
+  pricePosition52w: number | null;
+  adx14: number | null;
+  deliveryPercent: number | null;
 }
 
 export interface EarningsIntelligenceResponse {
@@ -158,6 +175,11 @@ export interface EarningsPricePointInput {
   symbol: string;
   timestamp: Date;
   close: number;
+  // Raw daily high/low — used by the technicals bundle (ADX / range maths).  Null
+  // for latest-price fallback rows that carry only a single close; optional so a
+  // close-only price source still satisfies the contract (ADX degrades to null).
+  high?: number | null;
+  low?: number | null;
   adjustedClose: number | null;
   volume: number | null;
 }

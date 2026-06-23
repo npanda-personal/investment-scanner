@@ -50,6 +50,11 @@ function persistedRow(categories: EarningsSnapshotDto['categories']): EarningsSn
     warnings: [],
     freshness: 'FRESH',
     categories,
+    rsi14: null,
+    smaPosture: null,
+    pricePosition52w: null,
+    adx14: null,
+    deliveryPercent: null,
   };
 }
 
@@ -170,10 +175,10 @@ describe('EarningsIntelligenceService', () => {
     expect(snapshot.reasonTags).toContain('MIXED_RESULT');
   });
 
-  it('reports DATE_TBA (never fabricates a forward date) and keeps estimated rows out of UPCOMING_RESULTS', () => {
+  it('Phase 3: an in-window cadence projection surfaces an Estimated date and enters UPCOMING_RESULTS', () => {
     const service = new EarningsIntelligenceService({} as any);
 
-    const tba = service.calculateSnapshot({
+    const estimated = service.calculateSnapshot({
       stockId: 'stock-1',
       symbol: 'AAA',
       region: 'IN',
@@ -190,26 +195,29 @@ describe('EarningsIntelligenceService', () => {
       ],
     });
 
-    // No official date → no fabricated forward date; row must not enter the
-    // official-only UPCOMING_RESULTS / PRE_RESULT_INTEREST buckets.
-    expect(tba.daysToResult).toBeNull();
-    expect(tba.resultDate).toBeNull();
-    expect(tba.resultDateSource).toBe('DATE_TBA');
-    expect(tba.resultDateLabel).toBe('TBA');
-    expect(tba.riskTags).toContain('ESTIMATED_RESULT_DATE');
-    expect(tba.reasonTags).toContain('PRE_RESULT_DELIVERY_INTEREST');
-    expect(tba.warnings).toEqual(expect.arrayContaining(['RESULT_DATE_NOT_ANNOUNCED']));
-    expect(tba.categories).not.toContain('UPCOMING_RESULTS');
-    expect(tba.categories).not.toContain('PRE_RESULT_INTEREST');
-    expect(tba.categories).toContain('EARNINGS_WATCHLIST');
+    // periodEnd 2026-03-31 → next quarter end 2026-06-30 + 45d lag = 2026-08-14,
+    // 30 days out (≤ the 90-day upcoming window) → an honest Estimated date that
+    // populates the year-round UPCOMING_RESULTS / PRE_RESULT_INTEREST tabs.
+    expect(estimated.resultDateSource).toBe('ESTIMATED_FROM_CADENCE');
+    expect(estimated.resultDate?.toISOString()).toBe('2026-08-14T00:00:00.000Z');
+    expect(estimated.resultDateLabel).toBe('Estimated');
+    expect(estimated.daysToResult).toBe(30);
+    expect(estimated.riskTags).toContain('ESTIMATED_RESULT_DATE');
+    expect(estimated.reasonTags).toContain('PRE_RESULT_DELIVERY_INTEREST');
+    expect(estimated.warnings).toEqual(expect.arrayContaining(['RESULT_DATE_ESTIMATED_FROM_CADENCE']));
+    expect(estimated.warnings).not.toContain('RESULT_DATE_NOT_ANNOUNCED');
+    expect(estimated.categories).toContain('UPCOMING_RESULTS');
+    expect(estimated.categories).toContain('PRE_RESULT_INTEREST');
+    // Result-reaction history stays gated on an OFFICIAL date only.
+    expect(estimated.categories).not.toContain('RESULT_REACTION_HISTORY');
   });
 
-  it('does not treat validatedAt or period end as the result date when no official date exists', () => {
+  it('Phase 3: the Estimated result date is the cadence projection, preserving period/validation provenance', () => {
     const service = new EarningsIntelligenceService({} as any);
 
-    // With no official date the engine reports DATE_TBA (resultDate null) rather
-    // than surfacing the fiscal period end or validation timestamp as a date.
-    // periodEndDate / validatedAt are still preserved as separate provenance fields.
+    // With no official date the resolved result date is the cadence projection
+    // (2026-06-30 + 45d = 2026-08-14), NOT the fiscal period end or the validation
+    // timestamp — those remain preserved as separate provenance fields.
     const snapshot = service.calculateSnapshot({
       stockId: 'stock-1',
       symbol: 'AAA',
@@ -223,19 +231,53 @@ describe('EarningsIntelligenceService', () => {
       ],
       prices: [
         { symbol: 'AAA', timestamp: new Date('2026-04-28T00:00:00.000Z'), close: 100, adjustedClose: 100, volume: 1000 },
-        { symbol: 'AAA', timestamp: new Date('2026-05-06T00:00:00.000Z'), close: 106, adjustedClose: 106, volume: 1200 },
       ],
       deliverySnapshots: [],
     });
 
-    expect(snapshot.resultDateSource).toBe('DATE_TBA');
-    expect(snapshot.resultDate).toBeNull();
+    expect(snapshot.resultDateSource).toBe('ESTIMATED_FROM_CADENCE');
+    expect(snapshot.resultDate?.toISOString()).toBe('2026-08-14T00:00:00.000Z');
+    expect(snapshot.resultDateLabel).toBe('Estimated');
     expect(snapshot.periodEndDate?.toISOString()).toBe('2026-03-31T00:00:00.000Z');
     expect(snapshot.validatedAt?.toISOString()).toBe('2026-05-10T00:00:00.000Z');
+    // 105 days out → beyond the 90-day window: labeled, but not yet "upcoming".
+    expect(snapshot.categories).not.toContain('UPCOMING_RESULTS');
     expect(snapshot.categories).not.toContain('RESULT_WINNERS');
     expect(snapshot.categories).not.toContain('RESULT_REACTION_HISTORY');
+    // Price-reaction history still requires an OFFICIAL date, never an estimate.
     expect(snapshot.riskTags).toContain('PRICE_REACTION_REQUIRES_OFFICIAL_RESULT_DATE');
-    expect(snapshot.warnings).toEqual(expect.arrayContaining(['RESULT_DATE_NOT_ANNOUNCED']));
+    expect(snapshot.warnings).toEqual(expect.arrayContaining(['RESULT_DATE_ESTIMATED_FROM_CADENCE']));
+  });
+
+  it('Phase 3: an OVERDUE period with no official date stays DATE_TBA (no past-dated estimate)', () => {
+    const service = new EarningsIntelligenceService({} as any);
+
+    // periodEnd 2025-03-31 → projection 2025-08-14, which is in the past relative
+    // to the snapshot: the result is overdue with no official date, so we never
+    // surface a stale projected date — it stays DATE_TBA and out of UPCOMING.
+    const tba = service.calculateSnapshot({
+      stockId: 'stock-1',
+      symbol: 'AAA',
+      region: 'IN',
+      assetType: 'STOCK',
+      snapshotDate: new Date('2026-07-15T00:00:00.000Z'),
+      dataThroughDate: null,
+      fundamentals: [
+        fundamental('2025-03-31', 130, 18, 1.8, { validatedAt: new Date('2025-05-10T00:00:00.000Z') }),
+        fundamental('2024-03-31', 100, 10, 1),
+      ],
+      prices: [],
+      deliverySnapshots: [],
+    });
+
+    expect(tba.daysToResult).toBeNull();
+    expect(tba.resultDate).toBeNull();
+    expect(tba.resultDateSource).toBe('DATE_TBA');
+    expect(tba.resultDateLabel).toBe('TBA');
+    expect(tba.riskTags).toContain('ESTIMATED_RESULT_DATE');
+    expect(tba.warnings).toEqual(expect.arrayContaining(['RESULT_DATE_NOT_ANNOUNCED']));
+    expect(tba.categories).not.toContain('UPCOMING_RESULTS');
+    expect(tba.categories).not.toContain('PRE_RESULT_INTEREST');
   });
 
   it('marks stale freshness from period end even when validatedAt is recent', () => {
@@ -574,8 +616,10 @@ describe('EarningsIntelligenceService', () => {
     expect(snapshot.riskTags).not.toContain('ESTIMATED_RESULT_DATE');
   });
 
-  it('CB-44: absent official date produces resultDateLabel="TBA" with not-announced warning', () => {
+  it('CB-44: absent official date for an OVERDUE period produces resultDateLabel="TBA" with not-announced warning', () => {
     const service = new EarningsIntelligenceService({} as any);
+    // Overdue period (projection in the past) → DATE_TBA rather than a Phase 3
+    // forward estimate; the not-announced honesty warning still applies.
     const snapshot = service.calculateSnapshot({
       stockId: 'stock-1',
       symbol: 'AAA',
@@ -584,10 +628,10 @@ describe('EarningsIntelligenceService', () => {
       snapshotDate: new Date('2026-07-15T00:00:00.000Z'),
       dataThroughDate: null,
       fundamentals: [
-        fundamental('2026-03-31', 130, 18, 1.8, {
-          validatedAt: new Date('2026-05-10T00:00:00.000Z'),
+        fundamental('2025-03-31', 130, 18, 1.8, {
+          validatedAt: new Date('2025-05-10T00:00:00.000Z'),
         }),
-        fundamental('2025-03-31', 100, 10, 1),
+        fundamental('2024-03-31', 100, 10, 1),
       ],
       prices: [],
       deliverySnapshots: [],
@@ -599,8 +643,10 @@ describe('EarningsIntelligenceService', () => {
     expect(snapshot.riskTags).toContain('ESTIMATED_RESULT_DATE');
   });
 
-  it('CB-44: DATE_TBA suppresses the fabricated date regardless of snapshot proximity', () => {
+  it('CB-44: an OVERDUE DATE_TBA period never surfaces a (past-dated) result date', () => {
     const service = new EarningsIntelligenceService({} as any);
+    // Projection 2024-08-14 is well in the past at snapshot 2026-05-01 → DATE_TBA
+    // with a suppressed (null) date; we never show a stale projected date.
     const snapshot = service.calculateSnapshot({
       stockId: 'stock-1',
       symbol: 'AAA',
@@ -609,8 +655,8 @@ describe('EarningsIntelligenceService', () => {
       snapshotDate: new Date('2026-05-01T00:00:00.000Z'),
       dataThroughDate: null,
       fundamentals: [
-        fundamental('2026-03-31', 130, 18, 1.8, { validatedAt: new Date('2026-04-30T00:00:00.000Z') }),
-        fundamental('2025-03-31', 100, 10, 1),
+        fundamental('2024-03-31', 130, 18, 1.8, { validatedAt: new Date('2024-04-30T00:00:00.000Z') }),
+        fundamental('2023-03-31', 100, 10, 1),
       ],
       prices: [],
       deliverySnapshots: [],

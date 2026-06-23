@@ -239,6 +239,12 @@ model EarningsIntelligenceSnapshot {
   warnings           Json      @default("[]")
   freshness          String
   categories         Json      @default("[]")
+  // Phase 3 numeric technicals bundle (computed at refresh from persisted price/delivery history)
+  rsi14              Float?
+  smaPosture         String?
+  pricePosition52w   Float?
+  adx14              Float?
+  deliveryPercent    Float?
   calculationVersion String    @default("earnings-intelligence-v1")
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt

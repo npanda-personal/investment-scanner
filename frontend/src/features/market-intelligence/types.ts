@@ -141,6 +141,12 @@ export interface EarningsIntelligenceSnapshot {
   stockId?: string;
   /** Current trading signal joined read-time; null = no trusted signal, undefined = join skipped. */
   signal?: EarningsSignalSummary | null;
+  /** Numeric technicals bundle (Phase 3); each field null when its warm-up window is unmet. */
+  rsi14?: number | null;
+  smaPosture?: string | null;
+  pricePosition52w?: number | null;
+  adx14?: number | null;
+  deliveryPercent?: number | null;
 }
 
 export interface EarningsSignalSummary {
