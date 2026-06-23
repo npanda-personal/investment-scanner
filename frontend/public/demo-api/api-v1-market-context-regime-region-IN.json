@@ -1,1 +1,1 @@
-{"regime":"RISK_ON","score":66,"explanation":"risk-on because 70.3% of liquid-universe instruments are above SMA50, 59.5% above SMA200, and the Nifty 50 index 63-bar trend score is 54.","updatedAt":"2026-06-23T06:22:41.447Z","dataStatus":"PARTIAL"}
+{"regime":"NEUTRAL","score":63,"explanation":"neutral because 65.1% of liquid-universe instruments are above SMA50, 57.2% above SMA200, and the Nifty 50 index 63-bar trend score is 50.","updatedAt":"2026-06-23T13:25:10.348Z","dataStatus":"PARTIAL"}
