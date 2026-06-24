@@ -61,7 +61,7 @@ export class CalendarService {
     }
 
     if (wants('DIVIDEND') || wants('SPLIT')) {
-      const rows = await this.repository.listCorporateActions(region, [], from, to, limit * 2);
+      const rows = await this.repository.listCorporateActions(region, assetType, [], from, to, limit * 2);
       for (const r of rows) {
         const family = classifyCorporateAction(r.actionType);
         if (family === 'DIVIDEND' && wants('DIVIDEND')) events.push(this.corporateActionToEvent(r, 'DIVIDEND'));
@@ -90,6 +90,12 @@ export class CalendarService {
 
     const counts = emptyCounts();
     for (const e of events) counts[e.eventType] += 1;
+
+    // Contract: under type=ALL each family is fetched up to `limit`, merged, sorted
+    // newest-first, then truncated to `limit` below — so on a small limit a date-clustered
+    // family could crowd out others in the page. The FE always requests the max limit and
+    // re-filters per tab client-side, and `counts` above is computed pre-slice so tab badges
+    // stay accurate regardless. A future small-limit caller should fetch per-type instead.
 
     const requested = type === 'ALL' ? [...CALENDAR_EVENT_TYPES] : [type];
     const populated = requested.filter((t) => counts[t] > 0).length;
@@ -171,9 +177,9 @@ export class CalendarService {
 
   private earningsToEvent(r: EarningsUpcomingRow, region: string): CalendarEvent {
     return {
-      id: `earn:${r.symbol}:${r.resultDate ? isoDay(r.resultDate) : 'tba'}`,
+      id: `earn:${r.symbol}:${isoDay(r.resultDate)}`,
       eventType: 'EARNINGS',
-      date: (r.resultDate ?? new Date()).toISOString(),
+      date: r.resultDate.toISOString(),
       region,
       symbol: r.symbol,
       companyName: r.stock?.name ?? null,
@@ -250,8 +256,15 @@ export class CalendarService {
       if (!first) rowWarnings.push('No traded close on/after listing date.');
       if (!last) rowWarnings.push('No latest price available.');
 
+      // Prefer the split/dividend-adjusted first close (back-adjusted to the latest-price
+      // basis) so a corporate action between listing and now doesn't distort the ratio;
+      // fall back to the raw close when no adjusted value exists. `firstClose` stored below
+      // stays the raw observed close — an honest "first traded close", not the adjusted one.
+      const firstForReturn = first ? (first.adjustedClose ?? first.close) : null;
       const returnSinceListing =
-        first && last && first.close > 0 ? (last.price - first.close) / first.close : null;
+        firstForReturn != null && last && firstForReturn > 0
+          ? (last.price - firstForReturn) / firstForReturn
+          : null;
       const daysListed = Math.max(0, Math.floor((req.snapshotDate.getTime() - s.ipoDate.getTime()) / DAY_MS));
       const freshness = first && last ? 'FRESH' : first || last ? 'PARTIAL' : 'NO_DATA';
 

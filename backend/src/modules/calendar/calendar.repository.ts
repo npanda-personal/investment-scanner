@@ -23,7 +23,8 @@ export interface CorporateActionRow {
 export interface EarningsUpcomingRow {
   symbol: string;
   stockId: string;
-  resultDate: Date | null;
+  // Non-null: listUpcomingEarnings filters resultDate to a [gte, lte] window, excluding nulls.
+  resultDate: Date;
   resultDateSource: string;
   daysToResult: number | null;
   stock: { name: string } | null;
@@ -110,12 +111,15 @@ export class CalendarRepository {
   }
 
   /**
-   * Corporate actions scoped by stock region + effective-date window. `actionTypes`
-   * is an optional exact-match filter; when empty, all action types are returned and
-   * the service classifies them (dividend vs split/bonus) — robust to source casing.
+   * Corporate actions scoped by stock region + assetType + effective-date window.
+   * `actionTypes` is an optional exact-match filter; when empty, all action types are
+   * returned and the service classifies them (dividend vs split/bonus) — robust to
+   * source casing. assetType is scoped for consistency with the IPO/earnings reads
+   * (corporate actions are equities-only today, but the scope keeps the read honest).
    */
   async listCorporateActions(
     region: string,
+    assetType: string,
     actionTypes: string[],
     from: Date,
     to: Date,
@@ -125,7 +129,7 @@ export class CalendarRepository {
       where: {
         ...(actionTypes.length ? { actionType: { in: actionTypes } } : {}),
         effectiveDate: { gte: from, lte: to },
-        stock: { region },
+        stock: { region, assetType },
       },
       orderBy: { effectiveDate: 'desc' },
       take: limit,
@@ -207,18 +211,27 @@ export class CalendarRepository {
     });
   }
 
-  /** Earliest traded close on/after the listing date (the first OBSERVABLE close — NOT an offer price). */
+  /**
+   * Earliest traded close on/after the listing date (the first OBSERVABLE close — NOT an
+   * offer price). Also returns the split/dividend-adjusted close when present: it is
+   * back-adjusted to the latest-price basis, so the service prefers it for the
+   * return-since-listing ratio while still surfacing the raw close for display.
+   */
   async firstCloseOnOrAfter(
     symbol: string,
     listingDate: Date,
-  ): Promise<{ close: number; timestamp: Date } | null> {
+  ): Promise<{ close: number; adjustedClose: number | null; timestamp: Date } | null> {
     const tick = await this.db.priceTick.findFirst({
       where: { symbol, timestamp: { gte: listingDate } },
       orderBy: { timestamp: 'asc' },
-      select: { close: true, timestamp: true },
+      select: { close: true, adjustedClose: true, timestamp: true },
     });
     if (!tick) return null;
-    return { close: Number(tick.close), timestamp: tick.timestamp };
+    return {
+      close: Number(tick.close),
+      adjustedClose: tick.adjustedClose != null ? Number(tick.adjustedClose) : null,
+      timestamp: tick.timestamp,
+    };
   }
 
   /** Latest known close per symbol (from latest_prices), keyed by symbol. */
