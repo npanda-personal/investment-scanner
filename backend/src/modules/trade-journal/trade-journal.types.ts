@@ -66,6 +66,16 @@ export interface UpdateTradeJournalEntryRequest {
   tags?: string[];
 }
 
+export type TradeJournalSortField =
+  | 'reviewedAt'
+  | 'symbol'
+  | 'direction'
+  | 'decision'
+  | 'entryPrice'
+  | 'conviction'
+  | 'outcomeStatus'
+  | 'realizedReturnPct';
+
 export interface TradeJournalListFilters {
   decision?: TradeDecision;
   outcomeStatus?: OutcomeStatus;
@@ -74,6 +84,8 @@ export interface TradeJournalListFilters {
   toDate?: string;
   page?: number;
   pageSize?: number;
+  sortBy?: TradeJournalSortField;
+  sortDirection?: 'asc' | 'desc';
 }
 
 export interface TradeJournalListResult {

@@ -23,6 +23,8 @@ import {
 } from '@mui/material';
 import { money } from '@/shared/format/money';
 import { StockWorkspaceLink } from '@/shared/workspace/StockWorkspaceLink';
+import { SortableTableCell } from '@/shared/components';
+import { useTableSort, sortRows } from '@/shared/hooks';
 import type { WorkspaceSource } from '@/shared/workspace/types';
 import type {
   MarketScanRow52w,
@@ -92,26 +94,49 @@ function sourceFrom(
   };
 }
 
+// ─── Table52w ────────────────────────────────────────────────────────────────
+
+type Sort52wKey = 'symbol' | 'company' | 'currentPrice' | 'high52w' | 'low52w' | 'pctFromHigh' | 'pctFromLow';
+
+function sort52wValue(row: MarketScanRow52w, key: Sort52wKey): unknown {
+  switch (key) {
+    case 'symbol': return row.symbol;
+    case 'company': return row.companyName;
+    case 'currentPrice': return row.currentPrice;
+    case 'high52w': return row.high52w;
+    case 'low52w': return row.low52w;
+    case 'pctFromHigh': return row.pctFromHigh;
+    case 'pctFromLow': return row.pctFromLow;
+  }
+}
+
 export function Table52w({ rows, scanType, currency, page, rowsPerPage, onPageChange, onRowsPerPageChange }: { rows: MarketScanRow52w[]; scanType: '52w-high' | '52w-low'; currency?: string } & PaginationProps) {
+  const { sortKey, sortDirection, handleSort } = useTableSort<Sort52wKey>(null, 'desc', () => onPageChange(0));
   if (!rows.length) {
     return <EmptyState message="No instruments found matching the scan criteria." />;
   }
-  const source = sourceFrom(scanType === '52w-high' ? '52-Week Highs' : '52-Week Lows', rows);
-  const visibleRows = rows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+  const sortedRows = sortRows(rows, sortKey, sortDirection, sort52wValue);
+  const source = sourceFrom(scanType === '52w-high' ? '52-Week Highs' : '52-Week Lows', sortedRows);
+  const visibleRows = sortedRows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+
+  const sortable = (label: React.ReactNode, columnKey: Sort52wKey, align?: 'left' | 'center' | 'right', title?: string) => (
+    <SortableTableCell label={label} columnKey={columnKey} activeKey={sortKey} direction={sortDirection} onSort={handleSort} align={align} title={title} />
+  );
+
   return (
     <>
       <TableContainer>
         <Table size="small">
           <TableHead>
             <TableRow>
-              <TableCell>Symbol</TableCell>
-              <TableCell>Company</TableCell>
+              {sortable('Symbol', 'symbol')}
+              {sortable('Company', 'company')}
               <TableCell>Sector</TableCell>
-              <TableCell align="right">Current Price</TableCell>
-              <TableCell align="right">52W High</TableCell>
-              <TableCell align="right">52W Low</TableCell>
-              <TableCell align="right">% from High</TableCell>
-              <TableCell align="right">% from Low</TableCell>
+              {sortable('Current Price', 'currentPrice', 'right')}
+              {sortable('52W High', 'high52w', 'right')}
+              {sortable('52W Low', 'low52w', 'right')}
+              {sortable('% from High', 'pctFromHigh', 'right')}
+              {sortable('% from Low', 'pctFromLow', 'right')}
               <TableCell>Basis</TableCell>
               <TableCell>Signal</TableCell>
             </TableRow>
@@ -179,25 +204,47 @@ export function Table52w({ rows, scanType, currency, page, rowsPerPage, onPageCh
   );
 }
 
+// ─── TableDeliverySpike ───────────────────────────────────────────────────────
+
+type SortDeliverySpikeKey = 'symbol' | 'company' | 'deliveryPct' | 'avgDeliveryPct' | 'spikeRatio' | 'lookbackBars';
+
+function sortDeliverySpikeValue(row: MarketScanRowDeliverySpike, key: SortDeliverySpikeKey): unknown {
+  switch (key) {
+    case 'symbol': return row.symbol;
+    case 'company': return row.companyName;
+    case 'deliveryPct': return row.deliveryPct;
+    case 'avgDeliveryPct': return row.avgDeliveryPct;
+    case 'spikeRatio': return row.spikeRatio;
+    case 'lookbackBars': return row.lookbackBars;
+  }
+}
+
 export function TableDeliverySpike({ rows, page, rowsPerPage, onPageChange, onRowsPerPageChange }: { rows: MarketScanRowDeliverySpike[] } & PaginationProps) {
+  const { sortKey, sortDirection, handleSort } = useTableSort<SortDeliverySpikeKey>(null, 'desc', () => onPageChange(0));
   if (!rows.length) {
     return <EmptyState message="No delivery-spike candidates found. Delivery data covers NSE-listed stocks only." />;
   }
-  const source = sourceFrom('Delivery Spikes', rows);
-  const visibleRows = rows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+  const sortedRows = sortRows(rows, sortKey, sortDirection, sortDeliverySpikeValue);
+  const source = sourceFrom('Delivery Spikes', sortedRows);
+  const visibleRows = sortedRows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+
+  const sortable = (label: React.ReactNode, columnKey: SortDeliverySpikeKey, align?: 'left' | 'center' | 'right', title?: string) => (
+    <SortableTableCell label={label} columnKey={columnKey} activeKey={sortKey} direction={sortDirection} onSort={handleSort} align={align} title={title} />
+  );
+
   return (
     <>
       <TableContainer>
         <Table size="small">
           <TableHead>
             <TableRow>
-              <TableCell>Symbol</TableCell>
-              <TableCell>Company</TableCell>
+              {sortable('Symbol', 'symbol')}
+              {sortable('Company', 'company')}
               <TableCell>Sector</TableCell>
-              <TableCell align="right">Latest Delivery %</TableCell>
-              <TableCell align="right">Avg Delivery %</TableCell>
-              <TableCell align="right">Spike Ratio</TableCell>
-              <TableCell align="right">Lookback (bars)</TableCell>
+              {sortable('Latest Delivery %', 'deliveryPct', 'right')}
+              {sortable('Avg Delivery %', 'avgDeliveryPct', 'right')}
+              {sortable('Spike Ratio', 'spikeRatio', 'right')}
+              {sortable('Lookback (bars)', 'lookbackBars', 'right')}
               <TableCell>Signal</TableCell>
             </TableRow>
           </TableHead>
@@ -254,25 +301,47 @@ export function TableDeliverySpike({ rows, page, rowsPerPage, onPageChange, onRo
   );
 }
 
+// ─── TablePotentialMovers ─────────────────────────────────────────────────────
+
+type SortPotentialMoversKey = 'symbol' | 'company' | 'latestClose' | 'dailyChangePct' | 'move3dPct' | 'avgVolume20';
+
+function sortPotentialMoversValue(row: MarketScanRowPotentialMovers, key: SortPotentialMoversKey): unknown {
+  switch (key) {
+    case 'symbol': return row.symbol;
+    case 'company': return row.companyName;
+    case 'latestClose': return row.latestClose;
+    case 'dailyChangePct': return row.dailyChangePct;
+    case 'move3dPct': return row.move3dPct;
+    case 'avgVolume20': return row.avgVolume20;
+  }
+}
+
 export function TablePotentialMovers({ rows, currency, page, rowsPerPage, onPageChange, onRowsPerPageChange }: { rows: MarketScanRowPotentialMovers[]; currency?: string } & PaginationProps) {
+  const { sortKey, sortDirection, handleSort } = useTableSort<SortPotentialMoversKey>(null, 'desc', () => onPageChange(0));
   if (!rows.length) {
     return <EmptyState message="No potential-mover candidates found. Check that recent price data has been ingested." />;
   }
-  const source = sourceFrom('Potential Movers', rows);
-  const visibleRows = rows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+  const sortedRows = sortRows(rows, sortKey, sortDirection, sortPotentialMoversValue);
+  const source = sourceFrom('Potential Movers', sortedRows);
+  const visibleRows = sortedRows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+
+  const sortable = (label: React.ReactNode, columnKey: SortPotentialMoversKey, align?: 'left' | 'center' | 'right', title?: string) => (
+    <SortableTableCell label={label} columnKey={columnKey} activeKey={sortKey} direction={sortDirection} onSort={handleSort} align={align} title={title} />
+  );
+
   return (
     <>
       <TableContainer>
         <Table size="small">
           <TableHead>
             <TableRow>
-              <TableCell>Symbol</TableCell>
-              <TableCell>Company</TableCell>
+              {sortable('Symbol', 'symbol')}
+              {sortable('Company', 'company')}
               <TableCell>Sector</TableCell>
-              <TableCell align="right">Price</TableCell>
-              <TableCell align="right">Day Chg %</TableCell>
-              <TableCell align="right">3-Day Move %</TableCell>
-              <TableCell align="right">Avg Vol 20</TableCell>
+              {sortable('Price', 'latestClose', 'right')}
+              {sortable('Day Chg %', 'dailyChangePct', 'right')}
+              {sortable('3-Day Move %', 'move3dPct', 'right')}
+              {sortable('Avg Vol 20', 'avgVolume20', 'right')}
               <TableCell>Signal</TableCell>
             </TableRow>
           </TableHead>
@@ -325,14 +394,36 @@ export function TablePotentialMovers({ rows, currency, page, rowsPerPage, onPage
   );
 }
 
+// ─── TableVolumeSpike ─────────────────────────────────────────────────────────
+
+type SortVolumeSpikeKey = 'symbol' | 'company' | 'latestVolume' | 'avgVolume' | 'spikeRatio' | 'lookbackBars';
+
+function sortVolumeSpikeValue(row: MarketScanRowVolumeSpike, key: SortVolumeSpikeKey): unknown {
+  switch (key) {
+    case 'symbol': return row.symbol;
+    case 'company': return row.companyName;
+    case 'latestVolume': return row.latestVolume;
+    case 'avgVolume': return row.avgVolume;
+    case 'spikeRatio': return row.spikeRatio;
+    case 'lookbackBars': return row.lookbackBars;
+  }
+}
+
 export function TableVolumeSpike({ rows, page, rowsPerPage, onPageChange, onRowsPerPageChange }: { rows: MarketScanRowVolumeSpike[] } & PaginationProps) {
+  const { sortKey, sortDirection, handleSort } = useTableSort<SortVolumeSpikeKey>(null, 'desc', () => onPageChange(0));
   if (!rows.length) {
     return <EmptyState message="No volume-spike candidates found. Check that recent price data has been ingested." />;
   }
-  const source = sourceFrom('Volume Spikes', rows);
+  const sortedRows = sortRows(rows, sortKey, sortDirection, sortVolumeSpikeValue);
+  const source = sourceFrom('Volume Spikes', sortedRows);
   // Derive lookback window from first row (all rows share the same lookback param)
   const lookbackWindow = rows[0]?.lookbackBars ?? null;
-  const visibleRows = rows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+  const visibleRows = sortedRows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+
+  const sortable = (label: React.ReactNode, columnKey: SortVolumeSpikeKey, align?: 'left' | 'center' | 'right', title?: string) => (
+    <SortableTableCell label={label} columnKey={columnKey} activeKey={sortKey} direction={sortDirection} onSort={handleSort} align={align} title={title} />
+  );
+
   return (
     <>
       {lookbackWindow != null && (
@@ -344,13 +435,13 @@ export function TableVolumeSpike({ rows, page, rowsPerPage, onPageChange, onRows
         <Table size="small">
           <TableHead>
             <TableRow>
-              <TableCell>Symbol</TableCell>
-              <TableCell>Company</TableCell>
+              {sortable('Symbol', 'symbol')}
+              {sortable('Company', 'company')}
               <TableCell>Sector</TableCell>
-              <TableCell align="right">Latest Volume</TableCell>
-              <TableCell align="right">Avg Volume</TableCell>
-              <TableCell align="right">Spike Ratio</TableCell>
-              <TableCell align="right">Lookback (bars)</TableCell>
+              {sortable('Latest Volume', 'latestVolume', 'right')}
+              {sortable('Avg Volume', 'avgVolume', 'right')}
+              {sortable('Spike Ratio', 'spikeRatio', 'right')}
+              {sortable('Lookback (bars)', 'lookbackBars', 'right')}
               <TableCell>Signal</TableCell>
             </TableRow>
           </TableHead>

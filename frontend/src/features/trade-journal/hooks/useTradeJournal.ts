@@ -33,6 +33,8 @@ export function useTradeJournal(filters?: TradeJournalListFilters) {
     filters?.toDate,
     filters?.page,
     filters?.pageSize,
+    filters?.sortBy,
+    filters?.sortDirection,
   ]);
 
   useEffect(() => {

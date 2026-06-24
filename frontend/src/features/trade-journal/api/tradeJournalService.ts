@@ -19,6 +19,8 @@ export async function fetchTradeJournalEntries(filters?: TradeJournalListFilters
   if (filters?.toDate) params.set('toDate', filters.toDate);
   if (filters?.page) params.set('page', String(filters.page));
   if (filters?.pageSize) params.set('pageSize', String(filters.pageSize));
+  if (filters?.sortBy) params.set('sortBy', filters.sortBy);
+  if (filters?.sortDirection) params.set('sortDirection', filters.sortDirection);
   const response = await axios.get<TradeJournalListResult>(API_BASE, { params });
   return response.data;
 }

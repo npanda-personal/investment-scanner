@@ -41,10 +41,14 @@ export class TradeJournalRepository {
     const where = this.buildWhere(userId, filters);
     const page = filters.page ?? 1;
     const pageSize = filters.pageSize ?? 25;
+    // sortBy is whitelisted to real columns in validation; fall back to most-recent-first.
+    const orderBy: Prisma.TradeJournalEntryOrderByWithRelationInput = filters.sortBy
+      ? { [filters.sortBy]: filters.sortDirection ?? 'desc' }
+      : { reviewedAt: 'desc' };
     const [entries, total] = await Promise.all([
       this.db.tradeJournalEntry.findMany({
         where,
-        orderBy: { reviewedAt: 'desc' },
+        orderBy,
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),

@@ -6,4 +6,5 @@ export { FreshnessChip, type FreshnessChipProps } from './FreshnessChip';
 export { PageHeader } from './PageHeader';
 export { StalenessBadge, type StalenessBadgeProps } from './StalenessBadge';
 export { StatusBadge, statusColor } from './StatusBadge';
+export { SortableTableCell } from './SortableTableCell';
 export { EmptyState, ErrorState, LoadingState } from './StatePanels';

@@ -70,6 +70,8 @@ export interface TradeJournalListFilters {
   toDate?: string;
   page?: number;
   pageSize?: number;
+  sortBy?: string;
+  sortDirection?: 'asc' | 'desc';
 }
 
 export interface TradeJournalListResult {
