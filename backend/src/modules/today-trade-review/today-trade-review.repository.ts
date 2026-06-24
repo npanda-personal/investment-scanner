@@ -10,6 +10,7 @@ import type {
   TodayReviewRunStatus,
   TodayReviewSourceSnapshot,
 } from './today-trade-review.types';
+import { snapshotComponentScores } from './today-trade-review.explainability';
 
 const LATEST_VISIBLE_RUN_PAGE_SIZE = 25;
 const LATEST_VISIBLE_RUN_MAX_SCAN_ROWS = 250;
@@ -527,13 +528,7 @@ export class TodayTradeReviewRepository implements TodayReviewRepositoryContract
       candidateId: candidate.id || `${candidate.runId || 'run'}:${candidate.instrumentId}`,
       state: candidate.state,
       rankingComponents: {
-        strategyProof: candidate.strategyProofSnapshot ? 8 : 0,
-        tradePlan: candidate.tradePlanSnapshot ? 8 : 0,
-        marketRegime: candidate.marketContextSnapshot ? 5 : 0,
-        sectorAlignment: (candidate.dataQualitySnapshot as any)?.sector || candidate.catalogSector ? 5 : 0,
-        signalCalibration: (candidate.sourceSignalSnapshot as any)?.calibration ? 5 : 0,
-        dataQuality: candidate.dataQualitySnapshot ? 8 : 0,
-        smartMoney: (candidate.sourceSignalSnapshot as any)?.smartMoney ? 5 : 0,
+        ...snapshotComponentScores(candidate),
         hardBlockerOverride: candidate.blockers.length > 0,
       },
       promotionReasons: ['LONG_REVIEW', 'SHORT_REVIEW', 'EXIT_RISK_REVIEW'].includes(candidate.state) ? [{
