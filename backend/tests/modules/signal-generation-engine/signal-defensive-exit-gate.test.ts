@@ -20,7 +20,7 @@ import type { SignalItem } from '../../../src/modules/signal-generation-engine/s
 
 const clean: DefensiveExitEvidence = { decision: 'HOLD', exitRulesTriggered: [], invalidationRulesTriggered: [] };
 
-describe('isUnderDefensiveExit — mirrors the ledger close-evidence rule', () => {
+describe('isUnderDefensiveExit — decision-driven, mirrors the ledger close-evidence rule', () => {
   it('false for no evidence / clean posture', () => {
     expect(isUnderDefensiveExit(undefined)).toBe(false);
     expect(isUnderDefensiveExit(null)).toBe(false);
@@ -32,11 +32,15 @@ describe('isUnderDefensiveExit — mirrors the ledger close-evidence rule', () =
     expect(isUnderDefensiveExit({ ...clean, decision: 'REDUCE_RISK' })).toBe(true);
   });
 
-  it('true when any exit rule triggered (even with a benign decision)', () => {
-    expect(isUnderDefensiveExit({ ...clean, exitRulesTriggered: ['DEATH_CROSS'] })).toBe(true);
+  it('FALSE when only sub-threshold exit rules fired under a HOLD verdict (decision-driven: honor HOLD)', () => {
+    // A HOLD verdict means "stay invested, do not exit". Raw exit-rule fires that did not
+    // escalate the decision must NOT gate the entry — otherwise nearly the entire bullish
+    // universe is suppressed (the 2026-06-24 IN regression). A genuine exit escalates the
+    // decision to EXIT_CANDIDATE/REDUCE_RISK, so nothing real is missed.
+    expect(isUnderDefensiveExit({ ...clean, decision: 'HOLD', exitRulesTriggered: ['DEATH_CROSS'] })).toBe(false);
   });
 
-  it('true when any invalidation rule triggered', () => {
+  it('true when any invalidation rule triggered (a hard invalidation gates regardless of decision)', () => {
     expect(isUnderDefensiveExit({ ...clean, invalidationRulesTriggered: ['SMA200_BREACH'] })).toBe(true);
   });
 });

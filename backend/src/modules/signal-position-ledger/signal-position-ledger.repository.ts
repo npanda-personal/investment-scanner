@@ -474,9 +474,16 @@ export class SignalPositionLedgerRepository {
    * close reasons so a closed position is backdated to the day its criterion was
    * actually met (the candle date), not the day the refresh happened to run:
    *  - exitDate:         earliest generatedDate where the decision is
-   *                      EXIT_CANDIDATE/REDUCE_RISK OR any exit rule triggered.
+   *                      EXIT_CANDIDATE/REDUCE_RISK (the strategy's aggregated exit
+   *                      verdict — DECISION-DRIVEN, not raw exit-rule fires).
    *  - invalidationDate: earliest generatedDate where any invalidation rule triggered.
    * Either field is null when that criterion was never met in the window.
+   *
+   * NOTE: kept in lockstep with the signal-generation defensive-exit ENTRY gate
+   * (isUnderDefensiveExit). Both deliberately ignore raw `exitRulesTriggered.length > 0`:
+   * sub-threshold exit rules that net to a HOLD verdict must NOT close a position (nor
+   * suppress a new entry). A genuine exit always escalates the decision, so nothing real
+   * is missed. See signal-defensive-exit-gate.ts header.
    */
   async firstCloseEvidenceDates(
     entries: Array<{ instrumentId: string; entryDate: string }>,
@@ -488,7 +495,6 @@ export class SignalPositionLedgerRepository {
       SELECT sub."instrumentId",
         MIN(sdr."generatedDate") FILTER (
           WHERE sdr.decision IN ('EXIT_CANDIDATE','REDUCE_RISK')
-            OR jsonb_array_length(COALESCE(sdr."exitRulesTriggered"::jsonb, '[]'::jsonb)) > 0
         ) AS "exitDate",
         MIN(sdr."generatedDate") FILTER (
           WHERE jsonb_array_length(COALESCE(sdr."invalidationRulesTriggered"::jsonb, '[]'::jsonb)) > 0
