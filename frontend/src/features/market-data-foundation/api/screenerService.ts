@@ -6,6 +6,7 @@ const API_BASE = '/api/v1/market-data/screener';
 export async function fetchScreener(filters: ScreenerFilters = {}, signal?: AbortSignal): Promise<ScreenerResult> {
   const params: Record<string, string | number | boolean> = {};
   if (filters.signalDirection) params.signalDirection = filters.signalDirection;
+  if (filters.setup) params.setup = filters.setup;
   if (filters.minScore != null) params.minScore = filters.minScore;
   if (filters.minRsPercentile != null) params.minRsPercentile = filters.minRsPercentile;
   if (filters.sector) params.sector = filters.sector;

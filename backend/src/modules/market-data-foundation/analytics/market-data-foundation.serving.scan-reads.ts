@@ -390,6 +390,7 @@ export class ScanReadsService {
     region?: string;
     assetType?: string;
     signalDirection?: string;
+    setup?: string;
     minScore?: number;
     minRsPercentile?: number;
     sector?: string;
@@ -424,6 +425,9 @@ export class ScanReadsService {
       scoreDeltaPrev: number | null;
       isNewEntry: boolean;
       factorFamilies: Record<string, number> | null;
+      setups: string[];
+      smartMoneyStatus: string | null;
+      sectorLeadershipStatus: string | null;
       sparkline: number[] | null;
       currency: string;
       region?: string;

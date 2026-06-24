@@ -43,13 +43,13 @@ export const marketPulseKey = (s: { region: string; assetType: string; timeframe
 
 export const screenerKeyPrefix = `${PREFIX}:screener:`;
 export const screenerKey = (s: {
-  region?: string; assetType?: string; signalDirection?: string;
+  region?: string; assetType?: string; signalDirection?: string; setup?: string;
   minScore?: number; minRsPercentile?: number; sector?: string;
   capBand?: string; minDeliveryPct?: number; min52wPositionPct?: number;
   excludeFnoBan?: boolean; onlyDerivativesEligible?: boolean; limit?: number;
 }): string =>
   `${screenerKeyPrefix}region=${val(s.region)}:assetType=${val(s.assetType)}` +
-  `:dir=${val(s.signalDirection)}:minScore=${val(s.minScore)}` +
+  `:dir=${val(s.signalDirection)}:setup=${val(s.setup)}:minScore=${val(s.minScore)}` +
   `:minRsP=${val(s.minRsPercentile)}:sector=${val(s.sector)}` +
   `:cap=${val(s.capBand)}:minDel=${val(s.minDeliveryPct)}` +
   `:min52w=${val(s.min52wPositionPct)}:exFno=${val(!!s.excludeFnoBan)}` +

@@ -532,6 +532,30 @@ describe('market data controller', () => {
     expect(res.json).toHaveBeenCalledWith({ status: 'COMPLETED' });
   });
 
+  it('rejects an unknown screener setup with 400 before calling the service', async () => {
+    const service = { screener: jest.fn() };
+    const controller = new MarketDataFoundationController(service as any);
+    const req = { query: { region: 'IN', assetType: 'STOCK', setup: 'NOT_A_SETUP' }, originalUrl: '/api/v1/market-data/screener' } as any;
+    const res = { json: jest.fn(), status: jest.fn().mockReturnThis() } as any;
+
+    await controller.screener(req, res);
+
+    expect(service.screener).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ error: expect.stringContaining('setup must be one of') }));
+  });
+
+  it('passes a valid (case-normalized) screener setup through to the service', async () => {
+    const service = { screener: jest.fn().mockResolvedValue({ count: 1, generatedAt: 'now', results: [], warnings: [] }) };
+    const controller = new MarketDataFoundationController(service as any);
+    const req = { query: { region: 'IN', assetType: 'STOCK', signalDirection: 'bullish', setup: 'breakout' }, originalUrl: '/api/v1/market-data/screener' } as any;
+    const res = { json: jest.fn(), status: jest.fn().mockReturnThis() } as any;
+
+    await controller.screener(req, res);
+
+    expect(service.screener).toHaveBeenCalledWith(expect.objectContaining({ setup: 'BREAKOUT', signalDirection: 'BULLISH' }));
+  });
+
   it('blocks legacy provider price backfill requests with NSE/BSE-only guidance', async () => {
     const service = {
       backfillPrices: jest.fn(),
