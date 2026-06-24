@@ -1,1 +1,1 @@
-{"marketCondition":"MIXED","marketGate":"SELECTIVE","allowedActions":["ONLY_HIGH_QUALITY_SETUPS","MANAGE_EXISTING_POSITIONS_ONLY"],"marketScore":63,"reasons":["Market conditions are mixed; selectivity is required."],"blockers":[],"dataStatus":"PARTIAL","updatedAt":"2026-06-23T21:04:13.404Z"}
+{"marketCondition":"HEALTHY","marketGate":"OPEN","allowedActions":["NEW_LONG_TRADES_ALLOWED","ONLY_HIGH_QUALITY_SETUPS"],"marketScore":65,"reasons":["Market regime is Risk-On and breadth is healthy."],"blockers":[],"dataStatus":"PARTIAL","updatedAt":"2026-06-24T16:12:57.785Z"}
