@@ -15,6 +15,7 @@ import type { ComposedSnapshotRow, ProvenanceStatus } from '../snapshot-assemble
 import { cacheService, type CacheService } from '../../cache/cache.service';
 import { todayReviewKey } from '../../cache/cache-keys';
 import { TodayTradeReviewRepository } from './today-trade-review.repository';
+import { snapshotComponentScores } from './today-trade-review.explainability';
 import type {
   TodayReviewBoardSection,
   TodayReviewBoardSelection,
@@ -2022,18 +2023,9 @@ export class TodayTradeReviewService {
       if (component === 'dataQuality') return this.dataQualityScore(source);
       if (component === 'smartMoney') return this.smartMoneyScore(source);
     }
-    const plan = candidate.tradePlanSnapshot as any;
-    const proof = candidate.strategyProofSnapshot as any;
-    const dataQuality = candidate.dataQualitySnapshot as any;
-    const signal = candidate.sourceSignalSnapshot as any;
-    if (component === 'strategyProof') return proof?.evidenceLabel === 'STRONG' ? 25 : proof?.frameworkBacked ? 22 : proof?.evidenceLabel === 'UNPROVEN' ? 0 : 8;
-    if (component === 'tradePlan') return plan?.planStatus === 'VALID' ? Math.min(20, 10 + Number(plan.rewardRiskRatio || 0) * 4) : 0;
-    if (component === 'marketRegime') return candidate.marketContextSnapshot ? 10 : 0;
-    if (component === 'sectorAlignment') return dataQuality?.sector ? 10 : 5;
-    if (component === 'signalCalibration') return signal?.calibration || signal?.setup ? 5 : 0;
-    if (component === 'dataQuality') return dataQuality?.coverageStatus === 'GOOD' || dataQuality?.dataStatus === 'PRICE_ACTION_READY' ? 15 : dataQuality ? 6 : 0;
-    if (component === 'smartMoney') return signal?.smartMoney ? 5 : 0;
-    return 0;
+    // No precise in-memory source (e.g. reconstructing for a persisted candidate):
+    // fall back to the shared snapshot-derived scores so write and read paths agree.
+    return snapshotComponentScores(candidate)[component] ?? 0;
   }
 
   private reasonFromText(label: string, severity: 'WATCH' | 'BLOCKER', candidate: TodayReviewCandidateDto): TodayReviewCandidateReason {

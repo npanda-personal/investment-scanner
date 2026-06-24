@@ -877,7 +877,7 @@ export class StrategyDecisionEngineService {
     }
 
     // 4. Data Quality (Weight: 15)
-    if (ctx.quality?.eligibleForSignals) {
+    if (this.isSignalEligible(ctx.quality)) {
       dataQualityScore = 15;
       reasons.push('Data quality is ready for signals.');
     } else {
@@ -990,7 +990,7 @@ export class StrategyDecisionEngineService {
     if (!near50 && !rsiCool) warnings.push('Pullback is not yet at an ideal support level.');
 
     // 4. Data Quality (Weight: 20)
-    if (ctx.quality?.eligibleForSignals) {
+    if (this.isSignalEligible(ctx.quality)) {
       dataQualityScore = 20;
     } else {
       blockers.push('Data quality NOT_READY.');
@@ -1288,14 +1288,26 @@ export class StrategyDecisionEngineService {
     if (ctx.prices.length < 100) confidence = 'LOW';
     else if (ctx.prices.length < 200) confidence = 'MEDIUM';
 
-    if (!ctx.quality?.eligibleForSignals) confidence = 'LOW';
-    
+    if (!this.isSignalEligible(ctx.quality)) confidence = 'LOW';
+
     if (dataGaps.length > 2) confidence = 'LOW';
     else if (dataGaps.length > 0 && confidence === 'HIGH') confidence = 'MEDIUM';
 
     if (ctx.gate.marketGate === 'UNKNOWN') confidence = 'LOW';
 
     return confidence;
+  }
+
+  // Signal-eligibility from ctx.quality. Batch path stores the nested
+  // InstrumentEligibilityRow (verdicts.signalEligible); legacy path stores a flat
+  // DataQualityEvaluation (eligibleForSignals). Reading only the flat field made
+  // batch decisions resolve undefined → confidence=LOW pipeline-wide. Handles both.
+  private isSignalEligible(quality: any): boolean {
+    if (!quality) return false;
+    if (quality.verdicts && typeof quality.verdicts === 'object') {
+      return Boolean(quality.verdicts.signalEligible);
+    }
+    return Boolean(quality.eligibleForSignals);
   }
 
   private async strategiesForRequest(request: StrategyEvaluateRequest): Promise<StrategyName[]> {
