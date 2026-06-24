@@ -2268,3 +2268,64 @@ model CryptoMarketScanSnapshot {
   @@index([tradingDate, region, assetType], map: "crypto_market_scan_snapshot_date_scope_idx")
   @@map("crypto_market_scan_snapshots")
 }
+
+// IPO Calendar — "recently listed" snapshot. Isolated table (plain stockId join, NO
+// Stock relation) following the InstrumentCoverage / crypto_* convention so it never
+// mutates cross-cutting Stock identity. Materialized at refresh from Stock.ipoDate +
+// boundary OHLC closes. We do NOT have free IPO-prospectus data (offer band / shares /
+// deal value); firstClose is the earliest TRADED close on/after listing (NOT an offer
+// price), and returnSinceListing = (latestClose - firstClose) / firstClose.
+model IpoCalendarSnapshot {
+  id                 String    @id @default(cuid())
+  snapshotDate       DateTime
+  dataThroughDate    DateTime?
+  stockId            String
+  symbol             String
+  companyName        String?
+  scopeRegion        String
+  scopeAssetType     String    @default("STOCK")
+  listingDate        DateTime
+  daysListed         Int
+  exchange           String?
+  sector             String?
+  currency           String?
+  firstClose         Float?
+  firstCloseDate     DateTime?
+  latestClose        Float?
+  latestCloseDate    DateTime?
+  returnSinceListing Float?
+  warnings           Json      @default("[]")
+  freshness          String
+  calculationVersion String    @default("ipo-calendar-v1")
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@unique([snapshotDate, scopeRegion, scopeAssetType, symbol], map: "ipo_calendar_snapshot_scope_symbol_key")
+  @@index([scopeRegion, scopeAssetType, listingDate], map: "ipo_calendar_snapshot_scope_listing_idx")
+  @@map("ipo_calendar_snapshots")
+}
+
+// Economic Calendar — FRED data-release schedule. Isolated table populated at refresh
+// from FRED /fred/releases/dates (+ a release->series map for latest actual/previous).
+// FRED is US/global macro only (CPI, GDP, employment, Fed Funds, yield curve) and
+// provides NO forecasts; actualValue/previousValue come from series observations.
+model EconomicCalendarEvent {
+  id            String    @id @default(cuid())
+  source        String    @default("FRED")
+  releaseId     String
+  releaseName   String
+  seriesId      String?
+  region        String    @default("US")
+  eventDate     DateTime
+  actualValue   Float?
+  previousValue Float?
+  unit          String?
+  sourceUrl     String?
+  fetchedAt     DateTime  @default(now())
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([source, releaseId, eventDate], map: "economic_calendar_event_source_release_date_key")
+  @@index([region, eventDate], map: "economic_calendar_event_region_date_idx")
+  @@map("economic_calendar_events")
+}

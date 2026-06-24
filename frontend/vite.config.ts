@@ -20,12 +20,15 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
+      // Proxy target defaults to the shared backend (:3000) but can be pointed at a
+      // dedicated worktree backend on an offset port via VITE_API_PROXY_TARGET — used by
+      // per-session worktree QA stacks (frontend on an offset port → its own backend).
       '/api': {
-        target: 'http://localhost:3000',
+        target: process.env.VITE_API_PROXY_TARGET || 'http://localhost:3000',
         changeOrigin: true,
       },
       '/ws': {
-        target: 'ws://localhost:3000',
+        target: (process.env.VITE_API_PROXY_TARGET || 'http://localhost:3000').replace(/^http/, 'ws'),
         ws: true,
       },
     },

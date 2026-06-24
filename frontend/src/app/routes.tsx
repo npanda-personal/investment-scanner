@@ -6,6 +6,7 @@ import AdminHomePage from './AdminHomePage';
 // CryptoMarketOverviewPage is kept (not deleted) but the route is redirected
 // to "/" while the crypto scope is inactive under the IN equity focus.
 import { marketIntelligenceRoutes } from '@/features/market-intelligence';
+import { calendarRoutes } from '@/features/calendar';
 import { marketDataFoundationRoutes, marketScansRoutes, screenerRoutes } from '@/features/market-data-foundation';
 import UnifiedStockPage, { InstrumentWorkspaceSymbolRedirect } from '@/features/market-data-foundation/components/UnifiedStockPage';
 import { stockResearchWorkbenchRoutes } from '@/features/stock-research-workbench';
@@ -108,6 +109,7 @@ export const appRoutes: RouteObject[] = [
         children: [
           { index: true, element: <HomePage /> },
           ...marketIntelligenceRoutes,
+          ...calendarRoutes,
           ...todayTradeReviewRoutes,
           ...marketScansRoutes,
           ...screenerRoutes,

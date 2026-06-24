@@ -4,6 +4,7 @@ import AssessmentIcon from '@mui/icons-material/Assessment';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import DashboardIcon from '@mui/icons-material/Dashboard';
+import EventNoteIcon from '@mui/icons-material/EventNote';
 import FactCheckIcon from '@mui/icons-material/FactCheck';
 import NotificationsNoneIcon from '@mui/icons-material/NotificationsNone';
 import SavedSearchIcon from '@mui/icons-material/SavedSearch';
@@ -62,6 +63,7 @@ export const navGroups: NavGroup[] = [
     items: [
       { path: '/screener', label: 'Screener', icon: <FilterAltIcon />, aliases: ['/market-scans', '/stock-interest-radar', '/index-constituents'] },
       { path: '/research', label: 'Research Hub', icon: <WorkspacesIcon />, hiddenForCrypto: true },
+      { path: '/calendar', label: 'Calendar', icon: <EventNoteIcon />, hiddenForCrypto: true },
       { path: '/earnings-intelligence', label: 'Earnings', icon: <CalendarMonthIcon />, hiddenForCrypto: true },
       { path: '/derivatives', label: 'Derivatives / F&O', icon: <ShowChartIcon />, hiddenForCrypto: true, hiddenForNonIndia: true },
     ],
