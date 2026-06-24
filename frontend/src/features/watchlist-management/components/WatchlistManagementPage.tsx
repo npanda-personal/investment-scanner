@@ -25,6 +25,7 @@ import { SaveOutlined, DeleteOutline, NotificationsOutlined } from '@mui/icons-m
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { SignalBadge } from '@/features/signal-generation-engine';
 import { DataTable, InstrumentSearchSelect, PageHeader, StatusBadge, type DataTableColumn } from '@/shared/components';
+import { useTableSort, sortRows } from '@/shared/hooks';
 import { useWorkspaceSourceListStore } from '@/shared/workspace/workspaceSourceListStore';
 import type { V1Instrument } from '@/features/market-data-foundation';
 import {
@@ -38,6 +39,15 @@ import { useWatchlistManagement } from '../hooks';
 import type { WatchlistDashboardItem, WatchlistSortOption } from '../types';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
 import { CreateAlertDialog } from '@/features/alerts-monitoring';
+
+/** Sortable column keys for the watchlist items table. */
+type WatchlistSortKey =
+  | 'symbol'
+  | 'companyName'
+  | 'sector'
+  | 'currentPrice'
+  | 'dailyChangePercent'
+  | 'signalScore';
 
 const money = (value: number | null, currency: string | null, regionCurrency: string) => {
   if (value === null) return 'N/A';
@@ -77,6 +87,42 @@ const WatchlistManagementPage: React.FC = () => {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [alertDialogOpen, setAlertDialogOpen] = useState(false);
   const [alertDialogDefaults, setAlertDialogDefaults] = useState<{ scope: 'STOCK'; type: 'PRICE_ABOVE'; instrumentId: string } | undefined>(undefined);
+
+  // Column-header sort state. Initialised to null so the dropdown ordering is
+  // preserved when no header has been clicked yet. A click overrides display
+  // order client-side without touching the dropdown.
+  const { sortKey, sortDirection, handleSort } = useTableSort<WatchlistSortKey>(
+    null,
+    'desc',
+    () => setPage(0),
+  );
+
+  /** Returns the comparable value for a given sort key on a dashboard item. */
+  const watchlistAccessor = (
+    row: WatchlistDashboardItem,
+    key: WatchlistSortKey,
+  ): unknown => {
+    switch (key) {
+      case 'symbol':           return row.symbol;
+      case 'companyName':      return row.companyName;
+      case 'sector':           return row.sector;
+      case 'currentPrice':     return row.currentPrice;
+      case 'dailyChangePercent': return row.dailyChangePercent;
+      case 'signalScore':      return row.latestSignal?.score ?? null;
+    }
+  };
+
+  /** Builds a sortable DataTable column descriptor using the shared sort state. */
+  const sortable = (
+    label: string,
+    key: WatchlistSortKey,
+    align?: 'left' | 'right' | 'center',
+  ): Pick<DataTableColumn<WatchlistDashboardItem>, 'id' | 'label' | 'align' | 'sortable'> => ({
+    id: key,
+    label,
+    align,
+    sortable: true,
+  });
 
   const submitWatchlist = async () => {
     setFormError(null);
@@ -143,7 +189,7 @@ const WatchlistManagementPage: React.FC = () => {
   };
 
   const itemColumns: DataTableColumn<WatchlistDashboardItem>[] = [
-    { id: 'symbol', label: 'Symbol', render: (item) => (
+    { ...sortable('Symbol', 'symbol'), render: (item) => (
       <Button
         component={Link}
         to={`/stocks/${item.instrumentId}`}
@@ -156,14 +202,13 @@ const WatchlistManagementPage: React.FC = () => {
         {item.symbol}
       </Button>
     ) },
-    { id: 'companyName', label: 'Company', render: (item) => item.companyName || 'Unknown company' },
-    { id: 'sector', label: 'Sector', render: (item) => item.sector || 'N/A' },
+    { ...sortable('Company', 'companyName'), render: (item) => item.companyName || 'Unknown company' },
+    { ...sortable('Sector', 'sector'), render: (item) => item.sector || 'N/A' },
     { id: 'country', label: 'Country', render: (item) => item.country || 'N/A' },
-    { id: 'currentPrice', label: 'Price', align: 'right', render: (item) => money(item.currentPrice, item.currency, regionCurrency) },
-    { id: 'dailyChange', label: 'Daily', align: 'right', render: (item) => <Typography color={item.dailyChangePercent === null ? 'text.secondary' : item.dailyChangePercent >= 0 ? 'success.main' : 'error.main'}>{percent(item.dailyChangePercent)}</Typography> },
+    { ...sortable('Price', 'currentPrice', 'right'), render: (item) => money(item.currentPrice, item.currency, regionCurrency) },
+    { ...sortable('Daily', 'dailyChangePercent', 'right'), render: (item) => <Typography color={item.dailyChangePercent === null ? 'text.secondary' : item.dailyChangePercent >= 0 ? 'success.main' : 'error.main'}>{percent(item.dailyChangePercent)}</Typography> },
     {
-      id: 'signal',
-      label: 'Signal',
+      ...sortable('Signal', 'signalScore'),
       render: (item) => item.latestSignal ? (
         <Stack spacing={0.5}>
           <SignalBadge
@@ -297,12 +342,15 @@ const WatchlistManagementPage: React.FC = () => {
 
           <DataTable
             columns={itemColumns}
-            rows={(detail.items || []).slice(page * pageSize, page * pageSize + pageSize)}
+            rows={sortRows(detail.items || [], sortKey, sortDirection, watchlistAccessor).slice(page * pageSize, page * pageSize + pageSize)}
             getRowId={(item) => item.id}
             page={page}
             pageSize={pageSize}
             totalCount={detail.items.length}
             emptyMessage="This watchlist has no stocks yet."
+            sortBy={sortKey ?? undefined}
+            sortDirection={sortDirection}
+            onSortChange={(key) => handleSort(key as WatchlistSortKey)}
             onPageChange={setPage}
             onPageSizeChange={(nextPageSize) => { setPageSize(nextPageSize); setPage(0); }}
           />

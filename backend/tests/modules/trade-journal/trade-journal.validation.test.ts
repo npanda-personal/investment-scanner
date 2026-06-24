@@ -132,6 +132,18 @@ describe('parseListFilters', () => {
     expect(f.fromDate).toBeUndefined();
     expect(f.toDate).toBeUndefined();
   });
+
+  it('accepts a whitelisted sortBy and sortDirection', () => {
+    const f = parseListFilters({ sortBy: 'realizedReturnPct', sortDirection: 'asc' });
+    expect(f.sortBy).toBe('realizedReturnPct');
+    expect(f.sortDirection).toBe('asc');
+  });
+
+  it('ignores a non-whitelisted sortBy and an invalid sortDirection', () => {
+    const f = parseListFilters({ sortBy: 'notAColumn', sortDirection: 'sideways' });
+    expect(f.sortBy).toBeUndefined();
+    expect(f.sortDirection).toBeUndefined();
+  });
 });
 
 describe('normalizeTags', () => {

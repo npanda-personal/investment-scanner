@@ -4,12 +4,23 @@ import type {
   TradeDirection,
   OutcomeStatus,
   TradeJournalListFilters,
+  TradeJournalSortField,
   UpdateTradeJournalEntryRequest,
 } from './trade-journal.types';
 
 const DIRECTIONS: TradeDirection[] = ['LONG', 'SHORT'];
 const DECISIONS: TradeDecision[] = ['ACTED', 'SKIPPED', 'WATCHING'];
 const OUTCOME_STATUSES: OutcomeStatus[] = ['OPEN', 'CLOSED', 'INVALIDATED'];
+const SORT_FIELDS: TradeJournalSortField[] = [
+  'reviewedAt',
+  'symbol',
+  'direction',
+  'decision',
+  'entryPrice',
+  'conviction',
+  'outcomeStatus',
+  'realizedReturnPct',
+];
 const MAX_NOTES_LENGTH = 4000;
 const MAX_THESIS_LENGTH = 4000;
 const MAX_TAG_LENGTH = 40;
@@ -100,7 +111,9 @@ export function parseListFilters(query: Record<string, unknown>): TradeJournalLi
   const toDate = typeof query.toDate === 'string' && !isNaN(Date.parse(query.toDate)) ? query.toDate : undefined;
   const page = Math.max(1, parseInt(String(query.page ?? '1'), 10) || 1);
   const pageSize = Math.min(MAX_PAGE_SIZE, Math.max(1, parseInt(String(query.pageSize ?? String(DEFAULT_PAGE_SIZE)), 10) || DEFAULT_PAGE_SIZE));
-  return { decision, outcomeStatus, symbol, fromDate, toDate, page, pageSize };
+  const sortBy = SORT_FIELDS.includes(query.sortBy as TradeJournalSortField) ? (query.sortBy as TradeJournalSortField) : undefined;
+  const sortDirection = query.sortDirection === 'asc' || query.sortDirection === 'desc' ? query.sortDirection : undefined;
+  return { decision, outcomeStatus, symbol, fromDate, toDate, page, pageSize, sortBy, sortDirection };
 }
 
 export function normalizeTags(tags?: string[]): string[] {

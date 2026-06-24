@@ -26,7 +26,8 @@ import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import type { MarketPulseAdvanceDeclineSummary, MarketPulseVixSummary } from '../types';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
-import { FreshnessChip, InstrumentSearchSelect, PageHeader } from '@/shared/components';
+import { FreshnessChip, InstrumentSearchSelect, PageHeader, SortableTableCell } from '@/shared/components';
+import { useTableSort, sortRows } from '@/shared/hooks';
 import type { V1Instrument } from '@/features/market-data-foundation';
 import { humanizeCode, indexLabel, isHeadlineIndex } from '@/shared/format/enumLabels';
 import { money, changeColor } from '@/shared/format/money';
@@ -1029,6 +1030,20 @@ function SectorRowWithDrillDown({
   );
 }
 
+type SectorConstituentSortKey = 'symbol' | 'company' | 'price' | 'return1W' | 'return1M' | 'signal' | 'score';
+
+function sectorConstituentSortValue(row: SectorConstituentRow, key: SectorConstituentSortKey): unknown {
+  switch (key) {
+    case 'symbol': return row.symbol;
+    case 'company': return row.companyName;
+    case 'price': return row.latestPrice;
+    case 'return1W': return row.return1W;
+    case 'return1M': return row.return1M;
+    case 'signal': return row.signalDirection;
+    case 'score': return row.signalScore;
+  }
+}
+
 /** Constituents sub-table shown inside expanded sector row. */
 function SectorConstituentsTable({
   sector,
@@ -1042,12 +1057,18 @@ function SectorConstituentsTable({
   error: string | null;
 }) {
   const { profile } = useMarketScope();
+  const { sortKey, sortDirection, handleSort } = useTableSort<SectorConstituentSortKey>(null, 'desc');
   if (loading) return <Stack spacing={1}><LinearProgress sx={{ mx: 1 }} /><Typography variant="caption" color="text.secondary" sx={{ px: 1 }}>Loading constituents for {indexLabel(sector)}…</Typography></Stack>;
   if (error) return <Alert severity="error" sx={{ mx: 0 }}>{error}</Alert>;
   if (!data) return null;
   if (data.availability !== 'READY' || data.constituents.length === 0) {
     return <Alert severity="info" sx={{ mx: 0 }}>{data.message || `No constituent stocks found for ${indexLabel(sector)}.`}</Alert>;
   }
+
+  const sortedConstituents = sortRows(data.constituents, sortKey, sortDirection, sectorConstituentSortValue);
+  const sortable = (label: ReactNode, columnKey: SectorConstituentSortKey, align?: 'left' | 'center' | 'right') => (
+    <SortableTableCell label={label} columnKey={columnKey} activeKey={sortKey} direction={sortDirection} onSort={handleSort} align={align} />
+  );
 
   return (
     <Stack spacing={0.75}>
@@ -1059,18 +1080,18 @@ function SectorConstituentsTable({
         <Table size="small" stickyHeader>
           <TableHead>
             <TableRow>
-              <TableCell>Symbol</TableCell>
-              <TableCell>Company</TableCell>
-              <TableCell align="right">Price</TableCell>
-              <TableCell align="right">1W %</TableCell>
-              <TableCell align="right">1M %</TableCell>
-              <TableCell>Signal</TableCell>
-              <TableCell align="right">Score</TableCell>
+              {sortable('Symbol', 'symbol')}
+              {sortable('Company', 'company')}
+              {sortable('Price', 'price', 'right')}
+              {sortable('1W %', 'return1W', 'right')}
+              {sortable('1M %', 'return1M', 'right')}
+              {sortable('Signal', 'signal')}
+              {sortable('Score', 'score', 'right')}
               <TableCell>Workspace</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {data.constituents.map((row: SectorConstituentRow) => (
+            {sortedConstituents.map((row: SectorConstituentRow) => (
               <TableRow key={row.instrumentId} hover>
                 <TableCell>
                   <Typography variant="body2" fontWeight={600}>{row.symbol}</Typography>
@@ -1119,6 +1140,19 @@ function SectorConstituentsTable({
   );
 }
 
+type SectorSortKey = 'sector' | 'classification' | 'sectorScore' | 'return1W' | 'return1M' | 'return3M';
+
+function sectorSortValue(row: SectorIntelligenceSnapshot, key: SectorSortKey): unknown {
+  switch (key) {
+    case 'sector': return row.sector;
+    case 'classification': return row.classification;
+    case 'sectorScore': return row.sectorScore;
+    case 'return1W': return row.return1W;
+    case 'return1M': return row.return1M;
+    case 'return3M': return row.return3M;
+  }
+}
+
 function SectorIntelligencePanel({
   envelope,
   loading,
@@ -1133,8 +1167,14 @@ function SectorIntelligencePanel({
 
   const [sectorPage, setSectorPage] = useState(0);
   const [sectorRowsPerPage, setSectorRowsPerPage] = useState(5);
+  const { sortKey, sortDirection, handleSort } = useTableSort<SectorSortKey>(null, 'desc', () => setSectorPage(0));
 
-  const pagedRows = rows.slice(sectorPage * sectorRowsPerPage, sectorPage * sectorRowsPerPage + sectorRowsPerPage);
+  // Default (no active sort) preserves the upstream ordering; a column click sorts client-side.
+  const sortedRows = sortRows(rows, sortKey, sortDirection, sectorSortValue);
+  const pagedRows = sortedRows.slice(sectorPage * sectorRowsPerPage, sectorPage * sectorRowsPerPage + sectorRowsPerPage);
+  const sortable = (label: ReactNode, columnKey: SectorSortKey, align?: 'left' | 'center' | 'right') => (
+    <SortableTableCell label={label} columnKey={columnKey} activeKey={sortKey} direction={sortDirection} onSort={handleSort} align={align} />
+  );
 
   return (
     <SectionPanel
@@ -1154,12 +1194,12 @@ function SectorIntelligencePanel({
                 <TableRow>
                   {/* expand toggle column */}
                   <TableCell padding="checkbox" />
-                  <TableCell>Sector</TableCell>
-                  <TableCell>Classification</TableCell>
-                  <TableCell align="right">Sector Score</TableCell>
-                  <TableCell align="right">1W</TableCell>
-                  <TableCell align="right">1M</TableCell>
-                  <TableCell align="right">3M</TableCell>
+                  {sortable('Sector', 'sector')}
+                  {sortable('Classification', 'classification')}
+                  {sortable('Sector Score', 'sectorScore', 'right')}
+                  {sortable('1W', 'return1W', 'right')}
+                  {sortable('1M', 'return1M', 'right')}
+                  {sortable('3M', 'return3M', 'right')}
                   <TableCell>Reasons</TableCell>
                   <TableCell>Warnings</TableCell>
                 </TableRow>
@@ -1197,25 +1237,42 @@ function SectorIntelligencePanel({
   );
 }
 
+type StockInterestSortKey = 'symbol' | 'company' | 'sector' | 'score' | 'direction' | 'freshness' | 'dataThrough';
+
+function stockInterestSortValue(row: StockInterestSnapshot, key: StockInterestSortKey): unknown {
+  switch (key) {
+    case 'symbol': return row.symbol;
+    case 'company': return row.company;
+    case 'sector': return row.sector;
+    case 'score': return row.score;
+    case 'direction': return row.direction;
+    case 'freshness': return row.freshness;
+    case 'dataThrough': return row.dataThroughDate;
+  }
+}
+
 function StockInterestTable({ rows }: { rows: StockInterestSnapshot[] }) {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
+  const { sortKey, sortDirection, handleSort } = useTableSort<StockInterestSortKey>(null, 'desc', () => setPage(0));
 
   // Reset to page 0 whenever the filtered row set changes (tab/scope change).
   useEffect(() => { setPage(0); }, [rows]);
 
-  const pagedRows = rows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+  // Default (no active sort) preserves the per-tab upstream ordering; a column click sorts client-side.
+  const sortedRows = sortRows(rows, sortKey, sortDirection, stockInterestSortValue);
+  const pagedRows = sortedRows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
 
-  const columns: Array<{ label: string; align?: 'right' | 'left' }> = [
-    { label: 'Symbol' },
-    { label: 'Company' },
-    { label: 'Sector' },
-    { label: 'Interest Score', align: 'right' },
-    { label: 'Direction' },
+  const columns: Array<{ label: string; align?: 'right' | 'left'; sortKey?: StockInterestSortKey }> = [
+    { label: 'Symbol', sortKey: 'symbol' },
+    { label: 'Company', sortKey: 'company' },
+    { label: 'Sector', sortKey: 'sector' },
+    { label: 'Interest Score', align: 'right', sortKey: 'score' },
+    { label: 'Direction', sortKey: 'direction' },
     { label: 'Reasons' },
     { label: 'Risks' },
-    { label: 'Freshness' },
-    { label: 'Data Through' },
+    { label: 'Freshness', sortKey: 'freshness' },
+    { label: 'Data Through', sortKey: 'dataThrough' },
     { label: 'Workspace' },
   ];
 
@@ -1225,7 +1282,19 @@ function StockInterestTable({ rows }: { rows: StockInterestSnapshot[] }) {
         <TableHead>
           <TableRow>
             {columns.map((col) => (
-              <TableCell key={col.label} align={col.align}>{col.label}</TableCell>
+              col.sortKey
+                ? (
+                  <SortableTableCell
+                    key={col.label}
+                    label={col.label}
+                    columnKey={col.sortKey}
+                    activeKey={sortKey}
+                    direction={sortDirection}
+                    onSort={handleSort}
+                    align={col.align}
+                  />
+                )
+                : <TableCell key={col.label} align={col.align}>{col.label}</TableCell>
             ))}
           </TableRow>
         </TableHead>
@@ -1353,17 +1422,55 @@ function TechnicalsCell({ row }: { row: EarningsIntelligenceSnapshot }) {
   );
 }
 
+type EarningsSortKey =
+  | 'symbol' | 'resultDate' | 'daysToResult' | 'revQoQ' | 'profitQoQ' | 'consistency'
+  | 'epsQoQ' | 'revYoY' | 'profitYoY' | 'epsYoY' | 'marginTrend' | 'acceleration'
+  | 'periodEnd' | 'validatedAt';
+
+function earningsSortValue(row: EarningsIntelligenceSnapshot, key: EarningsSortKey): unknown {
+  switch (key) {
+    case 'symbol': return row.symbol;
+    case 'resultDate': return row.resultDate;
+    case 'daysToResult': return row.daysToResult;
+    case 'revQoQ': return row.revenueGrowthQoQ ?? row.revenueGrowth;
+    case 'profitQoQ': return row.profitGrowthQoQ ?? row.profitGrowth;
+    case 'consistency': return row.consistencyScore;
+    case 'epsQoQ': return row.epsGrowthQoQ ?? row.epsGrowth;
+    case 'revYoY': return row.revenueGrowthYoY ?? null;
+    case 'profitYoY': return row.profitGrowthYoY ?? null;
+    case 'epsYoY': return row.epsGrowthYoY ?? null;
+    case 'marginTrend': return row.marginTrend;
+    case 'acceleration': return row.accelerationScore;
+    case 'periodEnd': return row.periodEndDate;
+    case 'validatedAt': return row.validatedAt;
+  }
+}
+
 function EarningsTable({ rows }: { rows: EarningsIntelligenceSnapshot[] }) {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
   const [showAllColumns, setShowAllColumns] = useState(false);
+  const { sortKey, sortDirection, handleSort } = useTableSort<EarningsSortKey>(null, 'desc', () => setPage(0));
 
   // Reset to page 0 whenever the filtered row set changes (tab/scope change).
   useEffect(() => { setPage(0); }, [rows]);
 
-  const pagedRows = rows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+  // Default (no active sort) preserves the per-tab upstream ordering; a column click sorts client-side.
+  const sortedRows = sortRows(rows, sortKey, sortDirection, earningsSortValue);
+  const pagedRows = sortedRows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
 
   const numericCellSx = { whiteSpace: 'nowrap' as const };
+  const sortable = (label: ReactNode, columnKey: EarningsSortKey, align?: 'left' | 'center' | 'right', title?: string) => (
+    <SortableTableCell
+      label={label}
+      columnKey={columnKey}
+      activeKey={sortKey}
+      direction={sortDirection}
+      onSort={handleSort}
+      align={align}
+      title={title}
+    />
+  );
 
   return (
     <TableContainer component={Paper} variant="outlined">
@@ -1375,26 +1482,26 @@ function EarningsTable({ rows }: { rows: EarningsIntelligenceSnapshot[] }) {
       <Table size="small">
         <TableHead>
           <TableRow>
-            <TableCell>Symbol</TableCell>
-            <TableCell>Result Date</TableCell>
-            <TableCell align="right">Days To Result</TableCell>
-            <TableCell align="right" title="Quarter-over-quarter: latest vs the most recent prior quarter">Rev QoQ</TableCell>
-            <TableCell align="right" title="Quarter-over-quarter: latest vs the most recent prior quarter">Profit QoQ</TableCell>
-            <TableCell align="right">Consistency</TableCell>
+            {sortable('Symbol', 'symbol')}
+            {sortable('Result Date', 'resultDate')}
+            {sortable('Days To Result', 'daysToResult', 'right')}
+            {sortable('Rev QoQ', 'revQoQ', 'right', 'Quarter-over-quarter: latest vs the most recent prior quarter')}
+            {sortable('Profit QoQ', 'profitQoQ', 'right', 'Quarter-over-quarter: latest vs the most recent prior quarter')}
+            {sortable('Consistency', 'consistency', 'right')}
             <TableCell>Technicals</TableCell>
             <TableCell>Signal</TableCell>
             <TableCell>Reasons</TableCell>
             {showAllColumns && (
               <>
                 <TableCell>Date Source</TableCell>
-                <TableCell>Period End</TableCell>
-                <TableCell>Validated At</TableCell>
-                <TableCell align="right" title="Quarter-over-quarter: latest vs the most recent prior quarter">EPS QoQ</TableCell>
-                <TableCell align="right" title="Year-over-year vs the same quarter last year; blank when no year-ago comparable is present yet">Rev YoY</TableCell>
-                <TableCell align="right" title="Year-over-year vs the same quarter last year; blank when no year-ago comparable is present yet">Profit YoY</TableCell>
-                <TableCell align="right" title="Year-over-year vs the same quarter last year; blank when no year-ago comparable is present yet">EPS YoY</TableCell>
-                <TableCell align="right">Margin Trend</TableCell>
-                <TableCell align="right">Acceleration</TableCell>
+                {sortable('Period End', 'periodEnd')}
+                {sortable('Validated At', 'validatedAt')}
+                {sortable('EPS QoQ', 'epsQoQ', 'right', 'Quarter-over-quarter: latest vs the most recent prior quarter')}
+                {sortable('Rev YoY', 'revYoY', 'right', 'Year-over-year vs the same quarter last year; blank when no year-ago comparable is present yet')}
+                {sortable('Profit YoY', 'profitYoY', 'right', 'Year-over-year vs the same quarter last year; blank when no year-ago comparable is present yet')}
+                {sortable('EPS YoY', 'epsYoY', 'right', 'Year-over-year vs the same quarter last year; blank when no year-ago comparable is present yet')}
+                {sortable('Margin Trend', 'marginTrend', 'right')}
+                {sortable('Acceleration', 'acceleration', 'right')}
                 <TableCell>Freshness</TableCell>
                 <TableCell>Risks</TableCell>
                 <TableCell>Warnings</TableCell>

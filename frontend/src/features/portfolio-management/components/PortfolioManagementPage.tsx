@@ -32,7 +32,8 @@ import axios from 'axios';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { SignalBadge } from '@/features/signal-generation-engine';
 import { PortfolioIntelligencePanel } from '@/features/portfolio-intelligence';
-import { InstrumentSearchSelect, PageHeader } from '@/shared/components';
+import { InstrumentSearchSelect, PageHeader, SortableTableCell } from '@/shared/components';
+import { useTableSort, sortRows } from '@/shared/hooks';
 import type { V1Instrument } from '@/features/market-data-foundation';
 import {
   addHolding,
@@ -77,6 +78,35 @@ const percent = (value: number | null | undefined) =>
   value === null || value === undefined ? 'N/A' : `${(value * 100).toFixed(2)}%`;
 
 const numberValue = (value: string) => Number(value || 0);
+
+type HoldingSortKey = 'symbol' | 'companyName' | 'quantity' | 'averageCost' | 'currentPrice' | 'marketValue' | 'unrealizedPnL';
+
+function holdingSortValue(row: HoldingValuation, key: HoldingSortKey): unknown {
+  switch (key) {
+    case 'symbol': return row.symbol;
+    case 'companyName': return row.companyName;
+    case 'quantity': return row.quantity;
+    case 'averageCost': return row.averageCost;
+    case 'currentPrice': return row.currentPrice;
+    case 'marketValue': return row.marketValue;
+    case 'unrealizedPnL': return row.unrealizedPnL;
+  }
+}
+
+type TransactionSortKey = 'transactionDate' | 'type' | 'instrument' | 'quantity' | 'price' | 'amount';
+
+function transactionSortValue(holdingsMap: Map<string, string>) {
+  return (row: PortfolioTransaction, key: TransactionSortKey): unknown => {
+    switch (key) {
+      case 'transactionDate': return row.transactionDate;
+      case 'type': return row.type;
+      case 'instrument': return resolveSymbol(row.instrumentId, holdingsMap);
+      case 'quantity': return row.quantity;
+      case 'price': return row.price;
+      case 'amount': return row.amount;
+    }
+  };
+}
 
 const defaultHoldingForm = {
   instrumentId: '',
@@ -154,6 +184,12 @@ const PortfolioManagementPage: React.FC = () => {
   const [postureError, setPostureError] = useState<string | null>(null);
   const baseCurrency = selectedPortfolio?.baseCurrency || 'INR';
 
+  // Holdings sort state
+  const { sortKey: holdingSortKey, sortDirection: holdingSortDir, handleSort: handleHoldingSort } = useTableSort<HoldingSortKey>(null, 'desc');
+
+  // Transactions sort state
+  const { sortKey: txSortKey, sortDirection: txSortDir, handleSort: handleTxSort } = useTableSort<TransactionSortKey>(null, 'desc');
+
   // Build a map from instrumentId -> symbol from holdings data for transaction display
   const holdingsSymbolMap = useMemo<Map<string, string>>(() => {
     const map = new Map<string, string>();
@@ -165,6 +201,17 @@ const PortfolioManagementPage: React.FC = () => {
     }
     return map;
   }, [summary, detail]);
+
+  // Sorted holdings and transactions
+  const sortedHoldings = useMemo(
+    () => sortRows(summary?.holdings ?? [], holdingSortKey, holdingSortDir, holdingSortValue),
+    [summary?.holdings, holdingSortKey, holdingSortDir],
+  );
+  const txAccessor = useMemo(() => transactionSortValue(holdingsSymbolMap), [holdingsSymbolMap]);
+  const sortedTransactions = useMemo(
+    () => sortRows(transactions, txSortKey, txSortDir, txAccessor),
+    [transactions, txSortKey, txSortDir, txAccessor],
+  );
 
   // Fetch capital posture when overview tab is active
   React.useEffect(() => {
@@ -414,19 +461,19 @@ const PortfolioManagementPage: React.FC = () => {
               <Table size="small">
                 <TableHead>
                   <TableRow>
-                    <TableCell>Symbol</TableCell>
-                    <TableCell>Company</TableCell>
-                    <TableCell align="right">Qty</TableCell>
-                    <TableCell align="right">Avg Cost</TableCell>
-                    <TableCell align="right">Current</TableCell>
-                    <TableCell align="right">Value</TableCell>
-                    <TableCell align="right">Unrealized</TableCell>
+                    <SortableTableCell label="Symbol" columnKey="symbol" activeKey={holdingSortKey} direction={holdingSortDir} onSort={handleHoldingSort} />
+                    <SortableTableCell label="Company" columnKey="companyName" activeKey={holdingSortKey} direction={holdingSortDir} onSort={handleHoldingSort} />
+                    <SortableTableCell label="Qty" columnKey="quantity" activeKey={holdingSortKey} direction={holdingSortDir} onSort={handleHoldingSort} align="right" />
+                    <SortableTableCell label="Avg Cost" columnKey="averageCost" activeKey={holdingSortKey} direction={holdingSortDir} onSort={handleHoldingSort} align="right" />
+                    <SortableTableCell label="Current" columnKey="currentPrice" activeKey={holdingSortKey} direction={holdingSortDir} onSort={handleHoldingSort} align="right" />
+                    <SortableTableCell label="Value" columnKey="marketValue" activeKey={holdingSortKey} direction={holdingSortDir} onSort={handleHoldingSort} align="right" />
+                    <SortableTableCell label="Unrealized" columnKey="unrealizedPnL" activeKey={holdingSortKey} direction={holdingSortDir} onSort={handleHoldingSort} align="right" />
                     <TableCell>Signal</TableCell>
                     <TableCell align="right">Actions</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {summary.holdings.map((holding: HoldingValuation) => (
+                  {sortedHoldings.map((holding: HoldingValuation) => (
                     <TableRow key={holding.id} hover>
                       <TableCell>
                         <Button component={Link} to={`/stocks/${holding.instrumentId}`} size="small">{holding.symbol}</Button>
@@ -534,16 +581,16 @@ const PortfolioManagementPage: React.FC = () => {
               <Table size="small">
                 <TableHead>
                   <TableRow>
-                    <TableCell>Date</TableCell>
-                    <TableCell>Type</TableCell>
-                    <TableCell>Instrument</TableCell>
-                    <TableCell align="right">Quantity</TableCell>
-                    <TableCell align="right">Price</TableCell>
-                    <TableCell align="right">Amount</TableCell>
+                    <SortableTableCell label="Date" columnKey="transactionDate" activeKey={txSortKey} direction={txSortDir} onSort={handleTxSort} />
+                    <SortableTableCell label="Type" columnKey="type" activeKey={txSortKey} direction={txSortDir} onSort={handleTxSort} />
+                    <SortableTableCell label="Instrument" columnKey="instrument" activeKey={txSortKey} direction={txSortDir} onSort={handleTxSort} />
+                    <SortableTableCell label="Quantity" columnKey="quantity" activeKey={txSortKey} direction={txSortDir} onSort={handleTxSort} align="right" />
+                    <SortableTableCell label="Price" columnKey="price" activeKey={txSortKey} direction={txSortDir} onSort={handleTxSort} align="right" />
+                    <SortableTableCell label="Amount" columnKey="amount" activeKey={txSortKey} direction={txSortDir} onSort={handleTxSort} align="right" />
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {transactions.map((transaction: PortfolioTransaction) => (
+                  {sortedTransactions.map((transaction: PortfolioTransaction) => (
                     <TableRow key={transaction.id}>
                       <TableCell>{new Date(transaction.transactionDate).toLocaleDateString()}</TableCell>
                       <TableCell>{transaction.type}</TableCell>

@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Alert, Box, Chip, CircularProgress, Paper, Stack, Table, TableBody, TableCell, TableHead, TableRow, Typography } from '@mui/material';
 import { Link } from 'react-router-dom';
-import { PageHeader } from '@/shared/components';
+import { PageHeader, SortableTableCell } from '@/shared/components';
+import { useTableSort, sortRows } from '@/shared/hooks';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
 import { MarketRegimeWidget } from '@/features/market-context-intelligence';
 import { fetchTopSignals } from '@/features/signal-generation-engine/api/signalGenerationEngineService';
@@ -16,6 +17,17 @@ import { fetchCryptoBoard, type CryptoBoardRow } from '../api/cryptoBoardApi';
 
 const directionColor = (d: string): 'success' | 'error' | 'warning' =>
   d === 'BULLISH' ? 'success' : d === 'BEARISH' ? 'error' : 'warning';
+
+type CoinSortKey = 'coin' | 'price' | 'change24h' | 'score';
+
+function coinSortValue(row: SignalResult, key: CoinSortKey): unknown {
+  switch (key) {
+    case 'coin': return row.symbol;
+    case 'price': return row.currentPrice;
+    case 'change24h': return row.dailyChangePercent;
+    case 'score': return row.score;
+  }
+}
 
 const pct = (value: number | null | undefined): string =>
   value === null || value === undefined ? '—' : `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`;
@@ -72,6 +84,21 @@ const CryptoMarketOverviewPage: React.FC = () => {
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [profile.isCrypto, hasVolumeInterest]);
+
+  const { sortKey: coinSortKey, sortDirection: coinSortDirection, handleSort: handleCoinSort } = useTableSort<CoinSortKey>(null, 'desc');
+  const sortedSignals = sortRows(signals, coinSortKey, coinSortDirection, coinSortValue);
+
+  const sortable = (label: string, key: CoinSortKey, align?: 'left' | 'right' | 'center', title?: string) => (
+    <SortableTableCell
+      label={label}
+      columnKey={key}
+      activeKey={coinSortKey}
+      direction={coinSortDirection}
+      onSort={handleCoinSort}
+      align={align}
+      title={title}
+    />
+  );
 
   const lastUpdated = useMemo(() => {
     const ts = signals.map((s) => s.priceTimestamp).filter(Boolean).sort().pop();
@@ -130,15 +157,15 @@ const CryptoMarketOverviewPage: React.FC = () => {
               <Table size="small">
                 <TableHead>
                   <TableRow>
-                    <TableCell>Coin</TableCell>
-                    <TableCell align="right">Price</TableCell>
-                    <TableCell align="right">24h</TableCell>
+                    {sortable('Coin', 'coin', 'left')}
+                    {sortable('Price', 'price', 'right')}
+                    {sortable('24h', 'change24h', 'right')}
                     <TableCell align="center">Signal</TableCell>
-                    <TableCell align="right">Score</TableCell>
+                    {sortable('Score', 'score', 'right')}
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {signals.map((s) => (
+                  {sortedSignals.map((s) => (
                     <TableRow key={s.instrument_id} hover>
                       <TableCell>
                         <Typography

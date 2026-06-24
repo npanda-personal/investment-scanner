@@ -25,7 +25,7 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
-import { PageHeader } from '@/shared/components';
+import { PageHeader, SortableTableCell } from '@/shared/components';
 import { useTradeJournal } from '../hooks';
 import {
   createTradeJournalEntry,
@@ -72,6 +72,8 @@ const formatReturn = (pct: number | null) => {
   return `${sign}${pct.toFixed(2)}%`;
 };
 
+type TradeSortKey = 'reviewedAt' | 'symbol' | 'direction' | 'decision' | 'entryPrice' | 'conviction' | 'outcomeStatus' | 'realizedReturnPct';
+
 export default function TradeJournalPage() {
   const [filters, setFilters] = useState<TradeJournalListFilters>({ page: 1, pageSize: 25 });
   const { entries, total, postMortem, loading, error, reload } = useTradeJournal(filters);
@@ -79,6 +81,20 @@ export default function TradeJournalPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editEntry, setEditEntry] = useState<TradeJournalEntry | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+
+  // Sorting is server-driven so it orders the full result set, not just the
+  // current page. Clicking the active column flips direction; a new column
+  // defaults to descending, mirroring the app's other sortable tables.
+  const sortKey: TradeSortKey | null = (filters.sortBy as TradeSortKey | undefined) ?? null;
+  const sortDirection = filters.sortDirection ?? 'desc';
+  const handleSort = (key: TradeSortKey) => {
+    setFilters((prev) => ({
+      ...prev,
+      sortBy: key,
+      sortDirection: prev.sortBy === key && prev.sortDirection === 'desc' ? 'asc' : 'desc',
+      page: 1,
+    }));
+  };
 
   const updateFilter = (key: keyof TradeJournalListFilters, value: any) => {
     setFilters((prev) => ({ ...prev, [key]: value || undefined, page: key === 'page' ? value : 1 }));
@@ -174,14 +190,14 @@ export default function TradeJournalPage() {
             <Table size="small">
               <TableHead>
                 <TableRow>
-                  <TableCell>Date</TableCell>
-                  <TableCell>Symbol</TableCell>
-                  <TableCell>Direction</TableCell>
-                  <TableCell>Decision</TableCell>
-                  <TableCell align="right">Entry</TableCell>
-                  <TableCell align="center">Conviction</TableCell>
-                  <TableCell>Outcome</TableCell>
-                  <TableCell align="right">Return</TableCell>
+                  <SortableTableCell label="Date" columnKey="reviewedAt" activeKey={sortKey} direction={sortDirection} onSort={handleSort} />
+                  <SortableTableCell label="Symbol" columnKey="symbol" activeKey={sortKey} direction={sortDirection} onSort={handleSort} />
+                  <SortableTableCell label="Direction" columnKey="direction" activeKey={sortKey} direction={sortDirection} onSort={handleSort} />
+                  <SortableTableCell label="Decision" columnKey="decision" activeKey={sortKey} direction={sortDirection} onSort={handleSort} />
+                  <SortableTableCell label="Entry" columnKey="entryPrice" activeKey={sortKey} direction={sortDirection} onSort={handleSort} align="right" />
+                  <SortableTableCell label="Conviction" columnKey="conviction" activeKey={sortKey} direction={sortDirection} onSort={handleSort} align="center" />
+                  <SortableTableCell label="Outcome" columnKey="outcomeStatus" activeKey={sortKey} direction={sortDirection} onSort={handleSort} />
+                  <SortableTableCell label="Return" columnKey="realizedReturnPct" activeKey={sortKey} direction={sortDirection} onSort={handleSort} align="right" />
                   <TableCell align="right">Actions</TableCell>
                 </TableRow>
               </TableHead>
