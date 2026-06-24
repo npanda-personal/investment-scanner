@@ -31,6 +31,7 @@ import { earningsIntelligenceRouter } from '../modules/earnings-intelligence';
 import { marketIntelligenceRouter } from '../modules/market-intelligence';
 import { tradeJournalRouter } from '../modules/trade-journal';
 import { derivativesIntelligenceRouter } from '../modules/derivatives-intelligence';
+import { calendarRouter } from '../modules/calendar';
 import { cacheAdminRouter } from '../cache/cache-admin.router';
 
 export interface ApiModule {
@@ -69,6 +70,7 @@ export const apiModules: ApiModule[] = [
   { path: tradePlanRiskModule.routePrefix, router: tradePlanRiskModule.router },
   { path: '/api/v1', router: tradeJournalRouter },
   { path: '/api/v1', router: derivativesIntelligenceRouter },
+  { path: '/api/v1', router: calendarRouter },
   { path: '/api/market-data-foundation', router: marketDataFoundationRouter },
   { path: '/api/v1', router: cacheAdminRouter },
 ];
