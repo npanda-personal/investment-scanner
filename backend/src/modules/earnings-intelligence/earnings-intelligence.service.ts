@@ -368,7 +368,7 @@ export class EarningsIntelligenceService {
     const periodEndDate = latest ? safeUtcDay(latest.periodEndDate) : null;
     const validatedAt = latest ? safeUtcDay(latest.validatedAt ?? null) : null;
     const expectedResultDate = latest ? this.expectedResultDate(latest, latestClass, config) : null;
-    const dateResolution = this.resolveResultDate(latest, expectedResultDate, input.snapshotDate);
+    const dateResolution = this.resolveResultDate(latest, expectedResultDate, input.snapshotDate, config);
     const resultDate = dateResolution.resultDate;
     const resultDateSource = dateResolution.resultDateSource;
     const daysToResult = dateResolution.daysToResult;
@@ -821,7 +821,8 @@ export class EarningsIntelligenceService {
   private resolveResultDate(
     latest: EarningsFundamentalInput | null,
     expectedResultDate: Date | null,
-    snapshotDate: Date
+    snapshotDate: Date,
+    config: EarningsRegionConfig
   ): {
     resultDate: Date | null;
     resultDateSource: EarningsResultDateSource;
@@ -834,7 +835,20 @@ export class EarningsIntelligenceService {
     const officialResultDate = safeUtcDay(latest.officialResultDate ?? null);
     if (officialResultDate) {
       const daysToResult = this.daysBetween(snapshotDate, officialResultDate);
-      return { resultDate: officialResultDate, resultDateSource: 'OFFICIAL_CALENDAR', daysToResult: daysToResult >= 0 ? daysToResult : null };
+      if (daysToResult >= 0) {
+        // A forward official board-meeting date is always authoritative.
+        return { resultDate: officialResultDate, resultDateSource: 'OFFICIAL_CALENDAR', daysToResult };
+      }
+      // A PAST official date is the announcement of an already-reported result.  While
+      // that result is still recent it stays authoritative — it drives RESULT_REACTION_
+      // HISTORY and the winner / disappointment classification (officialRecentResult is
+      // gated on the same recent window).  Once it ages past that window, fall through to
+      // the forward cadence estimate below so UPCOMING_RESULTS / PRE_RESULT_INTEREST
+      // populate for the NEXT period instead of pinning to a stale past date forever.
+      const daysSinceResult = this.daysBetween(officialResultDate, snapshotDate);
+      if (daysSinceResult <= config.recentResultWindowDays) {
+        return { resultDate: officialResultDate, resultDateSource: 'OFFICIAL_CALENDAR', daysToResult: null };
+      }
     }
 
     // Phase 3: emit an honest forward estimate projected from the persisted period

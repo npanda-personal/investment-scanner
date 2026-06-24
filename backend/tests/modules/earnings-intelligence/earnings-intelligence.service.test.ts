@@ -287,6 +287,84 @@ describe('EarningsIntelligenceService', () => {
     expect(tba.categories).not.toContain('PRE_RESULT_INTEREST');
   });
 
+  it('Phase 3: a PAST official date pivots to the cadence estimate once it ages beyond the recent window', () => {
+    const service = new EarningsIntelligenceService({} as any);
+
+    // The Q4 result was officially announced 2026-04-20 — 86 days before the
+    // snapshot, past IN's 60-day recent-result window.  It can no longer be a
+    // "recent" winner / reaction-history row, so the resolver pivots to the forward
+    // cadence estimate (2026-06-30 + 45d = 2026-08-14) so the NEXT result populates
+    // UPCOMING_RESULTS instead of the row pinning to a stale past date forever.
+    const agedOut = service.calculateSnapshot({
+      stockId: 'stock-1',
+      symbol: 'AAA',
+      region: 'IN',
+      assetType: 'STOCK',
+      snapshotDate: new Date('2026-07-15T00:00:00.000Z'),
+      dataThroughDate: null,
+      fundamentals: [
+        fundamental('2026-03-31', 130, 18, 1.8, {
+          officialResultDate: new Date('2026-04-20T00:00:00.000Z'),
+          validatedAt: new Date('2026-04-21T00:00:00.000Z'),
+        }),
+        fundamental('2025-03-31', 100, 10, 1),
+      ],
+      // Price data straddles the PAST official date with a post-result bar well past
+      // the reaction window — so a price reaction WOULD compute if the row were still
+      // OFFICIAL.  Asserting no RESULT_REACTION_HISTORY therefore proves the source
+      // pivot (not missing price data) is what drops the aged-out row from that tab.
+      prices: [
+        { symbol: 'AAA', timestamp: new Date('2026-04-18T00:00:00.000Z'), close: 100, adjustedClose: 100, volume: 1000 },
+        { symbol: 'AAA', timestamp: new Date('2026-04-30T00:00:00.000Z'), close: 108, adjustedClose: 108, volume: 1200 },
+      ],
+      deliverySnapshots: [],
+    });
+
+    expect(agedOut.resultDateSource).toBe('ESTIMATED_FROM_CADENCE');
+    expect(agedOut.resultDate?.toISOString()).toBe('2026-08-14T00:00:00.000Z');
+    expect(agedOut.daysToResult).toBe(30);
+    expect(agedOut.categories).toContain('UPCOMING_RESULTS');
+    // Aged out of the recent window → no longer a recent winner / reaction-history row,
+    // even though straddling price data is present.
+    expect(agedOut.categories).not.toContain('RESULT_WINNERS');
+    expect(agedOut.categories).not.toContain('RESULT_REACTION_HISTORY');
+  });
+
+  it('Phase 3: a PAST official date within the recent window stays OFFICIAL and out of UPCOMING', () => {
+    const service = new EarningsIntelligenceService({} as any);
+
+    // Same shape but the official result is only 36 days before the snapshot —
+    // inside IN's 60-day recent window — so it remains the authoritative result
+    // (driving winner / reaction-history) and is NOT pulled forward into UPCOMING,
+    // even though a forward cadence estimate would otherwise be in range.
+    const recent = service.calculateSnapshot({
+      stockId: 'stock-1',
+      symbol: 'AAA',
+      region: 'IN',
+      assetType: 'STOCK',
+      snapshotDate: new Date('2026-07-15T00:00:00.000Z'),
+      dataThroughDate: null,
+      fundamentals: [
+        fundamental('2026-03-31', 130, 18, 1.8, {
+          officialResultDate: new Date('2026-06-09T00:00:00.000Z'),
+          validatedAt: new Date('2026-06-10T00:00:00.000Z'),
+        }),
+        fundamental('2025-03-31', 100, 10, 1),
+      ],
+      prices: [
+        { symbol: 'AAA', timestamp: new Date('2026-06-07T00:00:00.000Z'), close: 100, adjustedClose: 100, volume: 1000 },
+        { symbol: 'AAA', timestamp: new Date('2026-06-19T00:00:00.000Z'), close: 107, adjustedClose: 107, volume: 1200 },
+      ],
+      deliverySnapshots: [],
+    });
+
+    expect(recent.resultDateSource).toBe('OFFICIAL_CALENDAR');
+    expect(recent.resultDate?.toISOString()).toBe('2026-06-09T00:00:00.000Z');
+    expect(recent.daysToResult).toBeNull();
+    expect(recent.categories).not.toContain('UPCOMING_RESULTS');
+    expect(recent.categories).toContain('RESULT_REACTION_HISTORY');
+  });
+
   it('marks stale freshness from period end even when validatedAt is recent', () => {
     const service = new EarningsIntelligenceService({} as any);
 
