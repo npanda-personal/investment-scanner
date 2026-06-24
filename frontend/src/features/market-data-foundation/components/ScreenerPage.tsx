@@ -14,6 +14,7 @@ import {
   Select,
   Slider,
   Stack,
+  Tab,
   Table,
   TableBody,
   TableCell,
@@ -21,17 +22,18 @@ import {
   TableHead,
   TablePagination,
   TableRow,
+  Tabs,
   TextField,
   Tooltip,
   Typography,
 } from '@mui/material';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type SyntheticEvent } from 'react';
 import { PageHeader } from '@/shared/components';
 import { NotApplicableForAssetClass } from '@/shared/components/NotApplicableForAssetClass';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
 import { compactByProfile, money } from '@/shared/format/money';
 import { screenerSubtitle as buildScreenerSubtitle } from '@/shared/format/exchangeLabels';
-import type { ScreenerFilters, ScreenerRow, ScreenerCapBand, ScreenerSignalDirection } from '../types';
+import type { ScreenerFilters, ScreenerRow, ScreenerCapBand, ScreenerSetup } from '../types';
 import type { WorkspaceSource } from '@/shared/workspace/types';
 import { fetchScreener } from '../api/screenerService';
 import {
@@ -42,10 +44,12 @@ import {
   RsRatingCell,
   ScoreDeltaCell,
   FactorBreakdownCell,
+  SetupChipsCell,
   PriceSparklineCell,
   FnoScreenerHeaderCells,
   FnoScreenerBodyCells,
 } from './screener/ScreenerCells';
+import { setupsForDirection, type ScreenerDirectionTab } from './screener/screener-setups';
 
 import { KNOWN_SECTORS } from './screener-constants';
 import { type SortKey, sortScreenerRows, SortHead } from './screener-sort';
@@ -136,6 +140,36 @@ export default function ScreenerPage() {
     });
   };
 
+  // Direction selector + setup sub-tabs drive `signalDirection` and `setup` together. NEUTRAL is
+  // not a tab (the legacy dropdown's NEUTRAL option is dropped) — it collapses to the "All" tab.
+  const directionTab: ScreenerDirectionTab =
+    filters.signalDirection === 'BULLISH' ? 'BULLISH'
+      : filters.signalDirection === 'BEARISH' ? 'BEARISH'
+        : 'ALL';
+  const setupOptions = setupsForDirection(directionTab);
+
+  const handleDirectionChange = (_e: SyntheticEvent, dir: ScreenerDirectionTab) => {
+    setPage(0);
+    setFilters((prev) => {
+      const next = { ...prev };
+      if (dir === 'ALL') delete next.signalDirection;
+      else next.signalDirection = dir;
+      // Setups are direction-specific — reset when the direction changes.
+      delete next.setup;
+      return next;
+    });
+  };
+
+  const handleSetupChange = (_e: SyntheticEvent, value: ScreenerSetup | '') => {
+    setPage(0);
+    setFilters((prev) => {
+      const next = { ...prev };
+      if (value) next.setup = value;
+      else delete next.setup;
+      return next;
+    });
+  };
+
   if (profile.isCrypto) {
     return (
       <Box sx={{ p: 3 }}>
@@ -164,29 +198,36 @@ export default function ScreenerPage() {
         subtitle={screenerSubtitle}
       />
 
+      {/* Direction selector + setup sub-tabs — drive signalDirection / setup; other filters
+          (sector, cap, score, RS, delivery, F&O) compose within the active tab. */}
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: setupOptions.length > 0 ? 0 : 2 }}>
+        <Tabs value={directionTab} onChange={handleDirectionChange} aria-label="Signal direction">
+          <Tab label="All" value="ALL" />
+          <Tab label="Bullish" value="BULLISH" />
+          <Tab label="Bearish" value="BEARISH" />
+        </Tabs>
+      </Box>
+      {setupOptions.length > 0 && (
+        <Box sx={{ mb: 2 }}>
+          <Tabs
+            value={filters.setup ?? ''}
+            onChange={handleSetupChange}
+            variant="scrollable"
+            scrollButtons="auto"
+            aria-label="Trade setup"
+            sx={{ minHeight: 40 }}
+          >
+            <Tab label={directionTab === 'BULLISH' ? 'All Bullish' : 'All Bearish'} value="" sx={{ minHeight: 40 }} />
+            {setupOptions.map((o) => (
+              <Tab key={o.code} label={o.label} value={o.code} sx={{ minHeight: 40 }} />
+            ))}
+          </Tabs>
+        </Box>
+      )}
+
       {/* Filter Bar */}
       <Paper variant="outlined" sx={{ p: 2, mb: 3 }}>
         <Grid container spacing={2} alignItems="flex-end">
-          {/* Signal Direction */}
-          <Grid item xs={12} sm={6} md={3}>
-            <FormControl fullWidth size="small">
-              <InputLabel>Signal Direction</InputLabel>
-              <Select
-                label="Signal Direction"
-                value={filters.signalDirection ?? ''}
-                onChange={(e) => {
-                  const v = e.target.value as ScreenerSignalDirection | '';
-                  if (v) setFilter('signalDirection', v); else clearFilter('signalDirection');
-                }}
-              >
-                <MenuItem value="">Any</MenuItem>
-                <MenuItem value="BULLISH">Bullish</MenuItem>
-                <MenuItem value="BEARISH">Bearish</MenuItem>
-                <MenuItem value="NEUTRAL">Neutral</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
-
           {/* Sector */}
           <Grid item xs={12} sm={6} md={3}>
             <FormControl fullWidth size="small">
@@ -393,6 +434,7 @@ export default function ScreenerPage() {
                 <SortHead label="Move" colKey="scoreDeltaPrev" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="center" />
                 <SortHead label="RS Rating" colKey="rsPercentile" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="right" />
                 <TableCell>Factors</TableCell>
+                <TableCell>Setups</TableCell>
                 <TableCell align="center">Trend</TableCell>
                 <TableCell>Sector</TableCell>
                 <TableCell>Cap Band</TableCell>
@@ -434,6 +476,9 @@ export default function ScreenerPage() {
                   </TableCell>
                   <TableCell>
                     <FactorBreakdownCell families={row.factorFamilies} />
+                  </TableCell>
+                  <TableCell>
+                    <SetupChipsCell setups={row.setups} />
                   </TableCell>
                   <TableCell align="center">
                     <PriceSparklineCell closes={row.sparkline} />

@@ -4,6 +4,8 @@ import { normalizeMarketRegion } from '../../shared/utils/market-scope';
 import { getMarketDataFoundationScheduler } from './ingestion/market-data-foundation.scheduler';
 import { cacheService } from '../../cache/cache.service';
 import { screenerKey, marketMoversKey } from '../../cache/cache-keys';
+// Setup taxonomy leaf (dependency-free) — validates the screener `setup` tab parameter.
+import { SETUP_CODES } from '../signal-generation-engine/signal-setups';
 
 export class MarketDataFoundationController {
   constructor(private readonly service = new MarketDataFoundationService()) {}
@@ -721,8 +723,12 @@ export class MarketDataFoundationController {
       if (capBand && !['LARGE', 'MID', 'SMALL'].includes(capBand)) {
         return res.status(400).json({ error: `capBand must be one of: LARGE, MID, SMALL` });
       }
+      const setup = typeof req.query.setup === 'string' ? req.query.setup.toUpperCase() : undefined;
+      if (setup && !SETUP_CODES.has(setup)) {
+        return res.status(400).json({ error: `setup must be one of: ${[...SETUP_CODES].join(', ')}` });
+      }
       const { region, assetType } = this.getMarketFilter(req);
-      const opts = { region, assetType, signalDirection, minScore: this.numberParam(req, 'minScore'), minRsPercentile: this.numberParam(req, 'minRsPercentile'), sector: typeof req.query.sector === 'string' ? req.query.sector : undefined, capBand: capBand as 'LARGE' | 'MID' | 'SMALL' | undefined, minDeliveryPct: this.numberParam(req, 'minDeliveryPct'), min52wPositionPct: this.numberParam(req, 'min52wPositionPct'), excludeFnoBan: this.parseOptionalBoolean(req.query.excludeFnoBan), onlyDerivativesEligible: this.parseOptionalBoolean(req.query.onlyDerivativesEligible), limit: this.numberParam(req, 'limit') };
+      const opts = { region, assetType, signalDirection, setup, minScore: this.numberParam(req, 'minScore'), minRsPercentile: this.numberParam(req, 'minRsPercentile'), sector: typeof req.query.sector === 'string' ? req.query.sector : undefined, capBand: capBand as 'LARGE' | 'MID' | 'SMALL' | undefined, minDeliveryPct: this.numberParam(req, 'minDeliveryPct'), min52wPositionPct: this.numberParam(req, 'min52wPositionPct'), excludeFnoBan: this.parseOptionalBoolean(req.query.excludeFnoBan), onlyDerivativesEligible: this.parseOptionalBoolean(req.query.onlyDerivativesEligible), limit: this.numberParam(req, 'limit') };
       return res.json(await cacheService.cacheReadThrough(screenerKey(opts), () => this.service.screener(opts), undefined, (v: any) => (v?.count ?? 0) > 0));
     } catch (error) {
       console.error('Screener error:', error);

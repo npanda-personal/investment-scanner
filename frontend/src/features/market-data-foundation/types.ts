@@ -1497,8 +1497,17 @@ export interface CorporateActionsResponse {
 export type ScreenerCapBand = 'LARGE' | 'MID' | 'SMALL';
 export type ScreenerSignalDirection = 'BULLISH' | 'BEARISH' | 'NEUTRAL';
 
+/** Trade-setup tab codes — mirror of backend signal-setups.ts SETUP_DEFS (8 bullish, 6 bearish). */
+export type ScreenerSetup =
+  | 'TREND_MOMENTUM' | 'BREAKOUT' | 'PULLBACK' | 'RELATIVE_STRENGTH' | 'QUALITY_VALUE'
+  | 'OVEREXTENDED' | 'SMART_MONEY_ACCUMULATION' | 'SECTOR_LEADERSHIP'
+  | 'TREND_BEARISH' | 'BREAKDOWN' | 'OVERBOUGHT_REVERSAL' | 'RELATIVE_WEAKNESS'
+  | 'WEAK_FUNDAMENTALS' | 'SMART_MONEY_DISTRIBUTION';
+
 export interface ScreenerFilters {
   signalDirection?: ScreenerSignalDirection;
+  /** Active trade-setup sub-tab; narrows results to rows matching that setup's evidence/context. */
+  setup?: ScreenerSetup;
   minScore?: number;
   minRsPercentile?: number;
   sector?: string;
@@ -1551,6 +1560,12 @@ export interface ScreenerRow {
   isNewEntry: boolean;
   /** Count of positive-evidence signals per independent factor family (TREND/MOMENTUM/…). */
   factorFamilies: Record<string, number> | null;
+  /** Trade-setup codes this row matches (see signal-setups.ts) — rendered as compact chips. */
+  setups?: string[];
+  /** Latest smart-money context status (ACCUMULATION / NEUTRAL / DISTRIBUTION …). */
+  smartMoneyStatus?: string | null;
+  /** Latest sector-leadership status for the row's sector (LEADING / IMPROVING / WEAKENING / LAGGING). */
+  sectorLeadershipStatus?: string | null;
   /** Recent closes (chronological) for an inline price sparkline. */
   sparkline: number[] | null;
   currency: string;

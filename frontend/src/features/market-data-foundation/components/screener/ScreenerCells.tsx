@@ -10,6 +10,7 @@ import { Box, Chip, TableCell, Tooltip, Typography } from '@mui/material';
 import { StockWorkspaceLink } from '@/shared/workspace/StockWorkspaceLink';
 import type { WorkspaceSource } from '@/shared/workspace/types';
 import type { ScreenerCapBand, FnoReadinessComponents, ScreenerRow } from '../../types';
+import { SETUP_LABEL } from './screener-setups';
 
 // ---------------------------------------------------------------------------
 // Base cells (moved verbatim from ScreenerPage)
@@ -150,6 +151,36 @@ export function FactorBreakdownCell({ families }: { families: Record<string, num
             {families[fam] > 1 ? <Box component="span" sx={{ ml: 0.2, opacity: 0.7 }}>{families[fam]}</Box> : null}
           </Box>
         ))}
+      </Box>
+    </Tooltip>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Trade-setup chips — which setup families a row matched (mirrors the sub-tabs)
+// ---------------------------------------------------------------------------
+
+export function SetupChipsCell({ setups }: { setups: string[] | undefined }) {
+  if (!setups || setups.length === 0) return <Dash />;
+  const MAX = 2;
+  const shown = setups.slice(0, MAX);
+  const overflow = setups.length - shown.length;
+  const fullList = setups.map((s) => SETUP_LABEL[s] ?? s).join(' · ');
+  return (
+    <Tooltip title={fullList}>
+      <Box sx={{ display: 'inline-flex', gap: 0.4, flexWrap: 'wrap', maxWidth: 180 }}>
+        {shown.map((s) => (
+          <Chip
+            key={s}
+            label={SETUP_LABEL[s] ?? s}
+            size="small"
+            variant="outlined"
+            sx={{ fontSize: '0.6rem', height: 18 }}
+          />
+        ))}
+        {overflow > 0 && (
+          <Chip label={`+${overflow}`} size="small" sx={{ fontSize: '0.6rem', height: 18 }} />
+        )}
       </Box>
     </Tooltip>
   );

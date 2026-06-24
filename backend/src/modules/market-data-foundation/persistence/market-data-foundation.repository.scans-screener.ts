@@ -5,6 +5,10 @@ import { normalizeMarketRegion } from '../../../shared/utils/market-scope';
 // itself imports MarketDataFoundationService — importing it here would close a runtime init
 // cycle (ScreenerRepository "is not a constructor"). The leaf imports only types.
 import { familyForCode } from '../../signal-generation-engine/signal-evidence';
+// Setup taxonomy from the same dependency-free leaf family as signal-evidence (cycle-safe;
+// imports only types/data, never the engine service). Drives the per-tab setup filter + the
+// per-row `setups` classification.
+import { getSetupDef, classifyRowSetups } from '../../signal-generation-engine/signal-setups';
 
 export class ScreenerRepository {
   constructor(private readonly prisma: PrismaClient) {}
@@ -28,6 +32,7 @@ export class ScreenerRepository {
   async screener(options: {
     region?: string;
     signalDirection?: string;
+    setup?: string;
     minScore?: number;
     minRsPercentile?: number;
     sector?: string;
@@ -56,6 +61,12 @@ export class ScreenerRepository {
     scoreDeltaPrev: number | null;
     isNewEntry: boolean;
     factorFamilies: Record<string, number> | null;
+    /** Trade-setup codes this row matches (see signal-setups.ts) — powers the per-row setup chip. */
+    setups: string[];
+    /** Latest smart-money context status for the instrument (ACCUMULATION / NEUTRAL / DISTRIBUTION …). */
+    smartMoneyStatus: string | null;
+    /** Latest sector-leadership status for the instrument's sector (LEADING / IMPROVING / WEAKENING / LAGGING). */
+    sectorLeadershipStatus: string | null;
   }>> {
     const rowLimit = Math.max(1, Math.min(options.limit ?? 50, 500));
     const LARGE_CAP_THRESHOLD = 2e11; // 20 000 Cr in INR
@@ -83,6 +94,28 @@ export class ScreenerRepository {
 
     if (options.signalDirection) {
       filters.push(Prisma.sql`ls."signalDirection" = UPPER(${options.signalDirection})`);
+    }
+    // Setup tab filter. EVIDENCE setups test exact factor codes in the right JSON column
+    // (positive evidence → triggeredSignals, negative/overextension → negativeSignals — the
+    // two never mix). FIELD setups test a joined context column (smart-money / sector). Applied
+    // in SQL (before LIMIT) so each tab gets its own top-N, not a client-side slice of 50 rows.
+    if (options.setup) {
+      const def = getSetupDef(options.setup);
+      if (def?.kind === 'EVIDENCE' && def.factorCodes && def.factorCodes.length > 0) {
+        const jsonCol = def.evidenceSource === 'NEGATIVE'
+          ? Prisma.sql`ls."negativeSignals"`
+          : Prisma.sql`ls."triggeredSignals"`;
+        filters.push(Prisma.sql`EXISTS (
+          SELECT 1 FROM jsonb_array_elements(COALESCE(${jsonCol}, '[]'::jsonb)) e
+          WHERE e->>'code' IN (${Prisma.join(def.factorCodes)})
+        )`);
+      } else if (def?.kind === 'FIELD' && def.field) {
+        if (def.field.name === 'smartMoney') {
+          filters.push(Prisma.sql`lsm."smartMoneyStatus" IN (${Prisma.join(def.field.values)})`);
+        } else {
+          filters.push(Prisma.sql`lsl."leadershipStatus" IN (${Prisma.join(def.field.values)})`);
+        }
+      }
     }
     if (options.minScore != null) {
       filters.push(Prisma.sql`ls."signalScore" >= ${options.minScore}`);
@@ -151,6 +184,34 @@ export class ScreenerRepository {
         ORDER BY m.underlying, m.expiry_date ASC
       )`;
 
+    // Latest per-instrument smart-money context (3M range — the engine default) and latest
+    // per-(region,sector) leadership status. MATERIALIZED for the same planner reason as the
+    // F&O CTEs: build a small hash table once, probe per stock, instead of a re-evaluated
+    // nested loop against the full universe. Both feed the FIELD setup tabs + the row chip.
+    const contextCtes = Prisma.sql`
+      latest_smart_money AS MATERIALIZED (
+        SELECT DISTINCT ON (smcs."instrumentId")
+          smcs."instrumentId", smcs.status AS "smartMoneyStatus"
+        FROM smart_money_context_snapshots smcs
+        WHERE smcs.range = '3M'
+        ORDER BY smcs."instrumentId", smcs."snapshotDate" DESC, smcs."updatedAt" DESC
+      ),
+      latest_sector_leadership AS MATERIALIZED (
+        SELECT DISTINCT ON (scs.region, scs.sector)
+          scs.region, scs.sector, scs."leadershipStatus"
+        FROM sector_context_snapshots scs
+        ORDER BY scs.region, scs.sector, scs."snapshotDate" DESC
+      )`;
+
+    // sector_context_snapshots is region-scoped (IN/US/EU rows exist, plus a GLOBAL fallback),
+    // so the leadership join must match the screened region; null region (no scope) falls back
+    // to GLOBAL. NULL binds as SQL NULL → COALESCE picks 'GLOBAL'.
+    const sectorRegionBind = normalizedRegion ?? null;
+    const contextJoins = Prisma.sql`
+        LEFT JOIN latest_smart_money lsm ON lsm."instrumentId" = s.id
+        LEFT JOIN latest_sector_leadership lsl
+          ON lsl.sector = s.sector AND lsl.region = COALESCE(${sectorRegionBind}, 'GLOBAL')`;
+
     type ScreenerRow = {
       instrumentId: string;
       symbol: string;
@@ -160,6 +221,9 @@ export class ScreenerRepository {
       signalScore: Prisma.Decimal | null;
       priorScore: Prisma.Decimal | null;
       triggeredSignals: unknown;
+      negativeSignals: unknown;
+      smartMoneyStatus: string | null;
+      sectorLeadershipStatus: string | null;
       sector: string | null;
       marketCap: Prisma.Decimal | null;
       deliveryPct: Prisma.Decimal | null;
@@ -180,7 +244,8 @@ export class ScreenerRepository {
       WITH latest_signal AS MATERIALIZED (
         SELECT DISTINCT ON (sr."instrumentId")
           sr."instrumentId", sr.direction AS "signalDirection", sr.score AS "signalScore",
-          sr."priorScore" AS "priorScore", sr."triggeredSignals" AS "triggeredSignals"
+          sr."priorScore" AS "priorScore", sr."triggeredSignals" AS "triggeredSignals",
+          sr."negativeSignals" AS "negativeSignals"
         FROM signal_results sr
         WHERE sr."generatedDate" IS NOT NULL
         ORDER BY sr."instrumentId", sr."generatedDate" DESC
@@ -197,6 +262,7 @@ export class ScreenerRepository {
         WHERE fbl.ban_date = (SELECT MAX(ban_date) FROM fno_ban_list)
       ),
       ${foCtes},
+      ${contextCtes},
       ranked AS (
         SELECT
           s.id AS "instrumentId", s.symbol, COALESCE(s.name, s.symbol) AS "companyName",
@@ -204,7 +270,9 @@ export class ScreenerRepository {
             COALESCE(NULLIF(s."sourceSymbol", ''), NULLIF(s.symbol, ''), NULLIF(s."providerSymbol", '')),
             '\\.(NS|BO)$', '', 'i'
           ) AS price_symbol,
-          ls."signalDirection", ls."signalScore", ls."priorScore", ls."triggeredSignals", s.sector, s."marketCap",
+          ls."signalDirection", ls."signalScore", ls."priorScore", ls."triggeredSignals", ls."negativeSignals",
+          lsm."smartMoneyStatus", lsl."leadershipStatus" AS "sectorLeadershipStatus",
+          s.sector, s."marketCap",
           ld."deliveryPct", COALESCE(fno."inBan", FALSE) AS "inFnoBan",
           foi."buildupLabel", foi."oiChangePct", fopt."pcrOi"
         FROM stocks s
@@ -212,7 +280,7 @@ export class ScreenerRepository {
         LEFT JOIN latest_delivery ld ON ld.symbol = s.symbol
         LEFT JOIN fno_ban fno ON fno.symbol = s.symbol
         LEFT JOIN fo_oi foi ON foi.underlying = ${foJoinSymbol}
-        LEFT JOIN fo_opt fopt ON fopt.underlying = ${foJoinSymbol}
+        LEFT JOIN fo_opt fopt ON fopt.underlying = ${foJoinSymbol}${contextJoins}
         WHERE ${whereClause}
         ORDER BY COALESCE(ls."signalScore", 0) DESC
         LIMIT ${rowLimit}
@@ -246,6 +314,7 @@ export class ScreenerRepository {
       SELECT
         r."instrumentId", r.symbol, r."companyName",
         lp.price AS price, r."signalDirection", r."signalScore", r."priorScore", r."triggeredSignals",
+        r."negativeSignals", r."smartMoneyStatus", r."sectorLeadershipStatus",
         r.sector, r."marketCap", r."deliveryPct",
         CASE
           WHEN rd."high52w" > rd."low52w"
@@ -279,7 +348,8 @@ export class ScreenerRepository {
           sr.direction AS "signalDirection",
           sr.score     AS "signalScore",
           sr."priorScore" AS "priorScore",
-          sr."triggeredSignals" AS "triggeredSignals"
+          sr."triggeredSignals" AS "triggeredSignals",
+          sr."negativeSignals" AS "negativeSignals"
         FROM signal_results sr
         WHERE sr."generatedDate" IS NOT NULL
         ORDER BY sr."instrumentId", sr."generatedDate" DESC
@@ -351,7 +421,8 @@ export class ScreenerRepository {
         FROM fno_ban_list fbl
         WHERE fbl.ban_date = (SELECT MAX(ban_date) FROM fno_ban_list)
       ),
-      ${foCtes}
+      ${foCtes},
+      ${contextCtes}
       SELECT
         s.id            AS "instrumentId",
         s.symbol,
@@ -361,6 +432,9 @@ export class ScreenerRepository {
         ls."signalScore",
         ls."priorScore",
         ls."triggeredSignals",
+        ls."negativeSignals",
+        lsm."smartMoneyStatus",
+        lsl."leadershipStatus" AS "sectorLeadershipStatus",
         s.sector,
         s."marketCap",
         ld."deliveryPct",
@@ -374,7 +448,7 @@ export class ScreenerRepository {
       LEFT JOIN latest_delivery ld ON ld.symbol = s.symbol
       LEFT JOIN fno_ban fno ON fno.symbol = s.symbol
       LEFT JOIN fo_oi foi ON foi.underlying = ${foJoinSymbol}
-      LEFT JOIN fo_opt fopt ON fopt.underlying = ${foJoinSymbol}
+      LEFT JOIN fo_opt fopt ON fopt.underlying = ${foJoinSymbol}${contextJoins}
       WHERE ${whereClause}
       ORDER BY COALESCE(ls."signalScore", 0) DESC
       LIMIT ${rowLimit}
@@ -421,8 +495,27 @@ export class ScreenerRepository {
         scoreDeltaPrev,
         isNewEntry,
         factorFamilies: this.summarizeFactorFamilies(row.triggeredSignals),
+        smartMoneyStatus: row.smartMoneyStatus ?? null,
+        sectorLeadershipStatus: row.sectorLeadershipStatus ?? null,
+        setups: classifyRowSetups({
+          positiveCodes: this.extractFactorCodes(row.triggeredSignals),
+          negativeCodes: this.extractFactorCodes(row.negativeSignals),
+          smartMoneyStatus: row.smartMoneyStatus ?? null,
+          sectorLeadershipStatus: row.sectorLeadershipStatus ?? null,
+        }),
       };
     });
+  }
+
+  /** Pull the distinct factor `code` strings out of a persisted evidence JSON array. */
+  private extractFactorCodes(raw: unknown): string[] {
+    if (!Array.isArray(raw) || raw.length === 0) return [];
+    const codes: string[] = [];
+    for (const item of raw) {
+      const code = item && typeof item === 'object' ? (item as { code?: unknown }).code : null;
+      if (typeof code === 'string' && code.length > 0) codes.push(code);
+    }
+    return codes;
   }
 
   /**

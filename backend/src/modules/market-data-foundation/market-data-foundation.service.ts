@@ -2182,6 +2182,7 @@ export class MarketDataFoundationService implements MarketDataReadApi, IndiaHist
     region?: string;
     assetType?: string;
     signalDirection?: string;
+    setup?: string;
     minScore?: number;
     minRsPercentile?: number;
     sector?: string;
@@ -2219,6 +2220,9 @@ export class MarketDataFoundationService implements MarketDataReadApi, IndiaHist
         delivery: number;
         trend: number;
       } | null;
+      setups: string[];
+      smartMoneyStatus: string | null;
+      sectorLeadershipStatus: string | null;
       currency: string;
       region?: string;
     }>;
