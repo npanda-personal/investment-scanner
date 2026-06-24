@@ -418,7 +418,9 @@ export class SignalPositionLedgerService {
     if (!exitDecision) return false;
     if (exitDecision.decision === 'REDUCE_RISK') return true;
     if (exitDecision.decision === 'EXIT_CANDIDATE') return false;
-    return (exitDecision.exitRulesTriggered || []).length > 0;
+    // Decision-driven: a HOLD verdict carrying only sub-threshold exit-rule fires is NOT a
+    // risk warning. Mirrors firstCloseEvidenceDates + the entry gate (isUnderDefensiveExit).
+    return false;
   }
 
   private exitEvidenceForDecision(exitDecision: SignalPositionLedgerRowSnapshots['exitDecision']): Partial<SignalPositionLedgerActiveRow> {

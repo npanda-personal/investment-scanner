@@ -15,11 +15,24 @@
  * the position (signal-position-ledger.service: trigger_type !== 'bullish_entry_trigger').
  * An audit row is appended to negative_signals (also persisted) for traceability.
  *
- * The "under defensive exit" test mirrors the ledger's own close-evidence rule
- * (signal-position-ledger.repository.firstCloseEvidenceDates) EXACTLY, so the gate
- * suppresses precisely the entries that would otherwise close on day one:
- *   exit:        decision IN (EXIT_CANDIDATE, REDUCE_RISK) OR exitRulesTriggered > 0
+ * The "under defensive exit" test is DECISION-DRIVEN and mirrors the ledger's own
+ * close-evidence rule (signal-position-ledger.repository.firstCloseEvidenceDates)
+ * EXACTLY, so the gate suppresses precisely the entries that would otherwise close
+ * on day one:
+ *   exit:        decision IN (EXIT_CANDIDATE, REDUCE_RISK)
  *   invalidation: invalidationRulesTriggered > 0
+ *
+ * It honors the DEFENSIVE_EXIT strategy's own verdict: `decision` is the aggregated,
+ * score-thresholded judgment. The framework EXIT path — the one that actually populates the
+ * persisted `exitRulesTriggered` column — maps score >=60 -> EXIT_CANDIDATE, >=40 -> REDUCE_RISK,
+ * else HOLD (strategy-framework.evaluator). A HOLD verdict means "stay invested, do not exit".
+ * Individual exit *rules* fire well below those thresholds, so a stock can carry a few
+ * triggered exit rules yet still net to HOLD —
+ * we deliberately do NOT gate on raw `exitRulesTriggered.length > 0`, because doing so
+ * overrides the strategy's HOLD verdict and suppressed nearly the entire bullish universe
+ * (e.g. 888 of 1,097 IN demotions on 2026-06-24 were HOLD instruments). A genuine exit
+ * always escalates the decision, so no real exit is missed. The ledger close rule was
+ * relaxed in lockstep — keep the two in sync.
  *
  * Like the regime gate (applyRegimeGateToShort), it is conservative, additive and
  * live-runs-only: skipped for as-of/backfill runs, where no current decision applies.
@@ -36,10 +49,11 @@ export interface DefensiveExitEvidence {
 /** True when the latest DEFENSIVE_EXIT decision flags an active exit/invalidation posture. */
 export function isUnderDefensiveExit(ev?: DefensiveExitEvidence | null): boolean {
   if (!ev) return false;
+  // Decision-driven: gate only on the strategy's aggregated exit verdict or a hard
+  // invalidation — NOT on raw sub-threshold exit-rule fires that net to HOLD. See header.
   return (
     ev.decision === 'EXIT_CANDIDATE' ||
     ev.decision === 'REDUCE_RISK' ||
-    (ev.exitRulesTriggered?.length ?? 0) > 0 ||
     (ev.invalidationRulesTriggered?.length ?? 0) > 0
   );
 }

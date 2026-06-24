@@ -794,7 +794,11 @@ describe('SignalPositionLedgerService', () => {
     expect(repository.closeLedgerRow).not.toHaveBeenCalled();
   });
 
-  it('books a pending exit (EXIT_TRIGGERED) for non-terminal exit-rule evidence when no proven exit price', async () => {
+  it('keeps the position ACTIVE for a non-exit verdict (WATCH/HOLD) carrying only sub-threshold exit-rule evidence (decision-driven)', async () => {
+    // Decision-driven policy: the close/exit test honors the strategy's aggregated verdict.
+    // A WATCH (or HOLD) decision means "no action / stay invested" — a sub-threshold exit
+    // rule that did NOT escalate the decision must NOT book a pending exit. A genuine exit
+    // escalates to EXIT_CANDIDATE/REDUCE_RISK. Mirrors isUnderDefensiveExit + firstCloseEvidenceDates.
     const existing = activeLedgerRow({ instrumentId: 'stock-1', symbol: 'ABC' });
     const repository = {
       listAllLedgerRows: jest.fn()
@@ -839,14 +843,10 @@ describe('SignalPositionLedgerService', () => {
     expect(active.totalCount).toBe(1);
     expect(closed.totalCount).toBe(0);
     expect(active.items[0]).toMatchObject({
-      status: 'EXIT_TRIGGERED',
-      healthState: 'EXIT_TRIGGERED',
-      lifecycleEvidenceStatus: 'EXIT_TRIGGERED',
-      exitRuleIds: ['RELATIVE_STRENGTH_DECAY_EXIT'],
-      exitSourceDecisionId: 'decision-weak-exit-1',
-      closePriceStatus: 'UNAVAILABLE',
-      closedAt: null,
+      status: 'ACTIVE',
+      lifecycleEvidenceStatus: 'ACTIVE_ENTRY',
     });
+    expect(active.items[0].status).not.toBe('EXIT_TRIGGERED');
     expect(repository.closeLedgerRow).not.toHaveBeenCalled();
   });
 
