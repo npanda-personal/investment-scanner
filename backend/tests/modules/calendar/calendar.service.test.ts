@@ -154,6 +154,13 @@ describe('CalendarService.latest', () => {
     expect(res.items).toHaveLength(0);
     expect(res.warnings.length).toBeGreaterThan(0);
   });
+
+  it('scopes economic events by region (no US-leak into IN)', async () => {
+    const { service, repo } = makeService();
+    await service.latest({ region: 'IN', assetType: 'STOCK', type: 'ECONOMIC', ...RANGE, limit: 100 });
+    // region must be passed through as the first arg so IN excludes US-stored FRED rows
+    expect(repo.listEconomicEvents).toHaveBeenCalledWith('IN', RANGE.from, RANGE.to, 100);
+  });
 });
 
 describe('CalendarService.refreshSnapshots (IPO)', () => {

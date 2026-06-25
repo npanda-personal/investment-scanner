@@ -172,10 +172,10 @@ export class CalendarRepository {
     });
   }
 
-  /** FRED economic release events in a date window (region-agnostic; FRED is US/global). */
-  async listEconomicEvents(from: Date, to: Date, limit: number): Promise<any[]> {
+  /** FRED economic release events in a date window, scoped by stored region (FRED is US/global). */
+  async listEconomicEvents(region: string, from: Date, to: Date, limit: number): Promise<any[]> {
     return this.db.economicCalendarEvent.findMany({
-      where: { eventDate: { gte: from, lte: to } },
+      where: { region, eventDate: { gte: from, lte: to } },
       orderBy: { eventDate: 'desc' },
       take: limit,
     });

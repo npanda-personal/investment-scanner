@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Box,
-  Button,
   Chip,
   MenuItem,
   Stack,
@@ -11,7 +10,6 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
 import {
   DataTable,
@@ -160,13 +158,6 @@ const earningsColumns: DataTableColumn<CalendarEvent>[] = [
   { id: 'resultDate', label: 'Result date', minWidth: 120, render: (r) => formatDate(r.date) },
   { id: 'daysToResult', label: 'Days to result', align: 'right', minWidth: 120, render: (r) => num(metric(r, 'daysToResult'), 0) },
   { id: 'source', label: 'Date source', minWidth: 130, render: (r) => (metric(r, 'resultDateSource') as string) ?? '—' },
-  {
-    id: 'open',
-    label: '',
-    align: 'right',
-    minWidth: 60,
-    render: () => <OpenInNewIcon fontSize="small" color="action" />,
-  },
 ];
 
 const economicColumns: DataTableColumn<CalendarEvent>[] = [
@@ -193,7 +184,7 @@ const TAB_EMPTY_MESSAGE: Record<TabKey, string> = {
   IPO: 'No recently-listed companies in this window. Run a calendar refresh to materialize IPO data.',
   DIVIDEND: 'No dividend actions recorded for this region and window.',
   SPLIT: 'No splits or bonus issues recorded for this region and window.',
-  EARNINGS: 'No upcoming results in this window — open Earnings Intelligence for the full view.',
+  EARNINGS: 'No upcoming results in this window for this region.',
   ECONOMIC: 'No economic releases ingested yet (FRED, US/global). Run a calendar refresh.',
 };
 
@@ -202,8 +193,27 @@ const TAB_EMPTY_MESSAGE: Record<TabKey, string> = {
 export function CalendarPage() {
   const { scope, profile } = useMarketScope();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  const [tab, setTab] = useState<TabKey>('ALL');
+  // Economic releases are US/global (FRED); hide that tab outside US.
+  const visibleTabs = useMemo(
+    () => TAB_ORDER.filter((t) => t.key !== 'ECONOMIC' || scope.region === 'US'),
+    [scope.region],
+  );
+  // Tab lives in the URL so browser-back from an instrument page restores it.
+  const tabParam = (searchParams.get('tab') ?? 'ALL') as TabKey;
+  const tab: TabKey = visibleTabs.some((t) => t.key === tabParam) ? tabParam : 'ALL';
+  const selectTab = useCallback(
+    (next: TabKey) => setSearchParams(next === 'ALL' ? {} : { tab: next }, { replace: false }),
+    [setSearchParams],
+  );
+  const openInstrument = useCallback(
+    (row: CalendarEvent) => {
+      if (row.symbol) navigate(`/instrument-workspace/${encodeURIComponent(row.symbol)}`);
+    },
+    [navigate],
+  );
+
   const [preset, setPreset] = useState<CalendarRangePreset>('UPCOMING');
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(25);
@@ -240,6 +250,13 @@ export function CalendarPage() {
 
   // Reset pagination when the active tab or range changes.
   useEffect(() => { setPage(0); }, [tab, preset, scope]);
+
+  // Drop a stale ?tab when its tab is no longer visible (e.g. region switched away from US).
+  useEffect(() => {
+    if (tabParam !== 'ALL' && !visibleTabs.some((t) => t.key === tabParam)) {
+      setSearchParams({}, { replace: true });
+    }
+  }, [tabParam, visibleTabs, setSearchParams]);
 
   const filtered = useMemo(() => {
     const events = data?.events ?? [];
@@ -293,12 +310,12 @@ export function CalendarPage() {
 
       <Tabs
         value={tab}
-        onChange={(_, next) => setTab(next as TabKey)}
+        onChange={(_, next) => selectTab(next as TabKey)}
         variant="scrollable"
         scrollButtons="auto"
         sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }}
       >
-        {TAB_ORDER.map((t) => (
+        {visibleTabs.map((t) => (
           <Tab key={t.key} value={t.key} label={tabLabel(t)} />
         ))}
       </Tabs>
@@ -307,18 +324,6 @@ export function CalendarPage() {
         <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
           Economic releases are US/global (FRED): release date with latest actual and previous value. FRED carries no forecasts.
         </Typography>
-      )}
-
-      {tab === 'EARNINGS' && (
-        <Stack direction="row" justifyContent="flex-end" sx={{ mb: 1 }}>
-          <Button
-            size="small"
-            endIcon={<OpenInNewIcon />}
-            onClick={() => navigate('/earnings-intelligence')}
-          >
-            Open Earnings Intelligence
-          </Button>
-        </Stack>
       )}
 
       {loading ? (
@@ -344,7 +349,7 @@ export function CalendarPage() {
             onPageChange={setPage}
             onPageSizeChange={(size) => { setPageSize(size); setPage(0); }}
             emptyMessage={TAB_EMPTY_MESSAGE[tab]}
-            onRowClick={tab === 'EARNINGS' ? () => navigate('/earnings-intelligence') : undefined}
+            onRowClick={tab === 'ECONOMIC' ? undefined : openInstrument}
           />
         </>
       )}
