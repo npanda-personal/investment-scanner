@@ -241,6 +241,9 @@ model EarningsIntelligenceSnapshot {
   profitGrowthYoY    Float?
   epsGrowthYoY       Float?
   growthComparisonBasis String?
+  // Tab-redesign sort metrics (computed at refresh from the same-period quarter series):
+  avgProfitGrowthQoQ4q Float?
+  epsGrowthTrendScore  Float?
   marginTrend        Float?
   consistencyScore   Float
   accelerationScore  Float

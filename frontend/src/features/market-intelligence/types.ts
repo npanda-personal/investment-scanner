@@ -121,6 +121,8 @@ export interface EarningsIntelligenceSnapshot {
   dataThroughDate?: string | null;
   generatedAt?: string | null;
   symbol: string;
+  /** Full company name (Stock.name), joined read-time by the backend; null when unresolved. */
+  name?: string | null;
   resultDate: string | null;
   resultDateSource: string;
   resultDateLabel?: 'Official' | 'TBA' | 'Estimated' | null;
@@ -142,6 +144,14 @@ export interface EarningsIntelligenceSnapshot {
   profitGrowthYoY?: number | null;
   epsGrowthYoY?: number | null;
   growthComparisonBasis?: string | null;
+  /**
+   * Tab-redesign sort metrics (persisted; computed at refresh from the same-period
+   * quarter series). avgProfitGrowthQoQ4q → Winners/Disappointments order;
+   * epsGrowthTrendScore → Growth tab order + GROWTH-category eligibility. Null when
+   * insufficient history; FE renders "—" and sorts those rows last.
+   */
+  avgProfitGrowthQoQ4q?: number | null;
+  epsGrowthTrendScore?: number | null;
   marginTrend: number | null;
   consistencyScore: number | null;
   accelerationScore: number | null;

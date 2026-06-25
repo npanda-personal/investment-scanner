@@ -33,6 +33,7 @@ function persistedRow(categories: EarningsSnapshotDto['categories']): EarningsSn
     snapshotDate: '2026-06-01T00:00:00.000Z',
     dataThroughDate: '2026-05-31T00:00:00.000Z',
     symbol: 'AAA',
+    name: 'Triple A Industries Ltd',
     resultDate: '2026-05-10T00:00:00.000Z',
     resultDateLabel: 'Official',
     resultDateSource: 'OFFICIAL_CALENDAR',
@@ -49,6 +50,8 @@ function persistedRow(categories: EarningsSnapshotDto['categories']): EarningsSn
     profitGrowthYoY: null,
     epsGrowthYoY: null,
     growthComparisonBasis: 'QOQ',
+    avgProfitGrowthQoQ4q: 30,
+    epsGrowthTrendScore: 25,
     marginTrend: 1.5,
     consistencyScore: 100,
     accelerationScore: 75,
@@ -936,5 +939,100 @@ describe('EarningsIntelligenceService — Phase 2 QoQ/YoY growth split', () => {
     expect(snapshot.revenueGrowthYoY).toBeNull();
     expect(snapshot.profitGrowthYoY).toBeNull();
     expect(snapshot.epsGrowthYoY).toBeNull();
+  });
+});
+
+describe('EarningsIntelligenceService — Tab-redesign sort metrics', () => {
+  const baseInput = {
+    stockId: 'stock-1',
+    symbol: 'TRENDCO',
+    region: 'IN' as const,
+    assetType: 'STOCK' as const,
+    snapshotDate: new Date('2026-05-15T00:00:00.000Z'),
+    dataThroughDate: null,
+    prices: [],
+    deliverySnapshots: [],
+  };
+
+  it('avgProfitGrowthQoQ4q averages only the last ≤4 consecutive QoQ profit deltas', () => {
+    const service = new EarningsIntelligenceService({} as any);
+    // newest-first netIncome: 200,160,128,100,80 → QoQ profit deltas (newest-first):
+    //   25, 25, 28, 25, (oldest pair 100→80 = 25 is the 4th); a 5th quarter exists so the
+    //   window must stop at 4 deltas — the oldest delta (80 has no prior) never enters.
+    const snapshot = service.calculateSnapshot({
+      ...baseInput,
+      fundamentals: [
+        fundamental('2026-03-31', 2000, 200, 20),
+        fundamental('2025-12-31', 1600, 160, 16),
+        fundamental('2025-09-30', 1280, 128, 12.8),
+        fundamental('2025-06-30', 1000, 100, 10),
+        fundamental('2025-03-31', 800, 80, 8),
+      ],
+    });
+    // mean(25, 25, 28, 25) = 25.75
+    expect(snapshot.avgProfitGrowthQoQ4q).toBeCloseTo(25.75, 2);
+  });
+
+  it('avgProfitGrowthQoQ4q is null with fewer than two QoQ profit deltas', () => {
+    const service = new EarningsIntelligenceService({} as any);
+    const snapshot = service.calculateSnapshot({
+      ...baseInput,
+      fundamentals: [
+        fundamental('2026-03-31', 2000, 200, 20),
+        fundamental('2025-12-31', 1600, 160, 16), // only one QoQ delta available
+      ],
+    });
+    expect(snapshot.avgProfitGrowthQoQ4q).toBeNull();
+  });
+
+  it('epsGrowthTrendScore ranks a consistently-rising EPS trend above a falling one', () => {
+    const service = new EarningsIntelligenceService({} as any);
+    const rising = service.calculateSnapshot({
+      ...baseInput,
+      fundamentals: [
+        fundamental('2026-03-31', 1000, 100, 16),
+        fundamental('2025-12-31', 1000, 100, 13),
+        fundamental('2025-09-30', 1000, 100, 11),
+        fundamental('2025-06-30', 1000, 100, 10),
+      ],
+    });
+    const falling = service.calculateSnapshot({
+      ...baseInput,
+      fundamentals: [
+        fundamental('2026-03-31', 1000, 100, 10),
+        fundamental('2025-12-31', 1000, 100, 11),
+        fundamental('2025-09-30', 1000, 100, 13),
+        fundamental('2025-06-30', 1000, 100, 16),
+      ],
+    });
+    expect(rising.epsGrowthTrendScore).not.toBeNull();
+    expect(falling.epsGrowthTrendScore).not.toBeNull();
+    expect(rising.epsGrowthTrendScore as number).toBeGreaterThan(falling.epsGrowthTrendScore as number);
+  });
+
+  it('GROWTH membership and epsGrowthTrendScore require ≥2 consecutive QoQ EPS deltas (≥3 EPS-bearing quarters — the depth US TTM data carries)', () => {
+    const service = new EarningsIntelligenceService({} as any);
+    // Exactly 3 EPS-bearing quarters → 2 QoQ deltas → eligible (US-depth floor).
+    const eligible = service.calculateSnapshot({
+      ...baseInput,
+      fundamentals: [
+        fundamental('2026-03-31', 1000, 100, 16),
+        fundamental('2025-12-31', 1000, 100, 13),
+        fundamental('2025-09-30', 1000, 100, 11),
+      ],
+    });
+    expect(eligible.epsGrowthTrendScore).not.toBeNull();
+    expect(eligible.categories).toContain('GROWTH');
+
+    // Only 2 EPS-bearing quarters → 1 QoQ delta → not a trend → not eligible.
+    const tooFew = service.calculateSnapshot({
+      ...baseInput,
+      fundamentals: [
+        fundamental('2026-03-31', 1000, 100, 16),
+        fundamental('2025-12-31', 1000, 100, 13),
+      ],
+    });
+    expect(tooFew.epsGrowthTrendScore).toBeNull();
+    expect(tooFew.categories).not.toContain('GROWTH');
   });
 });

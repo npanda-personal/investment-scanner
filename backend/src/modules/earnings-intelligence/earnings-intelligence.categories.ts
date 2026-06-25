@@ -19,6 +19,7 @@ import type { EarningsIntelligenceCategory, EarningsSnapshotDto } from './earnin
 export const EARNINGS_INTELLIGENCE_CATEGORIES = [
   'UPCOMING_RESULTS',
   'PRE_RESULT_INTEREST',
+  'GROWTH',
   'RESULT_WINNERS',
   'RESULT_DISAPPOINTMENTS',
   'RESULT_REACTION_HISTORY',

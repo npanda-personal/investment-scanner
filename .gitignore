@@ -143,6 +143,8 @@ frontend/playwright-results*/
 frontend/tmp-*
 test-results/
 frontend/tests/ui/support/.auth-state.json
+# Playwright QA screenshot artifacts (verification only, not source)
+frontend/tests/ui/screenshots/
 
 # Claude Code session marker (Post-Work Protocol hook)
 .claude/.pending-wrapup
