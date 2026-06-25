@@ -27,6 +27,8 @@ export type NavItem = {
   hiddenForCrypto?: boolean;
   /** Hide this item outside India (e.g. NSE F&O derivatives have no free non-IN feed in this release). */
   hiddenForNonIndia?: boolean;
+  /** Hide this item in the GitHub Pages demo build (VITE_DEMO=1) — e.g. account-bound My Workspace pages with no demo-relevant data. */
+  hiddenInDemo?: boolean;
 };
 
 export type NavGroup = {
@@ -71,12 +73,12 @@ export const navGroups: NavGroup[] = [
   {
     group: 'My Workspace',
     items: [
-      { path: '/watchlists', label: 'Watchlists', icon: <StarBorderIcon />, matchPrefixes: ['/watchlists/'] },
-      { path: '/portfolios', label: 'Portfolios', icon: <AccountBalanceWalletIcon />, matchPrefixes: ['/portfolios/'] },
-      { path: '/alerts', label: 'Alerts', icon: <NotificationsNoneIcon /> },
+      { path: '/watchlists', label: 'Watchlists', icon: <StarBorderIcon />, matchPrefixes: ['/watchlists/'], hiddenInDemo: true },
+      { path: '/portfolios', label: 'Portfolios', icon: <AccountBalanceWalletIcon />, matchPrefixes: ['/portfolios/'], hiddenInDemo: true },
+      { path: '/alerts', label: 'Alerts', icon: <NotificationsNoneIcon />, hiddenInDemo: true },
       { path: '/instrument-workspace', label: 'Instrument', icon: <AssessmentIcon />, matchPrefixes: ['/stocks/', '/research/stocks/'] },
-      { path: '/journal', label: 'Trade Journal', icon: <MenuBookIcon /> },
-      { path: '/copilot', label: 'Copilot', icon: <AutoAwesomeIcon /> },
+      { path: '/journal', label: 'Trade Journal', icon: <MenuBookIcon />, hiddenInDemo: true },
+      { path: '/copilot', label: 'Copilot', icon: <AutoAwesomeIcon />, hiddenInDemo: true },
     ],
   },
 ];

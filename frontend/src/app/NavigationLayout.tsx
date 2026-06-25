@@ -38,6 +38,10 @@ import { useMarketScope } from '@/contexts/MarketScopeContext';
 const drawerWidth = 260;
 const collapsedWidth = 72;
 
+// GitHub Pages demo build (VITE_DEMO=1): hide account-bound nav items (My Workspace
+// except Instrument) that have no demo-relevant data. Real builds show everything.
+const isDemo = import.meta.env.VITE_DEMO === '1';
+
 function useUnreadAlertCount() {
   const [count, setCount] = useState(0);
   useEffect(() => {
@@ -129,7 +133,7 @@ export default function NavigationLayout() {
               </Stack>
             )}
             {group.items
-              .filter((item) => !(profile.isCrypto && item.hiddenForCrypto) && !(scope.region !== 'IN' && item.hiddenForNonIndia))
+              .filter((item) => !(profile.isCrypto && item.hiddenForCrypto) && !(scope.region !== 'IN' && item.hiddenForNonIndia) && !(isDemo && item.hiddenInDemo))
               .map((item) => {
               const isActive = isNavItemActive(location.pathname, item);
               const isAlertsItem = item.path === '/alerts';
