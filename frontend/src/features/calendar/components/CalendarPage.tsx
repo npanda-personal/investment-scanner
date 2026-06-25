@@ -412,7 +412,12 @@ export function CalendarPage() {
     if (tab === 'IPO') {
       // Parent IPO tab splits client-side: Upcoming = forthcoming feed, Closed = already-listed.
       const wantType: CalendarEventType = ipoSub === 'UPCOMING' ? 'IPO_UPCOMING' : 'IPO';
-      return events.filter((e) => e.eventType === wantType);
+      const rows = events.filter((e) => e.eventType === wantType);
+      // Upcoming → nearest issue date first (ASC); Closed → most-recent listing first (DESC).
+      const dir = ipoSub === 'UPCOMING' ? 1 : -1;
+      return [...rows].sort(
+        (a, b) => dir * (new Date(a.date).getTime() - new Date(b.date).getTime()),
+      );
     }
     return events.filter((e) => e.eventType === tab);
   }, [data, tab, ipoSub]);
