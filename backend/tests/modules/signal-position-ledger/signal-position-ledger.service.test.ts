@@ -14,7 +14,7 @@ const trustedSignal = {
   dailyChangePercent: null,
   currency: null,
   priceTimestamp: null,
-  score: 82,
+  score: 95, // > LEDGER_MIN_ENTRY_SCORE (90): canonical tradable high-confidence entry
   direction: 'BULLISH' as const,
   confidence: 'HIGH' as const,
   triggered_signals: [],
@@ -274,6 +274,58 @@ describe('SignalPositionLedgerService', () => {
       strategyDecision: 'ENTRY_CANDIDATE',
       calibrationEvidenceStatus: 'AVAILABLE',
     });
+  });
+
+  // Ledger entry confidence floor (owner policy 2026-06-25): the ledger is STRICTER than the
+  // screener — it opens a tracked position only for HIGH-confidence signals scoring > 90, even
+  // though the screener surfaces the full bullish candidate set. See LEDGER_MIN_ENTRY_SCORE.
+  //
+  // NON-VACUOUS by construction: each fixture below is otherwise fully open-capable — it mirrors
+  // the canonical PATH A open test (READY/BULLISH/source-proven trigger via enrichSignals) and
+  // differs ONLY in score/confidence. So the floor is the sole thing suppressing the row: remove
+  // `isHighConfidenceEntry` from the entry path and both of these tests open a row (totalCount 1)
+  // and fail. The `enrichSignals.not.toHaveBeenCalled()` check pins that the gate short-circuits
+  // at the pre-enrichment PATH A filter (isTrustedSourceSignal), before the expensive enrich call.
+  const openCapableRepository = (signal: any) => ({
+    listLatestSignals: jest.fn().mockResolvedValue({
+      items: [signal], totalCount: 1, limit: 100, offset: 0, nextOffset: null, hasMore: false,
+    }),
+    latestPriceByInstrumentId: jest.fn().mockResolvedValue({
+      date: new Date().toISOString(), close: 109, adjustedClose: 110, dataStatus: 'COMPLETE', source: 'database',
+    }),
+    latestDataQualityByInstrumentId: jest.fn().mockResolvedValue({
+      signalReadinessStatus: 'READY', coverageStatus: 'GOOD', liquidityStatus: 'LIQUID', lastEvaluatedAt: new Date().toISOString(),
+    }),
+    latestExitDecisionByInstrumentId: jest.fn().mockResolvedValue(null),
+  });
+
+  it('does NOT open a ledger entry for a HIGH-confidence signal scoring at the floor (score must EXCEED 90)', async () => {
+    const atFloorSignal = { ...trustedSignal, score: 90, strategyMatches: undefined, blockedStrategies: undefined };
+    const repository = openCapableRepository(atFloorSignal);
+    // Were the floor removed, this enriched signal would open a row — so the assertion below is real.
+    const signalService = { enrichSignals: jest.fn().mockResolvedValue([{ ...atFloorSignal, triggerContract: sourceProvenTrigger }]) };
+    const service = new SignalPositionLedgerService(repository as any, signalService as any);
+    const query = { region: 'IN', assetType: 'STOCK', limit: 25, offset: 0 };
+
+    await service.refreshActiveRows(query, { force: true, wait: true });
+    const result = await service.listActiveRows(query);
+
+    expect(result.totalCount).toBe(0);
+    expect(signalService.enrichSignals).not.toHaveBeenCalled(); // gated at PATH A pre-filter
+  });
+
+  it('does NOT open a ledger entry for a non-HIGH-confidence signal even when it scores above the floor', async () => {
+    const mediumConfSignal = { ...trustedSignal, score: 98, confidence: 'MEDIUM' as const, strategyMatches: undefined, blockedStrategies: undefined };
+    const repository = openCapableRepository(mediumConfSignal);
+    const signalService = { enrichSignals: jest.fn().mockResolvedValue([{ ...mediumConfSignal, triggerContract: sourceProvenTrigger }]) };
+    const service = new SignalPositionLedgerService(repository as any, signalService as any);
+    const query = { region: 'IN', assetType: 'STOCK', limit: 25, offset: 0 };
+
+    await service.refreshActiveRows(query, { force: true, wait: true });
+    const result = await service.listActiveRows(query);
+
+    expect(result.totalCount).toBe(0);
+    expect(signalService.enrichSignals).not.toHaveBeenCalled(); // gated at PATH A pre-filter
   });
 
   it('does not drop existing active entries when the latest scan contains fewer current candidates', async () => {
