@@ -77,4 +77,55 @@ test.describe('Screener — direction + setup tabs', () => {
     // Bullish-only setup is no longer offered under Bearish.
     await expect(page.getByRole('tab', { name: 'Breakout' })).toHaveCount(0);
   });
+
+  /**
+   * Direction-aware default sort (dev b008d995). `score` is a DIRECTIONAL 0-100 scale
+   * (>=60 BULLISH, <=40 BEARISH), so "strongest conviction first" is score DESC for
+   * Bullish but ASC for Bearish (lowest score = most bearish). The fix lives in two
+   * layers — the backend ORDER BY *and* the FE client-side default sort on tab switch —
+   * so this drives the REAL stack (no API mock) to prove the rendered order end-to-end.
+   */
+  test('Bearish tab renders most-bearish (lowest score) first; Bullish renders highest first', async ({ page }) => {
+    // Pin India/STOCK so the equity ScreenerPage renders (crypto → CryptoSignalBoard).
+    await page.addInitScript(() => {
+      window.localStorage.setItem('market_scope', JSON.stringify({ region: 'IN', assetType: 'STOCK' }));
+    });
+    await visitAuthenticated(page, '/screener');
+
+    // Each row's SignalChip label is `${direction} ${roundedScore}` — read them in row order.
+    const scoresFor = async (direction: 'BULLISH' | 'BEARISH'): Promise<number[]> => {
+      const labels = await page.locator('table tbody .MuiChip-label').allInnerTexts();
+      return labels
+        .map((t) => t.match(new RegExp(`${direction}\\s+(\\d+)`)))
+        .filter((m): m is RegExpMatchArray => Boolean(m))
+        .map((m) => Number(m[1]));
+    };
+
+    // --- Bearish: expect ASCENDING (most bearish, lowest score, first) ---
+    await Promise.all([
+      page.waitForResponse(
+        (r) => r.url().includes('/market-data/screener') && r.url().includes('signalDirection=BEARISH') && r.status() === 200,
+      ),
+      page.getByRole('tab', { name: 'Bearish', exact: true }).click(),
+    ]);
+    // Wait until the table has re-rendered with bearish rows (no bullish chips left over).
+    await expect.poll(async () => (await scoresFor('BULLISH')).length).toBe(0);
+    const bearish = await scoresFor('BEARISH');
+    expect(bearish.length).toBeGreaterThan(1);
+    expect(bearish).toEqual([...bearish].sort((a, b) => a - b)); // non-decreasing
+    expect(bearish[0]).toBeLessThanOrEqual(40); // genuinely bearish leads, not a score-40 near-neutral
+
+    // --- Bullish: expect DESCENDING (most bullish, highest score, first) — unchanged behavior ---
+    await Promise.all([
+      page.waitForResponse(
+        (r) => r.url().includes('/market-data/screener') && r.url().includes('signalDirection=BULLISH') && r.status() === 200,
+      ),
+      page.getByRole('tab', { name: 'Bullish', exact: true }).click(),
+    ]);
+    await expect.poll(async () => (await scoresFor('BEARISH')).length).toBe(0);
+    const bullish = await scoresFor('BULLISH');
+    expect(bullish.length).toBeGreaterThan(1);
+    expect(bullish).toEqual([...bullish].sort((a, b) => b - a)); // non-increasing
+    expect(bullish[0]).toBeGreaterThanOrEqual(60);
+  });
 });
