@@ -49,6 +49,8 @@ test.describe("Earnings Intelligence tab redesign IN region", () => {
     await expect(thead.getByText("Profit QoQ")).toBeVisible();
     await expect(thead.getByText("EPS QoQ")).toBeVisible();
     const rows = page.locator("tbody tr");
+    // Deterministic wait for data rows (see Growth tests): avoids the fixed-800ms flake.
+    await expect(rows.first()).toBeVisible({ timeout: 15000 });
     const rowCount = await rows.count();
     console.log("IN Upcoming rows:", rowCount);
     expect(rowCount).toBeGreaterThan(0);
@@ -65,8 +67,10 @@ test.describe("Earnings Intelligence tab redesign IN region", () => {
 
   test("IN-4 Growth tab populated", async ({ page }) => {
     await page.getByRole("tab", { name: "Growth" }).click();
-    await page.waitForTimeout(800);
     const rows = page.locator("tbody tr");
+    // Wait for the data XHR + render to settle rather than a fixed timeout: the dev
+    // BE's earnings query can exceed a fixed 800ms wait, which made this row-count flaky.
+    await expect(rows.first()).toBeVisible({ timeout: 15000 });
     const rowCount = await rows.count();
     console.log("IN Growth rows:", rowCount);
     if (rowCount === 0) {
@@ -147,6 +151,8 @@ test.describe("Earnings Intelligence tab redesign US region", () => {
     await expect(thead.getByText("Profit QoQ")).toBeVisible();
     await expect(thead.getByText("EPS QoQ")).toBeVisible();
     const rows = page.locator("tbody tr");
+    // Deterministic wait for data rows (see Growth tests): avoids the fixed-800ms flake.
+    await expect(rows.first()).toBeVisible({ timeout: 15000 });
     const rowCount = await rows.count();
     console.log("US Upcoming rows:", rowCount);
     expect(rowCount).toBeGreaterThan(0);
@@ -155,8 +161,10 @@ test.describe("Earnings Intelligence tab redesign US region", () => {
 
   test("US-4 Growth tab populated CRITICAL", async ({ page }) => {
     await page.getByRole("tab", { name: "Growth" }).click();
-    await page.waitForTimeout(800);
     const rows = page.locator("tbody tr");
+    // Wait for the data XHR + render to settle rather than a fixed timeout: the dev
+    // BE's earnings query can exceed a fixed 800ms wait, which made this row-count flaky.
+    await expect(rows.first()).toBeVisible({ timeout: 15000 });
     const rowCount = await rows.count();
     console.log("US Growth rows:", rowCount);
     if (rowCount === 0) {

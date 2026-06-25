@@ -1,6 +1,10 @@
 /// <reference types="@types/jest" />
 import { EarningsIntelligenceService } from '../../../src/modules/earnings-intelligence';
 import type { EarningsFundamentalInput, EarningsSnapshotDto } from '../../../src/modules/earnings-intelligence';
+import {
+  calculateConsistencyScore,
+  calculateAccelerationScore,
+} from '../../../src/modules/earnings-intelligence/earnings-intelligence.growth-series';
 
 function fundamental(
   periodEndDate: string,
@@ -70,9 +74,7 @@ function persistedRow(categories: EarningsSnapshotDto['categories']): EarningsSn
 
 describe('EarningsIntelligenceService', () => {
   it('calculates consistency score from improving persisted earnings metrics', () => {
-    const service = new EarningsIntelligenceService({} as any);
-
-    expect(service.calculateConsistencyScore([
+    expect(calculateConsistencyScore([
       fundamental('2025-03-31', 100, 10, 1),
       fundamental('2025-06-30', 110, 12, 1.2),
       fundamental('2025-09-30', 125, 15, 1.5),
@@ -80,9 +82,7 @@ describe('EarningsIntelligenceService', () => {
   });
 
   it('calculates acceleration score when latest growth improves versus prior growth', () => {
-    const service = new EarningsIntelligenceService({} as any);
-
-    expect(service.calculateAccelerationScore([
+    expect(calculateAccelerationScore([
       fundamental('2025-03-31', 100, 10, 1),
       fundamental('2025-06-30', 110, 12.1, 1.2),
       fundamental('2025-09-30', 130, 16.9, 1.5),
