@@ -13,6 +13,7 @@
 import {
   applyDefensiveExitEntryGate,
   isUnderDefensiveExit,
+  HIGH_CONVICTION_BULLISH_SCORE,
   type DefensiveExitEvidence,
 } from '../../../src/modules/signal-generation-engine/signal-defensive-exit-gate';
 import { triggerTypeFor } from '../../../src/modules/signal-generation-engine/signal-trigger-contract';
@@ -45,11 +46,14 @@ describe('isUnderDefensiveExit — decision-driven, mirrors the ledger close-evi
   });
 });
 
+// A mid-range score (below the high-conviction floor) so the demotion path is exercised.
+const MID_SCORE = 70;
+
 describe('applyDefensiveExitEntryGate', () => {
   it('demotes a live BULLISH signal to NEUTRAL and records an audit negative-signal', () => {
     const neg: SignalItem[] = [];
     const ev: DefensiveExitEvidence = { decision: 'EXIT_CANDIDATE', exitRulesTriggered: ['DEATH_CROSS'], invalidationRulesTriggered: [] };
-    const out = applyDefensiveExitEntryGate('BULLISH', undefined, ev, neg);
+    const out = applyDefensiveExitEntryGate('BULLISH', MID_SCORE, undefined, ev, neg);
     expect(out).toBe('NEUTRAL');
     expect(neg).toHaveLength(1);
     expect(neg[0].code).toBe('DEFENSIVE_EXIT_ENTRY_GATE');
@@ -58,29 +62,47 @@ describe('applyDefensiveExitEntryGate', () => {
 
   it('leaves a BULLISH signal untouched when the instrument is not under defensive exit', () => {
     const neg: SignalItem[] = [];
-    expect(applyDefensiveExitEntryGate('BULLISH', undefined, clean, neg)).toBe('BULLISH');
+    expect(applyDefensiveExitEntryGate('BULLISH', MID_SCORE, undefined, clean, neg)).toBe('BULLISH');
     expect(neg).toHaveLength(0);
   });
 
   it('leaves a BULLISH signal untouched when there is no evidence at all', () => {
     const neg: SignalItem[] = [];
-    expect(applyDefensiveExitEntryGate('BULLISH', undefined, undefined, neg)).toBe('BULLISH');
+    expect(applyDefensiveExitEntryGate('BULLISH', MID_SCORE, undefined, undefined, neg)).toBe('BULLISH');
     expect(neg).toHaveLength(0);
   });
 
   it('never gates non-bullish directions', () => {
     const neg: SignalItem[] = [];
     const ev: DefensiveExitEvidence = { decision: 'EXIT_CANDIDATE', exitRulesTriggered: [], invalidationRulesTriggered: [] };
-    expect(applyDefensiveExitEntryGate('BEARISH', undefined, ev, neg)).toBe('BEARISH');
-    expect(applyDefensiveExitEntryGate('NEUTRAL', undefined, ev, neg)).toBe('NEUTRAL');
+    expect(applyDefensiveExitEntryGate('BEARISH', MID_SCORE, undefined, ev, neg)).toBe('BEARISH');
+    expect(applyDefensiveExitEntryGate('NEUTRAL', MID_SCORE, undefined, ev, neg)).toBe('NEUTRAL');
     expect(neg).toHaveLength(0);
   });
 
   it('does not gate as-of/backfill runs (no current decision applies to past dates)', () => {
     const neg: SignalItem[] = [];
     const ev: DefensiveExitEvidence = { decision: 'EXIT_CANDIDATE', exitRulesTriggered: ['DEATH_CROSS'], invalidationRulesTriggered: [] };
-    expect(applyDefensiveExitEntryGate('BULLISH', new Date('2026-01-10'), ev, neg)).toBe('BULLISH');
+    expect(applyDefensiveExitEntryGate('BULLISH', MID_SCORE, new Date('2026-01-10'), ev, neg)).toBe('BULLISH');
     expect(neg).toHaveLength(0);
+  });
+});
+
+describe('applyDefensiveExitEntryGate — high-conviction score floor (owner rule: > 90 always bullish)', () => {
+  const exiting: DefensiveExitEvidence = { decision: 'EXIT_CANDIDATE', exitRulesTriggered: ['DEATH_CROSS'], invalidationRulesTriggered: ['SMA200_BREACH'] };
+
+  it('does NOT demote a BULLISH signal scoring above the floor, even under an active exit + invalidation posture', () => {
+    const neg: SignalItem[] = [];
+    expect(applyDefensiveExitEntryGate('BULLISH', HIGH_CONVICTION_BULLISH_SCORE + 1, undefined, exiting, neg)).toBe('BULLISH');
+    expect(applyDefensiveExitEntryGate('BULLISH', 99, undefined, exiting, neg)).toBe('BULLISH');
+    expect(neg).toHaveLength(0); // no audit marker, since nothing was gated
+  });
+
+  it('still demotes at exactly the floor (boundary is strict: only scores ABOVE 90 are exempt)', () => {
+    const neg: SignalItem[] = [];
+    expect(applyDefensiveExitEntryGate('BULLISH', HIGH_CONVICTION_BULLISH_SCORE, undefined, exiting, neg)).toBe('NEUTRAL');
+    expect(neg).toHaveLength(1);
+    expect(neg[0].code).toBe('DEFENSIVE_EXIT_ENTRY_GATE');
   });
 });
 

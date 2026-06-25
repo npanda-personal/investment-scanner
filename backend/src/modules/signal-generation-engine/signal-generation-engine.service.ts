@@ -548,7 +548,7 @@ export class SignalGenerationEngineService {
     );
     const { score, triggeredSignals, negativeSignals, totalEvaluated } = scoreOutcome;
     // Entry gate: demote a bullish entry to NEUTRAL when the instrument is already under an active DEFENSIVE_EXIT posture (see signal-defensive-exit-gate).
-    const direction = applyDefensiveExitEntryGate(scoreOutcome.direction, asOfDate, options.batchContext?.defensiveExitDecisionsByInstrumentId?.get(instrumentId), negativeSignals);
+    const direction = applyDefensiveExitEntryGate(scoreOutcome.direction, score, asOfDate, options.batchContext?.defensiveExitDecisionsByInstrumentId?.get(instrumentId), negativeSignals);
     const rawConfidence = this.confidenceFor(prices, latestFundamental, totalEvaluated, asOfDate ?? undefined, scoreOutcome.components?.effectiveDisplacement ?? scoreOutcome.components?.displacement ?? null);
 
     // ── Regime gate (bearish/short suppression) ────────────────────────────────

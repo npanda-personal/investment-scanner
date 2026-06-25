@@ -36,9 +36,21 @@
  *
  * Like the regime gate (applyRegimeGateToShort), it is conservative, additive and
  * live-runs-only: skipped for as-of/backfill runs, where no current decision applies.
+ *
+ * High-conviction floor — a signal scoring strictly above HIGH_CONVICTION_BULLISH_SCORE
+ * is treated as unconditionally bullish and is NEVER demoted by this gate, regardless of
+ * defensive-exit posture. Such a score is top-decile bullish evidence; surfacing it as
+ * NEUTRAL (with the high score still attached) is self-contradictory on the screener, so
+ * the owner's rule is that the score is authoritative at this tier.
  */
 import prisma from '../../db/prisma';
 import type { SignalDirection, SignalItem } from './signal-generation-engine.types';
+
+/**
+ * Bullish-conviction score above which the defensive-exit gate never demotes. Scores are
+ * integer 0–100; "> 90" means the 91–100 band. A single, obvious knob for the owner rule.
+ */
+export const HIGH_CONVICTION_BULLISH_SCORE = 90;
 
 export interface DefensiveExitEvidence {
   decision: string | null;
@@ -68,14 +80,24 @@ function gateReason(ev: DefensiveExitEvidence): string {
  * Applies the entry gate. For a live (non-as-of) BULLISH signal whose instrument is
  * under defensive exit, returns 'NEUTRAL' and appends an audit detail to
  * negativeSignals; otherwise returns the original direction unchanged.
+ *
+ * A signal scoring strictly above HIGH_CONVICTION_BULLISH_SCORE is exempt from demotion
+ * (high-conviction floor — see header).
  */
 export function applyDefensiveExitEntryGate(
   direction: SignalDirection,
+  score: number,
   asOfDate: Date | null | undefined,
   evidence: DefensiveExitEvidence | undefined,
   negativeSignals: SignalItem[],
 ): SignalDirection {
-  if (asOfDate || direction !== 'BULLISH' || !isUnderDefensiveExit(evidence)) return direction;
+  if (
+    asOfDate ||
+    direction !== 'BULLISH' ||
+    score > HIGH_CONVICTION_BULLISH_SCORE ||
+    !isUnderDefensiveExit(evidence)
+  )
+    return direction;
   negativeSignals.push({ code: 'DEFENSIVE_EXIT_ENTRY_GATE', label: gateReason(evidence!), category: 'TECHNICAL' });
   return 'NEUTRAL';
 }
