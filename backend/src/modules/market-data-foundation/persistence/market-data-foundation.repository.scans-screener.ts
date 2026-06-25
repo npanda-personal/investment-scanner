@@ -152,6 +152,16 @@ export class ScreenerRepository {
 
     const whereClause = Prisma.join(filters, ' AND ');
 
+    // Direction-aware score sort. `score` is a DIRECTIONAL 0-100 scale (>=60 BULLISH, <=40
+    // BEARISH), so "strongest conviction first" means opposite orders per tab: BULLISH wants
+    // the HIGHEST score first (99 = most bullish), BEARISH wants the LOWEST first (9 = most
+    // bearish; 40 = barely bearish). A single DESC buried the strongest bearish names at the
+    // bottom AND — because this sort gates the LIMIT — returned the least-bearish 50 instead of
+    // the most-bearish 50. NEUTRAL / the all-directions view keep DESC (the existing default).
+    const scoreSortDir = options.signalDirection?.toUpperCase() === 'BEARISH'
+      ? Prisma.sql`ASC`
+      : Prisma.sql`DESC`;
+
     // Normalized cash symbol for joining the F&O read-model tables (fo_oi_buildup /
     // fo_option_metrics key on the bare NSE symbol, e.g. RELIANCE). Mirrors the
     // price_symbol derivation used for price_ticks.
@@ -282,7 +292,7 @@ export class ScreenerRepository {
         LEFT JOIN fo_oi foi ON foi.underlying = ${foJoinSymbol}
         LEFT JOIN fo_opt fopt ON fopt.underlying = ${foJoinSymbol}${contextJoins}
         WHERE ${whereClause}
-        ORDER BY COALESCE(ls."signalScore", 0) DESC
+        ORDER BY COALESCE(ls."signalScore", 0) ${scoreSortDir}
         LIMIT ${rowLimit}
       ),
       -- Bulk 52-week high/low across all result symbols in one price_ticks scan instead
@@ -333,7 +343,7 @@ export class ScreenerRepository {
         LIMIT 1
       ) lp ON TRUE
       LEFT JOIN range_data rd ON rd.symbol = r.price_symbol
-      ORDER BY COALESCE(r."signalScore", 0) DESC
+      ORDER BY COALESCE(r."signalScore", 0) ${scoreSortDir}
     `;
 
     // FULL PATH (min52wPositionPct filter active): the 52w range must be known before filtering,
@@ -450,7 +460,7 @@ export class ScreenerRepository {
       LEFT JOIN fo_oi foi ON foi.underlying = ${foJoinSymbol}
       LEFT JOIN fo_opt fopt ON fopt.underlying = ${foJoinSymbol}${contextJoins}
       WHERE ${whereClause}
-      ORDER BY COALESCE(ls."signalScore", 0) DESC
+      ORDER BY COALESCE(ls."signalScore", 0) ${scoreSortDir}
       LIMIT ${rowLimit}
     `;
 
