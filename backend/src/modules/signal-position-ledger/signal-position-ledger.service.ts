@@ -20,6 +20,15 @@ const PRICE_STALE_DAYS = 5;
 const REFRESH_STALE_MS = 15 * 60 * 1000;
 const SOURCE_PROVEN_PRICE_STATUS = 'COMPLETE';
 
+// The ledger is intentionally STRICTER than the screener (separation of purpose, owner
+// policy 2026-06-25). The screener surfaces the BROAD bullish/bearish candidate set —
+// driven by persisted signal_results.direction — while the ledger only TRACKS HIGH-confidence
+// entries. A position opens only for a HIGH-confidence signal whose composite score EXCEEDS
+// this floor; applied to BOTH entry paths (A: enriched, B: lifecycle). This decouples ledger
+// selectivity from screener breadth so relaxing the defensive-exit gate (which broadened the
+// screener) does not flood the ledger with weak entries. See signal-defensive-exit-gate.ts.
+const LEDGER_MIN_ENTRY_SCORE = 90; // exclusive: score must be > 90
+
 type LedgerRefreshState = {
   scopeKey: string;
   region: string;
@@ -237,11 +246,23 @@ export class SignalPositionLedgerService {
     };
   }
 
+  /**
+   * Ledger entry confidence floor — see LEDGER_MIN_ENTRY_SCORE. Only HIGH-confidence signals
+   * scoring above the floor may open a tracked position. Reads already-persisted score/confidence
+   * from signal_results; independent of the screener's direction-only selection.
+   */
+  private isHighConfidenceEntry(signal: SignalResultDto): boolean {
+    return signal.confidence === 'HIGH'
+      && Number.isFinite(signal.score)
+      && signal.score > LEDGER_MIN_ENTRY_SCORE;
+  }
+
   private isTrustedSourceSignal(signal: SignalResultDto): boolean {
     const quality = signal.dataQualityEligibility;
     const hasNoiseBlocker = (signal.blockedStrategies || []).some((item) => (item.noiseFiltersTriggered || []).length > 0);
     return signal.auditStatus === 'CURRENT'
       && signal.direction === 'BULLISH'
+      && this.isHighConfidenceEntry(signal)
       && quality?.filterApplied === true
       && quality.eligible === true
       && quality.signalReadinessStatus === 'READY'
@@ -587,6 +608,7 @@ export class SignalPositionLedgerService {
             && signal.direction === 'BULLISH'
             && signal.auditStatus === 'CURRENT'
             && (signal.dataQualityEligibility?.eligible === true)
+            && this.isHighConfidenceEntry(signal)
             && !pathAPublishedIds.has(signal.instrument_id)
             && !ledgerInstruments.has(signal.instrument_id),
         );
