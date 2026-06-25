@@ -148,6 +148,68 @@ function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/**
+ * Capture the unified calendar for one region as a SINGLE merged envelope.
+ *
+ * Why this isn't a plain SCOPED_GETS entry: the backend hard-caps `items` at 500
+ * ordered by date, so a `type=ALL` call lets earnings/dividends saturate the array
+ * and starves the IPO/SPLIT/ECONOMIC tabs (e.g. US type=ALL returns ZERO dividends/
+ * IPOs even though hundreds exist). The demo adapter keys on region only (it ignores
+ * the `type`/`ipoMonths` params), so it serves ONE file per region for every tab.
+ * To keep every tab populated we fetch each eventType separately and merge their
+ * items into one envelope, preserving the authoritative full-corpus `counts` for the
+ * tab badges. The page filters this envelope client-side by eventType.
+ */
+async function captureCalendarMerged(region) {
+  const PER_TYPE = 150; // cap per eventType — keeps the file lean while every tab stays full
+  const EVENT_TYPES = ['IPO', 'IPO_UPCOMING', 'DIVIDEND', 'SPLIT', 'EARNINGS', 'ECONOMIC'];
+  const base = { region, assetType: 'STOCK', ipoMonths: 6 };
+
+  async function get(params) {
+    const url = new URL('/api/v1/calendar', BACKEND);
+    for (const [k, v] of Object.entries({ ...base, ...params })) {
+      if (v != null) url.searchParams.set(k, String(v));
+    }
+    const res = await fetch(url, { headers: { authorization: `Bearer ${token}` } });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  }
+
+  const manifestKey = `/api/v1/calendar?region=${region}`;
+  try {
+    // type=ALL gives the authoritative envelope shell + full-corpus counts for badges.
+    const shell = await get({ type: 'ALL', limit: 500 });
+    const merged = [];
+    const seen = new Set();
+    for (const t of EVENT_TYPES) {
+      let body;
+      try {
+        body = await get({ type: t, limit: PER_TYPE });
+      } catch {
+        continue; // a single empty/unsupported type must not sink the whole capture
+      }
+      for (const it of Array.isArray(body.items) ? body.items : []) {
+        const id = it && it.id;
+        if (id && seen.has(id)) continue;
+        if (id) seen.add(id);
+        merged.push(it);
+      }
+      await delay(50);
+    }
+    const envelope = { ...shell, items: merged };
+    const file = `${slug('/api/v1/calendar')}-region-${region}.json`;
+    fs.writeFileSync(path.join(OUT_DIR, file), JSON.stringify(envelope));
+    manifest[manifestKey] = { file, status: 200 };
+    ok++;
+    console.log(`  ok GET ${manifestKey} -> ${merged.length} merged events (counts ${JSON.stringify(shell.counts || {})})`);
+    return envelope;
+  } catch (err) {
+    console.warn(`  x GET ${manifestKey} -> ${err.message}`);
+    skipped++;
+    return null;
+  }
+}
+
 // ---- extraction helpers ----------------------------------------------------
 
 function pickArray(data) {
@@ -208,6 +270,8 @@ const SCOPED_GETS = [
   '/api/v1/market-intelligence/stock-interest',
   '/api/v1/market-intelligence/earnings',
   ['/api/v1/market-intelligence/event-feed', { days: 5 }],
+  // NOTE: /api/v1/calendar is NOT a plain scoped GET — it needs the per-eventType
+  // merge in captureCalendarMerged() (see Phase 2) so every tab is populated.
   // market context
   '/api/v1/market-context/summary',
   '/api/v1/market-context/persisted-summary',
@@ -323,6 +387,10 @@ async function main() {
       regionData[region][p] = await capture('GET', p, { params, region });
       await delay(PACE_MS);
     }
+
+    // Calendar needs the per-eventType merge so every tab is populated (see fn doc).
+    regionData[region]['/api/v1/calendar'] = await captureCalendarMerged(region);
+    await delay(PACE_MS);
 
     if (region === 'IN') {
       console.log(`  + IN-only endpoints`);
