@@ -22,7 +22,7 @@ interface BackendCalendarResponse {
 }
 
 function emptyCounts(): Record<CalendarEventType, number> {
-  return { IPO: 0, DIVIDEND: 0, SPLIT: 0, EARNINGS: 0, ECONOMIC: 0 };
+  return { IPO: 0, IPO_UPCOMING: 0, DIVIDEND: 0, SPLIT: 0, EARNINGS: 0, ECONOMIC: 0 };
 }
 
 function normalizeCounts(raw: Partial<Record<CalendarEventType, number>> | undefined): Record<CalendarEventType, number> {
@@ -52,6 +52,8 @@ export interface FetchCalendarOptions {
   from?: string;
   to?: string;
   limit?: number;
+  /** Backward look-back window (months: 1|3|6) for the IPO "Closed" sub-tab. */
+  ipoMonths?: number;
 }
 
 /**
@@ -68,6 +70,7 @@ export async function fetchCalendar(scope: MarketScope, options: FetchCalendarOp
         ...(options.from ? { from: options.from } : {}),
         ...(options.to ? { to: options.to } : {}),
         ...(options.limit ? { limit: options.limit } : {}),
+        ...(options.ipoMonths ? { ipoMonths: options.ipoMonths } : {}),
       },
     });
     const body = response.data;

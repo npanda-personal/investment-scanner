@@ -6,7 +6,9 @@
 // Plus the boundary reads the IPO refresh needs (recently-listed stocks + first/last close).
 // No business logic here — shaping into CalendarEvent happens in the service.
 
+import { randomUUID } from 'crypto';
 import prisma from '../../db/prisma';
+import type { UpcomingIpoRecord } from './calendar.types';
 
 export interface CorporateActionRow {
   id: string;
@@ -170,6 +172,98 @@ export class CalendarRepository {
         stock: { select: { name: true } },
       },
     });
+  }
+
+  /**
+   * Forthcoming / ongoing IPOs from the newest upcoming snapshot for the region. Raw SQL because
+   * upcoming_ipo_snapshots is a drift-safe raw table with no Prisma model (InstrumentCoverage
+   * precedent). ONGOING first, then by soonest close/listing/open date.
+   */
+  async listUpcomingIpos(region: string, limit: number): Promise<any[]> {
+    const newest = (await this.db.$queryRawUnsafe(
+      'SELECT "snapshotDate" FROM "upcoming_ipo_snapshots" WHERE "scopeRegion" = $1 ORDER BY "snapshotDate" DESC LIMIT 1',
+      region,
+    )) as { snapshotDate: Date }[];
+    if (!newest?.length) return [];
+    return (await this.db.$queryRawUnsafe(
+      `SELECT * FROM "upcoming_ipo_snapshots"
+         WHERE "scopeRegion" = $1 AND "snapshotDate" = $2 AND "status" IN ('UPCOMING','ONGOING')
+         ORDER BY CASE "status" WHEN 'ONGOING' THEN 0 ELSE 1 END,
+                  COALESCE("closeDate", "expectedListingDate", "openDate") ASC NULLS LAST
+         LIMIT $3`,
+      region,
+      newest[0].snapshotDate,
+      limit,
+    )) as any[];
+  }
+
+  /** Upsert one forthcoming-IPO row into the newest snapshot for (snapshotDate, region, source, company). */
+  async upsertUpcomingIpo(
+    snapshotDate: Date,
+    region: string,
+    assetType: string,
+    rec: UpcomingIpoRecord,
+  ): Promise<void> {
+    await this.db.$executeRawUnsafe(
+      `INSERT INTO "upcoming_ipo_snapshots"
+         ("id","snapshotDate","source","scopeRegion","scopeAssetType","exchange","ipoType","symbol",
+          "companyName","status","openDate","closeDate","priceBandMin","priceBandMax","issueSizeCr",
+          "lotSize","expectedListingDate","sourceUrl","raw","freshness","updatedAt")
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19::jsonb,$20,CURRENT_TIMESTAMP)
+       ON CONFLICT ("snapshotDate","scopeRegion","source","companyName") DO UPDATE SET
+         "exchange"=EXCLUDED."exchange","ipoType"=EXCLUDED."ipoType","symbol"=EXCLUDED."symbol",
+         "status"=EXCLUDED."status","openDate"=EXCLUDED."openDate","closeDate"=EXCLUDED."closeDate",
+         "priceBandMin"=EXCLUDED."priceBandMin","priceBandMax"=EXCLUDED."priceBandMax",
+         "issueSizeCr"=EXCLUDED."issueSizeCr","lotSize"=EXCLUDED."lotSize",
+         "expectedListingDate"=EXCLUDED."expectedListingDate","sourceUrl"=EXCLUDED."sourceUrl",
+         "raw"=EXCLUDED."raw","freshness"=EXCLUDED."freshness","updatedAt"=CURRENT_TIMESTAMP`,
+      randomUUID(),
+      snapshotDate,
+      rec.source,
+      region,
+      assetType,
+      rec.exchange,
+      rec.ipoType,
+      rec.symbol,
+      rec.companyName,
+      rec.status,
+      rec.openDate,
+      rec.closeDate,
+      rec.priceBandMin,
+      rec.priceBandMax,
+      rec.issueSizeCr,
+      rec.lotSize,
+      rec.expectedListingDate,
+      rec.sourceUrl,
+      JSON.stringify(rec.raw ?? null),
+      'FRESH',
+    );
+  }
+
+  /**
+   * Recent persisted closes (ascending) per symbol within [since, now], for read-time trend.
+   * Persisted-read: PriceTick is local DB data, no external fetch. Bounded — caller passes a
+   * small symbol set (the Closed-tab window) and a ~30-day `since`.
+   */
+  async recentClosesForSymbols(
+    symbols: string[],
+    since: Date,
+  ): Promise<Map<string, { close: number; timestamp: Date }[]>> {
+    const map = new Map<string, { close: number; timestamp: Date }[]>();
+    if (!symbols.length) return map;
+    const rows = await this.db.priceTick.findMany({
+      where: { symbol: { in: symbols }, timestamp: { gte: since } },
+      orderBy: { timestamp: 'asc' },
+      select: { symbol: true, close: true, adjustedClose: true, timestamp: true },
+    });
+    for (const r of rows) {
+      const arr = map.get(r.symbol) ?? [];
+      // Prefer the corporate-action-adjusted close (mirrors firstCloseOnOrAfter) so a split or
+      // large dividend inside the trend window doesn't flip the direction; fall back to raw close.
+      arr.push({ close: Number(r.adjustedClose ?? r.close), timestamp: r.timestamp });
+      map.set(r.symbol, arr);
+    }
+    return map;
   }
 
   /** FRED economic release events in a date window, scoped by stored region (FRED is US/global). */

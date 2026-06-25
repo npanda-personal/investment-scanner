@@ -49,11 +49,21 @@ const RANGE_PRESETS: { key: CalendarRangePreset; label: string; pastDays: number
 
 const EVENT_TYPE_LABEL: Record<CalendarEventType, string> = {
   IPO: 'IPO',
+  IPO_UPCOMING: 'IPO (upcoming)',
   DIVIDEND: 'Dividend',
   SPLIT: 'Split',
   EARNINGS: 'Earnings',
   ECONOMIC: 'Economic',
 };
+
+/** IPO sub-tab + Closed timeframe — both persisted in the URL alongside ?tab=IPO. */
+type IpoSub = 'UPCOMING' | 'CLOSED';
+type IpoTimeframe = '1M' | '3M' | '6M';
+const IPO_TIMEFRAMES: { key: IpoTimeframe; months: number }[] = [
+  { key: '1M', months: 1 },
+  { key: '3M', months: 3 },
+  { key: '6M', months: 6 },
+];
 
 function isoDay(d: Date): string {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())).toISOString().slice(0, 10);
@@ -120,12 +130,57 @@ const allColumns: DataTableColumn<CalendarEvent>[] = [
   { id: 'detail', label: 'Detail', minWidth: 140, render: (r) => r.detail ?? '—' },
 ];
 
-const ipoColumns: DataTableColumn<CalendarEvent>[] = [
+type ChipColor = 'success' | 'error' | 'warning' | 'info' | 'default';
+
+function dash() {
+  return <Typography variant="body2" color="text.secondary">—</Typography>;
+}
+
+/** Recent-direction trend chip (read-time, from persisted closes). */
+function trendCell(r: CalendarEvent) {
+  const dir = metric(r, 'trendDirection') as string | null;
+  if (!dir) return dash();
+  const cfg: Record<string, { c: ChipColor; arrow: string }> = {
+    UP: { c: 'success', arrow: '▲' },
+    DOWN: { c: 'error', arrow: '▼' },
+    FLAT: { c: 'default', arrow: '▬' },
+  };
+  const m = cfg[dir] ?? cfg.FLAT;
+  const pct = metric(r, 'trendPct');
+  const label = pct === null || pct === undefined ? m.arrow : `${m.arrow} ${percent(pct)}`;
+  return <Chip size="small" variant="outlined" color={m.c} label={label} />;
+}
+
+/** Snapshot freshness rendered as a "health" badge. */
+function healthCell(r: CalendarEvent) {
+  const f = metric(r, 'freshness') as string | null;
+  if (!f) return dash();
+  const cfg: Record<string, { c: ChipColor; l: string }> = {
+    FRESH: { c: 'success', l: 'Fresh' },
+    PARTIAL: { c: 'warning', l: 'Partial' },
+    NO_DATA: { c: 'default', l: 'No data' },
+  };
+  const m = cfg[f] ?? { c: 'default' as ChipColor, l: f };
+  return <Chip size="small" variant="outlined" color={m.c} label={m.l} />;
+}
+
+/** Real signal-engine verdict; "—" when no trusted signal exists yet (never an error). */
+function signalCell(r: CalendarEvent) {
+  const dir = metric(r, 'signalDirection') as string | null;
+  if (!dir) return dash();
+  const cfg: Record<string, { c: ChipColor; l: string }> = {
+    BULLISH: { c: 'success', l: 'Bullish' },
+    BEARISH: { c: 'error', l: 'Bearish' },
+    NEUTRAL: { c: 'default', l: 'Neutral' },
+  };
+  const m = cfg[dir] ?? { c: 'default' as ChipColor, l: dir };
+  return <Chip size="small" color={m.c} label={m.l} />;
+}
+
+// IPO "Closed" sub-tab: already-listed → return · trend · health · signal.
+const ipoClosedColumns: DataTableColumn<CalendarEvent>[] = [
   { id: 'name', label: 'Company', minWidth: 200, render: nameCell },
   { id: 'listed', label: 'Listed', minWidth: 110, render: (r) => formatDate(r.date) },
-  { id: 'daysListed', label: 'Days listed', align: 'right', minWidth: 100, render: (r) => num(metric(r, 'daysListed'), 0) },
-  { id: 'firstClose', label: 'First close', align: 'right', minWidth: 110, render: (r) => num(metric(r, 'firstClose')) },
-  { id: 'latestClose', label: 'Last price', align: 'right', minWidth: 110, render: (r) => num(metric(r, 'latestClose')) },
   {
     id: 'return',
     label: 'Return since listing',
@@ -133,8 +188,78 @@ const ipoColumns: DataTableColumn<CalendarEvent>[] = [
     minWidth: 150,
     render: (r) => percent(metric(r, 'returnSinceListing')),
   },
-  { id: 'sector', label: 'Sector', minWidth: 140, render: (r) => (metric(r, 'sector') as string) ?? '—' },
-  { id: 'exchange', label: 'Exchange', minWidth: 110, render: (r) => (metric(r, 'exchange') as string) ?? '—' },
+  { id: 'trend', label: 'Trend', minWidth: 120, render: trendCell },
+  { id: 'health', label: 'Health', minWidth: 110, render: healthCell },
+  { id: 'signal', label: 'Signal', minWidth: 110, render: signalCell },
+  { id: 'exchange', label: 'Exchange', minWidth: 100, render: (r) => (metric(r, 'exchange') as string) ?? '—' },
+];
+
+function upcomingNameCell(r: CalendarEvent) {
+  return (
+    <Stack spacing={0}>
+      <Typography variant="body2" fontWeight={600}>{r.companyName ?? r.symbol ?? r.title}</Typography>
+      {r.symbol && <Typography variant="caption" color="text.secondary">{r.symbol}</Typography>}
+    </Stack>
+  );
+}
+
+function priceBand(r: CalendarEvent): string {
+  const lo = metric(r, 'priceBandMin');
+  const hi = metric(r, 'priceBandMax');
+  if ((lo === null || lo === undefined) && (hi === null || hi === undefined)) return '—';
+  if (lo !== null && lo !== undefined && hi !== null && hi !== undefined) return `₹${num(lo)} – ₹${num(hi)}`;
+  return `₹${num(lo ?? hi)}`;
+}
+
+function subscriptionWindow(r: CalendarEvent): string {
+  const o = metric(r, 'openDate') as string | null;
+  const c = metric(r, 'closeDate') as string | null;
+  if (!o && !c) return '—';
+  return `${formatDate(o)} – ${formatDate(c)}`;
+}
+
+function statusCell(r: CalendarEvent) {
+  const s = metric(r, 'status') as string | null;
+  if (!s) return dash();
+  const ongoing = s === 'ONGOING';
+  return (
+    <Chip
+      size="small"
+      color={ongoing ? 'success' : 'info'}
+      variant={ongoing ? 'filled' : 'outlined'}
+      label={ongoing ? 'Open now' : 'Upcoming'}
+    />
+  );
+}
+
+// IPO "Upcoming" sub-tab: forthcoming/ongoing subscription data (descriptive only).
+const ipoUpcomingColumns: DataTableColumn<CalendarEvent>[] = [
+  { id: 'name', label: 'Company', minWidth: 200, render: upcomingNameCell },
+  {
+    id: 'exchangeType',
+    label: 'Exchange / Type',
+    minWidth: 150,
+    render: (r) => {
+      const ex = metric(r, 'exchange') as string | null;
+      const tp = metric(r, 'ipoType') as string | null;
+      const tpLabel = tp ? (tp === 'SME' ? 'SME' : 'Mainboard') : null;
+      return [ex, tpLabel].filter(Boolean).join(' · ') || '—';
+    },
+  },
+  { id: 'subscription', label: 'Subscription', minWidth: 180, render: subscriptionWindow },
+  { id: 'priceBand', label: 'Price band', align: 'right', minWidth: 130, render: priceBand },
+  {
+    id: 'issueSize',
+    label: 'Issue size',
+    align: 'right',
+    minWidth: 120,
+    render: (r) => {
+      const v = metric(r, 'issueSizeCr');
+      return v === null || v === undefined ? '—' : `₹${num(v, 0)} Cr`;
+    },
+  },
+  { id: 'status', label: 'Status', minWidth: 110, render: statusCell },
+  { id: 'expectedListing', label: 'Expected listing', minWidth: 140, render: (r) => formatDate(metric(r, 'expectedListingDate') as string) },
 ];
 
 const dividendColumns: DataTableColumn<CalendarEvent>[] = [
@@ -168,9 +293,9 @@ const economicColumns: DataTableColumn<CalendarEvent>[] = [
   { id: 'unit', label: 'Unit', minWidth: 160, render: (r) => (metric(r, 'unit') as string) ?? '—' },
 ];
 
-function columnsForTab(tab: TabKey): DataTableColumn<CalendarEvent>[] {
+function columnsForTab(tab: TabKey, ipoSub: IpoSub): DataTableColumn<CalendarEvent>[] {
   switch (tab) {
-    case 'IPO': return ipoColumns;
+    case 'IPO': return ipoSub === 'UPCOMING' ? ipoUpcomingColumns : ipoClosedColumns;
     case 'DIVIDEND': return dividendColumns;
     case 'SPLIT': return splitColumns;
     case 'EARNINGS': return earningsColumns;
@@ -182,6 +307,7 @@ function columnsForTab(tab: TabKey): DataTableColumn<CalendarEvent>[] {
 const TAB_EMPTY_MESSAGE: Record<TabKey, string> = {
   ALL: 'No calendar events for this scope and window.',
   IPO: 'No recently-listed companies in this window. Run a calendar refresh to materialize IPO data.',
+  IPO_UPCOMING: 'No forthcoming IPOs ingested yet (NSE/BSE). Run a calendar refresh.',
   DIVIDEND: 'No dividend actions recorded for this region and window.',
   SPLIT: 'No splits or bonus issues recorded for this region and window.',
   EARNINGS: 'No upcoming results in this window for this region.',
@@ -203,8 +329,27 @@ export function CalendarPage() {
   // Tab lives in the URL so browser-back from an instrument page restores it.
   const tabParam = (searchParams.get('tab') ?? 'ALL') as TabKey;
   const tab: TabKey = visibleTabs.some((t) => t.key === tabParam) ? tabParam : 'ALL';
+  // IPO sub-tab + Closed timeframe live in the URL (?tab=IPO&ipo=CLOSED&tf=3M) so reload/back restore them.
+  const ipoSub: IpoSub = (searchParams.get('ipo') ?? 'UPCOMING') === 'CLOSED' ? 'CLOSED' : 'UPCOMING';
+  const tfParam = (searchParams.get('tf') ?? '3M') as IpoTimeframe;
+  const tf: IpoTimeframe = IPO_TIMEFRAMES.some((t) => t.key === tfParam) ? tfParam : '3M';
+  const ipoMonths = IPO_TIMEFRAMES.find((t) => t.key === tf)?.months ?? 3;
+
   const selectTab = useCallback(
-    (next: TabKey) => setSearchParams(next === 'ALL' ? {} : { tab: next }, { replace: false }),
+    (next: TabKey) => {
+      if (next === 'ALL') return setSearchParams({}, { replace: false });
+      // Default the IPO parent into its Upcoming sub-tab; other tabs carry only ?tab.
+      if (next === 'IPO') return setSearchParams({ tab: 'IPO', ipo: 'UPCOMING', tf }, { replace: false });
+      return setSearchParams({ tab: next }, { replace: false });
+    },
+    [setSearchParams, tf],
+  );
+  const selectIpoSub = useCallback(
+    (next: IpoSub) => setSearchParams({ tab: 'IPO', ipo: next, tf }, { replace: false }),
+    [setSearchParams, tf],
+  );
+  const selectTimeframe = useCallback(
+    (next: IpoTimeframe) => setSearchParams({ tab: 'IPO', ipo: 'CLOSED', tf: next }, { replace: false }),
     [setSearchParams],
   );
   const openInstrument = useCallback(
@@ -225,7 +370,10 @@ export function CalendarPage() {
 
   const range = useMemo(() => rangeToDates(preset), [preset]);
 
-  const loader = useCallback(() => fetchCalendar(scope, { from: range.from, to: range.to, limit: 500 }), [scope, range]);
+  const loader = useCallback(
+    () => fetchCalendar(scope, { from: range.from, to: range.to, limit: 500, ipoMonths }),
+    [scope, range, ipoMonths],
+  );
 
   useEffect(() => {
     const requestId = requestRef.current + 1;
@@ -248,8 +396,8 @@ export function CalendarPage() {
       });
   }, [loader]);
 
-  // Reset pagination when the active tab or range changes.
-  useEffect(() => { setPage(0); }, [tab, preset, scope]);
+  // Reset pagination when the active tab, sub-tab, timeframe or range changes.
+  useEffect(() => { setPage(0); }, [tab, ipoSub, tf, preset, scope]);
 
   // Drop a stale ?tab when its tab is no longer visible (e.g. region switched away from US).
   useEffect(() => {
@@ -260,8 +408,14 @@ export function CalendarPage() {
 
   const filtered = useMemo(() => {
     const events = data?.events ?? [];
-    return tab === 'ALL' ? events : events.filter((e) => e.eventType === tab);
-  }, [data, tab]);
+    if (tab === 'ALL') return events;
+    if (tab === 'IPO') {
+      // Parent IPO tab splits client-side: Upcoming = forthcoming feed, Closed = already-listed.
+      const wantType: CalendarEventType = ipoSub === 'UPCOMING' ? 'IPO_UPCOMING' : 'IPO';
+      return events.filter((e) => e.eventType === wantType);
+    }
+    return events.filter((e) => e.eventType === tab);
+  }, [data, tab, ipoSub]);
   const pageRows = useMemo(
     () => filtered.slice(page * pageSize, page * pageSize + pageSize),
     [filtered, page, pageSize],
@@ -283,9 +437,14 @@ export function CalendarPage() {
   const counts = data?.counts;
   const tabLabel = (t: { key: TabKey; label: string }) => {
     if (t.key === 'ALL' || !counts) return t.label;
-    const c = counts[t.key];
+    // IPO parent aggregates both families (Closed + Upcoming).
+    const c = t.key === 'IPO' ? (counts.IPO ?? 0) + (counts.IPO_UPCOMING ?? 0) : counts[t.key];
     return c ? `${t.label} (${c})` : t.label;
   };
+
+  const emptyMessage = tab === 'IPO' && ipoSub === 'UPCOMING' ? TAB_EMPTY_MESSAGE.IPO_UPCOMING : TAB_EMPTY_MESSAGE[tab];
+  // Upcoming IPOs are pre-listing (no tradable symbol) → not row-clickable; economic rows never link.
+  const rowClickHandler = tab === 'ECONOMIC' || (tab === 'IPO' && ipoSub === 'UPCOMING') ? undefined : openInstrument;
 
   return (
     <Box className="page-container page-container--hub">
@@ -320,6 +479,40 @@ export function CalendarPage() {
         ))}
       </Tabs>
 
+      {tab === 'IPO' && (
+        <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 1.5, flexWrap: 'wrap', rowGap: 1 }}>
+          <Tabs
+            value={ipoSub}
+            onChange={(_, next) => selectIpoSub(next as IpoSub)}
+            sx={{ minHeight: 36, '& .MuiTab-root': { minHeight: 36, py: 0 } }}
+          >
+            <Tab value="UPCOMING" label="Upcoming" />
+            <Tab value="CLOSED" label="Closed" />
+          </Tabs>
+          {ipoSub === 'CLOSED' && (
+            <Stack direction="row" spacing={0.75} alignItems="center">
+              <Typography variant="caption" color="text.secondary">Listed in last</Typography>
+              {IPO_TIMEFRAMES.map((t) => (
+                <Chip
+                  key={t.key}
+                  size="small"
+                  label={t.key}
+                  color={tf === t.key ? 'primary' : 'default'}
+                  variant={tf === t.key ? 'filled' : 'outlined'}
+                  onClick={() => selectTimeframe(t.key)}
+                />
+              ))}
+            </Stack>
+          )}
+        </Stack>
+      )}
+
+      {tab === 'IPO' && ipoSub === 'UPCOMING' && (
+        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+          Forthcoming and currently-open IPOs from NSE/BSE — subscription window, price band and issue size. Descriptive data only.
+        </Typography>
+      )}
+
       {tab === 'ECONOMIC' && (
         <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
           Economic releases are US/global (FRED): release date with latest actual and previous value. FRED carries no forecasts.
@@ -331,7 +524,7 @@ export function CalendarPage() {
       ) : error ? (
         <ErrorState message={error} />
       ) : filtered.length === 0 ? (
-        <EmptyState title="Nothing scheduled here yet" message={TAB_EMPTY_MESSAGE[tab]} />
+        <EmptyState title="Nothing scheduled here yet" message={emptyMessage} />
       ) : (
         <>
           {data?.warnings && data.warnings.length > 0 && (
@@ -340,7 +533,7 @@ export function CalendarPage() {
             </Typography>
           )}
           <DataTable<CalendarEvent>
-            columns={columnsForTab(tab)}
+            columns={columnsForTab(tab, ipoSub)}
             rows={pageRows}
             getRowId={(r) => r.id}
             page={page}
@@ -348,15 +541,15 @@ export function CalendarPage() {
             totalCount={filtered.length}
             onPageChange={setPage}
             onPageSizeChange={(size) => { setPageSize(size); setPage(0); }}
-            emptyMessage={TAB_EMPTY_MESSAGE[tab]}
-            onRowClick={tab === 'ECONOMIC' ? undefined : openInstrument}
+            emptyMessage={emptyMessage}
+            onRowClick={rowClickHandler}
           />
         </>
       )}
 
       {data?.generatedAt && (
         <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
-          Generated {formatDate(data.generatedAt)}. Persisted read — refresh runs from pipeline actions.
+          Generated {formatDate(data.generatedAt)}. Data refreshes on a schedule — not live on page load.
         </Typography>
       )}
     </Box>

@@ -1,6 +1,8 @@
 import type { MarketScope } from '@/contexts/MarketScopeContext';
 
-export const CALENDAR_EVENT_TYPES = ['IPO', 'DIVIDEND', 'SPLIT', 'EARNINGS', 'ECONOMIC'] as const;
+// IPO_UPCOMING = forthcoming/ongoing-subscription IPOs (descriptive). IPO = already-listed
+// (return/trend/health/signal). Surfaced as two FE sub-tabs under one "IPO" parent tab.
+export const CALENDAR_EVENT_TYPES = ['IPO', 'IPO_UPCOMING', 'DIVIDEND', 'SPLIT', 'EARNINGS', 'ECONOMIC'] as const;
 export type CalendarEventType = (typeof CALENDAR_EVENT_TYPES)[number];
 
 export type CalendarMetricValue = number | string | null;

@@ -22,10 +22,12 @@ export class CalendarController {
 
   /**
    * POST /api/v1/calendar/refresh
-   * Materialize the IPO snapshot (recently-listed window) and ingest the FRED
-   * economic-release schedule. Explicit action only — never runs on a GET.
+   * Materialize the IPO snapshot (recently-listed window), ingest the FRED
+   * economic-release schedule, and ingest the NSE/BSE forthcoming-IPO feed.
+   * Explicit action only — never runs on a GET.
    *
-   * Body (all optional): region, assetType, snapshotDate (ISO), lookbackDays, includeEconomic.
+   * Body (all optional): region, assetType, snapshotDate (ISO), lookbackDays,
+   * includeEconomic, includeUpcomingIpo.
    */
   refresh = async (req: Request, res: Response) => {
     try {
