@@ -71,12 +71,12 @@ export class CalendarService {
 
     if (wants('EARNINGS')) {
       const rows = await this.repository.listUpcomingEarnings(region, assetType, from, to, limit);
-      if (!rows.length) warnings.push('No upcoming earnings in range — see Earnings Intelligence for the full view.');
+      if (!rows.length) warnings.push('No upcoming earnings results in this window for this region.');
       events.push(...rows.map((r) => this.earningsToEvent(r, region)));
     }
 
     if (wants('ECONOMIC')) {
-      const rows = await this.repository.listEconomicEvents(from, to, limit);
+      const rows = await this.repository.listEconomicEvents(region, from, to, limit);
       if (!rows.length) warnings.push('No economic releases ingested yet (FRED, US/global) — run a calendar refresh.');
       events.push(...rows.map((r) => this.economicToEvent(r)));
     }
@@ -189,7 +189,7 @@ export class CalendarService {
         daysToResult: r.daysToResult ?? null,
         resultDateSource: r.resultDateSource ?? null,
       },
-      // FE deep-links the row to the Earnings Intelligence page (handled client-side).
+      // FE links the row to the instrument-details page (pure calendar — no signals/analysis surface).
       sourceUrl: null,
     };
   }
