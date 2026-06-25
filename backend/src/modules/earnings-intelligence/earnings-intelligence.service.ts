@@ -388,6 +388,11 @@ export class EarningsIntelligenceService {
     const marginTrend = this.marginTrend(latest, priorQuarter);
     const consistencyScore = this.calculateConsistencyScore(primarySeries);
     const accelerationScore = this.calculateAccelerationScore(primarySeries);
+    // Tab-redesign sort metrics: consecutive QoQ deltas across the same-class series
+    // (newest-first), summarised over a trailing window.  Profit avg drives the
+    // Result Winners/Disappointments sort; the EPS trend drives the Growth tab.
+    const avgProfitGrowthQoQ4q = this.averageOfRecentQoQ(this.qoqGrowthSeries(primarySeries, 'netIncome'), 4, 2);
+    const epsGrowthTrendScore = this.epsGrowthTrendScore(this.qoqGrowthSeries(primarySeries, 'eps'));
     const deliveryInterest = this.deliveryInterest(input.deliverySnapshots, config);
     const reactionDate = resultDateSource === 'OFFICIAL_CALENDAR' ? resultDate : null;
     const priceReaction = reactionDate ? this.priceReaction(input.prices, reactionDate, input.region, config) : null;
@@ -430,6 +435,7 @@ export class EarningsIntelligenceService {
       consistencyScore, accelerationScore, deliveryInterest, priceReaction,
       preResultPriceMove, freshness, config,
       winner: resultClass.winner, disappointment: resultClass.disappointment,
+      growthEligible: epsGrowthTrendScore !== null,
     });
     // Numeric technicals bundle (Phase 3) from the already-loaded price/delivery
     // history — no extra reads.  Each field degrades to null on a short warm-up.
@@ -464,11 +470,15 @@ export class EarningsIntelligenceService {
       marginTrend,
       consistencyScore,
       accelerationScore,
+      avgProfitGrowthQoQ4q,
+      epsGrowthTrendScore,
       reasonTags,
       riskTags,
       warnings,
       freshness,
       categories,
+      // name is joined read-time in the repository; the write path has no value.
+      name: null,
       ...technicals,
     };
   }
@@ -528,6 +538,8 @@ export class EarningsIntelligenceService {
     preResultPriceMove: number | null; freshness: EarningsFreshness; config: EarningsRegionConfig;
     // Pre-resolved, mutually-exclusive post-result classification (see classifyResult).
     winner: boolean; disappointment: boolean;
+    // True when a QoQ-EPS trend is computable (≥3 EPS quarters) → Growth-tab population.
+    growthEligible: boolean;
   }): EarningsIntelligenceCategory[] {
     const categories: EarningsIntelligenceCategory[] = [];
     const hasAuthoritativeResultDate = input.resultDateSource === 'OFFICIAL_CALENDAR';
@@ -544,6 +556,9 @@ export class EarningsIntelligenceService {
     if (upcoming && (input.deliveryInterest || (input.preResultPriceMove !== null && input.preResultPriceMove >= input.config.preResultPriceMoveThresholdPercent))) {
       categories.push('PRE_RESULT_INTEREST');
     }
+    // Growth tab: a broad population — any instrument with a computable QoQ-EPS trend,
+    // independent of an upcoming date.  Ranked read-time by epsGrowthTrendScore.
+    if (input.growthEligible) categories.push('GROWTH');
     // Winner and disappointment are mutually exclusive (resolved upstream) so a
     // row never contradicts itself across the two tabs.
     if (input.winner) categories.push('RESULT_WINNERS');
@@ -886,6 +901,64 @@ export class EarningsIntelligenceService {
   private growth(current: number | null, previous: number | null): number | null {
     if (current === null || previous === null || previous === 0) return null;
     return round2(((current - previous) / Math.abs(previous)) * 100);
+  }
+
+  /**
+   * Consecutive QoQ growth values for a metric across a same-period-type series
+   * (newest-first input), returned newest-first.  Reuses the standard QoQ delta;
+   * pairs with a null/zero base are skipped so only valid deltas accumulate.
+   */
+  private qoqGrowthSeries(seriesNewestFirst: EarningsFundamentalInput[], metric: 'revenue' | 'netIncome' | 'eps'): number[] {
+    const series: number[] = [];
+    for (let index = 0; index < seriesNewestFirst.length - 1; index += 1) {
+      const value = this.growth(
+        seriesNewestFirst[index][metric] as number | null,
+        seriesNewestFirst[index + 1][metric] as number | null,
+      );
+      if (value !== null) series.push(value);
+    }
+    return series;
+  }
+
+  /** Mean of the most-recent ≤`count` QoQ values (newest-first input); null below `minCount`. */
+  private averageOfRecentQoQ(seriesNewestFirst: number[], count: number, minCount: number): number | null {
+    if (seriesNewestFirst.length < minCount) return null;
+    const window = seriesNewestFirst.slice(0, count);
+    const sum = window.reduce((acc, value) => acc + value, 0);
+    return round2(sum / window.length);
+  }
+
+  /**
+   * Growth-tab score from the trailing QoQ EPS deltas (newest-first).  Recency-weighted
+   * mean (newest delta weighted highest) plus a 0–10 bonus scaled by how many consecutive
+   * steps are rising — so a company whose QoQ EPS growth is both high AND accelerating
+   * ranks above one that is merely high.  Null below 2 deltas (needs ≥3 EPS-bearing
+   * quarters) — the floor for a multi-quarter trend, and the depth US (TTM-only, ~3 rows
+   * per name) actually carries, so the Growth tab populates for both IN and US.
+   */
+  private epsGrowthTrendScore(epsQoQSeriesNewestFirst: number[]): number | null {
+    if (epsQoQSeriesNewestFirst.length < 2) return null;
+    const window = epsQoQSeriesNewestFirst.slice(0, 4);
+    let weightedSum = 0;
+    let weightTotal = 0;
+    window.forEach((value, index) => {
+      const weight = window.length - index; // newest (index 0) gets the largest weight
+      weightedSum += value * weight;
+      weightTotal += weight;
+    });
+    const weightedMean = weightedSum / weightTotal;
+    let risingSteps = 0;
+    for (let index = 0; index < window.length - 1; index += 1) {
+      // window is newest-first: window[index] is newer than window[index + 1].
+      if (window[index] > window[index + 1]) risingSteps += 1;
+    }
+    const maxSteps = window.length - 1;
+    // Bonus measures trajectory *improvement* (each delta higher than the prior), not
+    // positive growth per se — a still-shrinking-but-decelerating series can earn it.
+    // Acceptable: this is a signed ordering-only score, never displayed or gated on
+    // sign, and the recency-weighted mean keeps truly-growing names on top.
+    const uptrendBonus = maxSteps > 0 ? (risingSteps / maxSteps) * 10 : 0;
+    return round2(weightedMean + uptrendBonus);
   }
 
   private marginTrend(current: EarningsFundamentalInput | null | undefined, previous: EarningsFundamentalInput | null | undefined): number | null {

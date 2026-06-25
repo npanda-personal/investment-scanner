@@ -1,6 +1,9 @@
 export type EarningsIntelligenceCategory =
   | 'UPCOMING_RESULTS'
   | 'PRE_RESULT_INTEREST'
+  // Growth tab (renamed from Pre-Result Interest in the UI): broader population of
+  // instruments with a computable QoQ-EPS trend, ranked by epsGrowthTrendScore.
+  | 'GROWTH'
   | 'RESULT_WINNERS'
   | 'RESULT_DISAPPOINTMENTS'
   | 'RESULT_REACTION_HISTORY'
@@ -89,6 +92,12 @@ export interface EarningsSnapshotDto {
   snapshotDate: string;
   dataThroughDate: string | null;
   symbol: string;
+  /**
+   * Full company name (Stock.name), joined read-time in the read path so the UI can
+   * show it next to the symbol.  Not persisted on the snapshot (avoids name staleness);
+   * null on the write path and whenever the join cannot resolve the instrument.
+   */
+  name: string | null;
   resultDate: string | null;
   /**
    * Human-readable label that indicates whether the result date is authoritative
@@ -132,6 +141,19 @@ export interface EarningsSnapshotDto {
   profitGrowthYoY: number | null;
   epsGrowthYoY: number | null;
   growthComparisonBasis: string | null;
+  /**
+   * Tab-redesign sort metrics, computed at refresh from the full same-period-type
+   * quarter series (only available at materialization, hence persisted):
+   *   avgProfitGrowthQoQ4q — mean of the last ≤4 consecutive QoQ profit growth %s.
+   *     Result Winners sort desc / Result Disappointments sort asc.  Null when <2
+   *     consecutive QoQ profit deltas exist.
+   *   epsGrowthTrendScore  — recency-weighted mean of the last ≤4 QoQ EPS growth %s
+   *     plus a monotonic-uptrend bonus (higher = more consistently growing).  Growth
+   *     tab sort desc.  Null when <2 consecutive QoQ EPS deltas exist (i.e. <3
+   *     EPS-bearing quarters) — also the GROWTH-category eligibility gate.
+   */
+  avgProfitGrowthQoQ4q: number | null;
+  epsGrowthTrendScore: number | null;
   marginTrend: number | null;
   consistencyScore: number;
   accelerationScore: number;

@@ -167,6 +167,9 @@ export class EarningsIntelligenceRepository {
         { symbol: 'asc' },
       ],
       take: MAX_API_ROWS + 1,
+      // Read-time join of the full company name (Stock.name) — not persisted on the
+      // snapshot, so this single relation include is the source of truth for the UI.
+      include: { stock: { select: { name: true } } },
     });
     const rows: EarningsSnapshotDto[] = records.slice(0, MAX_API_ROWS).map((record: any) => this.toDto(record));
     const filteredRows = query.category
@@ -208,6 +211,8 @@ export class EarningsIntelligenceRepository {
       profitGrowthYoY: row.profitGrowthYoY,
       epsGrowthYoY: row.epsGrowthYoY,
       growthComparisonBasis: row.growthComparisonBasis,
+      avgProfitGrowthQoQ4q: row.avgProfitGrowthQoQ4q,
+      epsGrowthTrendScore: row.epsGrowthTrendScore,
       marginTrend: row.marginTrend,
       consistencyScore: row.consistencyScore,
       accelerationScore: row.accelerationScore,
@@ -310,6 +315,9 @@ export class EarningsIntelligenceRepository {
       snapshotDate: this.iso(record.snapshotDate) ?? '',
       dataThroughDate: this.iso(record.dataThroughDate),
       symbol: record.symbol,
+      // Full company name is joined read-time in latestSnapshot (record.stock?.name);
+      // null on the write path and whenever the instrument cannot be resolved.
+      name: record.stock?.name ?? null,
       // For DATE_TBA rows (incl. legacy estimated): suppress the fabricated date
       // and daysToResult so the UI renders "—".
       resultDate: isTba ? null : this.iso(record.resultDate),
@@ -328,6 +336,8 @@ export class EarningsIntelligenceRepository {
       profitGrowthYoY: nullableNumber(record.profitGrowthYoY),
       epsGrowthYoY: nullableNumber(record.epsGrowthYoY),
       growthComparisonBasis: record.growthComparisonBasis ?? null,
+      avgProfitGrowthQoQ4q: nullableNumber(record.avgProfitGrowthQoQ4q),
+      epsGrowthTrendScore: nullableNumber(record.epsGrowthTrendScore),
       marginTrend: nullableNumber(record.marginTrend),
       consistencyScore: Number(record.consistencyScore),
       accelerationScore: Number(record.accelerationScore),

@@ -75,7 +75,7 @@ const stockInterestTabs = [
 
 const earningsTabs = [
   { label: 'Upcoming Results', value: 'UPCOMING_RESULTS' },
-  { label: 'Pre-Result Interest', value: 'PRE_RESULT_INTEREST' },
+  { label: 'Growth', value: 'GROWTH' },
   { label: 'Result Winners', value: 'RESULT_WINNERS' },
   { label: 'Result Disappointments', value: 'RESULT_DISAPPOINTMENTS' },
   { label: 'Result Reaction History', value: 'RESULT_REACTION_HISTORY' },
@@ -100,6 +100,60 @@ function earningsUpcomingTier(row: EarningsIntelligenceSnapshot): number {
   return 0;
 }
 
+// Map the categorical 50/200 SMA posture to a 0–100 constructiveness score so it
+// can blend into the watchlist health score.  Null posture contributes nothing.
+function smaPostureScore(posture: string | null | undefined): number | null {
+  switch (posture) {
+    case 'ABOVE_50_200': return 100;
+    case 'ABOVE_50_BELOW_200': return 70;
+    case 'ABOVE_200': return 65;
+    case 'ABOVE_50': return 60;
+    case 'BELOW_50_ABOVE_200': return 40;
+    case 'BELOW_200': return 30;
+    case 'BELOW_50': return 25;
+    case 'BELOW_50_200': return 0;
+    default: return null;
+  }
+}
+
+// RSI-14 mapped to a 0–100 "health band": healthiest in the constructive 50–65
+// zone, tapering toward overbought (>70) and oversold (<40) extremes.
+function rsiHealthScore(rsi: number | null | undefined): number | null {
+  if (typeof rsi !== 'number' || !Number.isFinite(rsi)) return null;
+  const distanceFromIdeal = Math.abs(rsi - 57.5); // centre of the 50–65 band
+  return Math.max(0, Math.round(100 - distanceFromIdeal * 2));
+}
+
+// Blended fundamentals+technicals health score (0–100) for the Earnings Watchlist
+// ranking.  Averages only the components that are present, so it degrades
+// gracefully where a component is null (e.g. US has no deliveryPercent, or a
+// technicals warm-up window is unmet).  Returns null when nothing is available.
+function earningsHealthScore(row: EarningsIntelligenceSnapshot): number | null {
+  const components: number[] = [];
+  const push = (value: number | null | undefined) => {
+    if (typeof value === 'number' && Number.isFinite(value)) components.push(value);
+  };
+  push(row.consistencyScore);
+  push(row.accelerationScore);
+  push(row.pricePosition52w);
+  if (typeof row.adx14 === 'number' && Number.isFinite(row.adx14)) push(Math.min(100, row.adx14));
+  push(smaPostureScore(row.smaPosture));
+  push(rsiHealthScore(row.rsi14));
+  if (components.length === 0) return null;
+  return components.reduce((acc, value) => acc + value, 0) / components.length;
+}
+
+// Tab membership for the Earnings view.  Backend categories drive most tabs as-is;
+// the Watchlist tab is re-scoped here to exactly the upcoming-results population
+// (owner spec: "best health score … only for upcoming results"), decoupled from
+// the backend EARNINGS_WATCHLIST heuristic.
+function earningsTabMembership(row: EarningsIntelligenceSnapshot): string[] {
+  const categories = new Set(row.categories);
+  categories.delete('EARNINGS_WATCHLIST');
+  if (row.categories.includes('UPCOMING_RESULTS')) categories.add('EARNINGS_WATCHLIST');
+  return [...categories];
+}
+
 function orderEarningsRowsForTab(
   rows: EarningsIntelligenceSnapshot[],
   tab: string,
@@ -108,32 +162,36 @@ function orderEarningsRowsForTab(
   const FAR = Number.MAX_SAFE_INTEGER;
   switch (tab) {
     case 'UPCOMING_RESULTS':
-    case 'PRE_RESULT_INTEREST':
       // Soonest, most-reliable forward date first.
       return sorted.sort((a, b) =>
         earningsUpcomingTier(b) - earningsUpcomingTier(a)
         || num(a.daysToResult, FAR) - num(b.daysToResult, FAR)
         || num(b.consistencyScore, 0) - num(a.consistencyScore, 0));
+    case 'GROWTH':
+      // Most consistently growing on top: recency-weighted QoQ-EPS trend score.
+      // Rows without enough history (null score) sort last.
+      return sorted.sort((a, b) =>
+        num(b.epsGrowthTrendScore, -FAR) - num(a.epsGrowthTrendScore, -FAR)
+        || num(b.consistencyScore, 0) - num(a.consistencyScore, 0));
     case 'RESULT_WINNERS':
-      // Strongest reported result first (biggest profit growth).
+      // Strongest sustained result first: avg of the last ≤4 QoQ profit-growth %s.
       return sorted.sort((a, b) =>
-        num(b.profitGrowth, -FAR) - num(a.profitGrowth, -FAR)
-        || num(b.accelerationScore, 0) - num(a.accelerationScore, 0));
+        num(b.avgProfitGrowthQoQ4q, -FAR) - num(a.avgProfitGrowthQoQ4q, -FAR)
+        || num(b.profitGrowth, -FAR) - num(a.profitGrowth, -FAR));
     case 'RESULT_DISAPPOINTMENTS':
-      // Weakest reported result first (steepest profit decline).
+      // Weakest sustained result first: same avg-4-QoQ axis, ascending.
       return sorted.sort((a, b) =>
-        num(a.profitGrowth, FAR) - num(b.profitGrowth, FAR)
-        || num(a.accelerationScore, 0) - num(b.accelerationScore, 0));
+        num(a.avgProfitGrowthQoQ4q, FAR) - num(b.avgProfitGrowthQoQ4q, FAR)
+        || num(a.profitGrowth, FAR) - num(b.profitGrowth, FAR));
     case 'RESULT_REACTION_HISTORY':
       // Most recent reported result first.
       return sorted.sort((a, b) => (b.resultDate ?? '').localeCompare(a.resultDate ?? ''));
     case 'EARNINGS_WATCHLIST':
-      // Highest result-consistency quality first; many rows saturate the
-      // quality scores, so break ties toward the most recent result.
+      // Best blended health score (fundamentals + technicals) first; break ties
+      // toward the soonest upcoming result.
       return sorted.sort((a, b) =>
-        num(b.consistencyScore, -FAR) - num(a.consistencyScore, -FAR)
-        || num(b.accelerationScore, 0) - num(a.accelerationScore, 0)
-        || (b.resultDate ?? '').localeCompare(a.resultDate ?? ''));
+        num(earningsHealthScore(b), -FAR) - num(earningsHealthScore(a), -FAR)
+        || num(a.daysToResult, FAR) - num(b.daysToResult, FAR));
     default:
       return sorted;
   }
@@ -241,9 +299,10 @@ const EARNINGS_EMPTY_MESSAGES: Record<string, string> = {
     'No stocks have a result date within the next 90 days in stored data. ' +
     'This category populates when an official earnings calendar is available or when ' +
     'period-cadence estimates fall within 90 days. Data updates on the next scheduled refresh.',
-  PRE_RESULT_INTEREST:
-    'No upcoming-result stocks showed elevated pre-result delivery or price-move interest. ' +
-    'Pre-result Interest rows require an Upcoming Results classification first.',
+  GROWTH:
+    'No stocks have enough consecutive quarterly EPS history to compute a growth trend yet. ' +
+    'The Growth tab ranks instruments by their recent QoQ-EPS trend; rows appear once at least ' +
+    'three EPS-bearing quarters are available. Data updates on the next scheduled refresh.',
   RESULT_WINNERS:
     'No stocks showed strong post-result growth in the last 60 days in stored data. ' +
     'Winners are identified from revenue, profit, and EPS growth with at least 2 positive metrics.',
@@ -254,7 +313,9 @@ const EARNINGS_EMPTY_MESSAGES: Record<string, string> = {
     'This category requires an official earnings date and ' +
     'at least one price bar 5 trading sessions after the result date.',
   EARNINGS_WATCHLIST:
-    'No stocks qualified for the earnings watchlist. This is unusual — data should populate after the next scheduled refresh.',
+    'No upcoming-result stocks are available to rank by health score yet. ' +
+    'The watchlist ranks the upcoming-results population by a blended fundamentals + technicals ' +
+    'health score; it populates once upcoming results are in stored data.',
 };
 
 export function EarningsIntelligencePage() {
@@ -277,7 +338,7 @@ export function EarningsIntelligencePage() {
       loading={view.loading}
       error={view.error}
       missingTitle="Earnings Intelligence data not available yet."
-      getRowCategories={(row) => (row as EarningsIntelligenceSnapshot).categories}
+      getRowCategories={(row) => earningsTabMembership(row as EarningsIntelligenceSnapshot)}
       orderRowsForTab={(rows, tab) => orderEarningsRowsForTab(rows as EarningsIntelligenceSnapshot[], tab) as typeof rows}
       renderTable={(rows) => <EarningsTable rows={rows as EarningsIntelligenceSnapshot[]} />}
       tabEmptyMessages={EARNINGS_EMPTY_MESSAGES}
@@ -1423,19 +1484,20 @@ function TechnicalsCell({ row }: { row: EarningsIntelligenceSnapshot }) {
 }
 
 type EarningsSortKey =
-  | 'symbol' | 'resultDate' | 'daysToResult' | 'revQoQ' | 'profitQoQ' | 'consistency'
-  | 'epsQoQ' | 'revYoY' | 'profitYoY' | 'epsYoY' | 'marginTrend' | 'acceleration'
+  | 'symbol' | 'name' | 'resultDate' | 'daysToResult' | 'revQoQ' | 'profitQoQ' | 'epsQoQ' | 'consistency'
+  | 'revYoY' | 'profitYoY' | 'epsYoY' | 'marginTrend' | 'acceleration'
   | 'periodEnd' | 'validatedAt';
 
 function earningsSortValue(row: EarningsIntelligenceSnapshot, key: EarningsSortKey): unknown {
   switch (key) {
     case 'symbol': return row.symbol;
+    case 'name': return row.name ?? '';
     case 'resultDate': return row.resultDate;
     case 'daysToResult': return row.daysToResult;
     case 'revQoQ': return row.revenueGrowthQoQ ?? row.revenueGrowth;
     case 'profitQoQ': return row.profitGrowthQoQ ?? row.profitGrowth;
-    case 'consistency': return row.consistencyScore;
     case 'epsQoQ': return row.epsGrowthQoQ ?? row.epsGrowth;
+    case 'consistency': return row.consistencyScore;
     case 'revYoY': return row.revenueGrowthYoY ?? null;
     case 'profitYoY': return row.profitGrowthYoY ?? null;
     case 'epsYoY': return row.epsGrowthYoY ?? null;
@@ -1483,10 +1545,12 @@ function EarningsTable({ rows }: { rows: EarningsIntelligenceSnapshot[] }) {
         <TableHead>
           <TableRow>
             {sortable('Symbol', 'symbol')}
+            {sortable('Full Name', 'name')}
             {sortable('Result Date', 'resultDate')}
             {sortable('Days To Result', 'daysToResult', 'right')}
             {sortable('Rev QoQ', 'revQoQ', 'right', 'Quarter-over-quarter: latest vs the most recent prior quarter')}
             {sortable('Profit QoQ', 'profitQoQ', 'right', 'Quarter-over-quarter: latest vs the most recent prior quarter')}
+            {sortable('EPS QoQ', 'epsQoQ', 'right', 'Quarter-over-quarter: latest vs the most recent prior quarter')}
             {sortable('Consistency', 'consistency', 'right')}
             <TableCell>Technicals</TableCell>
             <TableCell>Signal</TableCell>
@@ -1496,7 +1560,6 @@ function EarningsTable({ rows }: { rows: EarningsIntelligenceSnapshot[] }) {
                 <TableCell>Date Source</TableCell>
                 {sortable('Period End', 'periodEnd')}
                 {sortable('Validated At', 'validatedAt')}
-                {sortable('EPS QoQ', 'epsQoQ', 'right', 'Quarter-over-quarter: latest vs the most recent prior quarter')}
                 {sortable('Rev YoY', 'revYoY', 'right', 'Year-over-year vs the same quarter last year; blank when no year-ago comparable is present yet')}
                 {sortable('Profit YoY', 'profitYoY', 'right', 'Year-over-year vs the same quarter last year; blank when no year-ago comparable is present yet')}
                 {sortable('EPS YoY', 'epsYoY', 'right', 'Year-over-year vs the same quarter last year; blank when no year-ago comparable is present yet')}
@@ -1517,16 +1580,37 @@ function EarningsTable({ rows }: { rows: EarningsIntelligenceSnapshot[] }) {
             return (
               <TableRow key={rowIndex}>
                 <TableCell sx={{ whiteSpace: 'nowrap' }}>{row.symbol}</TableCell>
+                <TableCell
+                  sx={{ maxWidth: 220, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+                  title={row.name ?? ''}
+                >
+                  {row.name ?? '—'}
+                </TableCell>
                 <TableCell sx={{ whiteSpace: 'nowrap' }}>
                   <ResultDateCell resultDate={row.resultDate} resultDateLabel={row.resultDateLabel} />
                 </TableCell>
                 <TableCell align="right" sx={numericCellSx}>{formatOptional(row.daysToResult)}</TableCell>
-                <TableCell align="right" sx={numericCellSx}>{formatPercentPoints(row.revenueGrowthQoQ ?? row.revenueGrowth)}</TableCell>
-                <TableCell align="right" sx={numericCellSx}>{formatPercentPoints(row.profitGrowthQoQ ?? row.profitGrowth)}</TableCell>
+                <TableCell align="right" sx={numericCellSx}>{formatPercentPoints(row.revenueGrowthQoQ ?? null)}</TableCell>
+                <TableCell align="right" sx={numericCellSx}>{formatPercentPoints(row.profitGrowthQoQ ?? null)}</TableCell>
+                <TableCell align="right" sx={numericCellSx}>{formatPercentPoints(row.epsGrowthQoQ ?? null)}</TableCell>
                 <TableCell align="right" sx={numericCellSx}>{formatOptional(row.consistencyScore)}</TableCell>
                 <TableCell sx={{ whiteSpace: 'nowrap' }}><TechnicalsCell row={row} /></TableCell>
                 <TableCell sx={{ whiteSpace: 'nowrap' }}><SignalCell signal={row.signal} /></TableCell>
-                <TableCell><ReasonTags tags={row.reasonTags.map(humanizeCode)} /></TableCell>
+                {(() => {
+                  // Reasons collapsed to a single ellipsised line; full list on hover.
+                  const reasons = row.reasonTags.map(humanizeCode);
+                  const joined = reasons.join(', ');
+                  return (
+                    <TableCell
+                      sx={{ maxWidth: 220, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+                      title={joined}
+                    >
+                      {reasons.length > 0
+                        ? joined
+                        : <Typography variant="body2" color="text.secondary" component="span">No reasons.</Typography>}
+                    </TableCell>
+                  );
+                })()}
                 {showAllColumns && (
                   <>
                     <TableCell
@@ -1537,7 +1621,6 @@ function EarningsTable({ rows }: { rows: EarningsIntelligenceSnapshot[] }) {
                     </TableCell>
                     <TableCell sx={{ whiteSpace: 'nowrap' }}>{formatDate(row.periodEndDate)}</TableCell>
                     <TableCell sx={{ whiteSpace: 'nowrap' }}>{formatDate(row.validatedAt)}</TableCell>
-                    <TableCell align="right" sx={numericCellSx}>{formatPercentPoints(row.epsGrowthQoQ ?? row.epsGrowth)}</TableCell>
                     <TableCell align="right" sx={numericCellSx}>{formatPercentPoints(row.revenueGrowthYoY ?? null)}</TableCell>
                     <TableCell align="right" sx={numericCellSx}>{formatPercentPoints(row.profitGrowthYoY ?? null)}</TableCell>
                     <TableCell align="right" sx={numericCellSx}>{formatPercentPoints(row.epsGrowthYoY ?? null)}</TableCell>
