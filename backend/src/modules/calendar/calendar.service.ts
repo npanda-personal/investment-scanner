@@ -1,8 +1,9 @@
 // Calendar service — unified persisted-read assembler + refresh orchestration.
-// READ path touches no provider; it merges four persisted sources into one
-// CalendarEvent[]. REFRESH path materializes the IPO snapshot (from Stock.ipoDate +
-// boundary closes) and ingests the FRED economic-release schedule. Research-support
-// framing only — first traded close is labeled as such, never an "IPO/offer price".
+// READ path touches no provider; it merges the persisted sources into one CalendarEvent[].
+// REFRESH path materializes the IPO snapshot (from Stock.ipoDate + boundary closes) and ingests
+// the FRED economic-release schedule. The IPO concern (both sub-tabs + upcoming-feed ingest) lives
+// in calendar.ipo-service.ts; this file orchestrates it alongside corporate-actions/earnings/FRED.
+// Research-support framing only — first traded close is labeled as such, never an "IPO/offer price".
 
 import { CalendarRepository } from './calendar.repository';
 import type { CorporateActionRow, EarningsUpcomingRow } from './calendar.repository';
@@ -12,6 +13,8 @@ import {
   getFredApiKey,
   mapReleaseToSeries,
 } from './calendar.fred-source';
+import { CalendarIpoService, type SignalReader } from './calendar.ipo-service';
+import { isoDay } from './calendar.format';
 import {
   CALENDAR_EVENT_TYPES,
   type CalendarEvent,
@@ -22,16 +25,16 @@ import {
   type CalendarRefreshResult,
   type CalendarRefreshSourceResult,
   type CalendarResponse,
+  type UpcomingIpoRecord,
 } from './calendar.types';
+
+// Re-exported so existing importers keep the calendar.service path (impl now in calendar.ipo-service).
+export { computeTrend } from './calendar.ipo-service';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-function isoDay(d: Date): string {
-  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())).toISOString();
-}
-
 function emptyCounts(): Record<CalendarEventType, number> {
-  return { IPO: 0, DIVIDEND: 0, SPLIT: 0, EARNINGS: 0, ECONOMIC: 0 };
+  return { IPO: 0, IPO_UPCOMING: 0, DIVIDEND: 0, SPLIT: 0, EARNINGS: 0, ECONOMIC: 0 };
 }
 
 /** Map a raw corporate-action type string to a calendar event family (or null to drop). */
@@ -43,7 +46,19 @@ export function classifyCorporateAction(actionType: string): 'DIVIDEND' | 'SPLIT
 }
 
 export class CalendarService {
-  constructor(private readonly repository = new CalendarRepository()) {}
+  /** IPO sub-tabs (Closed + Upcoming) + upcoming-feed ingest — split out at the 500-line cap. */
+  private readonly ipoService: CalendarIpoService;
+
+  constructor(
+    private readonly repository = new CalendarRepository(),
+    /** Persisted-read signal verdict source for the Closed sub-tab (tests inject a stub). */
+    signalReader?: SignalReader,
+    /** NSE+BSE forthcoming-IPO fetcher; injectable so refresh tests stay offline. */
+    upcomingIpoFetcher?: (now?: Date) => Promise<UpcomingIpoRecord[]>,
+  ) {
+    // Passing undefined lets CalendarIpoService apply its real fetchUpcomingIpos default.
+    this.ipoService = new CalendarIpoService(this.repository, signalReader, upcomingIpoFetcher);
+  }
 
   // ---- READ: unified assembly --------------------------------------------
 
@@ -54,10 +69,8 @@ export class CalendarService {
 
     const events: CalendarEvent[] = [];
 
-    if (wants('IPO')) {
-      const rows = await this.repository.latestIpoSnapshots(region, assetType, from, to, limit);
-      if (!rows.length) warnings.push('No IPO snapshot for this scope yet — run a calendar refresh.');
-      events.push(...rows.map((r) => this.ipoToEvent(r)));
+    if (wants('IPO') || wants('IPO_UPCOMING')) {
+      events.push(...(await this.ipoService.assembleIpoEvents(query, warnings)));
     }
 
     if (wants('DIVIDEND') || wants('SPLIT')) {
@@ -116,31 +129,6 @@ export class CalendarService {
   }
 
   // ---- READ: mappers ------------------------------------------------------
-
-  private ipoToEvent(r: any): CalendarEvent {
-    return {
-      id: `ipo:${r.symbol}:${isoDay(r.listingDate)}`,
-      eventType: 'IPO',
-      date: r.listingDate.toISOString(),
-      region: r.scopeRegion,
-      symbol: r.symbol,
-      companyName: r.companyName ?? null,
-      title: r.companyName ? `${r.companyName} — recently listed` : `${r.symbol} — recently listed`,
-      detail: r.exchange ? `Listed on ${r.exchange}` : null,
-      metrics: {
-        daysListed: r.daysListed ?? null,
-        firstClose: r.firstClose ?? null,
-        firstCloseDate: r.firstCloseDate ? r.firstCloseDate.toISOString() : null,
-        latestClose: r.latestClose ?? null,
-        returnSinceListing: r.returnSinceListing ?? null,
-        sector: r.sector ?? null,
-        exchange: r.exchange ?? null,
-        currency: r.currency ?? null,
-        freshness: r.freshness ?? null,
-      },
-      sourceUrl: null,
-    };
-  }
 
   private corporateActionToEvent(r: CorporateActionRow, family: 'DIVIDEND' | 'SPLIT'): CalendarEvent {
     const amount = r.amount != null ? Number(r.amount) : null;
@@ -213,16 +201,22 @@ export class CalendarService {
     };
   }
 
-  // ---- REFRESH: materialize IPO snapshot + FRED economic events -----------
+  // ---- REFRESH: materialize IPO snapshot + FRED economic events + upcoming-IPO feed ----
 
   async refreshSnapshots(req: CalendarRefreshRequest): Promise<CalendarRefreshResult> {
     const ipo = await this.refreshIpoSnapshot(req);
     const economic = req.includeEconomic
       ? await this.ingestEconomicEvents(req)
       : { processed: 0, written: 0, skipped: true, warnings: ['Economic ingest skipped by request.'] };
+    const upcomingIpo = req.includeUpcomingIpo
+      ? await this.ipoService.ingestUpcomingIpos(req)
+      : { processed: 0, written: 0, skipped: true, warnings: ['Upcoming-IPO ingest skipped by request.'] };
 
-    const failed = ipo.warnings.some((w) => w.startsWith('FAILED')) || economic.warnings.some((w) => w.startsWith('FAILED'));
-    const anyWritten = ipo.written > 0 || economic.written > 0;
+    const failed =
+      ipo.warnings.some((w) => w.startsWith('FAILED')) ||
+      economic.warnings.some((w) => w.startsWith('FAILED')) ||
+      upcomingIpo.warnings.some((w) => w.startsWith('FAILED'));
+    const anyWritten = ipo.written > 0 || economic.written > 0 || upcomingIpo.written > 0;
     const status: CalendarRefreshResult['status'] = failed ? 'PARTIAL' : anyWritten ? 'OK' : 'PARTIAL';
 
     return {
@@ -231,6 +225,7 @@ export class CalendarService {
       snapshotDate: isoDay(req.snapshotDate),
       ipo,
       economic,
+      upcomingIpo,
       generatedAt: new Date().toISOString(),
     };
   }

@@ -35,6 +35,16 @@ function parseLimit(value: unknown): number {
   return Math.min(n, MAX_LIMIT);
 }
 
+/** IPO "Closed" look-back window in months — only 1, 3, or 6 are allowed; default 3. */
+const ALLOWED_IPO_MONTHS = [1, 3, 6];
+const DEFAULT_IPO_MONTHS = 3;
+function parseIpoMonths(value: unknown): number {
+  const raw = normalizeText(value);
+  if (!raw) return DEFAULT_IPO_MONTHS;
+  const n = Number.parseInt(raw, 10);
+  return ALLOWED_IPO_MONTHS.includes(n) ? n : DEFAULT_IPO_MONTHS;
+}
+
 function parseType(value: unknown): CalendarEventType | 'ALL' {
   const raw = normalizeText(value)?.toUpperCase();
   if (!raw || raw === 'ALL') return 'ALL';
@@ -76,6 +86,7 @@ export function parseCalendarQuery(query: Record<string, unknown>): CalendarQuer
     from: rangeFrom,
     to: rangeTo,
     limit: parseLimit(query.limit),
+    ipoMonths: parseIpoMonths(query.ipoMonths),
   };
 }
 
@@ -84,6 +95,7 @@ export interface CalendarRefreshInput {
   assetType: string;
   lookbackDays: number;
   includeEconomic: boolean;
+  includeUpcomingIpo: boolean;
 }
 
 const DEFAULT_IPO_LOOKBACK_DAYS = 365;
@@ -104,5 +116,10 @@ export function parseCalendarRefreshBody(body: Record<string, unknown>): Calenda
   const includeEconomicRaw = normalizeText(body.includeEconomic)?.toLowerCase();
   const includeEconomic = includeEconomicRaw !== 'false' && body.includeEconomic !== false;
 
-  return { region, assetType, lookbackDays, includeEconomic };
+  // includeUpcomingIpo defaults true (IN scope); accept explicit false. The provider fetch is
+  // self-guarding (graceful empty on failure), so a default-on flag never breaks the refresh.
+  const includeUpcomingIpoRaw = normalizeText(body.includeUpcomingIpo)?.toLowerCase();
+  const includeUpcomingIpo = includeUpcomingIpoRaw !== 'false' && body.includeUpcomingIpo !== false;
+
+  return { region, assetType, lookbackDays, includeEconomic, includeUpcomingIpo };
 }
