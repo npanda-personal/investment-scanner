@@ -150,6 +150,13 @@ export default function ScreenerPage() {
 
   const handleDirectionChange = (_e: SyntheticEvent, dir: ScreenerDirectionTab) => {
     setPage(0);
+    // Default the score sort to match the tab's polarity: `score` is a directional 0-100
+    // scale (>=60 bullish, <=40 bearish), so "strongest conviction first" is score DESC for
+    // Bullish/All but ASC for Bearish (lowest score = most bearish). Mirrors the backend's
+    // direction-aware ORDER BY so the client re-sort doesn't undo it. A manual column click
+    // still overrides within the tab; this only sets the default on each tab switch.
+    setSortKey('signalScore');
+    setSortDir(dir === 'BEARISH' ? 'asc' : 'desc');
     setFilters((prev) => {
       const next = { ...prev };
       if (dir === 'ALL') delete next.signalDirection;
