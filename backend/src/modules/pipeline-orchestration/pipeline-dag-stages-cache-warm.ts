@@ -21,6 +21,8 @@ import { StockInterestSnapshotService, parseStockInterestScope } from '../market
 import { MarketContextIntelligenceService, MarketPulseSnapshotService } from '../market-context-intelligence';
 import { TodayTradeReviewService, parseTodayReviewQuery } from '../today-trade-review';
 import { ConvictionReadsService } from '../market-data-foundation/analytics/market-data-foundation.serving.conviction-reads';
+import type { MarketDataFoundationService } from '../market-data-foundation';
+import { SETUP_DEFS } from '../signal-generation-engine/signal-setups';
 import { CacheService } from '../../cache/cache.service';
 import {
   convictionKey,
@@ -29,6 +31,7 @@ import {
   todayReviewKey,
   marketContextSummaryKey,
   marketPulseKey,
+  screenerKey,
   screenerKeyPrefix,
   marketMoversKeyPrefix,
   signalsTopKeyPrefix,
@@ -43,6 +46,7 @@ export interface CacheWarmStageServices {
   marketContextService: MarketContextIntelligenceService;
   marketPulseService: MarketPulseSnapshotService;
   todayReviewService: TodayTradeReviewService;
+  screenerService: MarketDataFoundationService;
   cacheService: CacheService;
 }
 
@@ -193,6 +197,44 @@ export function createCacheWarmAdapter(services: CacheWarmStageServices): Pipeli
           },
         },
       ];
+
+      // Screener setup-tab warming. The Screener's All / Bullish / Bearish direction tabs and
+      // their setup sub-tabs are the highest-traffic data surface, and each cold combo is the
+      // heaviest data-page query (several MATERIALIZED CTEs over the whole universe, ~5s cold vs
+      // ~76ms warm). The invalidation above flushes EVERY screener key, so without this the first
+      // visitor after each pipeline run pays the full cold cost on every tab — and concurrent
+      // tab-clicks stampede the pool. We warm the DEFAULT-filter combo for each tab (limit=50, no
+      // extra filters), mirroring exactly what ScreenerDirectionTabs sends, under the SAME
+      // screenerKey the controller reads. STOCK-only: the equity screener has no crypto rows, so a
+      // CRYPTO scope would just run ~19 empty heavy queries. Appended to `tasks` so they warm
+      // sequentially with the rest (no self-stampede) and each gets a heartbeat.
+      const screenerAssetType = assetType?.trim().toUpperCase() || undefined;
+      if (screenerAssetType !== 'CRYPTO') {
+        const screenerRegion = normalizeMarketRegion(region);
+        const directionCombos: Array<{ signalDirection?: string; setup?: string }> = [
+          {}, // "All" tab — no direction, no setup
+        ];
+        for (const direction of ['BULLISH', 'BEARISH'] as const) {
+          directionCombos.push({ signalDirection: direction }); // "All Bullish" / "All Bearish"
+          for (const def of SETUP_DEFS) {
+            if (def.group === direction) directionCombos.push({ signalDirection: direction, setup: def.code });
+          }
+        }
+        for (const combo of directionCombos) {
+          const opts = { region: screenerRegion, assetType: screenerAssetType, ...combo, limit: 50 };
+          tasks.push({
+            name: `screener:${combo.signalDirection ?? 'ALL'}${combo.setup ? `/${combo.setup}` : ''}`,
+            warm: async () => {
+              const result = await services.screenerService.screener(opts);
+              if (result && result.count > 0) {
+                await cacheService.setJson(screenerKey(opts), result);
+              } else {
+                await cacheService.delete(screenerKey(opts));
+              }
+            },
+          });
+        }
+      }
 
       const warnings: string[] = [];
       let succeeded = 0;

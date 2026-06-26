@@ -453,6 +453,7 @@ describe('pipeline-dag-contract — FIX 1 scope end-to-end', () => {
       marketDataService: makeMarketDataStub() as any,
       snapshotAssemblerService: snapshotAssemblerStub as any,
       convictionService: { conviction: jest.fn().mockResolvedValue({}) } as any,
+      screenerService: { screener: jest.fn().mockResolvedValue({ count: 0, results: [] }) } as any,
       cacheService: { isEnabled: () => false, setJson: jest.fn() } as any,
     };
 
@@ -497,6 +498,7 @@ describe('pipeline-dag-contract — FIX 1 scope end-to-end', () => {
       marketDataService: makeMarketDataStub() as any,
       snapshotAssemblerService: makeSnapshotAssemblerStub() as any,
       convictionService: { conviction: jest.fn().mockResolvedValue({}) } as any,
+      screenerService: { screener: jest.fn().mockResolvedValue({ count: 0, results: [] }) } as any,
       cacheService: { isEnabled: () => false, setJson: jest.fn() } as any,
     };
 
@@ -535,6 +537,7 @@ describe('pipeline-dag-contract — FIX 1 scope end-to-end', () => {
       marketDataService: makeMarketDataStub() as any,
       snapshotAssemblerService: snapshotAssemblerStub as any,
       convictionService: { conviction: jest.fn().mockResolvedValue({}) } as any,
+      screenerService: { screener: jest.fn().mockResolvedValue({ count: 0, results: [] }) } as any,
       cacheService: { isEnabled: () => false, setJson: jest.fn() } as any,
     };
 

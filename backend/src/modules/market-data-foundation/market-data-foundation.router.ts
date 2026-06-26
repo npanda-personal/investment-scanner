@@ -1,4 +1,5 @@
 import express from 'express';
+import { screenerRouteLimiter } from '../../shared/middleware';
 import { MarketDataFoundationController } from './market-data-foundation.controller';
 import { MarketDataFoundationCryptoBoardController } from './market-data-foundation.crypto-board.controller';
 import { MarketDataFoundationConvictionController } from './market-data-foundation.conviction.controller';
@@ -81,7 +82,7 @@ export const createMarketDataV1Router = (
   router.get('/market-data/scans/delivery-spike', controller.marketScanDeliverySpike);
   router.get('/market-data/scans/volume-spike', controller.marketScanVolumeSpike);
   router.get('/market-data/scans/potential-movers', potentialMoversController.marketScanPotentialMovers);
-  router.get('/market-data/screener', controller.screener);
+  router.get('/market-data/screener', screenerRouteLimiter, controller.screener);
   // Conviction tab: signal × smart-money confluence across 1W/1M/3M/6M (own controller — god-files are shrink-only).
   router.get('/market-data/screener/conviction', convictionController.conviction);
   // US "smart money": combined SEC Form 4 (insider) + 13F (institutional) panel for a symbol.
