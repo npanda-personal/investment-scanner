@@ -10,15 +10,26 @@ import {
   getEarningsRegionConfig,
   normalizeRegionCode,
 } from './earnings-intelligence.region-config';
+import { cacheService } from '../../cache/cache.service';
+import { earningsKey } from '../../cache/cache-keys';
 
 export class EarningsIntelligenceController {
   constructor(private readonly service = new EarningsIntelligenceService()) {}
 
   latest = async (req: Request, res: Response) => {
     try {
+      // no-store is a BROWSER directive (always re-fetch from us); the server-side Redis
+      // page-cache below is what offloads Postgres under concurrent loads. Low-cardinality
+      // key (region × assetType × limit × category); CACHE_WARM prefix-invalidates on refresh.
       res.setHeader('Cache-Control', 'no-store');
       const query = parseEarningsIntelligenceQuery(req.query as Record<string, unknown>);
-      return res.json(await this.service.latest(query));
+      const result = await cacheService.cacheReadThrough(
+        earningsKey({ region: query.region, assetType: query.assetType, limit: query.limit, category: query.category }),
+        () => this.service.latest(query),
+        undefined,
+        (value) => value != null && value.freshness !== 'NO_SNAPSHOT', // don't pin the pre-pipeline empty envelope
+      );
+      return res.json(result);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to load earnings intelligence snapshot';
       return res.status(400).json({ error: message });

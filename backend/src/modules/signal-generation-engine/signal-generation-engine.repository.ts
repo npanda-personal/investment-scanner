@@ -179,6 +179,79 @@ export class SignalGenerationEngineRepository {
     return results.slice(offset, offset + query.limit);
   }
 
+  /**
+   * Scores-only projection of the same cohort universe `latestSignalUniverse` serves.
+   * Selects ONLY the `score` column (vs full-row fetch) so `withRsPercentiles` avoids
+   * deserialising ~800 heavy rows + JSON arrays just to extract one number per row.
+   *
+   * Mirrors the exact trusted + latest-generatedDate filter:
+   *  - Fast path: `latestGeneratedDateFor` → `findMany({ select: { score, signalReadinessStatus } })`
+   *    then trusted-predicate applied in-memory (same as `trustedRowsForLatestDate`).
+   *  - Slow path: falls back to the full latestFilteredSignals DTO fetch (graceful degradation).
+   */
+  async latestSignalUniverseScores(scope: { region?: string; assetType?: string }): Promise<number[]> {
+    const query = { region: scope.region, assetType: scope.assetType, limit: 100000, offset: 0 } as SignalQuery;
+    if (!this.canUseLatestGeneratedDateFastPath(query)) {
+      // Slow-path fallback: reuse existing full-DTO fetch (no new code path needed).
+      const rows = await this.latestFilteredSignals(query);
+      return rows.map((r) => (typeof r.score === 'number' ? r.score : 0));
+    }
+    if (typeof this.db.signalResult.findFirst !== 'function' || typeof this.db.signalResult.findMany !== 'function') {
+      const rows = await this.latestFilteredSignals(query);
+      return rows.map((r) => (typeof r.score === 'number' ? r.score : 0));
+    }
+
+    const generatedDate = await this.latestGeneratedDateFor(query);
+    if (!generatedDate) return [];
+
+    const where = {
+      ...this.buildWhere(query as SignalQuery & SignalFunnelDiagnosticsQuery),
+      generatedDate,
+    };
+
+    // Select only the columns the trusted predicate + dedup + score extraction need.
+    // `isTrustedReadSignal` evaluates: auditStatus (derived from rulesetVersion +
+    // scoringInputSummary + dataQualityEligibilitySnapshot), dataQualityEligibility.filterApplied,
+    // dataQualityEligibility.eligible, and dataQualityEligibility.signalReadinessStatus.
+    // All come from `dataQualityEligibilitySnapshot` (JSON) and three presence columns.
+    // `instrumentId` and `modelVersion` are required by dedupeTrustedRows so same-date v3+v4
+    // rows for the same instrument collapse to one entry (the v4 row), matching the full path.
+    const rows = await this.db.signalResult.findMany({
+      where,
+      select: {
+        instrumentId: true,
+        modelVersion: true,
+        score: true,
+        rulesetVersion: true,
+        scoringInputSummary: true,
+        dataQualityEligibilitySnapshot: true,
+      },
+    });
+
+    // Apply the same trusted predicate used by trustedRowsForLatestDate, but without
+    // building full DTOs.  Mirror signalRecordToDto's two fields that isTrustedReadSignal
+    // inspects: auditStatus (presence check) and dataQualityEligibility (the JSON blob).
+    const TRUSTED_READINESS = new Set(['READY', 'LIMITED']);
+    const trusted = rows.filter((r: any) => {
+      const auditStatus = r.rulesetVersion && r.scoringInputSummary && r.dataQualityEligibilitySnapshot
+        ? 'CURRENT'
+        : 'LEGACY_MISSING';
+      if (auditStatus !== 'CURRENT') return false;
+      const dq = r.dataQualityEligibilitySnapshot as any;
+      return dq?.filterApplied === true
+        && dq.eligible === true
+        && TRUSTED_READINESS.has(dq.signalReadinessStatus ?? '');
+    });
+
+    // Deduplicate: one row per instrumentId, preferring the active model version (v4).
+    // Mirrors dedupeTrustedRows() exactly — slim rows carry `instrumentId` + `modelVersion`
+    // so the same preference logic applies without building full DTOs.
+    // Shape adapter: dedupeTrustedRows keys on `instrument_id`; map then restore.
+    const slimForDedup = trusted.map((r: any) => ({ ...r, instrument_id: r.instrumentId }));
+    const deduped = dedupeTrustedRows(slimForDedup);
+    return deduped.map((r: any) => (typeof r.score === 'number' ? r.score : 0));
+  }
+
   async latestSignalUniverseCount(query: Omit<SignalQuery, 'limit'>): Promise<number> {
     const fastCount = await this.latestSignalUniverseCountFromLatestGeneratedDate(query);
     if (fastCount !== null) return fastCount;

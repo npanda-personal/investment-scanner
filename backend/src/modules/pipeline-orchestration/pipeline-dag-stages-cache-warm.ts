@@ -32,6 +32,8 @@ import {
   screenerKeyPrefix,
   marketMoversKeyPrefix,
   signalsTopKeyPrefix,
+  smartMoneySectorsKeyPrefix,
+  earningsKeyPrefix,
 } from '../../cache/cache-keys';
 import type { PipelineStageAdapter, StageContext, StageResult } from './pipeline-dag.types';
 
@@ -71,6 +73,10 @@ export function createCacheWarmAdapter(services: CacheWarmStageServices): Pipeli
       ctx.log(`[cache] invalidated ${moversDeleted} movers cache keys`);
       const signalsTopDeleted = await cacheService.deleteByPrefix(signalsTopKeyPrefix);
       ctx.log(`[cache] invalidated ${signalsTopDeleted} signals-top cache keys`);
+      const smartMoneyDeleted = await cacheService.deleteByPrefix(smartMoneySectorsKeyPrefix);
+      ctx.log(`[cache] invalidated ${smartMoneyDeleted} smart-money-sectors cache keys`);
+      const earningsDeleted = await cacheService.deleteByPrefix(earningsKeyPrefix);
+      ctx.log(`[cache] invalidated ${earningsDeleted} earnings cache keys`);
 
       // Each task mirrors EXACTLY what the matching controller passes to its service + key-builder,
       // so the warmed key equals the key the FE will look up. Reusing parseStockInterestScope /

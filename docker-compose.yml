@@ -17,12 +17,14 @@ services:
       - -c
       - work_mem=1MB
       - -c
-      # Each Prisma client (backend server + every standalone script) opens a
-      # connection_limit=10 pool. At max_connections=20 the ceiling fit only the
-      # backend + ONE script, so a single concurrent (or leaked) script saturated
-      # the pool ("too many clients") and starved the pipeline. 50 leaves room for
-      # the backend pool + ~4 concurrent scripts, still within the 1536m mem_limit.
-      - max_connections=50
+      # Each Prisma client (backend server + every standalone script) opens a pool.
+      # The backend pool was raised to connection_limit=20 (was 10) so concurrent FE
+      # page loads — which all share that ONE backend pool — get 20 in-flight DB ops
+      # instead of 10 before queueing (the "survive concurrency" fix). max_connections
+      # must therefore exceed backend(20) + script pools(10 each): 100 fits backend +
+      # ~8 concurrent scripts. We stop at 100 (not 150) for mem safety on the 1536m
+      # container — each PG connection carries a few MB of baseline overhead.
+      - max_connections=100
     environment:
       POSTGRES_DB: investment_scanner
       POSTGRES_USER: scanner
