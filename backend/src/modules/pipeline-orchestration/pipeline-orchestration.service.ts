@@ -216,6 +216,7 @@ export class PipelineOrchestrationService {
         workbenchRefreshService: this.workbenchRefreshService,
         snapshotAssemblerService: this.snapshotAssemblerService,
         convictionService: this.convictionService,
+        screenerService: this.marketDataService,
         cacheService: this.cacheService,
       });
       const alertFn = (summary: DagAlertSummary): void => {

@@ -59,7 +59,22 @@ export const createInFlightLimiter = ({ name, maxInFlight }: InFlightLimiterOpti
  * cheap/fast endpoints, so they never queue behind a heavy-route storm.
  */
 const HEAVY_ROUTE_MAX_IN_FLIGHT = 12;
-export const heavyDataRouteLimiter = createInFlightLimiter({
+export const heavyDataRouteLimiter: RequestHandler = createInFlightLimiter({
   name: 'heavy-data-routes',
   maxInFlight: HEAVY_ROUTE_MAX_IN_FLIGHT,
+});
+
+/**
+ * Dedicated limiter for the multi-factor Screener. Its query is the heaviest data-page read
+ * (several MATERIALIZED CTEs over the whole ~2,900-stock universe; ~5s cold vs ~76ms warm), so
+ * a handful run concurrently is enough to collapse them into each other (8-at-once measured at
+ * ~35s each). It gets a SEPARATE, much smaller cap than the shared heavy-route limiter so a
+ * screener storm can't fill 12 slots and stampede the pool. Note: a single user clicking through
+ * tabs never holds more than one open socket (the FE aborts the prior request), so this cap only
+ * trips under genuinely concurrent callers — it does not 503 normal single-user tab-switching.
+ */
+const SCREENER_ROUTE_MAX_IN_FLIGHT = 6;
+export const screenerRouteLimiter: RequestHandler = createInFlightLimiter({
+  name: 'screener-route',
+  maxInFlight: SCREENER_ROUTE_MAX_IN_FLIGHT,
 });
