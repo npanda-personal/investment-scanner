@@ -256,14 +256,17 @@ function spanDays(start?: string, end?: string): number | null {
 }
 
 /**
- * Annual (fiscal-year) series for the first matching concept, most-recent-first.
+ * Annual (fiscal-year) series MERGED across all listed concepts, most-recent-first.
  *
  * Keeps only genuine full-year facts: `fp='FY'`, an annual-report form
  * (10-K/20-F/40-F), and a ~365-day duration (350..380, guarding against
- * mis-tagged year-to-date entries).  Restatements are de-duplicated by fiscal
- * year-end (`end`), preferring the LATEST `filed` value.  Mirrors `latestFact`'s
- * concept-fallback (first concept that yields any annual data wins) so revenue /
- * net-income / EPS each resolve their best available tag.
+ * mis-tagged year-to-date entries).  Facts from every listed concept are merged
+ * by fiscal year-end (`end`) so a company that switched XBRL tags mid-history
+ * (e.g. revenue moving between `Revenues`, `SalesRevenueNet` and
+ * `RevenueFromContractWithCustomerExcludingAssessedTax`) yields one CONTINUOUS
+ * series instead of only the first non-empty tag's years.  Collision tie-breaks:
+ * an earlier (higher-priority) concept owns a shared year-end; within a single
+ * concept the LATEST `filed` wins (restatement).
  *
  * Pure — no I/O.  Returns [] when no annual facts are present (graceful: the
  * caller simply writes no ANNUAL rows for that stock).
@@ -275,29 +278,28 @@ export function annualSeries(
   group: 'usGaap' | 'dei' = 'usGaap',
 ): AnnualFact[] {
   const source = facts[group];
-  for (const concept of concepts) {
+  const byEnd = new Map<string, { end: string; val: number; fy?: number; filed?: string; rank: number }>();
+  concepts.forEach((concept, rank) => {
     const points = source[concept]?.[unit];
-    if (!points || !points.length) continue;
-    const byEnd = new Map<string, { end: string; val: number; fy?: number; filed?: string }>();
+    if (!points || !points.length) return;
     for (const p of points) {
       if (p.fp !== 'FY' || !isAnnualForm(p.form) || !p.end) continue;
       const days = spanDays(p.start, p.end);
       if (days === null || days < 350 || days > 380) continue;
       const prev = byEnd.get(p.end);
-      // Prefer the latest filing for a given fiscal year-end (restatement wins).
-      if (!prev || (p.filed ?? '') > (prev.filed ?? '')) {
-        byEnd.set(p.end, { end: p.end, val: p.val, fy: p.fy, filed: p.filed });
+      if (!prev) {
+        byEnd.set(p.end, { end: p.end, val: p.val, fy: p.fy, filed: p.filed, rank });
+        continue;
+      }
+      // A higher-priority (earlier-listed) concept already owns this year-end — keep it.
+      if (prev.rank < rank) continue;
+      // Same concept, later restatement — prefer the latest `filed`.
+      if (prev.rank === rank && (p.filed ?? '') > (prev.filed ?? '')) {
+        byEnd.set(p.end, { end: p.end, val: p.val, fy: p.fy, filed: p.filed, rank });
       }
     }
-    if (byEnd.size) {
-      // First concept that yields annual data wins (no cross-concept merge): a company
-      // that switched revenue XBRL tags mid-history gets only one tag's years, so the
-      // series can be gapped. Downstream skips null-revenue years gracefully (margin/
-      // revenue vote omitted, EPS unaffected). Cross-tag merge is a tracked follow-up.
-      return [...byEnd.values()]
-        .sort((a, b) => (a.end < b.end ? 1 : -1))
-        .map(({ end, val, fy }) => ({ end, val, fy }));
-    }
-  }
-  return [];
+  });
+  return [...byEnd.values()]
+    .sort((a, b) => (a.end < b.end ? 1 : -1))
+    .map(({ end, val, fy }) => ({ end, val, fy }));
 }
