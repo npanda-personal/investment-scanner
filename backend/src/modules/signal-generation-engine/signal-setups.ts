@@ -7,12 +7,17 @@
  * which the screener repository already imports directly rather than via the engine barrel).
  *
  * Two kinds of setup:
- *   EVIDENCE — matches exact factor codes from a `signal_results` JSON column. Codes are
+ *   EVIDENCE — matches factor codes from a `signal_results` JSON column. Codes are
  *     polarity-specific. Positive evidence (bullish factor confirmations) lives in
  *     `triggeredSignals`; negative evidence (bearish / overextension factors) lives in the
  *     SEPARATE `negativeSignals` column. `evidenceSource` selects which column to read — this
  *     split is load-bearing: without it every bearish / overextended tab is permanently empty,
  *     because no bearish code is ever written into `triggeredSignals`.
+ *     An EVIDENCE setup matches EITHER by a flat OR list (`factorCodes`, single-concept setups)
+ *     OR by `factorGroups` (composite setups: require ≥1 code from EACH group — AND across groups,
+ *     OR within). `factorGroups` exists because flat OR lists let broad setups (e.g. Trend
+ *     Momentum) collapse into "every name in this direction" once they include a near-universal
+ *     base-state code like `PRICE_ABOVE_SMA50`; the AND-of-groups form forces a real subset.
  *   FIELD — matches a joined per-instrument / per-sector context value (smart-money status,
  *     sector-leadership status) that is NOT part of the factor JSON.
  *
@@ -32,8 +37,18 @@ export interface SetupDef {
   kind: SetupKind;
   /** EVIDENCE only: which `signal_results` JSON column carries these codes. */
   evidenceSource?: EvidenceSource;
-  /** EVIDENCE only: exact factor codes; a row matches the setup if ANY is present. */
+  /**
+   * EVIDENCE single-concept setups: exact factor codes; a row matches if ANY is present
+   * (OR-of-codes). Mutually exclusive with `factorGroups`.
+   */
   factorCodes?: string[];
+  /**
+   * EVIDENCE composite setups: require AT LEAST ONE code from EACH group (AND across groups,
+   * OR within a group). Keeps broad setups from collapsing into the whole direction — e.g.
+   * Trend Momentum demands a trend-structure code AND a momentum code, not the near-universal
+   * `PRICE_ABOVE_SMA50` alone. Mutually exclusive with `factorCodes`.
+   */
+  factorGroups?: string[][];
   /** FIELD only: the joined context column + the values that satisfy the setup. */
   field?: { name: SetupFieldName; values: string[] };
 }
@@ -41,8 +56,14 @@ export interface SetupDef {
 export const SETUP_DEFS: readonly SetupDef[] = [
   // --- Bullish: positive evidence (triggeredSignals) ---
   {
+    // Composite: an uptrend that is ALSO accelerating. Flat OR over these codes made this tab
+    // ~the entire bullish list (`PRICE_ABOVE_SMA50` alone hits ~all bullish names); the AND of
+    // [trend structure] × [momentum] narrows it to genuine momentum leaders.
     code: 'TREND_MOMENTUM', label: 'Trend Momentum', group: 'BULLISH', kind: 'EVIDENCE', evidenceSource: 'POSITIVE',
-    factorCodes: ['PRICE_ABOVE_SMA50', 'SMA50_ABOVE_SMA200', 'ONE_MONTH_MOMENTUM', 'THREE_MONTH_MOMENTUM', 'SIX_MONTH_ACCELERATION', 'MACD_BULLISH_CROSS'],
+    factorGroups: [
+      ['PRICE_ABOVE_SMA50', 'SMA50_ABOVE_SMA200'],
+      ['ONE_MONTH_MOMENTUM', 'THREE_MONTH_MOMENTUM', 'SIX_MONTH_ACCELERATION', 'MACD_BULLISH_CROSS'],
+    ],
   },
   {
     code: 'BREAKOUT', label: 'Breakout', group: 'BULLISH', kind: 'EVIDENCE', evidenceSource: 'POSITIVE',
@@ -57,8 +78,15 @@ export const SETUP_DEFS: readonly SetupDef[] = [
     factorCodes: ['OUTPERFORMING_PEERS'],
   },
   {
-    code: 'QUALITY_VALUE', label: 'Quality / Value / Growth', group: 'BULLISH', kind: 'EVIDENCE', evidenceSource: 'POSITIVE',
-    factorCodes: ['POSITIVE_EPS', 'HEALTHY_NET_MARGIN', 'PE_BELOW_PEERS', 'PE_BELOW_OWN_HISTORY', 'YIELD_ABOVE_PEERS', 'REVENUE_GROWTH_YOY', 'EPS_GROWTH_YOY', 'MARGIN_EXPANSION_YOY'],
+    // Margin/valuation quality. Drops the near-universal `POSITIVE_EPS` (any profitable co.) and
+    // `YIELD_ABOVE_PEERS` (a dividend artifact, not a quality differentiator) that made the old
+    // omnibus "Quality / Value / Growth" tab match ~all bullish names. Growth split out below.
+    code: 'QUALITY', label: 'Quality', group: 'BULLISH', kind: 'EVIDENCE', evidenceSource: 'POSITIVE',
+    factorCodes: ['HEALTHY_NET_MARGIN', 'PE_BELOW_PEERS', 'PE_BELOW_OWN_HISTORY'],
+  },
+  {
+    code: 'GROWTH', label: 'Growth', group: 'BULLISH', kind: 'EVIDENCE', evidenceSource: 'POSITIVE',
+    factorCodes: ['REVENUE_GROWTH_YOY', 'EPS_GROWTH_YOY', 'MARGIN_EXPANSION_YOY'],
   },
   // --- Bullish: negative evidence (negativeSignals) — a caution lens on a long bias ---
   {
@@ -76,8 +104,13 @@ export const SETUP_DEFS: readonly SetupDef[] = [
   },
   // --- Bearish: negative evidence (negativeSignals) ---
   {
+    // Composite mirror of TREND_MOMENTUM: a downtrend that is ALSO losing momentum (the
+    // near-universal `PRICE_BELOW_SMA50` no longer matches on its own).
     code: 'TREND_BEARISH', label: 'Trend Bearish', group: 'BEARISH', kind: 'EVIDENCE', evidenceSource: 'NEGATIVE',
-    factorCodes: ['PRICE_BELOW_SMA50', 'SMA50_BELOW_SMA200', 'MACD_BEARISH_CROSS', 'ONE_MONTH_MOMENTUM_NEGATIVE', 'THREE_MONTH_MOMENTUM_NEGATIVE'],
+    factorGroups: [
+      ['PRICE_BELOW_SMA50', 'SMA50_BELOW_SMA200', 'MACD_BEARISH_CROSS'],
+      ['ONE_MONTH_MOMENTUM_NEGATIVE', 'THREE_MONTH_MOMENTUM_NEGATIVE'],
+    ],
   },
   {
     code: 'BREAKDOWN', label: 'Breakdown', group: 'BEARISH', kind: 'EVIDENCE', evidenceSource: 'NEGATIVE',
@@ -92,8 +125,14 @@ export const SETUP_DEFS: readonly SetupDef[] = [
     factorCodes: ['UNDERPERFORMING_PEERS'],
   },
   {
+    // Profitability/valuation weakness. Earnings-trend decline split out into EARNINGS_DECLINE
+    // below (mirrors the bullish Quality / Growth split).
     code: 'WEAK_FUNDAMENTALS', label: 'Weak Fundamentals', group: 'BEARISH', kind: 'EVIDENCE', evidenceSource: 'NEGATIVE',
-    factorCodes: ['NEGATIVE_EPS', 'NEGATIVE_NET_MARGIN', 'PE_ABOVE_OWN_HISTORY', 'REVENUE_DECLINE_YOY', 'EPS_DECLINE_YOY', 'MARGIN_CONTRACTION_YOY'],
+    factorCodes: ['NEGATIVE_EPS', 'NEGATIVE_NET_MARGIN', 'PE_ABOVE_OWN_HISTORY'],
+  },
+  {
+    code: 'EARNINGS_DECLINE', label: 'Earnings Decline', group: 'BEARISH', kind: 'EVIDENCE', evidenceSource: 'NEGATIVE',
+    factorCodes: ['REVENUE_DECLINE_YOY', 'EPS_DECLINE_YOY', 'MARGIN_CONTRACTION_YOY'],
   },
   {
     code: 'SMART_MONEY_DISTRIBUTION', label: 'Smart-Money Distribution', group: 'BEARISH', kind: 'FIELD',
@@ -127,9 +166,15 @@ export function classifyRowSetups(input: SetupClassificationInput): string[] {
   const neg = new Set(input.negativeCodes);
   const matched: string[] = [];
   for (const def of SETUP_DEFS) {
-    if (def.kind === 'EVIDENCE' && def.factorCodes) {
+    if (def.kind === 'EVIDENCE' && (def.factorCodes || def.factorGroups)) {
       const codes = def.evidenceSource === 'NEGATIVE' ? neg : pos;
-      if (def.factorCodes.some((c) => codes.has(c))) matched.push(def.code);
+      // Composite setups (factorGroups): require ≥1 code from EACH group. Single-concept setups
+      // (factorCodes): require ANY code. The same SETUP_DEFS authority drives both the per-row
+      // chip here and the SQL tab filter, so they can never diverge.
+      const isMatch = def.factorGroups
+        ? def.factorGroups.every((g) => g.some((c) => codes.has(c)))
+        : def.factorCodes!.some((c) => codes.has(c));
+      if (isMatch) matched.push(def.code);
     } else if (def.kind === 'FIELD' && def.field) {
       const value = def.field.name === 'smartMoney' ? input.smartMoneyStatus : input.sectorLeadershipStatus;
       if (value != null && def.field.values.includes(value)) matched.push(def.code);

@@ -1497,12 +1497,12 @@ export interface CorporateActionsResponse {
 export type ScreenerCapBand = 'LARGE' | 'MID' | 'SMALL';
 export type ScreenerSignalDirection = 'BULLISH' | 'BEARISH' | 'NEUTRAL';
 
-/** Trade-setup tab codes — mirror of backend signal-setups.ts SETUP_DEFS (8 bullish, 6 bearish). */
+/** Trade-setup tab codes — mirror of backend signal-setups.ts SETUP_DEFS (9 bullish, 7 bearish). */
 export type ScreenerSetup =
-  | 'TREND_MOMENTUM' | 'BREAKOUT' | 'PULLBACK' | 'RELATIVE_STRENGTH' | 'QUALITY_VALUE'
+  | 'TREND_MOMENTUM' | 'BREAKOUT' | 'PULLBACK' | 'RELATIVE_STRENGTH' | 'QUALITY' | 'GROWTH'
   | 'OVEREXTENDED' | 'SMART_MONEY_ACCUMULATION' | 'SECTOR_LEADERSHIP'
   | 'TREND_BEARISH' | 'BREAKDOWN' | 'OVERBOUGHT_REVERSAL' | 'RELATIVE_WEAKNESS'
-  | 'WEAK_FUNDAMENTALS' | 'SMART_MONEY_DISTRIBUTION';
+  | 'WEAK_FUNDAMENTALS' | 'EARNINGS_DECLINE' | 'SMART_MONEY_DISTRIBUTION';
 
 export interface ScreenerFilters {
   signalDirection?: ScreenerSignalDirection;
