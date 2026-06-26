@@ -8,6 +8,7 @@
  */
 import {
   yoyComparable,
+  latestFiscalRecord,
   fundamentalGrowthVotes,
   fundamentalMarginTrendVotes,
   fundamentalPeHistoryVotes,
@@ -90,8 +91,8 @@ describe('fundamentalGrowthVotes — revenue/EPS YoY thresholds', () => {
   };
 
   it('fires REVENUE_GROWTH_YOY at ≥+10% and EPS_GROWTH_YOY at ≥+15%', () => {
-    const { latest, records } = yoyPair({ revenue: 110, eps: 1.2 }, { revenue: 100, eps: 1.0 });
-    const { signals, negativeSignals } = fundamentalGrowthVotes(latest, records);
+    const { records } = yoyPair({ revenue: 110, eps: 1.2 }, { revenue: 100, eps: 1.0 });
+    const { signals, negativeSignals } = fundamentalGrowthVotes(records);
     expect(signals.map((s) => s.code)).toEqual(expect.arrayContaining(['REVENUE_GROWTH_YOY', 'EPS_GROWTH_YOY']));
     expect(negativeSignals).toHaveLength(0);
     expect(signals.find((s) => s.code === 'REVENUE_GROWTH_YOY')?.label).toContain('10.0%');
@@ -99,8 +100,8 @@ describe('fundamentalGrowthVotes — revenue/EPS YoY thresholds', () => {
   });
 
   it('fires REVENUE_DECLINE_YOY at ≤−10% and EPS_DECLINE_YOY at ≤−20%', () => {
-    const { latest, records } = yoyPair({ revenue: 90, eps: 0.75 }, { revenue: 100, eps: 1.0 });
-    const { signals, negativeSignals } = fundamentalGrowthVotes(latest, records);
+    const { records } = yoyPair({ revenue: 90, eps: 0.75 }, { revenue: 100, eps: 1.0 });
+    const { signals, negativeSignals } = fundamentalGrowthVotes(records);
     expect(signals).toHaveLength(0);
     expect(negativeSignals.map((s) => s.code)).toEqual(
       expect.arrayContaining(['REVENUE_DECLINE_YOY', 'EPS_DECLINE_YOY']),
@@ -108,30 +109,30 @@ describe('fundamentalGrowthVotes — revenue/EPS YoY thresholds', () => {
   });
 
   it('stays silent in the neutral band (small +/- moves)', () => {
-    const { latest, records } = yoyPair({ revenue: 105, eps: 1.05 }, { revenue: 100, eps: 1.0 });
-    const { signals, negativeSignals } = fundamentalGrowthVotes(latest, records);
+    const { records } = yoyPair({ revenue: 105, eps: 1.05 }, { revenue: 100, eps: 1.0 });
+    const { signals, negativeSignals } = fundamentalGrowthVotes(records);
     expect(signals).toHaveLength(0);
     expect(negativeSignals).toHaveLength(0);
   });
 
   it('skips EPS growth when prior EPS ≤ 0 (ratio is sign-meaningless) but still votes revenue', () => {
-    const { latest, records } = yoyPair({ revenue: 130, eps: 2.0 }, { revenue: 100, eps: -0.5 });
-    const { signals, negativeSignals } = fundamentalGrowthVotes(latest, records);
+    const { records } = yoyPair({ revenue: 130, eps: 2.0 }, { revenue: 100, eps: -0.5 });
+    const { signals, negativeSignals } = fundamentalGrowthVotes(records);
     expect(signals.map((s) => s.code)).toContain('REVENUE_GROWTH_YOY');
     expect(signals.some((s) => s.code.startsWith('EPS'))).toBe(false);
     expect(negativeSignals.some((s) => s.code.startsWith('EPS'))).toBe(false);
   });
 
   it('handles missing revenue/eps gracefully (skips the missing metric)', () => {
-    const { latest, records } = yoyPair({ revenue: 130, eps: null }, { revenue: 100, eps: 1.0 });
-    const { signals } = fundamentalGrowthVotes(latest, records);
+    const { records } = yoyPair({ revenue: 130, eps: null }, { revenue: 100, eps: 1.0 });
+    const { signals } = fundamentalGrowthVotes(records);
     expect(signals.map((s) => s.code)).toEqual(['REVENUE_GROWTH_YOY']);
   });
 
   it('returns no votes when there is no YoY comparable in the window', () => {
     const latest = rec('QUARTERLY', 0, { revenue: 200, eps: 5 });
     const records = [latest, rec('QUARTERLY', 91, { revenue: 100, eps: 1 })]; // only prior quarter
-    const { signals, negativeSignals } = fundamentalGrowthVotes(latest, records);
+    const { signals, negativeSignals } = fundamentalGrowthVotes(records);
     expect(signals).toHaveLength(0);
     expect(negativeSignals).toHaveLength(0);
   });
@@ -145,11 +146,11 @@ describe('fundamentalMarginTrendVotes — net margin expansion/contraction YoY',
   };
 
   it('fires MARGIN_EXPANSION_YOY when margin expands ≥3pp', () => {
-    const { latest, records } = marginPair(
+    const { records } = marginPair(
       { revenue: 100, net_income: 15 },
       { revenue: 100, net_income: 10 },
     );
-    const { signals, negativeSignals } = fundamentalMarginTrendVotes(latest, records);
+    const { signals, negativeSignals } = fundamentalMarginTrendVotes(records);
     expect(signals).toHaveLength(1);
     expect(signals[0].code).toBe('MARGIN_EXPANSION_YOY');
     expect(signals[0].label).toContain('5.0pp');
@@ -158,42 +159,42 @@ describe('fundamentalMarginTrendVotes — net margin expansion/contraction YoY',
   });
 
   it('fires MARGIN_CONTRACTION_YOY when margin contracts ≥3pp', () => {
-    const { latest, records } = marginPair(
+    const { records } = marginPair(
       { revenue: 100, net_income: 5 },
       { revenue: 100, net_income: 12 },
     );
-    const { signals, negativeSignals } = fundamentalMarginTrendVotes(latest, records);
+    const { signals, negativeSignals } = fundamentalMarginTrendVotes(records);
     expect(signals).toHaveLength(0);
     expect(negativeSignals).toHaveLength(1);
     expect(negativeSignals[0].code).toBe('MARGIN_CONTRACTION_YOY');
   });
 
   it('stays silent in the neutral band (<3pp change)', () => {
-    const { latest, records } = marginPair(
+    const { records } = marginPair(
       { revenue: 100, net_income: 11 },
       { revenue: 100, net_income: 10 },
     );
-    const { signals, negativeSignals } = fundamentalMarginTrendVotes(latest, records);
+    const { signals, negativeSignals } = fundamentalMarginTrendVotes(records);
     expect(signals).toHaveLength(0);
     expect(negativeSignals).toHaveLength(0);
   });
 
   it('skips when revenue is zero or negative', () => {
-    const { latest, records } = marginPair(
+    const { records } = marginPair(
       { revenue: 0, net_income: 5 },
       { revenue: 100, net_income: 10 },
     );
-    const { signals, negativeSignals } = fundamentalMarginTrendVotes(latest, records);
+    const { signals, negativeSignals } = fundamentalMarginTrendVotes(records);
     expect(signals).toHaveLength(0);
     expect(negativeSignals).toHaveLength(0);
   });
 
   it('skips when net_income is null on either side', () => {
-    const { latest, records } = marginPair(
+    const { records } = marginPair(
       { revenue: 100, net_income: null },
       { revenue: 100, net_income: 10 },
     );
-    const { signals, negativeSignals } = fundamentalMarginTrendVotes(latest, records);
+    const { signals, negativeSignals } = fundamentalMarginTrendVotes(records);
     expect(signals).toHaveLength(0);
     expect(negativeSignals).toHaveLength(0);
   });
@@ -288,5 +289,72 @@ describe('fundamentalPeHistoryVotes — PE vs own historical median', () => {
     const { signals, negativeSignals } = fundamentalPeHistoryVotes(latest, records);
     expect(signals).toHaveLength(0);
     expect(negativeSignals).toHaveLength(0);
+  });
+});
+
+/**
+ * Regression coverage for the US fix: US/EU fundamentals carry a TTM snapshot dated
+ * ~today as the newest record, with ANNUAL fiscal history behind it. The YoY votes
+ * MUST anchor on the latest ANNUAL (fiscal) record and ignore the shadowing TTM,
+ * otherwise the GROWTH setup tab can never populate for those regions.
+ */
+describe('fiscal-only YoY anchoring (US/EU TTM-shadowing regression)', () => {
+  // Mixed-period record builder including TTM (the US/EU runtime shape).
+  const mrec = (
+    period_type: 'TTM' | 'ANNUAL' | 'QUARTERLY',
+    daysBeforeAnchor: number,
+    fields: { revenue?: number | null; eps?: number | null; net_income?: number | null } = {},
+  ) => ({
+    period_type,
+    period_end_date: daysAgo(daysBeforeAnchor).toISOString(),
+    revenue: fields.revenue ?? null,
+    eps: fields.eps ?? null,
+    net_income: fields.net_income ?? null,
+    pe_ratio: null,
+  });
+
+  it('latestFiscalRecord ignores TTM and returns the newest ANNUAL record', () => {
+    const ttm = mrec('TTM', 0, { revenue: 999 });
+    const fy2025 = mrec('ANNUAL', 30, { revenue: 130 });
+    const fy2024 = mrec('ANNUAL', 395, { revenue: 100 });
+    const records = [ttm, fy2025, fy2024]; // DESC by date, TTM newest
+    expect(latestFiscalRecord(records)).toBe(fy2025);
+  });
+
+  it('latestFiscalRecord returns null when only TTM snapshots exist (pre-backfill US/EU)', () => {
+    expect(latestFiscalRecord([mrec('TTM', 0, { revenue: 500 })])).toBeNull();
+  });
+
+  it('fires REVENUE_GROWTH_YOY off ANNUAL history even when a TTM row is the newest record', () => {
+    const records = [
+      mrec('TTM', 0, { revenue: 9999, eps: 99 }), // shadowing TTM dated today — must be ignored
+      mrec('ANNUAL', 30, { revenue: 130, eps: 1.4 }),
+      mrec('ANNUAL', 395, { revenue: 100, eps: 1.0 }), // YoY comparable (~365d before the FY anchor)
+    ];
+    const { signals, negativeSignals } = fundamentalGrowthVotes(records);
+    expect(signals.map((s) => s.code)).toEqual(
+      expect.arrayContaining(['REVENUE_GROWTH_YOY', 'EPS_GROWTH_YOY']),
+    );
+    expect(negativeSignals).toHaveLength(0);
+  });
+
+  it('fires MARGIN_EXPANSION_YOY off ANNUAL history despite a shadowing TTM row', () => {
+    const records = [
+      mrec('TTM', 0, { revenue: 9999, net_income: 9999 }), // ignored
+      mrec('ANNUAL', 30, { revenue: 100, net_income: 15 }),
+      mrec('ANNUAL', 395, { revenue: 100, net_income: 10 }),
+    ];
+    const { signals } = fundamentalMarginTrendVotes(records);
+    expect(signals.map((s) => s.code)).toContain('MARGIN_EXPANSION_YOY');
+  });
+
+  it('stays silent for TTM-only stocks (US/EU before ANNUAL backfill, EU permanently)', () => {
+    const records = [
+      mrec('TTM', 0, { revenue: 130, eps: 1.4, net_income: 20 }),
+      mrec('TTM', 365, { revenue: 100, eps: 1.0, net_income: 10 }), // same rolling window, not a fiscal YoY pair
+    ];
+    expect(fundamentalGrowthVotes(records).signals).toHaveLength(0);
+    expect(fundamentalGrowthVotes(records).negativeSignals).toHaveLength(0);
+    expect(fundamentalMarginTrendVotes(records).signals).toHaveLength(0);
   });
 });

@@ -5,6 +5,7 @@ import {
   fetchSubmission,
   fetchCompanyFacts,
   latestFact,
+  annualSeries,
 } from './market-data-foundation.sec-edgar-client';
 import type { CoreFundamentals } from '../../market-data-foundation.types';
 
@@ -50,8 +51,13 @@ export interface UsFundamentalsSummary {
   updated: number;
   noCik: number;
   noFacts: number;
+  /** Total ANNUAL fiscal-year Fundamental rows written across all stocks. */
+  annualPeriods: number;
   warnings: string[];
 }
+
+/** How many most-recent fiscal years of ANNUAL history to persist per stock. */
+const MAX_ANNUAL_YEARS = 6;
 
 export class SecCompanyFactsService {
   constructor(private readonly repo = new MarketDataFoundationRepository()) {}
@@ -72,7 +78,7 @@ export class SecCompanyFactsService {
 
   /** Ingest SEC fundamentals for the given US symbols (or all priced US stocks). */
   async ingestForSymbols(options: { symbols?: string[]; limit?: number } = {}): Promise<UsFundamentalsSummary> {
-    const summary: UsFundamentalsSummary = { source: 'SEC_EDGAR', processed: 0, updated: 0, noCik: 0, noFacts: 0, warnings: [] };
+    const summary: UsFundamentalsSummary = { source: 'SEC_EDGAR', processed: 0, updated: 0, noCik: 0, noFacts: 0, annualPeriods: 0, warnings: [] };
     const cikMap = await loadTickerCikMap();
 
     let stocks: Array<{ id: string; symbol: string }>;
@@ -143,6 +149,7 @@ export class SecCompanyFactsService {
         };
 
         await this.repo.upsertFundamentals(stock.id, fundamentals);
+        summary.annualPeriods += await this.persistAnnualHistory(stock.id, stock.symbol, facts);
         await this.repo.prisma.stock.update({
           where: { id: stock.id },
           data: {
@@ -158,6 +165,71 @@ export class SecCompanyFactsService {
       }
     }
     return summary;
+  }
+
+  /**
+   * Persist up to MAX_ANNUAL_YEARS fiscal-year ANNUAL Fundamental rows from the
+   * already-fetched company facts, so US stocks gain the year-over-year
+   * comparable the signal engine needs for revenue/EPS/margin GROWTH votes
+   * (the single TTM snapshot has no prior-year same-period row to diff against).
+   *
+   * Each row carries the real fiscal year-end as periodEndDate; revenue / net
+   * income / EPS are merged by shared year-end (one 10-K reports all three for
+   * the same period). peRatio / marketCap are left null for historical periods
+   * (no point-in-time price is available). Distinct from the TTM row via the
+   * (stockId, periodType, periodEndDate, source) unique key. Returns the count
+   * of ANNUAL rows written.
+   */
+  private async persistAnnualHistory(
+    stockId: string,
+    symbol: string,
+    facts: Parameters<typeof annualSeries>[0],
+  ): Promise<number> {
+    const revenueByEnd = new Map(
+      annualSeries(facts, ['RevenueFromContractWithCustomerExcludingAssessedTax', 'Revenues', 'SalesRevenueNet'], 'USD').map((f) => [f.end, f.val]),
+    );
+    const netIncomeByEnd = new Map(annualSeries(facts, ['NetIncomeLoss', 'ProfitLoss'], 'USD').map((f) => [f.end, f.val]));
+    const epsByEnd = new Map(annualSeries(facts, ['EarningsPerShareDiluted', 'EarningsPerShareBasic'], 'USD/shares').map((f) => [f.end, f.val]));
+
+    // Fiscal year-ends that carry at least revenue or net income (EPS alone is
+    // too thin to anchor a period), most-recent-first, capped to MAX_ANNUAL_YEARS.
+    const ends = [...new Set([...revenueByEnd.keys(), ...netIncomeByEnd.keys()])]
+      .sort((a, b) => (a < b ? 1 : -1))
+      .slice(0, MAX_ANNUAL_YEARS);
+
+    let written = 0;
+    for (const end of ends) {
+      const revenue = revenueByEnd.get(end) ?? null;
+      const netIncome = netIncomeByEnd.get(end) ?? null;
+      const eps = epsByEnd.get(end) ?? null;
+      if (revenue == null && netIncome == null && eps == null) continue;
+      const profitMargins = revenue != null && revenue !== 0 && netIncome != null ? netIncome / revenue : null;
+
+      const annual: CoreFundamentals = {
+        symbol,
+        revenue,
+        eps,
+        earnings: netIncome,
+        dividendYield: null,
+        sharesOutstanding: null,
+        marketCap: null,
+        currency: 'USD',
+        periodType: 'ANNUAL',
+        ratios: {
+          trailingPe: null,
+          forwardPe: null,
+          priceToBook: null,
+          profitMargins,
+          returnOnEquity: null,
+          debtToEquity: null,
+        },
+        source: 'SEC_EDGAR',
+        asOf: end,
+      };
+      await this.repo.upsertFundamentals(stockId, annual);
+      written += 1;
+    }
+    return written;
   }
 }
 
