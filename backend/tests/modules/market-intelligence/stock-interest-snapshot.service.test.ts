@@ -139,6 +139,85 @@ describe('StockInterestSnapshotService', () => {
     });
   });
 
+  it('pages the entire universe and ranks globally across batches, not just the first alphabetical batch', async () => {
+    // Two distinct pages of a 4-stock universe. The strongest candidate (ZZZ)
+    // lives on the SECOND page and is alphabetically LAST — so if the old
+    // single-batch / clamped-alphabetical behaviour regressed, it could never
+    // be selected. A correct global pass must page both batches and rank ZZZ
+    // to the top of TODAY_TOP_INTEREST on raw score.
+    const page = (
+      stocks: Array<{ id: string; symbol: string; company: string; sector: string }>,
+      ticks: ReturnType<typeof prices>,
+      latest: Array<{ symbol: string; price: number; timestamp: Date }>
+    ): StockInterestCalculationInput => ({
+      region: 'IN',
+      assetType: 'STOCK',
+      totalUniverseCount: 4,
+      stocks,
+      priceTicks: ticks,
+      latestPrices: latest,
+      deliverySnapshots: [],
+      fundamentals: [],
+    });
+
+    const page1 = page(
+      [
+        { id: 's-aaa', symbol: 'AAA', company: 'AAA Ltd', sector: 'Technology' },
+        { id: 's-bbb', symbol: 'BBB', company: 'BBB Ltd', sector: 'Technology' },
+      ],
+      [
+        ...prices('AAA', [100, 101, 102, 103, 104], [1000, 1000, 1000, 1000, 1100]),
+        ...prices('BBB', [100, 100, 100, 100, 100], [900, 900, 900, 900, 900]),
+      ],
+      [
+        { symbol: 'AAA', price: 104, timestamp: day('2026-05-29') },
+        { symbol: 'BBB', price: 100, timestamp: day('2026-05-29') },
+      ]
+    );
+    const page2 = page(
+      [
+        { id: 's-zzz', symbol: 'ZZZ', company: 'ZZZ Ltd', sector: 'Energy' },
+        { id: 's-yyy', symbol: 'YYY', company: 'YYY Ltd', sector: 'Energy' },
+      ],
+      [
+        ...prices('ZZZ', [50, 60, 72, 86, 104], [1000, 1500, 2200, 3000, 5000]),
+        ...prices('YYY', [100, 99, 98, 97, 96], [900, 900, 900, 900, 900]),
+      ],
+      [
+        { symbol: 'ZZZ', price: 104, timestamp: day('2026-05-29') },
+        { symbol: 'YYY', price: 96, timestamp: day('2026-05-29') },
+      ]
+    );
+
+    const repository = {
+      loadCalculationInput: jest.fn(async ({ offset }: { offset: number }) =>
+        offset === 0 ? page1 : offset === 2 ? page2 : page([], [], [])
+      ),
+      upsertSnapshots: jest.fn(async (rows: unknown[]) => ({ createdCount: rows.length, updatedCount: 0, unchangedCount: 0 })),
+      pruneSnapshotRowsForSymbols: jest.fn().mockResolvedValue(0),
+    };
+    const service = new StockInterestSnapshotService(repository as any);
+
+    const result = await service.refreshSnapshots({ region: 'IN', assetType: 'STOCK', generatedAt });
+
+    // Paged the whole universe: two loads (offset 0, then 2), then terminated.
+    expect(repository.loadCalculationInput).toHaveBeenCalledTimes(2);
+    expect(repository.loadCalculationInput).toHaveBeenNthCalledWith(1, expect.objectContaining({ offset: 0 }));
+    expect(repository.loadCalculationInput).toHaveBeenNthCalledWith(2, expect.objectContaining({ offset: 2 }));
+    // Global ranking persists once, across all batches.
+    expect(repository.upsertSnapshots).toHaveBeenCalledTimes(1);
+    expect(repository.pruneSnapshotRowsForSymbols).toHaveBeenCalledWith(expect.objectContaining({
+      symbols: ['AAA', 'BBB', 'ZZZ', 'YYY'],
+    }));
+    expect(result).toMatchObject({ status: 'COMPLETED', nextOffset: null, hasMore: false });
+
+    // The second-page, alphabetically-last strong mover tops TODAY_TOP_INTEREST.
+    const persisted = repository.upsertSnapshots.mock.calls[0][0] as Array<{ category: string; symbol: string }>;
+    const topInterest = persisted.filter((row) => row.category === 'TODAY_TOP_INTEREST');
+    expect(topInterest[0]?.symbol).toBe('ZZZ');
+    expect(topInterest.map((row) => row.symbol)).toEqual(expect.arrayContaining(['AAA', 'ZZZ']));
+  });
+
   it('collapses noisy row-level warnings into one top-level latest snapshot warning', async () => {
     const repository = {
       latestSnapshots: jest.fn().mockResolvedValue([
