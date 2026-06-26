@@ -184,6 +184,18 @@ describe('CalendarService.latest', () => {
     // region must be passed through as the first arg so IN excludes US-stored FRED rows
     expect(repo.listEconomicEvents).toHaveBeenCalledWith('IN', RANGE.from, RANGE.to, 100);
   });
+
+  it('does not surface the empty-economic warning for IN (economic is US-only)', async () => {
+    const { service } = makeService();
+    const res = await service.latest({ region: 'IN', assetType: 'STOCK', type: 'ALL', ...QUERY_DEFAULTS });
+    expect(res.warnings.some((w) => w.includes('economic releases ingested'))).toBe(false);
+  });
+
+  it('still surfaces the empty-economic warning for US', async () => {
+    const { service } = makeService();
+    const res = await service.latest({ region: 'US', assetType: 'STOCK', type: 'ECONOMIC', ...QUERY_DEFAULTS });
+    expect(res.warnings.some((w) => w.includes('economic releases ingested'))).toBe(true);
+  });
 });
 
 describe('CalendarService.refreshSnapshots (IPO)', () => {
