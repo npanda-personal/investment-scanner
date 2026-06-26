@@ -108,11 +108,23 @@ export class CalendarService {
     const counts = emptyCounts();
     for (const e of events) counts[e.eventType] += 1;
 
-    // Contract: under type=ALL each family is fetched up to `limit`, merged, sorted
-    // newest-first, then truncated to `limit` below — so on a small limit a date-clustered
-    // family could crowd out others in the page. The FE always requests the max limit and
-    // re-filters per tab client-side, and `counts` above is computed pre-slice so tab badges
-    // stay accurate regardless. A future small-limit caller should fetch per-type instead.
+    // Truncate PER FAMILY, not globally. Each family is already fetched bounded to ~`limit`;
+    // a single global newest-first `slice(0, limit)` would let a large, date-clustered family
+    // crowd out the others whenever the merged feed exceeds `limit`. That silently dropped the
+    // SOONEST-upcoming earnings under type=ALL (the merged list is sorted newest-first, so the
+    // slice kept the furthest-out results and discarded the next companies to report) — exactly
+    // the rows the forward-looking Earnings tab leads with. Capping each event family at `limit`
+    // independently preserves every tab's rows while still bounding the payload. `counts` above
+    // is pre-cap so tab badges stay accurate; the FE requests the max limit and re-filters per tab.
+    const perFamilyRemaining = emptyCounts();
+    for (const t of CALENDAR_EVENT_TYPES) perFamilyRemaining[t] = limit;
+    const items: CalendarEvent[] = [];
+    for (const e of events) {
+      if (perFamilyRemaining[e.eventType] > 0) {
+        items.push(e);
+        perFamilyRemaining[e.eventType] -= 1;
+      }
+    }
 
     const requested = type === 'ALL' ? [...CALENDAR_EVENT_TYPES] : [type];
     const populated = requested.filter((t) => counts[t] > 0).length;
@@ -127,7 +139,7 @@ export class CalendarService {
       generatedAt: new Date().toISOString(),
       freshness,
       counts,
-      items: events.slice(0, limit),
+      items,
       warnings,
     };
   }

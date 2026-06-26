@@ -170,6 +170,54 @@ describe('CalendarService.latest', () => {
     expect(div?.metrics.amount).toBe(4.5);
   });
 
+  it('caps each family at limit under type=ALL so a large family never crowds out the soonest events', async () => {
+    // Regression: the soonest-upcoming earnings were silently dropped because the merged feed
+    // was sorted newest-first and globally sliced to `limit`. Here EARNINGS fills the whole
+    // limit (soonest-first) while ECONOMIC sits at much later dates; a global newest-first slice
+    // would keep the late economic rows and discard the EARLIEST earnings. Per-family capping
+    // must preserve every family's rows.
+    const LIMIT = 100;
+    const earnings = Array.from({ length: LIMIT }, (_, i) => {
+      const d = new Date(Date.UTC(2026, 5, 22) + i * 24 * 60 * 60 * 1000);
+      return {
+        symbol: `E${String(i).padStart(3, '0')}`,
+        resultDate: d,
+        daysToResult: i,
+        resultDateSource: 'OFFICIAL_CALENDAR',
+        stock: { name: `Earn ${i}` },
+      };
+    });
+    const earliestEarn = earnings[0].resultDate.toISOString(); // 2026-06-22
+    const economic = Array.from({ length: 20 }, (_, i) => ({
+      source: 'FRED',
+      releaseId: String(i),
+      releaseName: 'Consumer Price Index',
+      seriesId: 'CPIAUCSL',
+      region: 'US',
+      eventDate: new Date(Date.UTC(2026, 11, 1) + i * 24 * 60 * 60 * 1000), // Dec — strictly newest
+      actualValue: 1,
+      previousValue: 1,
+      unit: 'Index',
+      sourceUrl: 'https://fred.stlouisfed.org/release?rid=1',
+    }));
+
+    const { service } = makeService({
+      listUpcomingEarnings: jest.fn().mockResolvedValue(earnings),
+      listEconomicEvents: jest.fn().mockResolvedValue(economic),
+    });
+
+    const res = await service.latest({ region: 'US', assetType: 'STOCK', type: 'ALL', ...QUERY_DEFAULTS, limit: LIMIT });
+
+    const earnItems = res.items.filter((e) => e.eventType === 'EARNINGS');
+    const econItems = res.items.filter((e) => e.eventType === 'ECONOMIC');
+    expect(earnItems).toHaveLength(LIMIT); // all earnings survive, not crowded out
+    expect(econItems).toHaveLength(20); // economic survives too (no global truncation)
+    expect(earnItems.some((e) => e.date === earliestEarn)).toBe(true); // soonest earnings present
+    // counts are pre-cap and unchanged
+    expect(res.counts.EARNINGS).toBe(LIMIT);
+    expect(res.counts.ECONOMIC).toBe(20);
+  });
+
   it('returns NO_DATA freshness with a warning when a single requested type is empty', async () => {
     const { service } = makeService();
     const res = await service.latest({ region: 'IN', assetType: 'STOCK', type: 'IPO', ...QUERY_DEFAULTS });
