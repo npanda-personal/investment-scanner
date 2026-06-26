@@ -423,10 +423,18 @@ export function CalendarPage() {
     // Earnings is a forward-looking feed → soonest upcoming result first (ASC),
     // so the next company to report leads instead of the furthest-out date.
     if (tab === 'EARNINGS') {
-      return [...rows].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      let earnings = rows;
+      // On the default UPCOMING preset, drop already-reported results so the soonest
+      // *upcoming* result leads page 1 (the RECENT/WIDE presets still show past results).
+      if (preset === 'UPCOMING') {
+        const now = new Date();
+        const todayStart = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+        earnings = earnings.filter((e) => new Date(e.date).getTime() >= todayStart);
+      }
+      return [...earnings].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     }
     return rows;
-  }, [data, tab, ipoSub]);
+  }, [data, tab, ipoSub, preset]);
   const pageRows = useMemo(
     () => filtered.slice(page * pageSize, page * pageSize + pageSize),
     [filtered, page, pageSize],
