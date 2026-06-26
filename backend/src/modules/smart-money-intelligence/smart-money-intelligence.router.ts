@@ -1,4 +1,5 @@
 import express from 'express';
+import { heavyDataRouteLimiter } from '../../shared/middleware';
 import { SmartMoneyIntelligenceController } from './smart-money-intelligence.controller';
 
 export const createSmartMoneyIntelligenceRouter = (
@@ -8,7 +9,7 @@ export const createSmartMoneyIntelligenceRouter = (
 
   router.get('/smart-money/health', controller.health);
   router.post('/smart-money/run', controller.run);
-  router.get('/smart-money/sectors', controller.sectors);
+  router.get('/smart-money/sectors', heavyDataRouteLimiter, controller.sectors);
   router.get('/smart-money/top', controller.top);
   router.get('/smart-money/distribution', controller.distribution);
   router.get('/smart-money/stocks/:instrumentId', controller.stock);

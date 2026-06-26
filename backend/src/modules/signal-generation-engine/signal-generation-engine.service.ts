@@ -207,6 +207,20 @@ export class SignalGenerationEngineService {
     return null;
   }
 
+  /**
+   * Returns the raw (unenriched) trusted signal for an instrument — same persisted-read
+   * semantics as latestForInstrument but WITHOUT the enrichment step (no live price fetch,
+   * no calibration overlay, no universe read for RS percentiles).
+   *
+   * Used by the controller to fan out the enrichment and cohort-metrics fetch concurrently:
+   * the controller calls this first, then starts both enrichSignal() and the cohort fetch
+   * in parallel, which avoids the sequential universe-read → cohort-read chain.
+   */
+  async latestTrustedRawForInstrument(instrumentId: string): Promise<SignalResultDto | null> {
+    const latest = await this.repository.latestForInstrument(instrumentId);
+    return latest && this.isTrustedReadSignal(latest) ? latest : null;
+  }
+
   async latestPersistedForInstruments(instrumentIds: string[]): Promise<SignalResultDto[]> {
     const uniqueIds = [...new Set(instrumentIds.map((id) => String(id || '').trim()).filter(Boolean))];
     const results = await Promise.all(uniqueIds.map((instrumentId) => this.repository.latestForInstrument(instrumentId).catch(() => null)));
@@ -794,8 +808,13 @@ export class SignalGenerationEngineService {
   private async withRsPercentiles(signals: SignalResultDto[], scope: { region?: string; assetType?: string } = {}): Promise<SignalResultDto[]> {
     let universeScores: number[] = [];
     try {
-      const cohort = await this.repository.latestSignalUniverse({ region: scope.region, assetType: scope.assetType, limit: 100000, offset: 0 } as SignalQuery);
-      universeScores = cohort.map((c) => (typeof c.score === 'number' ? c.score : 0));
+      // Scores-only projection: selects only the columns needed to evaluate the trusted
+      // predicate + deduplicate + extract score, avoiding the ~800-row full-DTO fetch
+      // (JSON arrays, all columns) that the old latestSignalUniverse({ limit: 100000 })
+      // performed.  The returned score multiset is identical to the full path — same
+      // trusted+latest-date filter, same per-instrumentId deduplication (v4 preferred over
+      // v3 when both exist for the same date) — so RS-percentile output is byte-identical.
+      universeScores = await this.repository.latestSignalUniverseScores({ region: scope.region, assetType: scope.assetType });
     } catch { /* fall back to served-set ranking */ }
     return Scoring.attachRsPercentiles(signals, universeScores);
   }

@@ -33,7 +33,25 @@ export const getRedisClient = (): Redis | null => {
   return client;
 };
 
-/** Best-effort connect at boot. Never throws — read-through falls back to DB if Redis is down. */
+/** Loud, unmissable banner so an operator can't miss that the cache silently degraded to DB. */
+const warnCacheDegraded = (reason: string): void => {
+  const line = '='.repeat(72);
+  console.warn(
+    `\n${line}\n` +
+      `[cache] ⚠  CACHE_ENABLED=true BUT REDIS IS UNREACHABLE (${reason}).\n` +
+      `[cache] ⚠  Every cached endpoint will fall through to Postgres on EVERY request —\n` +
+      `[cache] ⚠  the page-cache concurrency relief is OFF. Start Redis:\n` +
+      `[cache] ⚠      docker compose --profile cache up -d redis\n` +
+      `${line}\n`,
+  );
+};
+
+/**
+ * Best-effort connect at boot. Never throws — read-through falls back to DB if Redis is down.
+ * A successful connect() does NOT prove a usable server, so we PING and emit a loud banner on
+ * failure: the failure mode this guards against is a long-lived backend silently serving every
+ * request from Postgres while the operator believes the cache is helping.
+ */
 export const connectRedis = async (): Promise<void> => {
   const instance = getRedisClient();
   if (!instance) {
@@ -41,9 +59,10 @@ export const connectRedis = async (): Promise<void> => {
   }
   try {
     await instance.connect();
-    console.log('[cache] redis connected');
+    await instance.ping();
+    console.log('[cache] redis connected and reachable (page-cache active)');
   } catch (error) {
-    console.error('[cache] redis connect failed; serving from DB until it recovers', (error as Error)?.message);
+    warnCacheDegraded((error as Error)?.message ?? 'connect/ping failed');
   }
 };
 

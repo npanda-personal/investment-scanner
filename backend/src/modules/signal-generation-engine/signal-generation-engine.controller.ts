@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
 import { SignalGenerationEngineService } from './signal-generation-engine.service';
-import { attachCohortMetrics } from './signal-cohort-overlay';
+import { attachCohortMetrics, resolveQualityCohortReader, DEFAULT_COHORT_HORIZON, countriesForRegion } from './signal-cohort-overlay';
 import { parseRunRequest, parseSignalQuery, validateInstrumentId } from './signal-generation-engine.validation';
 import { isCryptoScope } from '../../shared/data-access/market-repository-router';
 import {
@@ -176,15 +176,38 @@ export class SignalGenerationEngineController {
         const priceBySymbol = await this.cryptoRepo.pricesForSymbols([row.symbol]);
         return res.json(mapCryptoSignalRow(row, priceBySymbol.get(row.symbol)));
       }
-      // Persisted-read only (never calls run()). Use the ENRICHED single-instrument read so the
-      // research-tab widget receives the calibration overlay (calibratedScore/calibrationStatus)
-      // and live price/dailyChange — the bulk latestPersistedForInstruments() path skips
-      // enrichSignals(), which is why the widget showed "calibration pending" + null price for
-      // every stock even when a calibration row existed. Returns null when nothing trusted is persisted.
-      const result = await this.service.latestForInstrument(instrumentId);
-      if (!result) return res.status(404).json({ error: 'No persisted signal found for this instrument. Run signal generation via POST /signals/run to populate.' });
+      // Persisted-read only (never calls run()). Two-phase strategy to reduce sequential
+      // latency: (1) fetch the raw trusted signal (fast single-row read), then (2) fan out
+      // the enrichment (live price + calibration overlay + RS-percentile universe read) and
+      // the cohort-metrics read concurrently — they are independent DB reads on different
+      // tables.  Cohort metrics read requires modelVersion (from the raw signal) so it cannot
+      // start before phase 1, but it CAN run concurrently with enrichment in phase 2.
+      const raw = await this.service.latestTrustedRawForInstrument(instrumentId);
+      if (!raw) return res.status(404).json({ error: 'No persisted signal found for this instrument. Run signal generation via POST /signals/run to populate.' });
+
       const region = first(req.query?.region) as string | undefined;
-      const [enriched] = await attachCohortMetrics([result], { region });
+      const cohortReader = resolveQualityCohortReader();
+      const modelVersion = (raw as any).modelVersion ?? (raw as any).model_version ?? undefined;
+
+      // Pre-fetch cohort rows concurrently with signal enrichment.  We pass the pre-fetched
+      // rows to attachCohortMetrics via a synthetic reader so the function doesn't re-fetch.
+      const cohortRowsPromise = cohortReader
+        ? cohortReader.cohortHitRates({
+            horizon: DEFAULT_COHORT_HORIZON,
+            modelVersion,
+            countries: countriesForRegion(region),
+          }).catch(() => null)
+        : Promise.resolve(null);
+
+      const [enrichedSignal, cohortRows] = await Promise.all([
+        this.service.enrichSignal(raw),
+        cohortRowsPromise,
+      ]);
+
+      // Apply the pre-fetched cohort rows via an inline reader so attachCohortMetrics
+      // skips the DB call it would normally make.
+      const inlineReader = cohortRows ? { cohortHitRates: async () => cohortRows } : null;
+      const [enriched] = await attachCohortMetrics([enrichedSignal], { reader: inlineReader, region });
       return res.json(enriched);
     } catch (error) {
       console.error('Signal instrument endpoint error:', error);

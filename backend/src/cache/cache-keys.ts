@@ -55,6 +55,18 @@ export const screenerKey = (s: {
   `:min52w=${val(s.min52wPositionPct)}:exFno=${val(!!s.excludeFnoBan)}` +
   `:onlyDrv=${val(!!s.onlyDerivativesEligible)}:limit=${val(s.limit)}`;
 
+// Smart-money sectors — low cardinality (range × region × assetType). Mirrors the resolved scope
+// the service applies (withDefaultScope: region||IN, assetType||STOCK) so the invalidated key
+// matches the one the controller reads.
+export const smartMoneySectorsKeyPrefix = `${PREFIX}:smart-money-sectors:`;
+export const smartMoneySectorsKey = (s: { range: string; region: string; assetType: string }): string =>
+  `${smartMoneySectorsKeyPrefix}range=${val(s.range)}:region=${val(s.region)}:assetType=${val(s.assetType)}`;
+
+// Earnings intelligence — low cardinality (region × assetType × limit × optional category).
+export const earningsKeyPrefix = `${PREFIX}:earnings:`;
+export const earningsKey = (s: { region: string; assetType: string; limit?: number; category?: string }): string =>
+  `${earningsKeyPrefix}region=${val(s.region)}:assetType=${val(s.assetType)}:limit=${val(s.limit)}:cat=${val(s.category)}`;
+
 export const marketMoversKeyPrefix = `${PREFIX}:movers:`;
 export const marketMoversKey = (s: {
   region?: string; assetType?: string; limit?: number; range?: string;

@@ -70,6 +70,11 @@ const REGION_TO_COUNTRIES: Record<string, string[]> = {
   EU: ['Austria', 'Belgium', 'Germany', 'Spain', 'Finland', 'France', 'Italy', 'Netherlands', 'Portugal'],
 };
 
+/** Return the canonical country list for a region, or undefined if the region has no mapping. */
+export function countriesForRegion(region: string | undefined): string[] | undefined {
+  return region ? REGION_TO_COUNTRIES[region] : undefined;
+}
+
 /** Lazy-resolve the production cohort reader without a static import cycle. */
 export function resolveQualityCohortReader(): QualityCohortReader | null {
   try {

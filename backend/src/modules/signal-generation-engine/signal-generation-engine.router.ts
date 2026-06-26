@@ -1,4 +1,5 @@
 import express from 'express';
+import { heavyDataRouteLimiter } from '../../shared/middleware';
 import { SignalGenerationEngineController } from './signal-generation-engine.controller';
 
 export const createSignalGenerationEngineRouter = (
@@ -13,7 +14,7 @@ export const createSignalGenerationEngineRouter = (
   // Lifecycle endpoints — register BEFORE /:instrumentId to avoid route shadowing
   router.get('/signals/exit-candidates', controller.exitCandidates);
   router.get('/signals/lifecycle', controller.lifecycle);
-  router.get('/signals/:instrumentId', controller.latestForInstrument);
+  router.get('/signals/:instrumentId', heavyDataRouteLimiter, controller.latestForInstrument);
   router.post('/signals/run', controller.run);
 
   return router;
