@@ -419,7 +419,13 @@ export function CalendarPage() {
         (a, b) => dir * (new Date(a.date).getTime() - new Date(b.date).getTime()),
       );
     }
-    return events.filter((e) => e.eventType === tab);
+    const rows = events.filter((e) => e.eventType === tab);
+    // Earnings is a forward-looking feed → soonest upcoming result first (ASC),
+    // so the next company to report leads instead of the furthest-out date.
+    if (tab === 'EARNINGS') {
+      return [...rows].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    }
+    return rows;
   }, [data, tab, ipoSub]);
   const pageRows = useMemo(
     () => filtered.slice(page * pageSize, page * pageSize + pageSize),
