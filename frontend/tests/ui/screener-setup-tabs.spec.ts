@@ -66,6 +66,11 @@ test.describe('Screener — direction + setup tabs', () => {
     await expect(page.getByRole('tab', { name: 'Quality', exact: true })).toBeVisible();
     await expect(page.getByRole('tab', { name: 'Growth', exact: true })).toBeVisible();
 
+    // Hovering a setup tab surfaces a tooltip explaining what that setup matches
+    // (the tab labels alone don't convey each setup's selection logic).
+    await page.getByRole('tab', { name: 'Trend Momentum' }).hover();
+    await expect(page.getByRole('tooltip')).toContainText('50-day average');
+
     // Selecting a setup issues a screener request carrying setup=BREAKOUT.
     await page.getByRole('tab', { name: 'Breakout' }).click();
     await expect
