@@ -14,7 +14,6 @@ import {
   Select,
   Slider,
   Stack,
-  Tab,
   Table,
   TableBody,
   TableCell,
@@ -22,18 +21,17 @@ import {
   TableHead,
   TablePagination,
   TableRow,
-  Tabs,
   TextField,
   Tooltip,
   Typography,
 } from '@mui/material';
-import { useCallback, useEffect, useRef, useState, type SyntheticEvent } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { PageHeader } from '@/shared/components';
 import { NotApplicableForAssetClass } from '@/shared/components/NotApplicableForAssetClass';
 import { useMarketScope } from '@/contexts/MarketScopeContext';
 import { compactByProfile, money } from '@/shared/format/money';
 import { screenerSubtitle as buildScreenerSubtitle } from '@/shared/format/exchangeLabels';
-import type { ScreenerFilters, ScreenerRow, ScreenerCapBand, ScreenerSetup } from '../types';
+import type { ScreenerFilters, ScreenerRow, ScreenerCapBand } from '../types';
 import type { WorkspaceSource } from '@/shared/workspace/types';
 import { fetchScreener } from '../api/screenerService';
 import {
@@ -49,7 +47,7 @@ import {
   FnoScreenerHeaderCells,
   FnoScreenerBodyCells,
 } from './screener/ScreenerCells';
-import { setupsForDirection, type ScreenerDirectionTab } from './screener/screener-setups';
+import { ScreenerDirectionTabs } from './screener/ScreenerDirectionTabs';
 
 import { KNOWN_SECTORS } from './screener-constants';
 import { type SortKey, sortScreenerRows, SortHead } from './screener-sort';
@@ -140,43 +138,6 @@ export default function ScreenerPage() {
     });
   };
 
-  // Direction selector + setup sub-tabs drive `signalDirection` and `setup` together. NEUTRAL is
-  // not a tab (the legacy dropdown's NEUTRAL option is dropped) — it collapses to the "All" tab.
-  const directionTab: ScreenerDirectionTab =
-    filters.signalDirection === 'BULLISH' ? 'BULLISH'
-      : filters.signalDirection === 'BEARISH' ? 'BEARISH'
-        : 'ALL';
-  const setupOptions = setupsForDirection(directionTab);
-
-  const handleDirectionChange = (_e: SyntheticEvent, dir: ScreenerDirectionTab) => {
-    setPage(0);
-    // Default the score sort to match the tab's polarity: `score` is a directional 0-100
-    // scale (>=60 bullish, <=40 bearish), so "strongest conviction first" is score DESC for
-    // Bullish/All but ASC for Bearish (lowest score = most bearish). Mirrors the backend's
-    // direction-aware ORDER BY so the client re-sort doesn't undo it. A manual column click
-    // still overrides within the tab; this only sets the default on each tab switch.
-    setSortKey('signalScore');
-    setSortDir(dir === 'BEARISH' ? 'asc' : 'desc');
-    setFilters((prev) => {
-      const next = { ...prev };
-      if (dir === 'ALL') delete next.signalDirection;
-      else next.signalDirection = dir;
-      // Setups are direction-specific — reset when the direction changes.
-      delete next.setup;
-      return next;
-    });
-  };
-
-  const handleSetupChange = (_e: SyntheticEvent, value: ScreenerSetup | '') => {
-    setPage(0);
-    setFilters((prev) => {
-      const next = { ...prev };
-      if (value) next.setup = value;
-      else delete next.setup;
-      return next;
-    });
-  };
-
   if (profile.isCrypto) {
     return (
       <Box sx={{ p: 3 }}>
@@ -205,32 +166,13 @@ export default function ScreenerPage() {
         subtitle={screenerSubtitle}
       />
 
-      {/* Direction selector + setup sub-tabs — drive signalDirection / setup; other filters
-          (sector, cap, score, RS, delivery, F&O) compose within the active tab. */}
-      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: setupOptions.length > 0 ? 0 : 2 }}>
-        <Tabs value={directionTab} onChange={handleDirectionChange} aria-label="Signal direction">
-          <Tab label="All" value="ALL" />
-          <Tab label="Bullish" value="BULLISH" />
-          <Tab label="Bearish" value="BEARISH" />
-        </Tabs>
-      </Box>
-      {setupOptions.length > 0 && (
-        <Box sx={{ mb: 2 }}>
-          <Tabs
-            value={filters.setup ?? ''}
-            onChange={handleSetupChange}
-            variant="scrollable"
-            scrollButtons="auto"
-            aria-label="Trade setup"
-            sx={{ minHeight: 40 }}
-          >
-            <Tab label={directionTab === 'BULLISH' ? 'All Bullish' : 'All Bearish'} value="" sx={{ minHeight: 40 }} />
-            {setupOptions.map((o) => (
-              <Tab key={o.code} label={o.label} value={o.code} sx={{ minHeight: 40 }} />
-            ))}
-          </Tabs>
-        </Box>
-      )}
+      <ScreenerDirectionTabs
+        filters={filters}
+        setFilters={setFilters}
+        setPage={setPage}
+        setSortKey={setSortKey}
+        setSortDir={setSortDir}
+      />
 
       {/* Filter Bar */}
       <Paper variant="outlined" sx={{ p: 2, mb: 3 }}>
