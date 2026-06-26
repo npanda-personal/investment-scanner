@@ -91,22 +91,65 @@ export function yoyComparable<T extends { period_type?: unknown; period_end_date
 }
 
 /**
- * Year-over-year revenue & EPS growth votes (category FUNDAMENTAL).  Compares `latest`
- * against its YoY comparable (per `yoyComparable`).  Growth ratios are only computed
- * when the prior value is a meaningful positive base:
+ * Period types that are point-in-time snapshots, NOT fiscal reporting periods.
+ * A TTM (trailing-twelve-month) figure re-measured at different dates is the same
+ * rolling window, so "TTM-at-T vs TTM-at-T−1y" is not a true year-over-year
+ * comparison.  YoY must compare like fiscal periods (ANNUAL↔ANNUAL,
+ * QUARTERLY↔QUARTERLY), so TTM is excluded from the YoY basis below.
+ *
+ * This matters because US/EU fundamentals are predominantly TTM snapshots; without
+ * this exclusion the newest record (a TTM dated ~today) would be chosen as `latest`
+ * and never find a same-type prior, silently suppressing all GROWTH votes even when
+ * real ANNUAL fiscal history is present.
+ */
+const NON_FISCAL_PERIOD_TYPES = new Set(['TTM']);
+
+function isFiscalRecord(rec: { period_type?: unknown }): boolean {
+  const t = typeof rec?.period_type === 'string' ? rec.period_type.toUpperCase() : '';
+  return t !== '' && !NON_FISCAL_PERIOD_TYPES.has(t);
+}
+
+/**
+ * The newest fiscal (non-TTM) record by period_end_date, or null when the stock
+ * has only TTM snapshots.  This is the correct YoY anchor: ANNUAL/QUARTERLY rows
+ * have a same-period comparable a year earlier; TTM rows do not.
+ */
+export function latestFiscalRecord<T extends { period_type?: unknown; period_end_date?: unknown }>(records: T[]): T | null {
+  if (!Array.isArray(records)) return null;
+  let best: T | null = null;
+  let bestMs = -Infinity;
+  for (const rec of records) {
+    if (!isFiscalRecord(rec)) continue;
+    const ms = toEpochMs(rec.period_end_date);
+    if (ms === null) continue;
+    if (ms > bestMs) {
+      bestMs = ms;
+      best = rec;
+    }
+  }
+  return best;
+}
+
+/**
+ * Year-over-year revenue & EPS growth votes (category FUNDAMENTAL).  Anchors on the
+ * latest FISCAL record (`latestFiscalRecord`) and compares it against its YoY
+ * comparable (per `yoyComparable`).  Growth ratios are only computed when the prior
+ * value is a meaningful positive base:
  *   - revenueGrowth = (rev − priorRev) / priorRev   when priorRev > 0
  *   - epsGrowth     = (eps − priorEps) / priorEps    when priorEps > 0
  *     (priorEps ≤ 0 → skip EPS growth: the ratio is sign-meaningless)
  * Missing revenue/eps on either side is handled gracefully (that metric is skipped).
  */
 export function fundamentalGrowthVotes(
-  latest: any,
   records: any[],
 ): { signals: SignalItem[]; negativeSignals: SignalItem[] } {
   const signals: SignalItem[] = [];
   const negativeSignals: SignalItem[] = [];
-  if (!latest || !Array.isArray(records)) return { signals, negativeSignals };
+  const latest = latestFiscalRecord(records);
+  if (!latest) return { signals, negativeSignals };
 
+  // yoyComparable already restricts to the same period_type as `latest` (a fiscal
+  // type), so TTM rows can never be selected as the prior comparable.
   const prior = yoyComparable(records, latest);
   if (!prior) return { signals, negativeSignals };
 
@@ -143,12 +186,12 @@ const PE_BELOW_OWN_HISTORY_RATIO = 0.20;
 const PE_ABOVE_OWN_HISTORY_RATIO = 0.40;
 
 export function fundamentalMarginTrendVotes(
-  latest: any,
   records: any[],
 ): { signals: SignalItem[]; negativeSignals: SignalItem[] } {
   const signals: SignalItem[] = [];
   const negativeSignals: SignalItem[] = [];
-  if (!latest || !Array.isArray(records)) return { signals, negativeSignals };
+  const latest = latestFiscalRecord(records);
+  if (!latest) return { signals, negativeSignals };
 
   const prior = yoyComparable(records, latest);
   if (!prior) return { signals, negativeSignals };

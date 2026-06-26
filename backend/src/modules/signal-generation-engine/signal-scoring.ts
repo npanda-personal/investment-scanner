@@ -301,8 +301,8 @@ export function evaluateFundamentals(
       else if (margin < 0) negativeSignals.push(signal('NEGATIVE_NET_MARGIN', 'net margin is negative (lossmaking)', 'FUNDAMENTAL'));
     }
     if (Array.isArray(fundamentalRecords) && fundamentalRecords.length >= 2) {
-      for (const fn of [fundamentalGrowthVotes, fundamentalMarginTrendVotes, fundamentalPeHistoryVotes]) {
-        const v = fn(fundamentalRecords[0], fundamentalRecords);
+      // Growth/margin votes anchor on the latest FISCAL period internally (TTM excluded — see signal-fundamental-growth); PE self-history uses the newest record (TTM carries the live peRatio).
+      for (const v of [fundamentalGrowthVotes(fundamentalRecords), fundamentalMarginTrendVotes(fundamentalRecords), fundamentalPeHistoryVotes(fundamentalRecords[0], fundamentalRecords)]) {
         signals.push(...v.signals); negativeSignals.push(...v.negativeSignals);
       }
     }
