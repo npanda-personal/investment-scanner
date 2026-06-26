@@ -1055,24 +1055,24 @@
     "file": "api-v1-strategies-DEFENSIVE-EXIT-proof-region-US.json",
     "status": 200
   },
+  "/api/v1/today-review/runs/cmquoy6lp0xfqw528cwfbvqkz?region=US": {
+    "file": "api-v1-today-review-runs-cmquoy6lp0xfqw528cwfbvqkz-region-US.json",
+    "status": 200
+  },
   "/api/v1/today-review/runs/cmqtby91o1cbww5nsr3n3ln2m?region=US": {
     "file": "api-v1-today-review-runs-cmqtby91o1cbww5nsr3n3ln2m-region-US.json",
     "status": 200
   },
-  "/api/v1/today-review/runs/cmqslfu360y2xw5nsraqju9pz?region=US": {
-    "file": "api-v1-today-review-runs-cmqslfu360y2xw5nsraqju9pz-region-US.json",
-    "status": 200
-  },
-  "/api/v1/market-intelligence/sector-constituents?region=US&sector=Technology": {
-    "file": "api-v1-market-intelligence-sector-constituents-region-USsector-Technology.json",
+  "/api/v1/market-intelligence/sector-constituents?region=US&sector=Industrials": {
+    "file": "api-v1-market-intelligence-sector-constituents-region-USsector-Industrials.json",
     "status": 200
   },
   "/api/v1/market-intelligence/sector-constituents?region=US&sector=Healthcare": {
     "file": "api-v1-market-intelligence-sector-constituents-region-USsector-Healthcare.json",
     "status": 200
   },
-  "/api/v1/market-intelligence/sector-constituents?region=US&sector=Financials": {
-    "file": "api-v1-market-intelligence-sector-constituents-region-USsector-Financials.json",
+  "/api/v1/market-intelligence/sector-constituents?region=US&sector=Technology": {
+    "file": "api-v1-market-intelligence-sector-constituents-region-USsector-Technology.json",
     "status": 200
   },
   "/api/v1/market-data/us-smart-money/D": {
