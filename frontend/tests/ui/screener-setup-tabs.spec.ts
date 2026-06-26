@@ -57,11 +57,14 @@ test.describe('Screener — direction + setup tabs', () => {
     // No setup sub-tabs while "All" is selected.
     await expect(page.getByRole('tab', { name: 'Breakout' })).toHaveCount(0);
 
-    // Select Bullish → the 8 bullish setup sub-tabs (plus "All Bullish") appear.
+    // Select Bullish → the 9 bullish setup sub-tabs (plus "All Bullish") appear.
     await page.getByRole('tab', { name: 'Bullish' }).click();
     await expect(page.getByRole('tab', { name: 'All Bullish' })).toBeVisible();
     await expect(page.getByRole('tab', { name: 'Breakout' })).toBeVisible();
     await expect(page.getByRole('tab', { name: 'Trend Momentum' })).toBeVisible();
+    // The omnibus "Quality / Value / Growth" tab was split into distinct Quality and Growth tabs.
+    await expect(page.getByRole('tab', { name: 'Quality', exact: true })).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Growth', exact: true })).toBeVisible();
 
     // Selecting a setup issues a screener request carrying setup=BREAKOUT.
     await page.getByRole('tab', { name: 'Breakout' }).click();
@@ -74,6 +77,8 @@ test.describe('Screener — direction + setup tabs', () => {
     await expect(page.getByRole('tab', { name: 'All Bearish' })).toBeVisible();
     await expect(page.getByRole('tab', { name: 'Trend Bearish' })).toBeVisible();
     await expect(page.getByRole('tab', { name: 'Breakdown' })).toBeVisible();
+    // Weak Fundamentals was split, adding an Earnings Decline tab (mirror of bullish Growth).
+    await expect(page.getByRole('tab', { name: 'Earnings Decline', exact: true })).toBeVisible();
     // Bullish-only setup is no longer offered under Bearish.
     await expect(page.getByRole('tab', { name: 'Breakout' })).toHaveCount(0);
   });

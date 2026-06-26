@@ -16,7 +16,8 @@ export const BULLISH_SETUPS: ScreenerSetupOption[] = [
   { code: 'BREAKOUT', label: 'Breakout' },
   { code: 'PULLBACK', label: 'Pullback / Oversold' },
   { code: 'RELATIVE_STRENGTH', label: 'Relative Strength' },
-  { code: 'QUALITY_VALUE', label: 'Quality / Value / Growth' },
+  { code: 'QUALITY', label: 'Quality' },
+  { code: 'GROWTH', label: 'Growth' },
   { code: 'OVEREXTENDED', label: 'Overextended' },
   { code: 'SMART_MONEY_ACCUMULATION', label: 'Smart-Money Accumulation' },
   { code: 'SECTOR_LEADERSHIP', label: 'Sector Leadership' },
@@ -28,6 +29,7 @@ export const BEARISH_SETUPS: ScreenerSetupOption[] = [
   { code: 'OVERBOUGHT_REVERSAL', label: 'Overbought Reversal' },
   { code: 'RELATIVE_WEAKNESS', label: 'Relative Weakness' },
   { code: 'WEAK_FUNDAMENTALS', label: 'Weak Fundamentals' },
+  { code: 'EARNINGS_DECLINE', label: 'Earnings Decline' },
   { code: 'SMART_MONEY_DISTRIBUTION', label: 'Smart-Money Distribution' },
 ];
 

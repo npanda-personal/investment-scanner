@@ -95,20 +95,23 @@ export class ScreenerRepository {
     if (options.signalDirection) {
       filters.push(Prisma.sql`ls."signalDirection" = UPPER(${options.signalDirection})`);
     }
-    // Setup tab filter. EVIDENCE setups test exact factor codes in the right JSON column
-    // (positive evidence → triggeredSignals, negative/overextension → negativeSignals — the
-    // two never mix). FIELD setups test a joined context column (smart-money / sector). Applied
-    // in SQL (before LIMIT) so each tab gets its own top-N, not a client-side slice of 50 rows.
+    // Setup tab filter (applied in SQL before LIMIT so each tab gets its own top-N). EVIDENCE
+    // setups test factor codes in the right column (POSITIVE→triggeredSignals, NEGATIVE→
+    // negativeSignals — never mixed); FIELD setups test a joined context column. One EXISTS per
+    // code-group keeps AND-of-groups (composite) / OR (single-concept) identical to classifyRowSetups.
     if (options.setup) {
       const def = getSetupDef(options.setup);
-      if (def?.kind === 'EVIDENCE' && def.factorCodes && def.factorCodes.length > 0) {
+      if (def?.kind === 'EVIDENCE' && (def.factorCodes?.length || def.factorGroups?.length)) {
         const jsonCol = def.evidenceSource === 'NEGATIVE'
           ? Prisma.sql`ls."negativeSignals"`
           : Prisma.sql`ls."triggeredSignals"`;
-        filters.push(Prisma.sql`EXISTS (
-          SELECT 1 FROM jsonb_array_elements(COALESCE(${jsonCol}, '[]'::jsonb)) e
-          WHERE e->>'code' IN (${Prisma.join(def.factorCodes)})
-        )`);
+        const groups = def.factorGroups ?? [def.factorCodes!];
+        for (const codes of groups) {
+          filters.push(Prisma.sql`EXISTS (
+            SELECT 1 FROM jsonb_array_elements(COALESCE(${jsonCol}, '[]'::jsonb)) e
+            WHERE e->>'code' IN (${Prisma.join(codes)})
+          )`);
+        }
       } else if (def?.kind === 'FIELD' && def.field) {
         if (def.field.name === 'smartMoney') {
           filters.push(Prisma.sql`lsm."smartMoneyStatus" IN (${Prisma.join(def.field.values)})`);
