@@ -90,7 +90,11 @@ export class CalendarService {
 
     if (wants('ECONOMIC')) {
       const rows = await this.repository.listEconomicEvents(region, from, to, limit);
-      if (!rows.length) warnings.push('No economic releases ingested yet (FRED, US/global) — run a calendar refresh.');
+      // Economic releases are FRED US/global only (the Economic tab is hidden for other regions),
+      // so the "run a refresh" hint only makes sense for US — never surface it on the IN page.
+      if (!rows.length && region === 'US') {
+        warnings.push('No economic releases ingested yet (FRED, US/global) — run a calendar refresh.');
+      }
       events.push(...rows.map((r) => this.economicToEvent(r)));
     }
 
