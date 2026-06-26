@@ -5,7 +5,6 @@ import {
   normalizeStockInterestRegion,
   normalizeStockInterestTimeframe,
   parseStockInterestBatchSize,
-  parseStockInterestOffset,
 } from './stock-interest-snapshot.validation';
 import { CATEGORY_ORDER } from './stock-interest-snapshot.types';
 import type {
@@ -79,14 +78,44 @@ export class StockInterestSnapshotService {
     const assetType = normalizeStockInterestAssetType(request.assetType);
     const timeframe = normalizeStockInterestTimeframe(request.timeframe);
     const batchSize = parseStockInterestBatchSize(request.batchSize);
-    const offset = parseStockInterestOffset(request.offset);
     const generatedAt = request.generatedAt || new Date();
-    const input = await this.repository.loadCalculationInput({ region, assetType, batchSize, offset });
-    const rows = this.calculateSnapshots(input, {
+    const dataThroughOverride = request.dataThroughDate ?? undefined;
+
+    // Page through the ENTIRE universe and score globally. The Stock Interest
+    // categories are market-wide top-25 lists; a genuine top-25 cannot be
+    // assembled from independently-ranked alphabetical batches, so every scored
+    // candidate must be seen at once. (Previously the pipeline adapter persisted
+    // only the alphabetically-first batch, leaving the page reading A-prefix
+    // names in alphabetical order.)
+    const allMetrics: StockMetrics[] = [];
+    const processedSymbols: string[] = [];
+    let latestInputDate: Date | null = null;
+    let offset = 0;
+    for (;;) {
+      const input = await this.repository.loadCalculationInput({ region, assetType, batchSize, offset });
+      const batchCount = input.stocks.length;
+      if (batchCount === 0) break;
+      const metrics = this.calculateMetrics(input, generatedAt, dataThroughOverride);
+      for (const metric of metrics) {
+        // Heavy OHLC bars are only needed to derive the per-stock metrics above;
+        // drop them so the accumulator stays light across the full universe.
+        metric.bars = [];
+        allMetrics.push(metric);
+      }
+      for (const stock of input.stocks) processedSymbols.push(stock.symbol);
+      latestInputDate = this.maxDate([latestInputDate, this.latestInputDate(input)]);
+      offset += batchCount;
+      const totalUniverseCount = input.totalUniverseCount ?? processedSymbols.length;
+      if (offset >= totalUniverseCount) break;
+    }
+
+    const rows = this.rankMetrics(allMetrics, {
       generatedAt,
       snapshotDate: request.snapshotDate,
-      dataThroughDate: request.dataThroughDate ?? undefined,
+      dataThroughDate: dataThroughOverride,
       timeframe,
+      region,
+      assetType,
     });
     const writeSummary = await this.repository.upsertSnapshots(rows);
     const prunedCount = typeof (this.repository as any).pruneSnapshotRowsForSymbols === 'function'
@@ -95,14 +124,12 @@ export class StockInterestSnapshotService {
         region,
         assetType,
         timeframe,
-        symbols: input.stocks.map((stock) => stock.symbol),
+        symbols: processedSymbols,
         keepKeys: rows.map((row) => ({ category: row.category, symbol: row.symbol })),
       })
       : 0;
     writeSummary.prunedCount = prunedCount;
-    const processedCount = input.stocks.length;
-    const totalUniverseCount = input.totalUniverseCount ?? input.stocks.length;
-    const nextOffset = offset + processedCount < totalUniverseCount ? offset + processedCount : null;
+    const processedCount = processedSymbols.length;
     const categories = this.emptyCategoryCounts();
     for (const row of rows) categories[row.category] += 1;
     const warnings = this.summarizeRowWarnings(rows);
@@ -113,7 +140,7 @@ export class StockInterestSnapshotService {
       status,
       scope: { region, assetType, timeframe },
       snapshotDate: this.isoDate(this.snapshotDateFor(generatedAt, request.snapshotDate)),
-      dataThroughDate: rows[0]?.dataThroughDate ? this.isoDate(rows[0].dataThroughDate) : this.isoDateOrNull(request.dataThroughDate ?? this.latestInputDate(input)),
+      dataThroughDate: rows[0]?.dataThroughDate ? this.isoDate(rows[0].dataThroughDate) : this.isoDateOrNull(request.dataThroughDate ?? latestInputDate),
       generatedAt: generatedAt.toISOString(),
       totalCount: rows.length,
       processedCount: rows.length,
@@ -121,8 +148,9 @@ export class StockInterestSnapshotService {
       failedCount: 0,
       skippedCount: rows.length === 0 ? processedCount : 0,
       unchangedCount: writeSummary.unchangedCount,
-      nextOffset,
-      hasMore: nextOffset !== null,
+      // The whole universe is scored in a single pass — no external paging.
+      nextOffset: null,
+      hasMore: false,
       warnings,
       errors: [],
       categories,
@@ -133,10 +161,23 @@ export class StockInterestSnapshotService {
     input: StockInterestCalculationInput,
     options: { generatedAt: Date; snapshotDate?: Date; dataThroughDate?: Date | null; timeframe?: string }
   ): StockInterestSnapshotWriteInput[] {
+    const metrics = this.calculateMetrics(input, options.generatedAt, options.dataThroughDate);
+    return this.rankMetrics(metrics, { ...options, region: input.region, assetType: input.assetType });
+  }
+
+  /**
+   * Rank an already-computed metric set into persisted snapshot rows. Kept
+   * separate from metric calculation so a global multi-batch refresh can score
+   * the FULL universe at once, while the public `calculateSnapshots` keeps its
+   * single-input contract.
+   */
+  private rankMetrics(
+    metrics: StockMetrics[],
+    options: { generatedAt: Date; snapshotDate?: Date; dataThroughDate?: Date | null; timeframe?: string; region: string; assetType: string }
+  ): StockInterestSnapshotWriteInput[] {
     const snapshotDate = this.snapshotDateFor(options.generatedAt, options.snapshotDate);
     const generatedAt = options.generatedAt;
     const timeframe = options.timeframe || '1d';
-    const metrics = this.calculateMetrics(input, generatedAt, options.dataThroughDate);
     const rows: StockInterestSnapshotWriteInput[] = [];
 
     rows.push(...this.rank(metrics, 'TODAY_TOP_INTEREST', (item) => this.todayInterestScore(item), 'bullish interest'));
@@ -154,8 +195,8 @@ export class StockInterestSnapshotService {
         snapshotDate,
         generatedAt,
         timeframe,
-        region: input.region,
-        assetType: input.assetType,
+        region: options.region,
+        assetType: options.assetType,
       }))
       .sort((a, b) => {
         const categoryDelta = CATEGORY_ORDER.indexOf(a.category) - CATEGORY_ORDER.indexOf(b.category);
@@ -237,11 +278,20 @@ export class StockInterestSnapshotService {
     scorer: (item: StockMetrics) => number,
     direction: string
   ): StockInterestSnapshotWriteInput[] {
+    // Rank on the RAW score, not the 0-100 stored score. Several scorers
+    // saturate above 100 (e.g. SECTOR_LEADERS), so ranking on the clamped value
+    // collapses genuine leaders into a wall of 100-ties whose only tiebreak is
+    // alphabetical — re-introducing the alphabetical bias this fix removes. The
+    // stored row still carries the clamped score (via toRow).
     return metrics
-      .map((item) => this.toRow(item, category, scorer(item), direction))
-      .filter((row) => row.score > 0)
-      .sort((a, b) => b.score - a.score || a.symbol.localeCompare(b.symbol))
-      .slice(0, 25);
+      .map((item) => {
+        const rawScore = scorer(item);
+        return { row: this.toRow(item, category, rawScore, direction), rawScore };
+      })
+      .filter((entry) => entry.rawScore > 0)
+      .sort((a, b) => b.rawScore - a.rawScore || a.row.symbol.localeCompare(b.row.symbol))
+      .slice(0, 25)
+      .map((entry) => entry.row);
   }
 
   private toRow(
