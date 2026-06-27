@@ -35,7 +35,7 @@ import {
 // StockInterestTable
 // ---------------------------------------------------------------------------
 
-type StockInterestSortKey = 'symbol' | 'company' | 'sector' | 'score' | 'direction' | 'freshness' | 'dataThrough';
+type StockInterestSortKey = 'symbol' | 'company' | 'sector' | 'score' | 'freshness' | 'dataThrough';
 
 function stockInterestSortValue(row: StockInterestSnapshot, key: StockInterestSortKey): unknown {
   switch (key) {
@@ -43,7 +43,6 @@ function stockInterestSortValue(row: StockInterestSnapshot, key: StockInterestSo
     case 'company': return row.company;
     case 'sector': return row.sector;
     case 'score': return row.score;
-    case 'direction': return row.direction;
     case 'freshness': return row.freshness;
     case 'dataThrough': return row.dataThroughDate;
   }
@@ -66,7 +65,6 @@ export function StockInterestTable({ rows }: { rows: StockInterestSnapshot[] }) 
     { label: 'Company', sortKey: 'company' },
     { label: 'Sector', sortKey: 'sector' },
     { label: 'Interest Score', align: 'right', sortKey: 'score' },
-    { label: 'Direction', sortKey: 'direction' },
     { label: 'Reasons' },
     { label: 'Risks' },
     { label: 'Freshness', sortKey: 'freshness' },
@@ -106,7 +104,6 @@ export function StockInterestTable({ rows }: { rows: StockInterestSnapshot[] }) 
                 <TableCell sx={{ maxWidth: 180, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={row.company}>{row.company}</TableCell>
                 <TableCell sx={{ whiteSpace: 'nowrap', color: sectorDisplay === '—' ? 'text.disabled' : undefined }} title={sectorTitle}>{sectorDisplay}</TableCell>
                 <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>{formatOptional(row.score)}</TableCell>
-                <TableCell sx={{ whiteSpace: 'nowrap' }}>{row.direction}</TableCell>
                 <TableCell><ReasonTags tags={row.reasonTags} /></TableCell>
                 <TableCell><RiskTags tags={row.riskTags} /></TableCell>
                 <TableCell sx={{ whiteSpace: 'nowrap' }}>{row.freshness || '—'}</TableCell>
