@@ -244,6 +244,18 @@ describe('CalendarService.latest', () => {
     const res = await service.latest({ region: 'US', assetType: 'STOCK', type: 'ECONOMIC', ...QUERY_DEFAULTS });
     expect(res.warnings.some((w) => w.includes('economic releases ingested'))).toBe(true);
   });
+
+  it('does not surface the empty forthcoming-IPO (NSE/BSE) warning for US — it must not leak onto US tabs', async () => {
+    const { service } = makeService(); // listUpcomingIpos defaults to []
+    const res = await service.latest({ region: 'US', assetType: 'STOCK', type: 'ALL', ...QUERY_DEFAULTS });
+    expect(res.warnings.some((w) => w.includes('forthcoming IPOs ingested'))).toBe(false);
+  });
+
+  it('still surfaces the empty forthcoming-IPO warning for IN (NSE/BSE feed lives there)', async () => {
+    const { service } = makeService(); // listUpcomingIpos defaults to []
+    const res = await service.latest({ region: 'IN', assetType: 'STOCK', type: 'IPO_UPCOMING', ...QUERY_DEFAULTS });
+    expect(res.warnings.some((w) => w.includes('forthcoming IPOs ingested'))).toBe(true);
+  });
 });
 
 describe('CalendarService.refreshSnapshots (IPO)', () => {

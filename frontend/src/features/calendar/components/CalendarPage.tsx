@@ -329,8 +329,13 @@ export function CalendarPage() {
   // Tab lives in the URL so browser-back from an instrument page restores it.
   const tabParam = (searchParams.get('tab') ?? 'ALL') as TabKey;
   const tab: TabKey = visibleTabs.some((t) => t.key === tabParam) ? tabParam : 'ALL';
+  // The forthcoming-IPO ("Upcoming") sub-tab is NSE/BSE = India only (no US/other source exists),
+  // so it's offered only for IN — mirroring how the FRED-only Economic tab is hidden outside US.
+  const ipoUpcomingAvailable = scope.region === 'IN';
   // IPO sub-tab + Closed timeframe live in the URL (?tab=IPO&ipo=CLOSED&tf=3M) so reload/back restore them.
-  const ipoSub: IpoSub = (searchParams.get('ipo') ?? 'UPCOMING') === 'CLOSED' ? 'CLOSED' : 'UPCOMING';
+  // Outside IN there is no Upcoming sub-tab, so the IPO tab always resolves to Closed.
+  const ipoSub: IpoSub =
+    !ipoUpcomingAvailable || (searchParams.get('ipo') ?? 'UPCOMING') === 'CLOSED' ? 'CLOSED' : 'UPCOMING';
   const tfParam = (searchParams.get('tf') ?? '3M') as IpoTimeframe;
   const tf: IpoTimeframe = IPO_TIMEFRAMES.some((t) => t.key === tfParam) ? tfParam : '3M';
   const ipoMonths = IPO_TIMEFRAMES.find((t) => t.key === tf)?.months ?? 3;
@@ -338,11 +343,15 @@ export function CalendarPage() {
   const selectTab = useCallback(
     (next: TabKey) => {
       if (next === 'ALL') return setSearchParams({}, { replace: false });
-      // Default the IPO parent into its Upcoming sub-tab; other tabs carry only ?tab.
-      if (next === 'IPO') return setSearchParams({ tab: 'IPO', ipo: 'UPCOMING', tf }, { replace: false });
+      // Default the IPO parent into Upcoming (IN, where the NSE/BSE feed exists) or Closed (elsewhere).
+      if (next === 'IPO')
+        return setSearchParams(
+          { tab: 'IPO', ipo: ipoUpcomingAvailable ? 'UPCOMING' : 'CLOSED', tf },
+          { replace: false },
+        );
       return setSearchParams({ tab: next }, { replace: false });
     },
-    [setSearchParams, tf],
+    [setSearchParams, tf, ipoUpcomingAvailable],
   );
   const selectIpoSub = useCallback(
     (next: IpoSub) => setSearchParams({ tab: 'IPO', ipo: next, tf }, { replace: false }),
@@ -500,14 +509,16 @@ export function CalendarPage() {
 
       {tab === 'IPO' && (
         <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 1.5, flexWrap: 'wrap', rowGap: 1 }}>
-          <Tabs
-            value={ipoSub}
-            onChange={(_, next) => selectIpoSub(next as IpoSub)}
-            sx={{ minHeight: 36, '& .MuiTab-root': { minHeight: 36, py: 0 } }}
-          >
-            <Tab value="UPCOMING" label="Upcoming" />
-            <Tab value="CLOSED" label="Closed" />
-          </Tabs>
+          {ipoUpcomingAvailable && (
+            <Tabs
+              value={ipoSub}
+              onChange={(_, next) => selectIpoSub(next as IpoSub)}
+              sx={{ minHeight: 36, '& .MuiTab-root': { minHeight: 36, py: 0 } }}
+            >
+              <Tab value="UPCOMING" label="Upcoming" />
+              <Tab value="CLOSED" label="Closed" />
+            </Tabs>
+          )}
           {ipoSub === 'CLOSED' && (
             <Stack direction="row" spacing={0.75} alignItems="center">
               <Typography variant="caption" color="text.secondary">Listed in last</Typography>

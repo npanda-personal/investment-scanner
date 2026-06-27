@@ -101,7 +101,13 @@ export class CalendarIpoService {
 
     if (wantUpcoming) {
       const rows = await this.repository.listUpcomingIpos(region, limit);
-      if (!rows.length) warnings.push('No forthcoming IPOs ingested yet (NSE/BSE) — run a calendar refresh.');
+      // The forthcoming-IPO feed is NSE/BSE = India only (the ingest skips every non-IN region —
+      // see `ingestUpcomingIpos`). So an empty result is only "needs a refresh" for IN; for US/other
+      // regions there is no such source and the NSE/BSE hint is just noise — and because this runs
+      // under type=ALL it would otherwise leak onto every US tab (e.g. Earnings). Guard to IN only.
+      if (!rows.length && region === 'IN') {
+        warnings.push('No forthcoming IPOs ingested yet (NSE/BSE) — run a calendar refresh.');
+      }
       out.push(...rows.map((r) => this.upcomingIpoToEvent(r)));
     }
     return out;
