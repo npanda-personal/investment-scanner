@@ -4,9 +4,10 @@
  * Run LOCALLY against the running backend (localhost:3000):
  *     node scripts/capture-demo-data.mjs
  *
- * Captures all trader-facing endpoints for IN and US regions (STOCK only),
- * derives real IDs from list responses to capture detail pages, and writes each
- * response as a JSON file to frontend/public/demo-api/ plus a manifest.json.
+ * Captures trader-facing endpoints for IN and US regions (STOCK only).
+ * Scope: Daily Decisions + Discover sections + Instrument detail page.
+ * Excluded: portfolios, watchlists, alerts, notifications, crypto, admin-only,
+ * copilot, and price history (chart tab renders blank with TradingView link).
  *
  * Manifest key convention:
  *   - Region-scoped:  "/api/v1/signals/top?region=IN"
@@ -249,97 +250,38 @@ const GLOBAL_GETS = [
   '/api/v1/subscription/features',
   '/api/v1/market-context/macro',
   '/api/v1/fx-rates',
-  '/api/v1/signals/calibration/health',
-  '/api/v1/signals/calibration/model',
-  '/api/v1/signals/position-ledger/health',
-  '/api/v1/trade-plans/health',
-  '/api/v1/trade-plans/model',
-  '/api/v1/strategy/health',
-  '/api/v1/strategy/model',
-  '/api/v1/strategies/health',
-  '/api/v1/strategies/model',
-  '/api/v1/research/health',
-  '/api/v1/copilot/alert-digest',
 ];
 
 const SCOPED_GETS = [
-  // market intelligence
+  // ── Daily Decisions ──
+  // Market page: Health / Sectors / Events tabs
   ['/api/v1/market-intelligence/market-pulse', { timeframe: '1d' }],
   '/api/v1/market-intelligence/sectors',
   '/api/v1/market-intelligence/sector-rotation',
-  '/api/v1/market-intelligence/stock-interest',
-  '/api/v1/market-intelligence/earnings',
   ['/api/v1/market-intelligence/event-feed', { days: 5 }],
-  // NOTE: /api/v1/calendar is NOT a plain scoped GET — it needs the per-eventType
-  // merge in captureCalendarMerged() (see Phase 2) so every tab is populated.
-  // market context
-  '/api/v1/market-context/summary',
-  '/api/v1/market-context/persisted-summary',
-  '/api/v1/market-context/persisted-breadth',
-  '/api/v1/market-context/regime',
-  '/api/v1/market-context/sectors',
-  '/api/v1/market-context/breadth',
-  '/api/v1/market-context/countries',
-  '/api/v1/market-context/capital-posture',
-  ['/api/v1/market-context/breadth-internals', { days: 60 }],
-  // market data — screener, scans, movers
-  ['/api/v1/market-data/screener', { limit: 50 }],
-  '/api/v1/market-data/screener/conviction',
-  ['/api/v1/market-data/movers', { limit: 20 }],
-  ['/api/v1/market-data/scans/52w-high', { limit: 20 }],
-  ['/api/v1/market-data/scans/52w-low', { limit: 20 }],
-  ['/api/v1/market-data/scans/delivery-spike', { limit: 20 }],
-  ['/api/v1/market-data/scans/volume-spike', { limit: 20 }],
-  '/api/v1/market-data/health',
-  ['/api/v1/market-data/market-map', { limit: 50 }],
-  '/api/v1/market-data/review-readiness-summary',
-  // signals
-  '/api/v1/signals/health',
-  ['/api/v1/signals/top', { limit: 50, offset: 0 }],
-  ['/api/v1/signals/screener', { limit: 50, offset: 0 }],
-  '/api/v1/signals/runs/latest',
-  ['/api/v1/signals/exit-candidates', { limit: 25 }],
-  // signal quality
-  ['/api/v1/signals/quality/dashboard', { horizon: '20D' }],
-  ['/api/v1/signals/quality/summary', { horizon: '20D' }],
-  ['/api/v1/signals/quality/by-type', { horizon: '20D' }],
-  ['/api/v1/signals/quality/by-sector', { horizon: '20D' }],
-  ['/api/v1/signals/quality/by-score', { horizon: '20D' }],
-  ['/api/v1/signals/quality/by-regime', { horizon: '20D' }],
-  ['/api/v1/signals/quality/by-data-quality', { horizon: '20D' }],
-  ['/api/v1/signals/quality/noisy', { horizon: '20D' }],
-  ['/api/v1/signals/quality/scorecard', { horizon: '20D' }],
-  // signal calibration
-  ['/api/v1/signals/calibration/top', { limit: 25 }],
-  // signal position ledger
-  ['/api/v1/signals/position-ledger/persisted/active', { limit: 25 }],
-  ['/api/v1/signals/position-ledger/persisted/closed', { limit: 25 }],
-  // smart money
-  '/api/v1/smart-money/health',
-  ['/api/v1/smart-money/top', { range: '3M', limit: 20 }],
-  ['/api/v1/smart-money/distribution', { range: '3M', limit: 20 }],
-  ['/api/v1/smart-money/sectors', { range: '3M' }],
-  // today review
+  // Today Review: Daily Review / Shortlist / Overview tabs
   ['/api/v1/today-review/latest', { enrich: 'true' }],
   ['/api/v1/today-review/runs', { limit: 10, offset: 0 }],
-  // trade plans
-  ['/api/v1/trade-plans/candidates', { limit: 50 }],
-  '/api/v1/trade-plans/funnel',
-  // strategy decision engine
-  '/api/v1/strategy/market-gate',
-  ['/api/v1/strategy/candidates', { limit: 25 }],
-  '/api/v1/strategy/exits',
-  // strategies framework
-  '/api/v1/strategies',
-  '/api/v1/strategies/rankings',
-  '/api/v1/strategies/proof-registry',
-  // backtests
-  '/api/v1/backtests/strategies',
-  '/api/v1/backtests/runs',
-  // research + copilot + pipeline
+  '/api/v1/market-context/summary',
+  ['/api/v1/market-data/movers', { limit: 20 }],
+  '/api/v1/data-quality/summary',
+  ['/api/v1/signals/position-ledger/persisted/active', { limit: 100, offset: 0, sortBy: 'entryTriggerTimestamp', sortDirection: 'desc' }],
+  // ── Discover ──
+  // Screener page: Screener / Conviction / Market Scans / Stock Interest / Index Constituents
+  ['/api/v1/market-data/screener', { limit: 50 }],
+  '/api/v1/market-data/screener/conviction',
+  ['/api/v1/market-data/scans/52w-high', { limit: 30 }],
+  ['/api/v1/market-data/scans/52w-low', { limit: 30 }],
+  ['/api/v1/market-data/scans/delivery-spike', { limit: 30 }],
+  ['/api/v1/market-data/scans/volume-spike', { limit: 30 }],
+  ['/api/v1/market-data/scans/potential-movers', { limit: 50 }],
+  '/api/v1/market-intelligence/stock-interest',
+  // NOTE: index-constituents captured separately per region with region-specific index values
+  // NOTE: /api/v1/calendar is NOT a plain scoped GET — captureCalendarMerged() in Phase 2
+  // Research Hub
   '/api/v1/research/overview',
-  '/api/v1/copilot/market-brief',
-  '/api/v1/pipeline/status',
+  // Earnings Intelligence
+  ['/api/v1/market-intelligence/earnings', { limit: 100 }],
 ];
 
 const IN_ONLY_GETS = [
@@ -351,8 +293,12 @@ const IN_ONLY_GETS = [
   ['/api/v1/derivatives/option-metrics', { limit: 200 }],
   '/api/v1/derivatives/pcr',
   '/api/v1/derivatives/participant-oi',
-  '/api/v1/derivatives/fo-bhavcopy/meta',
 ];
+
+const INDEX_CONSTITUENTS_BY_REGION = {
+  IN: ['NIFTY_50', 'NIFTY_BANK'],
+  US: ['SP500', 'NDX100'],
+};
 
 // ---- main ------------------------------------------------------------------
 
@@ -370,7 +316,7 @@ async function main() {
   const PACE_MS = 50; // small delay between calls to avoid connection pool exhaustion
 
   // ── Phase 1: non-scoped endpoints ────────────────────────────────────────
-  console.log('\n[1/7] non-scoped endpoints');
+  console.log('\n[1/6] non-scoped endpoints');
   for (const item of GLOBAL_GETS) {
     const [p, params] = Array.isArray(item) ? item : [item, undefined];
     await capture('GET', p, { params });
@@ -379,7 +325,7 @@ async function main() {
 
   // ── Phase 2: region-scoped list endpoints ────────────────────────────────
   for (const region of REGIONS) {
-    console.log(`\n[2/7] region-scoped lists (${region})`);
+    console.log(`\n[2/6] region-scoped lists (${region})`);
     regionData[region] = {};
 
     for (const item of SCOPED_GETS) {
@@ -392,6 +338,17 @@ async function main() {
     regionData[region]['/api/v1/calendar'] = await captureCalendarMerged(region);
     await delay(PACE_MS);
 
+    // Index Constituents — different indices per region
+    const indices = INDEX_CONSTITUENTS_BY_REGION[region] || [];
+    for (const idx of indices) {
+      await capture('GET', '/api/v1/market-intelligence/index-constituents', {
+        params: { index: idx },
+        region,
+        manifestKeySuffix: `&index=${idx}`,
+      });
+      await delay(PACE_MS);
+    }
+
     if (region === 'IN') {
       console.log(`  + IN-only endpoints`);
       for (const item of IN_ONLY_GETS) {
@@ -403,27 +360,21 @@ async function main() {
   }
 
   // ── Phase 3: extract IDs per region ──────────────────────────────────────
-  console.log('\n[3/7] extracting IDs');
+  console.log('\n[3/6] extracting IDs');
   const regionIds = {};
 
   for (const region of REGIONS) {
     const rd = regionData[region];
 
-    // Instrument IDs from 8 sources
+    // Instrument IDs from trader-facing list endpoints
     const instrumentIds = [
       ...extractField(rd['/api/v1/market-data/screener'], ['instrumentId', 'id'], 10),
-      ...extractField(rd['/api/v1/signals/top'], ['instrumentId', 'id'], 10),
-      ...extractField(rd['/api/v1/signals/screener'], ['instrumentId', 'id'], 10),
       ...extractField(rd['/api/v1/market-data/movers'], ['instrumentId', 'id'], 5),
       ...extractField(rd['/api/v1/market-data/screener/conviction'], ['instrumentId', 'id'], 5),
-      ...extractField(rd['/api/v1/smart-money/top'], ['instrumentId', 'id'], 5),
-      ...extractField(rd['/api/v1/signals/calibration/top'], ['instrumentId', 'id'], 5),
+      ...extractField(rd['/api/v1/market-intelligence/stock-interest'], ['instrumentId', 'id'], 5),
       ...extractField(rd['/api/v1/signals/position-ledger/persisted/active'], ['instrumentId', 'id'], 5),
     ].filter(Boolean);
-    const uniqueInstrumentIds = [...new Set(instrumentIds)].slice(0, 3);
-
-    // Strategy codes
-    const strategyCodes = extractField(rd['/api/v1/strategies'], ['code', 'strategyCode'], 3);
+    const uniqueInstrumentIds = [...new Set(instrumentIds)].slice(0, 5);
 
     // Today review candidate IDs
     const todayData = rd['/api/v1/today-review/latest'];
@@ -435,53 +386,43 @@ async function main() {
     // Sector names
     const sectorNames = extractField(rd['/api/v1/market-intelligence/sectors'], ['sector', 'sectorName', 'name'], 3);
 
-    // US ticker symbols (for us-smart-money SEC endpoint)
+    // US ticker symbols (for us-smart-money SEC endpoint on instrument detail)
     const tickerSymbols = region === 'US'
-      ? extractField(rd['/api/v1/market-data/screener'], ['symbol'], 3)
+      ? extractField(rd['/api/v1/market-data/screener'], ['symbol'], 5)
       : [];
 
-    regionIds[region] = { uniqueInstrumentIds, strategyCodes, candidateIds, runIds, sectorNames, tickerSymbols };
-    console.log(`  ${region}: instruments=${uniqueInstrumentIds.length} strategies=${strategyCodes.length} candidates=${candidateIds.length} runs=${runIds.length} sectors=${sectorNames.length} tickers=${tickerSymbols.length}`);
+    regionIds[region] = { uniqueInstrumentIds, candidateIds, runIds, sectorNames, tickerSymbols };
+    console.log(`  ${region}: instruments=${uniqueInstrumentIds.length} candidates=${candidateIds.length} runs=${runIds.length} sectors=${sectorNames.length} tickers=${tickerSymbols.length}`);
   }
 
-  // ── Phase 4: per-instrument detail ───────────────────────────────────────
-  console.log('\n[4/7] per-instrument detail');
+  // ── Phase 4: per-instrument detail (trader-facing tabs only) ──────────────
+  // Chart tab: prices/:id deliberately SKIPPED — adapter returns {} so the chart
+  // renders "No price history" with the TradingView external link (lightweight).
+  console.log('\n[4/6] per-instrument detail');
   for (const region of REGIONS) {
     const ids = regionIds[region].uniqueInstrumentIds;
     for (const id of ids) {
       console.log(`  ${region} instrument ${id}`);
-      // Region-scoped instrument endpoints
-      await capture('GET', `/api/v1/signals/${id}`, { region });
-      await capture('GET', `/api/v1/signals/${id}/history`, { params: { limit: 20 }, region });
-      await capture('GET', `/api/v1/signals/${id}/outcomes`, { params: { horizon: '20D' }, region });
-      await capture('GET', `/api/v1/market-intelligence/instrument-context/${id}`, { region });
-      await capture('GET', `/api/v1/smart-money/stocks/${id}`, { params: { range: '3M' }, region });
-      await capture('GET', `/api/v1/research/stocks/${id}/workbench`, { params: { range: '1Y' }, region });
-      await capture('GET', `/api/v1/trade-plans/${id}`, { region });
-      await capture('GET', `/api/v1/strategy/${id}`, { region });
-      await capture('GET', `/api/v1/strategy/history/${id}`, { region });
-      await capture('GET', `/api/v1/signals/calibration/compare/${id}`, { params: { horizon: '20D' }, region });
-      await capture('GET', `/api/v1/signals/calibration/${id}`, { region });
-      // Non-scoped instrument metadata (capture once per unique ID)
+      // Non-scoped instrument metadata
       await capture('GET', `/api/v1/instruments/${id}`);
-      await capture('GET', `/api/v1/prices/${id}`, { params: { limit: 250 } });
       await capture('GET', `/api/v1/prices/${id}/latest`);
       await capture('GET', `/api/v1/fundamentals/${id}`);
       await capture('GET', `/api/v1/corporate-actions/${id}`);
+      // Region-scoped instrument endpoints
+      await capture('GET', `/api/v1/market-intelligence/instrument-context/${id}`, { region });
+      await capture('GET', `/api/v1/smart-money/stocks/${id}`, { params: { range: '3M' }, region });
+      await capture('GET', `/api/v1/research/stocks/${id}/workbench`, { params: { range: '1Y' }, region });
+      await capture('GET', `/api/v1/signals/${id}/history`, { params: { limit: 20 }, region });
+      await capture('GET', `/api/v1/signals/${id}/outcomes`, { params: { horizon: '20D' }, region });
       await delay(PACE_MS);
     }
   }
 
   // ── Phase 5: derived-ID detail (per region) ──────────────────────────────
-  console.log('\n[5/7] derived-ID detail');
+  console.log('\n[5/6] derived-ID detail');
   for (const region of REGIONS) {
-    const { strategyCodes, candidateIds, runIds, sectorNames } = regionIds[region];
+    const { candidateIds, runIds, sectorNames } = regionIds[region];
 
-    for (const code of strategyCodes) {
-      await capture('GET', `/api/v1/strategies/${code}`, { region });
-      await capture('GET', `/api/v1/strategies/${code}/performance`, { region });
-      await capture('GET', `/api/v1/strategies/${code}/proof`, { region });
-    }
     for (const id of candidateIds) {
       await capture('GET', `/api/v1/today-review/candidates/${id}`, { region });
     }
@@ -498,7 +439,7 @@ async function main() {
   }
 
   // ── Phase 6: non-scoped derived detail (once) ────────────────────────────
-  console.log('\n[6/7] non-scoped derived detail');
+  console.log('\n[6/6] non-scoped derived detail');
 
   // FX rate pairs
   const fxData = manifest['/api/v1/fx-rates']
@@ -509,22 +450,10 @@ async function main() {
     await capture('GET', `/api/v1/fx-rates/${pair}`);
   }
 
-  // US smart money (SEC Form 4 / 13F by ticker)
+  // US smart money by ticker (instrument detail page, US only)
   const usTickerSymbols = regionIds['US']?.tickerSymbols || [];
   for (const symbol of usTickerSymbols) {
-    await capture('GET', `/api/v1/market-data/us-smart-money/${symbol}`, { params: { limit: 50 } });
-  }
-
-  // ── Phase 7: copilot POST summaries (per region) ────────────────────────
-  console.log('\n[7/7] copilot POST summaries');
-  for (const region of REGIONS) {
-    const firstId = regionIds[region].uniqueInstrumentIds[0];
-    if (firstId) {
-      await capture('POST', '/api/v1/copilot/stock-summary', {
-        body: { instrumentId: firstId },
-        region,
-      });
-    }
+    await capture('GET', `/api/v1/market-data/us-smart-money/${symbol}`, { params: { limit: 25 } });
   }
 
   // ── Write manifest ───────────────────────────────────────────────────────

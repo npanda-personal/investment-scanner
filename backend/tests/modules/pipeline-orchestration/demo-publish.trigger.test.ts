@@ -58,9 +58,9 @@ describe('triggerDemoPublishIfEnabled', () => {
     expect(spawnMock).not.toHaveBeenCalled();
   });
 
-  it('does nothing for a non-IN/STOCK scope', () => {
+  it('does nothing for an unsupported scope', () => {
     process.env.DEMO_AUTO_PUBLISH = 'true';
-    load()(summary({ region: 'US' }));
+    load()(summary({ region: 'EU' }));
     load()(summary({ assetType: 'CRYPTO', region: 'GLOBAL' }));
     expect(spawnMock).not.toHaveBeenCalled();
   });
