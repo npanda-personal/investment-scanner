@@ -269,6 +269,8 @@ const SCOPED_GETS = [
   // ── Discover ──
   // Screener page: Screener / Conviction / Market Scans / Stock Interest / Index Constituents
   ['/api/v1/market-data/screener', { limit: 50 }],
+  ['/api/v1/market-data/screener', { limit: 50, signalDirection: 'BULLISH' }],
+  ['/api/v1/market-data/screener', { limit: 50, signalDirection: 'BEARISH' }],
   '/api/v1/market-data/screener/conviction',
   ['/api/v1/market-data/scans/52w-high', { limit: 30 }],
   ['/api/v1/market-data/scans/52w-low', { limit: 30 }],
@@ -330,7 +332,13 @@ async function main() {
 
     for (const item of SCOPED_GETS) {
       const [p, params] = Array.isArray(item) ? item : [item, undefined];
-      regionData[region][p] = await capture('GET', p, { params, region });
+      // Compound params that need distinct manifest keys (adapter resolves these)
+      const compoundSuffix = params?.signalDirection
+        ? `&signalDirection=${params.signalDirection}`
+        : '';
+      const result = await capture('GET', p, { params, region, manifestKeySuffix: compoundSuffix || undefined });
+      // Store under the bare path only for non-compound captures (ID extraction uses bare paths)
+      if (!compoundSuffix) regionData[region][p] = result;
       await delay(PACE_MS);
     }
 

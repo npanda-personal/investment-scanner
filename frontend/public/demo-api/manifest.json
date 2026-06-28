@@ -67,6 +67,14 @@
     "file": "api-v1-market-data-screener-region-IN.json",
     "status": 200
   },
+  "/api/v1/market-data/screener?region=IN&signalDirection=BULLISH": {
+    "file": "api-v1-market-data-screener-region-INsignalDirection-BULLISH.json",
+    "status": 200
+  },
+  "/api/v1/market-data/screener?region=IN&signalDirection=BEARISH": {
+    "file": "api-v1-market-data-screener-region-INsignalDirection-BEARISH.json",
+    "status": 200
+  },
   "/api/v1/market-data/screener/conviction?region=IN": {
     "file": "api-v1-market-data-screener-conviction-region-IN.json",
     "status": 200
@@ -189,6 +197,14 @@
   },
   "/api/v1/market-data/screener?region=US": {
     "file": "api-v1-market-data-screener-region-US.json",
+    "status": 200
+  },
+  "/api/v1/market-data/screener?region=US&signalDirection=BULLISH": {
+    "file": "api-v1-market-data-screener-region-USsignalDirection-BULLISH.json",
+    "status": 200
+  },
+  "/api/v1/market-data/screener?region=US&signalDirection=BEARISH": {
+    "file": "api-v1-market-data-screener-region-USsignalDirection-BEARISH.json",
     "status": 200
   },
   "/api/v1/market-data/screener/conviction?region=US": {

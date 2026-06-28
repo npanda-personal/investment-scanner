@@ -77,8 +77,16 @@ function resolveEntry(
   params: Record<string, unknown> | undefined,
 ): ManifestEntry | undefined {
   const region = (params?.region ?? params?.market) as string | undefined;
-  const secondary = (params?.sector ?? params?.index) as string | undefined;
-  const secondaryKey = params?.sector ? 'sector' : params?.index ? 'index' : null;
+  const secondary = (params?.sector ?? params?.index ?? params?.signalDirection) as
+    | string
+    | undefined;
+  const secondaryKey = params?.sector
+    ? 'sector'
+    : params?.index
+      ? 'index'
+      : params?.signalDirection
+        ? 'signalDirection'
+        : null;
   if (region && secondary && secondaryKey) {
     const key = `${path}?region=${region}&${secondaryKey}=${secondary}`;
     if (manifest[key]) return manifest[key];
