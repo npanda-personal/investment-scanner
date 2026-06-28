@@ -393,18 +393,33 @@ async function main() {
   for (const region of REGIONS) {
     const rd = regionData[region];
 
-    // Instrument IDs from trader-facing list endpoints
+    // Instrument IDs from ALL trader-facing list endpoints (no cap — every
+    // stock visible in any demo list/table must have its detail page working)
     const instrumentIds = [
-      ...extractField(rd['/api/v1/market-data/screener'], ['instrumentId', 'id'], 10),
-      ...extractField(rd['/api/v1/market-data/movers'], ['instrumentId', 'id'], 5),
-      ...extractField(rd['/api/v1/market-data/screener/conviction'], ['instrumentId', 'id'], 5),
-      ...extractField(rd['/api/v1/market-intelligence/stock-interest'], ['instrumentId', 'id'], 5),
-      ...extractField(rd['/api/v1/signals/position-ledger/persisted/active'], ['instrumentId', 'id'], 5),
+      ...extractField(rd['/api/v1/market-data/screener'], ['instrumentId', 'id'], 9999),
+      ...extractField(rd['/api/v1/market-data/movers'], ['instrumentId', 'id'], 9999),
+      ...extractField(rd['/api/v1/market-data/screener/conviction'], ['instrumentId', 'id'], 9999),
+      ...extractField(rd['/api/v1/market-intelligence/stock-interest'], ['instrumentId', 'id'], 9999),
+      ...extractField(rd['/api/v1/signals/position-ledger/persisted/active'], ['instrumentId', 'id'], 9999),
     ].filter(Boolean);
-    const uniqueInstrumentIds = [...new Set(instrumentIds)].slice(0, 5);
+    // Also extract IDs from compound screener captures (Bullish/Bearish/setup sub-tabs)
+    // — these aren't in regionData, so read back the saved JSON files
+    for (const f of fs.readdirSync(OUT_DIR)) {
+      if (!f.includes('screener') || !f.includes(`region-${region}`) || !f.includes('signalDirection')) continue;
+      if (f === 'manifest.json') continue;
+      try {
+        const data = JSON.parse(fs.readFileSync(path.join(OUT_DIR, f), 'utf8'));
+        instrumentIds.push(...extractField(data, ['instrumentId', 'id'], 9999));
+      } catch { /* skip unreadable */ }
+    }
+    // Also extract from today-review candidates
+    const todayData = rd['/api/v1/today-review/latest'];
+    if (todayData?.candidates) {
+      instrumentIds.push(...extractField(todayData.candidates, ['instrumentId', 'id'], 9999));
+    }
+    const uniqueInstrumentIds = [...new Set(instrumentIds.filter(Boolean))];
 
     // Today review candidate IDs
-    const todayData = rd['/api/v1/today-review/latest'];
     const candidateIds = extractField(todayData, ['candidateId', 'id'], 3);
 
     // Today review run IDs
@@ -415,7 +430,7 @@ async function main() {
 
     // US ticker symbols (for us-smart-money SEC endpoint on instrument detail)
     const tickerSymbols = region === 'US'
-      ? extractField(rd['/api/v1/market-data/screener'], ['symbol'], 5)
+      ? extractField(rd['/api/v1/market-data/screener'], ['symbol'], 9999)
       : [];
 
     regionIds[region] = { uniqueInstrumentIds, candidateIds, runIds, sectorNames, tickerSymbols };
