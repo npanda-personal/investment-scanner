@@ -63,6 +63,10 @@
     "file": "api-v1-signals-position-ledger-persisted-active-region-IN.json",
     "status": 200
   },
+  "/api/v1/signals/position-ledger/persisted/closed?region=IN": {
+    "file": "api-v1-signals-position-ledger-persisted-closed-region-IN.json",
+    "status": 200
+  },
   "/api/v1/market-data/screener?region=IN": {
     "file": "api-v1-market-data-screener-region-IN.json",
     "status": 200
@@ -73,6 +77,70 @@
   },
   "/api/v1/market-data/screener?region=IN&signalDirection=BEARISH": {
     "file": "api-v1-market-data-screener-region-INsignalDirection-BEARISH.json",
+    "status": 200
+  },
+  "/api/v1/market-data/screener?region=IN&signalDirection=BULLISH&setup=TREND_MOMENTUM": {
+    "file": "api-v1-market-data-screener-region-INsignalDirection-BULLISH-setup-TREND-MOMENTUM.json",
+    "status": 200
+  },
+  "/api/v1/market-data/screener?region=IN&signalDirection=BULLISH&setup=BREAKOUT": {
+    "file": "api-v1-market-data-screener-region-INsignalDirection-BULLISH-setup-BREAKOUT.json",
+    "status": 200
+  },
+  "/api/v1/market-data/screener?region=IN&signalDirection=BULLISH&setup=PULLBACK": {
+    "file": "api-v1-market-data-screener-region-INsignalDirection-BULLISH-setup-PULLBACK.json",
+    "status": 200
+  },
+  "/api/v1/market-data/screener?region=IN&signalDirection=BULLISH&setup=RELATIVE_STRENGTH": {
+    "file": "api-v1-market-data-screener-region-INsignalDirection-BULLISH-setup-RELATIVE-STRENGTH.json",
+    "status": 200
+  },
+  "/api/v1/market-data/screener?region=IN&signalDirection=BULLISH&setup=QUALITY": {
+    "file": "api-v1-market-data-screener-region-INsignalDirection-BULLISH-setup-QUALITY.json",
+    "status": 200
+  },
+  "/api/v1/market-data/screener?region=IN&signalDirection=BULLISH&setup=GROWTH": {
+    "file": "api-v1-market-data-screener-region-INsignalDirection-BULLISH-setup-GROWTH.json",
+    "status": 200
+  },
+  "/api/v1/market-data/screener?region=IN&signalDirection=BULLISH&setup=OVEREXTENDED": {
+    "file": "api-v1-market-data-screener-region-INsignalDirection-BULLISH-setup-OVEREXTENDED.json",
+    "status": 200
+  },
+  "/api/v1/market-data/screener?region=IN&signalDirection=BULLISH&setup=SMART_MONEY_ACCUMULATION": {
+    "file": "api-v1-market-data-screener-region-INsignalDirection-BULLISH-setup-SMART-MONEY-ACCUMULATION.json",
+    "status": 200
+  },
+  "/api/v1/market-data/screener?region=IN&signalDirection=BULLISH&setup=SECTOR_LEADERSHIP": {
+    "file": "api-v1-market-data-screener-region-INsignalDirection-BULLISH-setup-SECTOR-LEADERSHIP.json",
+    "status": 200
+  },
+  "/api/v1/market-data/screener?region=IN&signalDirection=BEARISH&setup=TREND_BEARISH": {
+    "file": "api-v1-market-data-screener-region-INsignalDirection-BEARISH-setup-TREND-BEARISH.json",
+    "status": 200
+  },
+  "/api/v1/market-data/screener?region=IN&signalDirection=BEARISH&setup=BREAKDOWN": {
+    "file": "api-v1-market-data-screener-region-INsignalDirection-BEARISH-setup-BREAKDOWN.json",
+    "status": 200
+  },
+  "/api/v1/market-data/screener?region=IN&signalDirection=BEARISH&setup=OVERBOUGHT_REVERSAL": {
+    "file": "api-v1-market-data-screener-region-INsignalDirection-BEARISH-setup-OVERBOUGHT-REVERSAL.json",
+    "status": 200
+  },
+  "/api/v1/market-data/screener?region=IN&signalDirection=BEARISH&setup=RELATIVE_WEAKNESS": {
+    "file": "api-v1-market-data-screener-region-INsignalDirection-BEARISH-setup-RELATIVE-WEAKNESS.json",
+    "status": 200
+  },
+  "/api/v1/market-data/screener?region=IN&signalDirection=BEARISH&setup=WEAK_FUNDAMENTALS": {
+    "file": "api-v1-market-data-screener-region-INsignalDirection-BEARISH-setup-WEAK-FUNDAMENTALS.json",
+    "status": 200
+  },
+  "/api/v1/market-data/screener?region=IN&signalDirection=BEARISH&setup=EARNINGS_DECLINE": {
+    "file": "api-v1-market-data-screener-region-INsignalDirection-BEARISH-setup-EARNINGS-DECLINE.json",
+    "status": 200
+  },
+  "/api/v1/market-data/screener?region=IN&signalDirection=BEARISH&setup=SMART_MONEY_DISTRIBUTION": {
+    "file": "api-v1-market-data-screener-region-INsignalDirection-BEARISH-setup-SMART-MONEY-DISTRIBUTION.json",
     "status": 200
   },
   "/api/v1/market-data/screener/conviction?region=IN": {
@@ -195,6 +263,10 @@
     "file": "api-v1-signals-position-ledger-persisted-active-region-US.json",
     "status": 200
   },
+  "/api/v1/signals/position-ledger/persisted/closed?region=US": {
+    "file": "api-v1-signals-position-ledger-persisted-closed-region-US.json",
+    "status": 200
+  },
   "/api/v1/market-data/screener?region=US": {
     "file": "api-v1-market-data-screener-region-US.json",
     "status": 200
@@ -205,6 +277,70 @@
   },
   "/api/v1/market-data/screener?region=US&signalDirection=BEARISH": {
     "file": "api-v1-market-data-screener-region-USsignalDirection-BEARISH.json",
+    "status": 200
+  },
+  "/api/v1/market-data/screener?region=US&signalDirection=BULLISH&setup=TREND_MOMENTUM": {
+    "file": "api-v1-market-data-screener-region-USsignalDirection-BULLISH-setup-TREND-MOMENTUM.json",
+    "status": 200
+  },
+  "/api/v1/market-data/screener?region=US&signalDirection=BULLISH&setup=BREAKOUT": {
+    "file": "api-v1-market-data-screener-region-USsignalDirection-BULLISH-setup-BREAKOUT.json",
+    "status": 200
+  },
+  "/api/v1/market-data/screener?region=US&signalDirection=BULLISH&setup=PULLBACK": {
+    "file": "api-v1-market-data-screener-region-USsignalDirection-BULLISH-setup-PULLBACK.json",
+    "status": 200
+  },
+  "/api/v1/market-data/screener?region=US&signalDirection=BULLISH&setup=RELATIVE_STRENGTH": {
+    "file": "api-v1-market-data-screener-region-USsignalDirection-BULLISH-setup-RELATIVE-STRENGTH.json",
+    "status": 200
+  },
+  "/api/v1/market-data/screener?region=US&signalDirection=BULLISH&setup=QUALITY": {
+    "file": "api-v1-market-data-screener-region-USsignalDirection-BULLISH-setup-QUALITY.json",
+    "status": 200
+  },
+  "/api/v1/market-data/screener?region=US&signalDirection=BULLISH&setup=GROWTH": {
+    "file": "api-v1-market-data-screener-region-USsignalDirection-BULLISH-setup-GROWTH.json",
+    "status": 200
+  },
+  "/api/v1/market-data/screener?region=US&signalDirection=BULLISH&setup=OVEREXTENDED": {
+    "file": "api-v1-market-data-screener-region-USsignalDirection-BULLISH-setup-OVEREXTENDED.json",
+    "status": 200
+  },
+  "/api/v1/market-data/screener?region=US&signalDirection=BULLISH&setup=SMART_MONEY_ACCUMULATION": {
+    "file": "api-v1-market-data-screener-region-USsignalDirection-BULLISH-setup-SMART-MONEY-ACCUMULATION.json",
+    "status": 200
+  },
+  "/api/v1/market-data/screener?region=US&signalDirection=BULLISH&setup=SECTOR_LEADERSHIP": {
+    "file": "api-v1-market-data-screener-region-USsignalDirection-BULLISH-setup-SECTOR-LEADERSHIP.json",
+    "status": 200
+  },
+  "/api/v1/market-data/screener?region=US&signalDirection=BEARISH&setup=TREND_BEARISH": {
+    "file": "api-v1-market-data-screener-region-USsignalDirection-BEARISH-setup-TREND-BEARISH.json",
+    "status": 200
+  },
+  "/api/v1/market-data/screener?region=US&signalDirection=BEARISH&setup=BREAKDOWN": {
+    "file": "api-v1-market-data-screener-region-USsignalDirection-BEARISH-setup-BREAKDOWN.json",
+    "status": 200
+  },
+  "/api/v1/market-data/screener?region=US&signalDirection=BEARISH&setup=OVERBOUGHT_REVERSAL": {
+    "file": "api-v1-market-data-screener-region-USsignalDirection-BEARISH-setup-OVERBOUGHT-REVERSAL.json",
+    "status": 200
+  },
+  "/api/v1/market-data/screener?region=US&signalDirection=BEARISH&setup=RELATIVE_WEAKNESS": {
+    "file": "api-v1-market-data-screener-region-USsignalDirection-BEARISH-setup-RELATIVE-WEAKNESS.json",
+    "status": 200
+  },
+  "/api/v1/market-data/screener?region=US&signalDirection=BEARISH&setup=WEAK_FUNDAMENTALS": {
+    "file": "api-v1-market-data-screener-region-USsignalDirection-BEARISH-setup-WEAK-FUNDAMENTALS.json",
+    "status": 200
+  },
+  "/api/v1/market-data/screener?region=US&signalDirection=BEARISH&setup=EARNINGS_DECLINE": {
+    "file": "api-v1-market-data-screener-region-USsignalDirection-BEARISH-setup-EARNINGS-DECLINE.json",
+    "status": 200
+  },
+  "/api/v1/market-data/screener?region=US&signalDirection=BEARISH&setup=SMART_MONEY_DISTRIBUTION": {
+    "file": "api-v1-market-data-screener-region-USsignalDirection-BEARISH-setup-SMART-MONEY-DISTRIBUTION.json",
     "status": 200
   },
   "/api/v1/market-data/screener/conviction?region=US": {

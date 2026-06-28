@@ -77,24 +77,30 @@ function resolveEntry(
   params: Record<string, unknown> | undefined,
 ): ManifestEntry | undefined {
   const region = (params?.region ?? params?.market) as string | undefined;
-  const secondary = (params?.sector ?? params?.index ?? params?.signalDirection) as
-    | string
-    | undefined;
-  const secondaryKey = params?.sector
-    ? 'sector'
-    : params?.index
-      ? 'index'
-      : params?.signalDirection
-        ? 'signalDirection'
-        : null;
-  if (region && secondary && secondaryKey) {
-    const key = `${path}?region=${region}&${secondaryKey}=${secondary}`;
-    if (manifest[key]) return manifest[key];
-  }
+
   if (region) {
-    const key = `${path}?region=${region}`;
+    // Build compound suffix from all discriminating params in canonical order
+    let suffix = `?region=${region}`;
+    if (params?.signalDirection) suffix += `&signalDirection=${params.signalDirection}`;
+    if (params?.setup) suffix += `&setup=${params.setup}`;
+    if (params?.sector) suffix += `&sector=${params.sector}`;
+    if (params?.index) suffix += `&index=${params.index}`;
+
+    // Try most-specific key first, then progressively strip trailing params
+    const key = `${path}${suffix}`;
     if (manifest[key]) return manifest[key];
+
+    // Fallback: signalDirection without setup (direction tab, no setup sub-tab)
+    if (params?.setup && params?.signalDirection) {
+      const dirOnly = `${path}?region=${region}&signalDirection=${params.signalDirection}`;
+      if (manifest[dirOnly]) return manifest[dirOnly];
+    }
+
+    // Fallback: region-only
+    const regionKey = `${path}?region=${region}`;
+    if (manifest[regionKey]) return manifest[regionKey];
   }
+
   return manifest[path];
 }
 

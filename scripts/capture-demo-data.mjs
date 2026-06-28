@@ -266,11 +266,30 @@ const SCOPED_GETS = [
   ['/api/v1/market-data/movers', { limit: 20 }],
   '/api/v1/data-quality/summary',
   ['/api/v1/signals/position-ledger/persisted/active', { limit: 100, offset: 0, sortBy: 'entryTriggerTimestamp', sortDirection: 'desc' }],
+  ['/api/v1/signals/position-ledger/persisted/closed', { limit: 100, offset: 0, sortBy: 'entryTriggerTimestamp', sortDirection: 'desc' }],
   // ── Discover ──
-  // Screener page: Screener / Conviction / Market Scans / Stock Interest / Index Constituents
+  // Screener page: All / Bullish / Bearish direction tabs
   ['/api/v1/market-data/screener', { limit: 50 }],
   ['/api/v1/market-data/screener', { limit: 50, signalDirection: 'BULLISH' }],
   ['/api/v1/market-data/screener', { limit: 50, signalDirection: 'BEARISH' }],
+  // Screener setup sub-tabs (bullish)
+  ['/api/v1/market-data/screener', { limit: 50, signalDirection: 'BULLISH', setup: 'TREND_MOMENTUM' }],
+  ['/api/v1/market-data/screener', { limit: 50, signalDirection: 'BULLISH', setup: 'BREAKOUT' }],
+  ['/api/v1/market-data/screener', { limit: 50, signalDirection: 'BULLISH', setup: 'PULLBACK' }],
+  ['/api/v1/market-data/screener', { limit: 50, signalDirection: 'BULLISH', setup: 'RELATIVE_STRENGTH' }],
+  ['/api/v1/market-data/screener', { limit: 50, signalDirection: 'BULLISH', setup: 'QUALITY' }],
+  ['/api/v1/market-data/screener', { limit: 50, signalDirection: 'BULLISH', setup: 'GROWTH' }],
+  ['/api/v1/market-data/screener', { limit: 50, signalDirection: 'BULLISH', setup: 'OVEREXTENDED' }],
+  ['/api/v1/market-data/screener', { limit: 50, signalDirection: 'BULLISH', setup: 'SMART_MONEY_ACCUMULATION' }],
+  ['/api/v1/market-data/screener', { limit: 50, signalDirection: 'BULLISH', setup: 'SECTOR_LEADERSHIP' }],
+  // Screener setup sub-tabs (bearish)
+  ['/api/v1/market-data/screener', { limit: 50, signalDirection: 'BEARISH', setup: 'TREND_BEARISH' }],
+  ['/api/v1/market-data/screener', { limit: 50, signalDirection: 'BEARISH', setup: 'BREAKDOWN' }],
+  ['/api/v1/market-data/screener', { limit: 50, signalDirection: 'BEARISH', setup: 'OVERBOUGHT_REVERSAL' }],
+  ['/api/v1/market-data/screener', { limit: 50, signalDirection: 'BEARISH', setup: 'RELATIVE_WEAKNESS' }],
+  ['/api/v1/market-data/screener', { limit: 50, signalDirection: 'BEARISH', setup: 'WEAK_FUNDAMENTALS' }],
+  ['/api/v1/market-data/screener', { limit: 50, signalDirection: 'BEARISH', setup: 'EARNINGS_DECLINE' }],
+  ['/api/v1/market-data/screener', { limit: 50, signalDirection: 'BEARISH', setup: 'SMART_MONEY_DISTRIBUTION' }],
   '/api/v1/market-data/screener/conviction',
   ['/api/v1/market-data/scans/52w-high', { limit: 30 }],
   ['/api/v1/market-data/scans/52w-low', { limit: 30 }],
@@ -333,9 +352,9 @@ async function main() {
     for (const item of SCOPED_GETS) {
       const [p, params] = Array.isArray(item) ? item : [item, undefined];
       // Compound params that need distinct manifest keys (adapter resolves these)
-      const compoundSuffix = params?.signalDirection
-        ? `&signalDirection=${params.signalDirection}`
-        : '';
+      let compoundSuffix = '';
+      if (params?.signalDirection) compoundSuffix += `&signalDirection=${params.signalDirection}`;
+      if (params?.setup) compoundSuffix += `&setup=${params.setup}`;
       const result = await capture('GET', p, { params, region, manifestKeySuffix: compoundSuffix || undefined });
       // Store under the bare path only for non-compound captures (ID extraction uses bare paths)
       if (!compoundSuffix) regionData[region][p] = result;
