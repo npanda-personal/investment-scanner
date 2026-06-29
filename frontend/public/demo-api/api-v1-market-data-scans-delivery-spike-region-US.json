@@ -1,1 +1,1 @@
-{"scanType":"delivery-spike","scope":{"region":"US","assetType":"STOCK"},"generatedAt":"2026-06-28T21:08:25.576Z","minSpikeRatio":1.5,"results":[],"warnings":["No delivery-spike snapshot found for US/STOCK. Run MARKET_SCAN_REFRESH to populate."]}
+{"scanType":"delivery-spike","scope":{"region":"US","assetType":"STOCK"},"generatedAt":"2026-06-29T15:02:03.242Z","minSpikeRatio":1.5,"results":[],"warnings":["No delivery-spike snapshot found for US/STOCK. Run MARKET_SCAN_REFRESH to populate."]}
