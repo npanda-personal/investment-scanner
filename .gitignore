@@ -133,6 +133,11 @@ Thumbs.db
 backend/dist/
 backend/.env
 
+# Backend scratch / ad-hoc debug artifacts (not source; mirrors frontend/tmp-* convention)
+backend/**/tmp-*
+backend/earn.json
+backend/src/modules/strategy-framework/strategy-framework.registry.txt
+
 # Frontend
 frontend/dist/
 frontend/.env
