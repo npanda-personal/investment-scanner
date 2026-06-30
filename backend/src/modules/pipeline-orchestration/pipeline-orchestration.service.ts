@@ -1,4 +1,5 @@
 ﻿import { createHash } from 'crypto';
+import { poolContext } from '../../db/prisma';
 import { sendPipelineRunAlert } from '../notifications-delivery/pipeline-alert';
 import { SnapshotAssemblerService } from '../snapshot-assembler';
 import { DataQualityEngineService } from '../data-quality-engine';
@@ -470,11 +471,16 @@ export class PipelineOrchestrationService {
     context: PipelineCommandExecutionContext,
     now = new Date()
   ): Promise<PipelineCommandResponse> {
-    const response = await this.executeCommandInner(request, context, now);
-    // A manual snapshot-producing command updates the DB but not the page cache; bust the
-    // affected keys so the FE doesn't serve a stale page (the full pipeline warms via CACHE_WARM).
-    await this.invalidatePageCacheForCommand(response);
-    return response;
+    // A pipeline command is heavy DAG/refresh work that happens to be HTTP-triggered.
+    // Force it onto the pipeline pool — otherwise it would inherit the 'api' context
+    // set by the request middleware and starve user requests of the API pool.
+    return poolContext.run('pipeline', async () => {
+      const response = await this.executeCommandInner(request, context, now);
+      // A manual snapshot-producing command updates the DB but not the page cache; bust the
+      // affected keys so the FE doesn't serve a stale page (the full pipeline warms via CACHE_WARM).
+      await this.invalidatePageCacheForCommand(response);
+      return response;
+    });
   }
 
   /** Bust the page-cache keys made stale by a successful manual snapshot-producing command. */
