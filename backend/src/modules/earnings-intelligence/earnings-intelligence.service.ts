@@ -1,6 +1,7 @@
 import { EarningsIntelligenceRepository } from './earnings-intelligence.repository';
 import { SignalGenerationEngineService } from '../signal-generation-engine';
 import type { SignalResultDto } from '../signal-generation-engine';
+import { filterScaleAnomalies } from '../data-quality-engine';
 import { CALCULATION_VERSION } from './earnings-intelligence.constants';
 import { emptyCategoryBuckets, emptyCategoryCounts } from './earnings-intelligence.categories';
 import {
@@ -348,7 +349,13 @@ export class EarningsIntelligenceService {
 
   calculateSnapshot(input: EarningsSnapshotCalculationInput): EarningsSnapshotUpsertInput {
     const config = this.regionConfig(input.region);
-    const fundamentals = sortFundamentals(input.fundamentals);
+    // Exclude fundamental periods whose stored netIncome is a confirmed out-of-scale
+    // value (iXBRL scale mis-parse or filer error). The Data Quality Engine owns the
+    // curated list; dropping them here keeps the bad value out of every netIncome-
+    // derived figure (QoQ/YoY growth, margins, consistency/acceleration scores).
+    const fundamentals = sortFundamentals(
+      filterScaleAnomalies(input.region, input.symbol, input.fundamentals)
+    );
     const quarterly = fundamentals.filter((record) => isQuarterlyPeriod(record.periodType));
     const annual = fundamentals.filter((record) => isAnnualPeriod(record.periodType));
     const ttm = fundamentals.filter((record) => isTtmPeriod(record.periodType));

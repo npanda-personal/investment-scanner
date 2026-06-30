@@ -16,6 +16,12 @@ export type {
   ScaleAnomalyField,
 } from './data-quality-engine.scale-anomaly';
 export { REASON_FUNDAMENTAL_SCALE_ANOMALY } from './data-quality-engine.constants';
+export {
+  filterScaleAnomalies,
+  isScaleAnomalyFundamental,
+  scaleAnomalyRowCount,
+} from './data-quality-engine.fundamentals-sanity';
+export type { ScaleAnomalyCandidate } from './data-quality-engine.fundamentals-sanity';
 export type {
   CoverageStatus,
   DataQualityEvaluateRequest,
