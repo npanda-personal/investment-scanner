@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import { CalendarService } from './calendar.service';
 import { parseCalendarQuery, parseCalendarRefreshBody } from './calendar.validation';
+import { poolContext } from '../../db/prisma';
 
 export class CalendarController {
   constructor(private readonly service = new CalendarService()) {}
@@ -39,7 +40,11 @@ export class CalendarController {
         return res.status(400).json({ error: 'snapshotDate must be a valid ISO date string' });
       }
       const parsed = parseCalendarRefreshBody(body);
-      const result = await this.service.refreshSnapshots({ ...parsed, snapshotDate });
+      // Heavy multi-feed snapshot rebuild — run on the dedicated pipeline pool so a
+      // long manual refresh doesn't contend with user traffic on the API pool.
+      const result = await poolContext.run('pipeline', () =>
+        this.service.refreshSnapshots({ ...parsed, snapshotDate }),
+      );
       return res.json(result);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to refresh calendar';

@@ -12,6 +12,7 @@ import {
 } from './earnings-intelligence.region-config';
 import { cacheService } from '../../cache/cache.service';
 import { earningsKey } from '../../cache/cache-keys';
+import { poolContext } from '../../db/prisma';
 
 export class EarningsIntelligenceController {
   constructor(private readonly service = new EarningsIntelligenceService()) {}
@@ -106,14 +107,19 @@ export class EarningsIntelligenceController {
       }
       const region = normalizeRegionCode(body.region ? String(body.region) : DEFAULT_EARNINGS_REGION);
       const assetType = body.assetType ? String(body.assetType) : getEarningsRegionConfig(region).defaultAssetType;
-      const result = await this.service.refreshSnapshots({
-        region,
-        assetType,
-        snapshotDate,
-        batchSize: body.batchSize ? Number(body.batchSize) : 25,
-        offset: body.offset ? Number(body.offset) : 0,
-        ...(Array.isArray(body.instrumentIds) ? { instrumentIds: body.instrumentIds.map((id) => String(id)) } : {}),
-      });
+      // Heavy full-corpus refresh (equivalent to the EARNINGS_INTELLIGENCE_REFRESH
+      // pipeline stage). Force it onto the dedicated pipeline pool so a long manual
+      // refresh doesn't starve user requests of the API pool.
+      const result = await poolContext.run('pipeline', () =>
+        this.service.refreshSnapshots({
+          region,
+          assetType,
+          snapshotDate,
+          batchSize: body.batchSize ? Number(body.batchSize) : 25,
+          offset: body.offset ? Number(body.offset) : 0,
+          ...(Array.isArray(body.instrumentIds) ? { instrumentIds: body.instrumentIds.map((id) => String(id)) } : {}),
+        }),
+      );
       return res.json(result);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to refresh earnings intelligence snapshot';

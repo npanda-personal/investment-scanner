@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import { SignalPositionLedgerService } from './signal-position-ledger.service';
 import { parseSignalPositionLedgerActiveQuery } from './signal-position-ledger.validation';
+import { poolContext } from '../../db/prisma';
 
 export class SignalPositionLedgerController {
   constructor(private readonly service = new SignalPositionLedgerService()) {}
@@ -39,7 +40,11 @@ export class SignalPositionLedgerController {
 
   refreshActiveRows = async (req: Request, res: Response) => {
     try {
-      return res.json(await this.service.refreshActiveRows(parseSignalPositionLedgerActiveQuery({ ...req.query, ...req.body }), { force: true }));
+      // Recompute work — run on the dedicated pipeline pool to avoid contending
+      // with user traffic on the API pool.
+      return res.json(await poolContext.run('pipeline', () =>
+        this.service.refreshActiveRows(parseSignalPositionLedgerActiveQuery({ ...req.query, ...req.body }), { force: true }),
+      ));
     } catch (error) {
       return this.error(res, error, 'Failed to refresh signal position ledger active rows', 400);
     }
