@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import { PortfolioIntelligenceService } from './portfolio-intelligence.service';
 import { getPortfolioId } from './portfolio-intelligence.validation';
+import { poolContext } from '../../db/prisma';
 
 const currentUserId = (req: Request) => (req as any).user?.id || 'default-user';
 
@@ -46,7 +47,11 @@ export class PortfolioIntelligenceController {
    */
   refresh = async (req: Request, res: Response) => {
     try {
-      const result = await this.service.refreshPortfolioIntelligence(getPortfolioId(req.params.id), currentUserId(req));
+      // Full recompute + upsert — run on the dedicated pipeline pool so it doesn't
+      // contend with user traffic on the API pool.
+      const result = await poolContext.run('pipeline', () =>
+        this.service.refreshPortfolioIntelligence(getPortfolioId(req.params.id), currentUserId(req)),
+      );
       if (!result) return res.status(404).json({ error: 'Portfolio not found' });
       return res.status(200).json(result);
     } catch (error) {
