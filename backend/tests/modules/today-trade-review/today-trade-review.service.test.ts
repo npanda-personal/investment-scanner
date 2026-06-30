@@ -557,7 +557,8 @@ describe('TodayTradeReviewRepository latest-run visibility', () => {
     const currentRun = persistedRunRecord({
       id: 'current-real-run',
       runDate: new Date('2026-06-02T00:00:00.000Z'),
-      candidateCounts: { LONG_REVIEW: 0, WATCH_ONLY: 0 },
+      candidateCounts: { LONG_REVIEW: 1, WATCH_ONLY: 0 },
+      candidates: [{ id: 'c1', runId: 'current-real-run', instrumentId: 'inst1', symbol: 'TEST', direction: 'LONG', state: 'LONG_REVIEW', strategyCode: 'MOMENTUM_V1', rank: 1, grade: 'A', confidenceScore: 80, reasonSummary: 'Test', blockers: [], watchReasons: [], sourceSignalSnapshot: null, sourceCalibrationSnapshot: null, sourceEvidenceSnapshot: null, sourceSmartMoneySnapshot: null, boardSection: 'LONG_REVIEW', setupType: null, strategyVersion: null, dataQualitySnapshot: null }],
     });
     const db = {
       todayReviewRun: {
@@ -566,7 +567,7 @@ describe('TodayTradeReviewRepository latest-run visibility', () => {
     };
     const repository = new TodayTradeReviewRepository(db as any);
 
-    const latest = await repository.latest('IN', 'STOCK');
+    const latest = await repository.latest('IN', 'STOCK', { enrich: false });
 
     expect(latest?.id).toBe('current-real-run');
     expect(latest?.reviewUniverseMode).toBe('NO_REVIEW');

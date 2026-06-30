@@ -573,7 +573,9 @@ export class TodayTradeReviewRepository implements TodayReviewRepositoryContract
   }
 
   private isTraderVisibleRun(record: any): boolean {
-    return !this.containsFixtureSourceMarker(record.sourceSnapshot);
+    if (this.containsFixtureSourceMarker(record.sourceSnapshot)) return false;
+    if (Array.isArray(record.candidates) && record.candidates.length === 0) return false;
+    return true;
   }
 
   private containsFixtureSourceMarker(value: unknown): boolean {
