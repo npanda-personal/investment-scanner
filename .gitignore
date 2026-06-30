@@ -151,8 +151,6 @@ frontend/tests/ui/support/.auth-state.json
 # Playwright QA screenshot artifacts (verification only, not source)
 frontend/tests/ui/screenshots/
 
-# Claude Code session marker (Post-Work Protocol hook)
-.claude/.pending-wrapup
-
-# Per-session linked git worktrees (EnterWorktree) — never tracked by the main repo
-.claude/worktrees/
+# Claude Code local config — agents, hooks, skills, workflows, settings, session markers.
+# Local/per-machine only; not tracked for git changes. (Covers .pending-wrapup and worktrees/.)
+.claude/
