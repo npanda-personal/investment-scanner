@@ -154,3 +154,6 @@ frontend/tests/ui/screenshots/
 # Claude Code local config — agents, hooks, skills, workflows, settings, session markers.
 # Local/per-machine only; not tracked for git changes. (Covers .pending-wrapup and worktrees/.)
 .claude/
+
+# Claude Code instruction files (root + per-module) — local AI config, not tracked
+CLAUDE.md
