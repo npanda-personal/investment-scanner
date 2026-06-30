@@ -6,6 +6,10 @@ import { isTrustedReadSignal, dedupeTrustedRows } from './signal-read-policy';
 import { normalizeUtcDay } from './signal-math';
 import { buildSignalResultData, signalRecordToDto, signalWriteStatus } from './signal-generation-engine.row-mapper';
 
+/** Quality-tiebreak ordinals (higher = ranks first). Unknown/legacy → 0. */
+const CONFIDENCE_RANK: Record<string, number> = { HIGH: 3, MEDIUM: 2, LOW: 1 };
+const RELIABILITY_RANK: Record<string, number> = { FULL: 2, PARTIAL: 1 };
+
 export interface SignalFunnelDiagnosticsQuery {
   region?: string;
   assetType?: string;
@@ -408,15 +412,14 @@ export class SignalGenerationEngineRepository {
       distinct: ['instrumentId'],
     });
 
-    return this.sortSignals(
-      results.map((item) => this.toDto(item))
-        .filter((result) => this.isTrustedReadSignal(result))
-        .filter((result) => !query.direction || result.direction === query.direction)
-        .filter((result) => !query.confidence || result.confidence === query.confidence)
-        .filter((result) => query.minScore === undefined || result.score >= query.minScore)
-        .filter((result) => !query.signalType || this.hasSignal(result, query.signalType)),
-      query
-    );
+    const filtered = results.map((item) => this.toDto(item))
+      .filter((result) => this.isTrustedReadSignal(result))
+      .filter((result) => !query.direction || result.direction === query.direction)
+      .filter((result) => !query.confidence || result.confidence === query.confidence)
+      .filter((result) => query.minScore === undefined || result.score >= query.minScore)
+      .filter((result) => !query.signalType || this.hasSignal(result, query.signalType));
+    await this.attachLiquidity(filtered);
+    return this.rankSignals(filtered, query);
   }
 
   /**
@@ -450,7 +453,9 @@ export class SignalGenerationEngineRepository {
       generatedDate,
     };
     const trusted = await this.trustedRowsForLatestDate(where, this.orderByForLatestSignals(query));
-    return { signals: trusted.slice(offset, offset + limit), total: trusted.length };
+    await this.attachLiquidity(trusted);
+    const ranked = this.rankSignals(trusted, query);
+    return { signals: ranked.slice(offset, offset + limit), total: ranked.length };
   }
 
   private async latestSignalUniverseCountFromLatestGeneratedDate(query: Omit<SignalQuery, 'limit'>): Promise<number | null> {
@@ -570,7 +575,7 @@ export class SignalGenerationEngineRepository {
 
   private normalizeSortBy(value?: string): string {
     const normalized = String(value || '').trim();
-    const allowed = new Set(['score', 'symbol', 'companyName', 'generatedAt', 'direction', 'confidence', 'dailyChangePercent']);
+    const allowed = new Set(['score', 'effectiveDisplacement', 'symbol', 'companyName', 'generatedAt', 'direction', 'confidence', 'dailyChangePercent']);
     return allowed.has(normalized) ? normalized : 'score';
   }
 
@@ -582,9 +587,112 @@ export class SignalGenerationEngineRepository {
       case 'direction': return signal.direction;
       case 'confidence': return signal.confidence;
       case 'dailyChangePercent': return signal.dailyChangePercent;
+      case 'effectiveDisplacement': return this.convictionOf(signal);
       case 'score':
       default:
         return signal.score;
+    }
+  }
+
+  /**
+   * Unrounded conviction on the displacement scale [-0.5, +0.5], used ONLY as the
+   * within-equal-score tiebreak (the integer `score` is the primary key — see
+   * compareSignalRank).  Prefers the v4 breadth-gated `effectiveDisplacement`, then
+   * the raw `displacement`; for legacy/v3 rows with no v4 blob it maps the rounded
+   * score back onto the same scale via (score-50)/100.  Because conviction only
+   * orders rows that ALREADY share a rounded score, the v3 fallback is near-constant
+   * within a bucket and simply falls through to the next tiebreak — so mixing v3/v4
+   * rows on one page cannot reorder across score buckets.  Non-finite values (a
+   * malformed JSON blob) fall back to the score-derived value to keep a total order.
+   */
+  private convictionOf(signal: SignalResultDto): number {
+    const v4 = signal.scoringInputSummary?.v4;
+    if (v4 && Number.isFinite(v4.effectiveDisplacement as number)) return v4.effectiveDisplacement as number;
+    if (v4 && Number.isFinite(v4.displacement as number)) return v4.displacement as number;
+    const score = typeof signal.score === 'number' && Number.isFinite(signal.score) ? signal.score : 50;
+    return (score - 50) / 100;
+  }
+
+  /**
+   * Deterministic total order for the default/conviction sort.
+   *
+   * Primary key is the headline integer `score` (which embeds the v4 evidence-breadth
+   * weighting), so the Score column stays monotonic with row order — a lower-score row
+   * never renders above a higher-score one.  Gap #1's dense integer ties are then broken
+   * by the unrounded `convictionOf` (the finer signal the score rounds away).
+   *
+   * `convictionSign` flips BOTH direction-bearing keys together (1 = strongest-bullish
+   * first for desc/Bullish tabs, -1 = strongest-bearish first for asc/Bearish tabs).
+   * The quality tiebreakers (confidence, reliability, liquidity) stay best-first
+   * regardless of direction, then recency, then instrumentId for stability.
+   */
+  private compareSignalRank(a: SignalResultDto, b: SignalResultDto, convictionSign: 1 | -1): number {
+    const sa = typeof a.score === 'number' && Number.isFinite(a.score) ? a.score : 0;
+    const sb = typeof b.score === 'number' && Number.isFinite(b.score) ? b.score : 0;
+    if (sa !== sb) return (sb - sa) * convictionSign;
+
+    const ca = this.convictionOf(a);
+    const cb = this.convictionOf(b);
+    if (ca !== cb) return (cb - ca) * convictionSign;
+
+    const fa = CONFIDENCE_RANK[a.confidence] ?? 0;
+    const fb = CONFIDENCE_RANK[b.confidence] ?? 0;
+    if (fa !== fb) return fb - fa;
+
+    const ra = RELIABILITY_RANK[a.reliabilityTier ?? ''] ?? 0;
+    const rb = RELIABILITY_RANK[b.reliabilityTier ?? ''] ?? 0;
+    if (ra !== rb) return rb - ra;
+
+    const la = typeof a.liquidityScore === 'number' ? a.liquidityScore : -1;
+    const lb = typeof b.liquidityScore === 'number' ? b.liquidityScore : -1;
+    if (la !== lb) return lb - la;
+
+    const ta = new Date(a.generated_at).getTime();
+    const tb = new Date(b.generated_at).getTime();
+    if (ta !== tb) return tb - ta;
+
+    return String(a.instrument_id).localeCompare(String(b.instrument_id));
+  }
+
+  /**
+   * Rank a served page.  The default ('score') and explicit 'effectiveDisplacement'
+   * sorts use the conviction comparator above; explicit column sorts (symbol,
+   * companyName, generatedAt, direction, confidence, dailyChangePercent) keep their
+   * single-key behaviour via sortSignals().
+   */
+  private rankSignals(results: SignalResultDto[], query: Pick<SignalQuery, 'sortBy' | 'sortDirection'>): SignalResultDto[] {
+    const sortBy = this.normalizeSortBy(query.sortBy);
+    if (sortBy === 'score' || sortBy === 'effectiveDisplacement') {
+      const convictionSign: 1 | -1 = query.sortDirection === 'asc' ? -1 : 1;
+      return [...results].sort((a, b) => this.compareSignalRank(a, b, convictionSign));
+    }
+    return this.sortSignals(results, query);
+  }
+
+  /**
+   * Attach the region-agnostic liquidity proxy (InstrumentCoverage.liquidityScore)
+   * to each served DTO, in-memory, via one indexed batch lookup keyed on stockId.
+   * Used as a ranking tiebreak and surfaced as a tradability indicator — never a
+   * filter.  Degrades gracefully (leaves liquidityScore null) when the coverage
+   * delegate is absent (e.g. unit-test mocks) or the lookup fails.
+   */
+  private async attachLiquidity(signals: SignalResultDto[]): Promise<void> {
+    if (signals.length === 0) return;
+    const coverage = (this.db as any).instrumentCoverage;
+    if (!coverage || typeof coverage.findMany !== 'function') return;
+    const ids = [...new Set(signals.map((s) => s.instrument_id).filter(Boolean))];
+    if (ids.length === 0) return;
+    const rows: Array<{ stockId: string; liquidityScore: unknown }> = await coverage.findMany({
+      where: { stockId: { in: ids } },
+      select: { stockId: true, liquidityScore: true },
+    }).catch(() => []);
+    const byId = new Map<string, number | null>();
+    for (const row of rows) {
+      const value = row.liquidityScore;
+      byId.set(row.stockId, value === null || value === undefined ? null : Number(value));
+    }
+    for (const signal of signals) {
+      signal.liquidityScore = byId.has(signal.instrument_id) ? byId.get(signal.instrument_id) ?? null : null;
     }
   }
 

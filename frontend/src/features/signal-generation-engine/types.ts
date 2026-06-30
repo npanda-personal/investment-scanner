@@ -64,6 +64,9 @@ export interface SignalResult {
   cohortAvgReturnPercent?: number | null;
   cohortMetricsHorizon?: string | null;
   cohortWinRateConfidence?: 'HIGH' | 'MEDIUM' | 'LOW' | null;
+  // Tradability overlay: region-agnostic liquidity proxy (avg daily turnover) used as a
+  // ranking tiebreak. Surfaced as an indicator only — never filters. null = not yet tracked.
+  liquidityScore?: number | null;
 }
 
 export interface SignalScoringInputSummary {

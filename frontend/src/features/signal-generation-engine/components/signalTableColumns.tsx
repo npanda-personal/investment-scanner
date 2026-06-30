@@ -213,6 +213,30 @@ export function buildSignalColumns({ navigate, openWorkspace, strategyContextLoa
         );
       },
     },
+    {
+      id: 'liquidity',
+      label: 'Liquidity',
+      align: 'right' as const,
+      render: (signal: SignalResult) => {
+        const value = signal.liquidityScore;
+        if (value == null) {
+          return (
+            <Tooltip title="Liquidity not yet tracked for this instrument." arrow>
+              <Typography variant="body2" color="text.disabled" sx={{ cursor: 'help' }}>—</Typography>
+            </Tooltip>
+          );
+        }
+        const compact = new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(value);
+        return (
+          <Tooltip
+            title={`Avg daily turnover ≈ ${compact}${signal.currency ? ` ${signal.currency}` : ''}. Higher = more liquid. Used only as a low-priority ranking tiebreak — never to include or exclude a candidate.`}
+            arrow
+          >
+            <Typography variant="body2" color="text.secondary" sx={{ cursor: 'help' }}>{compact}</Typography>
+          </Tooltip>
+        );
+      },
+    },
     { id: 'direction', label: 'Raw Direction', sortable: true, render: (signal) => <StatusBadge label={signal.direction} /> },
     { id: 'confidence', label: 'Confidence', sortable: true, render: (signal) => <StatusBadge label={signal.confidence} /> },
     {
