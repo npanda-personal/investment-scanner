@@ -66,9 +66,11 @@ describe('MarketDataFoundationScheduler', () => {
     expect(service.syncScheduledRegion).not.toHaveBeenCalled();
   });
 
-  it('on startup inside the pre-finalization wait window: skips when current, catches up when stale', async () => {
+  it('on startup inside the pre-finalization wait window: skips regardless of staleness', async () => {
     // 10:30 UTC = 16:00 IST — NSE closed (15:30) but before the ≈18:30 finalization
-    // grace, so the base session decision is MARKET_CLOSED_NO_SYNC (wait). Grace is
+    // grace (MARKET_CLOSED_AWAITING_EOD_FILE). The daily bhavcopy download target is
+    // always today's date; triggering inside the grace window would try to fetch a
+    // file that NSE has not yet published, causing a 90-minute hang. Grace is
     // intentionally omitted so the region's 180m base applies (not a test override).
     const baseConfig = {
       enabled: true,
@@ -81,8 +83,8 @@ describe('MarketDataFoundationScheduler', () => {
     } as const;
     const preGraceWindow = new Date('2026-05-05T10:30:00.000Z');
 
-    // (a) Yesterday's candle is already stored → nothing to do on boot; the 15-min
-    // poll will fire the EOD load once the ≈18:30 IST window opens.
+    // (a) Yesterday's candle is already stored → nothing to do; poll will fire
+    // the EOD load once the ≈18:30 IST window opens.
     const current = {
       activePriceBackfillRun: jest.fn().mockReturnValue(null),
       latestStoredCandleInfo: jest.fn().mockResolvedValue({
@@ -95,22 +97,21 @@ describe('MarketDataFoundationScheduler', () => {
     expect(skipResult[0]).toMatchObject({ region: 'IN', skipped: true });
     expect(current.syncScheduledRegion).not.toHaveBeenCalled();
 
-    // (b) localhost was down for days → latest stored lags the completed candle;
-    // the missing-completed override runs the catch-up even though the session
-    // decision alone would wait.
+    // (b) Machine was down for days → latest stored lags the completed candle.
+    // The "missing completed candle" override is suppressed inside the grace
+    // window to prevent a premature bhavcopy download that would hang. The 15-min
+    // poll will run the EOD catch-up once 18:30 IST passes.
     const stale = {
       activePriceBackfillRun: jest.fn().mockReturnValue(null),
       latestStoredCandleInfo: jest.fn().mockResolvedValue({
         latestTradingDate: '2026-05-01', finalConfirmed: false, syncState: null, tradingDate: '2026-05-05',
       }),
-      syncScheduledRegion: jest.fn().mockResolvedValue({
-        region: 'IN', assetType: 'STOCK', tradingDate: '2026-05-05', rowsInserted: 1, rowsUpdated: 0, rowsNoOp: 0,
-      }),
+      syncScheduledRegion: jest.fn(),
     };
     const catchUpResult = await new MarketDataFoundationScheduler(stale as any, baseConfig as any)
       .runOnce(preGraceWindow, { triggerType: 'startup' });
-    expect(catchUpResult[0]).toMatchObject({ region: 'IN', skipped: false });
-    expect(stale.syncScheduledRegion).toHaveBeenCalledTimes(1);
+    expect(catchUpResult[0]).toMatchObject({ region: 'IN', skipped: true });
+    expect(stale.syncScheduledRegion).not.toHaveBeenCalled();
   });
 
   it('runs catch-up sync when latest completed candle is missing even if session decision would skip', async () => {

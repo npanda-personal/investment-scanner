@@ -42,11 +42,13 @@ describe('market data market session decisions', () => {
   it('waits between IN close and the EOD finalization grace (bhavcopy not published yet)', () => {
     // 10:30 UTC = 16:00 IST — market closed (15:30) but before the ≈18:30 IST
     // finalization grace, so the official EOD file is typically not published.
+    // MARKET_CLOSED_AWAITING_EOD_FILE (not MARKET_CLOSED_NO_SYNC) so the
+    // scheduler and sync-gate suppress the "missing date" override during grace.
     const decision = shouldRunMarketDataSync('IN', new Date('2026-05-05T10:30:00.000Z'));
 
     expect(decision).toMatchObject({
       shouldRun: false,
-      reasonCode: 'MARKET_CLOSED_NO_SYNC',
+      reasonCode: 'MARKET_CLOSED_AWAITING_EOD_FILE',
       todayTradingDate: '2026-05-05',
     });
   });

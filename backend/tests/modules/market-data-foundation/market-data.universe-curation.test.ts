@@ -2,11 +2,12 @@
 import { UniverseCurationService } from '../../../src/modules/market-data-foundation/market-data-foundation.universe-curation.service';
 
 /** Build a mock CoverageRepository capturing what the service persists/enforces. */
-function mockCoverage(ranked: any[], instruments: any[]) {
+function mockCoverage(ranked: any[], instruments: any[], recentlyActive: any[] = []) {
   const captured: { entries: any[]; enforcedIds: string[] } = { entries: [], enforcedIds: [] };
   const coverage = {
     rankRegionLiquidity: jest.fn().mockResolvedValue(ranked),
     listRegionInstruments: jest.fn().mockResolvedValue(instruments),
+    listRecentlyActiveInstruments: jest.fn().mockResolvedValue(recentlyActive),
     replaceTrackedCoverage: jest.fn().mockImplementation((_region: string, entries: any[]) => {
       captured.entries = entries;
       return Promise.resolve(entries.length);
@@ -37,6 +38,7 @@ describe('UniverseCurationService', () => {
 
     expect(summary.trackedByLiquidity).toBe(2);
     expect(summary.pinnedCore).toBe(2);
+    expect(summary.protectedActive).toBe(0);
     expect(summary.trackedTotal).toBe(4); // AAA, BBB (liquidity) + ^GSPC, XLK (pins); CCC excluded
     expect(summary.deactivated).toBe(7);
 
@@ -57,7 +59,29 @@ describe('UniverseCurationService', () => {
     const summary = await new UniverseCurationService(coverage as any).curateRegion('US', { targetTrackedCount: 10 });
 
     expect(summary.trackedTotal).toBe(1);
+    expect(summary.protectedActive).toBe(0);
     // Selected by liquidity (rank 1) but, being a seeded ETF, persisted as CORE.
     expect(captured.entries[0]).toMatchObject({ symbol: 'XLK', trackingTier: 'CORE', reason: 'ETF', liquidityRank: 1 });
+  });
+
+  it('protection tier adds instruments with recent signals that fall below the liquidity cutoff', async () => {
+    const ranked = [
+      { stockId: 'a', symbol: 'AAA', assetType: 'STOCK', turnover: 100 },
+    ];
+    const instruments = [{ stockId: 'a', symbol: 'AAA', assetType: 'STOCK', catalogSource: 'NASDAQ_TRADER_LISTED' }];
+    // CFR-like: below liquidity cutoff but has a recent signal
+    const recentlyActive = [
+      { stockId: 'cfr', symbol: 'CFR' },
+    ];
+    const { coverage, captured } = mockCoverage(ranked, instruments, recentlyActive);
+
+    const summary = await new UniverseCurationService(coverage as any).curateRegion('US', { targetTrackedCount: 1 });
+
+    expect(summary.trackedByLiquidity).toBe(1);
+    expect(summary.protectedActive).toBe(1);
+    expect(summary.trackedTotal).toBe(2); // AAA (liquidity) + CFR (protection)
+    const bySymbol = Object.fromEntries(captured.entries.map((e: any) => [e.symbol, e]));
+    expect(bySymbol.CFR).toMatchObject({ trackingTier: 'STANDARD', reason: 'MANUAL', liquidityScore: null, liquidityRank: null });
+    expect(new Set(captured.enforcedIds)).toContain('cfr');
   });
 });

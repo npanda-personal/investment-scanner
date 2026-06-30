@@ -1,21 +1,16 @@
 /**
- * Crypto ENRICHMENT provider (FREE, commercial-OK sources only).
+ * Crypto ENRICHMENT provider — CoinPaprika (FREE, keyless).
  *
- *  - Metadata + supply + ATH: CoinPaprika
- *      /tickers?quotes=USD          (one call: supply, market cap, ATH per coin)
- *      /coins/{id}                  (per coin: description, logo, tags, website, genesis)
- *  - Fundamentals (TVL / fees / revenue / yields): DefiLlama (keyless)
- *      /protocols                   (TVL + category + chains per protocol)
- *      /overview/fees?dataType=...  (24h/7d fees & revenue per protocol)
+ *  - Metadata + supply + ATH: /tickers?quotes=USD
+ *  - Per-coin detail: /coins/{id}
  *
- * Pure HTTP — NO database access (mirrors crypto-provider.ts). All keyless & free.
+ * Pure HTTP — NO database access. DefiLlama fundamentals live in crypto-feeds-provider.ts.
  */
 
 import { getCryptoEndpoints } from '../market-data-foundation.endpoints';
 
 const enrichmentEndpoints = getCryptoEndpoints();
 const COINPAPRIKA_BASE = enrichmentEndpoints.coinpaprikaBase.url;
-const DEFILLAMA_BASE = enrichmentEndpoints.defillamaBase.url;
 const HTTP_TIMEOUT_MS = Number(process.env.CRYPTO_HTTP_TIMEOUT_MS || 20000);
 const COINPAPRIKA_DETAIL_THROTTLE_MS = Number(process.env.CRYPTO_COINPAPRIKA_DETAIL_THROTTLE_MS || 150);
 
@@ -110,84 +105,6 @@ export async function fetchCoinPaprikaCoinDetail(coinpaprikaId: string): Promise
     genesisDate: c.started_at || null,
     contractAddresses,
   };
-}
-
-// ── DefiLlama: protocols (TVL) ──────────────────────────────────────────────
-export interface DefiLlamaProtocol {
-  slug: string;
-  name: string;
-  symbol: string | null; // base ticker (uppercased) e.g. AAVE
-  category: string | null;
-  chains: string[];
-  tvlUsd: number | null;
-  tvlChange1dPct: number | null;
-  tvlChange7dPct: number | null;
-}
-
-interface DefiLlamaProtocolRow {
-  slug?: string;
-  name?: string;
-  symbol?: string | null;
-  category?: string | null;
-  chains?: string[];
-  tvl?: number | null;
-  change_1d?: number | null;
-  change_7d?: number | null;
-}
-
-/** All DeFi protocols with TVL. Returns a list; callers index by symbol. */
-export async function fetchDefiLlamaProtocols(): Promise<DefiLlamaProtocol[]> {
-  const rows = (await fetchJson(`${DEFILLAMA_BASE}/protocols`)) as DefiLlamaProtocolRow[];
-  if (!Array.isArray(rows)) return [];
-  return rows.map((r) => ({
-    slug: String(r.slug || '').trim(),
-    name: String(r.name || '').trim(),
-    symbol: r.symbol && r.symbol !== '-' ? String(r.symbol).trim().toUpperCase() : null,
-    category: r.category ?? null,
-    chains: Array.isArray(r.chains) ? r.chains : [],
-    tvlUsd: typeof r.tvl === 'number' ? r.tvl : null,
-    tvlChange1dPct: typeof r.change_1d === 'number' ? r.change_1d : null,
-    tvlChange7dPct: typeof r.change_7d === 'number' ? r.change_7d : null,
-  }));
-}
-
-// ── DefiLlama: fees & revenue overview (keyed by protocol SLUG) ──────────────
-// The /overview/fees rows have NO `symbol` field — they expose `slug` (matching
-// /protocols) plus total24h/7d/30d and annualized1y. Revenue is a separate call
-// via dataType=dailyRevenue. So we key everything by slug and join via /protocols.
-export interface DefiLlamaTotals {
-  total24h: number | null;
-  total7d: number | null;
-  total30d: number | null;
-  annualized1y: number | null;
-}
-
-interface DefiLlamaOverviewRow {
-  slug?: string;
-  total24h?: number | null;
-  total7d?: number | null;
-  total30d?: number | null;
-  annualized1y?: number | null;
-}
-
-/** /overview/fees keyed by slug. dataType='dailyRevenue' returns revenue instead of fees. */
-export async function fetchDefiLlamaOverviewBySlug(dataType?: 'dailyRevenue'): Promise<Map<string, DefiLlamaTotals>> {
-  const map = new Map<string, DefiLlamaTotals>();
-  const dt = dataType ? `&dataType=${dataType}` : '';
-  const body = (await fetchJson(
-    `${DEFILLAMA_BASE}/overview/fees?excludeTotalDataChart=true&excludeTotalDataChartBreakdown=true${dt}`,
-  )) as { protocols?: DefiLlamaOverviewRow[] };
-  for (const p of body.protocols ?? []) {
-    const slug = String(p.slug || '').trim();
-    if (!slug) continue;
-    map.set(slug, {
-      total24h: p.total24h ?? null,
-      total7d: p.total7d ?? null,
-      total30d: p.total30d ?? null,
-      annualized1y: p.annualized1y ?? null,
-    });
-  }
-  return map;
 }
 
 export { COINPAPRIKA_DETAIL_THROTTLE_MS };

@@ -112,7 +112,13 @@ export class MarketDataFoundationScheduler {
           finalConfirmed: latest.finalConfirmed,
         }, this.sessionOptions());
         const latestCompletedTradingDate = latestCompletedTradingDateForRegion(region, now);
-        const missingLatestCompleted = Boolean(
+        // Suppress the "missing completed date" override when the EOD file is not yet
+        // published (grace period). The static holiday list may be incomplete, causing
+        // latestCompletedTradingDateForRegion to treat an unrecognised holiday as a
+        // missing trading day — which would otherwise trigger a download that hangs
+        // until the bhavcopy is finally published (NSE: up to 90 min later).
+        const insideEodGrace = decision.reasonCode === 'MARKET_CLOSED_AWAITING_EOD_FILE';
+        const missingLatestCompleted = !insideEodGrace && Boolean(
           latestCompletedTradingDate
             && (!latest.latestTradingDate || latest.latestTradingDate < latestCompletedTradingDate)
         );
@@ -126,6 +132,7 @@ export class MarketDataFoundationScheduler {
           reasonCode: decision.reasonCode,
           tradingDate: decision.todayTradingDate,
           missingLatestCompleted,
+          insideEodGrace,
           marketDataRunIncomplete,
           latestCompletedTradingDate,
           latestStoredTradingDate: latest.latestTradingDate,

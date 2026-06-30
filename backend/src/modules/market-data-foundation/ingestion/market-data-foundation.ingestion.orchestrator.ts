@@ -18,6 +18,13 @@ import { latestCompletedTradingDateForRegion, shouldRunMarketDataSync, tradingDa
 import { regionUsesRegionProviderPath } from './market-data-foundation.provider-registry';
 import { resolveRegionAdapter } from './market-data-foundation.region-ingestion-registry';
 import { usEquityIngestionService } from './us/market-data-foundation.us-equity-ingestion.service';
+import { UniverseCurationService } from '../market-data-foundation.universe-curation.service';
+
+// Singleton — standalone (own Prisma via CoverageRepository default), used only inside
+// the provider-path branch to re-rank the tracked set before each sync so instruments
+// that gained data since the last curation (e.g. after a historical backfill) are
+// re-activated and picked up in the same pipeline run rather than staying excluded forever.
+const universeCurationService = new UniverseCurationService();
 
 export class RegionSyncOrchestrator {
   constructor(private readonly host: MarketDataIngestionHost) {}
@@ -202,6 +209,18 @@ export class RegionSyncOrchestrator {
       };
       await this.host.repository.upsertSyncState({ region, assetType, tradingDate, status: 'PENDING', summary, lastCheckedAt: now });
 
+      // Re-curate the universe before fetching so instruments that gained price data
+      // since the last curation (e.g. after a historical backfill) are re-ranked and
+      // re-activated. Without this, a deactivated instrument stays excluded forever
+      // even when it legitimately ranks within the top-N by liquidity.
+      // Errors are non-fatal: a curation hiccup should not abort the data sync.
+      try {
+        const curationResult = await universeCurationService.curateRegion(region);
+        console.log(`[syncScheduledRegion:${region}] universe re-curation complete: tracked=${curationResult.trackedTotal}, activated=${curationResult.activated}, deactivated=${curationResult.deactivated}`);
+      } catch (curationErr) {
+        console.warn(`[syncScheduledRegion:${region}] universe re-curation failed (non-fatal):`, curationErr instanceof Error ? curationErr.message : curationErr);
+      }
+
       const tasks = await this.host.repository.listActiveStockSyncTasks({ region, assetType });
       const symbols = tasks.map((task) => task.symbol).filter(Boolean);
       // Small forward lookback so a single tick captures the latest completed candle
@@ -365,7 +384,7 @@ export class RegionSyncOrchestrator {
       && summary.rowsInserted === 0
       && summary.rowsUpdated === 0
       && summary.rowsNoOp > 0
-      && (decisionAfterRun.reasonCode === 'POST_CLOSE_FINALIZATION_WINDOW' || decisionAfterRun.reasonCode === 'MARKET_CLOSED_NO_SYNC');
+      && (decisionAfterRun.reasonCode === 'POST_CLOSE_FINALIZATION_WINDOW' || decisionAfterRun.reasonCode === 'MARKET_CLOSED_NO_SYNC' || decisionAfterRun.reasonCode === 'MARKET_CLOSED_AWAITING_EOD_FILE');
     const status = summary.errors.length > 0 || remainingStaleCount > 0
       ? 'FAILED'
       : canConfirmFinal

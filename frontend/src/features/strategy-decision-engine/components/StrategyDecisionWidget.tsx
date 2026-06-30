@@ -49,8 +49,8 @@ const StrategyDecisionWidget: React.FC<StrategyDecisionWidgetProps> = ({ instrum
       fetchMarketGate({ region: scope.region })
     ])
     .then(([d, g]) => {
-      setDecision(d);
-      setGate(g);
+      setDecision(d && 'strategy' in d ? d : null);
+      setGate(g && 'marketGate' in g ? g : null);
     })
     .catch(err => setError(err.message || 'Failed to load decision'))
     .finally(() => setLoading(false));

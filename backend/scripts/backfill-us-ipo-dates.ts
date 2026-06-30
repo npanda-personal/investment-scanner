@@ -7,12 +7,13 @@
  * lookback cutoff be trusted based on their actual listing date instead.
  *
  * Uses a 7-day recent chart request so Yahoo returns a valid response with the
- * meta block (firstTradeDate). Throttle applies per-worker; default concurrency=3
- * means ~10 req/s aggregate — keep concurrency low to stay within Yahoo limits.
+ * meta block (firstTradeDate). Default concurrency=1 with throttle=300ms gives
+ * ~3 req/s aggregate against Yahoo (unauthenticated). Raise --concurrency only
+ * if you observe no 429s and want faster throughput.
  *
  * Usage (from backend/):
  *   npx ts-node --transpile-only scripts/backfill-us-ipo-dates.ts
- *   npx ts-node --transpile-only scripts/backfill-us-ipo-dates.ts --concurrency=3
+ *   npx ts-node --transpile-only scripts/backfill-us-ipo-dates.ts --concurrency=2
  */
 import * as https from 'https';
 import prisma from '../src/db/prisma';
@@ -23,7 +24,7 @@ function arg(name: string): string | undefined {
 }
 
 const THROTTLE_MS = Number(arg('throttle') || 300);
-const CONCURRENCY = Number(arg('concurrency') || 3);
+const CONCURRENCY = Number(arg('concurrency') || 1);
 const TIMEOUT_MS = 12_000;
 
 function sleep(ms: number) {
@@ -48,6 +49,13 @@ function fetchFirstTradeDate(rawSymbol: string): Promise<Date | null> {
       url,
       { headers: { 'User-Agent': 'Mozilla/5.0' }, timeout: TIMEOUT_MS },
       (res) => {
+        if (res.statusCode !== undefined && res.statusCode >= 400) {
+          const label = res.statusCode === 429 ? 'throttled' : `http-error-${res.statusCode}`;
+          console.warn(`[backfill-us-ipo-dates] ${label} for ${rawSymbol}`);
+          res.resume();
+          resolve(null);
+          return;
+        }
         let body = '';
         res.on('data', (chunk: Buffer) => (body += chunk.toString()));
         res.on('end', () => {

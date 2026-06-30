@@ -202,7 +202,10 @@ export class SyncGateService {
 
     const marketReason = this.marketDecisionToSkipReason(decision.reasonCode);
     if (marketReason && !decision.shouldRun) {
-      if (latestCompletedCandleMissing) {
+      // Do not override the grace-period gate: the EOD file is not yet published,
+      // so a "missing" completed date is likely a calendar artefact from an
+      // incomplete static holiday list — not a genuine data gap to backfill.
+      if (latestCompletedCandleMissing && decision.reasonCode !== 'MARKET_CLOSED_AWAITING_EOD_FILE') {
         return {
           shouldSkip: false,
           reason: 'RECENTLY_SYNCED',
@@ -236,7 +239,7 @@ export class SyncGateService {
     if (reasonCode === 'BEFORE_MARKET_OPEN') return 'BEFORE_MARKET_OPEN';
     if (reasonCode === 'WEEKEND_OR_HOLIDAY') return 'WEEKEND_OR_HOLIDAY';
     if (reasonCode === 'FINAL_CANDLE_CONFIRMED') return 'FINAL_CANDLE_CONFIRMED';
-    if (reasonCode === 'MARKET_CLOSED_NO_SYNC' || reasonCode === 'MARKET_OPEN') return 'MARKET_CLOSED_NO_NEW_DAILY_DATA';
+    if (reasonCode === 'MARKET_CLOSED_NO_SYNC' || reasonCode === 'MARKET_OPEN' || reasonCode === 'MARKET_CLOSED_AWAITING_EOD_FILE') return 'MARKET_CLOSED_NO_NEW_DAILY_DATA';
     return null;
   }
 

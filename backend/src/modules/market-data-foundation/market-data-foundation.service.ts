@@ -1154,6 +1154,24 @@ export class MarketDataFoundationService implements MarketDataReadApi, IndiaHist
     finalizationGraceMinutes?: number;
     skipWeekends?: boolean;
   } = {}): Promise<ScheduledRegionSyncSummary> {
+    // Ensure the live NSE holiday calendar is loaded before the orchestrator makes
+    // any scheduling decisions. On cold start the static fallback list is partial —
+    // variable-date holidays (Eid, Diwali, etc.) may be absent, causing
+    // latestCompletedTradingDateForRegion to treat an NSE holiday as a missing
+    // trading day and bypass the post-close grace gate with a premature download.
+    if (String(region).toUpperCase() === 'IN') {
+      const now = options.now ?? new Date();
+      const year = now.getUTCFullYear();
+      const cached = this.indiaTradingCalendar.nseTradingHolidayCache.get(year);
+      if (!cached || cached.expiresAt <= Date.now()) {
+        await this.nseCmTradingHolidayDatesForRange(
+          new Date(Date.UTC(year, 0, 1)),
+          new Date(Date.UTC(year, 11, 31)),
+        ).catch((err) => {
+          console.warn('[MDF] NSE holiday pre-warm failed — scheduling will use static fallback:', err instanceof Error ? err.message : String(err));
+        });
+      }
+    }
     return this.regionOrchestrator.syncScheduledRegion(region, options);
   }
 

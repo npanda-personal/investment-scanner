@@ -346,14 +346,16 @@ export function shouldRunMarketDataSync(
 
   // Market has closed but the official end-of-day file is typically not
   // published until the finalization grace elapses (NSE bhavcopy ≈18:00 IST).
-  // Wait rather than hammer the provider with attempts that 404. A multi-day
-  // stale backlog is unaffected: the caller's missing-completed override
-  // (scheduler + sync-gate) still triggers a catch-up inside this window.
+  // Use a DISTINCT reason code so callers can suppress the "missing completed
+  // date" override: during this window the static holiday list may be
+  // incomplete, causing latestCompletedTradingDateForRegion to return a holiday
+  // as a "missing" trading day — which would otherwise bypass this gate and
+  // trigger a download that hangs until the file is finally published.
   if (now > closeAt && now < closeGraceAt) {
     return {
       shouldRun: false,
-      reasonCode: 'MARKET_CLOSED_NO_SYNC',
-      sessionState: 'MARKET_CLOSED_NO_SYNC',
+      reasonCode: 'MARKET_CLOSED_AWAITING_EOD_FILE',
+      sessionState: 'MARKET_CLOSED_AWAITING_EOD_FILE',
       reason: `${config.region} market closed; awaiting end-of-day file publication (eligible after the finalization grace).`,
       todayTradingDate: tradingDate,
       nextSuggestedRunAt: closeGraceAt.toISOString(),

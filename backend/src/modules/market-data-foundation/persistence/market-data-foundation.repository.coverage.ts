@@ -39,6 +39,12 @@ export interface TrackedCoverageEntry {
   liquidityRank?: number | null;
 }
 
+/** Minimal instrument identity for the protection tier. */
+export interface ActiveInstrumentRow {
+  stockId: string;
+  symbol: string;
+}
+
 export class CoverageRepository {
   constructor(private readonly prisma: PrismaClient = defaultPrisma) {}
 
@@ -191,5 +197,41 @@ export class CoverageRepository {
       latestDate: latest ? latest.toISOString().slice(0, 10) : null,
       coveragePct: trackedTotal > 0 ? Math.round((currentToLatest / trackedTotal) * 1000) / 10 : 0,
     };
+  }
+
+  /**
+   * Instruments that are actively referenced in the app — have a signal generated
+   * within the lookback window OR an open position ledger entry — and must stay
+   * tracked regardless of their liquidity rank.  Joining through stocks ensures we
+   * only return non-delisted instruments in the correct region.
+   *
+   * This prevents the circular trap: a stock falls below the liquidity cutoff →
+   * deactivated → no new data → low/zero turnover forever → permanently excluded,
+   * even though the app is actively showing signals or positions for it.
+   */
+  async listRecentlyActiveInstruments(
+    region: string,
+    lookbackDays = 90,
+  ): Promise<ActiveInstrumentRow[]> {
+    const rows = await this.prisma.$queryRaw<Array<{ stockId: string; symbol: string }>>(Prisma.sql`
+      SELECT DISTINCT s.id AS "stockId", s.symbol
+      FROM stocks s
+      WHERE s.region = ${region}
+        AND s."isDelisted" = false
+        AND (
+          EXISTS (
+            SELECT 1 FROM signal_results sr
+            WHERE sr."instrumentId" = s.id
+              AND sr."generatedDate" >= NOW() - (${lookbackDays} || ' days')::interval
+          )
+          OR EXISTS (
+            SELECT 1 FROM signal_position_ledger_entries spl
+            WHERE spl."instrumentId" = s.id
+              AND spl."scopeRegion" = ${region}
+              AND spl.status != 'CLOSED'
+          )
+        )
+    `);
+    return rows;
   }
 }

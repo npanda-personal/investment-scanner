@@ -34,6 +34,8 @@ export type MarketDataSchedulerReasonCode =
   | 'POST_CLOSE_FINALIZATION_WINDOW'
   | 'FINAL_CANDLE_CONFIRMED'
   | 'MARKET_CLOSED_NO_SYNC'
+  /** Market closed but the EOD file (e.g. NSE bhavcopy) is not yet published — within the finalization grace window. The "missing date" override must NOT fire during this state, because the calendar may have an unrecognised holiday in its static list. */
+  | 'MARKET_CLOSED_AWAITING_EOD_FILE'
   | 'WEEKEND_OR_HOLIDAY'
   | 'UNKNOWN_SESSION'
   | 'MISSING_FINAL_CANDLE_RETRY';

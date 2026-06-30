@@ -172,6 +172,8 @@ const StockResearchWorkbenchPage: React.FC = () => {
         if (isWorkbenchNotYetComputed(result)) {
           setNotYetComputed(result.message);
           setData(null);
+        } else if (!result || !('chart' in result)) {
+          setData(null);
         } else {
           setData(result);
         }

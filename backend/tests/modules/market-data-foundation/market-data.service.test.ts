@@ -4054,6 +4054,13 @@ describe('MarketDataFoundationService syncV1', () => {
       updateStockLoadTimestampBySymbol: jest.fn().mockResolvedValue({}),
     };
     const service = new MarketDataFoundationService(repository as any, {} as any);
+    // Pre-warm the NSE holiday cache so syncScheduledRegion's pre-warm doesn't
+    // make an extra global.fetch call that would break the toHaveBeenCalledTimes(1) assertion.
+    (service as any).indiaTradingCalendar.nseTradingHolidayCache.set(2026, {
+      expiresAt: Date.now() + 86400000,
+      holidays: new Map<string, string>(),
+      sourceUrl: 'test-prefill',
+    });
     const storeHistorical = jest.spyOn(service, 'storeHistorical').mockResolvedValue({
       rowsReceived: 1,
       rowsInserted: 1,
