@@ -4,6 +4,9 @@ import { normalizeMarketRegion } from '../../shared/utils/market-scope';
 import { getMarketDataFoundationScheduler } from './ingestion/market-data-foundation.scheduler';
 import { cacheService } from '../../cache/cache.service';
 import { screenerKey, marketMoversKey } from '../../cache/cache-keys';
+// Pool isolation: route long-running synchronous file/import/backfill handlers onto the
+// dedicated 'pipeline' pool so a manual run can't starve user traffic on the 'api' pool.
+import { poolContext } from '../../db/prisma';
 // Setup taxonomy leaf (dependency-free) — validates the screener `setup` tab parameter.
 import { SETUP_CODES } from '../signal-generation-engine/signal-setups';
 
@@ -123,7 +126,7 @@ export class MarketDataFoundationController {
 
   executeProviderCleanup = async (_req: Request, res: Response) => {
     try {
-      return res.json(await this.service.executeProviderDataCleanup());
+      return res.json(await poolContext.run('pipeline', () => this.service.executeProviderDataCleanup()));
     } catch (error) {
       console.error('Error executing provider cleanup:', error);
       return res.status(500).json({ error: 'Failed to execute provider cleanup' });
@@ -156,13 +159,13 @@ export class MarketDataFoundationController {
       if (!tradingDate) {
         return res.status(400).json({ error: 'tradingDate is required' });
       }
-      const result = await this.service.importNseCmUdiffDaily({
+      const result = await poolContext.run('pipeline', () => this.service.importNseCmUdiffDaily({
         tradingDate: String(tradingDate),
         csvText: typeof req.body?.csvText === 'string' ? req.body.csvText : undefined,
         fileName: typeof req.body?.fileName === 'string' ? req.body.fileName : undefined,
         fileUrl: typeof req.body?.fileUrl === 'string' ? req.body.fileUrl : undefined,
         force: req.body?.force === true,
-      });
+      }));
       return res.status(result.status === 'FAILED' ? 500 : 200).json(result);
     } catch (error) {
       console.error('Error importing NSE CM UDiFF daily file:', error);
@@ -176,13 +179,13 @@ export class MarketDataFoundationController {
       if (!tradingDate) {
         return res.status(400).json({ error: 'tradingDate is required' });
       }
-      const result = await this.service.importBseCmBackupDaily({
+      const result = await poolContext.run('pipeline', () => this.service.importBseCmBackupDaily({
         tradingDate: String(tradingDate),
         csvText: typeof req.body?.csvText === 'string' ? req.body.csvText : undefined,
         fileName: typeof req.body?.fileName === 'string' ? req.body.fileName : undefined,
         fileUrl: typeof req.body?.fileUrl === 'string' ? req.body.fileUrl : undefined,
         force: req.body?.force === true,
-      });
+      }));
       return res.status(result.status === 'FAILED' ? 500 : 200).json(result);
     } catch (error) {
       console.error('Error importing BSE CM backup file:', error);
@@ -199,20 +202,20 @@ export class MarketDataFoundationController {
       const csvText = typeof req.body?.csvText === 'string' ? req.body.csvText : undefined;
       const fileUrl = typeof req.body?.fileUrl === 'string' ? req.body.fileUrl : undefined;
       if (!csvText && !fileUrl) {
-        const result = await this.service.importNseIndexOfficialDaily({
+        const result = await poolContext.run('pipeline', () => this.service.importNseIndexOfficialDaily({
           tradingDate: String(tradingDate),
           force: req.body?.force === true,
-        });
+        }));
         return res.status(result.status === 'FAILED' ? 500 : 200).json(result);
       }
-      const result = await this.service.importNseIndexEodDaily({
+      const result = await poolContext.run('pipeline', () => this.service.importNseIndexEodDaily({
         tradingDate: String(tradingDate),
         csvText,
         fileName: typeof req.body?.fileName === 'string' ? req.body.fileName : undefined,
         fileUrl,
         force: req.body?.force === true,
         segment: req.body?.segment === 'SECTOR_INDEX' ? 'SECTOR_INDEX' : 'INDEX',
-      });
+      }));
       return res.status(result.status === 'FAILED' ? 500 : 200).json(result);
     } catch (error) {
       console.error('Error importing NSE index EOD file:', error);
@@ -226,13 +229,13 @@ export class MarketDataFoundationController {
       if (!tradingDate) {
         return res.status(400).json({ error: 'tradingDate is required' });
       }
-      const result = await this.service.importNseFoUdiffDaily({
+      const result = await poolContext.run('pipeline', () => this.service.importNseFoUdiffDaily({
         tradingDate: String(tradingDate),
         csvText: typeof req.body?.csvText === 'string' ? req.body.csvText : undefined,
         fileName: typeof req.body?.fileName === 'string' ? req.body.fileName : undefined,
         fileUrl: typeof req.body?.fileUrl === 'string' ? req.body.fileUrl : undefined,
         force: req.body?.force === true,
-      });
+      }));
       return res.status(result.status === 'FAILED' ? 500 : 200).json(result);
     } catch (error) {
       console.error('Error importing NSE F&O UDiFF file:', error);
@@ -246,13 +249,13 @@ export class MarketDataFoundationController {
       if (!tradingDate) {
         return res.status(400).json({ error: 'tradingDate is required' });
       }
-      const result = await this.service.importNseDeliveryDaily({
+      const result = await poolContext.run('pipeline', () => this.service.importNseDeliveryDaily({
         tradingDate: String(tradingDate),
         csvText: typeof req.body?.csvText === 'string' ? req.body.csvText : undefined,
         fileName: typeof req.body?.fileName === 'string' ? req.body.fileName : undefined,
         fileUrl: typeof req.body?.fileUrl === 'string' ? req.body.fileUrl : undefined,
         force: req.body?.force === true,
-      });
+      }));
       return res.status(result.status === 'FAILED' ? 500 : 200).json(result);
     } catch (error) {
       console.error('Error importing NSE delivery file:', error);
@@ -263,10 +266,10 @@ export class MarketDataFoundationController {
   refreshNseDeliveryDaily = async (req: Request, res: Response) => {
     try {
       const tradingDate = req.body?.tradingDate || req.query.tradingDate;
-      const result = await this.service.refreshNseDeliveryDaily({
+      const result = await poolContext.run('pipeline', () => this.service.refreshNseDeliveryDaily({
         tradingDate: tradingDate ? String(tradingDate) : undefined,
         force: req.body?.force === true || req.query.force === 'true',
-      });
+      }));
       return res.status(result.status === 'FAILED' ? 500 : 200).json(result);
     } catch (error) {
       console.error('Error refreshing NSE delivery file:', error);
@@ -276,7 +279,7 @@ export class MarketDataFoundationController {
 
   runNseDeliveryHistoricalBackfill = async (req: Request, res: Response) => {
     try {
-      const result = await this.service.runNseDeliveryHistoricalBackfill({
+      const result = await poolContext.run('pipeline', () => this.service.runNseDeliveryHistoricalBackfill({
         region: typeof req.body?.region === 'string' ? req.body.region : typeof req.query.region === 'string' ? req.query.region : undefined,
         assetType: typeof req.body?.assetType === 'string' ? req.body.assetType : typeof req.query.assetType === 'string' ? req.query.assetType : undefined,
         startDate: req.body?.startDate || req.query.startDate,
@@ -287,7 +290,7 @@ export class MarketDataFoundationController {
         force: req.body?.force === true || req.query.force === 'true',
         downloadDelayMs: req.body?.downloadDelayMs === undefined ? (req.query.downloadDelayMs === undefined ? undefined : Number(req.query.downloadDelayMs)) : Number(req.body.downloadDelayMs),
         jitterMs: req.body?.jitterMs === undefined ? (req.query.jitterMs === undefined ? undefined : Number(req.query.jitterMs)) : Number(req.body.jitterMs),
-      });
+      }));
       return res.status(result.status === 'FAILED' ? 500 : 200).json(result);
     } catch (error) {
       console.error('Error running NSE delivery historical backfill:', error);
@@ -413,14 +416,14 @@ export class MarketDataFoundationController {
 
   importBulkManualVerifiedFundamentals = async (req: Request, res: Response) => {
     try {
-      const result = await this.service.importBulkManualVerifiedFundamentals({
+      const result = await poolContext.run('pipeline', () => this.service.importBulkManualVerifiedFundamentals({
         fileName: String(req.body?.fileName || req.body?.sourceFileName || 'manual-verified-fundamentals.csv'),
         csvText: String(req.body?.csvText || req.body?.fileContent || ''),
         region: typeof req.body?.region === 'string' ? req.body.region : undefined,
         assetType: typeof req.body?.assetType === 'string' ? req.body.assetType : undefined,
         sourceUrl: typeof req.body?.sourceUrl === 'string' ? req.body.sourceUrl : undefined,
         evidenceDate: req.body?.evidenceDate,
-      });
+      }));
       return res.status(201).json(result);
     } catch (error) {
       console.error('Bulk manual verified fundamentals import error:', error);
@@ -430,7 +433,7 @@ export class MarketDataFoundationController {
 
   nseXbrlBulkIngest = async (req: Request, res: Response) => {
     try {
-      const result = await this.service.importNseXbrlFundamentalsForUniverse({
+      const result = await poolContext.run('pipeline', () => this.service.importNseXbrlFundamentalsForUniverse({
         region: typeof req.body?.region === 'string' ? req.body.region : undefined,
         assetType: typeof req.body?.assetType === 'string' ? req.body.assetType : undefined,
         symbolBatchSize: req.body?.symbolBatchSize !== undefined ? Number(req.body.symbolBatchSize) : undefined,
@@ -438,7 +441,7 @@ export class MarketDataFoundationController {
         maxQuarterlyPeriods: req.body?.maxQuarterlyPeriods !== undefined ? Number(req.body.maxQuarterlyPeriods) : undefined,
         maxAnnualPeriods: req.body?.maxAnnualPeriods !== undefined ? Number(req.body.maxAnnualPeriods) : undefined,
         delayBetweenBatchesMs: req.body?.delayBetweenBatchesMs !== undefined ? Number(req.body.delayBetweenBatchesMs) : undefined,
-      });
+      }));
       return res.status(200).json(result);
     } catch (error) {
       console.error('NSE XBRL bulk ingest error:', error);
@@ -812,7 +815,7 @@ export class MarketDataFoundationController {
   repairRun = async (req: Request, res: Response) => {
     try {
       const { region, assetType } = this.getMarketFilter(req);
-      return res.json(await this.service.repairRun({
+      return res.json(await poolContext.run('pipeline', () => this.service.repairRun({
         region,
         assetType,
         batchSize: this.numberParam(req, 'batchSize') ?? this.numberParam(req, 'limit'),
@@ -832,7 +835,7 @@ export class MarketDataFoundationController {
         csvText: typeof req.body?.csvText === 'string' ? req.body.csvText : undefined,
         catalogSource: typeof req.body?.catalogSource === 'string' ? req.body.catalogSource : undefined,
         importMode: req.body?.importMode === 'MANUAL_CSV' || req.body?.importMode === 'CONFIGURED_URL' ? req.body.importMode : undefined,
-      }));
+      })));
     } catch (error: any) {
       console.error('Market data repair run error:', error);
       return res.status(500).json({ error: error.message || 'Market data repair run failed' });
@@ -864,7 +867,7 @@ export class MarketDataFoundationController {
   repairCatalogIdentity = async (req: Request, res: Response) => {
     try {
       const { region, assetType } = this.getMarketFilter(req);
-      return res.json(await this.service.repairCatalogIdentity({
+      return res.json(await poolContext.run('pipeline', () => this.service.repairCatalogIdentity({
         region,
         assetType,
         batchSize: this.numberParam(req, 'batchSize') ?? this.numberParam(req, 'limit'),
@@ -872,7 +875,7 @@ export class MarketDataFoundationController {
         csvText: typeof req.body?.csvText === 'string' ? req.body.csvText : undefined,
         catalogSource: typeof req.body?.catalogSource === 'string' ? req.body.catalogSource : undefined,
         importMode: req.body?.importMode === 'MANUAL_CSV' || req.body?.importMode === 'CONFIGURED_URL' ? req.body.importMode : undefined,
-      }));
+      })));
     } catch (error) {
       console.error('Catalog identity repair error:', error);
       return res.status(500).json({ error: 'Catalog identity repair failed' });
@@ -888,13 +891,13 @@ export class MarketDataFoundationController {
   repairPriceIdentity = async (req: Request, res: Response) => {
     try {
       const { region, assetType } = this.getMarketFilter(req);
-      return res.json(await this.service.repairPriceIdentity({
+      return res.json(await poolContext.run('pipeline', () => this.service.repairPriceIdentity({
         region,
         assetType,
         batchSize: this.numberParam(req, 'batchSize') ?? this.numberParam(req, 'limit'),
         offset: this.numberParam(req, 'offset'),
         dryRun: this.parseOptionalBoolean(req.query.dryRun ?? req.body?.dryRun),
-      }));
+      })));
     } catch (error: any) {
       console.error('Price identity repair error:', error);
       return res.status(500).json({ error: error.message || 'Price identity repair failed' });
@@ -904,13 +907,13 @@ export class MarketDataFoundationController {
   importManualMetadata = async (req: Request, res: Response) => {
     try {
       const { region, assetType } = this.getMarketFilter(req);
-      return res.json(await this.service.importManualMetadata({
+      return res.json(await poolContext.run('pipeline', () => this.service.importManualMetadata({
         region,
         assetType,
         batchSize: this.numberParam(req, 'batchSize') ?? this.numberParam(req, 'limit'),
         offset: this.numberParam(req, 'offset'),
         csvText: typeof req.body?.csvText === 'string' ? req.body.csvText : undefined,
-      }));
+      })));
     } catch (error: any) {
       console.error('Manual metadata import error:', error);
       return res.status(500).json({ error: error.message || 'Manual metadata import failed' });
@@ -1089,7 +1092,7 @@ export class MarketDataFoundationController {
 
   importCatalog = async (req: Request, res: Response) => {
     try {
-      const result = await this.service.importCatalog(req.body);
+      const result = await poolContext.run('pipeline', () => this.service.importCatalog(req.body));
       return res.json({ success: true, ...result });
     } catch (error: any) {
       console.error('Catalog import error:', error);
@@ -1102,7 +1105,7 @@ export class MarketDataFoundationController {
 
   backfillCatalogMetadata = async (req: Request, res: Response) => {
     try {
-      const result = await this.service.backfillCatalogMetadata(req.body || {});
+      const result = await poolContext.run('pipeline', () => this.service.backfillCatalogMetadata(req.body || {}));
       return res.json({ success: true, ...result });
     } catch (error: any) {
       console.error('Catalog metadata backfill error:', error);
@@ -1169,14 +1172,14 @@ export class MarketDataFoundationController {
 
   importNseCorporateActions = async (req: Request, res: Response) => {
     try {
-      const result = await this.service.importNseCorporateActionsFile({
+      const result = await poolContext.run('pipeline', () => this.service.importNseCorporateActionsFile({
         csvOrJsonText: typeof req.body?.csvOrJsonText === 'string' ? req.body.csvOrJsonText : undefined,
         rows: Array.isArray(req.body?.rows) ? req.body.rows : undefined,
         region: typeof req.body?.region === 'string' ? req.body.region : typeof req.query.region === 'string' ? req.query.region : undefined,
         assetType: typeof req.body?.assetType === 'string' ? req.body.assetType : typeof req.query.assetType === 'string' ? req.query.assetType : undefined,
         source: typeof req.body?.source === 'string' ? req.body.source : undefined,
         force: req.body?.force === true || req.query.force === 'true',
-      });
+      }));
       return res.status(result.status === 'FAILED' ? 500 : 200).json(result);
     } catch (error) {
       console.error('Error importing NSE corporate actions:', error);
@@ -1194,17 +1197,17 @@ export class MarketDataFoundationController {
       const batchMode = req.body?.batch === true || req.query.batch === 'true' || (!instrumentId);
 
       if (!batchMode && instrumentId) {
-        const result = await this.service.recomputeAdjustedClosesForInstrument(String(instrumentId));
+        const result = await poolContext.run('pipeline', () => this.service.recomputeAdjustedClosesForInstrument(String(instrumentId)));
         return res.json(result);
       }
 
       // Batch mode.
-      const result = await this.service.recomputeAdjustedClosesBatch({
+      const result = await poolContext.run('pipeline', () => this.service.recomputeAdjustedClosesBatch({
         region: typeof req.body?.region === 'string' ? req.body.region : typeof req.query.region === 'string' ? req.query.region : undefined,
         assetType: typeof req.body?.assetType === 'string' ? req.body.assetType : typeof req.query.assetType === 'string' ? req.query.assetType : undefined,
         batchSize: req.body?.batchSize !== undefined ? Number(req.body.batchSize) : req.query.batchSize !== undefined ? Number(req.query.batchSize) : undefined,
         offset: req.body?.offset !== undefined ? Number(req.body.offset) : req.query.offset !== undefined ? Number(req.query.offset) : undefined,
-      });
+      }));
       return res.json(result);
     } catch (error) {
       console.error('Error recomputing adjusted closes:', error);
