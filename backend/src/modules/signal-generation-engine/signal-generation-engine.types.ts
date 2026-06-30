@@ -96,6 +96,18 @@ export interface SignalResultDto {
   /** Human-readable delivery% evidence phrase appended to explanation/evidence. */
   deliveryEvidence?: string | null;
 
+  // ── Tradability / liquidity overlay (additive, persisted-read only) ─────────
+  /**
+   * Region-agnostic liquidity proxy = trailing avg daily turnover (close*volume)
+   * from InstrumentCoverage at last rank.  null when the instrument has not been
+   * ranked/tracked yet (honest absent — never fabricated).
+   *
+   * Used ONLY as a low-priority ranking tiebreak (after conviction → confidence →
+   * reliability) and surfaced as a tradability indicator; it NEVER filters or
+   * hides a candidate from the screener.
+   */
+  liquidityScore?: number | null;
+
   // ── Calibration overlay (additive, persisted-read only) ────────────────────
   /**
    * Calibration-adjusted score from the latest persisted SignalCalibrationResult

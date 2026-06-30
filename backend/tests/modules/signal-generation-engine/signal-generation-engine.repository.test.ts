@@ -678,6 +678,103 @@ describe('SignalGenerationEngineRepository', () => {
     });
   });
 
+  // ── Phase A: conviction-first ranking with quality/liquidity tiebreaks ─────────
+  const rankRow = (over: Record<string, unknown>) => ({
+    ...signal,
+    triggeredSignals: [],
+    negativeSignals: [],
+    generatedAt: new Date('2026-05-13T00:00:00.000Z'),
+    dataStatus: 'COMPLETE',
+    rulesetVersion: 'signal-engine-v1',
+    dataQualityEligibilitySnapshot: trustedReadRecord.dataQualityEligibilitySnapshot,
+    ...over,
+    // scoringInputSummary carries the v4 conviction blob; merge any per-row v4 in.
+    scoringInputSummary: {
+      ...trustedReadRecord.scoringInputSummary,
+      ...((over.scoringInputSummary as Record<string, unknown>) || {}),
+    },
+  });
+
+  it('A#1: ranks equal rounded scores by unrounded effectiveDisplacement', async () => {
+    const findMany = jest.fn().mockResolvedValue([
+      rankRow({ id: 'lo', instrumentId: 'lo', symbol: 'LOW', score: 75, scoringInputSummary: { v4: { effectiveDisplacement: 0.12, displacement: 0.12 } } }),
+      rankRow({ id: 'hi', instrumentId: 'hi', symbol: 'HIGH', score: 75, scoringInputSummary: { v4: { effectiveDisplacement: 0.31, displacement: 0.31 } } }),
+    ]);
+    const repository = new SignalGenerationEngineRepository({ signalResult: { findMany } } as any);
+
+    const result = await repository.latestSignals({ limit: 25 });
+    expect(result.signals.map((s) => s.symbol)).toEqual(['HIGH', 'LOW']);
+  });
+
+  it('A#1: score stays primary — higher score outranks higher conviction in a lower bucket', async () => {
+    // Locks MEDIUM-1: conviction is a within-equal-score tiebreak, never a cross-bucket
+    // primary, so the Score column remains monotonic with row order.
+    const findMany = jest.fn().mockResolvedValue([
+      rankRow({ id: 'big', instrumentId: 'big', symbol: 'BIGSCORE', score: 80, scoringInputSummary: { v4: { effectiveDisplacement: 0.10, displacement: 0.10 } } }),
+      rankRow({ id: 'conv', instrumentId: 'conv', symbol: 'HICONV', score: 73, scoringInputSummary: { v4: { effectiveDisplacement: 0.45, displacement: 0.45 } } }),
+    ]);
+    const repository = new SignalGenerationEngineRepository({ signalResult: { findMany } } as any);
+
+    const result = await repository.latestSignals({ limit: 25 });
+    expect(result.signals.map((s) => s.symbol)).toEqual(['BIGSCORE', 'HICONV']);
+  });
+
+  it('A#1: bearish (asc) ranks most-negative conviction first', async () => {
+    const findMany = jest.fn().mockResolvedValue([
+      rankRow({ id: 'mild', instrumentId: 'mild', symbol: 'MILD', score: 38, direction: 'BEARISH', scoringInputSummary: { v4: { effectiveDisplacement: -0.12, displacement: -0.12 } } }),
+      rankRow({ id: 'deep', instrumentId: 'deep', symbol: 'DEEP', score: 38, direction: 'BEARISH', scoringInputSummary: { v4: { effectiveDisplacement: -0.34, displacement: -0.34 } } }),
+    ]);
+    const repository = new SignalGenerationEngineRepository({ signalResult: { findMany } } as any);
+
+    const result = await repository.latestSignals({ limit: 25, sortBy: 'score', sortDirection: 'asc' });
+    expect(result.signals.map((s) => s.symbol)).toEqual(['DEEP', 'MILD']);
+  });
+
+  it('A#2: equal conviction falls back to confidence then reliabilityTier', async () => {
+    const v4 = { v4: { effectiveDisplacement: 0.2, displacement: 0.2 } };
+    const findMany = jest.fn().mockResolvedValue([
+      rankRow({ id: 'b', instrumentId: 'b', symbol: 'MEDFULL', score: 70, confidence: 'MEDIUM', reliabilityTier: 'FULL', scoringInputSummary: v4 }),
+      rankRow({ id: 'a', instrumentId: 'a', symbol: 'HIGHPART', score: 70, confidence: 'HIGH', reliabilityTier: 'PARTIAL', scoringInputSummary: v4 }),
+      rankRow({ id: 'c', instrumentId: 'c', symbol: 'MEDPART', score: 70, confidence: 'MEDIUM', reliabilityTier: 'PARTIAL', scoringInputSummary: v4 }),
+    ]);
+    const repository = new SignalGenerationEngineRepository({ signalResult: { findMany } } as any);
+
+    const result = await repository.latestSignals({ limit: 25 });
+    // HIGH beats MEDIUM regardless of reliability; among MEDIUM, FULL beats PARTIAL.
+    expect(result.signals.map((s) => s.symbol)).toEqual(['HIGHPART', 'MEDFULL', 'MEDPART']);
+  });
+
+  it('A#3: liquidity breaks otherwise-equal ranks and attaches to the DTO', async () => {
+    const v4 = { v4: { effectiveDisplacement: 0.2, displacement: 0.2 } };
+    const findMany = jest.fn().mockResolvedValue([
+      rankRow({ id: 'thin', instrumentId: 'thin', symbol: 'THIN', score: 70, confidence: 'HIGH', reliabilityTier: 'FULL', scoringInputSummary: v4 }),
+      rankRow({ id: 'liquid', instrumentId: 'liquid', symbol: 'LIQUID', score: 70, confidence: 'HIGH', reliabilityTier: 'FULL', scoringInputSummary: v4 }),
+    ]);
+    const coverageFindMany = jest.fn().mockResolvedValue([
+      { stockId: 'thin', liquidityScore: 1000 },
+      { stockId: 'liquid', liquidityScore: 9_000_000 },
+    ]);
+    const repository = new SignalGenerationEngineRepository({
+      signalResult: { findMany },
+      instrumentCoverage: { findMany: coverageFindMany },
+    } as any);
+
+    const result = await repository.latestSignals({ limit: 25 });
+    expect(result.signals.map((s) => s.symbol)).toEqual(['LIQUID', 'THIN']);
+    expect(result.signals.find((s) => s.symbol === 'LIQUID')?.liquidityScore).toBe(9_000_000);
+    expect(result.signals.find((s) => s.symbol === 'THIN')?.liquidityScore).toBe(1000);
+  });
+
+  it('A#3: degrades gracefully (null liquidity) when no coverage delegate exists', async () => {
+    const findMany = jest.fn().mockResolvedValue([
+      rankRow({ id: 'x', instrumentId: 'x', symbol: 'XONE', score: 70, scoringInputSummary: { v4: { effectiveDisplacement: 0.2, displacement: 0.2 } } }),
+    ]);
+    const repository = new SignalGenerationEngineRepository({ signalResult: { findMany } } as any);
+
+    const result = await repository.latestSignals({ limit: 25 });
+    expect(result.signals[0].liquidityScore ?? null).toBeNull();
+  });
+
   it('applies latest-row semantics to latestSignalUniverse and counts', async () => {
     const findMany = jest.fn().mockResolvedValue([
       { ...signal, id: 'latest-1', instrumentId: 'stock-1', symbol: 'AAPL', direction: 'NEUTRAL', score: 55, generatedAt: new Date('2026-04-30T00:00:00.000Z'), triggeredSignals: [], negativeSignals: [], dataStatus: 'COMPLETE', ...trustedReadRecord },
