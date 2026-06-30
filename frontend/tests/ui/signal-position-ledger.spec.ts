@@ -260,6 +260,21 @@ test.describe('Signal Position Ledger UI', () => {
     expect(forbiddenRequests).toEqual([]);
     await expect(page.getByText('OLD - Old Industries')).toBeVisible();
     await expect(page.getByRole('columnheader', { name: 'Exit' })).toBeVisible();
+
+    // Closed-trade cumulative-returns summary card (above the closed table).
+    const summaryCard = page.getByText('Closed-trade cumulative returns')
+      .locator('xpath=ancestor::div[contains(@class,"MuiPaper-root")]').first();
+    await expect(summaryCard.getByText('Cumulative realized return')).toBeVisible();
+    await expect(summaryCard.getByText('Sum of closed-trade returns')).toBeVisible();
+    await expect(summaryCard.getByText('+5.00%').first()).toBeVisible();
+    await expect(summaryCard.getByText('To: today', { exact: false })).toBeVisible();
+
+    // From-date filter: a "since" date after the trade's close date empties the window.
+    await summaryCard.getByLabel('Since (from date)').fill('2026-06-01');
+    await expect(summaryCard.getByText('No closed trades with source-proven returns closed on or after 2026-06-01 for IN / STOCK.')).toBeVisible();
+    // A date on/before the close date includes it again.
+    await summaryCard.getByLabel('Since (from date)').fill('2026-05-01');
+    await expect(summaryCard.getByText('+5.00%').first()).toBeVisible();
     const closedDownloadPromise = page.waitForEvent('download');
     await page.getByRole('button', { name: 'Export CSV' }).click();
     const closedDownload = await closedDownloadPromise;
