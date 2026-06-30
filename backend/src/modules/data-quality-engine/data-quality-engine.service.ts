@@ -22,6 +22,7 @@ import {
 import { computeStaleness } from './data-quality-engine.staleness';
 import { deriveUseCaseTiers } from './data-quality-engine.use-case-tiers';
 import { recommendedFixes } from './data-quality-engine.recommended-fixes';
+import { detectFundamentalScaleAnomalies, formatScaleAnomalyWarning } from './data-quality-engine.scale-anomaly';
 import { normalizeInstrument, type NormalizedInstrument } from './data-quality-engine.instrument';
 import { optionalNumber, optionalText } from './data-quality-engine.utils';
 import type {
@@ -454,6 +455,14 @@ export class DataQualityEngineService {
     if (!currency) dataGaps.push('Currency metadata is missing.');
     if (volumeValues.length === 0) dataGaps.push('Volume data is missing.');
     if (adjustedFallbackCount > 0) warnings.push('Adjusted close fallback to close is present for some rows.');
+    // Cross-period fundamentals scale check: flag (non-destructively) any stored
+    // value that is orders-of-magnitude out of line with the same company's other
+    // periods of the same periodType — the fingerprint of a one-filing units/scale
+    // error (e.g. TNTELE's -34.6B quarter among ~-36M quarters). The value is never
+    // mutated; the observation surfaces as a DQE warning for research.
+    for (const anomaly of detectFundamentalScaleAnomalies(fundamentals)) {
+      warnings.push(formatScaleAnomalyWarning(anomaly));
+    }
     if (tierEvidence.requiredHistoryStatus && tierEvidence.requiredHistoryStatus !== 'COMPLETE') {
       readinessBlockers.push(`Trusted baseline required history status is ${tierEvidence.requiredHistoryStatus}.`);
     }

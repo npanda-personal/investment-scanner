@@ -23,3 +23,13 @@ export const TIER_REASON_LISTING_DATE_CONFIDENCE_MISSING = 'LISTING_DATE_CONFIDE
 export const TIER_REASON_BACKTEST_LEGACY_INELIGIBLE = 'LEGACY_BACKTEST_EVIDENCE_INELIGIBLE';
 export const TIER_REASON_CALIBRATION_LEGACY_INELIGIBLE = 'LEGACY_CALIBRATION_EVIDENCE_INELIGIBLE';
 export const TIER_REASON_CALIBRATION_SIGNAL_HISTORY_MISSING = 'CALIBRATION_SIGNAL_HISTORY_MISSING';
+
+// ── Fundamentals cross-period quality finding ────────────────────────────────
+// Stable reason code for a single fundamental value (revenue / netIncome / eps)
+// whose magnitude is orders-of-magnitude out of line with the SAME company's
+// other stored periods of the same periodType — the signature of a units/scale
+// error in one source filing (e.g. a quarter reported in absolute rupees while
+// its neighbours are reported in a different scale). The finding is advisory and
+// NON-destructive: the stored value is never mutated or nulled; it is surfaced as
+// a DQE warning for research. See `data-quality-engine.scale-anomaly.ts`.
+export const REASON_FUNDAMENTAL_SCALE_ANOMALY = 'FUNDAMENTAL_SCALE_ANOMALY';

@@ -5,6 +5,17 @@ export { createDataQualityEngineRouter, dataQualityEngineRouter, default as data
 export { DataQualityEngineService } from './data-quality-engine.service';
 export type { FilterByVerdictResult, InstrumentEligibilityRow } from './data-quality-engine.service';
 export { parseDataQualityEvaluateRequest, parseDataQualityQuery, requireInstrumentId } from './data-quality-engine.validation';
+export {
+  detectFundamentalScaleAnomalies,
+  formatScaleAnomalyWarning,
+  DEFAULT_SCALE_ANOMALY_CONFIG,
+} from './data-quality-engine.scale-anomaly';
+export type {
+  FundamentalScaleAnomaly,
+  ScaleAnomalyConfig,
+  ScaleAnomalyField,
+} from './data-quality-engine.scale-anomaly';
+export { REASON_FUNDAMENTAL_SCALE_ANOMALY } from './data-quality-engine.constants';
 export type {
   CoverageStatus,
   DataQualityEvaluateRequest,
