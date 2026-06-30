@@ -31,6 +31,7 @@ import {
   formatPercentPoints,
   RiskTags,
 } from './marketIntelligencePrimitives';
+import { isLowBaseGrowth } from './earningsTabModel';
 
 // ---------------------------------------------------------------------------
 // Cell helpers
@@ -114,6 +115,26 @@ export function TechnicalsCell({ row }: { row: EarningsIntelligenceSnapshot }) {
   return (
     <Tooltip title={<span style={{ whiteSpace: 'pre-line' }}>{tooltip}</span>} arrow>
       <Chip size="small" color={postureColor} variant="outlined" label={label} sx={{ fontWeight: 600 }} />
+    </Tooltip>
+  );
+}
+
+// QoQ/YoY growth %, shown verbatim. When the prior-period base was near-zero or a
+// loss the ratio balloons into the hundreds/thousands of percent and overstates an
+// ordinary swing — we keep the raw figure but append a quiet "*" so the reader can
+// spot the low-base distortion (full explanation on hover).
+export function GrowthCell({ value }: { value: number | null | undefined }) {
+  const text = formatPercentPoints(value ?? null);
+  if (!isLowBaseGrowth(value)) return <>{text}</>;
+  return (
+    <Tooltip
+      arrow
+      title="Low-base distortion: the prior-period figure was near zero or a loss, so this percentage overstates an ordinary swing (e.g. a recovery from ~breakeven or a loss→profit turnaround). For seasonal businesses, compare year-over-year instead. Value shown as reported."
+    >
+      <Box component="span" sx={{ borderBottom: '1px dotted', cursor: 'help' }}>
+        {text}
+        <Box component="sup" sx={{ color: 'warning.main', fontWeight: 700, ml: 0.25 }}>*</Box>
+      </Box>
     </Tooltip>
   );
 }
@@ -229,9 +250,9 @@ export function EarningsTable({ rows }: { rows: EarningsIntelligenceSnapshot[] }
                   <ResultDateCell resultDate={row.resultDate} resultDateLabel={row.resultDateLabel} />
                 </TableCell>
                 <TableCell align="right" sx={numericCellSx}>{formatOptional(row.daysToResult)}</TableCell>
-                <TableCell align="right" sx={numericCellSx}>{formatPercentPoints(row.revenueGrowthQoQ ?? null)}</TableCell>
-                <TableCell align="right" sx={numericCellSx}>{formatPercentPoints(row.profitGrowthQoQ ?? null)}</TableCell>
-                <TableCell align="right" sx={numericCellSx}>{formatPercentPoints(row.epsGrowthQoQ ?? null)}</TableCell>
+                <TableCell align="right" sx={numericCellSx}><GrowthCell value={row.revenueGrowthQoQ} /></TableCell>
+                <TableCell align="right" sx={numericCellSx}><GrowthCell value={row.profitGrowthQoQ} /></TableCell>
+                <TableCell align="right" sx={numericCellSx}><GrowthCell value={row.epsGrowthQoQ} /></TableCell>
                 <TableCell align="right" sx={numericCellSx}>{formatOptional(row.consistencyScore)}</TableCell>
                 <TableCell sx={{ whiteSpace: 'nowrap' }}><TechnicalsCell row={row} /></TableCell>
                 <TableCell sx={{ whiteSpace: 'nowrap' }}><SignalCell signal={row.signal} /></TableCell>
@@ -260,9 +281,9 @@ export function EarningsTable({ rows }: { rows: EarningsIntelligenceSnapshot[] }
                     </TableCell>
                     <TableCell sx={{ whiteSpace: 'nowrap' }}>{formatDate(row.periodEndDate)}</TableCell>
                     <TableCell sx={{ whiteSpace: 'nowrap' }}>{formatDate(row.validatedAt)}</TableCell>
-                    <TableCell align="right" sx={numericCellSx}>{formatPercentPoints(row.revenueGrowthYoY ?? null)}</TableCell>
-                    <TableCell align="right" sx={numericCellSx}>{formatPercentPoints(row.profitGrowthYoY ?? null)}</TableCell>
-                    <TableCell align="right" sx={numericCellSx}>{formatPercentPoints(row.epsGrowthYoY ?? null)}</TableCell>
+                    <TableCell align="right" sx={numericCellSx}><GrowthCell value={row.revenueGrowthYoY} /></TableCell>
+                    <TableCell align="right" sx={numericCellSx}><GrowthCell value={row.profitGrowthYoY} /></TableCell>
+                    <TableCell align="right" sx={numericCellSx}><GrowthCell value={row.epsGrowthYoY} /></TableCell>
                     <TableCell align="right" sx={numericCellSx}>{formatPercentPoints(row.marginTrend)}</TableCell>
                     <TableCell align="right" sx={numericCellSx}>{formatOptional(row.accelerationScore)}</TableCell>
                     <TableCell sx={{ whiteSpace: 'nowrap' }}>{row.freshness || '—'}</TableCell>

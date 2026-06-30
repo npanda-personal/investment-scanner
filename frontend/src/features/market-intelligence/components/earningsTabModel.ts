@@ -11,6 +11,20 @@ import type { EarningsIntelligenceSnapshot } from '../types';
 export const num = (value: number | null | undefined, fallback: number): number =>
   typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 
+// A QoQ/YoY growth % becomes statistically not-meaningful when the prior-period
+// base was near-zero or a loss: (current - prior)/|prior| then explodes into the
+// hundreds/thousands of percent even though the underlying swing is ordinary — a
+// recovery from ~breakeven, a loss→profit turnaround, or an off-season base for a
+// seasonal business (compare YoY instead). We do NOT alter the raw figure; we only
+// flag it so the reader can spot the low-base distortion. A |growth| ≥ 300% (more
+// than a ~3× move) reliably isolates these from genuine operating changes.
+export const LOW_BASE_GROWTH_THRESHOLD_PCT = 300;
+
+export function isLowBaseGrowth(value: number | null | undefined): boolean {
+  return typeof value === 'number' && Number.isFinite(value)
+    && Math.abs(value) >= LOW_BASE_GROWTH_THRESHOLD_PCT;
+}
+
 // Forward-date reliability tier (mirrors the backend upcoming bucket order):
 // official board-meeting date > estimated-from-cadence > no/past date.
 export function earningsUpcomingTier(row: EarningsIntelligenceSnapshot): number {
