@@ -5,7 +5,9 @@ import { PageHeader } from '@/shared/components';
 import { fetchSignalPositionLedgerActiveRows, fetchSignalPositionLedgerClosedRows } from '../api/signalPositionLedgerApi';
 import { useSignalPositionLedgerActiveRows } from '../hooks/useSignalPositionLedgerActiveRows';
 import { useSignalPositionLedgerClosedRows } from '../hooks/useSignalPositionLedgerClosedRows';
+import { useSignalPositionLedgerClosedReturns } from '../hooks/useSignalPositionLedgerClosedReturns';
 import { ActivePositionsTable } from './ActivePositionsTable';
+import { ClosedTradesReturnsCard } from './ClosedTradesReturnsCard';
 import { SignalPositionSummaryStrip } from './SignalPositionSummaryStrip';
 import type { SignalPositionLedgerActiveRow } from '../types';
 
@@ -30,6 +32,7 @@ const SignalPositionLedgerPage: React.FC = () => {
     reload,
   } = useSignalPositionLedgerActiveRows();
   const closed = useSignalPositionLedgerClosedRows();
+  const closedReturns = useSignalPositionLedgerClosedReturns();
   const scopeLabel = `${scope.region} / ${scope.assetType}`;
   const currentTabLoading = activeTab === 'active' ? loading : closed.loading;
 
@@ -145,20 +148,28 @@ const SignalPositionLedgerPage: React.FC = () => {
           />
         </>
       ) : (
-        <ActivePositionsTable
-          data={closed.data}
-          loading={closed.loading}
-          error={closed.error}
-          scopeLabel={scopeLabel}
-          variant="closed"
-          page={closed.page}
-          pageSize={closed.pageSize}
-          sortBy={closed.sortBy}
-          sortDirection={closed.sortDirection}
-          onPageChange={closed.setPage}
-          onPageSizeChange={closed.setPageSize}
-          onSortChange={closed.setSort}
-        />
+        <>
+          <ClosedTradesReturnsCard
+            rows={closedReturns.rows}
+            scopeLabel={scopeLabel}
+            loading={closedReturns.loading}
+            error={closedReturns.error}
+          />
+          <ActivePositionsTable
+            data={closed.data}
+            loading={closed.loading}
+            error={closed.error}
+            scopeLabel={scopeLabel}
+            variant="closed"
+            page={closed.page}
+            pageSize={closed.pageSize}
+            sortBy={closed.sortBy}
+            sortDirection={closed.sortDirection}
+            onPageChange={closed.setPage}
+            onPageSizeChange={closed.setPageSize}
+            onSortChange={closed.setSort}
+          />
+        </>
       )}
     </Box>
   );
