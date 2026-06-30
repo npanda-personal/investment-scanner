@@ -303,3 +303,71 @@ export function annualSeries(
     .sort((a, b) => (a.end < b.end ? 1 : -1))
     .map(({ end, val, fy }) => ({ end, val, fy }));
 }
+
+/** SEC quarterly-report forms whose `Qx` facts represent a single fiscal quarter. */
+function isQuarterlyForm(form?: string): boolean {
+  return !!form && /^10-Q/.test(form);
+}
+
+/** XBRL fiscal-period codes that denote a standalone fiscal quarter. */
+const QUARTERLY_FP = new Set(['Q1', 'Q2', 'Q3', 'Q4']);
+
+/** One quarterly fiscal-period data point distilled from the XBRL fact array. */
+export interface QuarterlyFact {
+  /** Fiscal quarter-end date (YYYY-MM-DD) — used as the Fundamental periodEndDate. */
+  end: string;
+  val: number;
+  fy?: number;
+  /** Fiscal-period code (Q1..Q4) carried through for diagnostics. */
+  fp?: string;
+}
+
+/**
+ * Quarterly (single fiscal-quarter) series MERGED across all listed concepts,
+ * most-recent-first.  Mirrors {@link annualSeries} but keeps only genuine
+ * standalone quarters: `fp ∈ {Q1..Q4}`, a 10-Q form, and a ~quarter-length
+ * duration (80..100 days).  The duration guard is the load-bearing filter — a
+ * 10-Q reports income-statement concepts BOTH as the standalone quarter (~91d)
+ * AND as the cumulative year-to-date figure (Q2 YTD ≈ 180d, Q3 YTD ≈ 270d);
+ * keeping only ~quarter-length spans means the persisted series is never
+ * polluted with cumulative values, so quarter-over-prior-year-quarter
+ * comparisons stay apples-to-apples.  (There is no standalone Q4 10-Q — Q4 lives
+ * in the 10-K — so a clean series is typically Q1/Q2/Q3 per fiscal year, which
+ * is exactly what same-quarter YoY needs.)  Same cross-concept merge and
+ * restatement (latest `filed`) tie-breaks as the annual path.
+ *
+ * Pure — no I/O.  Returns [] when no quarterly facts are present (graceful: the
+ * caller simply writes no QUARTERLY rows for that stock).
+ */
+export function quarterlySeries(
+  facts: CompanyFacts,
+  concepts: string[],
+  unit: string,
+  group: 'usGaap' | 'dei' = 'usGaap',
+): QuarterlyFact[] {
+  const source = facts[group];
+  const byEnd = new Map<string, { end: string; val: number; fy?: number; fp?: string; filed?: string; rank: number }>();
+  concepts.forEach((concept, rank) => {
+    const points = source[concept]?.[unit];
+    if (!points || !points.length) return;
+    for (const p of points) {
+      if (!p.fp || !QUARTERLY_FP.has(p.fp) || !isQuarterlyForm(p.form) || !p.end) continue;
+      const days = spanDays(p.start, p.end);
+      if (days === null || days < 80 || days > 100) continue;
+      const prev = byEnd.get(p.end);
+      if (!prev) {
+        byEnd.set(p.end, { end: p.end, val: p.val, fy: p.fy, fp: p.fp, filed: p.filed, rank });
+        continue;
+      }
+      // A higher-priority (earlier-listed) concept already owns this quarter-end — keep it.
+      if (prev.rank < rank) continue;
+      // Same concept, later restatement — prefer the latest `filed`.
+      if (prev.rank === rank && (p.filed ?? '') > (prev.filed ?? '')) {
+        byEnd.set(p.end, { end: p.end, val: p.val, fy: p.fy, fp: p.fp, filed: p.filed, rank });
+      }
+    }
+  });
+  return [...byEnd.values()]
+    .sort((a, b) => (a.end < b.end ? 1 : -1))
+    .map(({ end, val, fy, fp }) => ({ end, val, fy, fp }));
+}

@@ -13,6 +13,40 @@ import type { MarketDataServingHost } from './market-data-foundation.serving-hos
 import type { PaginationOptions } from '../market-data-foundation.types';
 import { isCryptoScope } from '../../../shared/data-access/market-repository-router';
 
+/** Period types that represent a *live* trailing snapshot — the only rows that carry
+ *  the current peRatio / marketCap, as opposed to a closed fiscal period. */
+const LIVE_SNAPSHOT_PERIOD_TYPES = new Set(['TTM']);
+
+/**
+ * Order persisted fundamentals for serving so that, among records sharing a
+ * `periodEndDate`, the live trailing snapshot (TTM) leads. US SEC ingestion writes a
+ * standalone QUARTERLY (10-Q) row whose period-end equals the TTM snapshot's derived
+ * period-end (and after a 10-K the newest ANNUAL row ties TTM the same way). Without a
+ * deterministic tiebreak the DB's `periodEndDate DESC` order leaves `records[0]`
+ * non-deterministic, which would silently drop the signal engine's PE self-history
+ * votes — those read `records[0]` expecting the TTM row's live peRatio (signal-scoring
+ * `fundamentalPeHistoryVotes`). Primary order (periodEndDate DESC) is unchanged for
+ * distinct dates; only equal-date ties are made deterministic (TTM first). Stable for
+ * true ties (preserves incoming query order).
+ */
+export function orderFundamentalsForServing<T extends { periodEndDate?: unknown; periodType?: unknown }>(records: T[]): T[] {
+  const liveRank = (t: unknown) => (typeof t === 'string' && LIVE_SNAPSHOT_PERIOD_TYPES.has(t.toUpperCase()) ? 0 : 1);
+  const ms = (d: unknown) => {
+    const t = d instanceof Date ? d.getTime() : typeof d === 'string' || typeof d === 'number' ? new Date(d).getTime() : NaN;
+    return Number.isNaN(t) ? -Infinity : t;
+  };
+  return records
+    .map((record, index) => ({ record, index }))
+    .sort((a, b) => {
+      const byDate = ms(b.record.periodEndDate) - ms(a.record.periodEndDate);
+      if (byDate !== 0) return byDate;
+      const byLive = liveRank(a.record.periodType) - liveRank(b.record.periodType);
+      if (byLive !== 0) return byLive;
+      return a.index - b.index; // stable: preserve incoming (query) order for true ties
+    })
+    .map(({ record }) => record);
+}
+
 export class FundamentalsReadsService {
   constructor(private readonly host: MarketDataServingHost) {}
 
@@ -131,14 +165,18 @@ export class FundamentalsReadsService {
   }
 
   formatFundamentalsResponse(stock: any, records: any[]) {
+    // Deterministic order: live TTM snapshot leads on an equal periodEndDate so the
+    // signal engine's records[0]-based PE self-history keeps reading the live peRatio
+    // even after fiscal (QUARTERLY/ANNUAL) rows share that period-end.
+    const ordered = orderFundamentalsForServing(records);
     return {
       instrument_id: stock.id,
       symbol: stock.symbol,
-      source: records[0]?.source || 'database',
-      ingestion_timestamp: records[0]?.ingestionTimestamp?.toISOString?.() ?? null,
-      last_updated_timestamp: records[0]?.lastUpdatedTimestamp?.toISOString?.() ?? null,
-      data_status: records.length > 0 ? records[0].dataStatus : 'MISSING',
-      records: records.map((record: any) => ({
+      source: ordered[0]?.source || 'database',
+      ingestion_timestamp: ordered[0]?.ingestionTimestamp?.toISOString?.() ?? null,
+      last_updated_timestamp: ordered[0]?.lastUpdatedTimestamp?.toISOString?.() ?? null,
+      data_status: ordered.length > 0 ? ordered[0].dataStatus : 'MISSING',
+      records: ordered.map((record: any) => ({
         revenue: record.revenue !== null ? Number(record.revenue) : null,
         eps: record.eps !== null ? Number(record.eps) : null,
         net_income: record.netIncome !== null ? Number(record.netIncome) : null,
