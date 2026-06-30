@@ -5,6 +5,12 @@ export { createDataQualityEngineRouter, dataQualityEngineRouter, default as data
 export { DataQualityEngineService } from './data-quality-engine.service';
 export type { FilterByVerdictResult, InstrumentEligibilityRow } from './data-quality-engine.service';
 export { parseDataQualityEvaluateRequest, parseDataQualityQuery, requireInstrumentId } from './data-quality-engine.validation';
+export {
+  filterScaleAnomalies,
+  isScaleAnomalyFundamental,
+  scaleAnomalyRowCount,
+} from './data-quality-engine.fundamentals-sanity';
+export type { ScaleAnomalyCandidate } from './data-quality-engine.fundamentals-sanity';
 export type {
   CoverageStatus,
   DataQualityEvaluateRequest,
