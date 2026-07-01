@@ -3,6 +3,7 @@ import type { SignalResultDto } from '../signal-generation-engine';
 export type SignalPositionTriggerType = 'bullish_entry_trigger' | 'bearish_trigger';
 export type SignalPositionReturnStatus = 'CURRENT' | 'STALE' | 'UNAVAILABLE';
 export type SignalPositionLedgerStatus = 'ACTIVE' | 'RISK_WARNING' | 'EXIT_TRIGGERED' | 'INVALIDATED' | 'CLOSED';
+export type SignalPositionCloseReason = 'HORIZON_REACHED' | 'DEFENSIVE_EXIT' | 'INVALIDATED';
 export type SignalPositionLedgerSortBy = 'entryTriggerTimestamp' | 'currentReturnPercent';
 export type SignalPositionLedgerSortDirection = 'asc' | 'desc';
 export type SignalPositionHealthState = 'EXIT_TRIGGERED' | 'RISK_WARNING' | null;
@@ -153,6 +154,11 @@ export interface SignalPositionLedgerActiveRow {
   invalidationRuleIds?: string[];
   invalidationTimestamp?: string | null;
   closedAt?: string | null;
+  // Fixed-horizon lifecycle (2026-07): terminal-close provenance + benchmark/alpha.
+  closeReason?: SignalPositionCloseReason | null; // HORIZON_REACHED | DEFENSIVE_EXIT | INVALIDATED
+  horizonTradingDays?: number | null;             // trading-bar horizon used (60) when closeReason=HORIZON_REACHED
+  benchmarkReturnPercent?: number | null;         // region-benchmark simple return over the same holding window
+  alphaPercent?: number | null;                   // currentReturnPercent − benchmarkReturnPercent (percentage points)
 }
 
 export interface SignalPositionLedgerActiveListResponse {
@@ -173,5 +179,25 @@ export interface SignalPositionLedgerActiveListResponse {
 export interface SignalPositionLedgerMaterializedSnapshot {
   rows: SignalPositionLedgerActiveRow[];
   refresh: SignalPositionLedgerRefreshProgress;
+}
+
+/**
+ * Outcome of the one-time closed-history rebuild (recomputeClosedHistory). Every count
+ * is per-scope; `scanned` is the un-collapsed historical entry population, the rest sum
+ * to how it was reclassified/persisted under the fixed-horizon lifecycle.
+ */
+export interface SignalPositionLedgerRecomputeResult {
+  scope: { region: string; assetType: string };
+  scanned: number;          // historical rows enumerated (all statuses, no dedup)
+  shadowsDropped: number;   // re-entries that opened while a prior position was still open
+  bornDeadDropped: number;  // entries rejected by the coincident-evidence intake guard
+  kept: number;             // rows persisted after the replay (= inserted)
+  closedHorizon: number;    // CLOSED via HORIZON_REACHED
+  closedDefensive: number;  // CLOSED via DEFENSIVE_EXIT
+  invalidated: number;      // INVALIDATED
+  exitTriggered: number;    // defensive exit fired but close price not yet source-proven
+  active: number;           // still open (held, horizon not yet reached)
+  deleted: number;          // pre-existing rows removed
+  inserted: number;         // rows written back
 }
 

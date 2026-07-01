@@ -18,5 +18,6 @@ export type {
   SignalPositionHealthState,
   SignalPositionLifecycleEvidenceStatus,
   SignalPositionTrustEvidenceStatus,
+  SignalPositionLedgerRecomputeResult,
 } from './signal-position-ledger.types';
 

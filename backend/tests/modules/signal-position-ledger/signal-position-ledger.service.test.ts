@@ -472,7 +472,9 @@ describe('SignalPositionLedgerService', () => {
           quality: { signalReadinessStatus: 'READY', coverageStatus: 'GOOD', liquidityStatus: 'LIQUID', lastEvaluatedAt: TODAY },
           exitDecision: {
             id: 'decision-latest', strategy: 'DEFENSIVE_EXIT', strategyVersion: '1.2.0',
-            decision: 'REDUCE_RISK', generatedAt: TODAY,
+            // Fixed-horizon policy (2026-07): only EXIT_CANDIDATE (+ invalidation) closes;
+            // firstCloseEvidenceDates likewise surfaces EXIT_CANDIDATE dates only.
+            decision: 'EXIT_CANDIDATE', generatedAt: TODAY,
             reasons: ['Relative strength decayed.'],
             exitRulesTriggered: ['RELATIVE_STRENGTH_DECAY_EXIT'], invalidationRulesTriggered: [],
           },
@@ -902,7 +904,11 @@ describe('SignalPositionLedgerService', () => {
     expect(repository.closeLedgerRow).not.toHaveBeenCalled();
   });
 
-  it('replays pending-exit transitions idempotently without duplicate lifecycle rows', async () => {
+  it('rests a REDUCE_RISK position ACTIVE idempotently without duplicate lifecycle rows (REDUCE_RISK never closes)', async () => {
+    // Fixed-horizon policy (2026-07): REDUCE_RISK no longer transitions a position to
+    // EXIT_TRIGGERED — only EXIT_CANDIDATE + invalidation close early, otherwise the
+    // position rests ACTIVE and is held to the horizon. Replaying the refresh must be
+    // idempotent: the same ledgerKey is rewritten in place, never duplicated.
     const existing = activeLedgerRow({ instrumentId: 'stock-1', symbol: 'ABC' });
     const activeRows = new Map<string, any>([[existing.ledgerKey, existing]]);
     const repository = {
@@ -951,9 +957,10 @@ describe('SignalPositionLedgerService', () => {
     expect(active.totalCount).toBe(1);
     expect(active.items[0]).toMatchObject({
       ledgerKey: existing.ledgerKey,
-      status: 'EXIT_TRIGGERED',
-      lifecycleEvidenceStatus: 'EXIT_TRIGGERED',
+      status: 'ACTIVE',
+      lifecycleEvidenceStatus: 'ACTIVE_ENTRY',
     });
+    expect(active.items[0].status).not.toBe('EXIT_TRIGGERED');
     expect(repository.closeLedgerRow).not.toHaveBeenCalled();
   });
 
@@ -1106,7 +1113,10 @@ describe('SignalPositionLedgerService', () => {
     expect(result.items).toHaveLength(0);
   });
 
-  it('does not open a new entry that already carries risk evidence (only strong bull candidates stay open)', async () => {
+  it('opens a new entry carrying only REDUCE_RISK evidence and rests it ACTIVE (REDUCE_RISK no longer suppresses intake)', async () => {
+    // Fixed-horizon policy (2026-07): a REDUCE_RISK decision is NOT a close and NOT an
+    // intake block — the position opens and is held to horizon. Only a coincident
+    // EXIT_CANDIDATE/invalidation on the entry candle blocks intake (see the next test).
     const repository = {
       listLatestSignals: jest.fn().mockResolvedValue({
         items: [trustedSignal],
@@ -1144,8 +1154,58 @@ describe('SignalPositionLedgerService', () => {
     await service.refreshActiveRows(query, { force: true, wait: true });
     const result = await service.listActiveRows(query);
 
+    expect(result.totalCount).toBe(1);
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0].status).toBe('ACTIVE');
+    expect(result.items[0]).toMatchObject({ healthState: null, lifecycleEvidenceStatus: 'ACTIVE_ENTRY' });
+  });
+
+  it('intake guard: does not open a new entry whose entry candle carries coincident EXIT_CANDIDATE/invalidation evidence (Gap E, born-dead)', async () => {
+    // Gap E — entry-time adverse selection. When the entry candle ALREADY carries a
+    // same-day EXIT_CANDIDATE/invalidation (coincidentDefensiveEvidenceBatch), the entry
+    // is born-dead and must not be opened. Non-vacuous: the fixture is identical to the
+    // REDUCE_RISK-opens test above (which opens totalCount 1); the ONLY thing suppressing
+    // this row is the intake guard returning the instrument in the coincident set.
+    const repository = {
+      listLatestSignals: jest.fn().mockResolvedValue({
+        items: [trustedSignal],
+        totalCount: 1,
+        limit: 100,
+        offset: 0,
+        nextOffset: null,
+        hasMore: false,
+      }),
+      latestPriceByInstrumentId: jest.fn().mockResolvedValue({
+        date: new Date().toISOString(),
+        close: 101,
+        adjustedClose: 101,
+        dataStatus: 'COMPLETE',
+        source: 'database',
+      }),
+      latestDataQualityByInstrumentId: jest.fn().mockResolvedValue({
+        signalReadinessStatus: 'READY',
+        coverageStatus: 'GOOD',
+        liquidityStatus: 'LIQUID',
+        lastEvaluatedAt: new Date().toISOString(),
+      }),
+      latestExitDecisionByInstrumentId: jest.fn().mockResolvedValue(null),
+      // Entry candle carries coincident defensive/invalidation evidence → born-dead.
+      coincidentDefensiveEvidenceBatch: jest.fn().mockResolvedValue(new Set(['stock-1'])),
+    };
+    const signalService = {
+      enrichSignals: jest.fn().mockResolvedValue([{ ...trustedSignal, triggerContract: sourceProvenTrigger }]),
+    };
+    const service = new SignalPositionLedgerService(repository as any, signalService as any);
+
+    const query = { region: 'IN', assetType: 'STOCK', limit: 25, offset: 0 };
+    await service.refreshActiveRows(query, { force: true, wait: true });
+    const result = await service.listActiveRows(query);
+
     expect(result.totalCount).toBe(0);
     expect(result.items).toHaveLength(0);
+    expect(repository.coincidentDefensiveEvidenceBatch).toHaveBeenCalledWith(
+      expect.arrayContaining([expect.objectContaining({ instrumentId: 'stock-1' })]),
+    );
   });
 
   it('rests a new entry ACTIVE (never RISK_WARNING) when its REDUCE_RISK decision predates entry with no on/after-entry close evidence', async () => {
@@ -1609,6 +1669,119 @@ describe('SignalPositionLedgerService', () => {
     const upsertedInstruments = repository.upsertActiveLedgerRow.mock.calls.map(([row]: [any]) => row.instrumentId);
     expect(upsertedInstruments.sort()).toEqual(['stock-a', 'stock-b']);
   });
+
+  // -------------------------------------------------------------------------
+  // Fixed-horizon lifecycle (2026-07): HORIZON_REACHED close + benchmark/alpha
+  // -------------------------------------------------------------------------
+
+  it('closes an untouched ACTIVE position HORIZON_REACHED at the entry + 60-trading-day bar price', async () => {
+    // Dominant fix (Gap A): with no early defensive/invalidation evidence, a position is
+    // held to the 60-trading-day evaluation horizon and closes at that bar's price —
+    // letting winners run instead of exiting into the first defensive flag.
+    const existing = activeLedgerRow({
+      instrumentId: 'stock-h', symbol: 'HZN',
+      entryTriggerTimestamp: '2026-01-05T00:00:00.000Z', entryTriggerPrice: 100,
+    });
+    const priceAtTradingDayOffsetBatch = jest.fn().mockResolvedValue(new Map([
+      ['stock-h', { date: '2026-04-01T00:00:00.000Z', close: 130, adjustedClose: 130, dataStatus: 'COMPLETE', source: 'database' }],
+    ]));
+    const repository = {
+      listAllLedgerRows: jest.fn()
+        .mockResolvedValueOnce([existing])
+        .mockResolvedValueOnce([]),
+      listLatestSignals: jest.fn().mockResolvedValue({
+        items: [], totalCount: 0, limit: 100, offset: 0, nextOffset: null, hasMore: false,
+      }),
+      latestSnapshotsByInstrumentIds: jest.fn().mockResolvedValue(new Map([
+        ['stock-h', {
+          latestPrice: { date: '2026-04-01T00:00:00.000Z', close: 130, adjustedClose: 130, dataStatus: 'COMPLETE', source: 'database' },
+          quality: { signalReadinessStatus: 'READY', coverageStatus: 'GOOD', liquidityStatus: 'LIQUID', lastEvaluatedAt: '2026-04-01T00:00:00.000Z' },
+          exitDecision: null,
+        }],
+      ])),
+      firstCloseEvidenceDates: jest.fn().mockResolvedValue(new Map()),
+      priceAtTradingDayOffsetBatch,
+      upsertActiveLedgerRow: jest.fn(),
+      closeLedgerRow: jest.fn(),
+    };
+    const signalService = { enrichSignals: jest.fn() };
+    const service = new SignalPositionLedgerService(repository as any, signalService as any);
+    const query = { region: 'IN', assetType: 'STOCK', limit: 25, offset: 0 };
+
+    await service.refreshActiveRows(query, { force: true, wait: true });
+    const active = await service.listActiveRows(query);
+    const closed = await service.listClosedRows(query);
+
+    expect(active.totalCount).toBe(0);
+    expect(closed.totalCount).toBe(1);
+    expect(closed.items[0]).toMatchObject({
+      status: 'CLOSED',
+      lifecycleEvidenceStatus: 'CLOSED',
+      closeReason: 'HORIZON_REACHED',
+      horizonTradingDays: 60,
+      exitTriggerTimestamp: '2026-04-01T00:00:00.000Z',
+      exitTriggerPrice: 130,
+      closePriceStatus: 'SOURCE_PROVEN',
+      closedAt: '2026-04-01T00:00:00.000Z',
+    });
+    // Realized return: (130 - 100) / 100 * 100 = 30
+    expect(closed.items[0].currentReturnPercent).toBeCloseTo(30, 4);
+    // Horizon query batched with the 60-bar offset.
+    expect(priceAtTradingDayOffsetBatch).toHaveBeenCalledWith(
+      expect.arrayContaining([expect.objectContaining({ instrumentId: 'stock-h' })]),
+      60,
+      expect.objectContaining({ region: 'IN', assetType: 'STOCK' }),
+    );
+    expect(repository.closeLedgerRow).toHaveBeenCalledWith(expect.objectContaining({
+      status: 'CLOSED', closeReason: 'HORIZON_REACHED', horizonTradingDays: 60,
+    }));
+  });
+
+  it('persists benchmark return + alpha on a terminal close over the holding window', async () => {
+    // Gap F: entry edge is only measurable against a benchmark. Position return 30% over a
+    // window in which the region benchmark rose 10% ⇒ alpha = +20pp.
+    const existing = activeLedgerRow({
+      instrumentId: 'stock-b', symbol: 'BMK',
+      entryTriggerTimestamp: '2026-01-05T00:00:00.000Z', entryTriggerPrice: 100,
+    });
+    const repository = {
+      listAllLedgerRows: jest.fn()
+        .mockResolvedValueOnce([existing])
+        .mockResolvedValueOnce([]),
+      listLatestSignals: jest.fn().mockResolvedValue({
+        items: [], totalCount: 0, limit: 100, offset: 0, nextOffset: null, hasMore: false,
+      }),
+      latestSnapshotsByInstrumentIds: jest.fn().mockResolvedValue(new Map([
+        ['stock-b', {
+          latestPrice: { date: '2026-04-01T00:00:00.000Z', close: 130, adjustedClose: 130, dataStatus: 'COMPLETE', source: 'database' },
+          quality: { signalReadinessStatus: 'READY', coverageStatus: 'GOOD', liquidityStatus: 'LIQUID', lastEvaluatedAt: '2026-04-01T00:00:00.000Z' },
+          exitDecision: null,
+        }],
+      ])),
+      firstCloseEvidenceDates: jest.fn().mockResolvedValue(new Map()),
+      priceAtTradingDayOffsetBatch: jest.fn().mockResolvedValue(new Map([
+        ['stock-b', { date: '2026-04-01T00:00:00.000Z', close: 130, adjustedClose: 130, dataStatus: 'COMPLETE', source: 'database' }],
+      ])),
+      listBenchmarkSeries: jest.fn().mockResolvedValue([
+        { date: '2026-01-05T00:00:00.000Z', adjustedClose: 1000 },
+        { date: '2026-04-01T00:00:00.000Z', adjustedClose: 1100 },
+      ]),
+      upsertActiveLedgerRow: jest.fn(),
+      closeLedgerRow: jest.fn(),
+    };
+    const signalService = { enrichSignals: jest.fn() };
+    const service = new SignalPositionLedgerService(repository as any, signalService as any);
+    const query = { region: 'IN', assetType: 'STOCK', limit: 25, offset: 0 };
+
+    await service.refreshActiveRows(query, { force: true, wait: true });
+
+    expect(repository.closeLedgerRow).toHaveBeenCalledWith(expect.objectContaining({
+      status: 'CLOSED',
+      closeReason: 'HORIZON_REACHED',
+      benchmarkReturnPercent: 10,
+      alphaPercent: 20,
+    }));
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -1900,6 +2073,132 @@ describe('SignalPositionLedgerService — trader GET persisted-read constraint',
 
     // The live enrichment path (enrichSignals) IS called via POST refresh
     expect(enrichSignals).toHaveBeenCalled();
+  });
+
+  it('recomputeClosedHistory replays history: horizon-closes an old entry, keeps one ACTIVE, drops a shadow re-entry, and atomically replaces the scope', async () => {
+    // stock-1: two entries. The first (Jan) rests ACTIVE (no evidence, horizon not
+    //          reached), so the second (Feb) opened while a position was still open —
+    //          a legacy 2-day-close re-entry artifact — and must be dropped as a shadow.
+    // stock-2: one old entry that reaches the 60-trading-day horizon → HORIZON_REACHED
+    //          close at the offset price (entry 100 → close 130 = +30%).
+    const s1a = activeLedgerRow({
+      ledgerKey: 'IN:STOCK:stock-1:bullish_entry_trigger:2026-01-05T00:00:00.000Z',
+      instrumentId: 'stock-1', symbol: 'ABC',
+      entryTriggerTimestamp: '2026-01-05T00:00:00.000Z', entryTriggerPrice: 100,
+    });
+    const s1b = activeLedgerRow({
+      ledgerKey: 'IN:STOCK:stock-1:bullish_entry_trigger:2026-02-10T00:00:00.000Z',
+      instrumentId: 'stock-1', symbol: 'ABC',
+      entryTriggerTimestamp: '2026-02-10T00:00:00.000Z', entryTriggerPrice: 110,
+    });
+    const s2 = activeLedgerRow({
+      ledgerKey: 'IN:STOCK:stock-2:bullish_entry_trigger:2026-01-05T00:00:00.000Z',
+      instrumentId: 'stock-2', symbol: 'XYZ', companyName: 'XYZ Co',
+      entryTriggerTimestamp: '2026-01-05T00:00:00.000Z', entryTriggerPrice: 100,
+    });
+
+    const replaceScopeLedgerRows = jest.fn().mockResolvedValue({ deleted: 3, inserted: 2 });
+    const repository = {
+      listEveryLedgerRow: jest.fn().mockResolvedValue([s1a, s1b, s2]),
+      latestSnapshotsByInstrumentIds: jest.fn().mockResolvedValue(new Map([
+        ['stock-1', {
+          latestPrice: { date: '2026-02-20T00:00:00.000Z', close: 105, adjustedClose: 105, dataStatus: 'COMPLETE', source: 'database' },
+          quality: { signalReadinessStatus: 'READY', coverageStatus: 'GOOD', liquidityStatus: 'LIQUID', lastEvaluatedAt: '2026-02-20T00:00:00.000Z' },
+          exitDecision: null,
+        }],
+        ['stock-2', {
+          latestPrice: { date: '2026-04-01T00:00:00.000Z', close: 130, adjustedClose: 130, dataStatus: 'COMPLETE', source: 'database' },
+          quality: { signalReadinessStatus: 'READY', coverageStatus: 'GOOD', liquidityStatus: 'LIQUID', lastEvaluatedAt: '2026-04-01T00:00:00.000Z' },
+          exitDecision: null,
+        }],
+      ])),
+      // No defensive/invalidation evidence for either stock.
+      firstCloseEvidenceDates: jest.fn().mockResolvedValue(new Map()),
+      coincidentDefensiveEvidenceBatch: jest.fn().mockResolvedValue(new Set()),
+      // Only stock-2 has a source-proven 60-bar horizon bar; stock-1 has none (recent).
+      priceAtTradingDayOffsetBatch: jest.fn().mockImplementation(async (entries: Array<{ instrumentId: string }>) => {
+        const map = new Map();
+        for (const e of entries) {
+          if (e.instrumentId === 'stock-2') {
+            map.set('stock-2', { date: '2026-04-01T00:00:00.000Z', close: 130, adjustedClose: 130, dataStatus: 'COMPLETE', source: 'database' });
+          }
+        }
+        return map;
+      }),
+      listBenchmarkSeries: jest.fn().mockResolvedValue([]), // no benchmark → null alpha
+      replaceScopeLedgerRows,
+    };
+    const service = new SignalPositionLedgerService(repository as any, { enrichSignals: jest.fn() } as any);
+
+    const result = await service.recomputeClosedHistory({ region: 'IN', assetType: 'STOCK' });
+
+    expect(result).toMatchObject({
+      scanned: 3,
+      shadowsDropped: 1,
+      bornDeadDropped: 0,
+      closedHorizon: 1,
+      closedDefensive: 0,
+      invalidated: 0,
+      active: 1,
+      exitTriggered: 0,
+      kept: 2,
+      deleted: 3,
+      inserted: 2,
+    });
+
+    // The scope is replaced with exactly the two survivors (shadow re-entry excluded).
+    expect(replaceScopeLedgerRows).toHaveBeenCalledTimes(1);
+    const [, persistedRows] = replaceScopeLedgerRows.mock.calls[0];
+    expect(persistedRows).toHaveLength(2);
+    const persistedKeys = persistedRows.map((r: any) => r.ledgerKey).sort();
+    expect(persistedKeys).toEqual([
+      'IN:STOCK:stock-1:bullish_entry_trigger:2026-01-05T00:00:00.000Z',
+      'IN:STOCK:stock-2:bullish_entry_trigger:2026-01-05T00:00:00.000Z',
+    ]);
+    const closedRow = persistedRows.find((r: any) => r.instrumentId === 'stock-2');
+    expect(closedRow).toMatchObject({
+      status: 'CLOSED',
+      closeReason: 'HORIZON_REACHED',
+      horizonTradingDays: 60,
+      exitTriggerPrice: 130,
+      currentReturnPercent: 30,
+      closePriceStatus: 'SOURCE_PROVEN',
+    });
+    const activeRow = persistedRows.find((r: any) => r.instrumentId === 'stock-1');
+    expect(activeRow).toMatchObject({ status: 'ACTIVE', lifecycleEvidenceStatus: 'ACTIVE_ENTRY' });
+  });
+
+  it('recomputeClosedHistory drops a born-dead entry flagged by the coincident-evidence intake guard', async () => {
+    const entry = activeLedgerRow({
+      ledgerKey: 'IN:STOCK:stock-1:bullish_entry_trigger:2026-01-05T00:00:00.000Z',
+      instrumentId: 'stock-1', symbol: 'ABC',
+      entryTriggerTimestamp: '2026-01-05T00:00:00.000Z', entryTriggerPrice: 100,
+    });
+    const replaceScopeLedgerRows = jest.fn().mockResolvedValue({ deleted: 1, inserted: 0 });
+    const repository = {
+      listEveryLedgerRow: jest.fn().mockResolvedValue([entry]),
+      latestSnapshotsByInstrumentIds: jest.fn().mockResolvedValue(new Map([
+        ['stock-1', { latestPrice: null, quality: null, exitDecision: null }],
+      ])),
+      firstCloseEvidenceDates: jest.fn().mockResolvedValue(new Map()),
+      // Entry candle already carries coincident defensive/invalidation evidence.
+      coincidentDefensiveEvidenceBatch: jest.fn().mockResolvedValue(new Set(['stock-1'])),
+      priceAtTradingDayOffsetBatch: jest.fn().mockResolvedValue(new Map()),
+      listBenchmarkSeries: jest.fn().mockResolvedValue([]),
+      replaceScopeLedgerRows,
+    };
+    const service = new SignalPositionLedgerService(repository as any, { enrichSignals: jest.fn() } as any);
+
+    const result = await service.recomputeClosedHistory({ region: 'IN', assetType: 'STOCK' });
+
+    expect(result).toMatchObject({ scanned: 1, bornDeadDropped: 1, kept: 0, inserted: 0 });
+    expect(repository.coincidentDefensiveEvidenceBatch).toHaveBeenCalledWith([
+      { instrumentId: 'stock-1', entryDate: '2026-01-05T00:00:00.000Z' },
+    ]);
+    expect(replaceScopeLedgerRows).toHaveBeenCalledWith(
+      { region: 'IN', assetType: 'STOCK' },
+      [],
+    );
   });
 });
 

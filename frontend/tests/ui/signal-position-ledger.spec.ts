@@ -93,15 +93,69 @@ const closedRows = [
     entryTriggerTimestamp: '2026-05-20T09:15:00.000Z',
     entryTriggerPrice: 90,
     currentReturnPercent: 5,
-    healthState: 'EXIT_TRIGGERED',
-    lifecycleEvidenceStatus: 'EXIT_TRIGGERED',
-    exitSignalId: 'exit-old',
+    healthState: null,
+    lifecycleEvidenceStatus: 'CLOSED',
+    exitSignalId: null,
     exitTriggerTimestamp: '2026-05-27T09:15:00.000Z',
     exitTriggerPrice: 94.5,
+    exitReasonSummary: 'Held to the fixed 60-trading-day horizon.',
+    exitRuleId: null,
+    exitDecision: null,
+    closedAt: '2026-05-27T09:20:00.000Z',
+    closeReason: 'HORIZON_REACHED',
+    horizonTradingDays: 60,
+    benchmarkReturnPercent: 2,
+    alphaPercent: 3,
+  },
+  {
+    ...activeRows[0],
+    ledgerKey: 'IN:STOCK:stock-loss:bullish_entry_trigger:2026-05-21T09:15:00.000Z',
+    status: 'CLOSED',
+    signalId: 'signal-loss-entry',
+    instrumentId: 'stock-loss',
+    symbol: 'LOSSCO',
+    companyName: 'Loss Corp',
+    entryTriggerTimestamp: '2026-05-21T09:15:00.000Z',
+    entryTriggerPrice: 50,
+    currentReturnPercent: -4,
+    healthState: 'EXIT_TRIGGERED',
+    lifecycleEvidenceStatus: 'EXIT_TRIGGERED',
+    exitSignalId: 'exit-loss',
+    exitTriggerTimestamp: '2026-05-28T09:15:00.000Z',
+    exitTriggerPrice: 48,
     exitReasonSummary: 'Price closed below SMA50.',
     exitRuleId: 'PRICE_BELOW_SMA50',
     exitDecision: 'EXIT_CANDIDATE',
-    closedAt: '2026-05-27T09:20:00.000Z',
+    closedAt: '2026-05-28T09:20:00.000Z',
+    closeReason: 'DEFENSIVE_EXIT',
+    horizonTradingDays: null,
+    benchmarkReturnPercent: 0,
+    alphaPercent: -4,
+  },
+  {
+    ...activeRows[0],
+    ledgerKey: 'IN:STOCK:stock-flat:bullish_entry_trigger:2026-05-22T09:15:00.000Z',
+    status: 'CLOSED',
+    signalId: 'signal-flat-entry',
+    instrumentId: 'stock-flat',
+    symbol: 'FLATCO',
+    companyName: 'Flat Corp',
+    entryTriggerTimestamp: '2026-05-22T09:15:00.000Z',
+    entryTriggerPrice: 70,
+    currentReturnPercent: 0,
+    healthState: null,
+    lifecycleEvidenceStatus: 'CLOSED',
+    exitSignalId: null,
+    exitTriggerTimestamp: '2026-05-29T09:15:00.000Z',
+    exitTriggerPrice: 70,
+    exitReasonSummary: 'Held to the fixed 60-trading-day horizon.',
+    exitRuleId: null,
+    exitDecision: null,
+    closedAt: '2026-05-29T09:20:00.000Z',
+    closeReason: 'HORIZON_REACHED',
+    horizonTradingDays: 60,
+    benchmarkReturnPercent: 1,
+    alphaPercent: -1,
   },
 ];
 
@@ -199,7 +253,7 @@ async function routePersistedLedgerReads(
     }
 
     if (method === 'GET' && url.pathname === '/api/v1/signals/position-ledger/persisted/closed') {
-      const body = options.closedBody ?? ledgerResponse(closedRows, 1);
+      const body = options.closedBody ?? ledgerResponse(closedRows, closedRows.length);
       await route.fulfill({ status: closedStatus, contentType: 'application/json', body: JSON.stringify(body) });
       return;
     }
@@ -226,7 +280,7 @@ test.describe('Signal Position Ledger UI', () => {
     expect(forbiddenRequests).toEqual([]);
     await expect(page.getByText('Read-only rule-trigger lifecycle evidence for the current market scope. Scope: IN / STOCK.')).toBeVisible();
     await expect(page.getByRole('tab', { name: 'Entry Trigger Candidates' })).toHaveAttribute('aria-selected', 'true');
-    await expect(page.getByText('28 open entries and 1 closed entries for IN / STOCK.')).toBeVisible();
+    await expect(page.getByText('28 open entries and 3 closed entries for IN / STOCK.')).toBeVisible();
     await expect(page.getByText('Ledger pipeline')).toHaveCount(0);
     await expect(page.getByText('NEW - New Industries')).toBeVisible();
     await expect(page.getByText('+10.25%')).toBeVisible();
@@ -261,20 +315,33 @@ test.describe('Signal Position Ledger UI', () => {
     await expect(page.getByText('OLD - Old Industries')).toBeVisible();
     await expect(page.getByRole('columnheader', { name: 'Exit' })).toBeVisible();
 
-    // Closed-trade cumulative-returns summary card (above the closed table).
-    const summaryCard = page.getByText('Closed-trade cumulative returns')
+    // Closed-trade realized-returns summary card (above the closed table).
+    const summaryCard = page.getByText('Closed-trade realized returns')
       .locator('xpath=ancestor::div[contains(@class,"MuiPaper-root")]').first();
-    await expect(summaryCard.getByText('Cumulative realized return')).toBeVisible();
-    await expect(summaryCard.getByText('Sum of closed-trade returns')).toBeVisible();
-    await expect(summaryCard.getByText('+5.00%').first()).toBeVisible();
+    // Metric assertions scoped to each stat box (label caption -> value h6 sibling).
+    const statValue = (label: string) =>
+      summaryCard.getByText(label, { exact: true }).locator('xpath=..');
+    // 3 closed rows: +5% (win, HORIZON), -4% (loss, DEFENSIVE), 0% (flat, HORIZON).
+    // decided = 2 (flat excluded): avg = (5-4+0)/2 = +0.50%, win rate 1/2 = 50%.
+    await expect(statValue('Avg simple return / trade').getByText('+0.50%', { exact: true })).toBeVisible();
+    await expect(statValue('Win rate').getByText('50.00%', { exact: true })).toBeVisible();
+    await expect(statValue('Avg win / avg loss').getByText('+5.00% / -4.00%', { exact: true })).toBeVisible();
+    await expect(statValue('Payoff ratio').getByText('1.25×', { exact: true })).toBeVisible();
+    // benchmark mean = (2+0+1)/3 = +1.00%; alpha mean = (3-4-1)/3 = -0.67%.
+    await expect(statValue('Benchmark return').getByText('+1.00%', { exact: true })).toBeVisible();
+    await expect(statValue('Alpha vs. benchmark').getByText('-0.67%', { exact: true })).toBeVisible();
+    // cumulative = 5-4+0 = +1.00%; 3 counted, 1 flat excluded from the averages.
+    await expect(statValue('Cumulative simple return').getByText('+1.00%', { exact: true })).toBeVisible();
+    await expect(statValue('Closed trades counted').getByText('3', { exact: true })).toBeVisible();
+    await expect(summaryCard.getByText('1 flat excluded', { exact: false })).toBeVisible();
     await expect(summaryCard.getByText('To: today', { exact: false })).toBeVisible();
 
-    // From-date filter: a "since" date after the trade's close date empties the window.
+    // From-date filter: a "since" date after every close date empties the window.
     await summaryCard.getByLabel('Since (from date)').fill('2026-06-01');
     await expect(summaryCard.getByText('No closed trades with source-proven returns closed on or after 2026-06-01 for IN / STOCK.')).toBeVisible();
-    // A date on/before the close date includes it again.
+    // A date on/before the close dates includes them again.
     await summaryCard.getByLabel('Since (from date)').fill('2026-05-01');
-    await expect(summaryCard.getByText('+5.00%').first()).toBeVisible();
+    await expect(statValue('Win rate').getByText('50.00%', { exact: true })).toBeVisible();
     const closedDownloadPromise = page.waitForEvent('download');
     await page.getByRole('button', { name: 'Export CSV' }).click();
     const closedDownload = await closedDownloadPromise;
@@ -284,7 +351,7 @@ test.describe('Signal Position Ledger UI', () => {
     const closedCsv = readFileSync(closedDownloadPath!, 'utf8');
     expect(closedCsv).toContain('"OLD - Old Industries","90","2026-05-20T09:15:00.000Z","Breakout confirmation accepted with volume support."');
     await page.getByText('OLD - Old Industries').click();
-    await expect(page.getByText('Price closed below SMA50.')).toBeVisible();
+    await expect(page.getByText('Held to the fixed 60-trading-day horizon.')).toBeVisible();
   });
 
   test('shows scoped active error state without fallback rows', async ({ page }) => {

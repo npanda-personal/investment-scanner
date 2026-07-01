@@ -1644,6 +1644,10 @@ model SignalPositionLedgerEntry {
   invalidationRuleIds          Json      @default("[]")
   invalidationTimestamp        DateTime?
   closedAt                     DateTime?
+  closeReason                  String?
+  horizonTradingDays           Int?
+  benchmarkReturnPercent       Float?
+  alphaPercent                 Float?
   lastEvaluatedAt              DateTime?
   createdAt                    DateTime  @default(now())
   updatedAt                    DateTime  @updatedAt

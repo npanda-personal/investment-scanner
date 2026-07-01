@@ -11,6 +11,7 @@ import type {
   SignalPositionLedgerRefreshProgress,
   SignalPositionLedgerRefreshStatus,
   SignalPositionLatestPriceSnapshot,
+  SignalPositionLedgerRecomputeResult,
   SignalPositionTriggerContractReadModel,
 } from './signal-position-ledger.types';
 import { SignalPositionLedgerRepository } from './signal-position-ledger.repository';
@@ -28,6 +29,27 @@ const SOURCE_PROVEN_PRICE_STATUS = 'COMPLETE';
 // selectivity from screener breadth so relaxing the defensive-exit gate (which broadened the
 // screener) does not flood the ledger with weak entries. See signal-defensive-exit-gate.ts.
 const LEDGER_MIN_ENTRY_SCORE = 90; // exclusive: score must be > 90
+
+// Fixed-horizon exit policy (owner decision 2026-07). A position is HELD to a fixed
+// horizon and closes on the FIRST of: HORIZON_REACHED (entry + 60 trading bars),
+// DEFENSIVE_EXIT (earliest EXIT_CANDIDATE strictly after entry), or INVALIDATED
+// (earliest invalidation strictly after entry). This replaces the prior asymmetric
+// defensive-only exit that closed at the first flag (negative expectancy by
+// construction). REDUCE_RISK no longer closes — it rests the position ACTIVE.
+const HORIZON_TRADING_DAYS = 60;
+
+// Wide lower bound for the region-benchmark series fetch (alpha computation). Covers
+// the full ledger entry history; the actual holding window is sliced in JS.
+const BENCHMARK_SERIES_EARLIEST = new Date('2015-01-01T00:00:00.000Z');
+
+type LifecycleCloseEvidence = {
+  exitDate: string | null;
+  invalidationDate: string | null;
+  // Deterministic horizon terminal: date + price of the entry + HORIZON_TRADING_DAYS
+  // bar. Present only when that many bars have actually elapsed in stored history.
+  horizonDate: string | null;
+  horizonPrice: SignalPositionLatestPriceSnapshot | null;
+};
 
 type LedgerRefreshState = {
   scopeKey: string;
@@ -57,6 +79,9 @@ type RefreshOptions = {
 
 export class SignalPositionLedgerService {
   private readonly refreshStates = new Map<string, LedgerRefreshState>();
+  // Run-scoped region-benchmark series cache (adjustedClose sorted ascending by epoch).
+  // Cleared at the start of each refresh/recompute so a run never serves stale prices.
+  private readonly benchmarkSeriesByScope = new Map<string, Array<{ date: number; adjustedClose: number }>>();
 
   constructor(
     private readonly repository = new SignalPositionLedgerRepository(),
@@ -137,6 +162,190 @@ export class SignalPositionLedgerService {
       module: 'signal-position-ledger',
       timestamp: new Date().toISOString(),
     };
+  }
+
+  /**
+   * ONE-TIME rebuild of the corrupt closed-position history under the fixed-horizon
+   * lifecycle (owner decision 2026-07). The legacy defensive-only exit closed most
+   * positions at the first flag (~2-day holds, negative expectancy by construction),
+   * producing a misleading realized-return card. This replays every historical entry:
+   *
+   *  1. Enumerate every opened position for the scope (all statuses, NO dedup).
+   *  2. Reset each to a pristine ACTIVE entry row (entry identity + strategy metadata
+   *     only; every exit/current field cleared).
+   *  3. Replay chronologically PER STOCK, holding the one-open-position-per-stock
+   *     invariant (the activeSlot unique constraint): an entry that opened while a
+   *     prior position for the same stock was still open (a legacy 2-day-close
+   *     re-entry artifact) is dropped as a SHADOW; an entry whose own entry candle
+   *     already carries coincident defensive/invalidation evidence is dropped as
+   *     BORN-DEAD (the Gap-E intake guard). Each surviving opener runs through
+   *     lifecycleRow → HORIZON_REACHED / DEFENSIVE_EXIT / INVALIDATED / stays-ACTIVE.
+   *  4. Atomically replace the scope's rows with the recomputed set.
+   *
+   * Not part of the daily pipeline — invoked by scripts/rebuild-ledger.ts.
+   */
+  async recomputeClosedHistory(
+    scope: Pick<SignalPositionLedgerActiveQuery, 'region' | 'assetType'>,
+  ): Promise<SignalPositionLedgerRecomputeResult> {
+    const query: Pick<SignalPositionLedgerActiveQuery, 'region' | 'assetType'> = {
+      region: scope.region,
+      assetType: scope.assetType,
+    };
+    const repo = this.repository as any;
+    // Fresh region-benchmark series per rebuild run (mirrors refresh start).
+    this.benchmarkSeriesByScope.clear();
+
+    const result: SignalPositionLedgerRecomputeResult = {
+      scope: { region: scope.region, assetType: scope.assetType },
+      scanned: 0, shadowsDropped: 0, bornDeadDropped: 0, kept: 0,
+      closedHorizon: 0, closedDefensive: 0, invalidated: 0, exitTriggered: 0,
+      active: 0, deleted: 0, inserted: 0,
+    };
+
+    if (typeof repo.listEveryLedgerRow !== 'function' || typeof repo.replaceScopeLedgerRows !== 'function') {
+      return result;
+    }
+
+    const historical: SignalPositionLedgerActiveRow[] = await repo.listEveryLedgerRow(query);
+    result.scanned = historical.length;
+    if (historical.length === 0) return result;
+
+    // Latest per-instrument snapshots (price / quality / exitDecision) are keyed by
+    // instrumentId only, so batch once across every distinct instrument. (Per-entry
+    // close evidence is resolved per-opener below, since firstCloseEvidenceDates keys
+    // by instrumentId and would collapse a stock's multiple entry windows.)
+    const distinctInstruments = [...new Set(historical.map((row) => row.instrumentId))];
+    const snapshotCandidates: SignalPositionLedgerActiveCandidate[] = distinctInstruments.map((instrumentId) => {
+      const sample = historical.find((row) => row.instrumentId === instrumentId)!;
+      return {
+        signal: { id: sample.signalId || '', instrument_id: instrumentId, symbol: sample.symbol, company_name: sample.companyName } as any,
+        triggerContract: {} as any,
+      };
+    });
+    const snapshots = await this.loadRowSnapshots(snapshotCandidates, query);
+
+    // Group by stock and replay each group oldest-entry-first.
+    const byStock = new Map<string, SignalPositionLedgerActiveRow[]>();
+    for (const row of historical) {
+      const key = this.stockKey(row.symbol);
+      const bucket = byStock.get(key);
+      if (bucket) bucket.push(row); else byStock.set(key, [row]);
+    }
+
+    const kept: SignalPositionLedgerActiveRow[] = [];
+    for (const bucket of byStock.values()) {
+      bucket.sort((left, right) => Date.parse(left.entryTriggerTimestamp) - Date.parse(right.entryTriggerTimestamp));
+      // Epoch (ms) at which the currently-open position for this stock closes.
+      // -Infinity = nothing open yet; Infinity = a position is still open (held).
+      let openUntil = -Infinity;
+      for (const original of bucket) {
+        const entryMs = Date.parse(original.entryTriggerTimestamp);
+        // A position is still open on this entry candle → this re-entry never should
+        // have opened under the held lifecycle. Drop it as a shadow.
+        if (Number.isFinite(entryMs) && entryMs <= openUntil) {
+          result.shadowsDropped += 1;
+          continue;
+        }
+        // Intake guard (Gap E): reject a born-dead entry whose entry candle already
+        // carries coincident defensive/invalidation evidence. Does not advance the
+        // window — no position opened.
+        if (typeof repo.coincidentDefensiveEvidenceBatch === 'function' && original.entryTriggerTimestamp) {
+          const flagged: Set<string> = await repo.coincidentDefensiveEvidenceBatch([
+            { instrumentId: original.instrumentId, entryDate: original.entryTriggerTimestamp },
+          ]);
+          if (flagged.has(original.instrumentId)) {
+            result.bornDeadDropped += 1;
+            continue;
+          }
+        }
+        const rowSnapshots = snapshots.get(original.instrumentId) ?? this.emptySnapshots();
+        const recomputed = await this.recomputeEntry(this.toPristineEntryRow(original), rowSnapshots, query);
+        kept.push(recomputed);
+        if (recomputed.status === 'CLOSED') {
+          if (recomputed.closeReason === 'HORIZON_REACHED') result.closedHorizon += 1;
+          else result.closedDefensive += 1;
+          openUntil = this.closeEpoch(recomputed);
+        } else if (recomputed.status === 'INVALIDATED') {
+          result.invalidated += 1;
+          openUntil = this.closeEpoch(recomputed);
+        } else if (recomputed.status === 'EXIT_TRIGGERED') {
+          result.exitTriggered += 1;
+          openUntil = Infinity; // occupies the active slot until the close price resolves
+        } else {
+          result.active += 1;
+          openUntil = Infinity; // still open (held); no further entry for this stock
+        }
+      }
+    }
+
+    const { deleted, inserted } = await repo.replaceScopeLedgerRows(query, kept);
+    result.kept = kept.length;
+    result.deleted = deleted;
+    result.inserted = inserted;
+    return result;
+  }
+
+  /** Recompute one opener's terminal/active state under the fixed-horizon lifecycle. */
+  private async recomputeEntry(
+    entryRow: SignalPositionLedgerActiveRow,
+    snapshots: SignalPositionLedgerRowSnapshots,
+    query: Pick<SignalPositionLedgerActiveQuery, 'region' | 'assetType'>,
+  ): Promise<SignalPositionLedgerActiveRow> {
+    const evidence = await this.firstCloseEvidence(entryRow);
+    const lifecycle = await this.lifecycleRow(entryRow, snapshots, query, evidence);
+    if (!lifecycle) {
+      // No terminal evidence and horizon not reached → rest ACTIVE with current evidence.
+      return this.withCurrentEvidence(entryRow, snapshots);
+    }
+    if (lifecycle.status === 'CLOSED' || lifecycle.status === 'INVALIDATED') {
+      return await this.enrichTerminalRow(lifecycle);
+    }
+    return lifecycle; // ACTIVE (horizon bar not source-proven) or EXIT_TRIGGERED (fill pending)
+  }
+
+  /**
+   * Strip a stored row back to its pristine entry state (entry identity + strategy
+   * metadata) so it can be replayed cleanly through the lifecycle. All exit/current/
+   * terminal fields are cleared; status resets to ACTIVE.
+   */
+  private toPristineEntryRow(row: SignalPositionLedgerActiveRow): SignalPositionLedgerActiveRow {
+    return {
+      ledgerKey: row.ledgerKey,
+      status: 'ACTIVE',
+      signalId: row.signalId,
+      instrumentId: row.instrumentId,
+      symbol: row.symbol,
+      companyName: row.companyName,
+      region: row.region,
+      assetType: row.assetType,
+      triggerType: row.triggerType,
+      entryTriggerTimestamp: row.entryTriggerTimestamp,
+      entryTriggerPrice: row.entryTriggerPrice,
+      entryReasonSummary: row.entryReasonSummary,
+      strategyId: row.strategyId,
+      strategyVersion: row.strategyVersion,
+      strategyDecision: row.strategyDecision,
+      strategyReadinessLabel: row.strategyReadinessLabel,
+      strategyRatingGrade: row.strategyRatingGrade,
+      entryRuleId: row.entryRuleId,
+      latestTrustedPriceDate: null,
+      latestTrustedPrice: null,
+      currentReturnPercent: null,
+      currentReturnStatus: 'UNAVAILABLE',
+      currentDataQualityStatus: null,
+      healthState: null,
+      lifecycleEvidenceStatus: 'ACTIVE_ENTRY',
+      trustEvidenceStatus: 'SOURCE_PROVEN_PRICE_UNAVAILABLE',
+      calibrationEvidenceStatus: 'UNAVAILABLE',
+      displayWarnings: [],
+    };
+  }
+
+  /** Close epoch (ms) of a terminal row; Infinity when no usable close date (treat as still open). */
+  private closeEpoch(row: SignalPositionLedgerActiveRow): number {
+    const ts = row.closedAt ?? row.exitTriggerTimestamp ?? row.entryTriggerTimestamp;
+    const ms = Date.parse(ts || '');
+    return Number.isFinite(ms) ? ms : Infinity;
   }
 
   private async listPersistedRows(
@@ -365,6 +574,23 @@ export class SignalPositionLedgerService {
     return result;
   }
 
+  /**
+   * Gap E intake guard: the set of candidate instruments whose entry candle already
+   * carries coincident DEFENSIVE_EXIT (EXIT_CANDIDATE / invalidation) evidence.
+   * Batched against strategy_decision_results (same-candle only). Empty set when the
+   * repository doesn't expose the batch (defensive against partial mocks).
+   */
+  private async coincidentIntakeGuard(candidates: SignalPositionLedgerActiveCandidate[]): Promise<Set<string>> {
+    const repo = this.repository as any;
+    if (typeof repo.coincidentDefensiveEvidenceBatch !== 'function') return new Set<string>();
+    const entries = candidates.flatMap((c) => {
+      const entryDate = c.triggerContract?.trigger_timestamp;
+      return entryDate ? [{ instrumentId: c.signal.instrument_id, entryDate }] : [];
+    });
+    if (entries.length === 0) return new Set<string>();
+    return await repo.coincidentDefensiveEvidenceBatch(entries);
+  }
+
   private currentReturnProjection(
     entryPrice: number,
     latestPrice: SignalPositionLatestPriceSnapshot | null,
@@ -435,14 +661,11 @@ export class SignalPositionLedgerService {
     return (exitDecision?.invalidationRulesTriggered || []).length > 0;
   }
 
-  private hasRiskWarningEvidence(exitDecision: SignalPositionLedgerRowSnapshots['exitDecision']): boolean {
-    if (!exitDecision) return false;
-    if (exitDecision.decision === 'REDUCE_RISK') return true;
-    if (exitDecision.decision === 'EXIT_CANDIDATE') return false;
-    // Decision-driven: a HOLD verdict carrying only sub-threshold exit-rule fires is NOT a
-    // risk warning. Mirrors firstCloseEvidenceDates + the entry gate (isUnderDefensiveExit).
-    return false;
-  }
+  // Fixed-horizon policy (2026-07): REDUCE_RISK no longer closes a position — it rests
+  // ACTIVE and is held to horizon. Only EXIT_CANDIDATE + invalidation close early, and a
+  // HOLD verdict carrying only sub-threshold exit-rule fires is never a close (mirrors
+  // firstCloseEvidenceDates + the entry gate isUnderDefensiveExit). The former
+  // hasRiskWarningEvidence() helper was removed with its only caller.
 
   private exitEvidenceForDecision(exitDecision: SignalPositionLedgerRowSnapshots['exitDecision']): Partial<SignalPositionLedgerActiveRow> {
     if (!exitDecision) {
@@ -557,6 +780,8 @@ export class SignalPositionLedgerService {
     let sourceOffset = 0;
     let hasMore = true;
     const touchedInstruments = new Set<string>();
+    // Fresh benchmark series per run so alpha never uses stale prices.
+    this.benchmarkSeriesByScope.clear();
     try {
       await this.loadExistingLedgerState(state, query);
       while (hasMore && state.status === 'RUNNING') {
@@ -629,11 +854,21 @@ export class SignalPositionLedgerService {
         }
 
         const snapshots = await this.loadRowSnapshots(candidates, query);
+        // Intake guard (Gap E): the born-dead set — candidates whose entry candle
+        // already carries coincident EXIT_CANDIDATE/invalidation evidence. Such a NEW
+        // entry must not be opened (entry-time adverse selection). Existing positions
+        // are unaffected — they resolve via the normal lifecycle.
+        const coincidentGuardSet = await this.coincidentIntakeGuard(candidates);
         for (const candidate of candidates) {
           const rowSnapshots = snapshots.get(candidate.signal.instrument_id) ?? this.emptySnapshots();
           const row = this.toActiveRow(candidate, rowSnapshots);
           touchedInstruments.add(row.instrumentId);
           const existingActive = this.activeRowForStock(state, row) ?? this.activeRowForInstrument(state, row.instrumentId);
+          // Only guards brand-new entries; updates to an existing position pass through.
+          if (!existingActive && coincidentGuardSet.has(row.instrumentId)) {
+            state.skippedCount += 1;
+            continue;
+          }
           if (existingActive && existingActive.ledgerKey !== row.ledgerKey) {
             const lifecycleRow = await this.lifecycleRow(existingActive, rowSnapshots, query);
             const refreshed = lifecycleRow ?? this.withCurrentEvidence(existingActive, rowSnapshots);
@@ -884,55 +1119,92 @@ export class SignalPositionLedgerService {
     row: SignalPositionLedgerActiveRow,
     snapshots: SignalPositionLedgerRowSnapshots,
     query: Pick<SignalPositionLedgerActiveQuery, 'region' | 'assetType'>,
-    evidence?: { exitDate: string | null; invalidationDate: string | null },
+    evidence?: LifecycleCloseEvidence,
   ): Promise<SignalPositionLedgerActiveRow | null> {
     const ev = evidence ?? await this.firstCloseEvidence(row);
     const exitDecision = snapshots.exitDecision;
 
-    // 1) Authoritative historical evidence — date the close to the first day met.
-    if (ev.invalidationDate && (!ev.exitDate || ev.invalidationDate <= ev.exitDate)) {
-      return await this.invalidatedRow(row, snapshots, query, ev.invalidationDate);
-    }
-    if (ev.exitDate) {
-      return await this.exitLifecycleRow(row, snapshots, query, ev.exitDate);
-    }
+    // 1) Fixed-horizon lifecycle: close on the EARLIEST qualifying terminal event.
+    //    Early defensive/invalidation evidence is strictly-after-entry
+    //    (firstCloseEvidenceDates); the horizon is the deterministic entry + N-bar
+    //    close. Tie priority INVALIDATED > DEFENSIVE_EXIT > HORIZON_REACHED, so a
+    //    defensive/invalidation event coincident with the horizon date closes as the
+    //    defensive event, not the horizon.
+    const winner = this.earliestTerminal(ev);
+    if (winner === 'INVALIDATED') return await this.invalidatedRow(row, snapshots, query, ev.invalidationDate!);
+    if (winner === 'DEFENSIVE_EXIT') return await this.exitLifecycleRow(row, snapshots, query, ev.exitDate!);
+    if (winner === 'HORIZON_REACHED') return await this.horizonRow(row, snapshots, query, ev.horizonDate!, ev.horizonPrice!);
 
-    // 2) Fallback: no historical evidence found — honor the latest snapshot decision.
+    // 2) Fallback: no SQL evidence and the horizon has not elapsed — honor the latest
+    //    snapshot decision, but only when it is STRICTLY AFTER entry so a same-candle
+    //    or pre-entry decision can never backdate a zero-hold flat close. REDUCE_RISK
+    //    never closes (fixed-horizon policy); only EXIT_CANDIDATE + invalidation do.
     if (!exitDecision) return null;
     const latestDate = exitDecision.generatedDate || exitDecision.generatedAt || new Date().toISOString();
-    // Guard: the latest snapshot decision is NOT date-filtered relative to entry, so a
-    // stale pre-entry exit/invalidation (e.g. a re-entry after an earlier exit) would
-    // otherwise backdate the close before the position's own entry. Only let the
-    // fallback close when its decision is on/after entry; the SQL evidence is the
-    // authoritative source for on/after-entry closes.
-    if (row.entryTriggerTimestamp && latestDate < row.entryTriggerTimestamp) {
+    if (row.entryTriggerTimestamp && latestDate <= row.entryTriggerTimestamp) {
       return null;
     }
     if (this.hasInvalidationEvidence(exitDecision)) {
       return await this.invalidatedRow(row, snapshots, query, latestDate);
     }
-    if (exitDecision.decision === 'EXIT_CANDIDATE' || this.hasRiskWarningEvidence(exitDecision)) {
+    if (exitDecision.decision === 'EXIT_CANDIDATE') {
       return await this.exitLifecycleRow(row, snapshots, query, latestDate);
     }
     return null;
   }
 
   /**
-   * The candle date a close criterion was first met for this position (on/after
-   * its entry) — used to backdate the exit, not the refresh-run date. Returns
-   * nulls when the repository/method or entry timestamp is unavailable.
+   * The earliest qualifying terminal event among the three close reasons. Dates are
+   * ISO strings (lexicographically ordered for identical format). Tie priority
+   * INVALIDATED (0) > DEFENSIVE_EXIT (1) > HORIZON_REACHED (2). Returns null when no
+   * terminal event has occurred (position stays ACTIVE).
    */
-  private async firstCloseEvidence(
-    row: SignalPositionLedgerActiveRow,
-  ): Promise<{ exitDate: string | null; invalidationDate: string | null }> {
+  private earliestTerminal(ev: LifecycleCloseEvidence): 'INVALIDATED' | 'DEFENSIVE_EXIT' | 'HORIZON_REACHED' | null {
+    const cands: Array<{ kind: 'INVALIDATED' | 'DEFENSIVE_EXIT' | 'HORIZON_REACHED'; date: string; rank: number }> = [];
+    if (ev.invalidationDate) cands.push({ kind: 'INVALIDATED', date: ev.invalidationDate, rank: 0 });
+    if (ev.exitDate) cands.push({ kind: 'DEFENSIVE_EXIT', date: ev.exitDate, rank: 1 });
+    if (ev.horizonDate && ev.horizonPrice) cands.push({ kind: 'HORIZON_REACHED', date: ev.horizonDate, rank: 2 });
+    if (cands.length === 0) return null;
+    cands.sort((a, b) => (a.date === b.date ? a.rank - b.rank : a.date < b.date ? -1 : 1));
+    return cands[0].kind;
+  }
+
+  /**
+   * Close-evidence for a single row: earliest strictly-after-entry defensive/invalidation
+   * dates (firstCloseEvidenceDates) PLUS the deterministic entry + HORIZON_TRADING_DAYS
+   * bar (horizonEvidenceForRow). Used by the few-row paths; the bulk path batches both.
+   */
+  private async firstCloseEvidence(row: SignalPositionLedgerActiveRow): Promise<LifecycleCloseEvidence> {
+    const empty: LifecycleCloseEvidence = { exitDate: null, invalidationDate: null, horizonDate: null, horizonPrice: null };
+    if (!row.entryTriggerTimestamp) return empty;
     const repo = this.repository as any;
-    if (typeof repo.firstCloseEvidenceDates !== 'function' || !row.entryTriggerTimestamp) {
-      return { exitDate: null, invalidationDate: null };
+    let base: { exitDate: string | null; invalidationDate: string | null } = { exitDate: null, invalidationDate: null };
+    if (typeof repo.firstCloseEvidenceDates === 'function') {
+      const map = await repo.firstCloseEvidenceDates([{ instrumentId: row.instrumentId, entryDate: row.entryTriggerTimestamp }]);
+      base = map.get(row.instrumentId) ?? base;
     }
-    const map = await repo.firstCloseEvidenceDates([
-      { instrumentId: row.instrumentId, entryDate: row.entryTriggerTimestamp },
-    ]);
-    return map.get(row.instrumentId) ?? { exitDate: null, invalidationDate: null };
+    const horizon = await this.horizonEvidenceForRow(row);
+    return { ...base, ...horizon };
+  }
+
+  /** Deterministic horizon terminal for a single row (entry + HORIZON_TRADING_DAYS bar). */
+  private async horizonEvidenceForRow(
+    row: SignalPositionLedgerActiveRow,
+  ): Promise<{ horizonDate: string | null; horizonPrice: SignalPositionLatestPriceSnapshot | null }> {
+    const repo = this.repository as any;
+    if (typeof repo.priceAtTradingDayOffsetBatch !== 'function' || !row.entryTriggerTimestamp) {
+      return { horizonDate: null, horizonPrice: null };
+    }
+    const entryDate = new Date(row.entryTriggerTimestamp);
+    if (!Number.isFinite(entryDate.getTime())) return { horizonDate: null, horizonPrice: null };
+    const scope = { region: row.region ?? '', assetType: row.assetType ?? 'STOCK' };
+    const map: Map<string, SignalPositionLatestPriceSnapshot> = await repo.priceAtTradingDayOffsetBatch(
+      [{ instrumentId: row.instrumentId, entryDate }],
+      HORIZON_TRADING_DAYS,
+      scope,
+    );
+    const price = map.get(row.instrumentId) ?? null;
+    return { horizonDate: price?.date ?? null, horizonPrice: price };
   }
 
   private async exitLifecycleRow(
@@ -960,6 +1232,8 @@ export class SignalPositionLedgerService {
       exitTriggerTimestamp: exitDate,
       exitReasonSummary: exitReason,
       exitDecision: exitDecision?.decision ?? 'EXIT_CANDIDATE',
+      closeReason: 'DEFENSIVE_EXIT' as const,
+      horizonTradingDays: null,
     };
     if (!exitPriceSnap || closePrice === null) {
       return {
@@ -984,6 +1258,52 @@ export class SignalPositionLedgerService {
     };
   }
 
+  /**
+   * HORIZON_REACHED terminal: the position was held to entry + HORIZON_TRADING_DAYS
+   * bars and closes at that bar's price (passed in directly from
+   * priceAtTradingDayOffsetBatch — no at/before lookup). This is the dominant fix:
+   * it lets winners run to a fixed evaluation horizon instead of exiting into the
+   * first defensive flag. When the horizon bar is not source-proven the position
+   * stays ACTIVE (honest — no fabricated close) and resolves on a later refresh.
+   */
+  private async horizonRow(
+    row: SignalPositionLedgerActiveRow,
+    snapshots: SignalPositionLedgerRowSnapshots,
+    query: Pick<SignalPositionLedgerActiveQuery, 'region' | 'assetType'>,
+    horizonDate: string,
+    horizonPrice: SignalPositionLatestPriceSnapshot,
+  ): Promise<SignalPositionLedgerActiveRow> {
+    const closePrice = this.sourceProvenClosePrice(horizonPrice);
+    if (closePrice === null) {
+      return {
+        ...this.withCurrentEvidence(row, snapshots),
+        status: 'ACTIVE',
+        healthState: null,
+        lifecycleEvidenceStatus: 'ACTIVE_ENTRY',
+      };
+    }
+    const adjEntry = await adjustedEntryPrice(this.repository as any, row.instrumentId, row.entryTriggerTimestamp, row.entryTriggerPrice, query, closePrice);
+    const { pct: finalReturn, status: retStatus } = adjustedReturn(adjEntry, closePrice, row.currentReturnPercent);
+    return {
+      ...this.withCurrentEvidence(row, snapshots),
+      status: 'CLOSED',
+      healthState: null,
+      lifecycleEvidenceStatus: 'CLOSED',
+      closeReason: 'HORIZON_REACHED',
+      horizonTradingDays: HORIZON_TRADING_DAYS,
+      currentReturnPercent: finalReturn,
+      currentReturnStatus: retStatus,
+      latestTrustedPriceDate: horizonPrice.date,
+      latestTrustedPrice: closePrice,
+      exitTriggerTimestamp: horizonDate,
+      exitTriggerPrice: closePrice,
+      closePriceStatus: 'SOURCE_PROVEN',
+      exitDecision: 'HORIZON_REACHED',
+      exitReasonSummary: `Position held to the ${HORIZON_TRADING_DAYS}-trading-day evaluation horizon.`,
+      closedAt: horizonDate,
+    };
+  }
+
   private async invalidatedRow(row: SignalPositionLedgerActiveRow, snapshots: SignalPositionLedgerRowSnapshots, query: Pick<SignalPositionLedgerActiveQuery, 'region' | 'assetType'>, exitDate: string): Promise<SignalPositionLedgerActiveRow> {
     const exitDecision = snapshots.exitDecision;
     // exitDate is the candle date invalidation was first met (resolved by
@@ -993,7 +1313,7 @@ export class SignalPositionLedgerService {
     const ret = adjE !== null && adjE > 0 && cp !== null ? Number((((cp - adjE) / adjE) * 100).toFixed(4)) : adjE === null ? null : row.currentReturnPercent;
     return {
       ...this.withCurrentEvidence(row, snapshots), ...this.exitEvidenceForDecision(exitDecision),
-      status: 'INVALIDATED', healthState: null, lifecycleEvidenceStatus: 'INVALIDATED',
+      status: 'INVALIDATED', healthState: null, lifecycleEvidenceStatus: 'INVALIDATED', closeReason: 'INVALIDATED' as const, horizonTradingDays: null,
       closePriceStatus: cp !== null ? 'SOURCE_PROVEN' : 'UNAVAILABLE', exitTriggerPrice: cp, exitTriggerTimestamp: exitDate,
       currentReturnPercent: cp !== null ? ret : row.currentReturnPercent, currentReturnStatus: cp !== null && adjE !== null ? 'CURRENT' : adjE === null ? 'UNAVAILABLE' : row.currentReturnStatus,
       latestTrustedPriceDate: ep?.date ?? row.latestTrustedPriceDate, latestTrustedPrice: cp ?? row.latestTrustedPrice,
@@ -1032,15 +1352,26 @@ export class SignalPositionLedgerService {
       triggerContract: {} as any,
     })), query);
     const adjMap = await adjustedEntryPricesBatch(this.repository as any, untouched.map((r) => ({ instrumentId: r.instrumentId, entryTimestamp: r.entryTriggerTimestamp, storedEntryPrice: r.entryTriggerPrice })), query);
-    // Batch historical close evidence for all untouched rows (the bulk close path).
+    // Batch historical close evidence + deterministic horizon for all untouched rows
+    // (the bulk close path). Both are merged into the LifecycleCloseEvidence passed to
+    // lifecycleRow so the horizon terminal is evaluated alongside defensive/invalidation.
     const repo = this.repository as any;
     const evidenceMap: Map<string, { exitDate: string | null; invalidationDate: string | null }> =
       typeof repo.firstCloseEvidenceDates === 'function'
         ? await repo.firstCloseEvidenceDates(untouched.map((r) => ({ instrumentId: r.instrumentId, entryDate: r.entryTriggerTimestamp })))
         : new Map();
+    const horizonEntries = untouched
+      .map((r) => ({ instrumentId: r.instrumentId, entryDate: new Date(r.entryTriggerTimestamp) }))
+      .filter((e) => Number.isFinite(e.entryDate.getTime()));
+    const horizonMap: Map<string, SignalPositionLatestPriceSnapshot> =
+      typeof repo.priceAtTradingDayOffsetBatch === 'function'
+        ? await repo.priceAtTradingDayOffsetBatch(horizonEntries, HORIZON_TRADING_DAYS, query)
+        : new Map();
     for (const row of untouched) {
       const rowSnapshots = snapshots.get(row.instrumentId) ?? this.emptySnapshots();
-      const evidence = evidenceMap.get(row.instrumentId) ?? { exitDate: null, invalidationDate: null };
+      const base = evidenceMap.get(row.instrumentId) ?? { exitDate: null, invalidationDate: null };
+      const horizonPrice = horizonMap.get(row.instrumentId) ?? null;
+      const evidence: LifecycleCloseEvidence = { ...base, horizonDate: horizonPrice?.date ?? null, horizonPrice };
       const lifecycleRow = await this.lifecycleRow(row, rowSnapshots, query, evidence);
       if (lifecycleRow?.status === 'CLOSED' || lifecycleRow?.status === 'INVALIDATED') {
         await this.persistTerminalRow(lifecycleRow);
@@ -1141,7 +1472,77 @@ export class SignalPositionLedgerService {
       closeLedgerRow?: (row: SignalPositionLedgerActiveRow) => Promise<void>;
     };
     if (typeof repositoryWithLedger.closeLedgerRow !== 'function') return;
-    await repositoryWithLedger.closeLedgerRow(row);
+    await repositoryWithLedger.closeLedgerRow(await this.enrichTerminalRow(row));
+  }
+
+  /**
+   * Stamp a terminal (CLOSED/INVALIDATED) row with its closeReason (defaulted from
+   * status when a builder didn't set it) and region-benchmark return + alpha over the
+   * position's own holding window (entry → close candle). Centralized here so every
+   * close path — horizon, defensive, invalidation, EXIT_TRIGGERED→CLOSED fill — gets
+   * benchmark/alpha consistently. Alpha is null where the region has no benchmark series.
+   */
+  private async enrichTerminalRow(row: SignalPositionLedgerActiveRow): Promise<SignalPositionLedgerActiveRow> {
+    if (row.status !== 'CLOSED' && row.status !== 'INVALIDATED') return row;
+    const closeReason = row.closeReason ?? (row.status === 'INVALIDATED' ? 'INVALIDATED' : 'DEFENSIVE_EXIT');
+    const closeTs = row.closedAt ?? row.exitTriggerTimestamp ?? null;
+    const { benchmarkReturnPercent, alphaPercent } = await this.benchmarkAndAlpha(
+      row.region,
+      row.assetType,
+      row.entryTriggerTimestamp,
+      closeTs,
+      row.currentReturnPercent,
+    );
+    return { ...row, closeReason, benchmarkReturnPercent, alphaPercent };
+  }
+
+  /** Region-benchmark series (adjustedClose by epoch, ascending), cached per run/scope. */
+  private async getBenchmarkSeries(region: string, assetType: string): Promise<Array<{ date: number; adjustedClose: number }>> {
+    const key = `${region || ''}:${assetType || 'STOCK'}`;
+    const cached = this.benchmarkSeriesByScope.get(key);
+    if (cached) return cached;
+    const repo = this.repository as any;
+    let raw: Array<{ date: string; adjustedClose: number }> = [];
+    if (typeof repo.listBenchmarkSeries === 'function') {
+      raw = await repo.listBenchmarkSeries(region, assetType, BENCHMARK_SERIES_EARLIEST).catch(() => []);
+    }
+    const series = raw
+      .map((p) => ({ date: Date.parse(p.date), adjustedClose: Number(p.adjustedClose) }))
+      .filter((p) => Number.isFinite(p.date) && Number.isFinite(p.adjustedClose) && p.adjustedClose > 0)
+      .sort((a, b) => a.date - b.date);
+    this.benchmarkSeriesByScope.set(key, series);
+    return series;
+  }
+
+  /** Last benchmark adjustedClose at or before epoch `t` (binary search). */
+  private benchmarkAtOrBefore(series: Array<{ date: number; adjustedClose: number }>, t: number): number | null {
+    let lo = 0, hi = series.length - 1, ans = -1;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      if (series[mid].date <= t) { ans = mid; lo = mid + 1; } else hi = mid - 1;
+    }
+    return ans >= 0 ? series[ans].adjustedClose : null;
+  }
+
+  private async benchmarkAndAlpha(
+    region: string | null,
+    assetType: string | null,
+    entryTs: string | null,
+    closeTs: string | null,
+    positionReturnPercent: number | null,
+  ): Promise<{ benchmarkReturnPercent: number | null; alphaPercent: number | null }> {
+    const none = { benchmarkReturnPercent: null, alphaPercent: null };
+    if (!entryTs || !closeTs) return none;
+    const e = Date.parse(entryTs), c = Date.parse(closeTs);
+    if (!Number.isFinite(e) || !Number.isFinite(c)) return none;
+    const series = await this.getBenchmarkSeries(region ?? '', assetType ?? 'STOCK');
+    if (series.length === 0) return none;
+    const be = this.benchmarkAtOrBefore(series, e);
+    const bc = this.benchmarkAtOrBefore(series, c);
+    if (be === null || bc === null || be <= 0) return none;
+    const benchmarkReturnPercent = Number((((bc - be) / be) * 100).toFixed(4));
+    const alphaPercent = positionReturnPercent === null ? null : Number((positionReturnPercent - benchmarkReturnPercent).toFixed(4));
+    return { benchmarkReturnPercent, alphaPercent };
   }
 
   private shouldRefreshSnapshot(snapshot: SignalPositionLedgerMaterializedSnapshot | null): boolean {

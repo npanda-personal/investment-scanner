@@ -1,6 +1,7 @@
 export type SignalPositionTriggerType = 'bullish_entry_trigger' | 'bearish_trigger';
 export type SignalPositionReturnStatus = 'CURRENT' | 'STALE' | 'UNAVAILABLE';
 export type SignalPositionLedgerStatus = 'ACTIVE' | 'CLOSED';
+export type SignalPositionCloseReason = 'HORIZON_REACHED' | 'DEFENSIVE_EXIT' | 'INVALIDATED';
 export type SignalPositionLedgerSortBy = 'entryTriggerTimestamp' | 'currentReturnPercent';
 export type SignalPositionLedgerSortDirection = 'asc' | 'desc';
 export type SignalPositionHealthState = 'EXIT_TRIGGERED' | 'RISK_WARNING' | null;
@@ -79,6 +80,11 @@ export interface SignalPositionLedgerActiveRow {
   exitRuleId?: string | null;
   exitDecision?: string | null;
   closedAt?: string | null;
+  // Fixed-horizon lifecycle (2026-07): terminal-close provenance + benchmark/alpha.
+  closeReason?: SignalPositionCloseReason | null; // HORIZON_REACHED | DEFENSIVE_EXIT | INVALIDATED
+  horizonTradingDays?: number | null;             // trading-bar horizon (60) when closeReason=HORIZON_REACHED
+  benchmarkReturnPercent?: number | null;         // region-benchmark simple return over the same window
+  alphaPercent?: number | null;                   // currentReturnPercent − benchmarkReturnPercent (pp)
 }
 
 export interface SignalPositionLedgerActiveListResponse {

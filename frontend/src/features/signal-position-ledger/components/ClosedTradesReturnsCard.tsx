@@ -45,40 +45,103 @@ export const ClosedTradesReturnsCard: React.FC<ClosedTradesReturnsCardProps> = (
     });
     const returns = inWindow.map((row) => row.currentReturnPercent as number);
     const count = returns.length;
+
+    // Flats (exactly 0%) are neither winners nor losers: exclude them from the
+    // per-trade averages and the win rate so a wall of 0% closes cannot masquerade
+    // as "positive". Their count is surfaced separately.
+    const wins = returns.filter((value) => value > 0);
+    const losses = returns.filter((value) => value < 0);
+    const flats = count - wins.length - losses.length;
+    const decided = wins.length + losses.length;
+
     const cumulative = returns.reduce((sum, value) => sum + value, 0);
-    const average = count > 0 ? cumulative / count : 0;
-    const winners = returns.filter((value) => value >= 0).length;
-    const winRate = count > 0 ? (winners / count) * 100 : 0;
+    const average = decided > 0 ? returns.reduce((sum, value) => sum + value, 0) / decided : 0;
+    const winRate = decided > 0 ? (wins.length / decided) * 100 : 0;
+    const avgWin = wins.length > 0 ? wins.reduce((sum, value) => sum + value, 0) / wins.length : 0;
+    const avgLoss = losses.length > 0 ? losses.reduce((sum, value) => sum + value, 0) / losses.length : 0;
+    const payoff = avgLoss !== 0 ? Math.abs(avgWin / avgLoss) : null;
+
+    // Benchmark / alpha: mean over the trades that carry a source-proven benchmark
+    // return for the same holding window (null where a region has no benchmark series).
+    const benchVals = inWindow
+      .map((row) => row.benchmarkReturnPercent)
+      .filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
+    const alphaVals = inWindow
+      .map((row) => row.alphaPercent)
+      .filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
+    const benchmark = benchVals.length > 0 ? benchVals.reduce((sum, value) => sum + value, 0) / benchVals.length : null;
+    const alpha = alphaVals.length > 0 ? alphaVals.reduce((sum, value) => sum + value, 0) / alphaVals.length : null;
+
     const excluded = rows.length - realized.length;
-    return { count, cumulative, average, winRate, excluded };
+    return {
+      count,
+      decided,
+      flats,
+      cumulative,
+      average,
+      winRate,
+      avgWin,
+      avgLoss,
+      payoff,
+      benchmark,
+      alpha,
+      excluded,
+    };
   }, [rows, fromDate, today]);
 
   const tone = (value: number): Stat['tone'] => (value > 0 ? 'positive' : value < 0 ? 'negative' : 'neutral');
   const toneColor = (t: Stat['tone']): string => (t === 'positive' ? 'success.main' : t === 'negative' ? 'error.main' : 'text.primary');
   const signed = (value: number): string => `${value >= 0 ? '+' : ''}${pctFormatter.format(value)}%`;
 
+  const countHelperParts: string[] = [];
+  if (summary.flats > 0) countHelperParts.push(`${summary.flats.toLocaleString()} flat excluded`);
+  if (summary.excluded > 0) countHelperParts.push(`${summary.excluded.toLocaleString()} no source-proven return`);
+  const countHelper = countHelperParts.length > 0 ? countHelperParts.join(' · ') : 'In selected window';
+
   const stats: Stat[] = [
     {
-      label: 'Cumulative realized return',
+      label: 'Avg simple return / trade',
+      value: summary.decided > 0 ? signed(summary.average) : '—',
+      helper: 'Mean per decided trade (flats excluded)',
+      tone: tone(summary.average),
+    },
+    {
+      label: 'Win rate',
+      value: summary.decided > 0 ? `${pctFormatter.format(summary.winRate)}%` : '—',
+      helper: 'Winners ÷ decided (non-flat) trades',
+    },
+    {
+      label: 'Avg win / avg loss',
+      value: summary.decided > 0 ? `${signed(summary.avgWin)} / ${signed(summary.avgLoss)}` : '—',
+      helper: 'Mean winning vs. losing trade',
+    },
+    {
+      label: 'Payoff ratio',
+      value: summary.payoff !== null ? `${pctFormatter.format(summary.payoff)}×` : '—',
+      helper: 'Avg win ÷ avg loss (>1 favours winners)',
+    },
+    {
+      label: 'Benchmark return',
+      value: summary.benchmark !== null ? signed(summary.benchmark) : '—',
+      helper: 'Mean region benchmark over same windows',
+      tone: summary.benchmark !== null ? tone(summary.benchmark) : 'neutral',
+    },
+    {
+      label: 'Alpha vs. benchmark',
+      value: summary.alpha !== null ? signed(summary.alpha) : '—',
+      helper: 'Return − benchmark (percentage points)',
+      tone: summary.alpha !== null ? tone(summary.alpha) : 'neutral',
+    },
+    {
+      label: 'Cumulative simple return',
       value: summary.count > 0 ? signed(summary.cumulative) : '—',
-      helper: 'Sum of closed-trade returns',
+      helper: 'Sum of per-trade returns (not compounded)',
       tone: tone(summary.cumulative),
     },
     {
       label: 'Closed trades counted',
       value: summary.count.toLocaleString(),
-      helper: summary.excluded > 0 ? `${summary.excluded.toLocaleString()} excluded (no source-proven return)` : 'In selected window',
-    },
-    {
-      label: 'Average per trade',
-      value: summary.count > 0 ? signed(summary.average) : '—',
-      helper: 'Mean realized return',
-      tone: tone(summary.average),
-    },
-    {
-      label: 'Positive-return share',
-      value: summary.count > 0 ? `${pctFormatter.format(summary.winRate)}%` : '—',
-      helper: 'Trades closed at or above entry',
+      helper: countHelper,
     },
   ];
 
@@ -86,9 +149,9 @@ export const ClosedTradesReturnsCard: React.FC<ClosedTradesReturnsCardProps> = (
     <Paper variant="outlined" sx={{ p: 1.5, mb: 2 }}>
       <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', md: 'flex-start' }} gap={1.5} sx={{ mb: 1.5 }}>
         <Box sx={{ minWidth: 0 }}>
-          <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Closed-trade cumulative returns</Typography>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Closed-trade realized returns</Typography>
           <Typography variant="caption" color="text.secondary">
-            Research-support evidence — realized returns across closed entry-trigger trades for {scopeLabel}.
+            Research-support evidence — held-to-horizon realized returns across closed entry-trigger trades for {scopeLabel}, with benchmark/alpha context.
           </Typography>
         </Box>
         <Stack direction="row" alignItems="center" gap={1}>

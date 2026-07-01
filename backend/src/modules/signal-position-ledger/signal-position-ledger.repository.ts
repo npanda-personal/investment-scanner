@@ -1,5 +1,6 @@
 import prisma from '../../db/prisma';
 import { resolveMarketRegionFilter } from '../../shared/utils/market-scope';
+import { resolveMarketProfile } from '../../shared/utils/market-profile';
 import type {
   SignalPositionDataQualitySnapshot,
   SignalPositionExitDecisionSnapshot,
@@ -200,6 +201,60 @@ export class SignalPositionLedgerRepository {
       where: { ledgerKey: row.ledgerKey },
       data: this.toLedgerUpdate(row, true),
     });
+  }
+
+  /**
+   * Every historical ledger row for a scope, ANY status, WITHOUT the active-slot
+   * dedup that listAllLedgerRows applies. Each row is a distinct opened position
+   * (distinct ledgerKey / entry candle). Used only by the one-time rebuild
+   * (recomputeClosedHistory) which must see the full un-collapsed entry history to
+   * replay it chronologically. Ordered oldest-entry-first for the replay walk.
+   */
+  async listEveryLedgerRow(
+    scope: Pick<SignalPositionLedgerActiveQuery, 'region' | 'assetType'>,
+  ): Promise<SignalPositionLedgerActiveRow[]> {
+    const delegate = (this.db as any).signalPositionLedgerEntry;
+    if (!delegate || typeof delegate.findMany !== 'function') return [];
+    const rows = await delegate.findMany({
+      where: { scopeRegion: scope.region, scopeAssetType: scope.assetType },
+      orderBy: [{ entryTriggerTimestamp: 'asc' }, { createdAt: 'asc' }],
+    });
+    return rows.map((row: any) => this.toLedgerRow(row));
+  }
+
+  /**
+   * One-time rebuild primitive: atomically replace ALL ledger rows for a scope with a
+   * freshly recomputed set. Deletes every existing row for the scope, then bulk-inserts
+   * each recomputed row via the FULL write mapper (toLedgerWrite persists status +
+   * terminal fields on the create path — unlike closeLedgerRow's update-by-key, which
+   * requires the row to still exist). Runs in a single transaction (generous timeout —
+   * the shared Postgres default 5s tx window is too small for a full-scope rebuild) so
+   * the scope is never left half-rebuilt.
+   *
+   * CALLER CONTRACT: at most one active-like row (activeSlot != null) per
+   * (scope, stockKey) — the spl_entries_one_active_stock_key unique constraint rejects
+   * duplicates. recomputeClosedHistory guarantees this by chronological replay.
+   */
+  async replaceScopeLedgerRows(
+    scope: Pick<SignalPositionLedgerActiveQuery, 'region' | 'assetType'>,
+    rows: SignalPositionLedgerActiveRow[],
+  ): Promise<{ deleted: number; inserted: number }> {
+    const delegate = (this.db as any).signalPositionLedgerEntry;
+    if (!delegate || typeof delegate.deleteMany !== 'function' || typeof delegate.createMany !== 'function') {
+      return { deleted: 0, inserted: 0 };
+    }
+    const where = { scopeRegion: scope.region, scopeAssetType: scope.assetType };
+    const data = rows.map((row) => this.toLedgerWrite(row));
+    return await this.db.$transaction(
+      async (tx: any) => {
+        const del = await tx.signalPositionLedgerEntry.deleteMany({ where });
+        const ins = data.length
+          ? await tx.signalPositionLedgerEntry.createMany({ data })
+          : { count: 0 };
+        return { deleted: del.count, inserted: ins.count };
+      },
+      { timeout: 120_000, maxWait: 120_000 },
+    );
   }
 
   async listLatestSignals(query: SignalListQuery): Promise<SignalPositionLedgerSignalPage> {
@@ -474,10 +529,19 @@ export class SignalPositionLedgerRepository {
    * close reasons so a closed position is backdated to the day its criterion was
    * actually met (the candle date), not the day the refresh happened to run:
    *  - exitDate:         earliest generatedDate where the decision is
-   *                      EXIT_CANDIDATE/REDUCE_RISK (the strategy's aggregated exit
-   *                      verdict — DECISION-DRIVEN, not raw exit-rule fires).
+   *                      EXIT_CANDIDATE (the strategy's aggregated exit verdict —
+   *                      DECISION-DRIVEN, not raw exit-rule fires). REDUCE_RISK no
+   *                      longer closes a position (fixed-horizon policy): a risk
+   *                      warning rests the position ACTIVE rather than forcing a
+   *                      full close.
    *  - invalidationDate: earliest generatedDate where any invalidation rule triggered.
    * Either field is null when that criterion was never met in the window.
+   *
+   * Both criteria require evidence STRICTLY AFTER the entry candle
+   * (generatedDate > entryDate): defensive/invalidation evidence coincident with
+   * the entry candle is entry-time adverse selection, not a close signal, and must
+   * not backdate a zero-hold close to the entry day. Coincident evidence is handled
+   * separately by the intake guard (coincidentDefensiveEvidence).
    *
    * NOTE: kept in lockstep with the signal-generation defensive-exit ENTRY gate
    * (isUnderDefensiveExit). Both deliberately ignore raw `exitRulesTriggered.length > 0`:
@@ -494,7 +558,7 @@ export class SignalPositionLedgerRepository {
       await this.db.$queryRawUnsafe(`
       SELECT sub."instrumentId",
         MIN(sdr."generatedDate") FILTER (
-          WHERE sdr.decision IN ('EXIT_CANDIDATE','REDUCE_RISK')
+          WHERE sdr.decision IN ('EXIT_CANDIDATE')
         ) AS "exitDate",
         MIN(sdr."generatedDate") FILTER (
           WHERE jsonb_array_length(COALESCE(sdr."invalidationRulesTriggered"::jsonb, '[]'::jsonb)) > 0
@@ -505,7 +569,7 @@ export class SignalPositionLedgerRepository {
       -- same UTC wall-clock under ::timestamp.
       FROM unnest($1::text[], $2::timestamp[]) AS sub("instrumentId", "entryDate")
       JOIN strategy_decision_results sdr ON sdr."instrumentId" = sub."instrumentId"
-        AND sdr.strategy = 'DEFENSIVE_EXIT' AND sdr."generatedDate" >= sub."entryDate"
+        AND sdr.strategy = 'DEFENSIVE_EXIT' AND sdr."generatedDate" > sub."entryDate"
       GROUP BY sub."instrumentId"
     `, ids, dates);
     const result = new Map<string, { exitDate: string | null; invalidationDate: string | null }>();
@@ -518,7 +582,12 @@ export class SignalPositionLedgerRepository {
     return result;
   }
 
-  /** Batch next-bar fill: first price tick >= exitDate per instrument. */
+  /**
+   * Batch next-bar fill: first price tick STRICTLY AFTER exitDate per instrument.
+   * Strict `>` (not `>=`) so a defensive/invalidation close resolves to a genuine
+   * forward bar and can never collapse onto the exit/entry candle itself — the
+   * source of the historical flat (0%) same-candle closes.
+   */
   async firstPriceAtOrAfterBatch(
     entries: Array<{ instrumentId: string; exitDate: Date }>,
     scope: Pick<SignalPositionLedgerActiveQuery, 'region' | 'assetType'>,
@@ -570,7 +639,7 @@ export class SignalPositionLedgerRepository {
       SELECT DISTINCT ON (sub."instrumentId")
         sub."instrumentId", pt.timestamp, pt.close, pt."adjustedClose", pt."dataStatus", pt.source
       FROM unnest($1::text[], $2::text[], $3::timestamptz[]) AS sub("instrumentId", symbol, exit_date)
-      JOIN price_ticks pt ON pt.symbol = sub.symbol AND pt.timestamp >= sub.exit_date
+      JOIN price_ticks pt ON pt.symbol = sub.symbol AND pt.timestamp > sub.exit_date
       ORDER BY sub."instrumentId", pt.timestamp ASC
       `,
       ids,
@@ -665,6 +734,153 @@ export class SignalPositionLedgerRepository {
     }
 
     return result;
+  }
+
+  /**
+   * Fixed-horizon close price: the price tick exactly `offset` trading bars STRICTLY
+   * AFTER the entry candle, per instrument (entry candle = bar 0, so the returned bar
+   * is entry + `offset` trading days). Returns an entry ONLY when that bar exists —
+   * i.e. the full horizon has elapsed in the stored price history. Positions younger
+   * than `offset` bars are absent from the map and stay ACTIVE (no horizon close yet).
+   *
+   * ROW_NUMBER() over the strictly-forward bars picks the Nth (`offset`) bar in one
+   * query, mirroring the bounded per-symbol pattern of the other batch price helpers.
+   */
+  async priceAtTradingDayOffsetBatch(
+    entries: Array<{ instrumentId: string; entryDate: Date }>,
+    offset: number,
+    scope: Pick<SignalPositionLedgerActiveQuery, 'region' | 'assetType'>,
+  ): Promise<Map<string, SignalPositionLatestPriceSnapshot>> {
+    const result = new Map<string, SignalPositionLatestPriceSnapshot>();
+    if (entries.length === 0 || !Number.isInteger(offset) || offset <= 0) return result;
+
+    const uniqueIds = Array.from(new Set(entries.map((e) => e.instrumentId)));
+    const stocks = await this.db.stock.findMany({
+      where: { id: { in: uniqueIds }, ...this.stockScopeWhere(scope.region, scope.assetType) },
+      select: { id: true, symbol: true },
+    });
+    if (stocks.length === 0) return result;
+    const idToSymbol = new Map(stocks.map((s: { id: string; symbol: string }) => [s.id, s.symbol]));
+
+    // Keep the EARLIEST entry date per instrument when an id appears more than once,
+    // so the horizon bar is measured from the position's own entry candle.
+    const byId = new Map<string, { symbol: string; entryDate: Date }>();
+    for (const e of entries) {
+      const symbol = idToSymbol.get(e.instrumentId);
+      if (!symbol || !Number.isFinite(e.entryDate.getTime())) continue;
+      const existing = byId.get(e.instrumentId);
+      if (!existing || e.entryDate < existing.entryDate) byId.set(e.instrumentId, { symbol, entryDate: e.entryDate });
+    }
+    if (byId.size === 0) return result;
+
+    const ids = Array.from(byId.keys());
+    const syms = ids.map((id) => byId.get(id)!.symbol);
+    const dates = ids.map((id) => byId.get(id)!.entryDate.toISOString());
+
+    const rows: Array<{
+      instrumentId: string;
+      timestamp: Date;
+      close: unknown;
+      adjustedClose: unknown;
+      dataStatus: string | null;
+      source: string | null;
+    }> = await this.db.$queryRawUnsafe(
+      `
+      SELECT "instrumentId", timestamp, close, "adjustedClose", "dataStatus", source
+      FROM (
+        SELECT sub."instrumentId", pt.timestamp, pt.close, pt."adjustedClose", pt."dataStatus", pt.source,
+          ROW_NUMBER() OVER (PARTITION BY sub."instrumentId" ORDER BY pt.timestamp ASC) AS rn
+        FROM unnest($1::text[], $2::text[], $3::timestamptz[]) AS sub("instrumentId", symbol, entry_date)
+        JOIN price_ticks pt ON pt.symbol = sub.symbol AND pt.timestamp > sub.entry_date
+      ) ranked
+      WHERE rn = $4
+      `,
+      ids,
+      syms,
+      dates,
+      offset,
+    );
+
+    for (const r of rows) {
+      const close = Number(r.close);
+      const adjusted = r.adjustedClose !== null && r.adjustedClose !== undefined ? Number(r.adjustedClose) : close;
+      result.set(r.instrumentId, {
+        date: new Date(r.timestamp).toISOString(),
+        close,
+        adjustedClose: adjusted,
+        dataStatus: r.dataStatus || 'MISSING',
+        source: r.source || null,
+      });
+    }
+    return result;
+  }
+
+  /**
+   * Intake guard (Gap E): the set of instruments whose ENTRY candle itself already
+   * carries coincident DEFENSIVE_EXIT evidence — an EXIT_CANDIDATE decision or an
+   * invalidation rule fire on the SAME candle date as entry. Such a position is
+   * born-dead (entry-time adverse selection) and must not be opened. Same-day only
+   * (generatedDate::date = entryDate::date): a pre-entry exit from an earlier cycle
+   * must NOT block a legitimate fresh re-entry, and strictly-after evidence is the
+   * normal early-close path handled by firstCloseEvidenceDates.
+   */
+  async coincidentDefensiveEvidenceBatch(
+    entries: Array<{ instrumentId: string; entryDate: string }>,
+  ): Promise<Set<string>> {
+    const flagged = new Set<string>();
+    if (entries.length === 0) return flagged;
+    const ids = entries.map((e) => e.instrumentId);
+    const dates = entries.map((e) => e.entryDate);
+    const rows: Array<{ instrumentId: string }> = await this.db.$queryRawUnsafe(
+      `
+      SELECT DISTINCT sub."instrumentId"
+      FROM unnest($1::text[], $2::timestamp[]) AS sub("instrumentId", "entryDate")
+      JOIN strategy_decision_results sdr ON sdr."instrumentId" = sub."instrumentId"
+        AND sdr.strategy = 'DEFENSIVE_EXIT'
+        AND sdr."generatedDate"::date = sub."entryDate"::date
+        AND (
+          sdr.decision = 'EXIT_CANDIDATE'
+          OR jsonb_array_length(COALESCE(sdr."invalidationRulesTriggered"::jsonb, '[]'::jsonb)) > 0
+        )
+      `,
+      ids,
+      dates,
+    );
+    for (const r of rows) flagged.add(r.instrumentId);
+    return flagged;
+  }
+
+  /**
+   * Region-benchmark daily series (adjustedClose) for alpha computation, resolved via
+   * the same market profile signal-quality-lab uses (^NSEI/IN, ^GSPC/US, etc.).
+   * Returns [] when the benchmark symbol has no stored ticks (callers treat that as
+   * "benchmark unavailable" → null alpha). Sorted ascending by date.
+   */
+  async listBenchmarkSeries(
+    region: string,
+    assetType: string,
+    earliest?: Date,
+    latest?: Date,
+  ): Promise<Array<{ date: string; adjustedClose: number }>> {
+    const benchmarkSymbol = resolveMarketProfile({ region, assetType }).benchmark.symbol;
+    if (!benchmarkSymbol) return [];
+    const where: Record<string, unknown> = { symbol: benchmarkSymbol };
+    if (earliest || latest) {
+      const ts: Record<string, Date> = {};
+      if (earliest) ts.gte = earliest;
+      if (latest) ts.lte = latest;
+      where.timestamp = ts;
+    }
+    const ticks = await this.db.priceTick.findMany({
+      where,
+      orderBy: { timestamp: 'asc' },
+      select: { timestamp: true, close: true, adjustedClose: true },
+    });
+    return ticks.map((t: { timestamp: Date; close: unknown; adjustedClose: unknown }) => {
+      const close = Number(t.close);
+      const adjusted = t.adjustedClose !== null && t.adjustedClose !== undefined ? Number(t.adjustedClose) : close;
+      return { date: t.timestamp.toISOString(), adjustedClose: adjusted };
+    });
   }
 
   private signalScopeWhere(region: string, assetType: string) {
@@ -857,6 +1073,10 @@ export class SignalPositionLedgerRepository {
       invalidationRuleIds: Array.isArray(row.invalidationRuleIds) ? row.invalidationRuleIds.map(String) : [],
       invalidationTimestamp: row.invalidationTimestamp?.toISOString?.() ?? null,
       closedAt: row.closedAt?.toISOString?.() ?? null,
+      closeReason: (row.closeReason as SignalPositionLedgerActiveRow['closeReason']) ?? null,
+      horizonTradingDays: row.horizonTradingDays === null || row.horizonTradingDays === undefined ? null : Number(row.horizonTradingDays),
+      benchmarkReturnPercent: row.benchmarkReturnPercent === null || row.benchmarkReturnPercent === undefined ? null : Number(row.benchmarkReturnPercent),
+      alphaPercent: row.alphaPercent === null || row.alphaPercent === undefined ? null : Number(row.alphaPercent),
     };
   }
 
@@ -906,6 +1126,10 @@ export class SignalPositionLedgerRepository {
       invalidationRuleIds: row.invalidationRuleIds || [],
       invalidationTimestamp: row.invalidationTimestamp ? new Date(row.invalidationTimestamp) : null,
       closedAt: row.status === 'CLOSED' && row.closedAt ? new Date(row.closedAt) : null,
+      closeReason: row.closeReason ?? null,
+      horizonTradingDays: row.horizonTradingDays ?? null,
+      benchmarkReturnPercent: row.benchmarkReturnPercent ?? null,
+      alphaPercent: row.alphaPercent ?? null,
       lastEvaluatedAt: new Date(),
     };
   }
@@ -947,6 +1171,10 @@ export class SignalPositionLedgerRepository {
         status: row.status,
         activeSlot: this.isActiveLikeStatus(row.status) ? this.stockKey(row.symbol) : null,
         closedAt: row.status === 'CLOSED' ? (row.closedAt ? new Date(row.closedAt) : new Date()) : null,
+        closeReason: row.closeReason ?? null,
+        horizonTradingDays: row.horizonTradingDays ?? null,
+        benchmarkReturnPercent: row.benchmarkReturnPercent ?? null,
+        alphaPercent: row.alphaPercent ?? null,
       });
     }
     return data;
