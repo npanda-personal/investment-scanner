@@ -427,6 +427,7 @@ export class ScanReadsService {
       factorFamilies: Record<string, number> | null;
       setups: string[];
       smartMoneyStatus: string | null;
+      smartMoneyScore: number | null;
       sectorLeadershipStatus: string | null;
       sparkline: number[] | null;
       currency: string;

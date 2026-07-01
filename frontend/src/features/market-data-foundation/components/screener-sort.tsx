@@ -1,7 +1,7 @@
 import { TableCell, TableSortLabel } from '@mui/material';
 import type { ScreenerRow } from '../types';
 
-export type SortKey = 'signalScore' | 'rsPercentile' | 'scoreDeltaPrev' | 'price' | 'range52wPositionPct' | 'deliveryPct' | 'symbol';
+export type SortKey = 'signalScore' | 'rsPercentile' | 'scoreDeltaPrev' | 'price' | 'range52wPositionPct' | 'deliveryPct' | 'symbol' | 'smartMoneyScore';
 
 export function sortScreenerRows(rows: ScreenerRow[], key: SortKey, dir: 'asc' | 'desc'): ScreenerRow[] {
   return [...rows].sort((a, b) => {

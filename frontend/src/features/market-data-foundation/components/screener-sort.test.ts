@@ -25,6 +25,20 @@ describe('sortScreenerRows', () => {
       const result = sortScreenerRows(rows, 'signalScore', 'desc');
       expect(result.map(r => r.signalScore)).toEqual([80, 55, 30]);
     });
+
+    // Smart-Money setup tabs sort by smartMoneyScore: DESC for the Accumulation tab
+    // (strongest accumulation first), ASC for the Distribution tab (strongest distribution first).
+    it('sorts desc by smartMoneyScore (Accumulation tab default)', () => {
+      const rows = [row({ smartMoneyScore: 40 }), row({ smartMoneyScore: 88 }), row({ smartMoneyScore: 61 })];
+      const result = sortScreenerRows(rows, 'smartMoneyScore', 'desc');
+      expect(result.map(r => r.smartMoneyScore)).toEqual([88, 61, 40]);
+    });
+
+    it('sorts asc by smartMoneyScore (Distribution tab default)', () => {
+      const rows = [row({ smartMoneyScore: 40 }), row({ smartMoneyScore: 12 }), row({ smartMoneyScore: 33 })];
+      const result = sortScreenerRows(rows, 'smartMoneyScore', 'asc');
+      expect(result.map(r => r.smartMoneyScore)).toEqual([12, 33, 40]);
+    });
   });
 
   describe('null-last ordering', () => {

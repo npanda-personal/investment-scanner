@@ -187,6 +187,31 @@ export function SetupChipsCell({ setups }: { setups: string[] | undefined }) {
 }
 
 // ---------------------------------------------------------------------------
+// Smart-money score — directional 0-100 (high = accumulation, low = distribution),
+// shown with a colour-coded status chip so the Smart-Money setup tabs read at a glance.
+// ---------------------------------------------------------------------------
+
+const SMART_MONEY_STATUS: Record<string, { label: string; color: 'success' | 'error' | 'default' }> = {
+  ACCUMULATION: { label: 'Accum', color: 'success' },
+  DISTRIBUTION: { label: 'Distrib', color: 'error' },
+  NEUTRAL: { label: 'Neutral', color: 'default' },
+};
+
+export function SmartMoneyScoreCell({ score, status }: { score: number | null | undefined; status: string | null | undefined }) {
+  if (score == null) return <Dash />;
+  const meta = status ? SMART_MONEY_STATUS[status.toUpperCase()] : null;
+  const label = meta?.label ?? (status ?? '—');
+  return (
+    <Tooltip title={`Smart-money score ${Math.round(score)}${status ? ` (${status})` : ''}`}>
+      <Box sx={{ display: 'inline-flex', gap: 0.6, alignItems: 'center', justifyContent: 'flex-end' }}>
+        <Typography variant="body2" fontWeight={700}>{Math.round(score)}</Typography>
+        <Chip label={label} size="small" color={meta?.color ?? 'default'} variant="outlined" sx={{ fontSize: '0.6rem', height: 18 }} />
+      </Box>
+    </Tooltip>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Inline price sparkline — recent closes, coloured by net direction
 // ---------------------------------------------------------------------------
 

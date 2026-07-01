@@ -65,6 +65,8 @@ export class ScreenerRepository {
     setups: string[];
     /** Latest smart-money context status for the instrument (ACCUMULATION / NEUTRAL / DISTRIBUTION …). */
     smartMoneyStatus: string | null;
+    /** Latest smart-money score (directional 0-100; high = accumulation, low = distribution). */
+    smartMoneyScore: number | null;
     /** Latest sector-leadership status for the instrument's sector (LEADING / IMPROVING / WEAKENING / LAGGING). */
     sectorLeadershipStatus: string | null;
   }>> {
@@ -165,6 +167,26 @@ export class ScreenerRepository {
       ? Prisma.sql`ASC`
       : Prisma.sql`DESC`;
 
+    // Smart-money setup tabs rank by the smart-money score, not the generic directional signal
+    // score. smartMoneyScore is itself directional (high = accumulation, low = distribution), so
+    // the Accumulation tab wants the HIGHEST first (DESC) and Distribution the LOWEST first (ASC)
+    // — mirroring smart-money-intelligence.repository.ts (`isDistribution ? 'asc' : 'desc'`).
+    // signalScore stays as a stable tiebreak. Because this sort gates the LIMIT, applying it in
+    // SQL is what makes each tab's top-N the strongest smart-money names (not the top-N by score).
+    const smartMoneySetup =
+      options.setup === 'SMART_MONEY_ACCUMULATION' ? 'ACCUMULATION'
+        : options.setup === 'SMART_MONEY_DISTRIBUTION' ? 'DISTRIBUTION'
+          : null;
+    const smSortDir = smartMoneySetup === 'DISTRIBUTION' ? Prisma.sql`ASC` : Prisma.sql`DESC`;
+    // Two alias variants: `lsm`/`ls` inside the ranked CTE + full-path SELECT, `r` in the fast
+    // path's outer SELECT (which re-orders after the price lateral join).
+    const rankedOrderBy = smartMoneySetup
+      ? Prisma.sql`COALESCE(lsm."smartMoneyScore", 0) ${smSortDir}, COALESCE(ls."signalScore", 0) ${scoreSortDir}`
+      : Prisma.sql`COALESCE(ls."signalScore", 0) ${scoreSortDir}`;
+    const outerOrderBy = smartMoneySetup
+      ? Prisma.sql`COALESCE(r."smartMoneyScore", 0) ${smSortDir}, COALESCE(r."signalScore", 0) ${scoreSortDir}`
+      : Prisma.sql`COALESCE(r."signalScore", 0) ${scoreSortDir}`;
+
     // Normalized cash symbol for joining the F&O read-model tables (fo_oi_buildup /
     // fo_option_metrics key on the bare NSE symbol, e.g. RELIANCE). Mirrors the
     // price_symbol derivation used for price_ticks.
@@ -204,7 +226,7 @@ export class ScreenerRepository {
     const contextCtes = Prisma.sql`
       latest_smart_money AS MATERIALIZED (
         SELECT DISTINCT ON (smcs."instrumentId")
-          smcs."instrumentId", smcs.status AS "smartMoneyStatus"
+          smcs."instrumentId", smcs.status AS "smartMoneyStatus", smcs."smartMoneyScore" AS "smartMoneyScore"
         FROM smart_money_context_snapshots smcs
         WHERE smcs.range = '3M'
         ORDER BY smcs."instrumentId", smcs."snapshotDate" DESC, smcs."updatedAt" DESC
@@ -236,6 +258,7 @@ export class ScreenerRepository {
       triggeredSignals: unknown;
       negativeSignals: unknown;
       smartMoneyStatus: string | null;
+      smartMoneyScore: number | null;
       sectorLeadershipStatus: string | null;
       sector: string | null;
       marketCap: Prisma.Decimal | null;
@@ -284,7 +307,7 @@ export class ScreenerRepository {
             '\\.(NS|BO)$', '', 'i'
           ) AS price_symbol,
           ls."signalDirection", ls."signalScore", ls."priorScore", ls."triggeredSignals", ls."negativeSignals",
-          lsm."smartMoneyStatus", lsl."leadershipStatus" AS "sectorLeadershipStatus",
+          lsm."smartMoneyStatus", lsm."smartMoneyScore", lsl."leadershipStatus" AS "sectorLeadershipStatus",
           s.sector, s."marketCap",
           ld."deliveryPct", COALESCE(fno."inBan", FALSE) AS "inFnoBan",
           foi."buildupLabel", foi."oiChangePct", fopt."pcrOi"
@@ -295,7 +318,7 @@ export class ScreenerRepository {
         LEFT JOIN fo_oi foi ON foi.underlying = ${foJoinSymbol}
         LEFT JOIN fo_opt fopt ON fopt.underlying = ${foJoinSymbol}${contextJoins}
         WHERE ${whereClause}
-        ORDER BY COALESCE(ls."signalScore", 0) ${scoreSortDir}
+        ORDER BY ${rankedOrderBy}
         LIMIT ${rowLimit}
       ),
       -- Bulk 52-week high/low across all result symbols in one price_ticks scan instead
@@ -327,7 +350,7 @@ export class ScreenerRepository {
       SELECT
         r."instrumentId", r.symbol, r."companyName",
         lp.price AS price, r."signalDirection", r."signalScore", r."priorScore", r."triggeredSignals",
-        r."negativeSignals", r."smartMoneyStatus", r."sectorLeadershipStatus",
+        r."negativeSignals", r."smartMoneyStatus", r."smartMoneyScore", r."sectorLeadershipStatus",
         r.sector, r."marketCap", r."deliveryPct",
         CASE
           WHEN rd."high52w" > rd."low52w"
@@ -346,7 +369,7 @@ export class ScreenerRepository {
         LIMIT 1
       ) lp ON TRUE
       LEFT JOIN range_data rd ON rd.symbol = r.price_symbol
-      ORDER BY COALESCE(r."signalScore", 0) ${scoreSortDir}
+      ORDER BY ${outerOrderBy}
     `;
 
     // FULL PATH (min52wPositionPct filter active): the 52w range must be known before filtering,
@@ -447,6 +470,7 @@ export class ScreenerRepository {
         ls."triggeredSignals",
         ls."negativeSignals",
         lsm."smartMoneyStatus",
+        lsm."smartMoneyScore",
         lsl."leadershipStatus" AS "sectorLeadershipStatus",
         s.sector,
         s."marketCap",
@@ -463,7 +487,7 @@ export class ScreenerRepository {
       LEFT JOIN fo_oi foi ON foi.underlying = ${foJoinSymbol}
       LEFT JOIN fo_opt fopt ON fopt.underlying = ${foJoinSymbol}${contextJoins}
       WHERE ${whereClause}
-      ORDER BY COALESCE(ls."signalScore", 0) ${scoreSortDir}
+      ORDER BY ${rankedOrderBy}
       LIMIT ${rowLimit}
     `;
 
@@ -509,6 +533,7 @@ export class ScreenerRepository {
         isNewEntry,
         factorFamilies: this.summarizeFactorFamilies(row.triggeredSignals),
         smartMoneyStatus: row.smartMoneyStatus ?? null,
+        smartMoneyScore: row.smartMoneyScore != null ? Number(row.smartMoneyScore) : null,
         sectorLeadershipStatus: row.sectorLeadershipStatus ?? null,
         setups: classifyRowSetups({
           positiveCodes: this.extractFactorCodes(row.triggeredSignals),

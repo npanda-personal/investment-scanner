@@ -59,6 +59,18 @@ export function ScreenerDirectionTabs({
 
   const handleSetupChange = (_e: SyntheticEvent, value: ScreenerSetup | '') => {
     setPage(0);
+    // Default the sort to the tab's primary evidence. Smart-money setups rank by the smart-money
+    // score (itself directional: high = accumulation → DESC, low = distribution → ASC); every
+    // other setup falls back to the direction-aware signal-score default. Mirrors the backend's
+    // setup-aware ORDER BY so the client re-sort doesn't undo it. A manual column click still
+    // overrides within the tab; this only sets the default when the sub-tab changes.
+    if (value === 'SMART_MONEY_ACCUMULATION' || value === 'SMART_MONEY_DISTRIBUTION') {
+      setSortKey('smartMoneyScore');
+      setSortDir(value === 'SMART_MONEY_DISTRIBUTION' ? 'asc' : 'desc');
+    } else {
+      setSortKey('signalScore');
+      setSortDir(directionTab === 'BEARISH' ? 'asc' : 'desc');
+    }
     setFilters((prev) => {
       const next = { ...prev };
       if (value) next.setup = value;
