@@ -107,7 +107,9 @@ describe('triggerDemoPublishIfEnabled', () => {
     const trigger = load();
     trigger(summary());
     const child = spawnMock.mock.results[0].value;
-    jest.advanceTimersByTime(5 * 60 * 1000 + 1);
+    // Matches PUBLISH_TIMEOUT_MS (30 min); worktree isolation makes a timeout safe
+    // (only a throwaway worktree is abandoned), so the window is generous.
+    jest.advanceTimersByTime(30 * 60 * 1000 + 1);
     expect(child.kill).toHaveBeenCalledWith('SIGKILL');
     // guard reset -> a subsequent run can publish again
     trigger(summary());

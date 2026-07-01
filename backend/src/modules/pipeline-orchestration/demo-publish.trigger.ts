@@ -3,19 +3,23 @@
  *
  * Fired from the DAG completion hook (PipelineOrchestrationService.getDagRunner's
  * alertFn) once the whole pipeline has settled. When enabled, it re-captures the
- * GitHub Pages demo data and pushes it to the deploy branch — by spawning
- * scripts/publish-demo.mjs (which owns the capture + scoped-commit + push logic).
+ * GitHub Pages demo data and force-pushes it to the deploy branch — by spawning
+ * scripts/publish-demo.mjs, which does all its work in an EPHEMERAL git worktree
+ * (detached at dev HEAD) so the shared main checkout is never touched. That script
+ * owns the worktree lifecycle + capture + scoped-commit + push logic.
  *
  * Strictly opt-in and best-effort: it is OFF unless DEMO_AUTO_PUBLISH=true, only
  * runs for the demo scope (IN / STOCK) on a successful run, never throws, and
- * never affects the pipeline run status. Heavy lifting lives in the script, not
- * here, so the data pipeline stays free of git/deploy concerns.
+ * never affects the pipeline run status. Because the script is worktree-isolated,
+ * a timeout SIGKILL only abandons a throwaway worktree (cleaned up by the script's
+ * own finally / next run) — it can no longer leave the main checkout dirty. The
+ * timeout is therefore generous, sized for a keep-all (uncapped) capture.
  */
 import { spawn } from 'child_process';
 import path from 'path';
 import type { DagAlertSummary } from './pipeline-dag-runner';
 
-const PUBLISH_TIMEOUT_MS = 5 * 60 * 1000;
+const PUBLISH_TIMEOUT_MS = 30 * 60 * 1000;
 
 // repoRoot: this file is backend/src/modules/pipeline-orchestration → up 4.
 function resolveRepoRoot(): string {

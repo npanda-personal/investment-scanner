@@ -29,8 +29,17 @@ import { fileURLToPath } from 'node:url';
 
 const moduleDir = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(moduleDir, '..');
-const OUT_DIR = path.join(ROOT, 'frontend', 'public', 'demo-api');
-const AUTH_STATE_PATH = path.join(ROOT, 'frontend', 'tests', 'ui', 'support', '.auth-state.json');
+// Final output dir (DEMO_OUT_DIR lets the publisher target an isolated worktree's
+// demo-api instead of this checkout). We never write here directly — capture goes
+// to a temp staging dir and is swapped in only after the manifest is written, so a
+// killed/failed capture never wipes or half-rewrites the live demo-api.
+const FINAL_DIR = process.env.DEMO_OUT_DIR
+  ? path.resolve(process.env.DEMO_OUT_DIR)
+  : path.join(ROOT, 'frontend', 'public', 'demo-api');
+const OUT_DIR = `${FINAL_DIR}.tmp-${process.pid}`; // staging; swapped into FINAL_DIR at the end
+const AUTH_STATE_PATH = process.env.DEMO_AUTH_STATE_PATH
+  ? path.resolve(process.env.DEMO_AUTH_STATE_PATH)
+  : path.join(ROOT, 'frontend', 'tests', 'ui', 'support', '.auth-state.json');
 
 const BACKEND = process.env.E2E_BACKEND_URL || 'http://localhost:3000';
 const EMAIL = process.env.E2E_EMAIL || 'test@example.com';
@@ -324,10 +333,11 @@ const INDEX_CONSTITUENTS_BY_REGION = {
 // ---- main ------------------------------------------------------------------
 
 async function main() {
+  // Capture into a fresh temp staging dir. Clear any leftover from a crashed prior
+  // run first, then build up the full set of files; FINAL_DIR is only touched at the
+  // very end (atomic-ish swap), so the live demo-api stays intact until then.
+  fs.rmSync(OUT_DIR, { recursive: true, force: true });
   fs.mkdirSync(OUT_DIR, { recursive: true });
-  for (const f of fs.readdirSync(OUT_DIR)) {
-    if (f.endsWith('.json')) fs.rmSync(path.join(OUT_DIR, f), { force: true });
-  }
 
   token = await resolveToken();
 
@@ -417,20 +427,22 @@ async function main() {
     if (todayData?.candidates) {
       instrumentIds.push(...extractField(todayData.candidates, ['instrumentId', 'id'], 9999));
     }
-    const uniqueInstrumentIds = [...new Set(instrumentIds.filter(Boolean))];
+    // Sort every derived set deterministically so the captured file set / manifest
+    // order don't churn run-to-run from response ordering (keep-all: no cap).
+    const uniqueInstrumentIds = [...new Set(instrumentIds.filter(Boolean))].sort();
 
     // Today review candidate IDs
-    const candidateIds = extractField(todayData, ['candidateId', 'id'], 3);
+    const candidateIds = extractField(todayData, ['candidateId', 'id'], 3).sort();
 
     // Today review run IDs
-    const runIds = extractField(rd['/api/v1/today-review/runs'], ['id', 'runId'], 2);
+    const runIds = extractField(rd['/api/v1/today-review/runs'], ['id', 'runId'], 2).sort();
 
     // Sector names
-    const sectorNames = extractField(rd['/api/v1/market-intelligence/sectors'], ['sector', 'sectorName', 'name'], 3);
+    const sectorNames = extractField(rd['/api/v1/market-intelligence/sectors'], ['sector', 'sectorName', 'name'], 3).sort();
 
     // US ticker symbols (for us-smart-money SEC endpoint on instrument detail)
     const tickerSymbols = region === 'US'
-      ? extractField(rd['/api/v1/market-data/screener'], ['symbol'], 9999)
+      ? extractField(rd['/api/v1/market-data/screener'], ['symbol'], 9999).sort()
       : [];
 
     regionIds[region] = { uniqueInstrumentIds, candidateIds, runIds, sectorNames, tickerSymbols };
@@ -498,13 +510,24 @@ async function main() {
     await capture('GET', `/api/v1/market-data/us-smart-money/${symbol}`, { params: { limit: 25 } });
   }
 
-  // ── Write manifest ───────────────────────────────────────────────────────
-  fs.writeFileSync(path.join(OUT_DIR, 'manifest.json'), JSON.stringify(manifest, null, 2));
-  console.log(`\n=> captured ${ok} endpoints (${skipped} skipped) -> ${path.relative(ROOT, OUT_DIR)}`);
-  console.log(`   manifest: ${Object.keys(manifest).length} entries`);
+  // ── Write manifest (sorted keys for stable diffs) ────────────────────────
+  const sortedManifest = {};
+  for (const k of Object.keys(manifest).sort()) sortedManifest[k] = manifest[k];
+  fs.writeFileSync(path.join(OUT_DIR, 'manifest.json'), JSON.stringify(sortedManifest, null, 2));
+
+  // ── Atomic-ish swap: replace the previous output with the fresh capture ──
+  // Only reached once every file + the manifest are written, so the live demo-api
+  // is never left partial. rename is atomic within the same parent dir.
+  fs.rmSync(FINAL_DIR, { recursive: true, force: true });
+  fs.renameSync(OUT_DIR, FINAL_DIR);
+
+  console.log(`\n=> captured ${ok} endpoints (${skipped} skipped) -> ${path.relative(ROOT, FINAL_DIR)}`);
+  console.log(`   manifest: ${Object.keys(sortedManifest).length} entries`);
 }
 
 main().catch((err) => {
+  // Discard the partial temp dir; leave any previous demo-api/ untouched.
+  try { fs.rmSync(OUT_DIR, { recursive: true, force: true }); } catch { /* best-effort */ }
   console.error('\n=> capture failed:', err.message);
   process.exit(1);
 });

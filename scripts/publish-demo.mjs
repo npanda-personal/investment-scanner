@@ -1,36 +1,54 @@
 /**
- * Publish the GitHub Pages demo data.
+ * Publish the GitHub Pages demo data — WITHOUT ever touching the main checkout.
  *
  * Run LOCALLY (manually or from the post-pipeline trigger):
- *     node scripts/publish-demo.mjs
+ *     node scripts/publish-demo.mjs            # capture + deploy
+ *     node scripts/publish-demo.mjs --dry-run  # capture + commit in worktree, no push
+ *
+ * Why a worktree: capturing demo data wipes-and-rewrites ~4,100 files under
+ * frontend/public/demo-api. Doing that in the shared checkout left dirty WIP on
+ * every failure/timeout. Instead we create an EPHEMERAL git worktree OUTSIDE the
+ * repo, detached at the current DEMO_SOURCE_BRANCH (dev) HEAD, capture into it,
+ * commit there, and force-push that snapshot to the deploy branch. The main
+ * checkout's working tree and index are never modified.
+ *
+ * How latest code reaches Pages: the worktree is detached at dev HEAD each run, so
+ * it always contains the newest merged code; the force-push replaces the deploy
+ * branch with (latest dev + freshly captured data). No merge/pull step needed.
  *
  * Steps:
- *   1. Re-capture demo data (spawns scripts/capture-demo-data.mjs).
- *   2. Stage ONLY frontend/public/demo-api (never -A).
- *   3. If nothing changed -> exit 0 (no empty commit).
- *   4. Else commit (scoped) and push to the target branch -> the Pages workflow
- *      (.github/workflows/pages.yml, on push to dev) redeploys.
+ *   1. Create an ephemeral worktree detached at <SOURCE_BRANCH> HEAD.
+ *   2. Capture demo data INTO the worktree (never the main checkout).
+ *   3. Stage ONLY frontend/public/demo-api; if unchanged -> exit 0.
+ *   4. Commit (scoped) in the worktree.
+ *   5. Force-push HEAD -> origin/<DEPLOY_BRANCH> (single-writer deploy branch) so
+ *      the Pages workflow (.github/workflows/pages.yml, on push to that branch)
+ *      redeploys. Best-effort ff-mirror of <SOURCE_BRANCH> to origin (offsite
+ *      backup; does NOT trigger Pages).
+ *   6. finally: remove the worktree + prune — always, even on failure/timeout.
  *
  * Safety / best-effort:
- *   - Only acts when the current branch === target branch (default 'dev'); else
- *     logs a warning and exits 0 (never commits on the wrong branch).
- *   - Scoped add only — never touches other working-tree changes.
- *   - Plain fast-forward push; never --force, never --no-verify.
  *   - GIT_TERMINAL_PROMPT=0 so missing credentials fail fast instead of hanging.
+ *   - Scoped add only — never touches unrelated files.
  *   - Any git failure -> non-zero exit (the caller treats it as non-fatal).
  */
 import { spawn } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const moduleDir = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(moduleDir, '..');
 const DEMO_DIR = 'frontend/public/demo-api';
-const TARGET_BRANCH = process.env.DEMO_PUBLISH_BRANCH || 'dev';
+const SOURCE_BRANCH = process.env.DEMO_SOURCE_BRANCH || 'dev';
+const DEPLOY_BRANCH = process.env.DEMO_DEPLOY_BRANCH || 'demo-pages';
+const DRY_RUN = process.argv.includes('--dry-run');
+const AUTH_STATE_PATH = path.join(ROOT, 'frontend', 'tests', 'ui', 'support', '.auth-state.json');
 
 const gitEnv = { ...process.env, GIT_TERMINAL_PROMPT: '0' };
 
-/** Run a command, capturing stdout; rejects on non-zero exit. */
+/** Run a command, capturing stdout; rejects on non-zero exit. cwd defaults to ROOT. */
 function run(cmd, args, opts = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn(cmd, args, { cwd: ROOT, env: gitEnv, ...opts });
@@ -52,39 +70,86 @@ function run(cmd, args, opts = {}) {
   });
 }
 
-async function git(...args) {
-  return run('git', args);
+/** Run git; `cwd` picks which working tree the command runs in (default: main repo). */
+function git(args, cwd = ROOT) {
+  return run('git', args, { cwd });
+}
+
+async function removeWorktree(dir) {
+  try {
+    await git(['worktree', 'remove', '--force', dir]);
+  } catch (err) {
+    console.warn(`· worktree remove warning: ${err.message}`);
+  }
+  try {
+    await git(['worktree', 'prune']);
+  } catch { /* best-effort */ }
+  // Belt-and-suspenders: ensure the temp dir is gone even if `worktree remove` left it.
+  try {
+    fs.rmSync(dir, { recursive: true, force: true });
+  } catch { /* best-effort */ }
 }
 
 async function main() {
-  // 1. Re-capture (stream output so capture progress is visible).
-  console.log('· capturing demo data…');
-  await run(process.execPath, [path.join('scripts', 'capture-demo-data.mjs')], { inherit: true });
+  // Pin the source ref to a concrete SHA so the snapshot is stable even if dev
+  // moves (parallel merges) during the long capture.
+  const sourceSha = await git(['rev-parse', SOURCE_BRANCH]);
 
-  // 2. Branch guard.
-  const branch = await git('rev-parse', '--abbrev-ref', 'HEAD');
-  if (branch !== TARGET_BRANCH) {
-    console.warn(`· on branch "${branch}", not "${TARGET_BRANCH}" — skipping commit/push (no changes published).`);
-    return;
-  }
+  const wtDir = path.join(os.tmpdir(), `is-demo-publish-${process.pid}`);
+  // Clear any stale worktree/dir from a crashed prior run before re-adding.
+  await removeWorktree(wtDir);
 
-  // 3. Scoped stage + change detection.
-  await git('add', '--', DEMO_DIR);
+  console.log(`· creating ephemeral worktree (detached @ ${SOURCE_BRANCH} ${sourceSha.slice(0, 8)})`);
+  await git(['worktree', 'add', '--detach', wtDir, sourceSha]);
+
   try {
-    await git('diff', '--cached', '--quiet', '--', DEMO_DIR);
-    // exit 0 from --quiet => no staged changes.
-    console.log('· demo data unchanged — nothing to publish.');
-    return;
-  } catch {
-    // non-zero => there are staged changes; proceed.
-  }
+    // 1. Capture INTO the worktree's demo-api. We run the worktree's own copy of the
+    //    capture script (so its ROOT is the worktree) and also pass DEMO_OUT_DIR
+    //    explicitly; either way the main checkout is never written. Reuse the main
+    //    checkout's Playwright token so no fresh login is needed.
+    const outDir = path.join(wtDir, 'frontend', 'public', 'demo-api');
+    console.log('· capturing demo data…');
+    await run(process.execPath, [path.join(wtDir, 'scripts', 'capture-demo-data.mjs')], {
+      cwd: wtDir,
+      inherit: true,
+      env: { ...gitEnv, DEMO_OUT_DIR: outDir, DEMO_AUTH_STATE_PATH: AUTH_STATE_PATH },
+    });
 
-  // 4. Commit (scoped) + push.
-  const today = new Date().toISOString().slice(0, 10);
-  await git('commit', '-m', `chore(demo): refresh US/IN/Crypto data (data through ${today})`, '--', DEMO_DIR);
-  console.log(`· committed; pushing to origin/${TARGET_BRANCH}…`);
-  await git('push', 'origin', TARGET_BRANCH);
-  console.log('✓ demo data published — Pages will redeploy.');
+    // 2. Scoped stage + change detection (in the worktree).
+    await git(['add', '--', DEMO_DIR], wtDir);
+    try {
+      await git(['diff', '--cached', '--quiet', '--', DEMO_DIR], wtDir);
+      console.log('· demo data unchanged — nothing to publish.');
+      return;
+    } catch {
+      // non-zero => staged changes present; proceed.
+    }
+
+    // 3. Commit (scoped) in the detached worktree.
+    const today = new Date().toISOString().slice(0, 10);
+    await git(['commit', '-m', `chore(demo): refresh US/IN/Crypto data (data through ${today})`, '--', DEMO_DIR], wtDir);
+
+    if (DRY_RUN) {
+      console.log('· --dry-run: commit created in worktree; skipping pushes.');
+      return;
+    }
+
+    // 4. Deploy: force-push the snapshot to the single-writer deploy branch.
+    console.log(`· pushing to origin/${DEPLOY_BRANCH} (force)…`);
+    await git(['push', '--force', 'origin', `HEAD:refs/heads/${DEPLOY_BRANCH}`], wtDir);
+
+    // 5. Best-effort mirror of the source branch to origin (offsite backup; the
+    //    Pages workflow does NOT trigger on this branch, so it won't redeploy).
+    try {
+      await git(['push', 'origin', `${SOURCE_BRANCH}:${SOURCE_BRANCH}`], wtDir);
+    } catch (err) {
+      console.warn(`· ${SOURCE_BRANCH} mirror push skipped (non-fatal): ${err.message}`);
+    }
+
+    console.log(`✓ demo data published to ${DEPLOY_BRANCH} — Pages will redeploy.`);
+  } finally {
+    await removeWorktree(wtDir);
+  }
 }
 
 main().catch((err) => {

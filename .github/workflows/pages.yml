@@ -5,9 +5,13 @@ name: Deploy demo to GitHub Pages
 # (frontend/public/demo-api/*) instead of a live backend. This is an
 # owner-approved UI demo, distinct from the no-cloud production constraint.
 
+# Deploy source is the force-updated `demo-pages` branch (single-writer, produced
+# by scripts/publish-demo.mjs). It carries latest dev code + freshly captured demo
+# data. `dev` intentionally no longer triggers a deploy — that kept re-dirtying the
+# shared checkout via the demo commit.
 on:
   push:
-    branches: [dev]
+    branches: [demo-pages]
   workflow_dispatch:
 
 permissions:
