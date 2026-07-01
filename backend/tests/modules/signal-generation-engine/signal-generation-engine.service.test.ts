@@ -2285,7 +2285,7 @@ describe('SignalGenerationEngineService v2 accuracy fixes', () => {
   });
 
   // ── Fix 10 (v3): MODEL_VERSION bumped to v3 ──────────────────────────────
-  it('SG-9: MODEL_VERSION is signal-engine-v4 (v4 is the active engine)', async () => {
+  it('SG-9: MODEL_VERSION is signal-engine-v4.1 (Phase C: magnitude votes + scale guard + per-region calibration)', async () => {
     const repository = {
       createSignalResult: jest.fn(async (result: any) => ({ ...result, id: 'signal-v3' })),
     };
@@ -2297,8 +2297,8 @@ describe('SignalGenerationEngineService v2 accuracy fixes', () => {
     };
     const service = new SignalGenerationEngineService(repository as any, marketDataService as any, { workbench: jest.fn().mockResolvedValue(null) } as any);
     const result = await service.generateForInstrument('stock-v3', { researchContextMode: 'LIGHTWEIGHT' });
-    expect(result?.modelVersion).toBe('signal-engine-v4');
-    expect(result?.rulesetVersion).toBe('signal-engine-v4');
+    expect(result?.modelVersion).toBe('signal-engine-v4.1');
+    expect(result?.rulesetVersion).toBe('signal-engine-v4.1');
   });
 
   // ── v3 compositeScore: conviction gradient spread ─────────────────────────

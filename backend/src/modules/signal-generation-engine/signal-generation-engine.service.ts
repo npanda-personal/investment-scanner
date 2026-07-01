@@ -50,6 +50,7 @@ import {
 } from './signal-generation-engine.config';
 import * as Indicators from './signal-indicators';
 import * as Scoring from './signal-scoring';
+import { filterScaleAnomalousFundamentals } from './signal-fundamentals-scale-guard';
 import { average, stddev, optionalNumber as toOptionalNumber, clampInt as clampIntHelper, normalizeUtcDay as normalizeUtcDayHelper } from './signal-math';
 import {
   DEFAULT_SIGNAL_SCORING_CONFIG,
@@ -527,7 +528,19 @@ export class SignalGenerationEngineService {
     if (!instrument) return null;
 
     const prices = this.toPricePoints(pricesResponse?.prices || []);
-    const latestFundamental = fundamentalsResponse?.records?.[0] || null;
+    // #7 scale-anomaly guard: strip fiscal periods whose stored fundamentals carry a
+    // source-filing units/scale error (TNTELE-style ~1000x netIncome, etc.) BEFORE they
+    // reach the vote layer, so a mis-scaled figure can't flip the margin/growth votes.
+    // Applied here (not in getFundamentalsForGeneration) so BOTH the batch (/screener)
+    // path — which reads fundamentals from batchContext and bypasses that method — and
+    // the single-instrument path are covered; index 0 (live TTM) is always preserved.
+    const scaleGuard = filterScaleAnomalousFundamentals(
+      this.canonicalRegion(options.region || instrument.region || instrument.country),
+      instrument.symbol,
+      fundamentalsResponse?.records ?? null,
+    );
+    const cleanFundamentalRecords = scaleGuard.records;
+    const latestFundamental = cleanFundamentalRecords[0] || null;
     // SG-4: in batch (LIGHTWEIGHT) mode research is null, so peer valuation/strength came
     // back null and the peer votes never fired.  Fall back to region-scoped peer context
     // derived from the in-memory batch context (no extra DB calls), restoring FULL parity.
@@ -557,7 +570,7 @@ export class SignalGenerationEngineService {
     // v4 (engineVersion:'v4' above) and scoreOutcome.components is persisted into
     // scoringInputSummary.v4 (the audit JSON) below; the crypto lane / DEFAULT config stay v3.
     const scoreOutcome = Scoring.scoreInstrument(
-      { prices, relativeToPeers, fundamental: latestFundamental, fundamentalRecords: fundamentalsResponse?.records ?? null, peerAveragePe, peerAverageYield },
+      { prices, relativeToPeers, fundamental: latestFundamental, fundamentalRecords: cleanFundamentalRecords, peerAveragePe, peerAverageYield },
       scoringConfig,
     );
     const { score, triggeredSignals, negativeSignals, totalEvaluated } = scoreOutcome;
