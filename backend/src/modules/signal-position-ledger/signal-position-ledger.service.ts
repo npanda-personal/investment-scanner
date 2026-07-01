@@ -197,7 +197,7 @@ export class SignalPositionLedgerService {
 
     const result: SignalPositionLedgerRecomputeResult = {
       scope: { region: scope.region, assetType: scope.assetType },
-      scanned: 0, shadowsDropped: 0, bornDeadDropped: 0, kept: 0,
+      scanned: 0, shadowsDropped: 0, bornDeadDropped: 0, belowFloorDropped: 0, kept: 0,
       closedHorizon: 0, closedDefensive: 0, invalidated: 0, exitTriggered: 0,
       active: 0, deleted: 0, inserted: 0,
     };
@@ -224,6 +224,23 @@ export class SignalPositionLedgerService {
     });
     const snapshots = await this.loadRowSnapshots(snapshotCandidates, query);
 
+    // Entry floor: only signals that STILL pass the confidence/score floor
+    // (HIGH + score>LEDGER_MIN_ENTRY_SCORE) may re-open a tracked position on
+    // replay. This mirrors the CONFIDENCE/SCORE half of the live intake gate
+    // (isHighConfidenceEntry) only — it intentionally does NOT re-apply the
+    // live path's freshness gates (direction/auditStatus/dataQualityEligibility),
+    // since those describe current signal state and would wrongly drop a validly-
+    // held historical position whose signal has merely gone stale. Without this
+    // floor the rebuild resurrects legacy sub-floor entries (opened before the
+    // floor existed, or MEDIUM/LOW) — flooding the active book with noise.
+    const floorEnabled = typeof repo.entrySignalsPassingFloor === 'function';
+    const floorPassingSignals: Set<string> = floorEnabled
+      ? await repo.entrySignalsPassingFloor(
+          historical.map((row) => row.signalId).filter((id): id is string => Boolean(id)),
+          LEDGER_MIN_ENTRY_SCORE,
+        )
+      : new Set<string>();
+
     // Group by stock and replay each group oldest-entry-first.
     const byStock = new Map<string, SignalPositionLedgerActiveRow[]>();
     for (const row of historical) {
@@ -239,6 +256,13 @@ export class SignalPositionLedgerService {
       // -Infinity = nothing open yet; Infinity = a position is still open (held).
       let openUntil = -Infinity;
       for (const original of bucket) {
+        // Entry floor: a signal that fails HIGH+score>90 (or has no signal row at all)
+        // must never open a tracked position. Checked first so it neither occupies the
+        // active slot nor counts as a shadow/born-dead drop; leaves openUntil unchanged.
+        if (floorEnabled && (!original.signalId || !floorPassingSignals.has(original.signalId))) {
+          result.belowFloorDropped += 1;
+          continue;
+        }
         const entryMs = Date.parse(original.entryTriggerTimestamp);
         // A position is still open on this entry candle → this re-entry never should
         // have opened under the held lifecycle. Drop it as a shadow.

@@ -2126,6 +2126,8 @@ describe('SignalPositionLedgerService — trader GET persisted-read constraint',
         return map;
       }),
       listBenchmarkSeries: jest.fn().mockResolvedValue([]), // no benchmark → null alpha
+      // All three entries' signal still passes the HIGH+score>90 floor.
+      entrySignalsPassingFloor: jest.fn().mockResolvedValue(new Set(['signal-existing'])),
       replaceScopeLedgerRows,
     };
     const service = new SignalPositionLedgerService(repository as any, { enrichSignals: jest.fn() } as any);
@@ -2136,6 +2138,7 @@ describe('SignalPositionLedgerService — trader GET persisted-read constraint',
       scanned: 3,
       shadowsDropped: 1,
       bornDeadDropped: 0,
+      belowFloorDropped: 0,
       closedHorizon: 1,
       closedDefensive: 0,
       invalidated: 0,
@@ -2185,6 +2188,7 @@ describe('SignalPositionLedgerService — trader GET persisted-read constraint',
       coincidentDefensiveEvidenceBatch: jest.fn().mockResolvedValue(new Set(['stock-1'])),
       priceAtTradingDayOffsetBatch: jest.fn().mockResolvedValue(new Map()),
       listBenchmarkSeries: jest.fn().mockResolvedValue([]),
+      entrySignalsPassingFloor: jest.fn().mockResolvedValue(new Set(['signal-existing'])),
       replaceScopeLedgerRows,
     };
     const service = new SignalPositionLedgerService(repository as any, { enrichSignals: jest.fn() } as any);
@@ -2199,6 +2203,106 @@ describe('SignalPositionLedgerService — trader GET persisted-read constraint',
       { region: 'IN', assetType: 'STOCK' },
       [],
     );
+  });
+
+  it('recomputeClosedHistory drops entries whose signal fails the HIGH+score>90 entry floor (noise), keeping only floor-passing entries', async () => {
+    // stock-1: entry signal STILL passes the floor → rests ACTIVE and is kept.
+    // stock-2: entry signal is sub-floor (MEDIUM / score<=90 / no signal row) → must be
+    //          dropped so a legacy noisy entry never re-opens under the current policy.
+    const hi = activeLedgerRow({
+      ledgerKey: 'IN:STOCK:stock-1:bullish_entry_trigger:2026-05-20T00:00:00.000Z',
+      instrumentId: 'stock-1', symbol: 'ABC', signalId: 'signal-hi',
+      entryTriggerTimestamp: '2026-05-20T00:00:00.000Z', entryTriggerPrice: 100,
+    });
+    const lo = activeLedgerRow({
+      ledgerKey: 'IN:STOCK:stock-2:bullish_entry_trigger:2026-05-20T00:00:00.000Z',
+      instrumentId: 'stock-2', symbol: 'XYZ', signalId: 'signal-lo',
+      entryTriggerTimestamp: '2026-05-20T00:00:00.000Z', entryTriggerPrice: 50,
+    });
+
+    const replaceScopeLedgerRows = jest.fn().mockResolvedValue({ deleted: 2, inserted: 1 });
+    const entrySignalsPassingFloor = jest.fn().mockResolvedValue(new Set(['signal-hi']));
+    const repository = {
+      listEveryLedgerRow: jest.fn().mockResolvedValue([hi, lo]),
+      latestSnapshotsByInstrumentIds: jest.fn().mockResolvedValue(new Map([
+        ['stock-1', {
+          latestPrice: { date: '2026-06-01T00:00:00.000Z', close: 105, adjustedClose: 105, dataStatus: 'COMPLETE', source: 'database' },
+          quality: { signalReadinessStatus: 'READY', coverageStatus: 'GOOD', liquidityStatus: 'LIQUID', lastEvaluatedAt: '2026-06-01T00:00:00.000Z' },
+          exitDecision: null,
+        }],
+        ['stock-2', {
+          latestPrice: { date: '2026-06-01T00:00:00.000Z', close: 55, adjustedClose: 55, dataStatus: 'COMPLETE', source: 'database' },
+          quality: { signalReadinessStatus: 'READY', coverageStatus: 'GOOD', liquidityStatus: 'LIQUID', lastEvaluatedAt: '2026-06-01T00:00:00.000Z' },
+          exitDecision: null,
+        }],
+      ])),
+      firstCloseEvidenceDates: jest.fn().mockResolvedValue(new Map()),
+      coincidentDefensiveEvidenceBatch: jest.fn().mockResolvedValue(new Set()),
+      priceAtTradingDayOffsetBatch: jest.fn().mockResolvedValue(new Map()), // no horizon bar → ACTIVE
+      listBenchmarkSeries: jest.fn().mockResolvedValue([]),
+      entrySignalsPassingFloor,
+      replaceScopeLedgerRows,
+    };
+    const service = new SignalPositionLedgerService(repository as any, { enrichSignals: jest.fn() } as any);
+
+    const result = await service.recomputeClosedHistory({ region: 'IN', assetType: 'STOCK' });
+
+    // Only the floor-passing entry survives; the sub-floor entry is dropped, not kept.
+    expect(result).toMatchObject({ scanned: 2, belowFloorDropped: 1, active: 1, kept: 1, inserted: 1 });
+    expect(entrySignalsPassingFloor).toHaveBeenCalledWith(
+      expect.arrayContaining(['signal-hi', 'signal-lo']),
+      90,
+    );
+    const [, persistedRows] = replaceScopeLedgerRows.mock.calls[0];
+    expect(persistedRows).toHaveLength(1);
+    expect(persistedRows[0]).toMatchObject({ instrumentId: 'stock-1', status: 'ACTIVE' });
+  });
+
+  it('recomputeClosedHistory: a dropped sub-floor entry does not block a LATER floor-passing entry on the same stock', async () => {
+    // Same stock, two entries in chronological order:
+    //   early (Jan)  → sub-floor signal → dropped (must NOT advance openUntil).
+    //   later (May)  → floor-passing signal → opens ACTIVE (must NOT be shadow-dropped).
+    // If the drop wrongly left the slot "open", the later entry would be lost.
+    const early = activeLedgerRow({
+      ledgerKey: 'IN:STOCK:stock-1:bullish_entry_trigger:2026-01-05T00:00:00.000Z',
+      instrumentId: 'stock-1', symbol: 'ABC', signalId: 'signal-lo',
+      entryTriggerTimestamp: '2026-01-05T00:00:00.000Z', entryTriggerPrice: 90,
+    });
+    const later = activeLedgerRow({
+      ledgerKey: 'IN:STOCK:stock-1:bullish_entry_trigger:2026-05-20T00:00:00.000Z',
+      instrumentId: 'stock-1', symbol: 'ABC', signalId: 'signal-hi',
+      entryTriggerTimestamp: '2026-05-20T00:00:00.000Z', entryTriggerPrice: 100,
+    });
+
+    const replaceScopeLedgerRows = jest.fn().mockResolvedValue({ deleted: 2, inserted: 1 });
+    const repository = {
+      listEveryLedgerRow: jest.fn().mockResolvedValue([early, later]),
+      latestSnapshotsByInstrumentIds: jest.fn().mockResolvedValue(new Map([
+        ['stock-1', {
+          latestPrice: { date: '2026-06-01T00:00:00.000Z', close: 105, adjustedClose: 105, dataStatus: 'COMPLETE', source: 'database' },
+          quality: { signalReadinessStatus: 'READY', coverageStatus: 'GOOD', liquidityStatus: 'LIQUID', lastEvaluatedAt: '2026-06-01T00:00:00.000Z' },
+          exitDecision: null,
+        }],
+      ])),
+      firstCloseEvidenceDates: jest.fn().mockResolvedValue(new Map()),
+      coincidentDefensiveEvidenceBatch: jest.fn().mockResolvedValue(new Set()),
+      priceAtTradingDayOffsetBatch: jest.fn().mockResolvedValue(new Map()), // no horizon bar → ACTIVE
+      listBenchmarkSeries: jest.fn().mockResolvedValue([]),
+      entrySignalsPassingFloor: jest.fn().mockResolvedValue(new Set(['signal-hi'])),
+      replaceScopeLedgerRows,
+    };
+    const service = new SignalPositionLedgerService(repository as any, { enrichSignals: jest.fn() } as any);
+
+    const result = await service.recomputeClosedHistory({ region: 'IN', assetType: 'STOCK' });
+
+    // Early sub-floor entry dropped (not a shadow); later entry opens ACTIVE.
+    expect(result).toMatchObject({ scanned: 2, belowFloorDropped: 1, shadowsDropped: 0, active: 1, kept: 1 });
+    const [, persistedRows] = replaceScopeLedgerRows.mock.calls[0];
+    expect(persistedRows).toHaveLength(1);
+    expect(persistedRows[0]).toMatchObject({
+      ledgerKey: 'IN:STOCK:stock-1:bullish_entry_trigger:2026-05-20T00:00:00.000Z',
+      status: 'ACTIVE',
+    });
   });
 });
 

@@ -33,6 +33,7 @@ async function main() {
     console.log(`  scanned:          ${r.scanned}`);
     console.log(`  shadowsDropped:   ${r.shadowsDropped}  (re-entries while a position was still open)`);
     console.log(`  bornDeadDropped:  ${r.bornDeadDropped}  (coincident-evidence intake guard)`);
+    console.log(`  belowFloorDropped: ${r.belowFloorDropped}  (fails HIGH+score>90 entry floor / no signal)`);
     console.log(`  -- reclassified --`);
     console.log(`  closedHorizon:    ${r.closedHorizon}`);
     console.log(`  closedDefensive:  ${r.closedDefensive}`);

@@ -191,6 +191,7 @@ export interface SignalPositionLedgerRecomputeResult {
   scanned: number;          // historical rows enumerated (all statuses, no dedup)
   shadowsDropped: number;   // re-entries that opened while a prior position was still open
   bornDeadDropped: number;  // entries rejected by the coincident-evidence intake guard
+  belowFloorDropped: number; // entries whose signal fails the HIGH+score>90 entry floor (or has no signal row)
   kept: number;             // rows persisted after the replay (= inserted)
   closedHorizon: number;    // CLOSED via HORIZON_REACHED
   closedDefensive: number;  // CLOSED via DEFENSIVE_EXIT

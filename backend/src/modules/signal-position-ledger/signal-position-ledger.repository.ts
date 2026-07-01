@@ -223,6 +223,24 @@ export class SignalPositionLedgerRepository {
   }
 
   /**
+   * Rebuild intake floor: of the given entry-signal ids, return the subset whose
+   * signal_results row STILL passes the ledger entry floor (confidence HIGH and
+   * score strictly above `minScore`). Mirrors service.isHighConfidenceEntry so a
+   * historical replay only re-opens positions the live intake path would admit.
+   * An id with no matching signal_results row (orphaned entry) is NOT returned →
+   * the caller drops it. `score: { gt }` also excludes null scores.
+   */
+  async entrySignalsPassingFloor(signalIds: string[], minScore: number): Promise<Set<string>> {
+    const ids = [...new Set(signalIds.filter(Boolean))];
+    if (ids.length === 0) return new Set();
+    const rows = await this.db.signalResult.findMany({
+      where: { id: { in: ids }, confidence: 'HIGH', score: { gt: minScore } },
+      select: { id: true },
+    });
+    return new Set(rows.map((row: { id: string }) => row.id));
+  }
+
+  /**
    * One-time rebuild primitive: atomically replace ALL ledger rows for a scope with a
    * freshly recomputed set. Deletes every existing row for the scope, then bulk-inserts
    * each recomputed row via the FULL write mapper (toLedgerWrite persists status +
