@@ -17,6 +17,8 @@
  * branch with (latest dev + freshly captured data). No merge/pull step needed.
  *
  * Steps:
+ *   0. Sweep + reclaim any leaked worktree from a previously-killed run (see
+ *      sweepStaleWorktrees — pid-independent, so it frees a SIGKILL orphan).
  *   1. Create an ephemeral worktree detached at <SOURCE_BRANCH> HEAD.
  *   2. Capture demo data INTO the worktree (never the main checkout).
  *   3. Stage ONLY frontend/public/demo-api; if unchanged -> exit 0.
@@ -25,7 +27,8 @@
  *      the Pages workflow (.github/workflows/pages.yml, on push to that branch)
  *      redeploys. Best-effort ff-mirror of <SOURCE_BRANCH> to origin (offsite
  *      backup; does NOT trigger Pages).
- *   6. finally: remove the worktree + prune — always, even on failure/timeout.
+ *   6. finally: remove this run's worktree + prune. On a parent SIGKILL (publish
+ *      timeout) this finally is skipped — the next run's step-0 sweep reclaims it.
  *
  * Safety / best-effort:
  *   - GIT_TERMINAL_PROMPT=0 so missing credentials fail fast instead of hanging.
@@ -41,6 +44,7 @@ import { fileURLToPath } from 'node:url';
 const moduleDir = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(moduleDir, '..');
 const DEMO_DIR = 'frontend/public/demo-api';
+const WT_PREFIX = 'is-demo-publish-'; // ephemeral-worktree dir name prefix (in os.tmpdir())
 const SOURCE_BRANCH = process.env.DEMO_SOURCE_BRANCH || 'dev';
 const DEPLOY_BRANCH = process.env.DEMO_DEPLOY_BRANCH || 'demo-pages';
 const DRY_RUN = process.argv.includes('--dry-run');
@@ -90,14 +94,42 @@ async function removeWorktree(dir) {
   } catch { /* best-effort */ }
 }
 
+/**
+ * PID-independent reclamation of leaked ephemeral worktrees. The per-run worktree
+ * dir is named with the current PID, but the publish timeout kills the parent with
+ * SIGKILL — uncatchable, so the finally that would remove it never runs. A later
+ * run has a DIFFERENT pid and computes a DIFFERENT path, so a pid-scoped cleanup
+ * can never reclaim the orphan (and `git worktree prune` can't either: the dir is
+ * still fully present, just abandoned). So on startup we sweep EVERY is-demo-publish-*
+ * sibling in os.tmpdir(), reclaiming any leak from a previously-killed run
+ * regardless of pid. Quiet + best-effort: dirs that aren't registered worktrees or
+ * are already gone are ignored.
+ */
+async function sweepStaleWorktrees() {
+  const tmp = os.tmpdir();
+  let names = [];
+  try {
+    names = fs.readdirSync(tmp).filter((n) => n.startsWith(WT_PREFIX));
+  } catch { /* best-effort */ }
+  for (const name of names) {
+    const dir = path.join(tmp, name);
+    try { await git(['worktree', 'remove', '--force', dir]); } catch { /* not registered / gone */ }
+    try { fs.rmSync(dir, { recursive: true, force: true }); } catch { /* best-effort */ }
+  }
+  try { await git(['worktree', 'prune']); } catch { /* best-effort */ }
+}
+
 async function main() {
   // Pin the source ref to a concrete SHA so the snapshot is stable even if dev
   // moves (parallel merges) during the long capture.
   const sourceSha = await git(['rev-parse', SOURCE_BRANCH]);
 
-  const wtDir = path.join(os.tmpdir(), `is-demo-publish-${process.pid}`);
-  // Clear any stale worktree/dir from a crashed prior run before re-adding.
-  await removeWorktree(wtDir);
+  const wtDir = path.join(os.tmpdir(), `${WT_PREFIX}${process.pid}`);
+  // Reclaim ALL leaked worktrees (pid-independent) before re-adding — a prior run
+  // SIGKILL'd by the publish timeout skips its finally, and only this startup sweep
+  // can free the orphan (a later run's pid differs, so pid-scoped cleanup can't).
+  // Covers this pid's own dir too, in case the pid was reused since a crash.
+  await sweepStaleWorktrees();
 
   console.log(`· creating ephemeral worktree (detached @ ${SOURCE_BRANCH} ${sourceSha.slice(0, 8)})`);
   await git(['worktree', 'add', '--detach', wtDir, sourceSha]);
@@ -138,8 +170,11 @@ async function main() {
     console.log(`· pushing to origin/${DEPLOY_BRANCH} (force)…`);
     await git(['push', '--force', 'origin', `HEAD:refs/heads/${DEPLOY_BRANCH}`], wtDir);
 
-    // 5. Best-effort mirror of the source branch to origin (offsite backup; the
-    //    Pages workflow does NOT trigger on this branch, so it won't redeploy).
+    // 5. Best-effort ff-mirror of the source branch to origin (offsite backup; the
+    //    Pages workflow does NOT trigger on this branch, so it won't redeploy). This
+    //    is a plain (non-force) push, so it no-ops/rejects whenever origin/<SOURCE>
+    //    has diverged — that's expected and non-fatal; the deploy above is what
+    //    matters. We never force this branch.
     try {
       await git(['push', 'origin', `${SOURCE_BRANCH}:${SOURCE_BRANCH}`], wtDir);
     } catch (err) {

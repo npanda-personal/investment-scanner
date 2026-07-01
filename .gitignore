@@ -146,6 +146,10 @@ frontend/test-results-*/
 frontend/playwright-report/
 frontend/playwright-results*/
 frontend/tmp-*
+# Atomic demo-capture staging dir (capture-demo-data.mjs writes <demo-api>.tmp-<pid>
+# then renames it into place; only left behind if a direct main-checkout run dies
+# mid-capture). Never a source artifact.
+frontend/public/demo-api.tmp-*
 test-results/
 frontend/tests/ui/support/.auth-state.json
 # Playwright QA screenshot artifacts (verification only, not source)
