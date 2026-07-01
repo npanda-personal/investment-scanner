@@ -16,7 +16,9 @@ function clampInt(value: unknown, fallback: number, min: number, max: number): n
 
 function normalizeSortBy(value: unknown): SignalPositionLedgerActiveQuery['sortBy'] {
   const normalized = typeof first(value) === 'string' ? String(first(value)).trim() : '';
-  return normalized === 'currentReturnPercent' ? 'currentReturnPercent' : 'entryTriggerTimestamp';
+  if (normalized === 'currentReturnPercent') return 'currentReturnPercent';
+  if (normalized === 'latestSignalScore') return 'latestSignalScore';
+  return 'entryTriggerTimestamp';
 }
 
 function normalizeSortDirection(value: unknown): SignalPositionLedgerActiveQuery['sortDirection'] {

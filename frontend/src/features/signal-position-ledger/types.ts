@@ -2,7 +2,7 @@ export type SignalPositionTriggerType = 'bullish_entry_trigger' | 'bearish_trigg
 export type SignalPositionReturnStatus = 'CURRENT' | 'STALE' | 'UNAVAILABLE';
 export type SignalPositionLedgerStatus = 'ACTIVE' | 'CLOSED';
 export type SignalPositionCloseReason = 'HORIZON_REACHED' | 'DEFENSIVE_EXIT' | 'INVALIDATED';
-export type SignalPositionLedgerSortBy = 'entryTriggerTimestamp' | 'currentReturnPercent';
+export type SignalPositionLedgerSortBy = 'entryTriggerTimestamp' | 'currentReturnPercent' | 'latestSignalScore';
 export type SignalPositionLedgerSortDirection = 'asc' | 'desc';
 export type SignalPositionHealthState = 'EXIT_TRIGGERED' | 'RISK_WARNING' | null;
 export type SignalPositionLifecycleEvidenceStatus = 'ACTIVE_ENTRY' | 'EXIT_TRIGGERED' | 'UNAVAILABLE';
@@ -85,6 +85,12 @@ export interface SignalPositionLedgerActiveRow {
   horizonTradingDays?: number | null;             // trading-bar horizon (60) when closeReason=HORIZON_REACHED
   benchmarkReturnPercent?: number | null;         // region-benchmark simple return over the same window
   alphaPercent?: number | null;                   // currentReturnPercent − benchmarkReturnPercent (pp)
+  // Latest signal score for this stock — read-time join to signal_results ordered by
+  // generatedAt DESC (ALWAYS the most recent score, never the frozen entry-time value).
+  latestSignalScore?: number | null;
+  latestSignalScoreDate?: string | null;          // generatedAt of the score above (ISO)
+  latestSignalConfidence?: string | null;         // HIGH | MEDIUM | LOW of the latest signal
+  latestSignalDirection?: string | null;          // BULLISH | BEARISH | ... of the latest signal
 }
 
 export interface SignalPositionLedgerActiveListResponse {

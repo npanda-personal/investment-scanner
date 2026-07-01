@@ -54,6 +54,24 @@ function formatMove(row: SignalPositionLedgerActiveRow): string {
   return `${row.currentReturnPercent >= 0 ? '+' : ''}${numberFormatter.format(row.currentReturnPercent)}%`;
 }
 
+function formatScore(value: number | null | undefined): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) return 'No signal';
+  return numberFormatter.format(value);
+}
+
+function scoreTooltip(row: SignalPositionLedgerActiveRow): string {
+  if (row.latestSignalScore === null || row.latestSignalScore === undefined) {
+    return 'No current signal score for this stock.';
+  }
+  const parts = [
+    `Latest score ${numberFormatter.format(row.latestSignalScore)}`,
+    row.latestSignalConfidence ? `${labelize(row.latestSignalConfidence)} confidence` : null,
+    row.latestSignalDirection ? labelize(row.latestSignalDirection) : null,
+    row.latestSignalScoreDate ? `as of ${formatDate(row.latestSignalScoreDate)}` : null,
+  ].filter(Boolean);
+  return parts.join(' · ');
+}
+
 function healthLabel(row: SignalPositionLedgerActiveRow): string {
   if (row.healthState === 'EXIT_TRIGGERED') return 'Exit review';
   if (row.healthState === 'RISK_WARNING') return 'Risk warning';
@@ -142,6 +160,26 @@ export const ActivePositionsTable: React.FC<ActivePositionsTableProps> = ({
         />
       ),
     },
+    ...(variant === 'closed' ? [] : [{
+      id: 'latestSignalScore',
+      label: 'Signal Score',
+      align: 'right' as const,
+      sortable: true,
+      minWidth: 120,
+      maxWidth: 150,
+      render: (row: SignalPositionLedgerActiveRow) => (
+        <Tooltip title={scoreTooltip(row)} arrow>
+          <Chip
+            size="small"
+            variant={row.latestSignalScore === null || row.latestSignalScore === undefined ? 'outlined' : 'filled'}
+            color={row.latestSignalScore === null || row.latestSignalScore === undefined ? 'default'
+              : row.latestSignalScore >= 90 ? 'success'
+              : row.latestSignalScore >= 60 ? 'primary' : 'default'}
+            label={formatScore(row.latestSignalScore)}
+          />
+        </Tooltip>
+      ),
+    } satisfies DataTableColumn<SignalPositionLedgerActiveRow>]),
     {
       id: 'quality',
       label: 'Evidence',
@@ -193,7 +231,7 @@ export const ActivePositionsTable: React.FC<ActivePositionsTableProps> = ({
         onPageChange={onPageChange}
         onPageSizeChange={onPageSizeChange}
         onSortChange={(nextSortBy, nextSortDirection) => {
-          if (nextSortBy === 'entryTriggerTimestamp' || nextSortBy === 'currentReturnPercent') {
+          if (nextSortBy === 'entryTriggerTimestamp' || nextSortBy === 'currentReturnPercent' || nextSortBy === 'latestSignalScore') {
             onSortChange(nextSortBy, nextSortDirection);
           }
         }}
@@ -215,6 +253,9 @@ export const ActivePositionsTable: React.FC<ActivePositionsTableProps> = ({
                   <Chip label={`Trigger ${formatDate(selectedRow.entryTriggerTimestamp)}`} variant="outlined" />
                   <Chip label={`Price ${formatPrice(selectedRow.entryTriggerPrice)}`} variant="outlined" />
                   <Chip label={`Raw move ${formatMove(selectedRow)}`} variant="outlined" />
+                  {variant !== 'closed' && (
+                    <Chip label={`Signal score ${formatScore(selectedRow.latestSignalScore)}`} variant="outlined" />
+                  )}
                   <Chip label={`DQ ${selectedRow.currentDataQualityStatus || 'Unavailable'}`} variant="outlined" />
                   <Chip label={`Lifecycle ${healthLabel(selectedRow)}`} variant="outlined" />
                 </Stack>

@@ -153,6 +153,7 @@ describe('SignalPositionLedgerRepository', () => {
     ]);
     const repository = new SignalPositionLedgerRepository({
       signalPositionLedgerEntry: { findMany },
+      $queryRawUnsafe: jest.fn().mockResolvedValue([]),
     } as any);
 
     const page = await repository.listLedgerRows({
@@ -169,6 +170,55 @@ describe('SignalPositionLedgerRepository', () => {
     expect(page.totalCount).toBe(3);
     expect(page.hasMore).toBe(true);
     expect(page.nextOffset).toBe(2);
+  });
+
+  it('enriches active rows with the latest signal score and sorts by it globally', async () => {
+    const findMany = jest.fn().mockResolvedValue([
+      ledgerEntryRow({ ledgerKey: 'row-a', instrumentId: 'stock-a', symbol: 'AAA', entryTriggerTimestamp: '2026-05-24T00:00:00.000Z', currentReturnPercent: 1 }),
+      ledgerEntryRow({ ledgerKey: 'row-b', instrumentId: 'stock-b', symbol: 'BBB', entryTriggerTimestamp: '2026-05-25T00:00:00.000Z', currentReturnPercent: 2 }),
+      ledgerEntryRow({ ledgerKey: 'row-c', instrumentId: 'stock-c', symbol: 'CCC', entryTriggerTimestamp: '2026-05-23T00:00:00.000Z', currentReturnPercent: 3 }),
+    ]);
+    // Latest-score-per-instrument join: C highest, A mid, B has no score row.
+    const queryRawUnsafe = jest.fn().mockResolvedValue([
+      { instrumentId: 'stock-a', score: 72, confidence: 'MEDIUM', direction: 'BULLISH', generatedAt: new Date('2026-05-30T00:00:00.000Z') },
+      { instrumentId: 'stock-c', score: 95, confidence: 'HIGH', direction: 'BULLISH', generatedAt: new Date('2026-05-31T00:00:00.000Z') },
+    ]);
+    const repository = new SignalPositionLedgerRepository({
+      signalPositionLedgerEntry: { findMany },
+      $queryRawUnsafe: queryRawUnsafe,
+    } as any);
+
+    const page = await repository.listLedgerRows({
+      region: 'IN',
+      assetType: 'STOCK',
+      status: 'ACTIVE',
+      limit: 10,
+      offset: 0,
+      sortBy: 'latestSignalScore',
+      sortDirection: 'desc',
+    });
+
+    // Descending score; the instrument with no signal row (BBB) sorts last.
+    expect(page.items.map((row) => row.symbol)).toEqual(['CCC', 'AAA', 'BBB']);
+    const ccc = page.items.find((row) => row.symbol === 'CCC');
+    expect(ccc).toMatchObject({ latestSignalScore: 95, latestSignalConfidence: 'HIGH', latestSignalDirection: 'BULLISH' });
+    expect(ccc?.latestSignalScoreDate).toBe('2026-05-31T00:00:00.000Z');
+    expect(page.items.find((row) => row.symbol === 'BBB')?.latestSignalScore).toBeNull();
+    // The join is bounded to the distinct instrument ids on the page.
+    expect(queryRawUnsafe).toHaveBeenCalledTimes(1);
+    expect(queryRawUnsafe.mock.calls[0][1]).toEqual(expect.arrayContaining(['stock-a', 'stock-b', 'stock-c']));
+
+    // Ascending: lowest score first, and the no-score row (BBB) still sorts LAST.
+    const ascPage = await repository.listLedgerRows({
+      region: 'IN',
+      assetType: 'STOCK',
+      status: 'ACTIVE',
+      limit: 10,
+      offset: 0,
+      sortBy: 'latestSignalScore',
+      sortDirection: 'asc',
+    });
+    expect(ascPage.items.map((row) => row.symbol)).toEqual(['AAA', 'CCC', 'BBB']);
   });
 
   it('persists active risk-warning lifecycle evidence without clearing the active slot', async () => {

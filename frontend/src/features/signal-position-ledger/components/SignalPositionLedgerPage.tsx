@@ -6,6 +6,7 @@ import { fetchSignalPositionLedgerActiveRows, fetchSignalPositionLedgerClosedRow
 import { useSignalPositionLedgerActiveRows } from '../hooks/useSignalPositionLedgerActiveRows';
 import { useSignalPositionLedgerClosedRows } from '../hooks/useSignalPositionLedgerClosedRows';
 import { useSignalPositionLedgerClosedReturns } from '../hooks/useSignalPositionLedgerClosedReturns';
+import { useSignalPositionLedgerOpenReturns } from '../hooks/useSignalPositionLedgerOpenReturns';
 import { ActivePositionsTable } from './ActivePositionsTable';
 import { ClosedTradesReturnsCard } from './ClosedTradesReturnsCard';
 import { SignalPositionSummaryStrip } from './SignalPositionSummaryStrip';
@@ -33,6 +34,7 @@ const SignalPositionLedgerPage: React.FC = () => {
   } = useSignalPositionLedgerActiveRows();
   const closed = useSignalPositionLedgerClosedRows();
   const closedReturns = useSignalPositionLedgerClosedReturns();
+  const openReturns = useSignalPositionLedgerOpenReturns();
   const scopeLabel = `${scope.region} / ${scope.assetType}`;
   const currentTabLoading = activeTab === 'active' ? loading : closed.loading;
 
@@ -151,9 +153,10 @@ const SignalPositionLedgerPage: React.FC = () => {
         <>
           <ClosedTradesReturnsCard
             rows={closedReturns.rows}
+            openRows={openReturns.rows}
             scopeLabel={scopeLabel}
-            loading={closedReturns.loading}
-            error={closedReturns.error}
+            loading={closedReturns.loading || openReturns.loading}
+            error={closedReturns.error ?? openReturns.error}
           />
           <ActivePositionsTable
             data={closed.data}
