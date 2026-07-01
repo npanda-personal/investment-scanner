@@ -29,7 +29,7 @@ import {
   DEFAULT_SIGNAL_SCORING_CONFIG,
   type SignalScoringConfig,
 } from './signal-scoring.config';
-import { compositeV4, DEFAULT_V4_EVIDENCE, type V4Components } from './signal-evidence';
+import { compositeV4, gradedStrength, DEFAULT_V4_EVIDENCE, type V4Components } from './signal-evidence';
 import { extraTechnicalVotes } from './signal-extra-votes';
 import { fundamentalGrowthVotes, fundamentalMarginTrendVotes, fundamentalPeHistoryVotes } from './signal-fundamental-growth';
 export { peerAggregates, peerContextWarnings } from './signal-peer-aggregates';
@@ -42,8 +42,8 @@ export interface CategoryEvaluation {
   negativeSignals: SignalItem[];
 }
 
-export function signal(code: string, label: string, category: SignalItem['category']): SignalItem {
-  return { code, label, category };
+export function signal(code: string, label: string, category: SignalItem['category'], strength?: number): SignalItem {
+  return strength === undefined ? { code, label, category } : { code, label, category, strength };
 }
 
 /**
@@ -66,6 +66,10 @@ export function evaluateTechnical(
   config: SignalScoringConfig = DEFAULT_SIGNAL_SCORING_CONFIG,
 ): CategoryEvaluation {
   const guards = config.guards;
+  // #4 magnitude grades are a v4-only enrichment: the v3 (legacy count) path — which the
+  // crypto lane still runs — must persist byte-identical signal objects, so `strength` is
+  // attached only under v4 (mirrors the v4-gated fundamentals votes below at ~line 306).
+  const isV4 = config.scoringEngineVersion === 'v4';
   const signals: SignalItem[] = [];
   const negativeSignals: SignalItem[] = [];
   const latest = prices[0];
@@ -122,29 +126,40 @@ export function evaluateTechnical(
     // NEAR_52_WEEK_LOW removed: proximity to 52w-low is mean-reverting on NSE — anti-predictive as a bearish vote
   }
 
-  // Mean Reversion is stronger in range-bound markets
+  // Mean Reversion is stronger in range-bound markets.
+  // #4 magnitude grade: deeper oversold (rsiPrev further below 30) = stronger mean-reversion setup.
   if (rsiNow !== null && rsiPrev !== null && rsiPrev < 30 && rsiNow > rsiPrev) {
-    signals.push(signal(isRangeBound ? 'STRONG_RSI_RECOVERY' : 'RSI_RECOVERING', 'RSI is recovering from oversold levels', 'TECHNICAL'));
+    const code = isRangeBound ? 'STRONG_RSI_RECOVERY' : 'RSI_RECOVERING';
+    signals.push(signal(code, 'RSI is recovering from oversold levels', 'TECHNICAL', isV4 ? gradedStrength(code, (30 - rsiPrev) / 30) : undefined));
   }
-  // Require a meaningful RSI drop (>2 points) to avoid voting bearish on single-bar noise in strong trends
+  // Require a meaningful RSI drop (>2 points) to avoid voting bearish on single-bar noise in strong trends.
+  // #4 magnitude grade: the higher rsiPrev sat above 70, the stronger the reversal.
   if (rsiNow !== null && rsiPrev !== null && rsiPrev > 70 && rsiNow < rsiPrev - 2) {
-    negativeSignals.push(signal(isRangeBound ? 'STRONG_RSI_REVERSAL' : 'RSI_OVERBOUGHT_REVERSAL', 'RSI is reversing from overbought levels', 'TECHNICAL'));
+    const code = isRangeBound ? 'STRONG_RSI_REVERSAL' : 'RSI_OVERBOUGHT_REVERSAL';
+    negativeSignals.push(signal(code, 'RSI is reversing from overbought levels', 'TECHNICAL', isV4 ? gradedStrength(code, (rsiPrev - 70) / 30) : undefined));
   }
 
   // Guard 1: Overbought RSI — demote over-extended names while RSI is still elevated.
+  // #4 magnitude grade: within the 70–80 OVERBOUGHT band, strength scales with depth past
+  // 70 (RSI 79 outweighs RSI 71).  RSI_EXTREME_OVERBOUGHT is already tiered at the 1.0
+  // ceiling (>=80 is treated as saturated caution), so grading it is a bounded no-op.
   if (guards.overboughtRsiEnabled && rsiNow !== null) {
     if (rsiNow >= guards.rsiExtremeOverbought) {
       negativeSignals.push(signal('RSI_EXTREME_OVERBOUGHT', `RSI(14) is ${rsiNow.toFixed(1)} — extremely overbought (>=${guards.rsiExtremeOverbought}); mean-reversion risk is elevated`, 'TECHNICAL'));
     } else if (rsiNow >= guards.rsiOverbought) {
-      negativeSignals.push(signal('RSI_OVERBOUGHT', `RSI(14) is ${rsiNow.toFixed(1)} — overbought (>=${guards.rsiOverbought}); upside momentum is stretched`, 'TECHNICAL'));
+      const span = guards.rsiExtremeOverbought - guards.rsiOverbought;
+      const mag = span > 0 ? (rsiNow - guards.rsiOverbought) / span : 0;
+      negativeSignals.push(signal('RSI_OVERBOUGHT', `RSI(14) is ${rsiNow.toFixed(1)} — overbought (>=${guards.rsiOverbought}); upside momentum is stretched`, 'TECHNICAL', isV4 ? gradedStrength('RSI_OVERBOUGHT', mag) : undefined));
     }
   }
 
   // Guard 2: Extended above SMA50 — parabolic stretch from the medium-term trend.
+  // #4 magnitude grade: strength scales with how far past the stretch threshold the price sits.
   if (guards.sma50StretchEnabled && latest && sma50 !== null && sma50 > 0) {
     const stretchPct = (latest.adjusted_close - sma50) / sma50;
     if (stretchPct >= guards.sma50StretchPct) {
-      negativeSignals.push(signal('EXTENDED_ABOVE_SMA50', `price is ${(stretchPct * 100).toFixed(1)}% above SMA50 — over-extended from trend (threshold: ${(guards.sma50StretchPct * 100).toFixed(0)}%)`, 'TECHNICAL'));
+      const mag = guards.sma50StretchPct > 0 ? (stretchPct - guards.sma50StretchPct) / guards.sma50StretchPct : 0;
+      negativeSignals.push(signal('EXTENDED_ABOVE_SMA50', `price is ${(stretchPct * 100).toFixed(1)}% above SMA50 — over-extended from trend (threshold: ${(guards.sma50StretchPct * 100).toFixed(0)}%)`, 'TECHNICAL', isV4 ? gradedStrength('EXTENDED_ABOVE_SMA50', mag) : undefined));
     }
   }
 
@@ -224,9 +239,12 @@ export function evaluateMomentum(
   // SG-3 (v4 only): volatility-normalize the momentum thresholds so a high-beta name
   // needs a proportionally larger move to vote bullish, and a low-vol name a smaller one
   // (the fixed 2%/5% cuts over-fire on volatile stocks).  scale=1 on the v3 path.
-  const vScale = config.scoringEngineVersion === 'v4' ? volatilityScale(prices) : 1;
-  pushReturnSignal(oneMonth, 'ONE_MONTH_MOMENTUM', '1M momentum is positive', '1M momentum is negative', signals, negativeSignals, m.bull1m * vScale, m.bear1m * vScale);
-  pushReturnSignal(threeMonth, 'THREE_MONTH_MOMENTUM', '3M momentum is positive', '3M momentum is negative', signals, negativeSignals, m.bull3m * vScale, m.bear3m * vScale);
+  // #4 magnitude grades are v4-only (see evaluateTechnical): keep the v3/crypto vote objects
+  // byte-identical by attaching `strength` only under v4.
+  const isV4 = config.scoringEngineVersion === 'v4';
+  const vScale = isV4 ? volatilityScale(prices) : 1;
+  pushReturnSignal(oneMonth, 'ONE_MONTH_MOMENTUM', '1M momentum is positive', '1M momentum is negative', signals, negativeSignals, m.bull1m * vScale, m.bear1m * vScale, isV4);
+  pushReturnSignal(threeMonth, 'THREE_MONTH_MOMENTUM', '3M momentum is positive', '3M momentum is negative', signals, negativeSignals, m.bull3m * vScale, m.bear3m * vScale, isV4);
 
   // Guard 3: Parabolic short-term run-up — require BOTH 10-day and 5-day returns to
   // clear the threshold so a single-day post-earnings gap that then consolidates is
@@ -297,8 +315,9 @@ export function evaluateFundamentals(
     const revenue = numberOrNull(fundamental?.revenue);
     if (netIncome !== null && revenue !== null && revenue > 0) {
       const margin = netIncome / revenue;
-      if (margin >= 0.10) signals.push(signal('HEALTHY_NET_MARGIN', `net margin is ${(margin * 100).toFixed(1)}% (healthy profitability)`, 'FUNDAMENTAL'));
-      else if (margin < 0) negativeSignals.push(signal('NEGATIVE_NET_MARGIN', 'net margin is negative (lossmaking)', 'FUNDAMENTAL'));
+      // #4 magnitude grade: a 30%+ margin outweighs a bare 10%; a deep loss outweighs a marginal one.
+      if (margin >= 0.10) signals.push(signal('HEALTHY_NET_MARGIN', `net margin is ${(margin * 100).toFixed(1)}% (healthy profitability)`, 'FUNDAMENTAL', gradedStrength('HEALTHY_NET_MARGIN', (margin - 0.10) / 0.20)));
+      else if (margin < 0) negativeSignals.push(signal('NEGATIVE_NET_MARGIN', 'net margin is negative (lossmaking)', 'FUNDAMENTAL', gradedStrength('NEGATIVE_NET_MARGIN', -margin / 0.20)));
     }
     if (Array.isArray(fundamentalRecords) && fundamentalRecords.length >= 2) {
       // Growth/margin votes anchor on the latest FISCAL period internally (TTM excluded — see signal-fundamental-growth); PE self-history uses the newest record (TTM carries the live peRatio).
@@ -406,12 +425,23 @@ export function pushReturnSignal(
   negativeSignals: SignalItem[],
   bullThreshold: number,
   bearThreshold: number,
+  // #4 magnitude grade is a v4-only enrichment; default off so the v3 path (and any legacy
+  // caller) emits byte-identical strength-less vote objects.
+  gradeStrength = false,
 ): void {
   if (value === null) return;
+  // #4 magnitude grade: how far the return ran past the crossed threshold, normalized by a
+  // horizon-relative span (4x the threshold magnitude) so a +20% 1M move outweighs a +3% one
+  // while saturating before any single return can dominate the category.
   if (value >= bullThreshold) {
-    signals.push(signal(code, positiveLabel, 'MOMENTUM'));
+    const span = Math.abs(bullThreshold) * 4;
+    const mag = span > 0 ? (value - bullThreshold) / span : 0;
+    signals.push(signal(code, positiveLabel, 'MOMENTUM', gradeStrength ? gradedStrength(code, mag) : undefined));
   } else if (value <= bearThreshold) {
-    negativeSignals.push(signal(`${code}_NEGATIVE`, negativeLabel, 'MOMENTUM'));
+    const negCode = `${code}_NEGATIVE`;
+    const span = Math.abs(bearThreshold) * 4;
+    const mag = span > 0 ? (bearThreshold - value) / span : 0;
+    negativeSignals.push(signal(negCode, negativeLabel, 'MOMENTUM', gradeStrength ? gradedStrength(negCode, mag) : undefined));
   }
   // values in the neutral band produce no signal
 }

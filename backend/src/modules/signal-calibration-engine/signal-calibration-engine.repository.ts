@@ -2,6 +2,19 @@ import type { Prisma } from '@prisma/client';
 import prisma from '../../db/prisma';
 import type { CalibrationQuery, PaginatedCalibrationResponse, SignalCalibrationResultDto } from './signal-calibration-engine.types';
 import { resolveMarketRegionFilter } from '../../shared/utils/market-scope';
+import { SIGNAL_ENGINE_MODEL_VERSION_V4 } from '../signal-generation-engine/signal-scoring.config';
+
+/** One mature outcome row with region context + v4 scoring inputs for calibration fitting. */
+export interface RawOutcomeRow {
+  region: string;
+  assetType: string | null;
+  score: number;
+  direction: string;
+  forwardReturnPercent: number | null;
+  alphaPercent: number | null;
+  categoryScores: { technical: number; momentum: number; fundamental: number };
+  categoryHasEvidence: { technical: boolean; momentum: boolean; fundamental: boolean };
+}
 
 export class SignalCalibrationEngineRepository {
   constructor(private readonly db = prisma) {}
@@ -227,6 +240,80 @@ export class SignalCalibrationEngineRepository {
         country: item.country ?? stock.country ?? null,
       } : item;
     });
+  }
+
+  /**
+   * Fetches mature signal_outcomes joined to region/assetType (via signal_results→stock)
+   * and the persisted scoringInputSummary.v4 blob.  Used by RegionCalibrationFittingService.
+   *
+   * Only returns rows where:
+   *   - modelVersion matches (default: current v4.1 version string)
+   *   - horizon matches (default: '20D')
+   *   - dataComplete = true
+   *   - scoringInputSummary is not null (v4 blob must be present)
+   *
+   * Uses $queryRaw to perform the three-table join (signal_outcomes → signal_results → stocks)
+   * and extract the JSON sub-path without hitting Prisma's strict type system for JSON filters.
+   */
+  async matureOutcomesWithRegion(opts: {
+    modelVersion?: string;
+    horizon?: string;
+  } = {}): Promise<RawOutcomeRow[]> {
+    const modelVersion = opts.modelVersion ?? SIGNAL_ENGINE_MODEL_VERSION_V4;
+    const horizon = opts.horizon ?? '20D';
+
+    // Raw SQL join: signal_outcomes → signal_results → stocks
+    // "scoringInputSummary" is camelCase in PostgreSQL (Prisma maps it from the Prisma field name)
+    const rawRows = await this.db.$queryRaw<Array<{
+      score: number;
+      direction: string;
+      forwardReturnPercent: number | null;
+      alphaPercent: number | null;
+      region: string;
+      assetType: string | null;
+      scoringInputSummary: unknown;
+    }>>`
+      SELECT
+        so.score               AS "score",
+        so.direction           AS "direction",
+        so."forwardReturnPercent" AS "forwardReturnPercent",
+        so."alphaPercent"      AS "alphaPercent",
+        st.region              AS "region",
+        st."assetType"         AS "assetType",
+        sr."scoringInputSummary" AS "scoringInputSummary"
+      FROM signal_outcomes so
+      JOIN signal_results sr ON sr.id = so."signalResultId"
+      JOIN stocks st         ON st.id = so."instrumentId"
+      WHERE so."modelVersion" = ${modelVersion}
+        AND so.horizon        = ${horizon}
+        AND so."dataComplete" = true
+        AND sr."scoringInputSummary" IS NOT NULL
+    `;
+
+    const result: RawOutcomeRow[] = [];
+    for (const row of rawRows) {
+      if (!row.region) continue;
+
+      const summary = row.scoringInputSummary as any;
+      const v4 = summary?.v4;
+      if (!v4 || typeof v4 !== 'object') continue;
+
+      const categoryScores = v4.categoryScores as { technical: number; momentum: number; fundamental: number } | undefined;
+      const categoryHasEvidence = v4.categoryHasEvidence as { technical: boolean; momentum: boolean; fundamental: boolean } | undefined;
+      if (!categoryScores || !categoryHasEvidence) continue;
+
+      result.push({
+        region: row.region,
+        assetType: row.assetType ?? null,
+        score: Number(row.score),
+        direction: row.direction,
+        forwardReturnPercent: row.forwardReturnPercent !== null ? Number(row.forwardReturnPercent) : null,
+        alphaPercent: row.alphaPercent !== null ? Number(row.alphaPercent) : null,
+        categoryScores,
+        categoryHasEvidence,
+      });
+    }
+    return result;
   }
 
   private evidenceFields(result: SignalCalibrationResultDto) {
