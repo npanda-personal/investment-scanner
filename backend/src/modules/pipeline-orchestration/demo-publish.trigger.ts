@@ -11,9 +11,11 @@
  * Strictly opt-in and best-effort: it is OFF unless DEMO_AUTO_PUBLISH=true, only
  * runs for the demo scope (IN / STOCK) on a successful run, never throws, and
  * never affects the pipeline run status. Because the script is worktree-isolated,
- * a timeout SIGKILL only abandons a throwaway worktree (cleaned up by the script's
- * own finally / next run) — it can no longer leave the main checkout dirty. The
- * timeout is therefore generous, sized for a keep-all (uncapped) capture.
+ * a timeout SIGKILL only abandons a throwaway worktree — it can no longer leave the
+ * main checkout dirty. That SIGKILL is uncatchable, so the killed run's own cleanup
+ * is skipped; the orphan is reclaimed by the NEXT run's pid-independent startup
+ * sweep (publish-demo.mjs sweepStaleWorktrees). The timeout is therefore generous,
+ * sized for a keep-all (uncapped) capture.
  */
 import { spawn } from 'child_process';
 import path from 'path';
