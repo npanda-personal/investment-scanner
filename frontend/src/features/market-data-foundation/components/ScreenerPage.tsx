@@ -43,6 +43,7 @@ import {
   ScoreDeltaCell,
   FactorBreakdownCell,
   SetupChipsCell,
+  SmartMoneyScoreCell,
   PriceSparklineCell,
   FnoScreenerHeaderCells,
   FnoScreenerBodyCells,
@@ -384,6 +385,7 @@ export default function ScreenerPage() {
                 <SortHead label="RS Rating" colKey="rsPercentile" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="right" />
                 <TableCell>Factors</TableCell>
                 <TableCell>Setups</TableCell>
+                <SortHead label="Smart Money" colKey="smartMoneyScore" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="right" />
                 <TableCell align="center">Trend</TableCell>
                 <TableCell>Sector</TableCell>
                 <TableCell>Cap Band</TableCell>
@@ -428,6 +430,9 @@ export default function ScreenerPage() {
                   </TableCell>
                   <TableCell>
                     <SetupChipsCell setups={row.setups} />
+                  </TableCell>
+                  <TableCell align="right">
+                    <SmartMoneyScoreCell score={row.smartMoneyScore} status={row.smartMoneyStatus} />
                   </TableCell>
                   <TableCell align="center">
                     <PriceSparklineCell closes={row.sparkline} />

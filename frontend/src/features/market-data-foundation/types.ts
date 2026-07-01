@@ -1564,6 +1564,8 @@ export interface ScreenerRow {
   setups?: string[];
   /** Latest smart-money context status (ACCUMULATION / NEUTRAL / DISTRIBUTION …). */
   smartMoneyStatus?: string | null;
+  /** Latest smart-money score (directional 0-100; high = accumulation, low = distribution). */
+  smartMoneyScore?: number | null;
   /** Latest sector-leadership status for the row's sector (LEADING / IMPROVING / WEAKENING / LAGGING). */
   sectorLeadershipStatus?: string | null;
   /** Recent closes (chronological) for an inline price sparkline. */

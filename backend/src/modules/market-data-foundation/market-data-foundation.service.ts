@@ -2240,6 +2240,7 @@ export class MarketDataFoundationService implements MarketDataReadApi, IndiaHist
       } | null;
       setups: string[];
       smartMoneyStatus: string | null;
+      smartMoneyScore: number | null;
       sectorLeadershipStatus: string | null;
       currency: string;
       region?: string;
