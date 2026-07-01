@@ -12,6 +12,15 @@ export interface SignalItem {
   code: string;
   label: string;
   category: SignalCategory;
+  /**
+   * Optional magnitude-graded strength in (0,1] (#4).  When present it overrides the
+   * per-code base strength (signal-evidence STRENGTH_BY_CODE) in the v4 category
+   * aggregation, letting a factor that fired far past its threshold (e.g. RSI 99 vs
+   * RSI 71) carry more weight than a marginal one.  Bounded/clamped at the vote site
+   * so a single extreme factor can never dominate; absent → falls back to the code
+   * tier (fully backward-compatible, JSON-persisted in triggered/negative signals).
+   */
+  strength?: number;
 }
 
 export interface SignalResultDto {

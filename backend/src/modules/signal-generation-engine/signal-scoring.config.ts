@@ -30,6 +30,7 @@
 import { resolveMarketProfile } from '../../shared/utils/market-profile';
 import { DIRECTION_BULLISH_THRESHOLD, DIRECTION_BEARISH_THRESHOLD } from '../../shared/types/signal.types';
 import type { V4EvidenceConfig } from './signal-evidence';
+import { fittedDirectionThresholds, fittedBaseWeights } from './signal-region-calibration';
 
 export const SIGNAL_ENGINE_MODEL_VERSION = 'signal-engine-v3';
 
@@ -42,7 +43,7 @@ export const SIGNAL_ENGINE_MODEL_VERSION = 'signal-engine-v3';
  * Persistence is keyed by modelVersion, so the bump forces a clean regenerate rather
  * than mutating existing v3 rows in place.
  */
-export const SIGNAL_ENGINE_MODEL_VERSION_V4 = 'signal-engine-v4';
+export const SIGNAL_ENGINE_MODEL_VERSION_V4 = 'signal-engine-v4.1';
 
 export type ScoringEngineVersion = 'v3' | 'v4';
 
@@ -136,11 +137,11 @@ export interface SignalScoringConfig {
 }
 
 /**
- * Per-region direction cut-points.  Identical to the global 60/40 default for now —
- * the seam exists so SG-8 can drop in cohort-fitted values without touching callers.
+ * Per-region/assetType direction cut-points.  Consults the fitted calibration artifact
+ * first; falls back to the global 60/40 defaults when no cohort entry is present.
  */
-function directionThresholdsForRegion(_region: string): { bullish: number; bearish: number } {
-  return { bullish: DIRECTION_BULLISH_THRESHOLD, bearish: DIRECTION_BEARISH_THRESHOLD };
+function directionThresholdsForRegion(region: string, assetType?: string | null): { bullish: number; bearish: number } {
+  return fittedDirectionThresholds(region, assetType) ?? { bullish: DIRECTION_BULLISH_THRESHOLD, bearish: DIRECTION_BEARISH_THRESHOLD };
 }
 
 // ── Canonical India-equity scoring parameters (byte-identical to the prior consts) ──
@@ -223,7 +224,7 @@ export function resolveSignalScoringConfig(scope: { region?: string | null; asse
     modelVersion: engineVersion === 'v4' ? SIGNAL_ENGINE_MODEL_VERSION_V4 : SIGNAL_ENGINE_MODEL_VERSION,
     scoringEngineVersion: engineVersion,
     priceWindow: SIGNAL_GENERATION_PRICE_WINDOW,
-    weights: weightsForCapabilities(IN_EQUITY_WEIGHTS, caps.hasFundamentals),
+    weights: weightsForCapabilities(fittedBaseWeights(profile.region, scope.assetType) ?? IN_EQUITY_WEIGHTS, caps.hasFundamentals),
     evidence: DEFAULT_EVIDENCE,
     momentum: DEFAULT_MOMENTUM,
     guards: DEFAULT_GUARDS,
@@ -234,7 +235,7 @@ export function resolveSignalScoringConfig(scope: { region?: string | null; asse
     // Regime gate stays ON wherever a regime is actually computed; markets without a
     // regime read can never gate (the provider would return null anyway).
     regimeGateShortsEnabled: caps.hasRegime,
-    directionThresholds: directionThresholdsForRegion(profile.region),
+    directionThresholds: directionThresholdsForRegion(profile.region, scope.assetType),
   };
 }
 

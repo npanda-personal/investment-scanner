@@ -131,6 +131,29 @@ export function strengthForCode(code: string): number {
   return STRENGTH_BY_CODE[base] ?? STRENGTH_BY_CODE[code] ?? DEFAULT_FACTOR_STRENGTH;
 }
 
+const clamp01 = (x: number): number => (x <= 0 ? 0 : x >= 1 ? 1 : x);
+
+/**
+ * Magnitude-graded strength for a factor (#4).  Lifts the code's base strength toward
+ * the 1.0 ceiling in proportion to how far past its threshold the raw value sat, so a
+ * marginal vote keeps its base tier and an extreme one approaches (but never exceeds)
+ * full weight:
+ *
+ *   graded = base + (1 - base) · clamp01(magnitude01)      ∈ [base, 1.0]
+ *
+ * ADDITIVE-TO-CEILING (not multiplicative): a magnitude of 0 is a NO-OP (returns the
+ * exact base strength — zero regression vs the pre-#4 behaviour), and the result is
+ * bounded to [base, 1.0] so a single factor can never push its category weight past
+ * what a code already tiered at 1.0 contributes.  `magnitude01` is the caller's already
+ * -normalized, clamped distance past threshold in [0,1]; out-of-range inputs are clamped
+ * here as a defensive backstop.
+ */
+export function gradedStrength(code: string, magnitude01: number): number {
+  const base = strengthForCode(code);
+  const graded = base + (1 - base) * clamp01(magnitude01);
+  return graded < base ? base : graded > 1 ? 1 : graded;
+}
+
 /** Tunable knobs for the v4 evidence factor.  Defaults are deliberately conservative. */
 export interface V4EvidenceConfig {
   /** Laplace add-smoothing for the strength-weighted per-category Bayesian fraction. */
@@ -203,8 +226,10 @@ interface WeightedCategory {
 
 /** Strength-weighted Bayesian fraction for one category; flags whether it had any evidence. */
 function weightedCategoryScore(ev: CategoryEvaluationLike, alpha: number): WeightedCategory {
-  const positive = ev.signals.reduce((sum, f) => sum + strengthForCode(f.code), 0);
-  const negative = ev.negativeSignals.reduce((sum, f) => sum + strengthForCode(f.code), 0);
+  // #4: prefer the vote's magnitude-graded strength when the vote site supplied one,
+  // else fall back to the per-code base tier (unchanged for votes without a grade).
+  const positive = ev.signals.reduce((sum, f) => sum + (f.strength ?? strengthForCode(f.code)), 0);
+  const negative = ev.negativeSignals.reduce((sum, f) => sum + (f.strength ?? strengthForCode(f.code)), 0);
   const total = positive + negative;
   if (total === 0) return { score: 0.5, hasEvidence: false };
   return { score: (positive + alpha * 0.5) / (total + alpha), hasEvidence: true };
