@@ -71,7 +71,11 @@ export class SignalPositionLedgerRepository {
       }),
     ]);
     const mapped = rows.map((row: any) => this.toLedgerRow(row));
-    const sorted = this.sortLedgerRows(query.status === 'ACTIVE' ? this.dedupeActiveRows(mapped) : mapped, query);
+    const base = query.status === 'ACTIVE' ? this.dedupeActiveRows(mapped) : mapped;
+    // Enrich ACTIVE rows with the LATEST signal score (read-time join, never persisted) so the
+    // column always reflects current signal state and sort-by-score is global, not per-page.
+    const enriched = query.status === 'ACTIVE' ? await this.attachLatestSignalScores(base) : base;
+    const sorted = this.sortLedgerRows(enriched, query);
     const items = sorted.slice(query.offset, query.offset + query.limit);
     const effectiveTotalCount = canCount ? totalCount : sorted.length;
     const nextOffset = query.offset + items.length;
@@ -114,13 +118,13 @@ export class SignalPositionLedgerRepository {
     const sortBy = query.sortBy || 'entryTriggerTimestamp';
     const direction = query.sortDirection || 'desc';
     const factor = direction === 'asc' ? 1 : -1;
+    const valueFor = (row: SignalPositionLedgerActiveRow): number | null =>
+      sortBy === 'currentReturnPercent' ? this.sortableReturn(row)
+      : sortBy === 'latestSignalScore' ? this.sortableScore(row)
+      : this.sortableDate(row.entryTriggerTimestamp);
     return [...rows].sort((left, right) => {
-      const leftValue = sortBy === 'currentReturnPercent'
-        ? this.sortableReturn(left)
-        : this.sortableDate(left.entryTriggerTimestamp);
-      const rightValue = sortBy === 'currentReturnPercent'
-        ? this.sortableReturn(right)
-        : this.sortableDate(right.entryTriggerTimestamp);
+      const leftValue = valueFor(left);
+      const rightValue = valueFor(right);
       if (leftValue === null && rightValue === null) return left.symbol.localeCompare(right.symbol);
       if (leftValue === null) return 1;
       if (rightValue === null) return -1;
@@ -138,6 +142,69 @@ export class SignalPositionLedgerRepository {
   private sortableReturn(row: SignalPositionLedgerActiveRow): number | null {
     if (row.currentReturnStatus !== 'CURRENT') return null;
     return typeof row.currentReturnPercent === 'number' && Number.isFinite(row.currentReturnPercent) ? row.currentReturnPercent : null;
+  }
+
+  private sortableScore(row: SignalPositionLedgerActiveRow): number | null {
+    return typeof row.latestSignalScore === 'number' && Number.isFinite(row.latestSignalScore) ? row.latestSignalScore : null;
+  }
+
+  /**
+   * Attach the LATEST signal score to each ACTIVE row (read-time join to signal_results,
+   * ordered by generatedAt DESC per instrument). Always the most recent score — never the
+   * frozen entry-time value — so the UI column and its sort reflect current signal state.
+   */
+  private async attachLatestSignalScores(rows: SignalPositionLedgerActiveRow[]): Promise<SignalPositionLedgerActiveRow[]> {
+    if (rows.length === 0) return rows;
+    const scores = await this.latestSignalScores(rows.map((row) => row.instrumentId));
+    return rows.map((row) => {
+      const latest = scores.get(row.instrumentId);
+      return {
+        ...row,
+        latestSignalScore: latest ? latest.score : null,
+        latestSignalScoreDate: latest ? latest.generatedAt : null,
+        latestSignalConfidence: latest ? latest.confidence : null,
+        latestSignalDirection: latest ? latest.direction : null,
+      };
+    });
+  }
+
+  /**
+   * Most recent signal_results row per instrument (by generatedAt DESC). One DISTINCT ON
+   * query bounded to the given ids — uses @@index([instrumentId, generatedAt]). Rows with a
+   * null score are dropped so callers treat them as "no score".
+   */
+  async latestSignalScores(
+    instrumentIds: string[],
+  ): Promise<Map<string, { score: number; confidence: string | null; direction: string | null; generatedAt: string }>> {
+    const result = new Map<string, { score: number; confidence: string | null; direction: string | null; generatedAt: string }>();
+    const ids = [...new Set(instrumentIds.filter(Boolean))];
+    if (ids.length === 0) return result;
+    const rows: Array<{
+      instrumentId: string;
+      score: number | null;
+      confidence: string | null;
+      direction: string | null;
+      generatedAt: Date;
+    }> = await this.db.$queryRawUnsafe(
+      `
+      SELECT DISTINCT ON (sr."instrumentId")
+        sr."instrumentId", sr.score, sr.confidence, sr.direction, sr."generatedAt"
+      FROM unnest($1::text[]) AS sub("instrumentId")
+      JOIN signal_results sr ON sr."instrumentId" = sub."instrumentId"
+      ORDER BY sr."instrumentId", sr."generatedAt" DESC, sr."generatedDate" DESC, sr.id DESC
+      `,
+      ids,
+    );
+    for (const row of rows) {
+      if (row.score === null || row.score === undefined) continue;
+      result.set(row.instrumentId, {
+        score: Number(row.score),
+        confidence: row.confidence ?? null,
+        direction: row.direction ?? null,
+        generatedAt: new Date(row.generatedAt).toISOString(),
+      });
+    }
+    return result;
   }
 
   async listLegacyMaterializedRows(scope: Pick<SignalPositionLedgerActiveQuery, 'region' | 'assetType'>): Promise<SignalPositionLedgerActiveRow[]> {

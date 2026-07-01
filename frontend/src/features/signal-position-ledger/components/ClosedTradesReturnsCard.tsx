@@ -26,12 +26,16 @@ type Stat = { label: string; value: string; helper: string; tone?: 'positive' | 
 
 type ClosedTradesReturnsCardProps = {
   rows: SignalPositionLedgerActiveRow[];
+  // Currently-open (ACTIVE) entry-trigger candidates for the same scope. Their
+  // currentReturnPercent is the unrealized mark-to-market move — combined with the
+  // closed realized returns to surface a cumulative open + closed figure.
+  openRows?: SignalPositionLedgerActiveRow[];
   scopeLabel: string;
   loading: boolean;
   error: string | null;
 };
 
-export const ClosedTradesReturnsCard: React.FC<ClosedTradesReturnsCardProps> = ({ rows, scopeLabel, loading, error }) => {
+export const ClosedTradesReturnsCard: React.FC<ClosedTradesReturnsCardProps> = ({ rows, openRows = [], scopeLabel, loading, error }) => {
   const today = todayIso();
   const [fromDate, setFromDate] = useState<string>('');
 
@@ -73,6 +77,16 @@ export const ClosedTradesReturnsCard: React.FC<ClosedTradesReturnsCardProps> = (
     const alpha = alphaVals.length > 0 ? alphaVals.reduce((sum, value) => sum + value, 0) / alphaVals.length : null;
 
     const excluded = rows.length - realized.length;
+
+    // Open (ACTIVE) candidates carry an unrealized mark-to-market move in
+    // currentReturnPercent. They have no close date, so the "since" window (which
+    // filters on close date) does not apply — every current open candidate counts.
+    const openReturns = openRows.filter(hasRealizedReturn).map((row) => row.currentReturnPercent as number);
+    const openCount = openReturns.length;
+    const openCumulative = openReturns.reduce((sum, value) => sum + value, 0);
+    // Cumulative across the whole book: realized (closed) + unrealized (open).
+    const combinedCumulative = cumulative + openCumulative;
+
     return {
       count,
       decided,
@@ -86,8 +100,11 @@ export const ClosedTradesReturnsCard: React.FC<ClosedTradesReturnsCardProps> = (
       benchmark,
       alpha,
       excluded,
+      openCount,
+      openCumulative,
+      combinedCumulative,
     };
-  }, [rows, fromDate, today]);
+  }, [rows, openRows, fromDate, today]);
 
   const tone = (value: number): Stat['tone'] => (value > 0 ? 'positive' : value < 0 ? 'negative' : 'neutral');
   const toneColor = (t: Stat['tone']): string => (t === 'positive' ? 'success.main' : t === 'negative' ? 'error.main' : 'text.primary');
@@ -133,10 +150,22 @@ export const ClosedTradesReturnsCard: React.FC<ClosedTradesReturnsCardProps> = (
       tone: summary.alpha !== null ? tone(summary.alpha) : 'neutral',
     },
     {
-      label: 'Cumulative simple return',
+      label: 'Cumulative return (closed)',
       value: summary.count > 0 ? signed(summary.cumulative) : '—',
-      helper: 'Sum of per-trade returns (not compounded)',
+      helper: 'Sum of realized closed-trade returns (not compounded)',
       tone: tone(summary.cumulative),
+    },
+    {
+      label: 'Open unrealized (mark-to-market)',
+      value: summary.openCount > 0 ? signed(summary.openCumulative) : '—',
+      helper: `Sum of ${summary.openCount.toLocaleString()} open candidate mark-to-market moves`,
+      tone: summary.openCount > 0 ? tone(summary.openCumulative) : 'neutral',
+    },
+    {
+      label: 'Cumulative return (open + closed)',
+      value: summary.count > 0 || summary.openCount > 0 ? signed(summary.combinedCumulative) : '—',
+      helper: 'Realized closed + unrealized open, combined',
+      tone: tone(summary.combinedCumulative),
     },
     {
       label: 'Closed trades counted',
@@ -149,9 +178,9 @@ export const ClosedTradesReturnsCard: React.FC<ClosedTradesReturnsCardProps> = (
     <Paper variant="outlined" sx={{ p: 1.5, mb: 2 }}>
       <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', md: 'flex-start' }} gap={1.5} sx={{ mb: 1.5 }}>
         <Box sx={{ minWidth: 0 }}>
-          <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Closed-trade realized returns</Typography>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Returns</Typography>
           <Typography variant="caption" color="text.secondary">
-            Research-support evidence — held-to-horizon realized returns across closed entry-trigger trades for {scopeLabel}, with benchmark/alpha context.
+            Research-support evidence — realized returns across closed entry-trigger trades plus unrealized mark-to-market on open candidates for {scopeLabel}, with benchmark/alpha context.
           </Typography>
         </Box>
         <Stack direction="row" alignItems="center" gap={1}>
@@ -175,9 +204,9 @@ export const ClosedTradesReturnsCard: React.FC<ClosedTradesReturnsCardProps> = (
         <Typography variant="body2" color="error.main">Closed-trade return summary could not be loaded. {error}</Typography>
       ) : loading ? (
         <Typography variant="body2" color="text.secondary">Loading closed-trade returns for {scopeLabel}.</Typography>
-      ) : summary.count === 0 ? (
+      ) : summary.count === 0 && summary.openCount === 0 ? (
         <Typography variant="body2" color="text.secondary">
-          No closed trades with source-proven returns {fromDate ? `closed on or after ${fromDate}` : 'are available'} for {scopeLabel}.
+          No closed trades with source-proven returns {fromDate ? `closed on or after ${fromDate}` : 'are available'} for {scopeLabel}, and no open candidates carry a mark-to-market return.
         </Typography>
       ) : (
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' }, gap: 1.5 }}>
