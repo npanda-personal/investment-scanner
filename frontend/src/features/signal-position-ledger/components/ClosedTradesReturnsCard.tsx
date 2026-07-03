@@ -58,8 +58,14 @@ export const ClosedTradesReturnsCard: React.FC<ClosedTradesReturnsCardProps> = (
     const flats = count - wins.length - losses.length;
     const decided = wins.length + losses.length;
 
-    const cumulative = returns.reduce((sum, value) => sum + value, 0);
-    const average = decided > 0 ? returns.reduce((sum, value) => sum + value, 0) / decided : 0;
+    // Closed-book return is the EQUAL-WEIGHT AVERAGE (Σ rᵢ / n), never the raw sum:
+    // each rᵢ is a percentage of its own entry price (a different capital base per
+    // trade), so the sum is the return of no real portfolio. The average IS the
+    // return of a book that sizes every candidate equally. Flats are excluded (see
+    // above), so this is the mean over decided trades. `closedDecidedSum` is carried
+    // for the pooled open+closed figure below.
+    const closedDecidedSum = returns.reduce((sum, value) => sum + value, 0);
+    const closedAverage = decided > 0 ? closedDecidedSum / decided : null;
     const winRate = decided > 0 ? (wins.length / decided) * 100 : 0;
     const avgWin = wins.length > 0 ? wins.reduce((sum, value) => sum + value, 0) / wins.length : 0;
     const avgLoss = losses.length > 0 ? losses.reduce((sum, value) => sum + value, 0) / losses.length : 0;
@@ -83,16 +89,24 @@ export const ClosedTradesReturnsCard: React.FC<ClosedTradesReturnsCardProps> = (
     // filters on close date) does not apply — every current open candidate counts.
     const openReturns = openRows.filter(hasRealizedReturn).map((row) => row.currentReturnPercent as number);
     const openCount = openReturns.length;
-    const openCumulative = openReturns.reduce((sum, value) => sum + value, 0);
-    // Cumulative across the whole book: realized (closed) + unrealized (open).
-    const combinedCumulative = cumulative + openCumulative;
+    // Exclude flats from the open average too, for consistency with the closed book.
+    const openDecided = openReturns.filter((value) => value !== 0);
+    const openDecidedSum = openDecided.reduce((sum, value) => sum + value, 0);
+    const openAverage = openDecided.length > 0 ? openDecidedSum / openDecided.length : null;
+
+    // Whole-book (open + closed) return is a POOLED equal-weight average, NOT the sum
+    // of the two sums and NOT the average of the two averages: every decided position
+    // is weighted equally regardless of which bucket it sits in.
+    const combinedDecidedCount = decided + openDecided.length;
+    const combinedAverage = combinedDecidedCount > 0
+      ? (closedDecidedSum + openDecidedSum) / combinedDecidedCount
+      : null;
 
     return {
       count,
       decided,
       flats,
-      cumulative,
-      average,
+      closedAverage,
       winRate,
       avgWin,
       avgLoss,
@@ -101,14 +115,18 @@ export const ClosedTradesReturnsCard: React.FC<ClosedTradesReturnsCardProps> = (
       alpha,
       excluded,
       openCount,
-      openCumulative,
-      combinedCumulative,
+      openDecidedCount: openDecided.length,
+      openAverage,
+      combinedDecidedCount,
+      combinedAverage,
     };
   }, [rows, openRows, fromDate, today]);
 
   const tone = (value: number): Stat['tone'] => (value > 0 ? 'positive' : value < 0 ? 'negative' : 'neutral');
   const toneColor = (t: Stat['tone']): string => (t === 'positive' ? 'success.main' : t === 'negative' ? 'error.main' : 'text.primary');
   const signed = (value: number): string => `${value >= 0 ? '+' : ''}${pctFormatter.format(value)}%`;
+  const signedN = (value: number | null): string => (value === null ? '—' : signed(value));
+  const toneN = (value: number | null): Stat['tone'] => (value === null ? 'neutral' : tone(value));
 
   const countHelperParts: string[] = [];
   if (summary.flats > 0) countHelperParts.push(`${summary.flats.toLocaleString()} flat excluded`);
@@ -117,10 +135,10 @@ export const ClosedTradesReturnsCard: React.FC<ClosedTradesReturnsCardProps> = (
 
   const stats: Stat[] = [
     {
-      label: 'Avg simple return / trade',
-      value: summary.decided > 0 ? signed(summary.average) : '—',
-      helper: 'Mean per decided trade (flats excluded)',
-      tone: tone(summary.average),
+      label: 'Avg return / closed trade',
+      value: signedN(summary.closedAverage),
+      helper: `Equal-weight mean over ${summary.decided.toLocaleString()} decided closed trades (flats excluded)`,
+      tone: toneN(summary.closedAverage),
     },
     {
       label: 'Win rate',
@@ -150,22 +168,16 @@ export const ClosedTradesReturnsCard: React.FC<ClosedTradesReturnsCardProps> = (
       tone: summary.alpha !== null ? tone(summary.alpha) : 'neutral',
     },
     {
-      label: 'Cumulative return (closed)',
-      value: summary.count > 0 ? signed(summary.cumulative) : '—',
-      helper: 'Sum of realized closed-trade returns (not compounded)',
-      tone: tone(summary.cumulative),
+      label: 'Avg return / open candidate',
+      value: signedN(summary.openAverage),
+      helper: `Equal-weight mean unrealized move over ${summary.openDecidedCount.toLocaleString()} open candidates`,
+      tone: toneN(summary.openAverage),
     },
     {
-      label: 'Open unrealized (mark-to-market)',
-      value: summary.openCount > 0 ? signed(summary.openCumulative) : '—',
-      helper: `Sum of ${summary.openCount.toLocaleString()} open candidate mark-to-market moves`,
-      tone: summary.openCount > 0 ? tone(summary.openCumulative) : 'neutral',
-    },
-    {
-      label: 'Cumulative return (open + closed)',
-      value: summary.count > 0 || summary.openCount > 0 ? signed(summary.combinedCumulative) : '—',
-      helper: 'Realized closed + unrealized open, combined',
-      tone: tone(summary.combinedCumulative),
+      label: 'Avg return / position (open + closed)',
+      value: signedN(summary.combinedAverage),
+      helper: `Pooled equal-weight mean over ${summary.combinedDecidedCount.toLocaleString()} positions (not a compounded figure)`,
+      tone: toneN(summary.combinedAverage),
     },
     {
       label: 'Closed trades counted',
