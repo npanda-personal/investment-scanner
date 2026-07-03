@@ -58,18 +58,18 @@ export function buildCandidateColumns(
     {
       id: 'symbol',
       label: 'Symbol',
-      width: 112,
+      width: 152,
       primary: true,
       value: (candidate) => candidate.symbol,
       render: (candidate) => (
-        <Stack direction="row" spacing={0.5} alignItems="center" sx={{ overflow: 'hidden' }}>
+        <Stack direction="row" spacing={0.5} alignItems="center">
           <Tooltip title={`${candidate.symbol} - ${candidate.companyName || 'Company unavailable'}`} arrow enterDelay={350}>
             <Link
               component={RouterLink}
               to={`/today-review/candidates/${candidate.id}`}
               fontWeight={700}
               onClick={(event) => event.stopPropagation()}
-              sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+              sx={{ whiteSpace: 'nowrap', flexShrink: 0 }}
             >
               {candidate.symbol}
             </Link>
@@ -80,7 +80,7 @@ export function buildCandidateColumns(
                 component={RouterLink}
                 to={`/stocks/${candidate.instrumentId}`}
                 onClick={(event) => event.stopPropagation()}
-                sx={{ display: 'flex', alignItems: 'center', color: 'text.secondary', '&:hover': { color: 'primary.main' } }}
+                sx={{ display: 'flex', alignItems: 'center', flexShrink: 0, color: 'text.secondary', '&:hover': { color: 'primary.main' } }}
               >
                 <OpenInNewIcon sx={{ fontSize: 13 }} />
               </Link>
