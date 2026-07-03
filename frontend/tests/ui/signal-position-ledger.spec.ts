@@ -271,7 +271,13 @@ test.describe('Signal Position Ledger UI', () => {
 
     const forbiddenRequests = await routePersistedLedgerReads(page, {
       onActiveRequest: (url) => {
-        latestActiveRequest = url;
+        // The Returns card's open-returns hook also paginates /persisted/active, but
+        // WITHOUT a sortBy param (limit=100). Only the sortable table sends sortBy, so
+        // scope the sort-assertion capture to table requests — otherwise the hook's
+        // background request clobbers latestActiveRequest and the poll below races.
+        if (url.searchParams.has('sortBy')) {
+          latestActiveRequest = url;
+        }
       },
     });
 
@@ -315,31 +321,42 @@ test.describe('Signal Position Ledger UI', () => {
     await expect(page.getByText('OLD - Old Industries')).toBeVisible();
     await expect(page.getByRole('columnheader', { name: 'Exit' })).toBeVisible();
 
-    // Closed-trade realized-returns summary card (above the closed table).
-    const summaryCard = page.getByText('Closed-trade realized returns')
+    // Returns summary card (above the closed table).
+    const summaryCard = page.getByText('Returns', { exact: true })
       .locator('xpath=ancestor::div[contains(@class,"MuiPaper-root")]').first();
     // Metric assertions scoped to each stat box (label caption -> value h6 sibling).
     const statValue = (label: string) =>
       summaryCard.getByText(label, { exact: true }).locator('xpath=..');
     // 3 closed rows: +5% (win, HORIZON), -4% (loss, DEFENSIVE), 0% (flat, HORIZON).
-    // decided = 2 (flat excluded): avg = (5-4+0)/2 = +0.50%, win rate 1/2 = 50%.
-    await expect(statValue('Avg simple return / trade').getByText('+0.50%', { exact: true })).toBeVisible();
+    // decided = 2 (flat excluded): closed avg = (5-4)/2 = +0.50%, win rate 1/2 = 50%.
+    await expect(statValue('Avg return / closed trade').getByText('+0.50%', { exact: true })).toBeVisible();
     await expect(statValue('Win rate').getByText('50.00%', { exact: true })).toBeVisible();
     await expect(statValue('Avg win / avg loss').getByText('+5.00% / -4.00%', { exact: true })).toBeVisible();
     await expect(statValue('Payoff ratio').getByText('1.25×', { exact: true })).toBeVisible();
     // benchmark mean = (2+0+1)/3 = +1.00%; alpha mean = (3-4-1)/3 = -0.67%.
     await expect(statValue('Benchmark return').getByText('+1.00%', { exact: true })).toBeVisible();
     await expect(statValue('Alpha vs. benchmark').getByText('-0.67%', { exact: true })).toBeVisible();
-    // cumulative = 5-4+0 = +1.00%; 3 counted, 1 flat excluded from the averages.
-    await expect(statValue('Cumulative simple return').getByText('+1.00%', { exact: true })).toBeVisible();
+    // Averages, never sums. Open candidates = the 2 active rows (+10.25, -4), both
+    // non-flat: open avg = (10.25-4)/2 = +3.13%. Pooled open+closed = equal-weight
+    // mean over all 4 decided positions = (5-4+10.25-4)/4 = 7.25/4 = +1.81%.
+    await expect(statValue('Avg return / open candidate').getByText('+3.13%', { exact: true })).toBeVisible();
+    await expect(statValue('Avg return / position (open + closed)').getByText('+1.81%', { exact: true })).toBeVisible();
     await expect(statValue('Closed trades counted').getByText('3', { exact: true })).toBeVisible();
     await expect(summaryCard.getByText('1 flat excluded', { exact: false })).toBeVisible();
     await expect(summaryCard.getByText('To: today', { exact: false })).toBeVisible();
 
-    // From-date filter: a "since" date after every close date empties the window.
+    // From-date filter applies to CLOSED trades only (open candidates have no close
+    // date, so the window never drops them). A "since" date after every close date
+    // empties the closed side — closed avg and count go to zero — but the open
+    // candidates keep the card populated, and the pooled figure falls back to open-only
+    // ((10.25-4)/2 = +3.13%).
     await summaryCard.getByLabel('Since (from date)').fill('2026-06-01');
-    await expect(summaryCard.getByText('No closed trades with source-proven returns closed on or after 2026-06-01 for IN / STOCK.')).toBeVisible();
-    // A date on/before the close dates includes them again.
+    await expect(statValue('Avg return / closed trade').getByText('—', { exact: true })).toBeVisible();
+    await expect(statValue('Closed trades counted').getByText('0', { exact: true })).toBeVisible();
+    await expect(statValue('Win rate').getByText('—', { exact: true })).toBeVisible();
+    await expect(statValue('Avg return / open candidate').getByText('+3.13%', { exact: true })).toBeVisible();
+    await expect(statValue('Avg return / position (open + closed)').getByText('+3.13%', { exact: true })).toBeVisible();
+    // A date on/before the close dates includes the closed trades again.
     await summaryCard.getByLabel('Since (from date)').fill('2026-05-01');
     await expect(statValue('Win rate').getByText('50.00%', { exact: true })).toBeVisible();
     const closedDownloadPromise = page.waitForEvent('download');
